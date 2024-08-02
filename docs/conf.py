@@ -29,6 +29,10 @@ html_theme_options = {
     "navbar_end": ["theme-switcher", "navbar-icon-links"],
 }
 html_sidebars = {
+    "**": [
+        "localtoc.html",
+        "ethicalads.html",
+    ],
     "installation": [],  # removes Section Navigation sidebar
-    "data_download": []
+    "data_download": [],
 }
