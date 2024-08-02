@@ -23,7 +23,7 @@ def download_unpack_data(filename, subfolder, save_to="."):
 
     # Download the zip file from the repository
     file_path = hf_hub_download(
-        repo_id="Laboratoire-De-Chemoinformatique/syntool_old",
+        repo_id="Laboratoire-De-Chemoinformatique/SynPlanner",
         filename=filename,
         subfolder=subfolder,
         local_dir=save_to
@@ -45,7 +45,7 @@ def download_unpack_data(filename, subfolder, save_to="."):
 
 def download_all_data(save_to="."):
     dir_path = snapshot_download(
-        repo_id="Laboratoire-De-Chemoinformatique/syntool_old",
+        repo_id="Laboratoire-De-Chemoinformatique/SynPlanner",
         local_dir=save_to
     )
     dir_path = Path(dir_path).resolve()
