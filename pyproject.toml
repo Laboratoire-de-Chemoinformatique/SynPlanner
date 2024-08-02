@@ -1,0 +1,52 @@
+[tool.poetry]
+name = "SynPlanner"
+version = "1.0.0"
+description = "Toolbox for chemical synthesis planning"
+authors = ["Laboratoire de Chemoinformatique <tagirshin@gmail.com>"]
+license = "MIT"
+readme = "README.rst"
+packages = [{ include = "synplan", from = "." }, ]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.12"
+CGRtools = "^4.1.35"
+chython = ">=1.7, <1.78"
+StructureFingerprint = "^2.1"
+py-mini-racer = ">=0.6"
+pandas = ">=1.4"
+numpy = ">=1.26,<2"
+toytree = ">=2.0"
+ray = ">=2.0"
+click = ">=8.0.0"
+huggingface-hub = ">=0.24.0"
+torch = ">=2.0,<2.3"
+chytorch = ">=1.60"
+chytorch-rxnmap = ">=1.4"
+adabelief-pytorch = ">=0.2.1"
+torch-geometric = ">=2.4.0"
+pytorch-lightning = ">=2"
+ipykernel = ">6.29.0"
+ipywidgets = ">8.1.0"
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+pytest = '^7.4.3'
+black = "^24.4.2"
+
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+pydata-sphinx-theme = "^0.15.4"
+pandoc = '^2.3'
+ipython = '^8.12.1'
+nbsphinx = "^0.9.4"
+
+[tool.poetry.scripts]
+synplan = "synplan.interfaces.cli:synplan"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

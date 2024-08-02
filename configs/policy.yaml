@@ -1,0 +1,6 @@
+vector_dim: 512
+num_conv_layers: 5
+learning_rate: 0.0005
+dropout: 0.4
+num_epoch: 100
+batch_size: 1000

@@ -1,0 +1,9 @@
+functional_groups_config:
+kekule_form_config:
+check_valence_config:
+implicify_hydrogens_config:
+check_isotopes_config:
+aromatic_form_config:
+mapping_fix_config:
+unchanged_parts_config:
+duplicate_reaction_config:
