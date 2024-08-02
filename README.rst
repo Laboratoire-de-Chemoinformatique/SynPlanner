@@ -3,26 +3,25 @@
 .. raw:: html
 
     <div align="center">
-        <h1>synplanner – a tool for synthesis planning</h1>
+        <h1>SynPlanner – a tool for synthesis planning</h1>
     </div>
 
     <h3>
         <p align="center">
             <a href="https://synplanner.readthedocs.io/">Docs</a> •
-            <a href="https://github.com/Laboratoire-de-Chemoinformatique/synplanner/tree/main/tutorials">Tutorials</a> •
-            <a href="https://github.com/Laboratoire-de-Chemoinformatique/synplanner/tutorials">Paper</a> •
-            <a href="https://huggingface.co/spaces/Laboratoire-De-Chemoinformatique/synplanner">GUI demo</a>
+            <a href="https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials">Tutorials</a> •
+            <a href="https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tutorials">Paper</a> •
+            <a href="https://huggingface.co/spaces/Laboratoire-De-Chemoinformatique/SynPlanner">GUI demo</a>
         </p>
     </h3>
 
     <div align="center">
-        <a href="https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/synplanner">
-            <img src="https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/synplanner" alt="License Badge">
+        <a href="https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/SynPlanner">
+            <img src="https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/SynPlanner" alt="License Badge">
         </a>
     </div>
 
-
-``synplanner`` is an open-source tool for retrosynthesis planning,
+``SynPlanner`` is an open-source tool for retrosynthesis planning,
 designed to increase flexibility in training and developing
 customized retrosynthetic planning solutions from raw chemical data.
 It integrates Monte Carlo Tree Search (MCTS) with graph neural networks
@@ -33,7 +32,7 @@ the synthesizability of intermediate products (value network).
 Overview
 --------------------
 
-``synplanner`` can be used for:
+``SynPlanner`` can be used for:
 
 - ⚒️ Standardizing and filtering reaction data
 - 📑 Extracting reaction rules (templates) with various options
@@ -44,74 +43,68 @@ Overview
 
 Installation
 --------------------
-
-``synplanner`` can be installed by the following steps:
-
-.. code-block:: bash
-
-    # install miniconda
-    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-    bash Miniconda3-latest-Linux-x86_64.sh
-
-    # create a new environment and poetry
-    conda create -n synplanner -c conda-forge poetry "python=3.11" -y
-    conda activate synplanner
-
-    # clone synplanner
-    git clone https://github.com/Laboratoire-de-Chemoinformatique/synplanner.git
-
-    # navigate to the synplanner folder and install all the dependencies
-    cd synplanner/
-    poetry install
-
-After installation, ``synplanner`` environment can be used with Jupyter platform:
-
-.. code-block:: bash
-
-    conda install jupyter ipykernel
-    python -m ipykernel install --user --name synplanner --display-name "synplanner"
-
-Quick start
+Pip
 --------------------
 
-Each command in ``synplanner`` has a description that can be called with ``synplanner --help`` and ``synplanner command --help``
-
-To run a retrosynthesis planning in ``synplanner`` the reaction rules, trained retrosynthetic models (policy network and value network),
-and building block molecules are needed.
-
-The planning command takes the file with the SMILES of target molecules listed one by one.
-Also, the target molecule can be provided in the SDF format.
-
-If you use your custom building blocks, be sure to canonicalize them before planning.
+The easiest way to install SynPlanner is through PYPI:
 
 .. code-block:: bash
 
-    # download planning data
-    synplanner download_planning_data
+    pip install synplan
 
-    # canonicalize building blocks
-    synplanner building_blocks_canonicalizing --input building_blocks_custom.smi --output synplanner_planning_data/building_blocks.smi
+.. tip::
 
-    # planning with rollout evaluation
-    synplanner planning --config configs/planning.yaml --targets benchmark/targets_with_sascore_1.5_2.5.smi --reaction_rules synplanner_planning_data/uspto_reaction_rules.pickle --building_blocks synplanner_planning_data/building_blocks.smi --policy_network synplanner_planning_data/ranking_policy_network.ckpt --results_dir planning_results
+    In case your organisation have additional protection rules you can try to install it through adding additional
+    flags:
 
-    # planning with value network evaluation
-    synplanner planning --config configs/planning.yaml --targets benchmark/targets_with_sascore_1.5_2.5.smi --reaction_rules synplanner_planning_data/uspto_reaction_rules.pickle --building_blocks synplanner_planning_data/building_blocks.smi --policy_network synplanner_planning_data/ranking_policy_network.ckpt --value_network synplanner_planning_data/value_network.ckpt --results_dir planning_results
+    .. code-block:: bash
 
-After retrosynthesis planning is finished, the visualized retrosynthesis routes can be fund in the results folder (``planning_results/extracted_routes_html``).
+        pip install [--trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org]
+        --use-pep517 synplan
 
-``synplanner`` includes the full pipeline of reaction data curation, reaction rules extraction, and retrosynthetic models training.
-For more details consult the corresponding sections in the documentation `here <https://synplanner.readthedocs.io/>`_.
+
+Conda
+--------------------
+
+SynPlanner can also be installed using conda/mamba package managers.
+For more information on conda installation please refer to the
+`official documentation <https://github.com/conda-forge/miniforge>`_.
+
+To install SynPlanner, first clone the repository and move the package directory:
+
+.. code-block:: bash
+
+    git clone https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner.git
+    cd SynPlanner/
+
+Next, create SynPlanner environment with `.yaml` file, where `$OS` can be `linux`, `macos`, `win`:
+
+.. code-block:: bash
+
+    conda env create -f conda/synplan_env_$OS.yaml
+    conda activate synplan_env
+    pip install .
+
+.. tip::
+
+    After installation, one can add the SynPlanner environment in their Jupyter platform:
+
+    .. code-block:: bash
+
+        python -m ipykernel install --user --name synplan_env --display-name "synplan"
 
 Tutorials
 --------------------
 
-``synplanner`` can be accessed via the Python interface. For a better understanding of ``synplanner`` and its functionalities consult
-the tutorials in `synplanner/tutorials`. Currently, two tutorials are available:
+``SynPlanner`` can be accessed via the Python interface. For a better understanding of ``SynPlanner`` and its functionalities consult
+the tutorials in `SynPlanner/tutorials`. Currently, two tutorials are available:
 
-``tutorials/general_tutorial.ipynb`` – explains how to do a reaction rules extraction, policy network training, and retrosynthesis planning in synplanner.
+``tutorials/general_tutorial.ipynb`` – explains how to do a reaction rules extraction,
+policy network training, and retrosynthesis planning in SynPlanner.
 
-``tutorials/planning_tutorial.ipynb`` – explains how to do a retrosynthesis planning with various configurations of planning algorithms (various expansion/evaluation functions and search strategies).
+``tutorials/planning_tutorial.ipynb`` – explains how to do a retrosynthesis
+planning with various configurations of planning algorithms
+(various expansion/evaluation functions and search strategies).
 
 Contributing
 --------------------
