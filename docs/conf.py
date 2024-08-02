@@ -30,8 +30,8 @@ html_theme_options = {
 }
 html_sidebars = {
     "**": [
-        "localtoc.html",
-        "ethicalads.html",
+        "sidebar-nav-bs.html",
+        "sidebar-ethical-ads.html",
     ],
     "installation": [],  # removes Section Navigation sidebar
     "data_download": [],
