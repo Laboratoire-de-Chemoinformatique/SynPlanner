@@ -9,8 +9,8 @@
     <h3>
         <p align="center">
             <a href="https://synplanner.readthedocs.io/">Docs</a> •
-            <a href="https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials">Tutorials</a> •
-            <a href="https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tutorials">Paper</a> •
+            <a href="https://synplanner.readthedocs.io/en/latest/tutorials.html">Tutorials</a> •
+            <a href="https://doi.org/10.26434/chemrxiv-2024-bzpnd">Paper</a> •
             <a href="https://huggingface.co/spaces/Laboratoire-De-Chemoinformatique/SynPlanner">GUI demo</a>
         </p>
     </h3>
@@ -96,15 +96,16 @@ Next, create SynPlanner environment with `.yaml` file, where `$OS` can be `linux
 Tutorials
 --------------------
 
-``SynPlanner`` can be accessed via the Python interface. For a better understanding of ``SynPlanner`` and its functionalities consult
-the tutorials in `SynPlanner/tutorials`. Currently, two tutorials are available:
+``SynPlanner`` can be accessed via the Python interface.
+For a better understanding of ``SynPlanner`` and its functionalities consult
+the tutorials here. Currently, 5 tutorials are available:
 
-``tutorials/general_tutorial.ipynb`` – explains how to do a reaction rules extraction,
-policy network training, and retrosynthesis planning in SynPlanner.
+- `Retrosynthetic planning <https://synplanner.readthedocs.io/en/latest/tutorial/retrosynthetic_planning.html>`_ provides a minimal example of how to use SynPlanner for retrosynthetic planning.
+- `Data curation <https://synplanner.readthedocs.io/en/latest/tutorial/data_curation.html>`_ presents the workflow for reaction standardization and reaction filtration.
+- `Rules extraction <https://synplanner.readthedocs.io/en/latest/tutorial/rules_extraction.html>`_  provides a workflow for extracting rules from curated reaction data.
+- `Ranking policy training <https://synplanner.readthedocs.io/en/latest/tutorial/ranking_policy_training.html>`_ shows the workflow for extracting rules from curated reaction data.
+- `Value network training <https://synplanner.readthedocs.io/en/latest/tutorial/value_network.html>`_ describe how to train a value network by simulating the tree search.
 
-``tutorials/planning_tutorial.ipynb`` – explains how to do a retrosynthesis
-planning with various configurations of planning algorithms
-(various expansion/evaluation functions and search strategies).
 
 Contributing
 --------------------

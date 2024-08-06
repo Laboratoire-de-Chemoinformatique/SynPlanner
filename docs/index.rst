@@ -67,10 +67,10 @@ The main steps of this pipeline are listed below.
     If you want to run retrosynthetic planning, you can download the data we used in our paper.
     See more in section :ref:`data_download`.
 
-.. _retrosynthetic planning: notebooks/retrosynthetic_planning
-.. _data curation: notebooks/data_curation
-.. _reaction rules extraction: notebooks/rules_extraction
-.. _ranking policy training: notebooks/ranking_policy_training
+.. _retrosynthetic planning: tutorial/retrosynthetic_planning.ipynb
+.. _data curation: tutorial/data_curation.ipynb
+.. _reaction rules extraction: tutorial/rules_extraction.ipynb
+.. _ranking policy training: tutorial/ranking_policy_training.ipynb
 
 .. toctree::
     :hidden:
