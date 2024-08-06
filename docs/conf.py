@@ -24,11 +24,13 @@ release = '1.0'
 html_theme = 'pydata_sphinx_theme'
 html_theme_options = {
     "show_nav_level": 4,
-    "github_url": "https://github.com/Laboratoire-de-Chemoinformatique/synplanner",
+    "github_url": "https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner",
     "show_prev_next": False,
     "navbar_end": ["theme-switcher", "navbar-icon-links"],
+    "primary_sidebar_end": ["sidebar-ethical-ads"]
 }
+
 html_sidebars = {
     "installation": [],  # removes Section Navigation sidebar
-    "data_download": []
+    "data_download": [],
 }
