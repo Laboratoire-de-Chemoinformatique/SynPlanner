@@ -29,9 +29,9 @@ def synplan():
     """SynPlanner command line interface."""
 
 
-@synplan.command(name="download_planning_data")
-def download_planning_data_cli() -> None:
-    """Downloads data for retrosythetic models training."""
+@synplan.command(name="download_all_data")
+def download_all_data_cli() -> None:
+    """Downloads all data for training, planning and benchmarking SynPlanner."""
     download_all_data()
 
 
