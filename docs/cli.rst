@@ -36,6 +36,22 @@ Reaction filtration can be performed with the below command.
 The extension of the input/output files will be automatically parsed.
 
 
+Reaction rule extraction
+---------------------------
+Reaction rules extraction can be performed with the below command.
+
+.. code-block:: bash
+
+    synplan rule_extracting --config extraction.yaml --input reaction_data_filtered.smi --output reaction_rules.pickle
+
+**Parameters**:
+    - ``config`` - the path to the configuration file.
+    - ``input`` - the path to the file (.smi or .rdf) with reactions for reaction rule extraction.
+    - ``output`` - the path to the file (.pickle) where extracted reactions rules will be stored.
+
+The extension of the input/output files will be automatically parsed.
+
+
 Policy networks training
 ---------------------------
 Ranking and filtering policy network training can be performed with the below commands.
