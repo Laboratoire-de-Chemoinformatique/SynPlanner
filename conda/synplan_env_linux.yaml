@@ -51,7 +51,7 @@ dependencies:
   - gmp=6.3.0=hac33072_2
   - gmpy2=2.1.5=py311hc4f1f91_1
   - gnutls=3.7.9=hb077bed_0
-  - google-api_reference-core=2.19.1=pyhd8ed1ab_0
+  - google-api-core=2.19.1=pyhd8ed1ab_0
   - google-auth=2.32.0=pyhff2d567_0
   - googleapis-common-protos=1.63.2=pyhd8ed1ab_0
   - grpcio=1.62.2=py311ha6695c7_0
