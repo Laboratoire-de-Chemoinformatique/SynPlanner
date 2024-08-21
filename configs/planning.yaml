@@ -10,7 +10,7 @@ tree:
   exclude_small: True
   init_node_value: 0.5
   min_mol_size: 6
-  epsilon: 0
+  epsilon: 0.0
   silent: True
 node_evaluation:
   evaluation_type: rollout
