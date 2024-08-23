@@ -43,7 +43,7 @@ For the reaction rule extraction and retrosynthetic models training (policy and 
     Reaction data           Needed for reaction rules extraction and ranking policy network training
     Molecule data           Needed for filtering policy network training
     Targets data            Needed for value network training (targets for planning simulations in value network tuning)
-    Building blocks         Needed for retrosynthesis planning simulations in value network tuning
+    Building blocks         Needed for retrosynthetic planning simulations in value network tuning
     ======================= ============================================================================================
 
 Retrosynthetic planning
@@ -56,10 +56,10 @@ For the retrosynthetic planning the following data and files are needed:
     ======================= ============================================================================================
     Data / Files            Description
     ======================= ============================================================================================
-    Reaction rules          Extracted reaction rules for precursors dissection in retrosynthesis planning
+    Reaction rules          Extracted reaction rules for precursors dissection in retrosynthetic planning
     Policy network          Trained ranking or filtering policy network for node expansion in tree search
     Value network           Trained value neural network for node evaluation in tree search (optional, the default evaluation method is rollout)
-    Building blocks         Set of building block molecules, which are used as terminal materials in the retrosynthesis route planning
+    Building blocks         Set of building block molecules, which are used as terminal materials in the retrosynthetic route planning
     ======================= ============================================================================================
 
 .. tip::
