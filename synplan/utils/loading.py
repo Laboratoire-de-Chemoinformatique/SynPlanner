@@ -81,7 +81,7 @@ def load_reaction_rules(file: str) -> List[Reactor]:
 
 
 @functools.lru_cache(maxsize=None)
-def load_building_blocks(building_blocks_path: Union[str, Path], standardize=True) -> Set[str]:
+def load_building_blocks(building_blocks_path: Union[str, Path], standardize: bool = False) -> Set[str]:
     """Loads building blocks data from a file and returns a frozen set of building
     blocks.
 
