@@ -66,9 +66,8 @@ Next, create SynPlanner environment with `synplan_env_linux.yaml` file:
     conda activate synplan_env
     pip install .
 
-.. tip::
 
-    After installation, one can add the SynPlanner environment in their Jupyter platform:
+After installation, one can add the SynPlanner environment in their Jupyter platform:
 
     .. code-block:: bash
 
@@ -81,12 +80,9 @@ Colab tutorials don’t require the local installation of ``SynPlanner`` but are
 
 Currently, two tutorials are available:
 
-- General tutorial - presents the full pipeline of SynPlanner starting from raw reaction data and resulting in ready-to-use retrosynthetic planning.
-This tutorial can be used for training retrosynthetic models on custom data from scratch.
+- General tutorial - presents the full pipeline of SynPlanner starting from raw reaction data and resulting in ready-to-use retrosynthetic planning. *This tutorial can be used for training retrosynthetic models on custom data from scratch.*
 
-Planning tutorial – presents the ready-to-use retrosynthetic planning in SynPlanner.
-This tutorial can be used for retrosynthetic planning for custom target molecules with pretrained retrosynthetic models that can downloaded from SynPlanner.
-
+- Planning tutorial – presents the ready-to-use retrosynthetic planning in SynPlanner. *This tutorial can be used for retrosynthetic planning for custom target molecules with pretrained retrosynthetic models that can downloaded from SynPlanner.*
 
 Jupyter Tutorials
 --------------------
