@@ -101,9 +101,9 @@ Value network training can be performed with the below command.
     - ``results_dir`` - the path to the directory where the trained value network will be to be stored.
 
 
-Retrosynthesis planning
+Retrosynthetic planning
 ---------------------------
-Retrosynthesis planning can be performed with the below command.
+Retrosynthetic planning can be performed with the below command.
 If you use your custom building blocks, be sure to canonicalize them before planning.
 
 .. code-block:: bash
@@ -113,7 +113,7 @@ If you use your custom building blocks, be sure to canonicalize them before plan
 
 **Parameters**:
     - ``config`` - the path to the configuration file.
-    - ``targets`` - the path to the file with target molecule for retrosynthesis planning.
+    - ``targets`` - the path to the file with target molecule for retrosynthetic planning.
     - ``reaction_rules`` - the path to the file with reaction rules.
     - ``building_blocks`` - the path to the file with building blocks.
     - ``policy_network`` - the path to the file with trained policy network (ranking or filtering).

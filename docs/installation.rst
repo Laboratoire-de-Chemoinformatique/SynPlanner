@@ -60,12 +60,22 @@ you can follow these steps:
 
 .. code-block:: bash
 
+    # create a new environment and poetry
+    conda create -n synplan_env -c conda-forge "poetry=1.3.2" "python=3.11" -y
+    conda activate synplan_env
+
     # clone SynPlanner
     git clone https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner.git
     cd SynPlanner/
 
+    # install SynPlanner with poetry
     poetry install
 
+If Poetry fails with error, a possible solution is to update the bashrc file with the following command:
+
+.. code-block:: bash
+    echo 'export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring' >> ~/.bashrc
+    exec "bash"
 
 Manual installation
 --------------------

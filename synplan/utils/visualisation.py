@@ -97,7 +97,7 @@ def extract_routes(tree: Tree, extended: bool = False, min_mol_size: int = 0) ->
 
 
 def get_route_svg(tree: Tree, node_id: int) -> str:
-    """Visualizes the retrosynthesis route.
+    """Visualizes the retrosynthetic route.
 
     :param tree: The built tree.
     :param node_id: The id of the node from which to visualize the route.

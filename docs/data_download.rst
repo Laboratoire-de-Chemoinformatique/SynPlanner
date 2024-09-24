@@ -2,13 +2,37 @@
 
 Data download
 ===========================
+All SynPlanner data can be downloaded with corresponding  CLI command from HugginFace repository. Here the description of data acoomopnaying SynPlanner.
 
-This page explains how to download data for retrosynthetic models training and retrosynthesis planning in SynPlanner.
+| 📁 **uspto** - reaction data source
+| ``uspto/uspto_standardized.smi`` - the USPTO dataset from the study of Lin et al.
+| ``uspto_reaction_rules.pickle`` - the reaction rules were extracted with SynPlanner from the standardized USPTO dataset.
+| ``weights/ranking_policy_network.ckpt`` - needed for the prediction of applicable reaction rules in node expansion step in MCTS retrosynthetic planning. Ranking policy network trained on the standardized and filtered USPTO dataset and corresponding extracted reaction rules.
+| ``weights/filtering_policy_network.ckpt`` - needed for the prediction of applicable reaction rules in node expansion step in MCTS retrosynthetic planning. Filtering policy network trained on the data extracted from the ChEMBL database and corresponding extracted reaction rules.
+| ``weights/value_network.ckpt`` - needed for the prediction of synthesizability of precursors in node evaluation step in MCTS retrosynthetic planning. Value network trained on the planning simulations results for molecules extracted from the ChEMBL database and corresponding trained ranking policy network with building blocks.
 
-Introduction
----------------------------
-**Retrosynthetic models training.** For the training of the retrosynthetic models (policy and value network, reaction rules)
-the following types of data are needed:
+| 📁 **chembl** - molecule data source
+| ``molecules_for_filtering_policy_training.smi`` - the dataset of molecules extracted from the ChEMBL database for filtering policy network training with extracted reaction rules. Each reaction rule is applied to each molecule, and successfully applied reaction rules are labeled for network training
+| ``targets_for_value_network_training.smi`` - the dataset of molecules extracted from the ChEMBL database is used as targets for planning simulations in value network tuning.
+
+| 📁 **building_blocks** - building blocks
+| ``building_blocks_em_sa_ln.smi`` - the collection of building blocks for retrosynthetic planning. If during the planning the generated precursors are found in building blocks, the planning is terminated successfully. The default collection is the eMolecules and Sigma Aldrich building block datasets from the ASKCOS tool. The building blocks were standardized by SynPlanner.
+
+| 📁 **benchmarks** - SynPlanner original benchmarks
+| ``sascore`` - the Synthetic Accessibility Score benchmark dataset (SAScore benchmark) addresses the retrosynthetic planning for molecules of different synthetic complexities. The dataset consists of 700 target molecules split into seven equal-size subsets (100 molecules each) corresponding to synthetic accessibility score (SAScore, calculated with the RDKit package) 1-2, 2-3, 3-4, etc., up to the maximal value of 9 achieved in the dataset.
+
+| 📁 **tutorial** - the data for SynPlanner tutorials.
+| Tutorial data can be used as input data for any SynPlanner tutorial so that the separate SynPlanner pipeline steps are accessible separately (it is not needed to reproduce the pipeline from scratch).
+| ``data_curation/uspto_standardized.smi`` - the USPTO dataset is used as input data for the data curation tutorial in SynPlanner.
+| ``data_curation/uspto_filtered.smi`` - the standardized and filtered USPTO dataset is ready for reaction rules extraction by the corresponding tutorial.
+| ``rules extraction/uspto_reaction_rules.pickle`` - the reaction rules were extracted from the USPTO dataset. Can be used for ranking and filtering policy training in policy training tutorials.
+| ``ranking_policy_training/ranking_policy_dataset.pt`` - the training set was created from filtered USPTO and extracted reaction rules for ranking policy training.
+| ``ranking_policy_training/ranking_policy_network.ckpt`` - the trained ranking policy network, that can be used in retrosynthetic planning
+| ``uspto_tutorial.smi`` - the reduced version of the USPTO dataset was created for demonstrative and educational purposes. The reproduction of the SynPlanner pipeline (starting from data curation) with the reduced version should take around 1 hour and should be feasible on regular machines with limited computation power.
+
+Retrosynthetic models training
+=======================================
+For the reaction rule extraction and retrosynthetic models training (policy and value network) the following types of data are needed:
 
 .. table::
     :widths: 15 50
@@ -19,10 +43,12 @@ the following types of data are needed:
     Reaction data           Needed for reaction rules extraction and ranking policy network training
     Molecule data           Needed for filtering policy network training
     Targets data            Needed for value network training (targets for planning simulations in value network tuning)
-    Building blocks         Needed for retrosynthesis planning simulations in value network tuning
+    Building blocks         Needed for retrosynthetic planning simulations in value network tuning
     ======================= ============================================================================================
 
-**Retrosynthesis planning.** For the retrosynthesis planning the following data and files are needed:
+Retrosynthetic planning
+=======================================
+For the retrosynthetic planning the following data and files are needed:
 
 .. table::
     :widths: 15 50
@@ -30,37 +56,13 @@ the following types of data are needed:
     ======================= ============================================================================================
     Data / Files            Description
     ======================= ============================================================================================
-    Reaction rules          Extracted reaction rules for precursors dissection in retrosynthesis planning
+    Reaction rules          Extracted reaction rules for precursors dissection in retrosynthetic planning
     Policy network          Trained ranking or filtering policy network for node expansion in tree search
     Value network           Trained value neural network for node evaluation in tree search (optional, the default evaluation method is rollout)
-    Building blocks         Set of building block molecules, which are used as terminal materials in the retrosynthesis route planning
+    Building blocks         Set of building block molecules, which are used as terminal materials in the retrosynthetic route planning
     ======================= ============================================================================================
 
-As a source of reaction and molecule data public databases are used such as USPTO, ChEMBL, and COCONUT.
+.. tip::
 
-**Important:** the current available data formats are SMILES (.smi) and RDF (.rdf) for reactions and SMILES (.smi) and SDF (.sdf) for molecules.
-The extracted reaction rules are stored as CGRTools objects in a pickle file and currently cannot be stored in text format (e.g. reaction SMARTS).
-
-Configuration
----------------------------
-Data download does not require any special configuration in the current version of SynPlanner.
-
-CLI
----------------------------
-Data download can be performed with the below commands.
-
-**Data download for retrosynthetic models training**
-
-.. code-block:: bash
-
-    synplan download_training_data your/local/dir
-
-By default, the files will be stored in the ``your/local/dir`` directory.
-
-**Data download for retrosythesis planning**
-
-.. code-block:: bash
-
-    synplan download_planning_data your/local/dir
-
-By default, the files will be stored in the ``your/local/dir`` directory in the current location (./).
+    The current available data formats are SMILES (.smi) and RDF (.rdf) for reactions and SMILES (.smi) and SDF (.sdf) for molecules.
+    The extracted reaction rules are stored as CGRTools objects in a pickle file and currently cannot be stored in text format (e.g. reaction SMARTS).
