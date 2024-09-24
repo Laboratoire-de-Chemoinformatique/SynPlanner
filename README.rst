@@ -43,25 +43,6 @@ Overview
 
 Installation
 --------------------
-Pip
---------------------
-
-The easiest way to install SynPlanner is through PYPI:
-
-.. code-block:: bash
-
-    pip install synplan
-
-.. tip::
-
-    In case your organisation have additional protection rules you can try to install it through adding additional
-    flags:
-
-    .. code-block:: bash
-
-        pip install [--trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org]
-        --use-pep517 synplan
-
 
 Conda
 --------------------
