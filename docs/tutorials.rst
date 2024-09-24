@@ -15,7 +15,6 @@ The main pipeline of SynPlanner training from the raw reaction data includes:
 - `Data curation`_, which presents the workflow for reaction standardization and reaction filtration.
 - `Rules extraction`_, which provides a workflow for extracting rules from curated reaction data.
 - `Ranking policy training`_, which shows the workflow for extracting rules from curated reaction data.
-- `Value network training`_, which describe how to train a value network by simulating the tree search.
 
 The following tutorials will be added in the next releases:
 
@@ -28,7 +27,6 @@ The following tutorials will be added in the next releases:
 .. _Data curation: tutorial/data_curation.ipynb
 .. _Rules extraction: tutorial/rules_extraction.ipynb
 .. _Ranking policy training: tutorial/ranking_policy_training.ipynb
-.. _Value network training: tutorial/value_network.rst
 
 .. toctree::
     :hidden:
@@ -38,4 +36,3 @@ The following tutorials will be added in the next releases:
     tutorial/data_curation
     tutorial/rules_extraction
     tutorial/ranking_policy_training
-    tutorial/value_network
