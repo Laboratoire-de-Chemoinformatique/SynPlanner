@@ -30,9 +30,14 @@ def synplan():
 
 
 @synplan.command(name="download_all_data")
-def download_all_data_cli() -> None:
+@click.option(
+    "--save_to",
+    "save_to",
+    help="Path to the folder where downloaded data will be stored.",
+)
+def download_all_data_cli(save_to: str = ".") -> None:
     """Downloads all data for training, planning and benchmarking SynPlanner."""
-    download_all_data()
+    download_all_data(save_to=save_to)
 
 
 @synplan.command(name="building_blocks_canonicalizing")
