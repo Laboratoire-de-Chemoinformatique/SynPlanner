@@ -1,4 +1,4 @@
-"""Module containing a class Tree that used for tree search of retrosynthetic paths."""
+"""Module containing a class Tree that used for tree search of retrosynthetic routes."""
 import logging
 from collections import defaultdict, deque
 from math import sqrt
@@ -33,7 +33,7 @@ class Tree:
         """Initializes a tree object with optional parameters for tree search for target
         molecule.
 
-        :param target: A target molecule for retrosynthesis routes search.
+        :param target: A target molecule for retrosynthetic routes search.
         :param config: A tree configuration.
         :param reaction_rules: A loaded reaction rules.
         :param building_blocks: A loaded building blocks.
@@ -122,7 +122,7 @@ class Tree:
 
     def __repr__(self) -> str:
         """Returns a string representation of the tree (target SMILES, tree size, and
-        the number of found paths)."""
+        the number of found routes)."""
         return self.report()
 
     def __next__(self) -> [bool, List[int]]:
@@ -135,7 +135,7 @@ class Tree:
         if self.curr_iteration >= self.config.max_iterations:
             raise StopIteration("Iterations limit exceeded.")
         if self.curr_tree_size >= self.config.max_tree_size:
-            raise StopIteration("Max tree size exceeded or all possible paths found.")
+            raise StopIteration("Max tree size exceeded or all possible routes found.")
         if self.curr_time >= self.config.max_time:
             raise StopIteration("Time limit exceeded.")
 
@@ -160,7 +160,7 @@ class Tree:
                     node_id = self._select_node(node_id)  # select the child node
                     curr_depth += 1
             else:
-                if self.nodes[node_id].is_solved():  # found path
+                if self.nodes[node_id].is_solved():  # found route
                     self._update_visits(
                         node_id
                     )  # this prevents expanding of bb node_id
@@ -324,8 +324,8 @@ class Tree:
 
                     expanded = True
         if not expanded and node_id == 1:
-            logging.warning("The target molecule was not expanded.")
-            raise StopIteration("The target molecule was not expanded.")
+            logging.warning("\nThe target molecule was not expanded.")
+            raise StopIteration("\nThe target molecule was not expanded.")
 
     def _add_node(
         self,
@@ -557,7 +557,7 @@ class Tree:
 
     def synthesis_route(self, node_id: int) -> Tuple[Reaction,]:
         """Given a node_id, return a tuple of reactions that represent the
-        retrosynthesis route from the current node.
+        retrosynthetic route from the current node.
 
         :param node_id: The id of the current node.
         :return: The tuple of extracted reactions representing the synthesis route.

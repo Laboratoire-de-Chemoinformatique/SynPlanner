@@ -21,7 +21,7 @@
         </a>
     </div>
 
-``SynPlanner`` is an open-source tool for retrosynthesis planning,
+``SynPlanner`` is an open-source tool for retrosynthetic planning,
 designed to increase flexibility in training and developing
 customized retrosynthetic planning solutions from raw chemical data.
 It integrates Monte Carlo Tree Search (MCTS) with graph neural networks

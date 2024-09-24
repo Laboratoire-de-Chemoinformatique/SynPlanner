@@ -377,13 +377,13 @@ def value_network_tuning_cli(
     "config_path",
     required=True,
     type=click.Path(exists=True),
-    help="Path to the configuration file for retrosynthesis planning.",
+    help="Path to the configuration file for retrosynthetic planning.",
 )
 @click.option(
     "--targets",
     required=True,
     type=click.Path(exists=True),
-    help="Path to the file with target molecules for retrosynthesis planning.",
+    help="Path to the file with target molecules for retrosynthetic planning.",
 )
 @click.option(
     "--reaction_rules",
@@ -413,7 +413,7 @@ def value_network_tuning_cli(
     "--results_dir",
     default=".",
     type=click.Path(exists=False),
-    help="Path to the file where retrosynthesis planning results will be stored.",
+    help="Path to the file where retrosynthetic planning results will be stored.",
 )
 def planning_cli(
     config_path: str,
@@ -424,7 +424,7 @@ def planning_cli(
     value_network: str,
     results_dir: str,
 ):
-    """Retrosynthesis planning."""
+    """Retrosynthetic planning."""
 
     with open(config_path, "r", encoding="utf-8") as file:
         config = yaml.safe_load(file)
