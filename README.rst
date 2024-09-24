@@ -9,7 +9,7 @@
     <h3>
         <p align="center">
             <a href="https://synplanner.readthedocs.io/">Docs</a> •
-            <a href="https://synplanner.readthedocs.io/en/latest/tutorials.html">Tutorials</a> •
+            <a href="https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/docs/tutorial">Tutorials</a> •
             <a href="https://doi.org/10.26434/chemrxiv-2024-bzpnd">Paper</a> •
             <a href="https://huggingface.co/spaces/Laboratoire-De-Chemoinformatique/SynPlanner">GUI demo</a>
         </p>
@@ -98,9 +98,8 @@ Currently, five tutorials are available:
 
 - `Reaction data curation <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/data_curation.ipynb>`_ presents the workflow for reaction standardization and reaction filtration.
 - `Reaction rules extraction <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/rules_extraction.ipynb>`_  provides a workflow for extracting reaction rules from curated reaction data.
-- `Policy network training <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/retrosynthetic_planning.ipynb>`_ shows the workflow for policy network training.
-- `Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/data_curation.ipynb>`_ provides an example of how to use SynPlanner for retrosynthetic planning.
-
+- `Policy network training <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/ranking_policy_training.ipynb>`_ shows the workflow for policy network training.
+- `Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/retrosynthetic_planning.ipynb>`_ provides an example of how to use SynPlanner for retrosynthetic planning.
 
 Contributing
 --------------------
