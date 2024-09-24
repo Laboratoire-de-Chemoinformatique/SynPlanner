@@ -44,7 +44,7 @@ Overview
 Installation
 --------------------
 
-Conda
+Conda (Linux)
 --------------------
 
 SynPlanner can also be installed using conda/mamba package managers.
@@ -58,11 +58,11 @@ To install SynPlanner, first clone the repository and move the package directory
     git clone https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner.git
     cd SynPlanner/
 
-Next, create SynPlanner environment with `.yaml` file, where `$OS` can be `linux`, `macos`, `win`:
+Next, create SynPlanner environment with `synplan_env_linux.yaml` file:
 
 .. code-block:: bash
 
-    conda env create -f conda/synplan_env_$OS.yaml
+    conda env create -f conda/synplan_env_linux.yaml
     conda activate synplan_env
     pip install .
 
