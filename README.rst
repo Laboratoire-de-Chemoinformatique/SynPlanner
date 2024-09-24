@@ -45,7 +45,7 @@ Installation
 --------------------
 
 Conda (Linux)
---------------------
+====================
 
 ``SynPlanner`` can also be installed using conda/mamba package managers.
 For more information on conda installation please refer to the
@@ -89,12 +89,18 @@ Jupyter Tutorials
 
 Jupyter Tutorials requires the local installation of ``SynPlanner`` but can be executed with advanced computational resources on local servers.
 
-Currently, four tutorials are available:
+Currently, five tutorials are available:
 
-- `Data curation <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/data_curation.ipynb>`_ presents the workflow for reaction standardization and reaction filtration.
-- `Rules extraction <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/rules_extraction.ipynb>`_  provides a workflow for extracting rules from curated reaction data.
-- `Ranking policy training <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/retrosynthetic_planning.ipynb>`_ shows the workflow for extracting rules from curated reaction data.
-- `Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/data_curation.ipynb>`_ provides a minimal example of how to use SynPlanner for retrosynthetic planning.
+**Basic tutorials.** These tutorials can be used for easy execution of the default SynPlanner pipeline:
+
+- `General tutorial <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/general_tutorial.ipynb>`_ presents the full pipeline of SynPlanner starting from raw reaction data and resulting in ready-to-use retrosynthetic planning.
+
+**Advanced tutorials.** These tutorials provide advanced explanations and options for each step in the SynPlanner pipeline:
+
+- `Reaction data curation <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/data_curation.ipynb>`_ presents the workflow for reaction standardization and reaction filtration.
+- `Reaction rules extraction <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/rules_extraction.ipynb>`_  provides a workflow for extracting reaction rules from curated reaction data.
+- `Policy network training <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/retrosynthetic_planning.ipynb>`_ shows the workflow for policy network training.
+- `Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/data_curation.ipynb>`_ provides an example of how to use SynPlanner for retrosynthetic planning.
 
 
 Contributing
