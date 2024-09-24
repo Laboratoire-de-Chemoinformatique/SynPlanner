@@ -74,18 +74,31 @@ Next, create SynPlanner environment with `synplan_env_linux.yaml` file:
 
         python -m ipykernel install --user --name synplan_env --display-name "synplan"
 
-Tutorials
+Colab Tutorials
 --------------------
 
-``SynPlanner`` can be accessed via the Python interface.
-For a better understanding of ``SynPlanner`` and its functionalities consult
-the tutorials here. Currently, 5 tutorials are available:
+Colab tutorials don’t require the local installation of ``SynPlanner`` but are limited by available computational resources in Google Colab.
 
-- `Retrosynthetic planning <https://synplanner.readthedocs.io/en/latest/tutorial/retrosynthetic_planning.html>`_ provides a minimal example of how to use SynPlanner for retrosynthetic planning.
-- `Data curation <https://synplanner.readthedocs.io/en/latest/tutorial/data_curation.html>`_ presents the workflow for reaction standardization and reaction filtration.
-- `Rules extraction <https://synplanner.readthedocs.io/en/latest/tutorial/rules_extraction.html>`_  provides a workflow for extracting rules from curated reaction data.
-- `Ranking policy training <https://synplanner.readthedocs.io/en/latest/tutorial/ranking_policy_training.html>`_ shows the workflow for extracting rules from curated reaction data.
-- `Value network training <https://synplanner.readthedocs.io/en/latest/tutorial/value_network.html>`_ describe how to train a value network by simulating the tree search.
+Currently, two tutorials are available:
+
+- General tutorial - presents the full pipeline of SynPlanner starting from raw reaction data and resulting in ready-to-use retrosynthetic planning.
+This tutorial can be used for training retrosynthetic models on custom data from scratch.
+
+Planning tutorial – presents the ready-to-use retrosynthetic planning in SynPlanner.
+This tutorial can be used for retrosynthetic planning for custom target molecules with pretrained retrosynthetic models that can downloaded from SynPlanner.
+
+
+Jupyter Tutorials
+--------------------
+
+Jupyter Tutorials requires the local installation of ``SynPlanner`` but can be executed with advanced computational resources on local servers.
+
+Currently, four tutorials are available:
+
+- `Data curation <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/data_curation.ipynb>`_ presents the workflow for reaction standardization and reaction filtration.
+- `Rules extraction <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/rules_extraction.ipynb>`_  provides a workflow for extracting rules from curated reaction data.
+- `Ranking policy training <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/retrosynthetic_planning.ipynb>`_ shows the workflow for extracting rules from curated reaction data.
+- `Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/data_curation.ipynb>`_ provides a minimal example of how to use SynPlanner for retrosynthetic planning.
 
 
 Contributing
