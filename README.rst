@@ -76,7 +76,7 @@ After installation, one can add the ``SynPlanner`` environment in their Jupyter 
 Colab Tutorials
 --------------------
 
-.. note::
+.. note-block::
     Colab tutorials don’t require the local installation of ``SynPlanner`` but are limited by available computational resources in Google Colab.
 
 Currently, two tutorials are available:
