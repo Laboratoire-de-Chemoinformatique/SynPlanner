@@ -47,7 +47,7 @@ Installation
 Conda (Linux)
 ====================
 
-``SynPlanner`` can also be installed using conda/mamba package managers.
+``SynPlanner`` can be installed using conda/mamba package managers.
 For more information on conda installation please refer to the
 `official documentation <https://github.com/conda-forge/miniforge>`_.
 
@@ -58,7 +58,7 @@ To install ``SynPlanner``, first clone the repository and move the package direc
     git clone https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner.git
     cd SynPlanner/
 
-Next, create ``SynPlanner`` environment with `synplan_env_linux.yaml` file:
+Next, create ``SynPlanner`` environment with ``synplan_env_linux.yaml`` file:
 
 .. code-block:: bash
 
@@ -76,30 +76,32 @@ After installation, one can add the ``SynPlanner`` environment in their Jupyter 
 Colab Tutorials
 --------------------
 
-Colab tutorials don’t require the local installation of ``SynPlanner`` but are limited by available computational resources in Google Colab.
+    Colab tutorials do not require the local installation of ``SynPlanner`` but their performance is limited by available computational resources in Google Colab
 
 Currently, two tutorials are available:
 
-- `General tutorial <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/general_tutorial.ipynb>`_ presents the full pipeline of SynPlanner starting from raw reaction data and resulting in ready-to-use retrosynthetic planning. *This tutorial can be used for training retrosynthetic models on custom data from scratch.*
-- `Planning tutorial <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb>`_ presents the ready-to-use retrosynthetic planning in SynPlanner. *This tutorial can be used for retrosynthetic planning for custom target molecules with pretrained retrosynthetic models that can downloaded from SynPlanner.*
+- | `General tutorial <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/general_tutorial.ipynb>`_ presents the full pipeline of SynPlanner starting from raw reaction data and resulting in ready-to-use retrosynthetic planning.
+  | *This tutorial can be used for training retrosynthetic models on custom data from scratch.*
+- | `Planning tutorial <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb>`_ presents the ready-to-use retrosynthetic planning in SynPlanner.
+  | *This tutorial can be used for retrosynthetic planning for custom target molecules with pretrained retrosynthetic models that can downloaded from SynPlanner.*
 
 Jupyter Tutorials
 --------------------
 
-Jupyter Tutorials requires the local installation of ``SynPlanner`` but can be executed with advanced computational resources on local servers.
+    Jupyter Tutorials requires the local installation of ``SynPlanner`` but can be executed with advanced computational resources on local servers
 
 Currently, five tutorials are available:
 
-**Basic tutorials.** These tutorials can be used for easy execution of the default SynPlanner pipeline:
+**Quick-start tutorials.** These tutorials can be used for easy execution of the default ``SynPlanner`` pipeline:
 
 - `General tutorial <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/general_tutorial.ipynb>`_ presents the full pipeline of SynPlanner starting from raw reaction data and resulting in ready-to-use retrosynthetic planning.
 
-**Advanced tutorials.** These tutorials provide advanced explanations and options for each step in the SynPlanner pipeline:
+**Advanced tutorials.** These tutorials provide advanced explanations and options for each step in the ``SynPlanner`` pipeline:
 
 - `Reaction data curation <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/data_curation.ipynb>`_ presents the workflow for reaction standardization and reaction filtration.
 - `Reaction rules extraction <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/rules_extraction.ipynb>`_  provides a workflow for extracting reaction rules from curated reaction data.
 - `Policy network training <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/ranking_policy_training.ipynb>`_ shows the workflow for policy network training.
-- `Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/retrosynthetic_planning.ipynb>`_ provides an example of how to use SynPlanner for retrosynthetic planning.
+- `Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/retrosynthetic_planning.ipynb>`_ provides an example of how to use ``SynPlanner`` for retrosynthetic planning.
 
 Contributing
 --------------------
@@ -108,21 +110,11 @@ Contributions are welcome, in the form of issues or pull requests.
 
 If you have a question or want to report a bug, please submit an issue.
 
-To contribute with code to the project, follow these steps:
-
-1. Fork this repository.
-2. Create a branch: ``git checkout -b <branch_name>``.
-3. Make your changes and commit them: ``git commit -m '<commit_message>'``
-4. Push to the remote branch: ``git push``
-5. Create the pull request.
-
-
 Maintainers
 --------------------
 
 * `Tagir Akhmetshin <https://github.com/tagirshin>`_
 * `Dmitry Zankov <https://github.com/dzankov>`_
-
 
 Contributors
 --------------------
