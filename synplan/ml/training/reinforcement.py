@@ -185,15 +185,15 @@ def balance_extracted_precursor(extracted_precursor):
     return extracted_precursor_balanced
 
 
-def create_tuning_set(
+def create_updating_set(
     extracted_precursor: Dict[str, float], batch_size: int = 1
 ) -> LightningDataset:
-    """Creates the value network tuning dataset from precursor extracted from the planning
+    """Creates the value network updating dataset from precursor extracted from the planning
     simulation.
 
     :param extracted_precursor: The dictionary with the extracted precursor and their
         labels.
-    :param batch_size: The size of the batch in value network tuning.
+    :param batch_size: The size of the batch in value network updating.
     :return: A LightningDataset object, which contains the tuning set for value network
         tuning.
     """
@@ -260,7 +260,7 @@ def run_training(
     """
 
     # create training set
-    training_set = create_tuning_set(
+    training_set = create_updating_set(
         extracted_precursor=extracted_precursor, batch_size=value_config.batch_size
     )
 

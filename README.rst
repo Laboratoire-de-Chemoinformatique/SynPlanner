@@ -9,7 +9,7 @@
     <h3>
         <p align="center">
             <a href="https://synplanner.readthedocs.io/">Docs</a> •
-            <a href="https://synplanner.readthedocs.io/en/latest/tutorials.html">Tutorials</a> •
+            <a href="https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/docs/tutorial">Tutorials</a> •
             <a href="https://doi.org/10.26434/chemrxiv-2024-bzpnd">Paper</a> •
             <a href="https://huggingface.co/spaces/Laboratoire-De-Chemoinformatique/SynPlanner">GUI demo</a>
         </p>
@@ -43,69 +43,63 @@ Overview
 
 Installation
 --------------------
-Pip
---------------------
 
-The easiest way to install SynPlanner is through PYPI:
+Conda (Linux)
+====================
 
-.. code-block:: bash
-
-    pip install synplan
-
-.. tip::
-
-    In case your organisation have additional protection rules you can try to install it through adding additional
-    flags:
-
-    .. code-block:: bash
-
-        pip install [--trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org]
-        --use-pep517 synplan
-
-
-Conda
---------------------
-
-SynPlanner can also be installed using conda/mamba package managers.
+``SynPlanner`` can also be installed using conda/mamba package managers.
 For more information on conda installation please refer to the
 `official documentation <https://github.com/conda-forge/miniforge>`_.
 
-To install SynPlanner, first clone the repository and move the package directory:
+To install ``SynPlanner``, first clone the repository and move the package directory:
 
 .. code-block:: bash
 
     git clone https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner.git
     cd SynPlanner/
 
-Next, create SynPlanner environment with `.yaml` file, where `$OS` can be `linux`, `macos`, `win`:
+Next, create ``SynPlanner`` environment with `synplan_env_linux.yaml` file:
 
 .. code-block:: bash
 
-    conda env create -f conda/synplan_env_$OS.yaml
+    conda env create -f conda/synplan_env_linux.yaml
     conda activate synplan_env
     pip install .
 
-.. tip::
 
-    After installation, one can add the SynPlanner environment in their Jupyter platform:
+After installation, one can add the ``SynPlanner`` environment in their Jupyter platform:
 
-    .. code-block:: bash
+.. code-block:: bash
 
-        python -m ipykernel install --user --name synplan_env --display-name "synplan"
+    python -m ipykernel install --user --name synplan_env --display-name "synplan"
 
-Tutorials
+Colab Tutorials
 --------------------
 
-``SynPlanner`` can be accessed via the Python interface.
-For a better understanding of ``SynPlanner`` and its functionalities consult
-the tutorials here. Currently, 5 tutorials are available:
+Colab tutorials don’t require the local installation of ``SynPlanner`` but are limited by available computational resources in Google Colab.
 
-- `Retrosynthetic planning <https://synplanner.readthedocs.io/en/latest/tutorial/retrosynthetic_planning.html>`_ provides a minimal example of how to use SynPlanner for retrosynthetic planning.
-- `Data curation <https://synplanner.readthedocs.io/en/latest/tutorial/data_curation.html>`_ presents the workflow for reaction standardization and reaction filtration.
-- `Rules extraction <https://synplanner.readthedocs.io/en/latest/tutorial/rules_extraction.html>`_  provides a workflow for extracting rules from curated reaction data.
-- `Ranking policy training <https://synplanner.readthedocs.io/en/latest/tutorial/ranking_policy_training.html>`_ shows the workflow for extracting rules from curated reaction data.
-- `Value network training <https://synplanner.readthedocs.io/en/latest/tutorial/value_network.html>`_ describe how to train a value network by simulating the tree search.
+Currently, two tutorials are available:
 
+- `General tutorial <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/general_tutorial.ipynb>`_ presents the full pipeline of SynPlanner starting from raw reaction data and resulting in ready-to-use retrosynthetic planning. *This tutorial can be used for training retrosynthetic models on custom data from scratch.*
+- `Planning tutorial <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb>`_ presents the ready-to-use retrosynthetic planning in SynPlanner. *This tutorial can be used for retrosynthetic planning for custom target molecules with pretrained retrosynthetic models that can downloaded from SynPlanner.*
+
+Jupyter Tutorials
+--------------------
+
+Jupyter Tutorials requires the local installation of ``SynPlanner`` but can be executed with advanced computational resources on local servers.
+
+Currently, five tutorials are available:
+
+**Basic tutorials.** These tutorials can be used for easy execution of the default SynPlanner pipeline:
+
+- `General tutorial <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/general_tutorial.ipynb>`_ presents the full pipeline of SynPlanner starting from raw reaction data and resulting in ready-to-use retrosynthetic planning.
+
+**Advanced tutorials.** These tutorials provide advanced explanations and options for each step in the SynPlanner pipeline:
+
+- `Reaction data curation <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/data_curation.ipynb>`_ presents the workflow for reaction standardization and reaction filtration.
+- `Reaction rules extraction <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/rules_extraction.ipynb>`_  provides a workflow for extracting reaction rules from curated reaction data.
+- `Policy network training <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/ranking_policy_training.ipynb>`_ shows the workflow for policy network training.
+- `Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/retrosynthetic_planning.ipynb>`_ provides an example of how to use SynPlanner for retrosynthetic planning.
 
 Contributing
 --------------------
