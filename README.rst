@@ -116,7 +116,6 @@ Maintainers
 * `Tagir Akhmetshin <https://github.com/tagirshin>`_
 * `Dmitry Zankov <https://github.com/dzankov>`_
 
-
 Contributors
 --------------------
 
