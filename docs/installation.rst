@@ -1,3 +1,5 @@
+.. _installation:
+
 Installation
 ===========================
 
@@ -74,6 +76,7 @@ you can follow these steps:
 If Poetry fails with error, a possible solution is to update the bashrc file with the following command:
 
 .. code-block:: bash
+
     echo 'export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring' >> ~/.bashrc
     exec "bash"
 

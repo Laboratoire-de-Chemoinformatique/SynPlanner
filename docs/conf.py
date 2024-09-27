@@ -26,8 +26,9 @@ html_theme_options = {
     "show_nav_level": 4,
     "github_url": "https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner",
     "show_prev_next": False,
-    "navbar_end": ["theme-switcher", "navbar-icon-links"],
-    "primary_sidebar_end": ["sidebar-ethical-ads"]
+    "navbar_end": ["theme-switcher"],
+    "primary_sidebar_end": ["sidebar-ethical-ads"],
+    "header_links_before_dropdown": 7
 }
 
 html_sidebars = {

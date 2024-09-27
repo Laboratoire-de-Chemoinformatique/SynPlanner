@@ -1,6 +1,6 @@
 .. _data_download:
 
-Data download
+Data
 ===========================
 All SynPlanner data can be downloaded with corresponding  CLI command from HugginFace repository. Here the description of data acoomopnaying SynPlanner.
 

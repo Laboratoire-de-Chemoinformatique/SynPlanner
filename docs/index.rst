@@ -65,7 +65,7 @@ The main steps of this pipeline are listed below.
 
 .. tip::
     If you want to run retrosynthetic planning, you can download the data we used in our paper.
-    See more in section :ref:`data_download`.
+    See more in section :ref:`data`.
 
 .. _retrosynthetic planning: tutorial/retrosynthetic_planning.ipynb
 .. _data curation: tutorial/data_curation.ipynb
@@ -78,7 +78,10 @@ The main steps of this pipeline are listed below.
     :titlesonly:
 
     installation
-    tutorials
+    data
     interfaces
+    configuration
+    tutorials
+    methods
     api
-    data_download
+
