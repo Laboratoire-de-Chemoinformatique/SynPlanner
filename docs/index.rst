@@ -79,9 +79,9 @@ The main steps of this pipeline are listed below.
 
     installation
     data
-    interfaces
-    configuration
+    interfaces/interfaces
+    configuration/configuration
     tutorials
-    methods
+    methods/methods
     api
 
