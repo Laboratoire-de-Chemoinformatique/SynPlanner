@@ -97,9 +97,12 @@ def load_building_blocks(building_blocks_path: Union[str, Path], standardize: bo
     if standardize:
         with MoleculeReader(building_blocks_path) as molecules:
             for mol in molecules:
-                mol.canonicalize()
-                mol.clean_stereo()
-                building_blocks_smiles.add(str(mol))
+                try:
+                    mol.canonicalize()
+                    mol.clean_stereo()
+                    building_blocks_smiles.add(str(mol))
+                except:  # mol.canonicalize() / InvalidAromaticRing
+                    pass
     else:
         with open(building_blocks_path, "r") as inp:
             for line in inp:
