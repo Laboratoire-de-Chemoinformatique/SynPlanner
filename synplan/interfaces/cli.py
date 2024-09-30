@@ -40,20 +40,20 @@ def download_all_data_cli(save_to: str = ".") -> None:
     download_all_data(save_to=save_to)
 
 
-@synplan.command(name="building_blocks_canonicalizing")
+@synplan.command(name="building_blocks_standardizing")
 @click.option(
     "--input",
     "input_file",
     required=True,
     type=click.Path(exists=True),
-    help="Path to the file with building blocks to be canonicalized.",
+    help="Path to the file with building blocks to be standardized.",
 )
 @click.option(
     "--output",
     "output_file",
     required=True,
     type=click.Path(),
-    help="Path to the file where canonicalized building blocks will be stored.",
+    help="Path to the file where standardized building blocks will be stored.",
 )
 def building_blocks_standardizing_cli(input_file: str, output_file: str) -> None:
     """Standardizes building blocks."""
