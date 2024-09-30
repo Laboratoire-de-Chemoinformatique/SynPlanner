@@ -117,13 +117,13 @@ def safe_canonicalization(molecule: MoleculeContainer) -> MoleculeContainer:
         return molecule
 
 
-def canonicalize_building_blocks(input_file: str, output_file: str) -> str:
-    """Canonicalizes custom building blocks.
+def standardize_building_blocks(input_file: str, output_file: str) -> str:
+    """Standardizes custom building blocks.
 
     :param input_file: The path to the file that stores the original building blocks.
-    :param output_file: The path to the file that will store the canonicalized building
+    :param output_file: The path to the file that will store the standardized building
         blocks.
-    :return: The path to the file with canonicalized building blocks.
+    :return: The path to the file with standardized building blocks.
     """
     if input_file == output_file:
         raise ValueError("input_file name and output_file name cannot be the same.")
