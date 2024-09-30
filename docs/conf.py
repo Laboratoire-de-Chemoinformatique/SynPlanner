@@ -28,6 +28,7 @@ html_theme_options = {
     "show_prev_next": False,
     "navbar_end": ["theme-switcher"],
     "primary_sidebar_end": ["sidebar-ethical-ads"],
+    "secondary_sidebar_items": [],
     "header_links_before_dropdown": 7
 }
 

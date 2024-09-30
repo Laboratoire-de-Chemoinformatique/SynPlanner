@@ -1,8 +1,8 @@
 tree:
   max_iterations: 100
   max_tree_size: 1000000
-  max_time: 120
-  max_depth: 9
+  max_time: 600
+  max_depth: 6
   search_strategy: expansion_first
   ucb_type: uct
   c_ucb: 0.1

@@ -77,11 +77,11 @@ The main steps of this pipeline are listed below.
     :caption: Navigation
     :titlesonly:
 
-    installation
-    data
+    installation/installation
+    data/data
     interfaces/interfaces
     configuration/configuration
-    tutorials
+    tutorials/tutorials
     methods/methods
     api
 
