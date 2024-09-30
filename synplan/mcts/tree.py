@@ -324,7 +324,6 @@ class Tree:
 
                     expanded = True
         if not expanded and node_id == 1:
-            logging.warning("\nThe target molecule was not expanded.")
             raise StopIteration("\nThe target molecule was not expanded.")
 
     def _add_node(

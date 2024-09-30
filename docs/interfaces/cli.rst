@@ -16,6 +16,18 @@ See the purpose and description of downloaded data **here**.
 **Parameters**:
     - ``save_to`` - the location where the downloaded data will be stored.
 
+Building blocks standardization
+-------------------------------
+It is crucial to standardize custom building blocks for compatibility with SynPlanner.
+
+.. code-block:: bash
+
+    synplan building_blocks_standardizing --input building_blocks_original.smi --output building_blocks_standardized.smi
+
+**Parameters**:
+    - ``input`` - the path to the file (.smi or .rdf) with building blocks to be standardized.
+    - ``output`` - the path to the file (.smi or .rdf) where standardized building blocks to be stored.
+
 Reaction standardization
 ---------------------------
 Reactions can be standardized with SynPlanner. The list of applied standardizers (see the details here) should be provided
@@ -115,12 +127,11 @@ with the configuration file (see the details here).
 
 Retrosynthetic planning
 ---------------------------
-Retrosynthetic planning can be performed with the below command.
-If you use your custom building blocks, be sure to canonicalize them before planning.
+Retrosynthetic planning can be performed in SynPlanner.
 
 .. code-block:: bash
 
-    synplan planning --config configs/planning.yaml --targets targets.smi --reaction_rules reaction_rules.pickle --building_blocks building_blocks_stand.smi --policy_network policy_network.ckpt --value_network=None  --results_dir planning_results
+    synplan planning --config configs/planning.yaml --targets targets.smi --reaction_rules reaction_rules.pickle --building_blocks building_blocks_stand.smi --policy_network policy_network.ckpt --results_dir planning_results
 
 **Parameters**:
     - ``config`` - the path to the configuration file.
