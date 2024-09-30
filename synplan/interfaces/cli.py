@@ -12,7 +12,7 @@ from synplan.chem.data.filtering import (ReactionFilterConfig,
 from synplan.chem.data.standardizing import (ReactionStandardizationConfig,
                                              standardize_reactions_from_file)
 from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions
-from synplan.chem.utils import canonicalize_building_blocks
+from synplan.chem.utils import standardize_building_blocks
 from synplan.mcts.search import run_search
 from synplan.ml.training.supervised import (create_policy_dataset,
                                             run_policy_training)
@@ -55,9 +55,9 @@ def download_all_data_cli(save_to: str = ".") -> None:
     type=click.Path(),
     help="Path to the file where canonicalized building blocks will be stored.",
 )
-def building_blocks_canonicalizing_cli(input_file: str, output_file: str) -> None:
-    """Canonicalizes building blocks."""
-    canonicalize_building_blocks(input_file=input_file, output_file=output_file)
+def building_blocks_standardizing_cli(input_file: str, output_file: str) -> None:
+    """Standardizes building blocks."""
+    standardize_building_blocks(input_file=input_file, output_file=output_file)
 
 
 @synplan.command(name="reaction_standardizing")
