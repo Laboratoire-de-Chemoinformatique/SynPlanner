@@ -79,7 +79,7 @@ SynPlanner can be used for retrosynthetic planning of target molecules with pre-
 and benchmarking it against other tools. This can be done easily without local SynPlanner installation with
 the following Google Colab notebook:
 
- - `Benchmarking SynPlanner <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb>`_ running retrosynthetic  planning with SynPlanner and comparing the resulted statistics and predicted retrosynthetic routes.
+- `Benchmarking SynPlanner <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb>`_ running retrosynthetic  planning with SynPlanner and comparing the resulted statistics and predicted retrosynthetic routes.
 
 Colab Tutorials
 --------------------
