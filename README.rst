@@ -73,14 +73,6 @@ After installation, one can add the ``SynPlanner`` environment in their Jupyter 
 
     python -m ipykernel install --user --name synplan_env --display-name "synplan"
 
-Quick start
---------------------
-``SynPlanner`` can be used for retrosynthetic planning of target molecules with pre-trained retrosynthetic models
-and benchmarking it against other tools. This can be done easily without local ``SynPlanner`` installation with
-the following Google Colab notebook:
-
-- `Benchmarking SynPlanner <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb>`_ running retrosynthetic  planning with SynPlanner and comparing the resulted statistics and predicted retrosynthetic routes.
-
 Colab Tutorials
 --------------------
 
@@ -110,6 +102,14 @@ Currently, five tutorials are available:
 - `Reaction rules extraction <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/rules_extraction.ipynb>`_  provides a workflow for extracting reaction rules from curated reaction data.
 - `Policy network training <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/ranking_policy_training.ipynb>`_ shows the workflow for policy network training.
 - `Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/retrosynthetic_planning.ipynb>`_ provides an example of how to use ``SynPlanner`` for retrosynthetic planning.
+
+Benchmarks
+--------------------
+``SynPlanner`` can be used for retrosynthetic planning of target molecules with pre-trained retrosynthetic models
+and benchmarking it against other tools. This can be done easily without local ``SynPlanner`` installation with
+the following Google Colab notebook:
+
+- `Benchmarking SynPlanner <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb>`_ running retrosynthetic  planning with SynPlanner and comparing the resulted statistics and predicted retrosynthetic routes.
 
 Contributing
 --------------------
