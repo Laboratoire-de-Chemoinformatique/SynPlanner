@@ -4,7 +4,7 @@
 Reaction standardization
 ================================
 
-This page explains how to do a reaction standardization in SynPlanner.
+This page explains how to do a reaction standardization in ``SynPlanner``.
 
 Reaction mapping
 --------------------------------
@@ -29,26 +29,18 @@ valence checking, hydrogens manipulation, cleaning isotopes, and radicals, etc.
 The reaction standardization layer includes reaction role assignment, reaction equation balancing,
 and atom-to-atom mapping fixing. The duplicate reactions and erroneous reactions are removed.
 
-The current available reaction standardizers in SynPlanner:
+The current available reaction standardizers in ``SynPlanner``:
 
-.. table::
-    :widths: 30 50
+- Reaction mapping (reaction atom mapping using ``chython`` from ``chytorch``)
+- Reaction mapping fix (fix reaction mapping in reaction when needed and possible)
+- Functional groups standardization (standardization of functional groups)
+- Kekule / Aromatic form conversion (conversion between Kekule and Aromatic form when needed)
+- Atom valence validation (check atom valences)
+- Isotope validation (check and clean isotope atoms when possible)
+- Reagents validation (remove reagents from reaction)
+- Unchanged parts validation (remove unchanged parts in reaction)
+- Hydrogen manipulation (remove hydrogen atoms)
+- Ions splitting (split ions in reaction when possible)
+- Reaction rebalancing (rebalancing reaction)
+- Duplicate reaction removal (remove duplicate reactions)
 
-    ================================== =================================================================================
-    Reaction standardizer              Description
-    ================================== =================================================================================
-    reaction_mapping_config            Maps atoms of the reaction using chython (chytorch)
-    functional_groups_config           Standardization of functional groups
-    kekule_form_config                 Transform molecules to Kekule form when possible
-    check_valence_config               Check atom valences
-    implicify_hydrogens_config         Remove hydrogen atoms
-    check_isotopes_config              Check and clean isotope atoms when possible
-    split_ions_config                  Split ions in reaction when possible
-    aromatic_form_config               Transform molecules to aromatic form when possible
-    mapping_fix_config                 Fix atom-to-atom mapping in reaction when needed and possible
-    unchanged_parts_config             Remove unchanged parts in reaction
-    small_molecules_config             Remove small molecule from reaction
-    remove_reagents_config             Remove reagents from reaction
-    rebalance_reaction_config          Rebalance reaction
-    duplicate_reaction_config          Remove duplicate reactions
-    ================================== =================================================================================

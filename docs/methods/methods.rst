@@ -4,8 +4,8 @@
 Methods
 ================
 
-
-SynPlanner protocol and algorithms details:
+This section provides with some details about approaches, methods and protocols implemented in ``SynPlanner``.
+Consult this section for more details.
 
 .. toctree::
     :hidden:

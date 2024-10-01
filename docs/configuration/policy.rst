@@ -4,7 +4,9 @@
 Policy network
 ================
 
-The ranking or filtering policy network architecture and training hyperparameters can be adjusted in the training configuration yaml file below.
+The ranking or filtering policy network architecture and training hyperparameters can be adjusted in the training configuration file.
+
+**Configuration file**
 
 .. code-block:: yaml
 
@@ -15,18 +17,18 @@ The ranking or filtering policy network architecture and training hyperparameter
     num_epoch: 100
     batch_size: 1000
 
-**Configuration parameters**:
+**Configuration parameters**
 
 .. table::
-    :widths: 20 10 50
+    :widths: 20 50
 
-    ================================== ======= =========================================================================
-    Parameter                          Default  Description
-    ================================== ======= =========================================================================
-    vector_dim                         512     The dimension of the hidden layers
-    num_conv_layers                    5       The number of convolutional layers
-    learning_rate                      0.0005  The learning rate
-    dropout                            0.4     The dropout value
-    num_epoch                          100     The number of training epochs
-    batch_size                         1000    The size of the training batch of input molecular graphs
-    ================================== ======= =========================================================================
+    ================================== =========================================================================
+    Parameter                          Description
+    ================================== =========================================================================
+    vector_dim                         The dimension of the hidden layers
+    num_conv_layers                    The number of convolutional layers
+    learning_rate                      The learning rate
+    dropout                            The dropout value
+    num_epoch                          The number of training epochs
+    batch_size                         The size of the training batch of input molecular graphs
+    ================================== =========================================================================

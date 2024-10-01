@@ -4,7 +4,7 @@
 Manual installation
 ===========================
 
-If you want to install SynPlanner in an already existing environment with minimal breaking of dependencies,
+If you want to install ``SynPlanner`` in an already existing environment with minimal breaking of dependencies,
 or if you want to install different GPU drivers, we recommend to install all dependencies manually.
 We also recommend using conda environments for proper installation of GPU drivers. In this example, the code
 provided for the linux machine:

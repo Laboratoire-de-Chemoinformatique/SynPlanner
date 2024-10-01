@@ -4,7 +4,7 @@
 Installation
 ===========================
 
-Current installation options are available on Linux-based machines
+Current installation options are available on Linux-based machines.
 
 .. toctree::
     :hidden:

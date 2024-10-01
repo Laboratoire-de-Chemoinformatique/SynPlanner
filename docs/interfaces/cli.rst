@@ -6,7 +6,7 @@ Command-line interface
 
 Data download
 ---------------------------
-Reaction and molecule data needed for training retrosynthetic models and retrosynthetic planning with pre-trained models can be downloaded directly from SynPlanner.
+Reaction and molecule data needed for training retrosynthetic models and retrosynthetic planning with pre-trained models can be downloaded directly from ``SynPlanner``.
 See the purpose and description of downloaded data **here**.
 
 .. code-block:: bash
@@ -18,7 +18,7 @@ See the purpose and description of downloaded data **here**.
 
 Building blocks standardization
 -------------------------------
-It is crucial to standardize custom building blocks for compatibility with SynPlanner.
+It is crucial to standardize custom building blocks for compatibility with ``SynPlanner``.
 
 .. code-block:: bash
 
@@ -30,10 +30,10 @@ It is crucial to standardize custom building blocks for compatibility with SynPl
 
 Reaction standardization
 ---------------------------
-Reactions can be standardized with SynPlanner. The list of applied standardizers (see the details here) should be provided
-in the configuration file (see the details here). SynPlanner takes the file with the list of reaction smiles and records
+Reactions can be standardized with ``SynPlanner``. The list of applied standardizers (see the details here) should be provided
+in the configuration file (see the details here). ``SynPlanner`` takes the file with the list of reaction smiles and records
 the standardized reactions as reaction smiles in the output file. If the reaction standardization fails by some reason
-(e.g. incorrect reaction or corrupt smiles), the corresponding reactions will be discarded, which means that SynPlanner
+(e.g. incorrect reaction or corrupt smiles), the corresponding reactions will be discarded, which means that ``SynPlanner``
 also works as a general reaction data cleaner.
 
 .. code-block:: bash
@@ -79,7 +79,7 @@ compatible with the CGRTools package.
 
 Policy networks training
 ---------------------------
-Ranking and filtering policy networks (see the details here) can be trained with SynPlanner. The architecture of both
+Ranking and filtering policy networks (see the details here) can be trained with ``SynPlanner``. The architecture of both
 types of policy networks is configured by the same configuration file (see the details here).
 
 **Ranking policy network**
@@ -127,7 +127,7 @@ with the configuration file (see the details here).
 
 Retrosynthetic planning
 ---------------------------
-Retrosynthetic planning can be performed in SynPlanner.
+Retrosynthetic planning can be performed in ``SynPlanner``.
 
 .. code-block:: bash
 

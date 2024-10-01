@@ -4,7 +4,7 @@
 Data download
 ================================
 
-All SynPlanner data can be downloaded with corresponding  CLI command from HugginFace repository. Here the description of data acoomopnaying SynPlanner.
+All ``SynPlanner`` data can be downloaded with corresponding  CLI command from HugginFace repository. Here the description of data available in ``SynPlanner``.
 
 | 📁 **uspto** - reaction data source
 | ``uspto/uspto_standardized.smi`` - the USPTO dataset from the study of Lin et al.

@@ -4,7 +4,7 @@
 Retrosynthetic planning
 ================================
 
-Currently, in SynPlanner there are different configurations of planning algorithms are available. The two reasonable and
+Currently, in ``SynPlanner`` there are different configurations of planning algorithms are available. The two reasonable and
 recommended configurations are  - default and advanced configuration.
 
 **Default planning**. This planning configuration includes the ranking policy network for node expansion,

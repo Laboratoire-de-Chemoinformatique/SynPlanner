@@ -4,7 +4,7 @@
 Policy network
 ================
 
-The tree nodes in MCTS are expanded by an expansion function approximated by a policy graph neu-ral network.
+The tree nodes in MCTS are expanded by an expansion function approximated by a policy graph neural network.
 The policy network is composed of two parts: molecular representation and reaction rule prediction parts.
 In the representation part, the molecular graph is converted to a single vector by graph convolutional layers.
 The training set structure and the prediction part architecture depend on the type of policy network,

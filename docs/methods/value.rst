@@ -5,7 +5,7 @@ Value network
 ================
 
 **Node evaluation**. During the evaluation step, the value function (or evaluation function) is used to estimate the
-retrosynthetic feasibility of newly created nodes. In SynPlanner, there are three types of evaluation functions implemented:
+retrosynthetic feasibility of newly created nodes. In ``SynPlanner``, there are three types of evaluation functions implemented:
 
     * `random function` (assigns a random value between 0 and 1 to the new node). Mostly used as a baseline.
     * `rollout function` (default evaluation type in MCTS). In the current implementation it does a series of node expansions until it reaches some stope criterion (maximum simulation depth, discovered retrosynthetic route, etc.). Based on the simulation results it assigns the value between (-1 and 1) to the new node.
