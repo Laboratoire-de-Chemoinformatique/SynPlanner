@@ -1,8 +1,10 @@
-.. _data_download:
+.. _download:
 
+================================
 Data download
-===========================
-All SynPlanner data can be downloaded with corresponding  CLI command from HugginFace repository. Here the description of data acoomopnaying SynPlanner.
+================================
+
+All ``SynPlanner`` data can be downloaded with corresponding  CLI command from HugginFace repository. Here the description of data available in ``SynPlanner``.
 
 | 📁 **uspto** - reaction data source
 | ``uspto/uspto_standardized.smi`` - the USPTO dataset from the study of Lin et al.
@@ -29,40 +31,3 @@ All SynPlanner data can be downloaded with corresponding  CLI command from Huggi
 | ``ranking_policy_training/ranking_policy_dataset.pt`` - the training set was created from filtered USPTO and extracted reaction rules for ranking policy training.
 | ``ranking_policy_training/ranking_policy_network.ckpt`` - the trained ranking policy network, that can be used in retrosynthetic planning
 | ``uspto_tutorial.smi`` - the reduced version of the USPTO dataset was created for demonstrative and educational purposes. The reproduction of the SynPlanner pipeline (starting from data curation) with the reduced version should take around 1 hour and should be feasible on regular machines with limited computation power.
-
-Retrosynthetic models training
-=======================================
-For the reaction rule extraction and retrosynthetic models training (policy and value network) the following types of data are needed:
-
-.. table::
-    :widths: 15 50
-
-    ======================= ============================================================================================
-    Data                    Description
-    ======================= ============================================================================================
-    Reaction data           Needed for reaction rules extraction and ranking policy network training
-    Molecule data           Needed for filtering policy network training
-    Targets data            Needed for value network training (targets for planning simulations in value network tuning)
-    Building blocks         Needed for retrosynthetic planning simulations in value network tuning
-    ======================= ============================================================================================
-
-Retrosynthetic planning
-=======================================
-For the retrosynthetic planning the following data and files are needed:
-
-.. table::
-    :widths: 15 50
-
-    ======================= ============================================================================================
-    Data / Files            Description
-    ======================= ============================================================================================
-    Reaction rules          Extracted reaction rules for precursors dissection in retrosynthetic planning
-    Policy network          Trained ranking or filtering policy network for node expansion in tree search
-    Value network           Trained value neural network for node evaluation in tree search (optional, the default evaluation method is rollout)
-    Building blocks         Set of building block molecules, which are used as terminal materials in the retrosynthetic route planning
-    ======================= ============================================================================================
-
-.. tip::
-
-    The current available data formats are SMILES (.smi) and RDF (.rdf) for reactions and SMILES (.smi) and SDF (.sdf) for molecules.
-    The extracted reaction rules are stored as CGRTools objects in a pickle file and currently cannot be stored in text format (e.g. reaction SMARTS).

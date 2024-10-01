@@ -1,10 +1,10 @@
 min_popularity: 3
 environment_atom_count: 1
 multicenter_rules: True
-include_rings: True
+include_rings: False
 include_func_groups: False
 func_groups_list: []
-keep_leaving_groups: True
+keep_leaving_groups: False
 keep_incoming_groups: False
 keep_reagents: False
 atom_info_retention:
