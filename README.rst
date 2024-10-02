@@ -3,7 +3,7 @@
 .. raw:: html
 
     <div align="center">
-        <h1>SynPlanner – a tool for synthesis planning</h1>
+        <h1>SynPlanner – an end-to-end tool for synthesis planning</h1>
     </div>
 
     <h3>
