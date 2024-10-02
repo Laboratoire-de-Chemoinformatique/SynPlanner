@@ -103,7 +103,7 @@ Currently, five tutorials are available:
 - `Policy network training <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/ranking_policy_training.ipynb>`_ shows the workflow for policy network training.
 - `Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/retrosynthetic_planning.ipynb>`_ provides an example of how to use ``SynPlanner`` for retrosynthetic planning.
 
-Benchmarks
+SynPlanner Benchmarks
 --------------------
 ``SynPlanner`` can be used for retrosynthetic planning of target molecules with pre-trained retrosynthetic models
 and benchmarking it against other tools. This can be done easily without local ``SynPlanner`` installation with
