@@ -20,7 +20,7 @@ the evaluation function, which allows for more exhaustive tree exploration. Alth
 evaluation-first strategy imposes an additional computational overhead, this problem can be overcome by the application
 of fast evaluation functions, such as one approximated by a value neural network.
 
-**Rollout evaluation.** The current implementation of rollout evaluation in ``SynPlanner`` is described here. For the given precursor,
+**Rollout evaluation.** The current implementation of rollout evaluation in ``SynPlanner``. For the given precursor,
 a policy network predicts a set of applicable reaction rules sorted by their predicted probability. Then all reaction rules
 are applied one by one and the first successfully applied reaction rule from this set generates new precursors. Then, the policy network
 predicts the reaction rules for obtained precursors. This dissection proceeds until the stop criterion is reached with the corresponding value:

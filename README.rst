@@ -66,8 +66,7 @@ Next, create ``SynPlanner`` environment with ``synplan_env_linux.yaml`` file:
     conda activate synplan_env
     pip install .
 
-
-After installation, one can add the ``SynPlanner`` environment in their Jupyter platform:
+The installed ``SynPlanner`` environment can then be added to the Jupyter platform:
 
 .. code-block:: bash
 
