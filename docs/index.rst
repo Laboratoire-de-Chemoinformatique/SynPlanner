@@ -6,11 +6,8 @@ SynPlanner
 
 .. image:: images/banner.png
 
-``SynPlanner`` is a comprehensive tool for reaction data curation, rule extraction, model training, and retrosynthetic planning.
+``SynPlanner`` is a comprehensive tool for reaction data curation, rule extraction, retrosynthetic model training, and retrosynthetic planning.
 It processes various reaction data sources to build a ready-to-use retrosynthetic planner.
-
-You can use ``SynPlanner`` with pre-trained policy/value networks or fine-tune them on custom data using its automated training pipeline.
-It also allows training custom value functions on discovered synthesis routes for better predictive performance.
 
 ``SynPlanner`` includes modules for atom-to-atom mapping, reaction curation, standardization, and rule extraction,
 ensuring reproducibility from initial data to trained retrosynthetic models.
@@ -25,20 +22,19 @@ including reaction atom mapping, standardization, and filtering, which can be us
 This curated data and pipelines can be used in other reaction informatics applications or for CASP tool development.
 More details can be found in `data curation`_.
 
-**2. Building custom retrosynthetic planners**
-
-``SynPlanner`` delivers various configurations of reaction rule extraction and a comprehensive pipeline
-for preparing retrosynthetic models (policy and value networks) and building ready-to-use retro-synthetic planners.
-This makes it perfect for retrosynthetic planning using custom or private re-action data, specific reaction databases,
-or specific types of chemistry.
-
-**3. Extracting reaction rules from the reaction database**
+**2. Extracting reaction rules from the reaction database**
 
 ``SynPlanner`` incorporates the original module for reaction rule extraction from reaction data.
 The protocol of reaction rule extraction is flexible and allows balancing between the generality and specificity of reaction rules
 depending on the task.
 More details can be found in `reaction rules extraction`_.
 
+**3. Building custom retrosynthetic planners**
+
+``SynPlanner`` delivers various configurations of reaction rule extraction and a comprehensive pipeline
+for preparing retrosynthetic models (policy and value networks) and building ready-to-use retro-synthetic planners.
+This makes it perfect for retrosynthetic planning using custom or private re-action data, specific reaction databases,
+or specific types of chemistry.
 
 SynPlanner Pipeline
 -----------------------
@@ -67,10 +63,10 @@ The main steps of this pipeline are listed below.
     If you want to run retrosynthetic planning, you can download the data we used in our paper.
     See more in section :ref:`data`.
 
-.. _retrosynthetic planning: tutorial/retrosynthetic_planning.ipynb
-.. _data curation: tutorial/data_curation.ipynb
-.. _reaction rules extraction: tutorial/rules_extraction.ipynb
-.. _ranking policy training: tutorial/ranking_policy_training.ipynb
+.. _retrosynthetic planning: tutorials/retrosynthetic_planning.ipynb
+.. _data curation: tutorials/data_curation.ipynb
+.. _reaction rules extraction: tutorials/rules_extraction.ipynb
+.. _ranking policy training: tutorials/policy_training.ipynb
 
 .. toctree::
     :hidden:
