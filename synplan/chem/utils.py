@@ -112,6 +112,7 @@ def safe_canonicalization(molecule: MoleculeContainer) -> MoleculeContainer:
     molecule_copy = molecule.copy()
     try:
         molecule_copy.canonicalize()
+        molecule_copy.clean_stereo()
         return molecule_copy
     except InvalidAromaticRing:
         return molecule

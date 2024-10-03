@@ -116,7 +116,7 @@ def run_tree_search(
     policy_function = PolicyNetworkFunction(policy_config=policy_config)
     value_function = ValueNetworkFunction(weights_path=value_config.weights_path)
     reaction_rules = load_reaction_rules(reaction_rules_path)
-    building_blocks = load_building_blocks(building_blocks_path)
+    building_blocks = load_building_blocks(building_blocks_path, standardize=True)
 
     # initialize tree
     tree_config.evaluation_type = "gcn"
