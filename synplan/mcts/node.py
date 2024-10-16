@@ -34,8 +34,8 @@ class Node:
     def __repr__(self) -> str:
         """Returns the SMILES of each precursor in precursor_to_expand and new_precursor."""
         return (
-            f"precursor to expand: {self.precursors_to_expand}\n"
-            f"New precursor: {self.new_precursors}"
+            f"New precursors: {self.new_precursors}\n"
+            f"Precursors to expand: {self.precursors_to_expand}\n"
         )
 
     def is_solved(self) -> bool:

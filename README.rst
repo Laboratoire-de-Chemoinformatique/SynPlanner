@@ -3,13 +3,13 @@
 .. raw:: html
 
     <div align="center">
-        <h1>SynPlanner – an end-to-end tool for synthesis planning</h1>
+        <h1>SynPlanner – a tool for synthesis planning</h1>
     </div>
 
     <h3>
         <p align="center">
             <a href="https://synplanner.readthedocs.io/">Docs</a> •
-            <a href="https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/docs/tutorials">Tutorials</a> •
+            <a href="https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/docs/tutorial">Tutorials</a> •
             <a href="https://doi.org/10.26434/chemrxiv-2024-bzpnd">Paper</a> •
             <a href="https://huggingface.co/spaces/Laboratoire-De-Chemoinformatique/SynPlanner">GUI demo</a>
         </p>
@@ -30,7 +30,7 @@ the synthesizability of intermediate products (value network).
 
 
 Overview
---------------------
+-----------------------------
 
 ``SynPlanner`` can be used for:
 
@@ -42,10 +42,10 @@ Overview
 
 
 Installation
---------------------
+-----------------------------
 
 Conda (Linux)
-====================
+=============================
 
 ``SynPlanner`` can be installed using conda/mamba package managers.
 For more information on conda installation please refer to the
@@ -66,14 +66,18 @@ Next, create ``SynPlanner`` environment with ``synplan_env_linux.yaml`` file:
     conda activate synplan_env
     pip install .
 
-The installed ``SynPlanner`` environment can then be added to the Jupyter platform:
+
+After installation, one can add the ``SynPlanner`` environment in their Jupyter platform:
 
 .. code-block:: bash
 
     python -m ipykernel install --user --name synplan_env --display-name "synplan"
 
-Colab Tutorials
---------------------
+Tutorials
+-----------------------------
+
+Colab
+=============================
 
     Colab tutorials do not require the local installation of ``SynPlanner`` but their performance is limited by available computational resources in Google Colab
 
@@ -84,8 +88,8 @@ Currently, two tutorials are available:
 - | `Planning tutorial <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb>`_ presents the ready-to-use retrosynthetic planning in SynPlanner.
   | *This tutorial can be used for retrosynthetic planning for custom target molecules with pretrained retrosynthetic models that can downloaded from SynPlanner.*
 
-Jupyter Tutorials
---------------------
+Jupyter
+=============================
 
     Jupyter Tutorials requires the local installation of ``SynPlanner`` but can be executed with advanced computational resources on local servers
 
@@ -93,38 +97,50 @@ Currently, five tutorials are available:
 
 **Quick-start tutorials.** These tutorials can be used for easy execution of the default ``SynPlanner`` pipeline:
 
-- `General tutorial <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorials/general_tutorial.ipynb>`_ presents the full pipeline of SynPlanner starting from raw reaction data and resulting in ready-to-use retrosynthetic planning.
+- `General tutorial <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/general_tutorial.ipynb>`_ presents the full pipeline of SynPlanner starting from raw reaction data and resulting in ready-to-use retrosynthetic planning.
 
 **Advanced tutorials.** These tutorials provide advanced explanations and options for each step in the ``SynPlanner`` pipeline:
 
-- `Reaction data curation <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorials/data_curation.ipynb>`_ presents the workflow for reaction standardization and reaction filtration.
-- `Reaction rules extraction <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorials/rules_extraction.ipynb>`_  provides a workflow for extracting reaction rules from curated reaction data.
-- `Policy network training <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorials/policy_training.ipynb>`_ shows the workflow for policy network training.
-- `Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorials/retrosynthetic_planning.ipynb>`_ provides an example of how to use ``SynPlanner`` for retrosynthetic planning.
+- `Reaction data curation <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/data_curation.ipynb>`_ presents the workflow for reaction standardization and reaction filtration.
+- `Reaction rules extraction <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/rules_extraction.ipynb>`_  provides a workflow for extracting reaction rules from curated reaction data.
+- `Policy network training <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/ranking_policy_training.ipynb>`_ shows the workflow for policy network training.
+- `Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/retrosynthetic_planning.ipynb>`_ provides an example of how to use ``SynPlanner`` for retrosynthetic planning.
 
 SynPlanner Benchmarks
---------------------
+-----------------------------
 ``SynPlanner`` can be used for retrosynthetic planning of target molecules with pre-trained retrosynthetic models
 and benchmarking it against other tools. This can be done easily without local ``SynPlanner`` installation with
 the following Google Colab notebook:
 
 - `Benchmarking SynPlanner <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb>`_ running retrosynthetic  planning with SynPlanner and comparing the resulted statistics and predicted retrosynthetic routes.
 
+Command-line interface
+-----------------------------
+
+SynPlanner pipeline can be accessed by neat command-line interface (CLI). For example, retrosynthetic planning of several target molecules  with pre-trained models can performed with the following commands:
+
+.. code-block:: bash
+
+    synplan download_all_data --save_to synplan_data
+    synplan planning --config configs/planning.yaml --targets synplan_data/benchmarks/sascore/targets_with_sascore_1.5_2.5.smi --reaction_rules synplan_data/uspto/uspto_reaction_rules.pickle --building_blocks synplan_data/building_blocks/building_blocks_em_sa_ln.smi --policy_network synplan_data/uspto/weights/ranking_policy_network.ckpt --results_dir planning_results
+
+More details about CLI can be found in ``SynPlanner`` `Documentaion <https://synplanner.readthedocs.io/en/latest/interfaces/cli.html>`_
+
 Contributing
---------------------
+-----------------------------
 
 Contributions are welcome, in the form of issues or pull requests.
 
 If you have a question or want to report a bug, please submit an issue.
 
 Maintainers
---------------------
+-----------------------------
 
 * `Tagir Akhmetshin <https://github.com/tagirshin>`_
 * `Dmitry Zankov <https://github.com/dzankov>`_
 
 Contributors
---------------------
+-----------------------------
 
 * `Timur Madzhidov <tmadzhidov@gmail.com>`_
 * `Alexandre Varnek <varnek@unistra.fr>`_

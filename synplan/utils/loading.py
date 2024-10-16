@@ -10,6 +10,7 @@ from typing import List, Set, Union
 from CGRtools.reactor.reactor import Reactor
 from torch import device
 from huggingface_hub import hf_hub_download, snapshot_download
+from tqdm import tqdm
 
 from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.networks.value import ValueNetwork
@@ -81,7 +82,7 @@ def load_reaction_rules(file: str) -> List[Reactor]:
 
 
 @functools.lru_cache(maxsize=None)
-def load_building_blocks(building_blocks_path: Union[str, Path], standardize: bool = False) -> Set[str]:
+def load_building_blocks(building_blocks_path: Union[str, Path], standardize: bool = True) -> Set[str]:
     """Loads building blocks data from a file and returns a frozen set of building
     blocks.
 
@@ -96,7 +97,9 @@ def load_building_blocks(building_blocks_path: Union[str, Path], standardize: bo
     building_blocks_smiles = set()
     if standardize:
         with MoleculeReader(building_blocks_path) as molecules:
-            for mol in molecules:
+            for mol in tqdm(molecules,
+                            desc="Number of building blocks processed: ",
+                            bar_format="{desc}{n} [{elapsed}]",):
                 try:
                     mol.canonicalize()
                     mol.clean_stereo()
