@@ -72,8 +72,11 @@ The installed ``SynPlanner`` environment can then be added to the Jupyter platfo
 
     python -m ipykernel install --user --name synplan_env --display-name "synplan"
 
-Colab Tutorials
+Tutorials
 --------------------
+
+Colab
+====================
 
     Colab tutorials do not require the local installation of ``SynPlanner`` but their performance is limited by available computational resources in Google Colab
 
@@ -84,8 +87,8 @@ Currently, two tutorials are available:
 - | `Retrosynthetic planning <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb>`_ presents the ready-to-use retrosynthetic planning in SynPlanner.
   | *This tutorial can be used for retrosynthetic planning for custom target molecules with pretrained retrosynthetic models that can downloaded from SynPlanner.*
 
-Jupyter Tutorials
---------------------
+Jupyter
+====================
 
     Jupyter Tutorials requires the local installation of ``SynPlanner`` but can be executed with advanced computational resources on local servers
 
