@@ -1,4 +1,4 @@
-.. _extraction:
+.. _extraction_config:
 
 ================================
 Reaction rules

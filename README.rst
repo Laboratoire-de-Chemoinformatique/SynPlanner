@@ -67,10 +67,11 @@ Next, create ``SynPlanner`` environment with ``synplan_env_linux.yaml`` file:
     pip install .
 
 
-After installation, one can add the ``SynPlanner`` environment in their Jupyter platform:
+After installation, ``SynPlanner`` can be added to Jupyter platform:
 
 .. code-block:: bash
 
+    conda install ipykernel
     python -m ipykernel install --user --name synplan_env --display-name "synplan"
 
 Tutorials
@@ -117,14 +118,14 @@ the following Google Colab notebook:
 Command-line interface
 -----------------------------
 
-SynPlanner pipeline can be accessed by neat command-line interface (CLI). For example, retrosynthetic planning of several target molecules  with pre-trained models can performed with the following commands:
+``SynPlanner`` pipeline can be accessed by neat command-line interface (CLI). For example, retrosynthetic planning of several target molecules  with pre-trained models can performed with the following commands:
 
 .. code-block:: bash
 
     synplan download_all_data --save_to synplan_data
     synplan planning --config configs/planning.yaml --targets synplan_data/benchmarks/sascore/targets_with_sascore_1.5_2.5.smi --reaction_rules synplan_data/uspto/uspto_reaction_rules.pickle --building_blocks synplan_data/building_blocks/building_blocks_em_sa_ln.smi --policy_network synplan_data/uspto/weights/ranking_policy_network.ckpt --results_dir planning_results
 
-More details about CLI can be found in ``SynPlanner`` `Documentaion <https://synplanner.readthedocs.io/en/latest/interfaces/cli.html>`_
+More details about CLI can be found in `SynPlanner Documentaion <https://synplanner.readthedocs.io/en/latest/interfaces/cli.html>`_
 
 Contributing
 -----------------------------

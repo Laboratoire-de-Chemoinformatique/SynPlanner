@@ -1,4 +1,4 @@
-.. _filtration:
+.. _filtration_config:
 
 ================================
 Reaction filtration

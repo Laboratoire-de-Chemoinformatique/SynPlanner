@@ -1,4 +1,4 @@
-.. _value:
+.. _value_config:
 
 ================
 Value network

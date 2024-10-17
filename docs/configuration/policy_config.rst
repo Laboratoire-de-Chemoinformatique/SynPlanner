@@ -1,4 +1,4 @@
-.. _policy:
+.. _policy_config:
 
 ================
 Policy network
