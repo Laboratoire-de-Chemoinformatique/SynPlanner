@@ -9,7 +9,7 @@
     <h3>
         <p align="center">
             <a href="https://synplanner.readthedocs.io/">Docs</a> •
-            <a href="https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/docs/tutorial">Tutorials</a> •
+            <a href="https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials">Tutorials</a> •
             <a href="https://doi.org/10.26434/chemrxiv-2024-bzpnd">Paper</a> •
             <a href="https://huggingface.co/spaces/Laboratoire-De-Chemoinformatique/SynPlanner">GUI demo</a>
         </p>
