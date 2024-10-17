@@ -1,4 +1,4 @@
-.. _planning:
+.. _planning_config:
 
 ================================
 Retrosynthetic planning

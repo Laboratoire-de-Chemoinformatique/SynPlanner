@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # General configuration
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints']
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon', 'nbsphinx']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon', 'nbsphinx', 'nbsphinx_link']
 source_suffix = '.rst'
 master_doc = 'index'
 

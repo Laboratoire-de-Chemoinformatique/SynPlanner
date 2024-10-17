@@ -1,4 +1,4 @@
-.. _standardization:
+.. _standardization_config:
 
 ================================
 Reaction standardization
