@@ -84,10 +84,8 @@ Colab
 
 Currently, two tutorials are available:
 
-- | `General tutorial <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/general_tutorial.ipynb>`_ presents the full pipeline of SynPlanner starting from raw reaction data and resulting in ready-to-use retrosynthetic planning.
-  | *This tutorial can be used for training retrosynthetic models on custom data from scratch.*
-- | `Planning tutorial <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb>`_ presents the ready-to-use retrosynthetic planning in SynPlanner.
-  | *This tutorial can be used for retrosynthetic planning for custom target molecules with pretrained retrosynthetic models that can downloaded from SynPlanner.*
+- `Retrosynthetic planning <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb>`_ can be used for retrosynthetic planning of any target molecule with pre-trained retrosynthetic models and advanced analysis of the search tree.
+- `SynPlanner benchmarking <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb>`_ can be used for retrosynthetic planning of many target molecules for benchmarking or comparison analysis.
 
 Jupyter
 =============================
@@ -106,14 +104,6 @@ Currently, five tutorials are available:
 - `Reaction rules extraction <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/rules_extraction.ipynb>`_  provides a workflow for extracting reaction rules from curated reaction data.
 - `Policy network training <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/ranking_policy_training.ipynb>`_ shows the workflow for policy network training.
 - `Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/tutorial/retrosynthetic_planning.ipynb>`_ provides an example of how to use ``SynPlanner`` for retrosynthetic planning.
-
-SynPlanner Benchmarks
------------------------------
-``SynPlanner`` can be used for retrosynthetic planning of target molecules with pre-trained retrosynthetic models
-and benchmarking it against other tools. This can be done easily without local ``SynPlanner`` installation with
-the following Google Colab notebook:
-
-- `Benchmarking SynPlanner <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb>`_ running retrosynthetic  planning with SynPlanner and comparing the resulted statistics and predicted retrosynthetic routes.
 
 Command-line interface
 -----------------------------
