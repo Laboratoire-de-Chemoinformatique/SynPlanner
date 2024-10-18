@@ -12,9 +12,9 @@ reaction rules extraction, and retrosynthetic planning. ``SynPlanner`` can be co
     :hidden:
     :titlesonly:
 
-    standardization_config
-    filtration_config
-    extraction_config
-    policy_config
-    value_config
-    planning_config
+    standardization
+    filtration
+    extraction
+    policy
+    value
+    planning
