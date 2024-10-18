@@ -14,27 +14,27 @@ each ``SynPlanner`` pipeline step and allows for more sophisticated functionalit
 
 **General tutorials:**
 
-- `General tutorial`_ - demonstrates the whole ``SynPlanner`` pipeline of reaction data curation, reaction rules extraction, retrosynthetic models training, retrosynthetic planning, and predicted retrosynthetic routes visualization. This tutorial can be used for routine creating ready-to-use planners for custom data and creating custom pipeline configurations.
+- `SynPlanner Pipeline`_ - demonstrates the whole ``SynPlanner`` pipeline of reaction data curation, reaction rules extraction, retrosynthetic models training, retrosynthetic planning, and predicted retrosynthetic routes visualization. This tutorial can be used for routine creating ready-to-use planners for custom data and creating custom pipeline configurations.
 
 **Advanced tutorials:**
 
-- `Data curation`_ - demonstrates how to prepare data (reaction standardization and filtration) before reaction rules extraction and retrosynthetic model training in ``SynPlanner``
-- `Rules extraction`_ - demonstrates how to extract reaction rules from reaction data in ``SynPlanner``.
-- `Policy training`_ - demonstrates how to train ranking and filtering policy network in ``SynPlanner``.
-- `Retrosynthetic planning`_ - demonstrates how retrosynthetic planning can be performed for target molecules in ``SynPlanner``.
+- `Step-1. Data curation`_ - demonstrates how to prepare data (reaction standardization and filtration) before reaction rules extraction and retrosynthetic model training in ``SynPlanner``
+- `Step-2. Reaction rules extraction`_ - demonstrates how to extract reaction rules from reaction data in ``SynPlanner``.
+- `Step-3. Policy network training`_ - demonstrates how to train ranking and filtering policy network in ``SynPlanner``.
+- `Step-4. Retrosynthetic planning`_ - demonstrates how retrosynthetic planning can be performed for target molecules in ``SynPlanner``.
 
-.. _General tutorial: general_tutorial.ipynb
-.. _Data curation: data_curation.ipynb
-.. _Rules extraction: rules_extraction.ipynb
-.. _Policy training: policy_training.ipynb
-.. _Retrosynthetic planning: retrosynthetic_planning.ipynb
+.. _SynPlanner Pipeline: SynPlanner_Pipeline.ipynb
+.. _Step-1. Data curation: Step-1_Data_Curation.ipynb
+.. _Step-2. Reaction rules extraction: Step-2_Rules_Extraction.ipynb
+.. _Step-3. Policy network training: Step-3_Policy_Training.ipynb
+.. _Step-4. Retrosynthetic planning: Step-4_Retrosynthetic_Planning.ipynb
 
 .. toctree::
     :hidden:
     :titlesonly:
 
-    general_tutorial
-    data_curation
-    rules_extraction
-    policy_training
-    retrosynthetic_planning
+    SynPlanner_Pipeline
+    Step-1_Data_Curation
+    Step-2_Rules_Extraction
+    Step-3_Policy_Training
+    Step-4_Retrosynthetic_Planning
