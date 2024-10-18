@@ -1,5 +1,6 @@
 """Module containing a class Tree that used for tree search of retrosynthetic routes."""
 import logging
+import warnings
 from collections import defaultdict, deque
 from math import sqrt
 from random import choice, uniform
@@ -97,10 +98,10 @@ class Tree:
         # utils
         self._tqdm = True  # needed to disable tqdm with multiprocessing module
 
-        if self.nodes[1].curr_precursor.is_building_block(
-                self.building_blocks, self.config.min_mol_size
-        ):
-            raise ValueError("Target is building block.")
+        target_smiles = str(self.nodes[1].curr_precursor.molecule)
+        if target_smiles in self.building_blocks:
+            self.building_blocks.remove(target_smiles)
+            print("Target was found in building blocks and removed from building blocks.")
 
     def __len__(self) -> int:
         """Returns the current size (the number of nodes) in the tree."""
