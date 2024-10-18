@@ -93,7 +93,7 @@ def run_policy_training(
     weights_file_name: str = "policy_network",
     accelerator: str = "gpu",
     devices: Union[List[int], str, int] = "auto",
-    silent: bool = True,
+    silent: bool = False,
 ) -> None:
     """
     Trains a policy network using a given datamodule and training configuration.
