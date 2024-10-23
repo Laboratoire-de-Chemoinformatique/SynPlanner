@@ -12,6 +12,7 @@ build:
       - poetry install --with docs
       - pip install nbsphinx
       - pip install pydata-sphinx-theme
+      - pip install nbsphinx-link
       - pip install .
 
 sphinx:
