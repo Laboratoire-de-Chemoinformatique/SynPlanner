@@ -260,8 +260,7 @@ def reaction_rules_appliance(
         rule_prioritized = False
 
         try:
-            tmp = [molecule.copy()]
-            for reaction in rule(tmp):
+            for reaction in rule([molecule]):
                 for prod in reaction.products:
                     prod.kekule()
                     if prod.check_valence():

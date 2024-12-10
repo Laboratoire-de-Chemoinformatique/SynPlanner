@@ -2,8 +2,7 @@ min_popularity: 3
 environment_atom_count: 1
 multicenter_rules: True
 include_rings: False
-include_func_groups: False
-func_groups_list: []
+include_func_groups: True
 keep_leaving_groups: False
 keep_incoming_groups: False
 keep_reagents: False
@@ -18,3 +17,31 @@ atom_info_retention:
     hybridization: False
     implicit_hydrogens: False
     ring_sizes: False
+func_groups_list: [
+                    '[O,S;h0]=C[O,Cl,I,Br,F]',                   # carboxylic acid / halogen
+                    '[O,S;h0]=CN',                               # amide/sulfamide
+                    'S(O)(O)[Cl]',                               # sulfonyl chloride
+                    'B(O)O',                                     # boronic acid/ester
+                    '[Si](C)(C)C',                               # trialkyl silane
+                    '[Si](OC)(OC)(OC)',                          # trialkoxy silane, default to methyl
+                    '[N;H0;$(N-[#6]);D2]-,=[N;D2]-,=[N;D1]',     # azide
+                    'O=C1N([Br,I,F,Cl])C(=O)CC1',                # NBS brominating agent
+                    'Cc1ccc(S(=O)(=O)O)cc1',                     # Tosyl
+                    'CC(C)(C)OC(=O)[N]',                         # N(boc)
+                    '[C;h3][C;h0]([C;h3])([C;h3])O',             #
+                    '[C,N]=[C,N]',                               # alkene/imine
+                    '[C,N]#[C,N]',                               # alkyne/nitrile
+                    'C=C-[A]',                                   # adj to alkene
+                    'C#C-[A]',                                   # adj to alkyne
+                    'O=C-[A]',                                   # adj to carbonyl
+                    'O=C([C;h3])-[A]',                           # adj to methyl ketone
+                    'O=C([O,N])-[A]',                            # adj to carboxylic acid/amide/ester
+                    'ClS(Cl)=O',                                 # thionyl chloride
+                    '[Mg,Li,Zn,Sn][Br,Cl,I,F]',                  # grinard/metal (non-disassociated)
+                    'S(O)(O)',                                   # SO2 group
+                    'N~N',                                       # diazo
+                    '[C;a]:[N,S,O;a]',                           # adjacency to heteroatom in aromatic ring
+                    '[N,S,O;a]:[C;a]:[C;a]',                     # two-steps away from heteroatom in aromatic ring
+                    '[B,C](F)(F)F',                              # CF3, BF3 should have the F3 included
+                 ]
+# Functional group list from: Coley, Connor W., JCIM., 59.6 (2019): 2529-2537.

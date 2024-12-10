@@ -4,6 +4,9 @@
 Reaction rules
 ================================
 
+Extraction protocol
+-----------------------------
+
 The protocol for reaction rule extraction in SynTool includes several steps:
 
 **1. CGR creation**
@@ -69,3 +72,27 @@ and validated by application of the final reaction rule to the original reaction
 
 Finally, the extracted rules are filtered by popularity, which is defined by the ``min_popularity`` parameter.
 For example, ``min_popularity:3`` means, that only rules observed in not less than 3 reactions from the reaction dataset are remained.
+
+
+Functional groups
+-----------------------------
+
+If reaction center atoms and their neighboring atoms are part of some specific substructural motif,
+they should be also included in the reaction rule for a better description of the chemical context or reaction.
+These motifs can be some “functional groups” with specific electronic and steric properties that influence
+the reactivity of reaction center atoms and may define the reaction performance.
+
+The list of functional groups can be specified in the configuration file, where each group is represented by ``chython`` SMARTS.
+
+.. tip::
+    The ``chython`` SMARTS definition is slightly different from the popular `Daylight SMARTS definition <https://www.daylight.com/dayhtml/doc/theory/theory.smarts.html>`_, please consult the official ``chython`` documentation `here <https://chython.readthedocs.io/en/latest/>`_.
+
+In SynPlanner, roughly 25 functional groups from ``Coley, Connor W., JCIM., 59.6 (2019): 2529-2537`` are available in the default configuration file.
+
+**Important:** currently in SynPlanner there is no exact specification of atom in the functional group, which must
+intersect with reaction center atoms or their neighbors for inclusion of the whole functional group to the reaction rule.
+It means that if any atom functional group intersects with reaction center atoms or their neighbors, the functional group
+will be included in the reaction rule. It sometimes leads to multiple inclusions of the same functional group in the reaction,
+which makes the final reaction rule more specific.
+
+
