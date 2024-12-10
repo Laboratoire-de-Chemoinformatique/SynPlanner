@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Union
+from chython import smarts
 
 import yaml
 from CGRtools.containers import MoleculeContainer, QueryContainer
@@ -96,9 +97,7 @@ class RuleExtractionConfig(ConfigABC):
     reverse_rule: bool = True
     as_query_container: bool = True
     include_func_groups: bool = False
-    func_groups_list: List[Union[MoleculeContainer, QueryContainer]] = field(
-        default_factory=list
-    )
+    func_groups_list: List[str] = field(default_factory=list)
 
     # adjustable parameters
     environment_atom_count: int = 1
@@ -114,6 +113,7 @@ class RuleExtractionConfig(ConfigABC):
         super().__post_init__()
         self._validate_params(self.to_dict())
         self._initialize_default_atom_info_retention()
+        self._parse_functional_groups()
 
     def _initialize_default_atom_info_retention(self):
         default_atom_info = {
@@ -138,6 +138,16 @@ class RuleExtractionConfig(ConfigABC):
                 self.atom_info_retention[key].update(
                     self.atom_info_retention.get(key, {})
                 )
+
+    def _parse_functional_groups(self):
+        func_groups_list = []
+        for group_smarts in self.func_groups_list:
+            try:
+                query = smarts(group_smarts)
+                func_groups_list.append(query)
+            except Exception as e:
+                print(f'Functional group {group_smarts} was not parsed because of {e}')
+        self.func_groups_list = func_groups_list
 
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "RuleExtractionConfig":
@@ -168,11 +178,11 @@ class RuleExtractionConfig(ConfigABC):
             raise ValueError("include_func_groups must be a boolean.")
 
         if params["func_groups_list"] is not None and not all(
-            isinstance(group, (MoleculeContainer, QueryContainer))
+            isinstance(group, str)
             for group in params["func_groups_list"]
         ):
             raise ValueError(
-                "func_groups_list must be a list of MoleculeContainer or QueryContainer objects."
+                "func_groups_list must be a list of SMARTS."
             )
 
         if not isinstance(params["include_rings"], bool):

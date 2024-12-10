@@ -12,6 +12,8 @@ from tqdm import tqdm
 from synplan.chem import smiles_parser
 from synplan.utils.files import MoleculeReader, MoleculeWriter
 
+from chython import MoleculeContainer as MoleculeContainerChython
+
 
 def mol_from_smiles(
         smiles: str,
@@ -188,3 +190,31 @@ def reverse_reaction(
     reversed_reaction.name = reaction.name
 
     return reversed_reaction
+
+
+def cgrtools_to_chython_molecule(molecule):
+    molecule_chython = MoleculeContainerChython()
+    for n, atom in molecule.atoms():
+        molecule_chython.add_atom(atom.atomic_symbol, n)
+
+    for n, m, bond in molecule.bonds():
+        molecule_chython.add_bond(n, m, int(bond))
+
+    return molecule_chython
+
+
+def chython_query_to_cgrtools(query):
+    cgrtools_query = QueryContainer()
+    for n, atom in query.atoms():
+        cgrtools_query.add_atom(
+            atom=atom.atomic_symbol,
+            charge=atom.charge,
+            neighbors=atom.neighbors,
+            hybridization=atom.hybridization,
+            _map=n
+        )
+    for n, m, bond in query.bonds():
+        cgrtools_query.add_bond(n, m, int(bond))
+
+    return cgrtools_query
+

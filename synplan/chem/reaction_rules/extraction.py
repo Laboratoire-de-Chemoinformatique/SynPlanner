@@ -8,6 +8,8 @@ from os.path import splitext
 from typing import Dict, List, Set, Tuple
 
 import ray
+from chython import smarts
+from chython import QueryContainer as QueryContainerChython
 from CGRtools.containers.cgr import CGRContainer
 from CGRtools.containers.molecule import MoleculeContainer
 from CGRtools.containers.query import QueryContainer
@@ -17,7 +19,7 @@ from CGRtools.reactor import Reactor
 from tqdm import tqdm
 
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
-from synplan.chem.utils import reverse_reaction
+from synplan.chem.utils import reverse_reaction, cgrtools_to_chython_molecule, chython_query_to_cgrtools
 from synplan.utils.config import RuleExtractionConfig
 from synplan.utils.files import ReactionReader
 
@@ -54,7 +56,7 @@ def add_environment_atoms(
 def add_functional_groups(
     reaction: ReactionContainer,
     center_atoms: Set[int],
-    func_groups_list: List[MoleculeContainer],
+    func_groups_list: List[QueryContainerChython],
 ) -> Set[int]:
     """
     Augments the set of reaction rule atoms with functional groups if specified.
@@ -76,10 +78,11 @@ def add_functional_groups(
     rule_atoms = center_atoms.copy()
     # iterate over each molecule in the reaction
     for molecule in reaction.molecules():
+        molecule_chython = cgrtools_to_chython_molecule(molecule)
         # for each functional group specified in the list
         for func_group in func_groups_list:
             # find mappings of the functional group in the molecule
-            for mapping in func_group.get_mapping(molecule):
+            for mapping in func_group.get_mapping(molecule_chython):
                 # remap the functional group based on the found mapping
                 func_group.remap(mapping)
                 # if the functional group intersects with center atoms, include it
@@ -454,7 +457,7 @@ def create_rule(
     )
 
     # 3. include functional groups in the rule if specified in config
-    if config.include_func_groups:
+    if config.include_func_groups and config.func_groups_list:
         rule_atoms = add_functional_groups(
             reaction, center_atoms, config.func_groups_list
         )
