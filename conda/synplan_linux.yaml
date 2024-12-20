@@ -1,4 +1,4 @@
-name: synplan_env
+name: synplan
 channels:
   - pytorch
   - pyg
