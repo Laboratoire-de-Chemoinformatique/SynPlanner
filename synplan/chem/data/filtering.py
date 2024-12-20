@@ -953,4 +953,4 @@ def filter_reactions_from_file(
 
     ray.shutdown()
     print(f"Initial number of reactions: {lines_counter}")
-    print(f"Removed number of reactions: {lines_counter - n_filtered}")
+    print(f"Filtered number of reactions: {n_filtered}")
