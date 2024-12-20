@@ -87,9 +87,9 @@ The list of functional groups can be specified in the configuration file, where 
 .. tip::
     The ``chython`` SMARTS definition is slightly different from the popular `Daylight SMARTS definition <https://www.daylight.com/dayhtml/doc/theory/theory.smarts.html>`_, please consult the official ``chython`` documentation `here <https://chython.readthedocs.io/en/latest/>`_.
 
-In SynPlanner, roughly 25 functional groups from ``Coley, Connor W., JCIM., 59.6 (2019): 2529-2537`` are available in the default configuration file.
+In ``SynPlanner``, roughly 25 functional groups from ``Coley, Connor W., JCIM., 59.6 (2019): 2529-2537`` are available in the default configuration file.
 
-**Important:** currently in SynPlanner there is no exact specification of atom in the functional group, which must
+**Important:** currently in ``SynPlanner`` there is no exact specification of atom in the functional group, which must
 intersect with reaction center atoms or their neighbors for inclusion of the whole functional group to the reaction rule.
 It means that if any atom functional group intersects with reaction center atoms or their neighbors, the functional group
 will be included in the reaction rule. It sometimes leads to multiple inclusions of the same functional group in the reaction,
