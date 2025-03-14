@@ -80,7 +80,7 @@ class ReactionMappingStandardizer:
             successfully, else None.
         """
         try:
-            reaction.standardize()
+            self._map_reaction(reaction)
             return reaction
         except Exception as e:
             logging.debug(e)
