@@ -48,7 +48,6 @@ class ReactionMappingStandardizer:
             reaction.remove_reagents()
         except Exception as e:
             logging.debug(e)
-
         return reaction
 
     def _map_reaction(
@@ -68,8 +67,6 @@ class ReactionMappingStandardizer:
             reaction_mapped_cgrtools = smiles_cgrtools(format(chython_reaction, "m"))
             return reaction_mapped_cgrtools
 
-        return None
-
     def __call__(
         self, reaction: ReactionContainerCGRTools
     ) -> ReactionContainerCGRTools | None:
@@ -80,11 +77,10 @@ class ReactionMappingStandardizer:
             successfully, else None.
         """
         try:
-            self._map_reaction(reaction)
+            reaction = self._map_reaction(reaction)
             return reaction
         except Exception as e:
             logging.debug(e)
-        return None
 
 
 class FunctionalGroupsConfig:
