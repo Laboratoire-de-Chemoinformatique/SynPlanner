@@ -12,9 +12,8 @@ python = ">=3.10,<3.13"
 chython = {git = "https://github.com/tagirshin/chython.git", rev = "cross-platform"}
 cgrtools = {git = "https://github.com/tagirshin/CGRtools.git"}
 StructureFingerprint = "^2.1"
-py-mini-racer = ">=0.6"
+numpy = ">=2"
 pandas = ">=1.4"
-numpy = ">=1.26,<2"
 toytree = ">=2.0"
 ray = ">=2.0"
 click = ">=8.0.0"
