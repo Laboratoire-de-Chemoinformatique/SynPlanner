@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "SynPlanner"
-version = "1.0.0"
+version = "1.0.1"
 description = "Toolbox for chemical synthesis planning"
 authors = ["Laboratoire de Chemoinformatique <tagirshin@gmail.com>"]
 license = "MIT"
@@ -8,9 +8,9 @@ readme = "README.rst"
 packages = [{ include = "synplan", from = "." }, ]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.12"
-CGRtools = "^4.1.35"
-chython = ">=1.7, <1.78"
+python = ">=3.10,<3.13"
+chython = {git = "https://github.com/tagirshin/chython.git", rev = "cross-platform"}
+cgrtools = {git = "https://github.com/tagirshin/CGRtools.git"}
 StructureFingerprint = "^2.1"
 py-mini-racer = ">=0.6"
 pandas = ">=1.4"
@@ -19,9 +19,7 @@ toytree = ">=2.0"
 ray = ">=2.0"
 click = ">=8.0.0"
 huggingface-hub = ">=0.24.0"
-torch = ">=2.0,<2.3"
-chytorch = ">=1.60"
-chytorch-rxnmap = ">=1.4"
+torch = ">=2.0"
 adabelief-pytorch = ">=0.2.1"
 torch-geometric = ">=2.4.0"
 pytorch-lightning = ">=2"
