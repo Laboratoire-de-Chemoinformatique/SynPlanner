@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, cross-platform]
+    branches: [ main ]
   pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
