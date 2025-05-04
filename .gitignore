@@ -143,3 +143,6 @@ coverage/
 .DS_Store
 .AppleDouble
 .LSOverride
+
+tutorials/tutorial_results/
+*.smi

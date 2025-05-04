@@ -7,18 +7,23 @@ from pathlib import Path
 import click
 import yaml
 
-from synplan.chem.data.filtering import (ReactionFilterConfig,
-                                         filter_reactions_from_file)
-from synplan.chem.data.standardizing import (ReactionStandardizationConfig,
-                                             standardize_reactions_from_file)
+from synplan.chem.data.filtering import ReactionFilterConfig, filter_reactions_from_file
+from synplan.chem.data.standardizing import (
+    ReactionStandardizationConfig,
+    standardize_reactions_from_file,
+)
 from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions
 from synplan.chem.utils import standardize_building_blocks
 from synplan.mcts.search import run_search
-from synplan.ml.training.supervised import (create_policy_dataset,
-                                            run_policy_training)
+from synplan.ml.training.supervised import create_policy_dataset, run_policy_training
 from synplan.ml.training.reinforcement import run_updating
-from synplan.utils.config import (PolicyNetworkConfig, RuleExtractionConfig,
-                                  TreeConfig, TuningConfig, ValueNetworkConfig)
+from synplan.utils.config import (
+    PolicyNetworkConfig,
+    RuleExtractionConfig,
+    TreeConfig,
+    TuningConfig,
+    ValueNetworkConfig,
+)
 from synplan.utils.loading import download_all_data
 
 warnings.filterwarnings("ignore")

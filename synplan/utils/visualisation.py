@@ -39,7 +39,9 @@ def get_child_nodes(
     return {"type": "reaction", "children": nodes}
 
 
-def extract_routes(tree: Tree, extended: bool = False, min_mol_size: int = 0) -> List[Dict[str, Any]]:
+def extract_routes(
+    tree: Tree, extended: bool = False, min_mol_size: int = 0
+) -> List[Dict[str, Any]]:
     """Takes the target and the dictionary of successors and predecessors and returns a
     list of dictionaries that contain the target and the list of successors.
 

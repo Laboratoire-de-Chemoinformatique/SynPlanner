@@ -27,12 +27,12 @@ def download_unpack_data(filename, subfolder, save_to="."):
         repo_id="Laboratoire-De-Chemoinformatique/SynPlanner",
         filename=filename,
         subfolder=subfolder,
-        local_dir=save_to
+        local_dir=save_to,
     )
     file_path = Path(file_path)
 
     if file_path.suffix == ".zip":
-        with zipfile.ZipFile(file_path, 'r') as zip_ref:
+        with zipfile.ZipFile(file_path, "r") as zip_ref:
             # Extract the single file in the zip
             zip_ref.extractall(save_to)
             extracted_file = save_to / zip_ref.namelist()[0]
@@ -46,12 +46,11 @@ def download_unpack_data(filename, subfolder, save_to="."):
 
 def download_all_data(save_to="."):
     dir_path = snapshot_download(
-        repo_id="Laboratoire-De-Chemoinformatique/SynPlanner",
-        local_dir=save_to
+        repo_id="Laboratoire-De-Chemoinformatique/SynPlanner", local_dir=save_to
     )
     dir_path = Path(dir_path).resolve()
-    for zip_file in dir_path.rglob('*.zip'):
-        with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+    for zip_file in dir_path.rglob("*.zip"):
+        with zipfile.ZipFile(zip_file, "r") as zip_ref:
             # Check each file in the zip
             for file_name in zip_ref.namelist():
                 extracted_file_path = zip_file.parent / file_name
@@ -82,7 +81,9 @@ def load_reaction_rules(file: str) -> List[Reactor]:
 
 
 @functools.lru_cache(maxsize=None)
-def load_building_blocks(building_blocks_path: Union[str, Path], standardize: bool = True) -> Set[str]:
+def load_building_blocks(
+    building_blocks_path: Union[str, Path], standardize: bool = True
+) -> Set[str]:
     """Loads building blocks data from a file and returns a frozen set of building
     blocks.
 
@@ -92,14 +93,19 @@ def load_building_blocks(building_blocks_path: Union[str, Path], standardize: bo
     """
 
     building_blocks_path = Path(building_blocks_path).resolve()
-    assert building_blocks_path.suffix == ".smi" or building_blocks_path.suffix == ".smiles"
+    assert (
+        building_blocks_path.suffix == ".smi"
+        or building_blocks_path.suffix == ".smiles"
+    )
 
     building_blocks_smiles = set()
     if standardize:
         with MoleculeReader(building_blocks_path) as molecules:
-            for mol in tqdm(molecules,
-                            desc="Number of building blocks processed: ",
-                            bar_format="{desc}{n} [{elapsed}]",):
+            for mol in tqdm(
+                molecules,
+                desc="Number of building blocks processed: ",
+                bar_format="{desc}{n} [{elapsed}]",
+            ):
                 try:
                     mol.canonicalize()
                     mol.clean_stereo()
@@ -115,7 +121,9 @@ def load_building_blocks(building_blocks_path: Union[str, Path], standardize: bo
     return building_blocks_smiles
 
 
-def load_value_net(model_class: ValueNetwork, value_network_path: Union[str, Path]) -> ValueNetwork:
+def load_value_net(
+    model_class: ValueNetwork, value_network_path: Union[str, Path]
+) -> ValueNetwork:
     """Loads the value network.
 
     :param value_network_path: The path to the file storing value network weights.
@@ -127,7 +135,9 @@ def load_value_net(model_class: ValueNetwork, value_network_path: Union[str, Pat
     return model_class.load_from_checkpoint(value_network_path, map_location)
 
 
-def load_policy_net(model_class: PolicyNetwork, policy_network_path: Union[str, Path]) -> PolicyNetwork:
+def load_policy_net(
+    model_class: PolicyNetwork, policy_network_path: Union[str, Path]
+) -> PolicyNetwork:
     """Loads the policy network.
 
     :param policy_network_path: The path to the file storing policy network weights.

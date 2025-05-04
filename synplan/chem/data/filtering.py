@@ -8,14 +8,15 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import numpy as np
 import ray
 import yaml
-from CGRtools.containers import (CGRContainer, MoleculeContainer,
-                                 ReactionContainer)
+from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from StructureFingerprint import MorganFingerprint
 from tqdm import tqdm
 
-from synplan.chem.data.standardizing import (AromaticFormStandardizer,
-                                             KekuleFormStandardizer,
-                                             RemoveReagentsStandardizer)
+from synplan.chem.data.standardizing import (
+    AromaticFormStandardizer,
+    KekuleFormStandardizer,
+    RemoveReagentsStandardizer,
+)
 from synplan.utils.config import ConfigABC, convert_config_to_dict
 from synplan.utils.files import ReactionReader, ReactionWriter
 
@@ -191,7 +192,10 @@ class SmallMoleculesConfig(ConfigABC):
 
     def _validate_params(self, params: Dict[str, Any]) -> None:
         """Validate configuration parameters."""
-        if not isinstance(params.get("mol_max_size"), int) or params["mol_max_size"] < 1:
+        if (
+            not isinstance(params.get("mol_max_size"), int)
+            or params["mol_max_size"] < 1
+        ):
             raise ValueError("Invalid 'mol_max_size'; expected a positive integer")
 
 
@@ -483,6 +487,7 @@ class CCRingBreakingConfig:
     Object to pass to ReactionFilterConfig if you want to enable C-C ring breaking filter
 
     """
+
     pass
 
 
