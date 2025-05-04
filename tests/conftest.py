@@ -3,8 +3,7 @@ from pathlib import Path
 
 import pytest
 from CGRtools import smiles
-from CGRtools.containers import ReactionContainer, MoleculeContainer, CGRContainer
-from functools import reduce
+from CGRtools.containers import ReactionContainer, CGRContainer
 
 from synplan.chem.data.filtering import (
     ReactionFilterConfig,
@@ -23,6 +22,7 @@ from synplan.chem.data.standardizing import (
     MappingFixConfig,
     UnchangedPartsConfig,
     RemoveReagentsConfig,
+    RebalanceReactionConfig,
     DuplicateReactionConfig,
 )
 from synplan.chem.reaction_rules.extraction import RuleExtractionConfig
@@ -127,7 +127,7 @@ def std_config() -> ReactionStandardizationConfig:
         mapping_fix_config=MappingFixConfig(),
         unchanged_parts_config=UnchangedPartsConfig(),
         remove_reagents_config=RemoveReagentsConfig(),
-        # rebalance_reaction_config=RebalanceReactionConfig(),
+        rebalance_reaction_config=RebalanceReactionConfig(),
         duplicate_reaction_config=DuplicateReactionConfig(),
     )
 
