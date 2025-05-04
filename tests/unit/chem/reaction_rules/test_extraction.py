@@ -12,14 +12,12 @@ from CGRtools.containers import (
     QueryContainer,
     ReactionContainer,
 )
-from CGRtools.exceptions import IsNotConnectedAtom
 from chython import smarts as sq_chy
 
 from synplan.chem.reaction_rules.extraction import (
     add_environment_atoms,
     add_functional_groups,
     add_ring_structures,
-    clean_atom,
     clean_molecules,
 )
 from synplan.chem.utils import cgrtools_to_chython_molecule
@@ -69,12 +67,7 @@ def _neighbours(mol: MoleculeContainer | CGRContainer, idx: int) -> Set[int]:
 @pytest.mark.parametrize("depth", [0, 1])
 def test_add_environment_atoms(simple_cgr: CGRContainer, depth: int) -> None:
     centre = set(simple_cgr.center_atoms)
-
-    try:
-        expanded = add_environment_atoms(simple_cgr, centre, depth)
-    except Exception as exc:  # pragma: no cover – should not happen now
-        pytest.fail(f"add_environment_atoms raised {exc!r}")
-
+    expanded = add_environment_atoms(simple_cgr, centre, depth)
     if depth == 0:
         assert expanded == centre, "Depth 0 must echo centre atoms only"
     else:
