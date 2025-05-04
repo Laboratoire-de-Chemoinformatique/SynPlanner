@@ -197,7 +197,7 @@ def simple_esterification_reaction() -> ReactionContainer:
         "[CH3:1][C:2](=[O:3])[O:5][CH3:6].[OH2:4]"
     )
     # One‑liner gives a fully mapped ReactionContainer
-    rxn.canonicalize()          # acts on *all* molecules consistently
+    rxn.canonicalize()  # acts on *all* molecules consistently
     return rxn
 
 

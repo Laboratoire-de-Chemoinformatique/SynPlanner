@@ -85,7 +85,9 @@ def test_add_environment_atoms(simple_cgr: CGRContainer, depth: int) -> None:
         assert expected.issubset(expanded)
 
 
-def test_add_functional_groups(simple_esterification_reaction: ReactionContainer) -> None:
+def test_add_functional_groups(
+    simple_esterification_reaction: ReactionContainer,
+) -> None:
     centre = {3, 4, 5, 6}
     carbonyl = sq_chy("[C]=[O]")
     r0_ch = cgrtools_to_chython_molecule(simple_esterification_reaction.reactants[0])
@@ -140,8 +142,14 @@ def test_clean_molecules(simple_esterification_reaction: ReactionContainer) -> N
     p_queries = _extract(rxn.products)
 
     retention = {
-        "reaction_center": {k: True for k in ("neighbors", "hybridization", "implicit_hydrogens", "ring_sizes")},
-        "environment": {k: False for k in ("neighbors", "hybridization", "implicit_hydrogens", "ring_sizes")},
+        "reaction_center": {
+            k: True
+            for k in ("neighbors", "hybridization", "implicit_hydrogens", "ring_sizes")
+        },
+        "environment": {
+            k: False
+            for k in ("neighbors", "hybridization", "implicit_hydrogens", "ring_sizes")
+        },
     }
 
     cleaned_r = clean_molecules(r_queries, rxn.reactants, centre, retention)
