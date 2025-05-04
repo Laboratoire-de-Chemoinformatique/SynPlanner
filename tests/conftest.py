@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 from CGRtools import smiles
+from CGRtools.containers import ReactionContainer, MoleculeContainer, CGRContainer
+from functools import reduce
 
 from synplan.chem.data.filtering import (
     ReactionFilterConfig,
@@ -186,3 +188,42 @@ def complex_molecule():
 def ring_molecule():
     """A cyclic molecule."""
     return smiles("C1CCCCC1")
+
+
+@pytest.fixture(scope="session")
+def simple_esterification_reaction() -> ReactionContainer:
+    rxn = smiles(
+        "[CH3:1][C:2](=[O:3])[OH:4].[OH:5][CH3:6]>>"
+        "[CH3:1][C:2](=[O:3])[O:5][CH3:6].[OH2:4]"
+    )
+    # One‑liner gives a fully mapped ReactionContainer
+    rxn.canonicalize()          # acts on *all* molecules consistently
+    return rxn
+
+
+@pytest.fixture
+def simple_cgr(simple_esterification_reaction) -> CGRContainer:
+    """CGR for the simple esterification."""
+    # Standard CGR creation - skip if disjoint mapping error occurs
+    return ~simple_esterification_reaction
+
+
+@pytest.fixture
+def default_config() -> RuleExtractionConfig:
+    """Default RuleExtractionConfig."""
+    return RuleExtractionConfig()
+
+
+@pytest.fixture(scope="session")
+def diels_alder_reaction() -> ReactionContainer:
+    return smiles(
+        "[CH2:1]=[CH:2][CH:3]=[CH2:4].[CH2:5]=[CH2:6]>>"
+        "[CH2:1][CH:2]1[CH:3][CH2:4][CH2:5][CH2:6]1"
+    )
+
+
+@pytest.fixture
+def diels_alder_cgr(diels_alder_reaction) -> CGRContainer:
+    """CGR for the Diels-Alder reaction."""
+    # Standard CGR creation - skip if disjoint mapping error occurs
+    return ~diels_alder_reaction
