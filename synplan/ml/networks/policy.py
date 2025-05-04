@@ -7,11 +7,9 @@ import torch
 from pytorch_lightning import LightningModule
 from torch import Tensor
 from torch.nn import Linear
-from torch.nn.functional import (binary_cross_entropy_with_logits,
-                                 cross_entropy, one_hot)
+from torch.nn.functional import binary_cross_entropy_with_logits, cross_entropy, one_hot
 from torch_geometric.data.batch import Batch
-from torchmetrics.functional.classification import (f1_score, recall,
-                                                    specificity)
+from torchmetrics.functional.classification import f1_score, recall, specificity
 
 from synplan.ml.networks.modules import MCTSNetwork
 

@@ -33,6 +33,7 @@ from synplan.utils.logging import init_logger, init_ray_logging
 
 logger = logging.getLogger("synplan.chem.data.standardizing")
 
+
 class StandardizationError(RuntimeError):
     """Wraps the original exception and the reaction string that failed."""
 
@@ -1010,7 +1011,7 @@ def process_batch_remote(
     # --- Worker-specific logging setup ---
     worker_logger = logging.getLogger("synplan.chem.data.standardizing")
     if log_file_path:
-        log_file_path = Path(log_file_path) # Ensure it's a Path object
+        log_file_path = Path(log_file_path)  # Ensure it's a Path object
         # Check if a handler for this file already exists for this logger
         handler_exists = any(
             isinstance(h, logging.FileHandler) and Path(h.baseFilename) == log_file_path
@@ -1018,22 +1019,28 @@ def process_batch_remote(
         )
         if not handler_exists:
             try:
-                fh = logging.FileHandler(log_file_path, encoding='utf-8')
+                fh = logging.FileHandler(log_file_path, encoding="utf-8")
                 # Use a simple format for worker logs, or match driver's format
                 formatter = logging.Formatter(
-                    '%(asctime)s | %(name)s (worker) | %(levelname)-8s | %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S'
+                    "%(asctime)s | %(name)s (worker) | %(levelname)-8s | %(message)s",
+                    datefmt="%Y-%m-%d %H:%M:%S",
                 )
                 fh.setFormatter(formatter)
-                fh.setLevel(logging.INFO) # Or DEBUG, or use worker_log_level if passed
+                fh.setLevel(logging.INFO)  # Or DEBUG, or use worker_log_level if passed
                 worker_logger.addHandler(fh)
-                worker_logger.setLevel(logging.INFO) # Ensure logger passes messages to handler
-                worker_logger.propagate = False # Avoid double logging if driver also logs
+                worker_logger.setLevel(
+                    logging.INFO
+                )  # Ensure logger passes messages to handler
+                worker_logger.propagate = (
+                    False  # Avoid double logging if driver also logs
+                )
                 # Optional: Log that the handler was added
                 # worker_logger.info(f"Worker process attached file handler: {log_file_path}")
             except Exception as e:
                 # Log error if handler creation fails (e.g., permissions)
-                logging.error(f"Worker failed to create file handler {log_file_path}: {e}")
+                logging.error(
+                    f"Worker failed to create file handler {log_file_path}: {e}"
+                )
 
     return _process_batch(batch, standardizers)
 

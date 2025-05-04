@@ -1,4 +1,5 @@
 """Module containing a class Tree that used for tree search of retrosynthetic routes."""
+
 import logging
 import warnings
 from collections import defaultdict, deque
@@ -46,7 +47,9 @@ class Tree:
         # config parameters
         self.config = config
 
-        assert isinstance(target, MoleculeContainer), "Target should be given as MoleculeContainer"
+        assert isinstance(
+            target, MoleculeContainer
+        ), "Target should be given as MoleculeContainer"
         assert len(target) > 3, "Target molecule has less than 3 atoms"
 
         target_molecule = Precursor(target)
@@ -101,7 +104,9 @@ class Tree:
         target_smiles = str(self.nodes[1].curr_precursor.molecule)
         if target_smiles in self.building_blocks:
             self.building_blocks.remove(target_smiles)
-            print("Target was found in building blocks and removed from building blocks.")
+            print(
+                "Target was found in building blocks and removed from building blocks."
+            )
 
     def __len__(self) -> int:
         """Returns the current size (the number of nodes) in the tree."""

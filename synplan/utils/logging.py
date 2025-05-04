@@ -14,8 +14,10 @@ from IPython import get_ipython
 #                               Helper classes                                #
 # --------------------------------------------------------------------------- #
 
+
 class DisableLogger:
     """Context‑manager that suppresses *all* logging inside its scope."""
+
     def __enter__(self):
         logging.disable(logging.CRITICAL)
 
@@ -25,6 +27,7 @@ class DisableLogger:
 
 class HiddenPrints:
     """Context‑manager that suppresses *print* output inside its scope."""
+
     def __enter__(self):
         self._orig = sys.stdout
         sys.stdout = open(os.devnull, "w")
@@ -38,6 +41,7 @@ class HiddenPrints:
 #                         Notebook‑aware console handler                      #
 # --------------------------------------------------------------------------- #
 
+
 def _in_notebook() -> bool:
     ip = get_ipython()
     return bool(ip) and ip.__class__.__name__ == "ZMQInteractiveShell"
@@ -45,9 +49,11 @@ def _in_notebook() -> bool:
 
 class TqdmHandler(logging.StreamHandler):
     """Write via tqdm.write so log lines don't break progress bars."""
+
     def emit(self, record):
         try:
             from tqdm import tqdm
+
             tqdm.write(self.format(record), end=self.terminator)
         except ModuleNotFoundError:
             super().emit(record)
@@ -56,6 +62,7 @@ class TqdmHandler(logging.StreamHandler):
 # --------------------------------------------------------------------------- #
 #                           Public initialisation API                         #
 # --------------------------------------------------------------------------- #
+
 
 def init_logger(
     *,
@@ -75,10 +82,10 @@ def init_logger(
         Configured logger instance.
     """
     logger = logging.getLogger(name)
-    if logger.handlers:           # already configured
+    if logger.handlers:  # already configured
         return logger
 
-    logger.setLevel("DEBUG")      # capture everything; handlers filter
+    logger.setLevel("DEBUG")  # capture everything; handlers filter
 
     # console / notebook handler
     if _in_notebook() or (redirect_tqdm and "tqdm" in sys.modules):
@@ -86,33 +93,37 @@ def init_logger(
     else:
         ch = logging.StreamHandler(sys.stderr)
     ch.setLevel(console_level)
-    ch.setFormatter(logging.Formatter(
-        "%(asctime)s | %(levelname)-8s | %(message)s",
-        datefmt="%H:%M:%S",
-    ))
+    ch.setFormatter(
+        logging.Formatter(
+            "%(asctime)s | %(levelname)-8s | %(message)s",
+            datefmt="%H:%M:%S",
+        )
+    )
     logger.addHandler(ch)
 
     # rotating file handler (one file per session)
     Path(log_dir).mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    fh = logging.FileHandler(Path(log_dir) / f"{name}_{stamp}.log",
-                             encoding="utf-8")
+    fh = logging.FileHandler(Path(log_dir) / f"{name}_{stamp}.log", encoding="utf-8")
     fh.setLevel(file_level)
-    fh.setFormatter(logging.Formatter(
-        "%(asctime)s | %(name)s | %(levelname)-8s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    ))
+    fh.setFormatter(
+        logging.Formatter(
+            "%(asctime)s | %(name)s | %(levelname)-8s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
     logger.addHandler(fh)
 
     # logger.propagate = False # Removed correctly
     log_file_path = fh.baseFilename
     logger.info("Logging initialised → %s", log_file_path)
-    return logger, log_file_path # <-- Return path too
+    return logger, log_file_path  # <-- Return path too
 
 
 # --------------------------------------------------------------------------- #
 #                 Optional Ray‑specific configuration helpers                 #
 # --------------------------------------------------------------------------- #
+
 
 def init_ray_logging(
     *,
@@ -136,12 +147,16 @@ def init_ray_logging(
     if filter_userwarnings:
         warnings.filterwarnings("ignore", category=UserWarning)
 
-    import ray                                # local import to avoid hard dep
+    import ray  # local import to avoid hard dep
 
     # 3) global Python logger levels for every worker
     ray_logger_names: Iterable[str] = (
-        "ray", "ray.worker", "ray.runtime", "ray.dashboard",
-        "ray.tune", "ray.serve",
+        "ray",
+        "ray.worker",
+        "ray.runtime",
+        "ray.dashboard",
+        "ray.tune",
+        "ray.serve",
     )
     for n in ray_logger_names:
         logging.getLogger(n).setLevel(python_level)

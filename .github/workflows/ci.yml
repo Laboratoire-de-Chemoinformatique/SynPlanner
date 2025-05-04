@@ -55,13 +55,13 @@ jobs:
     needs: tests
     steps:
       - uses: actions/checkout@v4
+      - uses: snok/install-poetry@v1
+        with:
+          version: "1.8.2"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: "poetry"
-      - uses: snok/install-poetry@v1
-        with:
-          version: "1.8.2"
       - run: |
           poetry install --with dev --no-interaction --no-root
           poetry run black --check synplan tests

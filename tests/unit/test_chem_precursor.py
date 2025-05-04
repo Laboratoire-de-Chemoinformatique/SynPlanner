@@ -39,7 +39,7 @@ def test_is_building_block_with_stock(simple_molecule, complex_molecule):
     bb.clean_stereo()
     stock = {str(bb)}
     assert not p1.is_building_block(bb_stock=stock, min_mol_size=0)
-    assert p2.is_building_block(bb_stock=stock,  min_mol_size=0)
+    assert p2.is_building_block(bb_stock=stock, min_mol_size=0)
 
 
 def test_ring_molecule_handling(ring_molecule):

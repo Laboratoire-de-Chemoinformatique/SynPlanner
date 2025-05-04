@@ -146,7 +146,7 @@ class RuleExtractionConfig(ConfigABC):
                 query = smarts(group_smarts)
                 func_groups_list.append(query)
             except Exception as e:
-                print(f'Functional group {group_smarts} was not parsed because of {e}')
+                print(f"Functional group {group_smarts} was not parsed because of {e}")
         self.func_groups_list = func_groups_list
 
     @staticmethod
@@ -178,12 +178,9 @@ class RuleExtractionConfig(ConfigABC):
             raise ValueError("include_func_groups must be a boolean.")
 
         if params["func_groups_list"] is not None and not all(
-            isinstance(group, str)
-            for group in params["func_groups_list"]
+            isinstance(group, str) for group in params["func_groups_list"]
         ):
-            raise ValueError(
-                "func_groups_list must be a list of SMARTS."
-            )
+            raise ValueError("func_groups_list must be a list of SMARTS.")
 
         if not isinstance(params["include_rings"], bool):
             raise ValueError("include_rings must be a boolean.")

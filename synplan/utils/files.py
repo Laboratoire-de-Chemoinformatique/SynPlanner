@@ -6,8 +6,7 @@ from pathlib import Path
 from typing import Iterable, Union
 
 from CGRtools import smiles
-from CGRtools.containers import (CGRContainer, MoleculeContainer,
-                                 ReactionContainer)
+from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from CGRtools.files.RDFrw import RDFRead, RDFWrite
 from CGRtools.files.SDFrw import SDFRead, SDFWrite
 
