@@ -49,11 +49,3 @@ synplan = "synplan.interfaces.cli:synplan"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.cibuildwheel]
-environment = { CIBW_BEFORE_BUILD="echo pre", CIBW_TEST_COMMAND="pytest" }
-
-[[tool.cibuildwheel.overrides]]
-select = "cp3[1-2][0-9]*"
-inherit.environment = "append"
-environment = { EXTRA="value" }
