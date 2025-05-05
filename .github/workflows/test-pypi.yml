@@ -26,7 +26,8 @@ jobs:
 
       - name: Build wheels
         env:
-          CIBW_BEFORE_BUILD: 'poetry install --no-dev --no-interaction'
+          CIBW_BEFORE_BUILD: 'python -m pip install poetry && poetry install --without dev --no-interaction'
+          CIBW_BUILD: 'cp310-* cp311-* cp312-*'
         run: python -m cibuildwheel --output-dir wheelhouse
 
       - name: Upload wheel artifacts
@@ -41,6 +42,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Download Linux wheels
         uses: actions/download-artifact@v4
         with:
