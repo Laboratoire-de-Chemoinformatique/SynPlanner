@@ -1,25 +1,20 @@
 .. image:: docs/images/banner.png
 
-.. raw:: html
+SynPlanner – a tool for synthesis planning
+===========================================
 
-    <div align="center">
-        <h1>SynPlanner – a tool for synthesis planning</h1>
-    </div>
+.. centered:: Docs_ | Tutorials_ | Paper_ | GUI demo_
 
-    <h3>
-        <p align="center">
-            <a href="https://synplanner.readthedocs.io/">Docs</a> •
-            <a href="https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials">Tutorials</a> •
-            <a href="https://doi.org/10.26434/chemrxiv-2024-bzpnd">Paper</a> •
-            <a href="https://huggingface.co/spaces/Laboratoire-De-Chemoinformatique/SynPlanner">GUI demo</a>
-        </p>
-    </h3>
+.. _Docs: https://synplanner.readthedocs.io/
+.. _Tutorials: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials
+.. _Paper: https://doi.org/10.26434/chemrxiv-2024-bzpnd
+.. _GUI demo: https://huggingface.co/spaces/Laboratoire-De-Chemoinformatique/SynPlanner
 
-    <div align="center">
-        <a href="https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/SynPlanner">
-            <img src="https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/SynPlanner" alt="License Badge">
-        </a>
-    </div>
+.. centered:: |License Badge|
+
+.. |License Badge| image:: https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/SynPlanner
+   :target: https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/SynPlanner
+   :alt: License Badge
 
 ``SynPlanner`` is an open-source tool for retrosynthetic planning,
 designed to increase flexibility in training and developing
