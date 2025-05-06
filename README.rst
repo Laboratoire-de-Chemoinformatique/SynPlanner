@@ -80,7 +80,7 @@ You can run the SynPlanner command-line interface inside a Docker container. Fol
 
    ``<semver>-<interface>-<platform>``
 
-   For example, to build version 1.1.0 with the CLI interface on AMD64::
+   For example, to build version 1.1.0 with the CLI interface on AMD64:
 
 .. code-block:: bash
 
@@ -91,19 +91,19 @@ You can run the SynPlanner command-line interface inside a Docker container. Fol
 
 2. Verify the image
 
-   List your local images to confirm the tag::
+   List your local images to confirm the tag:
 
 .. code-block:: bash
 
        docker images | grep synplan
 
-You should see an entry similar to::
+You should see an entry similar to:
 
        synplan   1.1.0-cli-amd64   ...
 
 3. Run and test the CLI
 
-   Launch a container to execute the ``--help`` command and confirm the CLI is working::
+   Launch a container to execute the ``--help`` command and confirm the CLI is working:
 
 .. code-block:: bash
 
@@ -111,7 +111,7 @@ You should see an entry similar to::
 
 4. Example: planning with Docker
 
-   You can also mount a local directory for data persistence. For example::
+   You can also mount a local directory for data persistence. For example:
 
 .. code-block:: bash
 
