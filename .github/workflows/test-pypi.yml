@@ -62,7 +62,8 @@ jobs:
           # Use token unless/until Trusted Publishing is configured
           password: ${{ secrets.TEST_PYPI_TOKEN }}
           repository_url: https://test.pypi.org/legacy/
-          # skip_existing: true # Optional: Add if needed
+          skip_existing: true
+          verbose: true
 
       - name: Set up Python for testing
         uses: actions/setup-python@v5
