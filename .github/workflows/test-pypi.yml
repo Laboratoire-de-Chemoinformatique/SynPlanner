@@ -32,6 +32,13 @@ jobs:
       - name: Install dependencies (excluding dev)
         run: poetry install --no-interaction --no-root --without dev
 
+      - name: Prepare PyPI-compatible pyproject.toml
+        run: |
+          # Update version to avoid conflicts
+          sed -i 's/version = "1.1"/version = "1.1.1-dev0"/' pyproject.toml.pypi
+          # Use the PyPI-compatible file for building
+          cp pyproject.toml.pypi pyproject.toml
+
       - name: Build distribution
         run: poetry build
 
