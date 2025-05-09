@@ -1,0 +1,91 @@
+name: 🔧 Build Wheels & Test Installation from TestPyPI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    tags: ['v*.*.*']
+
+jobs:
+  build_distribution:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: "2.0.1"
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'poetry'
+
+      - name: Install dependencies (excluding dev)
+        run: poetry install --no-interaction --no-root --without dev
+
+      - name: Prepare PyPI-compatible pyproject.toml
+        run: |
+          # Update version to avoid conflicts
+          sed -i 's/version = "1.1"/version = "1.1.1-dev0"/' pyproject.toml.pypi
+          # Use the PyPI-compatible file for building
+          cp pyproject.toml.pypi pyproject.toml
+
+      - name: Build distribution
+        run: poetry build
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-distribution
+          path: dist/*
+
+  test_install_from_testpypi:
+    if: github.event_name == 'pull_request'
+    needs: build_distribution
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-distribution
+          path: dist
+
+      - name: Publish distribution 📦 to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Use token unless/until Trusted Publishing is configured
+          password: ${{ secrets.TEST_PYPI_TOKEN }}
+          repository_url: https://test.pypi.org/legacy/
+          skip_existing: true
+          verbose: true
+
+      - name: Set up Python for testing
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x' # Or a specific version used for testing
+
+      - name: Install test dependencies
+        run: python -m pip install pytest
+
+      - name: Install package from TestPyPI
+        run: |
+          python -m pip install \
+            --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple \
+            SynPlanner
+
+      - name: Run tests on installed package
+        run: pytest

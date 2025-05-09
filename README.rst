@@ -1,25 +1,20 @@
 .. image:: docs/images/banner.png
 
-.. raw:: html
+SynPlanner – a tool for synthesis planning
+===========================================
 
-    <div align="center">
-        <h1>SynPlanner – a tool for synthesis planning</h1>
-    </div>
+Docs_  |  Tutorials_  |  Paper_  |  `GUI demo`_
 
-    <h3>
-        <p align="center">
-            <a href="https://synplanner.readthedocs.io/">Docs</a> •
-            <a href="https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials">Tutorials</a> •
-            <a href="https://doi.org/10.26434/chemrxiv-2024-bzpnd">Paper</a> •
-            <a href="https://huggingface.co/spaces/Laboratoire-De-Chemoinformatique/SynPlanner">GUI demo</a>
-        </p>
-    </h3>
+.. _Docs: https://synplanner.readthedocs.io/
+.. _Tutorials: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials
+.. _Paper: https://doi.org/10.26434/chemrxiv-2024-bzpnd
+.. _GUI demo: https://huggingface.co/spaces/Laboratoire-De-Chemoinformatique/SynPlanner
 
-    <div align="center">
-        <a href="https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/SynPlanner">
-            <img src="https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/SynPlanner" alt="License Badge">
-        </a>
-    </div>
+|License Badge|
+
+.. |License Badge| image:: https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/SynPlanner
+   :target: https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/SynPlanner
+   :alt: License Badge
 
 ``SynPlanner`` is an open-source tool for retrosynthetic planning,
 designed to increase flexibility in training and developing
@@ -73,6 +68,65 @@ After installation, ``SynPlanner`` can be added to Jupyter platform:
 
     conda install ipykernel
     python -m ipykernel install --user --name synplan --display-name "synplan"
+
+Docker (CLI)
+=============================
+
+You can run the SynPlanner command-line interface inside a Docker container. Follow these steps to build, name, and test the image.
+
+1. Build the image
+
+   Use the provided ``cli.Dockerfile`` to build a Linux AMD64 image. Name (tag) the image using the convention:
+
+   ``<semver>-<interface>-<platform>``
+
+   For example, to build version 1.1.0 with the CLI interface on AMD64:
+
+.. code-block:: bash
+
+       docker build \
+         --platform linux/amd64 \
+         -t synplan:1.1.0-cli-amd64 \
+         -f cli.Dockerfile .
+
+2. Verify the image
+
+   List your local images to confirm the tag:
+
+.. code-block:: bash
+
+       docker images | grep synplan
+
+You should see an entry similar to:
+
+       synplan   1.1.0-cli-amd64   ...
+
+3. Run and test the CLI
+
+   Launch a container to execute the ``--help`` command and confirm the CLI is working:
+
+.. code-block:: bash
+
+       docker run --rm --platform linux/amd64 -it synplan:1.1.0-cli-amd64 --help
+
+4. Example: planning with Docker
+
+   You can also mount a local directory for data persistence. For example:
+
+.. code-block:: bash
+
+    docker run --rm \
+      --platform linux/amd64 \
+      -v "$(pwd)":/app \
+      -w /app \
+      synplan:1.1.0-cli-amd64 \
+      planning \
+        --config configs/planning.yaml \
+        --targets tutorials/synplan_data/benchmarks/sascore/targets_with_sascore_1.5_2.5.smi \
+        --reaction_rules tutorials/synplan_data/uspto/uspto_reaction_rules.pickle \
+        --building_blocks tutorials/synplan_data/building_blocks/building_blocks_em_sa_ln.smi \
+        --policy_network tutorials/synplan_data/uspto/weights/ranking_policy_network.ckpt \
+        --results_dir tutorials/planning_results
 
 Tutorials
 -----------------------------
