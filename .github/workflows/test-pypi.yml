@@ -29,6 +29,13 @@ jobs:
           python-version: '3.12'
           cache: 'poetry'
 
+      - name: 🛠️ Install build tools (Ubuntu only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev
+          pip install --upgrade pip setuptools wheel
+
       - name: Install dependencies (excluding dev)
         run: poetry install --no-interaction --no-root --without dev
 

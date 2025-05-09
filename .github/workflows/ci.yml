@@ -36,6 +36,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: "poetry"          # ↖ automatic dependency caching
 
+      - name: 🛠️ Install build tools (Ubuntu only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev
+          pip install --upgrade pip setuptools wheel
+
       - name: 📚Install project (incl. dev extras)
         run: |
           poetry install --with dev --no-interaction
