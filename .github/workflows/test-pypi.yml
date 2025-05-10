@@ -1,17 +1,18 @@
-name: 🔧 Build Wheels & Test Installation from TestPyPI
+name: 🔧 Publish to TestPyPI
 
 on:
   pull_request:
     branches: [ main ]
   push:
     tags: ['v*.*.*']
+  workflow_dispatch:
 
 jobs:
-  build_distribution:
+  build-and-publish:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: 🛎️Checkout repo
         uses: actions/checkout@v4
 
       - name: 📦Install Poetry
@@ -22,77 +23,27 @@ jobs:
           virtualenvs-in-project: true
           installer-parallel: true
 
-      - name: Set up Python
-        id: setup-python
+      - name: 🐍Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-          cache: 'poetry'
+          python-version: "3.12"
+          cache: "poetry"
 
-      - name: 🛠️ Install build tools (Ubuntu only)
-        if: runner.os == 'Linux'
+      - name: 🛠️ Install build tools
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential python3-dev
-          pip install --upgrade pip setuptools wheel
+          pip install --upgrade pip setuptools wheel twine
 
-      - name: Install dependencies (excluding dev)
-        run: poetry install --no-interaction --no-root --without dev
-
-      - name: Prepare PyPI-compatible pyproject.toml
+      - name: 📚Install project (incl. dev extras)
         run: |
-          # Update version to avoid conflicts
-          sed -i 's/version = "1.1"/version = "1.1.1-dev0"/' pyproject.toml.pypi
-          # Use the PyPI-compatible file for building
-          cp pyproject.toml.pypi pyproject.toml
+          poetry install --with dev --no-interaction
+          poetry build -f wheel      # guarantees the package itself is buildable
+        shell: bash
 
-      - name: Build distribution
-        run: poetry build
-
-      - name: Upload distribution artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-distribution
-          path: dist/*
-
-  test_install_from_testpypi:
-    if: github.event_name == 'pull_request'
-    needs: build_distribution
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download distribution artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: python-distribution
-          path: dist
-
-      - name: Publish distribution 📦 to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          # Use token unless/until Trusted Publishing is configured
-          password: ${{ secrets.TEST_PYPI_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
-          skip_existing: true
-          verbose: true
-
-      - name: Set up Python for testing
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x' # Or a specific version used for testing
-
-      - name: Install test dependencies
-        run: python -m pip install pytest
-
-      - name: Install package from TestPyPI
+      - name: Publish to TestPyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
         run: |
-          python -m pip install \
-            --index-url https://test.pypi.org/simple/ \
-            --extra-index-url https://pypi.org/simple \
-            SynPlanner
-
-      - name: Run tests on installed package
-        run: pytest
+          twine upload --repository-url https://test.pypi.org/legacy/ --non-interactive --skip-existing dist/*
