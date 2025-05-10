@@ -631,81 +631,65 @@ files = [
 ]
 
 [[package]]
-name = "chython"
+name = "chython-synplan"
 version = "1.90"
 description = "Library for processing molecules and reactions in python way"
 optional = false
-python-versions = ">=3.10,<4"
+python-versions = "<3.13,>=3.10"
 groups = ["main"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
-files = []
-develop = false
+files = [
+    {file = "chython_synplan-1.90-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:5f3e2b0d2f619af82c1b630b8f84c2f9a4f9689032aee1fcffd58bf104e85a04"},
+    {file = "chython_synplan-1.90-cp310-cp310-manylinux_2_39_x86_64.whl", hash = "sha256:a2230aac5b41ddb9ce9ab80a4d32b7bbffc4b988d4edd0a983d3dce814969970"},
+    {file = "chython_synplan-1.90-cp310-cp310-win_amd64.whl", hash = "sha256:a98f82c7d0e9f17bac1d2f466234ec03e488264dba6749cb52f190148a8d796b"},
+    {file = "chython_synplan-1.90-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:c32a53fc58523ac7d20dab14d53c0e95c78ca5b6e85840a52ad4eb4819225a5c"},
+    {file = "chython_synplan-1.90-cp311-cp311-manylinux_2_39_x86_64.whl", hash = "sha256:155d56c8c3f463402525022dac8dff1c26f49151ac24fa0cd02ade81e6329294"},
+    {file = "chython_synplan-1.90-cp311-cp311-win_amd64.whl", hash = "sha256:d4cdf587e2e4804ac96e22d1f043872fbb1a226a1f2b0da872c8064f48468786"},
+    {file = "chython_synplan-1.90-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:9e8b84b1d43bdd336310b647b32a997d37acd28fe8199e471836f615faa21cd3"},
+    {file = "chython_synplan-1.90-cp312-cp312-manylinux_2_39_x86_64.whl", hash = "sha256:de0625cb2cf8434bca353f51401173757edd30bc573029d039b5fa803a72ac9f"},
+    {file = "chython_synplan-1.90-cp312-cp312-win_amd64.whl", hash = "sha256:480187819a9373c8bcc0687547ae2d5a4235793eabab87fb0ffc7f3e9b49a3db"},
+]
 
 [package.dependencies]
 cachedmethods = ">=0.1.4"
-chytorch = {git = "https://github.com/tagirshin/chytorch.git", rev = "cross-platform"}
-chytorch-rxnmap = {git = "https://github.com/chython/chytorch-rxnmap.git", rev = "chython"}
 lazy-object-proxy = ">=1.6"
 lxml = ">=4.1"
-mini-racer = "^0.12.4"
+mini-racer = ">=0.12.4"
 
 [package.extras]
 rdkit = ["rdkit (>=2023.9)"]
 
-[package.source]
-type = "git"
-url = "https://github.com/tagirshin/chython.git"
-reference = "cross-platform"
-resolved_reference = "cba42204289aedf86e2a95be8a9662a89c20e90c"
-
 [[package]]
-name = "chytorch"
-version = "1.66"
+name = "chytorch-synplan"
+version = "1.68"
 description = "Library for modeling molecules and reactions in torch way"
 optional = false
-python-versions = ">=3.10,<4"
+python-versions = "<3.13,>=3.10"
 groups = ["main"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
-files = []
-develop = false
+files = [
+    {file = "chytorch_synplan-1.68-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:537ce153f3798cf196c0be8cd4c55458c562d829aa9a7b67949f3420efa2cdef"},
+    {file = "chytorch_synplan-1.68-cp310-cp310-manylinux_2_39_x86_64.whl", hash = "sha256:b7b913ec80f87bc59bcadc2c8b470e81907b7b1a71fb96bd928b731ecc652a8b"},
+    {file = "chytorch_synplan-1.68-cp310-cp310-win_amd64.whl", hash = "sha256:68c986a10784ff6310720f4eb8c6e9732131cddd111f148d5ed8cda545ff4774"},
+    {file = "chytorch_synplan-1.68-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:bcd6565ff2b338e027e17e0ecd44cd20d02aa1d300600a03ffb73a5ead3f046a"},
+    {file = "chytorch_synplan-1.68-cp311-cp311-manylinux_2_39_x86_64.whl", hash = "sha256:98ec63340d759784ac181f1099a71af752e8425590aae5074e0fa30ee2e2a44b"},
+    {file = "chytorch_synplan-1.68-cp311-cp311-win_amd64.whl", hash = "sha256:0808909b8cbcff283f69ceb55895aa427006018c4ea103c90c0dfa57021f2c86"},
+    {file = "chytorch_synplan-1.68-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:6333c60cd6bb56e6352f7c71eeb4278914fc0c7dc02da139338a3400d1caec3f"},
+    {file = "chytorch_synplan-1.68-cp312-cp312-manylinux_2_39_x86_64.whl", hash = "sha256:3921e25eecf358c9de3680b340f24174cca3bb51d2cbfbc325e8f964f5f520d4"},
+    {file = "chytorch_synplan-1.68-cp312-cp312-win_amd64.whl", hash = "sha256:a2863ff25953261d7cbaeff82910b4a18efde54b9c51f53b2f7eaedd89129404"},
+]
 
 [package.dependencies]
-chython = ">=1.70"
-scipy = "^1.10"
+chython-synplan = "1.90"
+scipy = ">=1.10,<2.0"
 torch = ">=2.0"
-torchtyping = "^0.1.4"
+torchtyping = ">=0.1.4,<0.2.0"
 
 [package.extras]
 lmdb = ["lmdb (>=1.4.1,<2.0.0)"]
 postgres = ["psycopg2-binary (>=2.9,<3.0)"]
-rdkit = ["rdkit (>=2023.9.1)"]
+rdkit = ["rdkit (>=2023.9.1,<2024.0.0)"]
 zstd = ["pyzstd (>=0.15.9,<0.16.0)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/tagirshin/chytorch.git"
-reference = "cross-platform"
-resolved_reference = "e2682f4d2e6002e07e4be63d84a6dbb316381247"
-
-[[package]]
-name = "chytorch-rxnmap"
-version = "1.4"
-description = ""
-optional = false
-python-versions = ">=3.8"
-groups = ["main"]
-markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
-files = []
-develop = false
-
-[package.dependencies]
-chytorch = ">=1.42,<2.0"
-
-[package.source]
-type = "git"
-url = "https://github.com/chython/chytorch-rxnmap.git"
-reference = "chython"
-resolved_reference = "ada315563a5fc2fc240ee7ded8e4d4e7c6d4dd32"
 
 [[package]]
 name = "click"
@@ -4682,4 +4666,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "1d24f342cbd7540daa3927c6a4c53aab4af668b6281e9aad2ceb6c6eff241dc8"
+content-hash = "2056b076e055d80779850e0f743abc732878d932e12b99b381fd1cbba05136f9"

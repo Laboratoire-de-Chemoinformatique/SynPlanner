@@ -9,7 +9,8 @@ packages = [{ include = "synplan", from = "." }, ]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
-chython = {git = "https://github.com/tagirshin/chython.git", rev = "cross-platform"}
+chython-synplan = "1.90"
+chytorch-synplan = "1.68"
 cgrtools-stable = "4.2.13"
 numpy = ">=2"
 pandas = ">=1.4"
