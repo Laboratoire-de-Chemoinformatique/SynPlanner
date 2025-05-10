@@ -485,29 +485,34 @@ files = [
 pycparser = "*"
 
 [[package]]
-name = "CGRtools"
-version = "4.1.36"
-description = ""
+name = "cgrtools-stable"
+version = "4.2.13"
+description = "Chemical Graph Reaction (CGR) Toolkit — representation, manipulation and analysis of molecules, reactions and reaction mechanisms"
 optional = false
-python-versions = ">=3.6.1"
+python-versions = ">=3.8"
 groups = ["main"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
-files = []
-develop = false
+files = [
+    {file = "cgrtools_stable-4.2.13-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:60285e53116c439ef38b6df60528280d217c792687ed600809907257c549a683"},
+    {file = "cgrtools_stable-4.2.13-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:78a3db89dc1288b96ddd38ce290e43c75195dfe6e27d7637dc75fe910b0d7e92"},
+    {file = "cgrtools_stable-4.2.13-cp310-cp310-win32.whl", hash = "sha256:3bb5d03972512cc1f217f429bcc413f0eec3d3bf6914c03deef204b1ca113770"},
+    {file = "cgrtools_stable-4.2.13-cp310-cp310-win_amd64.whl", hash = "sha256:c1216b1d267fec8e29998ae84bd81d79103b8f30db98241b2eb84621ddb45f63"},
+    {file = "cgrtools_stable-4.2.13-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:27c4eeff0725da748bb73f2fd7ff803cdf53eed5ed76dc860c2856059c893704"},
+    {file = "cgrtools_stable-4.2.13-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f8ef51d6ecc84c3abaab62d036ad9e8e592831f894ae8a36c05cdc5f7c230879"},
+    {file = "cgrtools_stable-4.2.13-cp311-cp311-win32.whl", hash = "sha256:be7f66260b924ed5c277a6ca0b8810983999c866f1175ad9fdc0887b01a1e28f"},
+    {file = "cgrtools_stable-4.2.13-cp311-cp311-win_amd64.whl", hash = "sha256:177aecb0e5130e5d20509d2fe512ea2c87dba0d70df79a7a57e489ce1fd70454"},
+    {file = "cgrtools_stable-4.2.13-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:3aa179dd9b621a57b046d4b905cbe610ffa43ef6e8aff96b174f715f966c60be"},
+    {file = "cgrtools_stable-4.2.13-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f83ff28334aa6ce8d66515c0095e212235188499db5da937214d75718d024835"},
+    {file = "cgrtools_stable-4.2.13-cp312-cp312-win32.whl", hash = "sha256:4a67ae47d1d5f8b2a0f9661231579ac49d7c0bdc7e8a233a4afda9ec3a64cd0d"},
+    {file = "cgrtools_stable-4.2.13-cp312-cp312-win_amd64.whl", hash = "sha256:9054509651bd5e9677fe6fea5502af05e77e4f5ec3f365ab4f86f8ae9079b6b7"},
+]
 
 [package.dependencies]
 CachedMethods = ">=0.1.4,<0.2"
-
-[package.extras]
-clean2d = ["mini-racer (>=0.12.0)"]
-jit = ["numba (>=0.50)", "numpy (>=1.18)"]
-mrv = ["lxml (>=4.1)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/tagirshin/CGRtools.git"
-reference = "HEAD"
-resolved_reference = "243fae56574bcd7af2416ecd888bdd95a492ad90"
+lxml = ">=4.1"
+mini-racer = ">=0.12.0"
+numba = ">=0.50"
+numpy = ">=1.18"
 
 [[package]]
 name = "chardet"
@@ -626,81 +631,80 @@ files = [
 ]
 
 [[package]]
-name = "chython"
+name = "chython-synplan"
 version = "1.90"
 description = "Library for processing molecules and reactions in python way"
 optional = false
-python-versions = ">=3.10,<4"
+python-versions = "<3.13,>=3.10"
 groups = ["main"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
-files = []
-develop = false
+files = [
+    {file = "chython_synplan-1.90-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:5f3e2b0d2f619af82c1b630b8f84c2f9a4f9689032aee1fcffd58bf104e85a04"},
+    {file = "chython_synplan-1.90-cp310-cp310-manylinux_2_39_x86_64.whl", hash = "sha256:a2230aac5b41ddb9ce9ab80a4d32b7bbffc4b988d4edd0a983d3dce814969970"},
+    {file = "chython_synplan-1.90-cp310-cp310-win_amd64.whl", hash = "sha256:a98f82c7d0e9f17bac1d2f466234ec03e488264dba6749cb52f190148a8d796b"},
+    {file = "chython_synplan-1.90-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:c32a53fc58523ac7d20dab14d53c0e95c78ca5b6e85840a52ad4eb4819225a5c"},
+    {file = "chython_synplan-1.90-cp311-cp311-manylinux_2_39_x86_64.whl", hash = "sha256:155d56c8c3f463402525022dac8dff1c26f49151ac24fa0cd02ade81e6329294"},
+    {file = "chython_synplan-1.90-cp311-cp311-win_amd64.whl", hash = "sha256:d4cdf587e2e4804ac96e22d1f043872fbb1a226a1f2b0da872c8064f48468786"},
+    {file = "chython_synplan-1.90-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:9e8b84b1d43bdd336310b647b32a997d37acd28fe8199e471836f615faa21cd3"},
+    {file = "chython_synplan-1.90-cp312-cp312-manylinux_2_39_x86_64.whl", hash = "sha256:de0625cb2cf8434bca353f51401173757edd30bc573029d039b5fa803a72ac9f"},
+    {file = "chython_synplan-1.90-cp312-cp312-win_amd64.whl", hash = "sha256:480187819a9373c8bcc0687547ae2d5a4235793eabab87fb0ffc7f3e9b49a3db"},
+]
 
 [package.dependencies]
 cachedmethods = ">=0.1.4"
-chytorch = {git = "https://github.com/tagirshin/chytorch.git", rev = "cross-platform"}
-chytorch-rxnmap = {git = "https://github.com/chython/chytorch-rxnmap.git", rev = "chython"}
 lazy-object-proxy = ">=1.6"
 lxml = ">=4.1"
-mini-racer = "^0.12.4"
+mini-racer = ">=0.12.4"
 
 [package.extras]
 rdkit = ["rdkit (>=2023.9)"]
 
-[package.source]
-type = "git"
-url = "https://github.com/tagirshin/chython.git"
-reference = "cross-platform"
-resolved_reference = "cba42204289aedf86e2a95be8a9662a89c20e90c"
-
 [[package]]
-name = "chytorch"
-version = "1.66"
-description = "Library for modeling molecules and reactions in torch way"
+name = "chytorch-rxnmap-synplan"
+version = "1.5"
+description = ""
 optional = false
-python-versions = ">=3.10,<4"
+python-versions = ">=3.10"
 groups = ["main"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
-files = []
-develop = false
+files = [
+    {file = "chytorch_rxnmap_synplan-1.5-py3-none-any.whl", hash = "sha256:bf5d408449a334a0f7b68ce8f3e22a3a7204183da29efd86d60d1c4b087c0c2d"},
+]
 
 [package.dependencies]
-chython = ">=1.70"
-scipy = "^1.10"
+chytorch-synplan = ">=1.68"
+
+[[package]]
+name = "chytorch-synplan"
+version = "1.68"
+description = "Library for modeling molecules and reactions in torch way"
+optional = false
+python-versions = "<3.13,>=3.10"
+groups = ["main"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "chytorch_synplan-1.68-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:537ce153f3798cf196c0be8cd4c55458c562d829aa9a7b67949f3420efa2cdef"},
+    {file = "chytorch_synplan-1.68-cp310-cp310-manylinux_2_39_x86_64.whl", hash = "sha256:b7b913ec80f87bc59bcadc2c8b470e81907b7b1a71fb96bd928b731ecc652a8b"},
+    {file = "chytorch_synplan-1.68-cp310-cp310-win_amd64.whl", hash = "sha256:68c986a10784ff6310720f4eb8c6e9732131cddd111f148d5ed8cda545ff4774"},
+    {file = "chytorch_synplan-1.68-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:bcd6565ff2b338e027e17e0ecd44cd20d02aa1d300600a03ffb73a5ead3f046a"},
+    {file = "chytorch_synplan-1.68-cp311-cp311-manylinux_2_39_x86_64.whl", hash = "sha256:98ec63340d759784ac181f1099a71af752e8425590aae5074e0fa30ee2e2a44b"},
+    {file = "chytorch_synplan-1.68-cp311-cp311-win_amd64.whl", hash = "sha256:0808909b8cbcff283f69ceb55895aa427006018c4ea103c90c0dfa57021f2c86"},
+    {file = "chytorch_synplan-1.68-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:6333c60cd6bb56e6352f7c71eeb4278914fc0c7dc02da139338a3400d1caec3f"},
+    {file = "chytorch_synplan-1.68-cp312-cp312-manylinux_2_39_x86_64.whl", hash = "sha256:3921e25eecf358c9de3680b340f24174cca3bb51d2cbfbc325e8f964f5f520d4"},
+    {file = "chytorch_synplan-1.68-cp312-cp312-win_amd64.whl", hash = "sha256:a2863ff25953261d7cbaeff82910b4a18efde54b9c51f53b2f7eaedd89129404"},
+]
+
+[package.dependencies]
+chython-synplan = "1.90"
+scipy = ">=1.10,<2.0"
 torch = ">=2.0"
-torchtyping = "^0.1.4"
+torchtyping = ">=0.1.4,<0.2.0"
 
 [package.extras]
 lmdb = ["lmdb (>=1.4.1,<2.0.0)"]
 postgres = ["psycopg2-binary (>=2.9,<3.0)"]
-rdkit = ["rdkit (>=2023.9.1)"]
+rdkit = ["rdkit (>=2023.9.1,<2024.0.0)"]
 zstd = ["pyzstd (>=0.15.9,<0.16.0)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/tagirshin/chytorch.git"
-reference = "cross-platform"
-resolved_reference = "e2682f4d2e6002e07e4be63d84a6dbb316381247"
-
-[[package]]
-name = "chytorch-rxnmap"
-version = "1.4"
-description = ""
-optional = false
-python-versions = ">=3.8"
-groups = ["main"]
-markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
-files = []
-develop = false
-
-[package.dependencies]
-chytorch = ">=1.42,<2.0"
-
-[package.source]
-type = "git"
-url = "https://github.com/chython/chytorch-rxnmap.git"
-reference = "chython"
-resolved_reference = "ada315563a5fc2fc240ee7ded8e4d4e7c6d4dd32"
 
 [[package]]
 name = "click"
@@ -1521,6 +1525,38 @@ docs = ["requests (>=2.0.0)"]
 typing = ["fire", "mypy (>=1.0.0)", "types-setuptools"]
 
 [[package]]
+name = "llvmlite"
+version = "0.44.0"
+description = "lightweight wrapper around basic LLVM functionality"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "llvmlite-0.44.0-cp310-cp310-macosx_10_14_x86_64.whl", hash = "sha256:9fbadbfba8422123bab5535b293da1cf72f9f478a65645ecd73e781f962ca614"},
+    {file = "llvmlite-0.44.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:cccf8eb28f24840f2689fb1a45f9c0f7e582dd24e088dcf96e424834af11f791"},
+    {file = "llvmlite-0.44.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7202b678cdf904823c764ee0fe2dfe38a76981f4c1e51715b4cb5abb6cf1d9e8"},
+    {file = "llvmlite-0.44.0-cp310-cp310-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:40526fb5e313d7b96bda4cbb2c85cd5374e04d80732dd36a282d72a560bb6408"},
+    {file = "llvmlite-0.44.0-cp310-cp310-win_amd64.whl", hash = "sha256:41e3839150db4330e1b2716c0be3b5c4672525b4c9005e17c7597f835f351ce2"},
+    {file = "llvmlite-0.44.0-cp311-cp311-macosx_10_14_x86_64.whl", hash = "sha256:eed7d5f29136bda63b6d7804c279e2b72e08c952b7c5df61f45db408e0ee52f3"},
+    {file = "llvmlite-0.44.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:ace564d9fa44bb91eb6e6d8e7754977783c68e90a471ea7ce913bff30bd62427"},
+    {file = "llvmlite-0.44.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c5d22c3bfc842668168a786af4205ec8e3ad29fb1bc03fd11fd48460d0df64c1"},
+    {file = "llvmlite-0.44.0-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:f01a394e9c9b7b1d4e63c327b096d10f6f0ed149ef53d38a09b3749dcf8c9610"},
+    {file = "llvmlite-0.44.0-cp311-cp311-win_amd64.whl", hash = "sha256:d8489634d43c20cd0ad71330dde1d5bc7b9966937a263ff1ec1cebb90dc50955"},
+    {file = "llvmlite-0.44.0-cp312-cp312-macosx_10_14_x86_64.whl", hash = "sha256:1d671a56acf725bf1b531d5ef76b86660a5ab8ef19bb6a46064a705c6ca80aad"},
+    {file = "llvmlite-0.44.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:5f79a728e0435493611c9f405168682bb75ffd1fbe6fc360733b850c80a026db"},
+    {file = "llvmlite-0.44.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c0143a5ef336da14deaa8ec26c5449ad5b6a2b564df82fcef4be040b9cacfea9"},
+    {file = "llvmlite-0.44.0-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:d752f89e31b66db6f8da06df8b39f9b91e78c5feea1bf9e8c1fba1d1c24c065d"},
+    {file = "llvmlite-0.44.0-cp312-cp312-win_amd64.whl", hash = "sha256:eae7e2d4ca8f88f89d315b48c6b741dcb925d6a1042da694aa16ab3dd4cbd3a1"},
+    {file = "llvmlite-0.44.0-cp313-cp313-macosx_10_14_x86_64.whl", hash = "sha256:319bddd44e5f71ae2689859b7203080716448a3cd1128fb144fe5c055219d516"},
+    {file = "llvmlite-0.44.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:9c58867118bad04a0bb22a2e0068c693719658105e40009ffe95c7000fcde88e"},
+    {file = "llvmlite-0.44.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:46224058b13c96af1365290bdfebe9a6264ae62fb79b2b55693deed11657a8bf"},
+    {file = "llvmlite-0.44.0-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:aa0097052c32bf721a4efc03bd109d335dfa57d9bffb3d4c24cc680711b8b4fc"},
+    {file = "llvmlite-0.44.0-cp313-cp313-win_amd64.whl", hash = "sha256:2fb7c4f2fb86cbae6dca3db9ab203eeea0e22d73b99bc2341cdf9de93612e930"},
+    {file = "llvmlite-0.44.0.tar.gz", hash = "sha256:07667d66a5d150abed9157ab6c0b9393c9356f229784a4385c02f99e94fc94d4"},
+]
+
+[[package]]
 name = "loguru"
 version = "0.7.3"
 description = "Python logging made (stupidly) simple"
@@ -1627,8 +1663,11 @@ files = [
     {file = "lxml-5.4.0-cp36-cp36m-win_amd64.whl", hash = "sha256:7ce1a171ec325192c6a636b64c94418e71a1964f56d002cc28122fceff0b6121"},
     {file = "lxml-5.4.0-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:795f61bcaf8770e1b37eec24edf9771b307df3af74d1d6f27d812e15a9ff3872"},
     {file = "lxml-5.4.0-cp37-cp37m-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:29f451a4b614a7b5b6c2e043d7b64a15bd8304d7e767055e8ab68387a8cacf4e"},
+    {file = "lxml-5.4.0-cp37-cp37m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:891f7f991a68d20c75cb13c5c9142b2a3f9eb161f1f12a9489c82172d1f133c0"},
     {file = "lxml-5.4.0-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4aa412a82e460571fad592d0f93ce9935a20090029ba08eca05c614f99b0cc92"},
+    {file = "lxml-5.4.0-cp37-cp37m-manylinux_2_28_aarch64.whl", hash = "sha256:ac7ba71f9561cd7d7b55e1ea5511543c0282e2b6450f122672a2694621d63b7e"},
     {file = "lxml-5.4.0-cp37-cp37m-manylinux_2_28_x86_64.whl", hash = "sha256:c5d32f5284012deaccd37da1e2cd42f081feaa76981f0eaa474351b68df813c5"},
+    {file = "lxml-5.4.0-cp37-cp37m-musllinux_1_2_aarch64.whl", hash = "sha256:ce31158630a6ac85bddd6b830cffd46085ff90498b397bd0a259f59d27a12188"},
     {file = "lxml-5.4.0-cp37-cp37m-musllinux_1_2_x86_64.whl", hash = "sha256:31e63621e073e04697c1b2d23fcb89991790eef370ec37ce4d5d469f40924ed6"},
     {file = "lxml-5.4.0-cp37-cp37m-win32.whl", hash = "sha256:be2ba4c3c5b7900246a8f866580700ef0d538f2ca32535e991027bdaba944063"},
     {file = "lxml-5.4.0-cp37-cp37m-win_amd64.whl", hash = "sha256:09846782b1ef650b321484ad429217f5154da4d6e786636c38e434fa32e94e49"},
@@ -2207,6 +2246,42 @@ doc = ["intersphinx-registry", "myst-nb (>=1.1)", "numpydoc (>=1.8.0)", "pillow 
 example = ["cairocffi (>=1.7)", "contextily (>=1.6)", "igraph (>=0.11)", "momepy (>=0.7.2)", "osmnx (>=1.9)", "scikit-learn (>=1.5)", "seaborn (>=0.13)"]
 extra = ["lxml (>=4.6)", "pydot (>=3.0.1)", "pygraphviz (>=1.14)", "sympy (>=1.10)"]
 test = ["pytest (>=7.2)", "pytest-cov (>=4.0)"]
+
+[[package]]
+name = "numba"
+version = "0.61.2"
+description = "compiling Python code using LLVM"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "numba-0.61.2-cp310-cp310-macosx_10_14_x86_64.whl", hash = "sha256:cf9f9fc00d6eca0c23fc840817ce9f439b9f03c8f03d6246c0e7f0cb15b7162a"},
+    {file = "numba-0.61.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:ea0247617edcb5dd61f6106a56255baab031acc4257bddaeddb3a1003b4ca3fd"},
+    {file = "numba-0.61.2-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:ae8c7a522c26215d5f62ebec436e3d341f7f590079245a2f1008dfd498cc1642"},
+    {file = "numba-0.61.2-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:bd1e74609855aa43661edffca37346e4e8462f6903889917e9f41db40907daa2"},
+    {file = "numba-0.61.2-cp310-cp310-win_amd64.whl", hash = "sha256:ae45830b129c6137294093b269ef0a22998ccc27bf7cf096ab8dcf7bca8946f9"},
+    {file = "numba-0.61.2-cp311-cp311-macosx_10_14_x86_64.whl", hash = "sha256:efd3db391df53aaa5cfbee189b6c910a5b471488749fd6606c3f33fc984c2ae2"},
+    {file = "numba-0.61.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:49c980e4171948ffebf6b9a2520ea81feed113c1f4890747ba7f59e74be84b1b"},
+    {file = "numba-0.61.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:3945615cd73c2c7eba2a85ccc9c1730c21cd3958bfcf5a44302abae0fb07bb60"},
+    {file = "numba-0.61.2-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:bbfdf4eca202cebade0b7d43896978e146f39398909a42941c9303f82f403a18"},
+    {file = "numba-0.61.2-cp311-cp311-win_amd64.whl", hash = "sha256:76bcec9f46259cedf888041b9886e257ae101c6268261b19fda8cfbc52bec9d1"},
+    {file = "numba-0.61.2-cp312-cp312-macosx_10_14_x86_64.whl", hash = "sha256:34fba9406078bac7ab052efbf0d13939426c753ad72946baaa5bf9ae0ebb8dd2"},
+    {file = "numba-0.61.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:4ddce10009bc097b080fc96876d14c051cc0c7679e99de3e0af59014dab7dfe8"},
+    {file = "numba-0.61.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:5b1bb509d01f23d70325d3a5a0e237cbc9544dd50e50588bc581ba860c213546"},
+    {file = "numba-0.61.2-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:48a53a3de8f8793526cbe330f2a39fe9a6638efcbf11bd63f3d2f9757ae345cd"},
+    {file = "numba-0.61.2-cp312-cp312-win_amd64.whl", hash = "sha256:97cf4f12c728cf77c9c1d7c23707e4d8fb4632b46275f8f3397de33e5877af18"},
+    {file = "numba-0.61.2-cp313-cp313-macosx_10_14_x86_64.whl", hash = "sha256:3a10a8fc9afac40b1eac55717cece1b8b1ac0b946f5065c89e00bde646b5b154"},
+    {file = "numba-0.61.2-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:7d3bcada3c9afba3bed413fba45845f2fb9cd0d2b27dd58a1be90257e293d140"},
+    {file = "numba-0.61.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:bdbca73ad81fa196bd53dc12e3aaf1564ae036e0c125f237c7644fe64a4928ab"},
+    {file = "numba-0.61.2-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:5f154aaea625fb32cfbe3b80c5456d514d416fcdf79733dd69c0df3a11348e9e"},
+    {file = "numba-0.61.2-cp313-cp313-win_amd64.whl", hash = "sha256:59321215e2e0ac5fa928a8020ab00b8e57cda8a97384963ac0dfa4d4e6aa54e7"},
+    {file = "numba-0.61.2.tar.gz", hash = "sha256:8750ee147940a6637b80ecf7f95062185ad8726c8c28a2295b8ec1160a196f7d"},
+]
+
+[package.dependencies]
+llvmlite = "==0.44.*"
+numpy = ">=1.24,<2.3"
 
 [[package]]
 name = "numpy"
@@ -3977,23 +4052,6 @@ pure-eval = "*"
 tests = ["cython", "littleutils", "pygments", "pytest", "typeguard"]
 
 [[package]]
-name = "structurefingerprint"
-version = "2.1"
-description = ""
-optional = false
-python-versions = ">=3.6.0"
-groups = ["main"]
-markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
-files = [
-    {file = "StructureFingerprint-2.1-py3-none-any.whl", hash = "sha256:ae464085928df4dbfc85d565333fd7970f94e44fe3c67495800b898566cd7439"},
-    {file = "StructureFingerprint-2.1.tar.gz", hash = "sha256:4bb11e1a2fbda5b4732926b6c15eed42945e3deb8f0809f23afe96f6de1ce0ba"},
-]
-
-[package.dependencies]
-CGRtools = ">=4.0.41"
-numpy = ">=1.18"
-
-[[package]]
 name = "sympy"
 version = "1.14.0"
 description = "Computer algebra system (CAS) in Python"
@@ -4623,4 +4681,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "45a70231698f619627492f0055ca37c5b836273cd84e4a0b1e361ab007a287b5"
+content-hash = "abbed7930d1400e0e2be0f286514b47a04f215038dd6511ceef861e0c6e162d1"
