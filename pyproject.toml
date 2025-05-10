@@ -11,6 +11,7 @@ packages = [{ include = "synplan", from = "." }, ]
 python = ">=3.10,<3.13"
 chython-synplan = "1.90"
 chytorch-synplan = "1.68"
+chytorch-rxnmap-synplan = "1.5"
 cgrtools-stable = "4.2.13"
 numpy = ">=2"
 pandas = ">=1.4"
