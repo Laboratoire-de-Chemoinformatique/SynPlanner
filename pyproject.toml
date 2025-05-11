@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "SynPlanner"
-version = "1.1.1"
+version = "1.1.2"
 description = "Toolbox for chemical synthesis planning"
 authors = ["Laboratoire de Chemoinformatique <tagirshin@gmail.com>"]
 license = "MIT"
@@ -9,9 +9,9 @@ packages = [{ include = "synplan", from = "." }, ]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
-chython-synplan = "1.90"
-chytorch-synplan = "1.68"
-chytorch-rxnmap-synplan = "1.5"
+chython-synplan = ">=1.91"
+chytorch-synplan = ">=1.69"
+chytorch-rxnmap-synplan = ">=1.6"
 cgrtools-stable = "4.2.13"
 numpy = ">=2"
 pandas = ">=1.4"
