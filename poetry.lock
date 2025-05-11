@@ -632,22 +632,25 @@ files = [
 
 [[package]]
 name = "chython-synplan"
-version = "1.90"
+version = "1.91"
 description = "Library for processing molecules and reactions in python way"
 optional = false
 python-versions = "<3.13,>=3.10"
 groups = ["main"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
 files = [
-    {file = "chython_synplan-1.90-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:5f3e2b0d2f619af82c1b630b8f84c2f9a4f9689032aee1fcffd58bf104e85a04"},
-    {file = "chython_synplan-1.90-cp310-cp310-manylinux_2_39_x86_64.whl", hash = "sha256:a2230aac5b41ddb9ce9ab80a4d32b7bbffc4b988d4edd0a983d3dce814969970"},
-    {file = "chython_synplan-1.90-cp310-cp310-win_amd64.whl", hash = "sha256:a98f82c7d0e9f17bac1d2f466234ec03e488264dba6749cb52f190148a8d796b"},
-    {file = "chython_synplan-1.90-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:c32a53fc58523ac7d20dab14d53c0e95c78ca5b6e85840a52ad4eb4819225a5c"},
-    {file = "chython_synplan-1.90-cp311-cp311-manylinux_2_39_x86_64.whl", hash = "sha256:155d56c8c3f463402525022dac8dff1c26f49151ac24fa0cd02ade81e6329294"},
-    {file = "chython_synplan-1.90-cp311-cp311-win_amd64.whl", hash = "sha256:d4cdf587e2e4804ac96e22d1f043872fbb1a226a1f2b0da872c8064f48468786"},
-    {file = "chython_synplan-1.90-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:9e8b84b1d43bdd336310b647b32a997d37acd28fe8199e471836f615faa21cd3"},
-    {file = "chython_synplan-1.90-cp312-cp312-manylinux_2_39_x86_64.whl", hash = "sha256:de0625cb2cf8434bca353f51401173757edd30bc573029d039b5fa803a72ac9f"},
-    {file = "chython_synplan-1.90-cp312-cp312-win_amd64.whl", hash = "sha256:480187819a9373c8bcc0687547ae2d5a4235793eabab87fb0ffc7f3e9b49a3db"},
+    {file = "chython_synplan-1.91-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:e315ee3a751bae0c72a1e8227ec136f99acbeadd536335c86a1297148f8f24d7"},
+    {file = "chython_synplan-1.91-cp310-cp310-manylinux_2_17_x86_64.whl", hash = "sha256:31559572055de8b49aab0011c07b848dd09de71a55d40d023be65a5e41979970"},
+    {file = "chython_synplan-1.91-cp310-cp310-win32.whl", hash = "sha256:9a30f7216d0beb362b89ebe888af83ee4c44bf9f04c5d73ce2c9eb5b7c871ba0"},
+    {file = "chython_synplan-1.91-cp310-cp310-win_amd64.whl", hash = "sha256:1cbf5612fd1edced84a5bb3b9cd8b772af3d8d27b3094e88320b682046d49079"},
+    {file = "chython_synplan-1.91-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:3fab15684ababb219b7512dad4a69bc805e8928e615cdbad47889f2e97cea621"},
+    {file = "chython_synplan-1.91-cp311-cp311-manylinux_2_17_x86_64.whl", hash = "sha256:b685ffcd62c75d2bfa949c330f35d7f56157bbc8eae2c4ae825be92d1dbf3703"},
+    {file = "chython_synplan-1.91-cp311-cp311-win32.whl", hash = "sha256:0a3a31133ce816606afb0f85ddd37f3a6d1d5739ff024ee5035537a8cea6c871"},
+    {file = "chython_synplan-1.91-cp311-cp311-win_amd64.whl", hash = "sha256:85c436b3069096c0a0e7ae9ea07644fc1fc327155c174b5c40c03f0bf22bd077"},
+    {file = "chython_synplan-1.91-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:e5e6ca50c101211edc93c9433bcb1a27ff9082b2824b91459d879382d960141f"},
+    {file = "chython_synplan-1.91-cp312-cp312-manylinux_2_17_x86_64.whl", hash = "sha256:5452db484eca1c6461644c15dadb0d39ac9e346e9031190e8e76a365084330f3"},
+    {file = "chython_synplan-1.91-cp312-cp312-win32.whl", hash = "sha256:a98ec35d02483b0b187c30084b3a2f089626ce1619e5807694d0e5429e7a31f0"},
+    {file = "chython_synplan-1.91-cp312-cp312-win_amd64.whl", hash = "sha256:ca50ff4ba96486c6c248313837d01cb03d46090a306272abac40a65e9a6dbcb1"},
 ]
 
 [package.dependencies]
@@ -655,47 +658,51 @@ cachedmethods = ">=0.1.4"
 lazy-object-proxy = ">=1.6"
 lxml = ">=4.1"
 mini-racer = ">=0.12.4"
+numpy = ">=1.26"
 
 [package.extras]
 rdkit = ["rdkit (>=2023.9)"]
 
 [[package]]
 name = "chytorch-rxnmap-synplan"
-version = "1.5"
+version = "1.6"
 description = ""
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
 files = [
-    {file = "chytorch_rxnmap_synplan-1.5-py3-none-any.whl", hash = "sha256:bf5d408449a334a0f7b68ce8f3e22a3a7204183da29efd86d60d1c4b087c0c2d"},
+    {file = "chytorch_rxnmap_synplan-1.6-py3-none-any.whl", hash = "sha256:9283bde63b705e4d42d4e56992cef76e7023f7d9ddb8bd34d106c57480677ea2"},
 ]
 
 [package.dependencies]
-chytorch-synplan = ">=1.68"
+chytorch-synplan = ">=1.69"
 
 [[package]]
 name = "chytorch-synplan"
-version = "1.68"
+version = "1.69"
 description = "Library for modeling molecules and reactions in torch way"
 optional = false
 python-versions = "<3.13,>=3.10"
 groups = ["main"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
 files = [
-    {file = "chytorch_synplan-1.68-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:537ce153f3798cf196c0be8cd4c55458c562d829aa9a7b67949f3420efa2cdef"},
-    {file = "chytorch_synplan-1.68-cp310-cp310-manylinux_2_39_x86_64.whl", hash = "sha256:b7b913ec80f87bc59bcadc2c8b470e81907b7b1a71fb96bd928b731ecc652a8b"},
-    {file = "chytorch_synplan-1.68-cp310-cp310-win_amd64.whl", hash = "sha256:68c986a10784ff6310720f4eb8c6e9732131cddd111f148d5ed8cda545ff4774"},
-    {file = "chytorch_synplan-1.68-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:bcd6565ff2b338e027e17e0ecd44cd20d02aa1d300600a03ffb73a5ead3f046a"},
-    {file = "chytorch_synplan-1.68-cp311-cp311-manylinux_2_39_x86_64.whl", hash = "sha256:98ec63340d759784ac181f1099a71af752e8425590aae5074e0fa30ee2e2a44b"},
-    {file = "chytorch_synplan-1.68-cp311-cp311-win_amd64.whl", hash = "sha256:0808909b8cbcff283f69ceb55895aa427006018c4ea103c90c0dfa57021f2c86"},
-    {file = "chytorch_synplan-1.68-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:6333c60cd6bb56e6352f7c71eeb4278914fc0c7dc02da139338a3400d1caec3f"},
-    {file = "chytorch_synplan-1.68-cp312-cp312-manylinux_2_39_x86_64.whl", hash = "sha256:3921e25eecf358c9de3680b340f24174cca3bb51d2cbfbc325e8f964f5f520d4"},
-    {file = "chytorch_synplan-1.68-cp312-cp312-win_amd64.whl", hash = "sha256:a2863ff25953261d7cbaeff82910b4a18efde54b9c51f53b2f7eaedd89129404"},
+    {file = "chytorch_synplan-1.69-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:db07f694072a91d0ce6568a4b4612f38a6da763405137c8e26b35ef9132a751d"},
+    {file = "chytorch_synplan-1.69-cp310-cp310-manylinux_2_17_x86_64.whl", hash = "sha256:c5bc34e2ca45df5dcac408a6f40b09e510d4155cd006b7de37de3c25723fac61"},
+    {file = "chytorch_synplan-1.69-cp310-cp310-win32.whl", hash = "sha256:63d150971b88ee8bffa0b4d6a1517fbf19ffae92afc9c558fe39ca16660fd0c9"},
+    {file = "chytorch_synplan-1.69-cp310-cp310-win_amd64.whl", hash = "sha256:374613858f39ac15c59c59170a14e4a0139e6abd3c902d8a4c1ea53f5f61dab6"},
+    {file = "chytorch_synplan-1.69-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:9c03d221a21031e749895e07af7714d7a8c9e6f3a20337000acd452174736e05"},
+    {file = "chytorch_synplan-1.69-cp311-cp311-manylinux_2_17_x86_64.whl", hash = "sha256:6473399479cca16433e583aa37199627b45ec3b36a36d3af1626c6648cd8dbdf"},
+    {file = "chytorch_synplan-1.69-cp311-cp311-win32.whl", hash = "sha256:1fc0d175322fa81711e568be4842ce0c4b6175db7bd80514d24916f9f75c8f6b"},
+    {file = "chytorch_synplan-1.69-cp311-cp311-win_amd64.whl", hash = "sha256:696a1d79ead22054294c98f723c12b6b3e1842f1d7797c8cf78ddb67fb9922bf"},
+    {file = "chytorch_synplan-1.69-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:cfb07b01031080e99e5278fc1ff31ef79603afb8b8fc3c1c1793d741a9d59e02"},
+    {file = "chytorch_synplan-1.69-cp312-cp312-manylinux_2_17_x86_64.whl", hash = "sha256:65a42a58d7a8cd25b9d40777f4c53991a373db88410a28a2d59e9e52f67653a2"},
+    {file = "chytorch_synplan-1.69-cp312-cp312-win32.whl", hash = "sha256:4f9b155a75ca91eb16a2c0a4cbcdda9edc4e6d3f860aa6404ebaad72ee1ed15b"},
+    {file = "chytorch_synplan-1.69-cp312-cp312-win_amd64.whl", hash = "sha256:50c5944eb8d910af34b20e812898b90d85565c159a657cb980065f1cf616bfad"},
 ]
 
 [package.dependencies]
-chython-synplan = "1.90"
+chython-synplan = ">=1.91"
 scipy = ">=1.10,<2.0"
 torch = ">=2.0"
 torchtyping = ">=0.1.4,<0.2.0"
@@ -4681,4 +4688,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "abbed7930d1400e0e2be0f286514b47a04f215038dd6511ceef861e0c6e162d1"
+content-hash = "43e46e23cc11794ab2bb28520643f4007d815b993600c858559caef2f7587821"
