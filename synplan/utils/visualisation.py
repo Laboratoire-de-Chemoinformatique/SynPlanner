@@ -5,7 +5,10 @@ from typing import Any, Dict, List
 
 from CGRtools.containers.molecule import MoleculeContainer
 
+from synplan.chem.reaction_routes.visualisation import cgr_display, depict_custom_reaction
 from synplan.mcts.tree import Tree
+
+from IPython.display import display, HTML
 
 
 def get_child_nodes(
@@ -377,3 +380,474 @@ def generate_results_html(
         html_file.write(template_begin)
         html_file.write(table)
         html_file.write(template_end)
+
+
+def routes_clustering_report(
+        tree: Tree,
+        groups: dict,
+        group_index: str,
+        rg_cgrs_dict: dict,
+        aam: bool = False,
+    ) -> str:
+    """
+    Generates an HTML page report for a specific cluster's synthesis routes.
+
+    :param tree: The built MCTS tree.
+    :param final_groups: 
+    :param cluster_num: The identifier for this cluster (used in title/header).
+    :param aam: If True, depict atom-to-atom mapping in route SVGs.
+    :return: A string containing the complete HTML report.
+    """
+    # --- Depict Settings (Optional: Keep if get_route_svg depends on it) ---
+    try:
+        if aam:
+            MoleculeContainer.depict_settings(aam=True)
+        else:
+            MoleculeContainer.depict_settings(aam=False)
+    except NameError:
+         # If MoleculeContainer isn't available/needed, just pass
+         pass
+    except Exception as e:
+         print(f"Warning: Error setting MoleculeContainer depict settings: {e}")
+
+    # --- Validate Input ---
+    if not isinstance(groups, dict):
+        return "<html><body>Error: cluster_node_ids must be a list.</body></html>"
+    if not tree or not isinstance(tree, Tree):
+        return "<html><body>Error: Invalid tree object provided.</body></html>"
+
+    full_html = 0
+    group = groups[group_index]
+    cluster_node_ids = group['node_ids']
+    # Filter out node IDs not actually present or not solved in the tree
+    valid_routes_in_cluster = []
+    for node_id in cluster_node_ids:
+        if node_id in tree.nodes and tree.nodes[node_id].is_solved():
+            valid_routes_in_cluster.append(node_id)
+
+    if not valid_routes_in_cluster:
+        # Return a minimal HTML page indicating no valid routes
+        return f"""
+        <!doctype html><html lang="en"><head><meta charset="utf-8">
+        <title>Cluster {group_index} Report</title></head><body>
+        <h3>Cluster {group_index} Report</h3>
+        <p>No valid/solved routes found for this cluster.</p>
+        </body></html>"""
+
+    # --- HTML Templates & Tags ---
+    th = '<th style="text-align: left; background-color:#978785; border: 1px solid black; border-spacing: 0">'
+    td = '<td style="text-align: left; border: 1px solid black; border-spacing: 0">'
+    font_head = "<font style='font-weight: bold; font-size: 18px'>"
+    font_normal = "<font style='font-weight: normal; font-size: 18px'>"
+    font_close = "</font>"
+
+    template_begin = f"""
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3"
+    crossorigin="anonymous">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cluster {group_index} Routes Report</title>
+    <style>
+        /* Optional: Add some basic styling */
+        .table {{ border-collapse: collapse; width: 100%; }}
+        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+        tr:nth-child(even) {{ background-color: #f2f2f2; }}
+        caption {{ caption-side: top; font-size: 1.5em; margin: 1em 0; }}
+        svg {{ max-width: 100%; height: auto; }}
+    </style>
+    </head>
+    <body>
+    <div class="container"> """
+
+    template_end = """
+    </div> <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
+    crossorigin="anonymous">
+    </script>
+    </body>
+    </html>
+    """
+
+    box_mark = """
+    <svg width="30" height="30" viewBox="0 0 1 1" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 5px;">
+    <circle cx="0.5" cy="0.5" r="0.5" fill="rgb()" fill-opacity="0.35" />
+    </svg>
+    """
+
+    # --- Build HTML Table ---
+    table = f"""
+    <table class="table table-striped table-hover caption-top">
+    <caption><h3>Retrosynthetic Routes Report - Cluster {group_index}</h3></caption>
+    <tbody>"""
+
+    try:
+        target_smiles_str = str(tree.nodes[1].curr_precursor) if 1 in tree.nodes else "N/A"
+    except Exception:
+        target_smiles_str = "Error retrieving target SMILES"
+    table += f"<tr>{td}{font_normal}Target Molecule: {target_smiles_str}{font_close}</td></tr>"
+    table += f"<tr>{td}{font_normal}Group index: {group_index}{font_close}</td></tr>"
+    table += f"<tr>{td}{font_normal}Size of Cluster: {len(valid_routes_in_cluster)} routes{font_close} </td></tr>"
+
+    # --- Add RG-CGR Image ---
+    first_route_id = valid_routes_in_cluster[0] if valid_routes_in_cluster else None
+
+    if first_route_id and rg_cgrs_dict and first_route_id in rg_cgrs_dict:
+        try:
+            rg_cgr = rg_cgrs_dict[first_route_id]
+            rg_cgr.clean2d()
+            rg_cgr_svg = cgr_display(rg_cgr)
+
+            if rg_cgr_svg.strip().startswith("<svg"):
+                table += f"<tr>{td}{font_normal}Created Strategic Bonds{font_close}<br>{rg_cgr_svg}</td></tr>"
+            else:
+                table += f"<tr>{td}{font_normal}Cluster Representative RG-CGR (from Route {first_route_id}):{font_close}<br><i>Invalid SVG format retrieved.</i></td></tr>"
+                print(f"Warning: Expected SVG for RG-CGR of node {first_route_id}, but got: {rg_cgr_svg[:100]}...")
+        except Exception as e:
+            table += f"<tr>{td}{font_normal}Cluster Representative RG-CGR (from Route {first_route_id}):{font_close}<br><i>Error retrieving/displaying RG-CGR: {e}</i></td></tr>"
+    else:
+        if first_route_id:
+            table += f"<tr>{td}{font_normal}Cluster Representative RG-CGR (from Route {first_route_id}):{font_close}<br><i>Not found in provided RG-CGR dictionary.</i></td></tr>"
+        else:
+            table += f"<tr>{td}{font_normal}Cluster Representative RG-CGR:{font_close}<br><i>No valid routes in cluster to select from.</i></td></tr>"
+
+    table += f"""
+    <tr>{td}
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
+            <span>{box_mark.replace("rgb()", "rgb(152, 238, 255)")} Target Molecule</span>
+            <span>{box_mark.replace("rgb()", "rgb(240, 171, 144)")} Molecule Not In Stock</span>
+            <span>{box_mark.replace("rgb()", "rgb(155, 250, 179)")} Molecule In Stock</span>
+        </div>
+    </td></tr>
+    """
+
+    for route_id in valid_routes_in_cluster:
+        try:
+            svg = get_route_svg(tree, route_id)  # get SVG for the route
+            full_route = tree.synthesis_route(route_id)  # get route steps
+            reactions = ""
+            for i, synth_step in enumerate(full_route):
+                reactions += f"<b>Step {i + 1}:</b> {str(synth_step)}<br>"
+            route_score = round(tree.route_score(route_id), 3)
+
+            table += (
+                f'<tr style="line-height: 1.8;">{td}{font_head}Route {route_id} | '
+                f"Steps: {len(full_route)} | "
+                f"Score: {route_score}{font_close}</td></tr>"
+            )
+            table += f"<tr>{td}{svg if svg else '<i>Error generating route visualization</i>'}</td></tr>"
+            table += f"<tr>{td}{reactions if reactions else '<i>No reaction steps found</i>'}</td></tr>"
+        except Exception as e:
+            table += f'<tr><td colspan="1" style="color: red;">Error processing route {route_id}: {e}</td></tr>'
+
+    table += "</tbody></table>"
+
+    full_html = template_begin + table + template_end
+    return full_html
+
+def lg_table_2_html(subgroup, nodes_to_display=[], if_display=True): 
+    # Create HTML table header
+    html = "<table style='border-collapse: collapse;'><tr><th style='border: 1px solid black; padding: 4px;'>Node ID</th>"
+    
+    # Extract all unique marks across all nodes to form consistent columns
+    all_marks = set()
+    for node_data in subgroup['nodes_data'].values():
+        all_marks.update(node_data.keys())
+    all_marks = sorted(all_marks)  # sort for consistent ordering
+    
+    # Add marks as headers
+    for mark in all_marks:
+        html += f"<th style='border: 1px solid black; padding: 4px;'>{mark}</th>"
+    html += "</tr>"
+    
+    # Fill in the rows
+    if len(nodes_to_display) == 0:
+        for node_id, node_data in subgroup['nodes_data'].items():
+            html += f"<tr><td style='border: 1px solid black; padding: 4px;'>{node_id}</td>"
+            for mark in all_marks:
+                html += "<td style='border: 1px solid black; padding: 4px;'>"
+                if mark in node_data:
+                    svg = node_data[mark][0].depict()  # Get SVG data as string
+                    html += svg
+                html += "</td>"
+            html += "</tr>"
+    else:
+        for node_id in nodes_to_display:
+            # Check if the node_id exists in the subgroup data
+            if node_id in subgroup['nodes_data']:
+                node_data = subgroup['nodes_data'][node_id]
+                html += f"<tr><td style='border: 1px solid black; padding: 4px;'>{node_id}</td>"
+                for mark in all_marks:
+                    html += "<td style='border: 1px solid black; padding: 4px;'>"
+                    if mark in node_data:
+                        svg = node_data[mark][0].depict()  # Get SVG data as string
+                        html += svg
+                    html += "</td>"
+                html += "</tr>"
+            else:
+                # Optionally, you can note that the node_id was not found
+                html += f"<tr><td colspan='{len(all_marks)+1}' style='border: 1px solid black; padding: 4px; color:red;'>Node ID {node_id} not found.</td></tr>"
+    
+    html += "</table>"
+    
+    if if_display:
+        display(HTML(html))
+    return html
+
+def group_lg_table_2_html_fixed(
+    grouped: dict,
+    groups_to_display=None,
+    if_display=False,
+    max_group_col_width: int = 200
+) -> str:
+    """
+    Same as before, but the first column ('Group') is capped at max_group_col_width (px)
+    and will wrap long text within that width.
+    """
+    # 1) pick which groups to show
+    if groups_to_display is None:
+        groups = list(grouped.keys())
+    else:
+        groups = [g for g in groups_to_display if g in grouped]
+
+    # 2) collect all marks for the header
+    all_marks = sorted({m for rep in grouped.values() for m in rep.keys()})
+
+    # 3) build table start with auto layout
+    html = [
+        "<table style='width:100%; table-layout:auto; border-collapse: collapse;'>",
+        "<thead><tr>",
+        "<th style='border:1px solid #ccc; padding:4px;'>Node IDs</th>"
+    ]
+    # numeric headers
+    html += [
+        f"<th style='border:1px solid #ccc; padding:4px; text-align:center;'>{mark}</th>"
+        for mark in all_marks
+    ]
+    html.append("</tr></thead><tbody>")
+
+    # 4) each row
+    group_td_style = (
+        f"border:1px solid #ccc; padding:4px; "
+        "white-space: normal; overflow-wrap: break-word; "
+        f"max-width:{max_group_col_width}px;"
+    )
+    img_td_style = "border:1px solid #ccc; padding:4px; text-align:center; vertical-align:middle;"
+
+    for group in groups:
+        rep = grouped[group]
+        label = ",".join(str(n) for n in group)
+        # start row
+        row = [f"<td style='{group_td_style}'>{label}</td>"]
+        # fill in each mark column
+        for mark in all_marks:
+            cell = ["<td style='" + img_td_style + "'>"]
+            if mark in rep:
+                val = rep[mark]
+                cell.append(val.depict() if hasattr(val, "depict") else str(val))
+            cell.append("</td>")
+            row.append("".join(cell))
+        html.append("<tr>" + "".join(row) + "</tr>")
+
+    html.append("</tbody></table>")
+    out = "".join(html)
+    if if_display:
+        display(HTML(out))
+    return out
+
+def routes_subclustering_report(
+        tree: Tree,
+        subgroup: dict,
+        group_index: str,
+        cluster_num: int,
+        rg_cgrs_dict: dict,
+        if_lg_group: bool = False,
+        aam: bool = False,
+    ) -> str:
+    """
+    Generates an HTML page report for a specific cluster's synthesis routes.
+
+    :param tree: The built MCTS tree.
+    :param final_groups: 
+    :param cluster_num: The identifier for this cluster (used in title/header).
+    :param aam: If True, depict atom-to-atom mapping in route SVGs.
+    :return: A string containing the complete HTML report.
+    """
+    # --- Depict Settings (Optional: Keep if get_route_svg depends on it) ---
+    try:
+        if aam:
+            MoleculeContainer.depict_settings(aam=True)
+        else:
+            MoleculeContainer.depict_settings(aam=False)
+    except NameError:
+         # If MoleculeContainer isn't available/needed, just pass
+         pass
+    except Exception as e:
+         print(f"Warning: Error setting MoleculeContainer depict settings: {e}")
+
+    # --- Validate Input ---
+    if not isinstance(subgroup, dict):
+        return "<html><body>Error: cluster_node_ids must be a list.</body></html>"
+    if not tree or not isinstance(tree, Tree):
+        return "<html><body>Error: Invalid tree object provided.</body></html>"
+
+    full_html = 0
+    cluster_node_ids = list(subgroup['nodes_data'].keys())
+    # Filter out node IDs not actually present or not solved in the tree
+    valid_routes_in_cluster = []
+    for node_id in cluster_node_ids:
+        if node_id in tree.nodes and tree.nodes[node_id].is_solved():
+            valid_routes_in_cluster.append(node_id)
+
+    if not valid_routes_in_cluster:
+        # Return a minimal HTML page indicating no valid routes
+        return f"""
+        <!doctype html><html lang="en"><head><meta charset="utf-8">
+        <title>Cluster {group_index}.{cluster_num} Report</title></head><body>
+        <h3>Cluster {group_index}.{cluster_num} Report</h3>
+        <p>No valid/solved routes found for this cluster.</p>
+        </body></html>"""
+
+    # --- HTML Templates & Tags ---
+    th = '<th style="text-align: left; background-color:#978785; border: 1px solid black; border-spacing: 0">'
+    td = '<td style="text-align: left; border: 1px solid black; border-spacing: 0">'
+    font_head = "<font style='font-weight: bold; font-size: 18px'>"
+    font_normal = "<font style='font-weight: normal; font-size: 18px'>"
+    font_close = "</font>"
+
+    template_begin = f"""
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3"
+    crossorigin="anonymous">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SubCluster {group_index}.{cluster_num} Routes Report</title>
+    <style>
+        /* Optional: Add some basic styling */
+        .table {{ border-collapse: collapse; width: 100%; }}
+        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+        tr:nth-child(even) {{ background-color: #f2f2f2; }}
+        caption {{ caption-side: top; font-size: 1.5em; margin: 1em 0; }}
+        svg {{ max-width: 100%; height: auto; }}
+    </style>
+    </head>
+    <body>
+    <div class="container"> """
+
+    template_end = """
+    </div> <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
+    crossorigin="anonymous">
+    </script>
+    </body>
+    </html>
+    """
+
+    box_mark = """
+    <svg width="30" height="30" viewBox="0 0 1 1" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 5px;">
+    <circle cx="0.5" cy="0.5" r="0.5" fill="rgb()" fill-opacity="0.35" />
+    </svg>
+    """
+
+    # --- Build HTML Table ---
+    table = f"""
+    <table class="table table-striped table-hover caption-top">
+    <caption><h3>Retrosynthetic Routes Report - SubCluster {group_index}.{cluster_num}</h3></caption>
+    <tbody>"""
+
+    try:
+        target_smiles_str = str(tree.nodes[1].curr_precursor) if 1 in tree.nodes else "N/A"
+    except Exception:
+        target_smiles_str = "Error retrieving target SMILES"
+    table += f"<tr>{td}{font_normal}Target Molecule: {target_smiles_str}{font_close}</td></tr>"
+    table += f"<tr>{td}{font_normal}Group index: {group_index}{font_close}</td></tr>"
+    table += f"<tr>{td}{font_normal}Cluster Number: {cluster_num}{font_close}</td></tr>"
+    table += f"<tr>{td}{font_normal}Size of Cluster: {len(valid_routes_in_cluster)} routes{font_close} </td></tr>"
+
+    # --- Add RG-CGR Image ---
+    first_route_id = valid_routes_in_cluster[0] if valid_routes_in_cluster else None
+
+    if first_route_id and rg_cgrs_dict and first_route_id in rg_cgrs_dict:
+        try:
+            rg_cgr = rg_cgrs_dict[first_route_id]
+            rg_cgr.clean2d()
+            rg_cgr_svg = cgr_display(rg_cgr)
+
+            if rg_cgr_svg.strip().startswith("<svg"):
+                table += f"<tr>{td}{font_normal}Created Strategic Bonds{font_close}<br>{rg_cgr_svg}</td></tr>"
+            else:
+                table += f"<tr>{td}{font_normal}Cluster Representative RG-CGR (from Route {first_route_id}):{font_close}<br><i>Invalid SVG format retrieved.</i></td></tr>"
+                print(f"Warning: Expected SVG for RG-CGR of node {first_route_id}, but got: {rg_cgr_svg[:100]}...")
+        except Exception as e:
+            table += f"<tr>{td}{font_normal}Cluster Representative RG-CGR (from Route {first_route_id}):{font_close}<br><i>Error retrieving/displaying RG-CGR: {e}</i></td></tr>"
+    else:
+        if first_route_id:
+            table += f"<tr>{td}{font_normal}Cluster Representative RG-CGR (from Route {first_route_id}):{font_close}<br><i>Not found in provided RG-CGR dictionary.</i></td></tr>"
+        else:
+            table += f"<tr>{td}{font_normal}Cluster Representative RG-CGR:{font_close}<br><i>No valid routes in cluster to select from.</i></td></tr>"
+
+
+    try:
+        synthon_reaction = subgroup['synthon_reaction']
+        synthon_reaction.clean2d()
+        synthon_svg = depict_custom_reaction(synthon_reaction)
+
+        extra_synthon = f"<tr>{td}{font_normal}Synthon pseudo reaction:{font_close}<br>{synthon_svg}</td></tr>"
+        table += extra_synthon
+    except Exception as e:
+        table += f"<tr><td colspan='1' style='color: red;'>Error displaying synthon reaction: {e}</td></tr>"
+
+    try:
+        if if_lg_group:
+            grouped_lgs = subgroup['group_lgs']
+            lg_table_html = group_lg_table_2_html_fixed(grouped_lgs , if_display=False)
+        else:
+            lg_table_html = lg_table_2_html(subgroup, if_display=False)
+        extra_lg = f"<tr>{td}{font_normal}Leaving Groups table:{font_close}<br>{lg_table_html}</td></tr>"
+        table += extra_lg
+    except Exception as e:
+        table += f"<tr><td colspan='1' style='color: red;'>Error displaying leaving groups: {e}</td></tr>"
+
+    table += f"""
+    <tr>{td}
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
+            <span>{box_mark.replace("rgb()", "rgb(152, 238, 255)")} Target Molecule</span>
+            <span>{box_mark.replace("rgb()", "rgb(240, 171, 144)")} Molecule Not In Stock</span>
+            <span>{box_mark.replace("rgb()", "rgb(155, 250, 179)")} Molecule In Stock</span>
+        </div>
+    </td></tr>
+    """
+
+    for route_id in valid_routes_in_cluster:
+        try:
+            svg = get_route_svg(tree, route_id)  # get SVG for the route
+            full_route = tree.synthesis_route(route_id)  # get route steps
+            reactions = ""
+            for i, synth_step in enumerate(full_route):
+                reactions += f"<b>Step {i + 1}:</b> {str(synth_step)}<br>"
+            route_score = round(tree.route_score(route_id), 3)
+
+            table += (
+                f'<tr style="line-height: 1.8;">{td}{font_head}Route {route_id} | '
+                f"Steps: {len(full_route)} | "
+                f"Score: {route_score}{font_close}</td></tr>"
+            )
+            table += f"<tr>{td}{svg if svg else '<i>Error generating route visualization</i>'}</td></tr>"
+            table += f"<tr>{td}{reactions if reactions else '<i>No reaction steps found</i>'}</td></tr>"
+        except Exception as e:
+            table += f'<tr><td colspan="1" style="color: red;">Error processing route {route_id}: {e}</td></tr>'
+
+    table += "</tbody></table>"
+
+    full_html = template_begin + table + template_end
+    return full_html
