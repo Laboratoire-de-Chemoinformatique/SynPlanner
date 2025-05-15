@@ -13,6 +13,7 @@ from synplan.chem.data.standardizing import (
     standardize_reactions_from_file,
 )
 from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions
+from synplan.chem.reaction_routes.clustering import run_cluster_cli
 from synplan.chem.utils import standardize_building_blocks
 from synplan.mcts.search import run_search
 from synplan.ml.training.supervised import create_policy_dataset, run_policy_training
@@ -25,6 +26,7 @@ from synplan.utils.config import (
     ValueNetworkConfig,
 )
 from synplan.utils.loading import download_all_data
+from synplan.utils.visualisation import routes_clustering_report, routes_subclustering_report
 
 warnings.filterwarnings("ignore")
 
@@ -448,6 +450,53 @@ def planning_cli(
         value_network_path=value_network,
         results_root=results_dir,
     )
+
+@synplan.command(name="clustering")
+@click.option(
+    "--targets",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the file with target molecules for retrosynthetic planning.",
+)
+@click.option(
+    "--routes_file",
+    default=".",
+    type=click.Path(exists=False),
+    help="Path to the file where the planning results are stored.",
+)
+@click.option(
+    "--cluster_results_dir",
+    default=".",
+    type=click.Path(exists=False),
+    help="Path to the file where clustering results will be stored.",
+)
+@click.option(
+    "--perform_subcluster",
+    default=None,
+    type=click.Path(exists=False),
+    help="Perform subclustering.",
+)
+@click.option(
+    "--subcluster_results_dir",
+    default='.',
+    type=click.Path(exists=False),
+    help="Path to the file where subclustering results will be stored.",
+)
+def cluster_route_from_file_cli(
+    targets: str,
+    routes_file: str,
+    cluster_results_dir: str,
+    perform_subcluster: bool,
+    subcluster_results_dir: str,
+    ):
+    """Clustering the routes from planning"""
+    run_cluster_cli(
+        routes_file=routes_file,
+        cluster_results_dir=cluster_results_dir,
+        perform_subcluster=perform_subcluster,
+        subcluster_results_dir=subcluster_results_dir if perform_subcluster else None,
+    )
+
 
 
 if __name__ == "__main__":
