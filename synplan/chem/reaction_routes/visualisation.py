@@ -7,10 +7,10 @@ from math import hypot
 from functools import partial
 
 
-class WideFormedBondDepictCGR(DepictCGR):
+class WideBondDepictCGR(DepictCGR):
     """
-    Like DepictCGR, but all bonds with order==None
-    are drawn 4× wider than the standard bond width.
+    Like DepictCGR, but all DynamicBonds
+    are drawn 2.5× wider than the standard bond width.
     """
     __slots__ = ()
 
@@ -317,12 +317,11 @@ class WideFormedBondDepictCGR(DepictCGR):
 def cgr_display(cgr: CGRContainer) -> str:
     
     CGRContainer._CGRContainer__render_aromatic_bond = (
-        WideFormedBondDepictCGR._WideFormedBondDepictCGR__render_aromatic_bond
+        WideBondDepictCGR._WideBondDepictCGR__render_aromatic_bond
     )
-    CGRContainer._render_bonds = WideFormedBondDepictCGR._render_bonds
-    # CGRContainer.__render_aromatic_bond = WideFormedBondDepictCGR.__render_aromatic_bond
-    CGRContainer._WideFormedBondDepictCGR__render_aromatic_bond = (
-    WideFormedBondDepictCGR._WideFormedBondDepictCGR__render_aromatic_bond
+    CGRContainer._render_bonds = WideBondDepictCGR._render_bonds
+    CGRContainer._WideBondDepictCGR__render_aromatic_bond = (
+    WideBondDepictCGR._WideBondDepictCGR__render_aromatic_bond
     )
     cgr.clean2d()       
     return cgr.depict()
@@ -333,10 +332,6 @@ class CustomDepictMolecule(DepictMolecule):
     Custom molecule depiction class that uses atom.symbol for rendering.
     """
     def _render_atoms(self):
-        # This method is largely copied from CGRtools.algorithms.depict.DepictMolecule._render_atoms
-        # The key change is replacing atom.atomic_symbol with atom.symbol
-        
-        # --- Start copied and modified code ---
         bonds = self._bonds
         plane = self._plane
         charges = self._charges
@@ -513,7 +508,7 @@ class CustomDepictMolecule(DepictMolecule):
 
 def depict_custom_reaction(reaction: ReactionContainer):
     """
-    Depicts a ReactionContainer using custom atom rendering logic 
+    Depicts a ReactionContainer using custom atom rendering logic (replace At to X)
     (uses atom.symbol instead of atom.atomic_symbol).
     """
     if not reaction._arrow:
@@ -561,10 +556,7 @@ def depict_custom_reaction(reaction: ReactionContainer):
         for mol, original_class in original_classes.items():
             mol.__class__ = original_class
 
-    # --- Rest of the code is similar to DepictReaction.depict ---
-    # --- FIX: Access _render_config correctly ---
     config = DepictMolecule._render_config # Access via the imported class
-    # --- END FIX ---
     
     font_size = config['font_size']
     font125 = 1.25 * font_size

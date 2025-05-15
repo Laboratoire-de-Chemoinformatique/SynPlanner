@@ -55,7 +55,7 @@ def get_leaving_groups(products):
             lg_atom_nums.extend(prod._atoms.keys())
     return lg_atom_nums
 
-def process_first_reaction(first_react, tree, node_id, min_mol_size):
+def process_first_reaction(first_react, tree, node_id):
     """Process first reaction in the route and initialize building block set."""
     bb_set = set()
     
@@ -63,14 +63,14 @@ def process_first_reaction(first_react, tree, node_id, min_mol_size):
         react_key = tuple(curr_mol._atoms)
         react_key_set = set(react_key)
         
-        if len(curr_mol) <= min_mol_size or str(curr_mol) in tree.building_blocks:
+        if len(curr_mol) <= tree.config.min_mol_size or str(curr_mol) in tree.building_blocks:
             bb_set = react_key_set
         
         validate_molecule_components(curr_mol, node_id)
     
     return bb_set
 
-def update_reaction_dict(reaction, node_id, mapping, react_dict, tree, min_mol_size, bb_set, prev_remap=None):
+def update_reaction_dict(reaction, node_id, mapping, react_dict, tree, bb_set, prev_remap=None):
     """Update reaction dictionary with new mappings."""
     for curr_mol in reaction.reactants:
         react_key = tuple(curr_mol._atoms)
@@ -78,7 +78,7 @@ def update_reaction_dict(reaction, node_id, mapping, react_dict, tree, min_mol_s
         
         validate_molecule_components(curr_mol, node_id)
         
-        if len(curr_mol) <= min_mol_size or str(curr_mol) in tree.building_blocks:
+        if len(curr_mol) <= tree.config.min_mol_size or str(curr_mol) in tree.building_blocks:
             bb_set = bb_set.union(react_key_set)
 
         # Filter the mapping to include only keys present in the current react_key
@@ -104,7 +104,7 @@ def process_target_blocks(curr_products, curr_prod, lg_atom_nums, curr_lg_atom_n
                         target_block.append(key)
     return target_block
 
-def compose_route_cgr(tree_or_routes, node_id, min_mol_size=6):
+def compose_route_cgr(tree_or_routes, node_id):
     """
     Process a single synthesis route maintaining consistent state.
 
@@ -114,8 +114,6 @@ def compose_route_cgr(tree_or_routes, node_id, min_mol_size=6):
         or dict mapping route_id -> {step_id: ReactionContainer}
     node_id : int
         the route index (in the Tree’s winning_nodes, or the dict’s keys)
-    min_mol_size : int
-        minimum building-block size (only used in tree-based mode)
 
     Returns
     -------
@@ -156,7 +154,7 @@ def compose_route_cgr(tree_or_routes, node_id, min_mol_size=6):
         reactions_dict = { len(reactions)-1: first_react }
 
         accum_cgr = first_react.compose()
-        bb_set    = process_first_reaction(first_react, tree, node_id, min_mol_size)
+        bb_set    = process_first_reaction(first_react, tree, node_id)
         react_dict = {}
         max_num    = find_next_atom_num(reactions)
 
@@ -198,7 +196,7 @@ def compose_route_cgr(tree_or_routes, node_id, min_mol_size=6):
 
             # update our react_dict & bb_set
             react_dict, bb_set = update_reaction_dict(
-                reaction, node_id, mapping, react_dict, tree, min_mol_size,
+                reaction, node_id, mapping, react_dict, tree,
                 bb_set, prev_remap
             )
 
@@ -215,111 +213,7 @@ def compose_route_cgr(tree_or_routes, node_id, min_mol_size=6):
         print(f"Error processing node {node_id}: {e}")
         return None
 
-# def compose_route_cgr(tree, node_id, min_mol_size=6):
-#     """Process a single synthesis route maintaining consistent state."""
-#     reactions_dict = {}
-#     try:
-#         reactions = tree.synthesis_route(node_id)
-        
-#         first_react = reactions[-1]
-#         reactions_dict[len(reactions)-1]  = first_react
-
-        
-#         accum_cgr = first_react.compose()
-#         bb_set = process_first_reaction(first_react, tree, node_id, min_mol_size)
-
-#         react_dict = {}
-
-#         max_num = find_next_atom_num(reactions)
-        
-#         for step in range(len(reactions) - 2, -1, -1):
-#             reaction = reactions[step]
-#             curr_cgr = reaction.compose()
-
-#             curr_prod = reaction.products[0]
-#             accum_products = accum_cgr.decompose()[1].split()
-#             lg_atom_nums = get_leaving_groups(accum_products)
-    
-#             curr_products = curr_cgr.decompose()[1].split()
-
-#             tuple_atoms = tuple(curr_prod._atoms)
-#             prev_remap = {}
-            
-#             if tuple_atoms in react_dict.keys() and len(react_dict[tuple_atoms]) != 0:
-#                 prev_remap = react_dict[tuple_atoms]
-#                 curr_cgr = curr_cgr.remap(prev_remap, copy=True)
-
-#             curr_lg_atom_nums = []
-#             for i in range(1, len(curr_products)):
-#                 prod = curr_products[i]
-#                 curr_lg_atom_nums += list(prod._atoms.keys())
-
-#             target_block = process_target_blocks(curr_products, curr_prod, lg_atom_nums, curr_lg_atom_nums, bb_set)
-                                                  
-#             mapping = {}
-#             for atom_num in sorted(target_block):
-#                 if atom_num in accum_cgr._atoms and atom_num not in mapping:
-#                     mapping[atom_num] = max_num
-#                     max_num += 1
-    
-#             for i in range(len(accum_products)):
-#                 accum_prod = accum_products[i]
-#                 dict_map = get_clean_mapping(curr_prod, accum_prod, reverse=True)
-                
-#             if dict_map:
-#                 curr_cgr.remap(dict_map)
-
-#             #maybe remap, then decompose and to BB
-#             react_dict, bb_set = update_reaction_dict(reaction, node_id, mapping, react_dict, tree, min_mol_size, bb_set, prev_remap)
-
-#             if mapping:
-#                 curr_cgr.remap(mapping)
-            
-#             reactions_dict[step] = ReactionContainer.from_cgr(curr_cgr)
-
-#             accum_cgr = curr_cgr.compose(accum_cgr)
-
-#         return {
-#             'cgr': accum_cgr,
-#             'reactions_dict': reactions_dict
-#         }
-
-#     except Exception as e:
-#         print(f"Error processing node {node_id}: {e}")
-#         return None
-
-# def compose_all_route_cgrs(tree, node_id=None, min_mol_size=6):
-#     """
-#     Process routes (reassign atom mappings) to compose RouteCGR.
-    
-#     Args:
-#         tree: Synthesis tree
-#         node_id: Optional specific node ID to process. If None, processes all winning nodes
-#         min_mol_size: Minimum size for building blocks
-        
-#     Returns:
-#         If node_id is None:
-#             dict: Dictionary mapping node IDs to their processed Generalized CGRs
-#         If node_id is specified:
-#             dict: Information about the processed route
-#     """
-#     route_cgrs_dict = {}
-#     if node_id is not None:
-#         result = compose_route_cgr(tree, node_id, min_mol_size)
-#         if result:
-#             route_cgrs_dict[node_id] = result['cgr']
-#         else:
-#             return None
-#         return route_cgrs_dict
-
-#     for node_id in set(tree.winning_nodes):
-#         result = compose_route_cgr(tree, node_id, min_mol_size)
-#         if result:
-#             route_cgrs_dict[node_id] = result['cgr']
-    
-#     return dict(sorted(route_cgrs_dict.items()))
-
-def compose_all_route_cgrs(tree_or_routes, node_id=None, min_mol_size=6):
+def compose_all_route_cgrs(tree_or_routes, node_id=None):
     """
     Process routes (reassign atom mappings) to compose RouteCGR.
 
@@ -330,8 +224,6 @@ def compose_all_route_cgrs(tree_or_routes, node_id=None, min_mol_size=6):
     node_id : int or None
         if None, do *all* winning routes (or all keys of the dict);
         otherwise only that specific route.
-    min_mol_size : int
-        minimum building-block size (only used in tree-based mode)
 
     Returns
     -------
@@ -345,7 +237,7 @@ def compose_all_route_cgrs(tree_or_routes, node_id=None, min_mol_size=6):
         routes_dict = tree_or_routes
 
         def _single(rid):
-            res = compose_route_cgr(routes_dict, rid, min_mol_size)
+            res = compose_route_cgr(routes_dict, rid)
             return res['cgr'] if res else None
 
         if node_id is not None:
@@ -362,7 +254,7 @@ def compose_all_route_cgrs(tree_or_routes, node_id=None, min_mol_size=6):
     route_cgrs = {}
 
     if node_id is not None:
-        res = compose_route_cgr(tree, node_id, min_mol_size)
+        res = compose_route_cgr(tree, node_id)
         if res:
             route_cgrs[node_id] = res['cgr']
         else:
@@ -370,13 +262,13 @@ def compose_all_route_cgrs(tree_or_routes, node_id=None, min_mol_size=6):
         return route_cgrs
 
     for rid in sorted(set(tree.winning_nodes)):
-        res = compose_route_cgr(tree, rid, min_mol_size)
+        res = compose_route_cgr(tree, rid)
         if res:
             route_cgrs[rid] = res['cgr']
 
     return route_cgrs
 
-def extract_reactions(tree, node_id=None, min_mol_size=6):
+def extract_reactions(tree, node_id=None):
     """
     Collect mapped reaction sequences from a synthesis tree.
 
@@ -391,8 +283,6 @@ def extract_reactions(tree, node_id=None, min_mol_size=6):
         supporting `compose_route_cgr(...)`.
     node_id : hashable, optional
         If provided, only extract reactions for this specific node/route.
-    min_mol_size : int, default=6
-        Minimum atom count for product molecules to include.
 
     Returns
     -------
@@ -403,7 +293,7 @@ def extract_reactions(tree, node_id=None, min_mol_size=6):
     """
     react_dict = {}
     if node_id is not None:
-        result = compose_route_cgr(tree, node_id, min_mol_size)
+        result = compose_route_cgr(tree, node_id)
         if result:
             react_dict[node_id] = result['reactions_dict']
         else:
@@ -411,7 +301,7 @@ def extract_reactions(tree, node_id=None, min_mol_size=6):
         return react_dict
 
     for node_id in set(tree.winning_nodes):
-        result = compose_route_cgr(tree, node_id, min_mol_size)
+        result = compose_route_cgr(tree, node_id)
         if result:
             react_dict[node_id] = result['reactions_dict']
     

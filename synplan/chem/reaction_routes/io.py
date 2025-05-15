@@ -55,8 +55,8 @@ def make_dict(routes_json):
 
 def read_routes_json(file_path='routes.csv'):
     with open(file_path, 'r') as file:
-        data = json.load(file)
-    return data
+        routes_json = json.load(file)
+    return routes_json
 
 def read_routes_csv(file_path='routes.csv'):
     """
@@ -90,7 +90,7 @@ def make_json(routes_dict, keep_ids=True):
         list or dict: JSON-like tree(s) of routes.
     """
     # Prepare output
-    all_routes = [] if keep_ids else {}
+    all_routes = {} if keep_ids else []
 
     for route_id, steps in routes_dict.items():
         if not steps:
@@ -124,7 +124,8 @@ def make_json(routes_dict, keep_ids=True):
                     return {
                         "type": "mol",
                         "smiles": smiles,
-                        "children": [build_reaction_node(sid)]
+                        "children": [build_reaction_node(sid)],
+                        "in_stock": False
                     }
             # Shouldn't reach here if tree is consistent
             return None
@@ -145,16 +146,16 @@ def make_json(routes_dict, keep_ids=True):
                 if prior:
                     node["children"].append(build_mol_node(max(prior)))
                 else:
-                    node["children"].append({"type": "mol", "smiles": r_smi})
+                    node["children"].append({"type": "mol", "smiles": r_smi, "in_stock": True})
 
             return node
 
         # Build route tree and store
         tree = build_mol_node(final_step)
         if keep_ids:
-            all_routes.append(tree)
-        else:
             all_routes[route_id] = tree
+        else:
+            all_routes.append(tree)
 
     return all_routes
 
@@ -164,9 +165,9 @@ def write_routes_json(routes_dict, file_path):
     with open(file_path, 'w') as f:
         json.dump(routes_json, f, indent=2)
 
-def write_routes_csv(reaction_dict, file_path='routes.csv'):
+def write_routes_csv(routes_dict, file_path='routes.csv'):
     """
-    Write out a nested reaction_dict of the form
+    Write out a nested routes_dict of the form
         { route_id: { step_id: reaction_obj, ... }, ... }
     to a CSV with columns: route_id, step_id, smiles, meta
     where smiles is format(reaction, 'm') and meta is left blank.
@@ -176,8 +177,8 @@ def write_routes_csv(reaction_dict, file_path='routes.csv'):
         # header row
         writer.writerow(['route_id', 'step_id', 'smiles', 'meta'])
         # sort routes and steps for deterministic output
-        for route_id in sorted(reaction_dict):
-            steps = reaction_dict[route_id]
+        for route_id in sorted(routes_dict):
+            steps = routes_dict[route_id]
             for step_id in sorted(steps):
                 reaction = steps[step_id]
                 smiles = format(reaction, 'm')

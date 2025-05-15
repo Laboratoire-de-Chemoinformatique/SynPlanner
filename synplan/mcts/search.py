@@ -11,6 +11,8 @@ from typing import Union
 from CGRtools.containers import MoleculeContainer
 from tqdm import tqdm
 
+from synplan.chem.reaction_routes.route_cgr import extract_reactions
+from synplan.chem.reaction_routes.io import write_routes_csv, write_routes_json
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.evaluation import ValueNetworkFunction
 from synplan.mcts.expansion import PolicyNetworkFunction
@@ -181,5 +183,12 @@ def run_search(
             # save json routes
             with open(routes_file, "w", encoding="utf-8") as f:
                 json.dump(extracted_routes, f)
+
+            # Save mapped reactions (CSV)
+            routes_dict = extract_reactions(tree)
+            write_routes_csv(routes_dict, os.path.join(routes_folder, f'mapped_routes_{ti}.csv'))
+
+            # save mapped reactions (JSON)
+            write_routes_json(routes_dict, os.path.join(routes_folder,f'mapped_routes_{ti}.json'))
 
     print(f"Number of solved target molecules: {n_solved}")
