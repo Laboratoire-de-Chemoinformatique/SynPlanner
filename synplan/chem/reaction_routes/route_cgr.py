@@ -1,97 +1,272 @@
-
 from CGRtools.containers.bonds import DynamicBond
-from CGRtools.containers import ReactionContainer
+from CGRtools.containers import ReactionContainer, CGRContainer, MoleculeContainer
+from synplan.mcts.tree import Tree
 
-def find_next_atom_num(reactions):
-    """Find the next available atom number."""
+
+def find_next_atom_num(reactions: list):
+    """
+    Find the next available atom number across a list of reactions.
+
+    This function iterates through a list of reaction containers, composes
+    each reaction to get its Condensed Graph of Reaction (CGR), and finds
+    the maximum atom index used within each CGR. It then returns the maximum
+    atom index found across all reactions plus one, providing a unique
+    next available atom number.
+
+    Args:
+        reactions (list): A list of ReactionContainer objects.
+
+    Returns:
+        int: The next available integer atom number, which is one greater
+             than the maximum atom index found in any of the provided reaction CGRs.
+    """
     max_num = 0
     for reaction in reactions:
         cgr = reaction.compose()
         max_num = max(max_num, max(cgr._atoms.keys()))
     return max_num + 1
 
-def get_clean_mapping(curr_prod, prod, reverse=False):
-    """Get clean mapping between molecules while avoiding number conflicts."""
+
+def get_clean_mapping(
+    curr_prod: MoleculeContainer, prod: MoleculeContainer, reverse: bool = False
+):
+    """
+    Get a 'clean' atom mapping between two molecules, avoiding conflicts.
+
+    This function attempts to establish a mapping between the atoms of two
+    MoleculeContainer objects (`curr_prod` and `prod`). It uses an internal
+    mapping mechanism and then filters the result to create a "clean" mapping.
+    The cleaning process specifically avoids adding entries to the mapping
+    where the source and target indices are the same, or where the target
+    index already exists as a source in the mapping with a different target.
+    It also checks for potential conflicts based on the atom keys present
+    in the original molecules.
+
+    Args:
+        curr_prod (MoleculeContainer): The first MoleculeContainer object.
+        prod (MoleculeContainer): The second MoleculeContainer object.
+        reverse (bool, optional): If True, the mapping is generated in the
+                                  reverse direction (from `prod` to `curr_prod`).
+                                  Defaults to False (mapping from `curr_prod` to `prod`).
+
+    Returns:
+        dict: A dictionary representing the clean atom mapping. Keys are atom
+              indices from the source molecule, and values are the corresponding
+              atom indices in the target molecule. Returns an empty dictionary
+              if no mapping is found or if the initial mapping is empty.
+    """
     dict_map = {}
     m = list(curr_prod.get_mapping(prod))
-    
+
     if len(m) == 0:
         return dict_map
 
     curr_atoms = set(curr_prod._atoms.keys())
     prod_atoms = set(prod._atoms.keys())
-    
+
     rr = m[0]
-    
+
     # Build mapping while checking for conflicts
     for key, value in rr.items():
         if key != value:
             if value in rr.keys() and rr[value] != key:
                 continue
-                
+
             source = value if reverse else key
             target = key if reverse else value
-            
+
             if reverse and target in curr_atoms:
                 continue
             if not reverse and target in prod_atoms:
                 continue
-                
+
             dict_map[source] = target
-    
+
     return dict_map
 
-def validate_molecule_components(curr_mol, node_id):
-    """Validate that molecule has only one connected component."""
+
+def validate_molecule_components(curr_mol: MoleculeContainer, node_id: int):
+    """
+    Validate that a molecule has only one connected component.
+
+    This function checks if a given MoleculeContainer object represents a
+    single connected molecule or multiple disconnected fragments. It extracts
+    the connected components and prints an error message if more than one
+    component is found, indicating a potential issue with the molecule
+    representation within a specific tree node.
+
+    Args:
+        curr_mol (MoleculeContainer): The MoleculeContainer object to validate.
+        node_id (int): The ID of the tree node associated with this molecule,
+                       used for reporting purposes in the error message.
+    """
     new_rmol = [curr_mol.substructure(c) for c in curr_mol.connected_components]
     if len(new_rmol) > 1:
-        print(f'Error tree {node_id}: We have more than one molecule in one node')
+        print(f"Error tree {node_id}: We have more than one molecule in one node")
 
-def get_leaving_groups(products):
-    """Extract leaving group atom numbers from products."""
+
+def get_leaving_groups(products: list):
+    """
+    Extract leaving group atom numbers from a list of reaction products.
+
+    This function takes a list of product MoleculeContainer objects resulting
+     from a reaction. It assumes the first molecule in the list is the main
+    product and the subsequent molecules are leaving groups. It collects
+    the atom indices (keys from the `_atoms` dictionary) for all molecules
+    except the first one, considering these indices as belonging to leaving
+    group atoms.
+
+    Args:
+        products (list): A list of MoleculeContainer objects representing the
+                         products of a reaction. The first element is assumed
+                         to be the main product.
+
+    Returns:
+        list: A list of integer atom indices corresponding to the atoms
+              in the leaving group molecules.
+    """
     lg_atom_nums = []
     for i, prod in enumerate(products):
         if i != 0:  # Skip first product (main product)
             lg_atom_nums.extend(prod._atoms.keys())
     return lg_atom_nums
 
-def process_first_reaction(first_react, tree, node_id):
-    """Process first reaction in the route and initialize building block set."""
+
+def process_first_reaction(first_react: ReactionContainer, tree: Tree, node_id: int):
+    """
+    Process the first reaction in a retrosynthetic route and initialize the building block set.
+
+    This function takes the first reaction in a route, iterates through its
+    reactants, validates that each reactant is a single connected component,
+    and identifies potential building blocks. A reactant is considered a
+    potential building block if its size is less than or equal to the
+    minimum molecule size defined in the tree's configuration or if its
+    SMILES string is present in the tree's building blocks set. The atom
+    indices of such building blocks are collected into a set.
+
+    Args:
+        first_react (ReactionContainer): The first ReactionContainer object in the route.
+        tree (Tree): The Tree object containing the retrosynthetic search tree
+                     and configuration (including `min_mol_size` and `building_blocks`).
+        node_id (int): The ID of the tree node associated with this reaction,
+                       used for validation reporting.
+
+    Returns:
+        set: A set of integer atom indices corresponding to the atoms
+             identified as part of building blocks in the first reaction's reactants.
+    """
     bb_set = set()
-    
+
     for curr_mol in first_react.reactants:
         react_key = tuple(curr_mol._atoms)
         react_key_set = set(react_key)
-        
-        if len(curr_mol) <= tree.config.min_mol_size or str(curr_mol) in tree.building_blocks:
+
+        if (
+            len(curr_mol) <= tree.config.min_mol_size
+            or str(curr_mol) in tree.building_blocks
+        ):
             bb_set = react_key_set
-        
+
         validate_molecule_components(curr_mol, node_id)
-    
+
     return bb_set
 
-def update_reaction_dict(reaction, node_id, mapping, react_dict, tree, bb_set, prev_remap=None):
-    """Update reaction dictionary with new mappings."""
+
+def update_reaction_dict(
+    reaction: ReactionContainer,
+    node_id: int,
+    mapping: dict,
+    react_dict: dict,
+    tree: Tree,
+    bb_set: set,
+    prev_remap: dict = None,
+):
+    """
+    Update a reaction dictionary with atom mappings and identify building blocks.
+
+    This function processes the reactants of a given reaction, validates their
+    structure (single connected component), updates a dictionary (`react_dict`)
+    with atom mappings for each reactant, and expands a set of building block
+    atom indices (`bb_set`). The mapping is filtered based on the atoms present
+    in the current reactant, and can optionally include a previous remapping.
+    Reactants are identified as building blocks based on size or presence in
+    the tree's building blocks set.
+
+    Args:
+        reaction (ReactionContainer): The ReactionContainer object representing the reaction.
+        node_id (int): The ID of the tree node associated with this synthethic route,
+                       used for validation reporting.
+        mapping (dict): The primary atom mapping dictionary to filter and apply.
+        react_dict (dict): The dictionary to update with filtered mappings for each reactant.
+                           Keys are tuples of atom indices for each reactant molecule.
+        tree (Tree): The Tree object containing the retrosynthetic search tree
+                     and configuration (including `min_mol_size` and `building_blocks`).
+        bb_set (set): The set of building block atom indices to update.
+        prev_remap (dict, optional): An optional dictionary representing a previous
+                                     remapping to include in the filtered mapping.
+                                     Defaults to None.
+
+    Returns:
+        tuple: A tuple containing:
+               - dict: The updated `react_dict` with filtered mappings for each reactant.
+               - set: The updated `bb_set` including atom indices from newly identified
+                      building blocks.
+    """
     for curr_mol in reaction.reactants:
         react_key = tuple(curr_mol._atoms)
         react_key_set = set(react_key)
-        
+
         validate_molecule_components(curr_mol, node_id)
-        
-        if len(curr_mol) <= tree.config.min_mol_size or str(curr_mol) in tree.building_blocks:
+
+        if (
+            len(curr_mol) <= tree.config.min_mol_size
+            or str(curr_mol) in tree.building_blocks
+        ):
             bb_set = bb_set.union(react_key_set)
 
         # Filter the mapping to include only keys present in the current react_key
         filtered_mapping = {k: v for k, v in mapping.items() if k in react_key_set}
         if prev_remap:
-            prev_remappping = {k: v for k, v in prev_remap.items() if k in react_key_set}
+            prev_remappping = {
+                k: v for k, v in prev_remap.items() if k in react_key_set
+            }
             filtered_mapping.update(prev_remappping)
         react_dict[react_key] = filtered_mapping
-    
+
     return react_dict, bb_set
 
-def process_target_blocks(curr_products, curr_prod, lg_atom_nums, curr_lg_atom_nums, bb_set):
-    """Process and collect target blocks for remapping."""
+
+def process_target_blocks(
+    curr_products: list,
+    curr_prod: MoleculeContainer,
+    lg_atom_nums: list,
+    curr_lg_atom_nums: list,
+    bb_set: set,
+):
+    """
+    Identifies and collects atom indices for target blocks based on leaving groups and building blocks.
+
+    This function iterates through a list of current product molecules, compares their atoms
+    to a reference molecule (`curr_prod`), and collects the indices of atoms that correspond
+    to atoms in the provided leaving group lists (`lg_atom_nums`, `curr_lg_atom_nums`) or
+    the building block set (`bb_set`). This is typically used to identify parts of molecules
+    that should be treated as 'target blocks' during a remapping or analysis process.
+
+    Args:
+        curr_products (list): A list of MoleculeContainer objects representing the current products.
+        curr_prod (MoleculeContainer): A reference MoleculeContainer object, likely the main product,
+                                       used for mapping atom indices.
+        lg_atom_nums (list): A list of integer atom indices identified as leaving group atoms
+                             in a relevant context.
+        curr_lg_atom_nums (list): Another list of integer atom indices identified as leaving
+                                   group atoms, potentially from a different context than `lg_atom_nums`.
+        bb_set (set): A set of integer atom indices identified as building block atoms.
+
+    Returns:
+        list: A list of integer atom indices that are identified as 'target blocks' based on
+              their presence in the leaving group lists or building block set after mapping
+              to the reference molecule.
+    """
     target_block = []
     if len(curr_products) > 1:
         for prod in curr_products:
@@ -103,6 +278,7 @@ def process_target_blocks(curr_products, curr_prod, lg_atom_nums, curr_lg_atom_n
                     if key in bb_set:
                         target_block.append(key)
     return target_block
+
 
 def compose_route_cgr(tree_or_routes, node_id):
     """
@@ -127,22 +303,21 @@ def compose_route_cgr(tree_or_routes, node_id):
         if node_id not in routes_dict:
             raise KeyError(f"Route {node_id} not in provided dict.")
         # grab and sort the ReactionContainers in chronological order
-        step_map   = routes_dict[node_id]
+        step_map = routes_dict[node_id]
         sorted_ids = sorted(step_map)
-        reactions  = [step_map[i] for i in sorted_ids]
+        reactions = [step_map[i] for i in sorted_ids]
 
         # start from the last (final) reaction
-        accum_cgr       = reactions[-1].compose()
-        reactions_dict  = { len(reactions)-1: reactions[-1] }
+        accum_cgr = reactions[-1].compose()
+        reactions_dict = {len(reactions) - 1: reactions[-1]}
         # now fold backwards through the earlier steps
-        for idx in range(len(reactions)-2, -1, -1):
+        for idx in range(len(reactions) - 2, -1, -1):
             rxn = reactions[idx]
             curr_cgr = rxn.compose()
-            accum_cgr      = curr_cgr.compose(accum_cgr)
+            accum_cgr = curr_cgr.compose(accum_cgr)
             reactions_dict[idx] = rxn
 
-        return {'cgr': accum_cgr, 'reactions_dict': reactions_dict }
-
+        return {"cgr": accum_cgr, "reactions_dict": reactions_dict}
 
     # ----------- tree-based branch ------------
     tree = tree_or_routes
@@ -151,33 +326,36 @@ def compose_route_cgr(tree_or_routes, node_id):
         reactions = tree.synthesis_route(node_id)
 
         first_react = reactions[-1]
-        reactions_dict = { len(reactions)-1: first_react }
+        reactions_dict = {len(reactions) - 1: first_react}
 
         accum_cgr = first_react.compose()
-        bb_set    = process_first_reaction(first_react, tree, node_id)
+        bb_set = process_first_reaction(first_react, tree, node_id)
         react_dict = {}
-        max_num    = find_next_atom_num(reactions)
+        max_num = find_next_atom_num(reactions)
 
-        for step in range(len(reactions)-2, -1, -1):
+        for step in range(len(reactions) - 2, -1, -1):
             reaction = reactions[step]
             curr_cgr = reaction.compose()
             curr_prod = reaction.products[0]
 
             accum_products = accum_cgr.decompose()[1].split()
-            lg_atom_nums   = get_leaving_groups(accum_products)
-            curr_products  = curr_cgr.decompose()[1].split()
+            lg_atom_nums = get_leaving_groups(accum_products)
+            curr_products = curr_cgr.decompose()[1].split()
 
             tuple_atoms = tuple(curr_prod._atoms)
-            prev_remap  = react_dict.get(tuple_atoms, {})
+            prev_remap = react_dict.get(tuple_atoms, {})
 
             if prev_remap:
                 curr_cgr = curr_cgr.remap(prev_remap, copy=True)
 
             # identify new atom‐numbers for any overlap
-            target_block = process_target_blocks(curr_products, curr_prod,
-                                                 lg_atom_nums,
-                                                 [list(p._atoms.keys()) for p in curr_products[1:]],
-                                                 bb_set)
+            target_block = process_target_blocks(
+                curr_products,
+                curr_prod,
+                lg_atom_nums,
+                [list(p._atoms.keys()) for p in curr_products[1:]],
+                bb_set,
+            )
             mapping = {}
             for atom_num in sorted(target_block):
                 if atom_num in accum_cgr._atoms and atom_num not in mapping:
@@ -196,8 +374,7 @@ def compose_route_cgr(tree_or_routes, node_id):
 
             # update our react_dict & bb_set
             react_dict, bb_set = update_reaction_dict(
-                reaction, node_id, mapping, react_dict, tree,
-                bb_set, prev_remap
+                reaction, node_id, mapping, react_dict, tree, bb_set, prev_remap
             )
 
             # apply the new overlap‐mapping
@@ -207,11 +384,12 @@ def compose_route_cgr(tree_or_routes, node_id):
             reactions_dict[step] = ReactionContainer.from_cgr(curr_cgr)
             accum_cgr = curr_cgr.compose(accum_cgr)
 
-        return { 'cgr': accum_cgr, 'reactions_dict': reactions_dict }
+        return {"cgr": accum_cgr, "reactions_dict": reactions_dict}
 
     except Exception as e:
         print(f"Error processing node {node_id}: {e}")
         return None
+
 
 def compose_all_route_cgrs(tree_or_routes, node_id=None):
     """
@@ -238,15 +416,15 @@ def compose_all_route_cgrs(tree_or_routes, node_id=None):
 
         def _single(rid):
             res = compose_route_cgr(routes_dict, rid)
-            return res['cgr'] if res else None
+            return res["cgr"] if res else None
 
         if node_id is not None:
             if node_id not in routes_dict:
                 raise KeyError(f"Route {node_id} not in provided dict.")
-            return { node_id: _single(node_id) }
+            return {node_id: _single(node_id)}
 
         # all routes
-        result = { rid: _single(rid) for rid in sorted(routes_dict) }
+        result = {rid: _single(rid) for rid in sorted(routes_dict)}
         return result
 
     # tree-based branch
@@ -256,7 +434,7 @@ def compose_all_route_cgrs(tree_or_routes, node_id=None):
     if node_id is not None:
         res = compose_route_cgr(tree, node_id)
         if res:
-            route_cgrs[node_id] = res['cgr']
+            route_cgrs[node_id] = res["cgr"]
         else:
             return None
         return route_cgrs
@@ -264,9 +442,10 @@ def compose_all_route_cgrs(tree_or_routes, node_id=None):
     for rid in sorted(set(tree.winning_nodes)):
         res = compose_route_cgr(tree, rid)
         if res:
-            route_cgrs[rid] = res['cgr']
+            route_cgrs[rid] = res["cgr"]
 
     return route_cgrs
+
 
 def extract_reactions(tree, node_id=None):
     """
@@ -295,7 +474,7 @@ def extract_reactions(tree, node_id=None):
     if node_id is not None:
         result = compose_route_cgr(tree, node_id)
         if result:
-            react_dict[node_id] = result['reactions_dict']
+            react_dict[node_id] = result["reactions_dict"]
         else:
             return None
         return react_dict
@@ -303,31 +482,38 @@ def extract_reactions(tree, node_id=None):
     for node_id in set(tree.winning_nodes):
         result = compose_route_cgr(tree, node_id)
         if result:
-            react_dict[node_id] = result['reactions_dict']
-    
+            react_dict[node_id] = result["reactions_dict"]
+
     return dict(sorted(react_dict.items()))
 
-def compose_reduced_route_cgr(route_cgr):
+
+def compose_reduced_route_cgr(route_cgr: CGRContainer):
     """
-    Reduces a Routes Condensed Graph of reaction (G-CGR) by performing the following steps:
-    
-    1. Extracts substructures corresponding to connected components from the input G-CGR.
+    Reduces a Routes Condensed Graph of reaction (RouteCGR) by performing the following steps:
+
+    1. Extracts substructures corresponding to connected components from the input RouteCGR.
     2. Selects the first substructure as the target to work on.
-    3. Iterates over all bonds in the target G-CGR:
+    3. Iterates over all bonds in the target RouteCGR:
        - If a bond is identified as a "leaving group" (its primary order is None while its original order is defined),
          the bond is removed.
        - If a bond has a modified order (both primary and original orders are integers) and the primary order is less than the original,
          the bond is deleted and then re-added with a new dynamic bond using the primary order (this updates the bond to the reduced form).
-    4. After bond modifications, re-extracts the substructure from the target G-CGR (now called the reduced G-CGR or RG-CGR).
+    4. After bond modifications, re-extracts the substructure from the target RouteCGR (now called the reduced RouteCGR or ReducedRouteCGR).
     5. If the charge distributions (_p_charges vs. _charges) differ, neutralizes the charges by setting them to zero.
-    
-    Finally, returns the reduced RouteCGR.
+
+    Args:
+        route_cgr: The input RouteCGR object to be reduced.
+
+    Returns:
+        The reduced RouteCGR object.
     """
-    # Get all connected components of the G-CGR as separate substructures.
+    # Get all connected components of the RouteCGR as separate substructures.
     cgr_prods = [route_cgr.substructure(c) for c in route_cgr.connected_components]
-    target_cgr = cgr_prods[0]  # Choose the first substructure (main product) for further reduction.
-    
-    # Iterate over each bond in the target G-CGR.
+    target_cgr = cgr_prods[
+        0
+    ]  # Choose the first substructure (main product) for further reduction.
+
+    # Iterate over each bond in the target RouteCGR.
     bond_items = list(target_cgr._bonds.items())
     for atom1, bond_set in bond_items:
         bond_set_items = list(bond_set.items())
@@ -341,13 +527,19 @@ def compose_reduced_route_cgr(route_cgr):
 
             # For bonds that have been modified (not leaving groups) where the new (primary) order is less than the original:
             # Remove the bond and re-add it using the DynamicBond with the primary order for both bond orders.
-            elif type(bond.p_order) is int and type(bond.order) is int and bond.p_order != bond.order:
+            elif (
+                type(bond.p_order) is int
+                and type(bond.order) is int
+                and bond.p_order != bond.order
+            ):
                 p_order = int(bond.p_order)
                 target_cgr.delete_bond(atom1, atom2)
                 target_cgr.add_bond(atom1, atom2, DynamicBond(p_order, p_order))
-                
-    # After modifying bonds, extract the reduced G-CGR from the target's connected components.
-    reduced_route_cgr = [target_cgr.substructure(c) for c in target_cgr.connected_components][0]
+
+    # After modifying bonds, extract the reduced RouteCGR from the target's connected components.
+    reduced_route_cgr = [
+        target_cgr.substructure(c) for c in target_cgr.connected_components
+    ][0]
 
     # Neutralize charges if the primary charges and current charges differ.
     if reduced_route_cgr._p_charges != reduced_route_cgr._charges:
@@ -357,14 +549,20 @@ def compose_reduced_route_cgr(route_cgr):
 
     return reduced_route_cgr
 
-def compose_all_reduced_route_cgrs(route_cgrs_dict):
+
+def compose_all_reduced_route_cgrs(route_cgrs_dict: dict):
     """
     Processes a collection (dictionary) of RouteCGRs to generate their reduced forms (ReducedRouteCGRs).
-    
-    Iterates over each G-CGR in the provided dictionary and applies the compose_reduced_route_cgr function.
-    
+
+    Iterates over each RouteCGR in the provided dictionary and applies the compose_reduced_route_cgr function.
+
+    Args:
+        route_cgrs_dict (dict): A dictionary where keys are identifiers (e.g., route numbers)
+                                and values are RouteCGR objects.
+
     Returns:
-        A dictionary where each key corresponds to the RG-CGR obtained from the input G-CGR.
+        dict: A dictionary where each key corresponds to the original identifier from
+              `route_cgrs_dict` and the value is the corresponding ReducedRouteCGR object.
     """
     all_reduced_route_cgrs = dict()
     for num, cgr in route_cgrs_dict.items():

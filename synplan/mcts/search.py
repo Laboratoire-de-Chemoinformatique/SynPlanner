@@ -186,9 +186,13 @@ def run_search(
 
             # Save mapped reactions (CSV)
             routes_dict = extract_reactions(tree)
-            write_routes_csv(routes_dict, os.path.join(routes_folder, f'mapped_routes_{ti}.csv'))
+            write_routes_csv(
+                routes_dict, os.path.join(routes_folder, f"mapped_routes_{ti}.csv")
+            )
 
             # save mapped reactions (JSON)
-            write_routes_json(routes_dict, os.path.join(routes_folder,f'mapped_routes_{ti}.json'))
+            write_routes_json(
+                routes_dict, os.path.join(routes_folder, f"mapped_routes_{ti}.json")
+            )
 
     print(f"Number of solved target molecules: {n_solved}")

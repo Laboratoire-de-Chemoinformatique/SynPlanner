@@ -3,10 +3,11 @@ import json
 
 from CGRtools import smiles as read_smiles
 
+
 def make_dict(routes_json):
     """
     routes_json : list of tree-dicts as produced by make_json()
-    
+
     Returns a dict mapping each route index (0, 1, …) to a sub-dict
     of {new_step_id: ReactionContainer}, where the step IDs run
     from the earliest reaction (0) up to the final (max).
@@ -15,18 +16,18 @@ def make_dict(routes_json):
     if isinstance(routes_json, dict):
         for route_idx, tree in routes_json.items():
             rxn_list = []
-            
+
             def _postorder(node):
                 # first dive into any children, then record this reaction
-                for child in node.get('children', []):
+                for child in node.get("children", []):
                     _postorder(child)
-                if node['type'] == 'reaction':
-                    rxn_list.append(read_smiles(node['smiles']))
+                if node["type"] == "reaction":
+                    rxn_list.append(read_smiles(node["smiles"]))
                 # mol-nodes simply recurse (no record)
-            
+
             # collect all reactions in leaf→root order
             _postorder(tree)
-            
+
             # now assign 0,1,2,… in that order
             reactions = {i: rxn for i, rxn in enumerate(rxn_list)}
             routes_dict[route_idx] = reactions
@@ -35,30 +36,32 @@ def make_dict(routes_json):
     else:
         for route_idx, tree in enumerate(routes_json):
             rxn_list = []
-            
+
             def _postorder(node):
                 # first dive into any children, then record this reaction
-                for child in node.get('children', []):
+                for child in node.get("children", []):
                     _postorder(child)
-                if node['type'] == 'reaction':
-                    rxn_list.append(read_smiles(node['smiles']))
+                if node["type"] == "reaction":
+                    rxn_list.append(read_smiles(node["smiles"]))
                 # mol-nodes simply recurse (no record)
-            
+
             # collect all reactions in leaf→root order
             _postorder(tree)
-            
+
             # now assign 0,1,2,… in that order
             reactions = {i: rxn for i, rxn in enumerate(rxn_list)}
             routes_dict[route_idx] = reactions
 
         return routes_dict
 
-def read_routes_json(file_path='routes.csv'):
-    with open(file_path, 'r') as file:
+
+def read_routes_json(file_path="routes.csv"):
+    with open(file_path, "r") as file:
         routes_json = json.load(file)
     return routes_json
 
-def read_routes_csv(file_path='routes.csv'):
+
+def read_routes_csv(file_path="routes.csv"):
     """
     Read a CSV with columns: route_id, step_id, smiles, meta
     and return a nested dict mapping
@@ -66,14 +69,14 @@ def read_routes_csv(file_path='routes.csv'):
     (ignoring meta for now, but you could extract it if needed).
     """
     reaction_dict = {}
-    with open(file_path, newline='') as csvfile:
+    with open(file_path, newline="") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
-            route_id = int(row['route_id'])
-            step_id = int(row['step_id'])
-            smiles = row['smiles']
+            route_id = int(row["route_id"])
+            step_id = int(row["step_id"])
+            smiles = row["smiles"]
             # adjust this constructor to your actual API
-            reaction = read_smiles(smiles)  
+            reaction = read_smiles(smiles)
             reaction_dict.setdefault(route_id, {})[step_id] = reaction
     return reaction_dict
 
@@ -112,7 +115,9 @@ def make_json(routes_dict, keep_ids=True):
                 prod_map.setdefault(s, []).append(sid)
 
         def transform(mol):
-            mol.kekule(); mol.implicify_hydrogens(); mol.thiele()
+            mol.kekule()
+            mol.implicify_hydrogens()
+            mol.thiele()
             return str(mol)
 
         def build_mol_node(sid):
@@ -125,7 +130,7 @@ def make_json(routes_dict, keep_ids=True):
                         "type": "mol",
                         "smiles": smiles,
                         "children": [build_reaction_node(sid)],
-                        "in_stock": False
+                        "in_stock": False,
                     }
             # Shouldn't reach here if tree is consistent
             return None
@@ -133,11 +138,7 @@ def make_json(routes_dict, keep_ids=True):
         def build_reaction_node(sid):
             """Build reaction node and recurse into reactant molecule nodes."""
             rxn = steps[sid]
-            node = {
-                "type": "reaction",
-                "smiles": format(rxn, 'm'),
-                "children": []
-            }
+            node = {"type": "reaction", "smiles": format(rxn, "m"), "children": []}
 
             for react in rxn.reactants:
                 r_smi = transform(react)
@@ -146,7 +147,9 @@ def make_json(routes_dict, keep_ids=True):
                 if prior:
                     node["children"].append(build_mol_node(max(prior)))
                 else:
-                    node["children"].append({"type": "mol", "smiles": r_smi, "in_stock": True})
+                    node["children"].append(
+                        {"type": "mol", "smiles": r_smi, "in_stock": True}
+                    )
 
             return node
 
@@ -159,28 +162,30 @@ def make_json(routes_dict, keep_ids=True):
 
     return all_routes
 
+
 def write_routes_json(routes_dict, file_path):
     """Serialize reaction routes to a JSON file."""
     routes_json = make_json(routes_dict)
-    with open(file_path, 'w') as f:
+    with open(file_path, "w") as f:
         json.dump(routes_json, f, indent=2)
 
-def write_routes_csv(routes_dict, file_path='routes.csv'):
+
+def write_routes_csv(routes_dict, file_path="routes.csv"):
     """
     Write out a nested routes_dict of the form
         { route_id: { step_id: reaction_obj, ... }, ... }
     to a CSV with columns: route_id, step_id, smiles, meta
     where smiles is format(reaction, 'm') and meta is left blank.
     """
-    with open(file_path, 'w', newline='') as csvfile:
+    with open(file_path, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         # header row
-        writer.writerow(['route_id', 'step_id', 'smiles', 'meta'])
+        writer.writerow(["route_id", "step_id", "smiles", "meta"])
         # sort routes and steps for deterministic output
         for route_id in sorted(routes_dict):
             steps = routes_dict[route_id]
             for step_id in sorted(steps):
                 reaction = steps[step_id]
-                smiles = format(reaction, 'm')
-                meta = ''   # or reaction.meta if you add that later
+                smiles = format(reaction, "m")
+                meta = ""  # or reaction.meta if you add that later
                 writer.writerow([route_id, step_id, smiles, meta])
