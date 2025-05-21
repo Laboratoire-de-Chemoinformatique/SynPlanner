@@ -447,7 +447,7 @@ def compose_all_route_cgrs(tree_or_routes, node_id=None):
     return route_cgrs
 
 
-def extract_reactions(tree, node_id=None):
+def extract_reactions(tree: Tree, node_id=None):
     """
     Collect mapped reaction sequences from a synthesis tree.
 

@@ -196,13 +196,13 @@ def extract_strat_bonds(target_cgr: CGRContainer):
     return sorted(result)
 
 
-def cluster_routes(clusters_dict: dict, use_strat=True):
+def cluster_routes(r_route_cgrs: dict, use_strat=False):
     """
     Cluster routes objects based on their strategic bonds
       or CGRContainer object signature (not avoid mapping)
 
     Args:
-        clusters_dict: Dictionary mapping node_id to r_route_cgr objects.
+        r_route_cgrs: Dictionary mapping node_id to r_route_cgr objects.
 
     Returns:
         Dictionary with groups keyed by '{length}.{index}' containing
@@ -213,7 +213,7 @@ def cluster_routes(clusters_dict: dict, use_strat=True):
     )
 
     # 1. Initial grouping based on the content of strategic bonds
-    for node_id, r_route_cgr in clusters_dict.items():
+    for node_id, r_route_cgr in r_route_cgrs.items():
         strat_bonds_list = extract_strat_bonds(r_route_cgr)
         if use_strat == True:
             group_key = tuple(strat_bonds_list)
@@ -232,7 +232,7 @@ def cluster_routes(clusters_dict: dict, use_strat=True):
         temp_groups[group_key][
             "node_ids"
         ].sort()  # Keep node_ids sorted for consistency
-        # temp_groups[group_key]['group_size'] = len(temp_groups[group_key]['node_ids'])
+
     for group_key in temp_groups.keys():
         temp_groups[group_key]["group_size"] = len(temp_groups[group_key]["node_ids"])
 
@@ -255,7 +255,7 @@ def cluster_routes(clusters_dict: dict, use_strat=True):
     return final_grouped_results
 
 
-def lg_process_reset(lg_cgr, atom_num):
+def lg_process_reset(lg_cgr: CGRContainer, atom_num: int):
     """
     Normalize bonds in an extracted leaving group (X) fragment and flag the attachment atom as a radical.
 
@@ -373,7 +373,6 @@ def lg_replacer(route_cgr: CGRContainer):
             if atom_num in r._atoms:
                 synthon_cgr._atoms[atom_num].mark = g
                 atom_mark_map[atom_num] = g
-                # print('reasssigned', atom_num, 'mark', g)
                 g += 1
 
     new_lg_groups = {}
@@ -387,7 +386,9 @@ def lg_replacer(route_cgr: CGRContainer):
     return synthon_cgr, lg_groups
 
 
-def lg_reaction_replacer(synthon_reaction, lg_groups, max_in_target_mol):
+def lg_reaction_replacer(
+    synthon_reaction: ReactionContainer, lg_groups: dict, max_in_target_mol: int
+):
     """
     Replace marked leaving-groups (X) into synthon reactants.
 
@@ -430,6 +431,10 @@ def lg_reaction_replacer(synthon_reaction, lg_groups, max_in_target_mol):
     return new_reactants
 
 
+class SubclusterError(Exception):
+    """Raised when subcluster_one_cluster cannot complete successfully."""
+
+
 def subcluster_one_cluster(group, r_route_cgrs_dict, route_cgrs_dict):
     """
     Generate synthon data for each route in a single cluster.
@@ -452,45 +457,60 @@ def subcluster_one_cluster(group, r_route_cgrs_dict, route_cgrs_dict):
     dict or None
         If successful, returns a dict mapping each `node_id` to a tuple:
         `(r_route_cgr, original_reaction, synthon_cgr, new_reaction, lg_groups)`.
-        Returns `None` immediately if any step (X replacement or reaction
+        Or raises SubclusterError on any failure: if any step (X replacement or reaction
         parsing) fails for a node.
 
     """
-    group_synthons = {}
-    for node_id in group["node_ids"]:
+
+    node_ids = group.get("node_ids")
+    if not isinstance(node_ids, (list, tuple)):
+        raise SubclusterError(
+            f"'node_ids' must be a list or tuple, got {type(node_ids).__name__}"
+        )
+
+    result = {}
+    for node_id in node_ids:
         r_route_cgr = r_route_cgrs_dict[node_id]
         route_cgr = route_cgrs_dict[node_id]
+
+        # 1) Replace leaving groups in RouteCGR
         try:
             synthon_cgr, lg_groups = lg_replacer(route_cgr)
-        except:
-            print("replacer", node_id)
-            return None
+        except (KeyError, ValueError) as e:
+            raise SubclusterError(f"LG replacement failed for node {node_id}") from e
+
+        # 2) Build ReactionContainer for Abstracted RouteCGR
         try:
-            synthon_reaction = ReactionContainer.from_cgr(synthon_cgr)
-        except:
-            print("reaction", node_id)
-            return None
-        old_reactants = ReactionContainer.from_cgr(synthon_cgr).reactants
-        target_mol = synthon_reaction.products[0]
-        max_in_target_mol = max(target_mol._atoms)
-        new_reactants = lg_reaction_replacer(
-            synthon_reaction, lg_groups, max_in_target_mol
-        )
-        new_synthon_reaction = ReactionContainer(
-            reactants=new_reactants, products=[target_mol]
-        )
-        group_synthons[node_id] = (
+            synthon_rxn = ReactionContainer.from_cgr(synthon_cgr)
+        except:  # replace with the actual exception class
+            raise SubclusterError(
+                f"Failed to parse synthon CGR for node {node_id}"
+            ) from e
+
+        # 3) Prepare for X-based reaction replacement
+        try:
+            old_reactants = synthon_rxn.reactants
+            target_mol = synthon_rxn.products[0]
+            max_atom_idx = max(target_mol._atoms)
+            new_reactants = lg_reaction_replacer(synthon_rxn, lg_groups, max_atom_idx)
+            new_rxn = ReactionContainer(reactants=new_reactants, products=[target_mol])
+        except (IndexError, TypeError) as e:
+            raise SubclusterError(
+                f"Leaving group (X) reaction replacement failed for node {node_id}"
+            ) from e
+
+        result[node_id] = (
             r_route_cgr,
             ReactionContainer(reactants=old_reactants, products=[target_mol]),
             synthon_cgr,
-            new_synthon_reaction,
+            new_rxn,
             lg_groups,
         )
 
-    return group_synthons
+    return result
 
 
-def group_nodes_by_synthon_detail(data_dict):
+def group_nodes_by_synthon_detail(data_dict: dict):
     """
     Groups nodes based on synthon CGR (result[0]) and reaction (result[1]).
     The output includes a dictionary mapping node IDs to their result[2] value.

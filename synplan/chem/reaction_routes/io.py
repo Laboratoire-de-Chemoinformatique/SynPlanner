@@ -1,7 +1,10 @@
 import csv
 import json
+import pickle
+import os
 
 from CGRtools import smiles as read_smiles
+from synplan.mcts.tree import Tree
 
 
 def make_dict(routes_json):
@@ -30,7 +33,7 @@ def make_dict(routes_json):
 
             # now assign 0,1,2,… in that order
             reactions = {i: rxn for i, rxn in enumerate(rxn_list)}
-            routes_dict[route_idx] = reactions
+            routes_dict[int(route_idx)] = reactions
 
         return routes_dict
     else:
@@ -50,7 +53,7 @@ def make_dict(routes_json):
 
             # now assign 0,1,2,… in that order
             reactions = {i: rxn for i, rxn in enumerate(rxn_list)}
-            routes_dict[route_idx] = reactions
+            routes_dict[int(route_idx)] = reactions
 
         return routes_dict
 
@@ -68,7 +71,7 @@ def read_routes_csv(file_path="routes.csv"):
         route_id (int) -> step_id (int) -> ReactionContainer
     (ignoring meta for now, but you could extract it if needed).
     """
-    reaction_dict = {}
+    routes_dict = {}
     with open(file_path, newline="") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
@@ -77,8 +80,8 @@ def read_routes_csv(file_path="routes.csv"):
             smiles = row["smiles"]
             # adjust this constructor to your actual API
             reaction = read_smiles(smiles)
-            reaction_dict.setdefault(route_id, {})[step_id] = reaction
-    return reaction_dict
+            routes_dict.setdefault(route_id, {})[step_id] = reaction
+    return routes_dict
 
 
 def make_json(routes_dict, keep_ids=True):
@@ -156,7 +159,7 @@ def make_json(routes_dict, keep_ids=True):
         # Build route tree and store
         tree = build_mol_node(final_step)
         if keep_ids:
-            all_routes[route_id] = tree
+            all_routes[int(route_id)] = tree
         else:
             all_routes.append(tree)
 
@@ -189,3 +192,93 @@ def write_routes_csv(routes_dict, file_path="routes.csv"):
                 smiles = format(reaction, "m")
                 meta = ""  # or reaction.meta if you add that later
                 writer.writerow([route_id, step_id, smiles, meta])
+
+
+class TreeWrapper:
+
+    def __init__(self, tree, mol_id=1, config=1, path="planning_results/forest"):
+        """Initializes the TreeWrapper."""
+        self.tree = tree
+        self.mol_id = mol_id
+        self.config = config
+        self.path = path
+        # Ensure the directory exists before creating the filename
+        os.makedirs(self.path, exist_ok=True)
+        self.filename = os.path.join(self.path, f"tree_{mol_id}_{config}.pkl")
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        tree_state = self.tree.__dict__.copy()
+        # Reset or remove non-pickleable attributes (e.g., _tqdm, policy_network, value_network)
+        if "_tqdm" in tree_state:
+            tree_state["_tqdm"] = True  # Reset to a simple flag
+        for attr in ["policy_network", "value_network"]:
+            if attr in tree_state:
+                tree_state[attr] = None
+        state["tree_state"] = tree_state
+        del state["tree"]
+        return state
+
+    def __setstate__(self, state):
+        tree_state = state.pop("tree_state")
+        self.__dict__.update(state)
+        new_tree = Tree.__new__(Tree)
+        new_tree.__dict__.update(tree_state)
+        self.tree = new_tree
+
+    def save_tree(self):
+        """Saves the TreeWrapper instance (including the tree state) to a file."""
+        try:
+            with open(self.filename, "wb") as f:
+                pickle.dump(self, f)
+            print(
+                f"Tree wrapper for mol_id '{self.mol_id}', config '{self.config}' saved to '{self.filename}'."
+            )
+        except Exception as e:
+            print(f"Error saving tree to {self.filename}: {e}")
+
+    @classmethod
+    def load_tree_from_id(cls, mol_id, config=1, path="planning_results/forest"):
+        """
+        Loads a Tree object from a saved file using mol_id and config.
+
+        Args:
+            mol_id: The molecule ID used for saving.
+            config: The configuration used for saving.
+            path: The directory where the file is located
+
+        Returns:
+            The loaded Tree object, or None if loading fails.
+        """
+        filename = os.path.join(path, f"tree_{mol_id}_{config}.pkl")
+        print(f"Attempting to load tree from: {filename}")
+        try:
+            # Ensure the 'Tree' class is defined in the current scope
+            if "Tree" not in globals() and "Tree" not in locals():
+                raise NameError(
+                    "The 'Tree' class definition is required to load the object."
+                )
+
+            with open(filename, "rb") as f:
+                loaded_wrapper = pickle.load(f)  # This implicitly calls __setstate__
+
+            print(
+                f"Tree object for mol_id '{mol_id}', config '{config}' successfully loaded from '{filename}'."
+            )
+            # The __setstate__ method already reconstructed the tree inside the wrapper
+            return loaded_wrapper.tree
+
+        except FileNotFoundError:
+            print(f"Error: File not found at {filename}")
+            return None
+        except (pickle.UnpicklingError, EOFError) as e:
+            print(
+                f"Error: Could not unpickle file {filename}. It might be corrupted or empty. Details: {e}"
+            )
+            return None
+        except NameError as e:
+            print(f"Error during loading: {e}. Ensure 'Tree' class is defined.")
+            return None
+        except Exception as e:
+            print(f"An unexpected error occurred loading tree from {filename}: {e}")
+            return None
