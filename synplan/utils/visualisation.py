@@ -306,7 +306,13 @@ def get_route_svg_from_json(routes_json: dict, route_id: int) -> str:
     :return:           The SVG string .
     """
     # 1) Parse JSON into per-depth lists of mol-dicts, remembering parent links
-    root = routes_json[route_id]
+    if route_id not in routes_json.keys():
+        try:
+            root = routes_json[str(route_id)]
+        except KeyError:
+            raise ValueError(f"Route ID {route_id} not found in routes_json.")
+    else:
+        root = routes_json[route_id]
     levels = []  # levels[d] = list of mol-dicts at depth d
     parent_of = {}  # mol_id -> parent_mol_dict
     Q = deque([(root, 0, None)])
@@ -484,6 +490,10 @@ def generate_results_html(
         html_file.write(template_end)
 
 
+from synplan.utils.visualisation import routes_clustering_report, routes_subclustering_report
+from typing import Any, Dict, List, Union
+
+
 def routes_clustering_report(
     source: Union[Tree, dict],
     clusters: dict,
@@ -566,12 +576,11 @@ def routes_clustering_report(
             if nid in tree.nodes and tree.nodes[nid].is_solved():
                 valid_routes.append(nid)
     else:
-        # JSON mode: just keep those IDs present in the JSON
-        for nid in cluster_node_ids:
-            if nid in routes_json:
-                valid_routes.append(nid)
+        # JSON mode: check if the node ID exists in the routes_dict
         routes_dict = make_dict(routes_json)
-
+        for nid in cluster_node_ids:
+            if nid in routes_dict.keys():
+                valid_routes.append(nid)
     if not valid_routes:
         return f"""
         <!doctype html><html><body>
@@ -600,7 +609,7 @@ def routes_clustering_report(
             target_smiles = "N/A"
     else:
         # JSON mode: take the root smiles of the first route
-        target_smiles = routes_json[valid_routes[0]]["smiles"]
+        target_smiles = routes_json[str(valid_routes[0])]["smiles"]
 
     # legend row omitted…
 
@@ -672,7 +681,7 @@ def routes_clustering_report(
             r_route_cgr_svg = cgr_display(r_route_cgr)
 
             if r_route_cgr_svg.strip().startswith("<svg"):
-                table += f"<tr>{td}{font_normal}Created Strategic Bonds{font_close}<br>{r_route_cgr_svg}</td></tr>"
+                table += f"<tr>{td}{font_normal}Identified Strategic Bonds{font_close}<br>{r_route_cgr_svg}</td></tr>"
             else:
                 table += f"<tr>{td}{font_normal}Cluster Representative ReducedRouteCGR (from Route {first_route_id}):{font_close}<br><i>Invalid SVG format retrieved.</i></td></tr>"
                 print(
@@ -1102,7 +1111,7 @@ def routes_subclustering_report(
             r_route_cgr_svg = cgr_display(r_route_cgr)
 
             if r_route_cgr_svg.strip().startswith("<svg"):
-                table += f"<tr>{td}{font_normal}Created Strategic Bonds{font_close}<br>{r_route_cgr_svg}</td></tr>"
+                table += f"<tr>{td}{font_normal}Identified Strategic Bonds{font_close}<br>{r_route_cgr_svg}</td></tr>"
             else:
                 table += f"<tr>{td}{font_normal}Cluster Representative ReducedRouteCGR (from Route {first_route_id}):{font_close}<br><i>Invalid SVG format retrieved.</i></td></tr>"
                 print(
