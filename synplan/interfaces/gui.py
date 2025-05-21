@@ -166,10 +166,10 @@ def initialize_app():
         st.session_state.reactions_dict = None
     if "num_clusters_setting" not in st.session_state:  # Store the setting used
         st.session_state.num_clusters_setting = 10
-    if "g_cgrs_dict" not in st.session_state:
-        st.session_state.g_cgrs_dict = None
-    if "rg_cgrs_dict" not in st.session_state:
-        st.session_state.rg_cgrs_dict = None
+    if "route_cgrs_dict" not in st.session_state:
+        st.session_state.route_cgrs_dict = None
+    if "r_route_cgrs_dict" not in st.session_state:
+        st.session_state.r_route_cgrs_dict = None
 
     # Subclustering state
     if "subclustering_done" not in st.session_state:
@@ -243,8 +243,8 @@ def handle_molecule_input():
     #     syba_score = ()
     #     st.markdown(f"SYBA: {sascore}")
 
-    current_smile_code = mol_from_smiles(molecule_text_input)
-    # current_smile_code = smile_code_ketcher # The output from ketcher is the definitive SMILES
+
+    current_smile_code = smile_code_ketcher # The output from ketcher is the definitive SMILES
 
     if (
         "target_smiles" in st.session_state
@@ -358,8 +358,8 @@ def setup_planning_options():
         st.session_state.clusters = None
         st.session_state.reactions_dict = None
         st.session_state.subclusters = None
-        st.session_state.g_cgrs_dict = None
-        st.session_state.rg_cgrs_dict = None
+        st.session_state.route_cgrs_dict = None
+        st.session_state.r_route_cgrs_dict = None
         active_smile_code = st.session_state.get(
             "ketcher", DEFAULT_MOL
         )  # Get current SMILES
@@ -594,8 +594,8 @@ def setup_clustering():
             st.session_state.clusters = None
             st.session_state.reactions_dict = None
             st.session_state.subclusters = None
-            st.session_state.g_cgrs_dict = None
-            st.session_state.rg_cgrs_dict = None
+            st.session_state.route_cgrs_dict = None
+            st.session_state.r_route_cgrs_dict = None
 
             with st.spinner("Performing clustering..."):
                 try:
@@ -604,19 +604,19 @@ def setup_clustering():
                         st.error("Tree object not found. Please re-run planning.")
                         return
 
-                    st.write("Calculating Generalized CGRs...")
-                    g_cgrs_dict = compose_all_route_cgrs(current_tree)
-                    st.write("Processing RG-CGRs...")
-                    reduced_g_cgrs_dict = compose_all_reduced_route_cgrs(g_cgrs_dict)
+                    st.write("Calculating RoutesCGRs...")
+                    route_cgrs_dict = compose_all_route_cgrs(current_tree)
+                    st.write("Processing ReducedRoutesCGRs...")
+                    r_route_cgrs_dict = compose_all_reduced_route_cgrs(route_cgrs_dict)
 
                     results = cluster_routes(
-                        reduced_g_cgrs_dict, use_strat=False
+                        r_route_cgrs_dict, use_strat=False
                     )  # num_clusters was removed from args
                     results = dict(sorted(results.items()))
 
                     st.session_state.clusters = results
-                    st.session_state.g_cgrs_dict = g_cgrs_dict
-                    st.session_state.rg_cgrs_dict = reduced_g_cgrs_dict
+                    st.session_state.route_cgrs_dict = route_cgrs_dict
+                    st.session_state.r_route_cgrs_dict = r_route_cgrs_dict
                     st.write("Extracting reactions...")
                     st.session_state.reactions_dict = extract_reactions(current_tree)
 
@@ -632,7 +632,7 @@ def setup_clustering():
                         st.error("Clustering failed or returned empty results.")
                         st.session_state.clustering_done = False
 
-                    del results  # g_cgrs_dict, reduced_g_cgrs_dict are stored
+                    del results  # route_cgrs_dict, r_route_cgrs_dict are stored
                     gc.collect()
                     st.rerun()
                 except Exception as e:
@@ -678,16 +678,16 @@ def display_clustering_results():
                 num_steps = len(tree.synthesis_route(node_id))
                 route_score = round(tree.route_score(node_id), 3)
                 svg = get_route_svg(tree, node_id)
-                rg_cgr = group_data.get("rg_cgr")  # Safely get rg_cgr
-                rg_cgr_svg = None
-                if rg_cgr:
-                    rg_cgr.clean2d()
-                    rg_cgr_svg = cgr_display(rg_cgr)
+                r_route_cgr = group_data.get("r_route_cgr")  # Safely get r_route_cgr
+                r_route_cgr_svg = None
+                if r_route_cgr:
+                    r_route_cgr.clean2d()
+                    r_route_cgr_svg = cgr_display(r_route_cgr)
 
-                if svg and rg_cgr_svg:
+                if svg and r_route_cgr_svg:
                     col1, col2 = st.columns([0.2, 0.8])
                     with col1:
-                        st.image(rg_cgr_svg, caption="RG-CGR")
+                        st.image(r_route_cgr_svg, caption="ReducedRouteCGR")
                     with col2:
                         st.image(
                             svg,
@@ -699,11 +699,11 @@ def display_clustering_results():
                         caption=f"Route {node_id}; {num_steps} steps; Route score: {route_score}",
                     )
                     st.warning(
-                        f"RG-CGR could not be displayed for cluster {cluster_num}."
+                        f"ReducedRouteCGR could not be displayed for cluster {cluster_num}."
                     )
                 else:
                     st.warning(
-                        f"Could not generate SVG for route {node_id} or its RG-CGR."
+                        f"Could not generate SVG for route {node_id} or its ReducedRouteCGR."
                     )
             except Exception as e:
                 st.error(
@@ -730,16 +730,16 @@ def display_clustering_results():
                         num_steps = len(tree.synthesis_route(node_id))
                         route_score = round(tree.route_score(node_id), 3)
                         svg = get_route_svg(tree, node_id)
-                        rg_cgr = group_data.get("rg_cgr")
-                        rg_cgr_svg = None
-                        if rg_cgr:
-                            rg_cgr.clean2d()
-                            rg_cgr_svg = cgr_display(rg_cgr)
+                        r_route_cgr = group_data.get("r_route_cgr")
+                        r_route_cgr_svg = None
+                        if r_route_cgr:
+                            r_route_cgr.clean2d()
+                            r_route_cgr_svg = cgr_display(r_route_cgr)
 
-                        if svg and rg_cgr_svg:
+                        if svg and r_route_cgr_svg:
                             col1, col2 = st.columns([0.2, 0.8])
                             with col1:
-                                st.image(rg_cgr_svg, caption="RG-CGR")
+                                st.image(r_route_cgr_svg, caption="ReducedRouteCGR")
                             with col2:
                                 st.image(
                                     svg,
@@ -751,11 +751,11 @@ def display_clustering_results():
                                 caption=f"Route {node_id}; {num_steps} steps; Route score: {route_score}",
                             )
                             st.warning(
-                                f"RG-CGR could not be displayed for cluster {cluster_num}."
+                                f"ReducedRouteCGR could not be displayed for cluster {cluster_num}."
                             )
                         else:
                             st.warning(
-                                f"Could not generate SVG for route {node_id} or its RG-CGR."
+                                f"Could not generate SVG for route {node_id} or its ReducedRouteCGR."
                             )
                     except Exception as e:
                         st.error(
@@ -768,8 +768,8 @@ def download_clustering_results():
     if st.session_state.get("clustering_done", False):
         tree_for_html = st.session_state.get("tree")
         clusters_for_html = st.session_state.get("clusters")
-        rg_cgrs_for_html = st.session_state.get(
-            "rg_cgrs_dict"
+        r_route_cgrs_for_html = st.session_state.get(
+            "r_route_cgrs_dict"
         )  # This was used instead of reactions_dict in the original for report
 
         if not tree_for_html:
@@ -778,7 +778,7 @@ def download_clustering_results():
         if not clusters_for_html:
             st.warning("Cluster data not found. Cannot generate cluster reports.")
             return
-        # rg_cgrs_for_html is optional for routes_clustering_report if not essential
+        # r_route_cgrs_for_html is optional for routes_clustering_report if not essential
 
         st.subheader("Cluster Reports")  # Changed subheader in original
         st.write("Generate downloadable HTML reports for each cluster:")
@@ -797,7 +797,7 @@ def download_clustering_results():
                     tree_for_html,
                     clusters_for_html,  # Pass the whole dict
                     str(cluster_idx),  # Pass the key of the cluster
-                    rg_cgrs_for_html,  # Pass the rg_cgrs dict
+                    r_route_cgrs_for_html,  # Pass the r_route_cgrs dict
                     aam=False,
                 )
                 st.download_button(
@@ -824,7 +824,7 @@ def download_clustering_results():
                             tree_for_html,
                             clusters_for_html,
                             str(group_index),
-                            rg_cgrs_for_html,
+                            r_route_cgrs_for_html,
                             aam=False,
                         )
                         st.download_button(
@@ -849,7 +849,7 @@ def download_clustering_results():
                         tree_for_html,
                         clusters_for_html,
                         str(idx),
-                        rg_cgrs_for_html,
+                        r_route_cgrs_for_html,
                         aam=False,
                     )
                     filename = f"cluster_{idx}_{st.session_state.target_smiles}.html"
@@ -881,20 +881,20 @@ def setup_subclustering():
             with st.spinner("Performing subclustering analysis..."):
                 try:
                     clusters_for_sub = st.session_state.get("clusters")
-                    rg_cgrs_dict_for_sub = st.session_state.get(
-                        "rg_cgrs_dict"
+                    r_route_cgrs_dict_for_sub = st.session_state.get(
+                        "r_route_cgrs_dict"
                     )  # Corrected name
-                    g_cgrs_dict_for_sub = st.session_state.get(
-                        "g_cgrs_dict"
+                    route_cgrs_dict_for_sub = st.session_state.get(
+                        "route_cgrs_dict"
                     )  # Corrected name
 
                     if (
                         clusters_for_sub
-                        and rg_cgrs_dict_for_sub
-                        and g_cgrs_dict_for_sub
+                        and r_route_cgrs_dict_for_sub
+                        and route_cgrs_dict_for_sub
                     ):  # Ensure all are present
                         all_subgroups = subcluster_all_clusters(
-                            clusters_for_sub, rg_cgrs_dict_for_sub, g_cgrs_dict_for_sub
+                            clusters_for_sub, r_route_cgrs_dict_for_sub, route_cgrs_dict_for_sub
                         )
                         st.session_state.subclusters = all_subgroups
                         st.session_state.subclustering_done = True
@@ -905,10 +905,10 @@ def setup_subclustering():
                         missing = []
                         if not clusters_for_sub:
                             missing.append("clusters")
-                        if not rg_cgrs_dict_for_sub:
-                            missing.append("RG-CGRs dictionary")
-                        if not g_cgrs_dict_for_sub:
-                            missing.append("G-CGRs dictionary")
+                        if not r_route_cgrs_dict_for_sub:
+                            missing.append("ReducedRouteCGRs dictionary")
+                        if not route_cgrs_dict_for_sub:
+                            missing.append("RouteCGRs dictionary")
                         st.error(
                             f"Cannot run subclustering. Missing data: {', '.join(missing)}. Please ensure clustering ran successfully."
                         )
@@ -968,15 +968,15 @@ def display_subclustering_results():
                         current_subcluster_data = sub[user_input_cluster_num_display][
                             selected_subcluster_idx
                         ]
-                        if "rg_cgr" in current_subcluster_data:
-                            cluster_rg_cgr_display = current_subcluster_data["rg_cgr"]
-                            cluster_rg_cgr_display.clean2d()
+                        if "r_route_cgr" in current_subcluster_data:
+                            cluster_r_route_cgr_display = current_subcluster_data["r_route_cgr"]
+                            cluster_r_route_cgr_display.clean2d()
                             st.image(
-                                cluster_rg_cgr_display.depict(),
-                                caption=f"RG-CGR of parent Cluster {user_input_cluster_num_display}",
+                                cluster_r_route_cgr_display.depict(),
+                                caption=f"ReducedRouteCGR of parent Cluster {user_input_cluster_num_display}",
                             )
                         else:
-                            st.warning("RG-CGR for this subcluster not found.")
+                            st.warning("ReducedRouteCGR for this subcluster not found.")
             else:
                 st.warning(
                     f"Selected cluster {user_input_cluster_num_display} not found in subclustering results."
@@ -1086,16 +1086,16 @@ def download_subclustering_results():
 
         sub = st.session_state.get("subclusters")
         tree = st.session_state.get("tree")
-        rg_cgrs_for_report = st.session_state.get(
-            "rg_cgrs_dict"
+        r_route_cgrs_for_report = st.session_state.get(
+            "r_route_cgrs_dict"
         )  # Used by routes_subclustering_report
 
         user_input_cluster_num_display = st.session_state.subcluster_num_select_key
         selected_subcluster_idx = st.session_state.subcluster_index_select_key
 
-        if not tree or not sub or not rg_cgrs_for_report:
+        if not tree or not sub or not r_route_cgrs_for_report:
             st.warning(
-                "Missing data for subclustering report generation (tree, subclusters, or RG-CGRs)."
+                "Missing data for subclustering report generation (tree, subclusters, or ReducedRouteCGRs)."
             )
             return
 
@@ -1126,7 +1126,7 @@ def download_subclustering_results():
                     processed_subcluster_data,  # Pass the specific post-processed subcluster data
                     user_input_cluster_num_display,
                     selected_subcluster_idx,
-                    rg_cgrs_for_report,  # Pass the whole rg_cgrs dict
+                    r_route_cgrs_for_report,  # Pass the whole r_route_cgrs dict
                     if_lg_group=True,  # This parameter was in the original call
                 )
                 st.download_button(
@@ -1158,8 +1158,8 @@ def implement_restart():
             "clusters",
             "reactions_dict",
             "num_clusters_setting",
-            "g_cgrs_dict",
-            "rg_cgrs_dict",
+            "route_cgrs_dict",
+            "r_route_cgrs_dict",
             "subclustering_done",
             "subclusters",  # "sub" was renamed
             "clusters_downloaded",
