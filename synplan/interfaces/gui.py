@@ -19,15 +19,16 @@ from synplan.mcts.tree import Tree
 from synplan.chem.utils import mol_from_smiles
 from synplan.chem.reaction_routes.route_cgr import *
 from synplan.chem.reaction_routes.clustering import *
+
 from synplan.utils.visualisation import (
     routes_clustering_report,
     routes_subclustering_report,
+    generate_results_html,
+    html_top_routes_cluster,
+    get_route_svg,
 )
-
-
 from synplan.utils.config import TreeConfig, PolicyNetworkConfig
 from synplan.utils.loading import load_reaction_rules, load_building_blocks
-from synplan.utils.visualisation import generate_results_html, get_route_svg
 
 
 import psutil
@@ -243,8 +244,9 @@ def handle_molecule_input():
     #     syba_score = ()
     #     st.markdown(f"SYBA: {sascore}")
 
-
-    current_smile_code = smile_code_ketcher # The output from ketcher is the definitive SMILES
+    current_smile_code = (
+        smile_code_ketcher  # The output from ketcher is the definitive SMILES
+    )
 
     if (
         "target_smiles" in st.session_state
@@ -612,7 +614,7 @@ def setup_clustering():
                     results = cluster_routes(
                         r_route_cgrs_dict, use_strat=False
                     )  # num_clusters was removed from args
-                    results = dict(sorted(results.items()))
+                    results = dict(sorted(results.items(), key=lambda x: float(x[0])))
 
                     st.session_state.clusters = results
                     st.session_state.route_cgrs_dict = route_cgrs_dict
@@ -764,7 +766,7 @@ def display_clustering_results():
 
 
 def download_clustering_results():
-    """9. Clustering Results Download: Providing functionality to download."""
+    """10. Clustering Results Download: Providing functionality to download."""
     if st.session_state.get("clustering_done", False):
         tree_for_html = st.session_state.get("tree")
         clusters_for_html = st.session_state.get("clusters")
@@ -868,7 +870,7 @@ def download_clustering_results():
 
 
 def setup_subclustering():
-    """10. Subclustering: Encapsulating the logic related to the "subclustering" functionality."""
+    """11. Subclustering: Encapsulating the logic related to the "subclustering" functionality."""
     if st.session_state.get(
         "clustering_done", False
     ):  # Subclustering depends on clustering being done
@@ -883,10 +885,8 @@ def setup_subclustering():
                     clusters_for_sub = st.session_state.get("clusters")
                     r_route_cgrs_dict_for_sub = st.session_state.get(
                         "r_route_cgrs_dict"
-                    )  # Corrected name
-                    route_cgrs_dict_for_sub = st.session_state.get(
-                        "route_cgrs_dict"
-                    )  # Corrected name
+                    )
+                    route_cgrs_dict_for_sub = st.session_state.get("route_cgrs_dict")
 
                     if (
                         clusters_for_sub
@@ -894,7 +894,9 @@ def setup_subclustering():
                         and route_cgrs_dict_for_sub
                     ):  # Ensure all are present
                         all_subgroups = subcluster_all_clusters(
-                            clusters_for_sub, r_route_cgrs_dict_for_sub, route_cgrs_dict_for_sub
+                            clusters_for_sub,
+                            r_route_cgrs_dict_for_sub,
+                            route_cgrs_dict_for_sub,
                         )
                         st.session_state.subclusters = all_subgroups
                         st.session_state.subclustering_done = True
@@ -920,7 +922,7 @@ def setup_subclustering():
 
 
 def display_subclustering_results():
-    """11. Subclustering Results Display: Handling the presentation of results."""
+    """12. Subclustering Results Display: Handling the presentation of results."""
     if st.session_state.get("subclustering_done", False):
         sub = st.session_state.get("subclusters")
         tree = st.session_state.get("tree")
@@ -969,7 +971,9 @@ def display_subclustering_results():
                             selected_subcluster_idx
                         ]
                         if "r_route_cgr" in current_subcluster_data:
-                            cluster_r_route_cgr_display = current_subcluster_data["r_route_cgr"]
+                            cluster_r_route_cgr_display = current_subcluster_data[
+                                "r_route_cgr"
+                            ]
                             cluster_r_route_cgr_display.clean2d()
                             st.image(
                                 cluster_r_route_cgr_display.depict(),
@@ -994,8 +998,8 @@ def display_subclustering_results():
                     selected_subcluster_idx
                 ]
 
-                subcluster_to_display = post_process_subgroup(subcluster_content)
-
+                # subcluster_to_display = post_process_subgroup(subcluster_content) #Under development
+                subcluster_to_display = subcluster_content
                 if (
                     not subcluster_to_display
                     or "nodes_data" not in subcluster_to_display
@@ -1057,7 +1061,6 @@ def display_subclustering_results():
                                     route_score_sub = round(
                                         tree.route_score(route_id), 3
                                     )
-                                    # num_steps_sub = len(tree.synthesis_route(route_id))
                                     svg_sub = get_route_svg(tree, route_id)
                                     if svg_sub:
                                         st.image(
@@ -1077,7 +1080,7 @@ def display_subclustering_results():
 
 
 def download_subclustering_results():
-    """12. Subclustering Results Download: Providing functionality to download."""
+    """13. Subclustering Results Download: Providing functionality to download."""
     if (
         st.session_state.get("subclustering_done", False)
         and "subcluster_num_select_key" in st.session_state
@@ -1145,7 +1148,7 @@ def download_subclustering_results():
 
 
 def implement_restart():
-    """13. Restart: Implementing the logic to reset or restart the application state."""
+    """14. Restart: Implementing the logic to reset or restart the application state."""
     st.divider()
     st.header("Restart Application State")
     if st.button("Clear All Results & Restart", key="restart_button"):
@@ -1267,9 +1270,21 @@ def main():
                     if not cluster_df.empty:
                         cluster_df.index += 1
                         st.dataframe(cluster_df)
+                        best_route_html = html_top_routes_cluster(
+                            clusters,
+                            st.session_state.tree,
+                            st.session_state.target_smiles,
+                        )
+                        st.download_button(
+                            label=f"Download best route from each cluster",
+                            data=best_route_html,
+                            file_name=f"cluster_best_{st.session_state.target_smiles}.html",
+                            mime="text/html",
+                            key=f"download_cluster_best",
+                        )
                     else:
                         st.write("No valid cluster data to display statistics for.")
-
+                    # download_top_routes_cluster()
                 else:
                     st.write("No cluster data to display statistics for.")
             with cluster_download_col:

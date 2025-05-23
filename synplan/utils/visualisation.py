@@ -1,5 +1,6 @@
 """Module containing functions for analysis and visualization of the built tree."""
 
+import base64
 from itertools import count, islice
 from collections import deque
 from typing import Any, Dict, List, Union
@@ -490,8 +491,82 @@ def generate_results_html(
         html_file.write(template_end)
 
 
-from synplan.utils.visualisation import routes_clustering_report, routes_subclustering_report
-from typing import Any, Dict, List, Union
+def html_top_routes_cluster(clusters: dict, tree: Tree, target_smiles: str) -> str:
+    """9. Clustering Results Download: Providing functionality to download the clustering results with styled HTML report."""
+
+    # Compute summary
+    total_routes = sum(len(data.get("node_ids", [])) for data in clusters.values())
+    total_clusters = len(clusters)
+
+    # Build styled HTML report using Bootstrap
+    html = []
+
+    html.append("<!doctype html><html lang='en'><head>")
+    html.append(
+        "<meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>"
+    )
+    html.append(
+        "<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css' rel='stylesheet'>"
+    )
+    html.append("<title>Clustering Results Report</title>")
+    html.append(
+        "<style> svg{max-width:100%;height:auto;} .report-table th,.report-table td{vertical-align:top;border:1px solid #dee2e6;} </style>"
+    )
+    html.append("</head><body><div class='container my-4'>")
+    # Report header
+    html.append(f"<h1 class='mb-3'>Best route from each cluster</h1>")
+    html.append(f"<p><strong>Target molecule (SMILES):</strong> {target_smiles}</p>")
+    html.append(f"<p><strong>Total number of routes:</strong> {total_routes}</p>")
+    html.append(f"<p><strong>Total number of clusters:</strong> {total_clusters}</p>")
+    # Table header
+    # html.append("<table class='table report-table'><thead><tr>")
+    html.append(
+        "<table class='table report-table'><colgroup><col style='width:5%'><colgroup><col style='width:5%'><col style='width:15%'><col style='width:75%'></colgroup><thead><tr>"
+    )
+    html.append(
+        "<th>Cluster index</th><th>Size</th><th>ReducedRouteCGR</th><th>Best Route</th>"
+    )
+    html.append("</tr></thead><tbody>")
+
+    # Rows per cluster
+    for cluster_num, group_data in clusters.items():
+        node_ids = group_data.get("node_ids", [])
+        if not node_ids:
+            continue
+        node_id = node_ids[0]
+        # Get SVGs
+        svg = get_route_svg(tree, node_id)
+        r_cgr = group_data.get("r_route_cgr")
+        r_cgr_svg = None
+        if r_cgr:
+            r_cgr.clean2d()
+            r_cgr_svg = cgr_display(r_cgr)
+        # Start row
+        html.append(f"<tr><td>{cluster_num}</td>")
+        html.append(f"<td>{len(node_ids)}</td>")
+        # ReducedRouteCGR cell
+        html.append("<td>")
+        if r_cgr_svg:
+            b64_r = base64.b64encode(r_cgr_svg.encode("utf-8")).decode()
+            html.append(
+                f"<img src='data:image/svg+xml;base64,{b64_r}' alt='ReducedRouteCGR' class='img-fluid'/>"
+            )
+        html.append("</td>")
+        # Best Route cell
+        html.append("<td>")
+        if svg:
+            b64_svg = base64.b64encode(svg.encode("utf-8")).decode()
+            html.append(
+                f"<img src='data:image/svg+xml;base64,{b64_svg}' alt='Route {node_id}' class='img-fluid'/>"
+            )
+        html.append("</td></tr>")
+
+    # Close table and HTML
+    html.append("</tbody></table>")
+    html.append("</div></body></html>")
+
+    report_html = "".join(html)
+    return report_html
 
 
 def routes_clustering_report(
@@ -635,7 +710,7 @@ def routes_clustering_report(
         /* Optional: Add some basic styling */
         .table {{ border-collapse: collapse; width: 100%; }}
         th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-        tr:nth-child(even) {{ background-color: #f2f2f2; }}
+        tr:nth-child(even) {{ background-color: #ffffff; }}
         caption {{ caption-side: top; font-size: 1.5em; margin: 1em 0; }}
         svg {{ max-width: 100%; height: auto; }}
     </style>
@@ -661,7 +736,7 @@ def routes_clustering_report(
 
     # --- Build HTML Table ---
     table = f"""
-    <table class="table table-striped table-hover caption-top">
+    <table class="table table-hover caption-top">
     <caption><h3>Retrosynthetic Routes Report - Cluster {group_index}</h3></caption>
     <tbody>"""
 
@@ -770,7 +845,7 @@ def lg_table_2_html(subcluster, nodes_to_display=[], if_display=True):
         str: The generated HTML string for the table.
     """
     # Create HTML table header
-    html = "<table style='border-collapse: collapse;'><tr><th style='border: 1px solid black; padding: 4px;'>Node ID</th>"
+    html = "<table style='border-collapse: collapse;'><tr><th style='border: 1px solid black; padding: 4px;'>Route ID</th>"
 
     # Extract all unique marks across all nodes to form consistent columns
     all_marks = set()
@@ -811,7 +886,7 @@ def lg_table_2_html(subcluster, nodes_to_display=[], if_display=True):
                 html += "</tr>"
             else:
                 # Optionally, you can note that the node_id was not found
-                html += f"<tr><td colspan='{len(all_marks)+1}' style='border: 1px solid black; padding: 4px; color:red;'>Node ID {node_id} not found.</td></tr>"
+                html += f"<tr><td colspan='{len(all_marks)+1}' style='border: 1px solid black; padding: 4px; color:red;'>Route ID {node_id} not found.</td></tr>"
 
     html += "</table>"
 
@@ -871,7 +946,7 @@ def group_lg_table_2_html_fixed(
     html = [
         "<table style='width:100%; table-layout:auto; border-collapse: collapse;'>",
         "<thead><tr>",
-        "<th style='border:1px solid #ccc; padding:4px;'>Node IDs</th>",
+        "<th style='border:1px solid #ccc; padding:4px;'>Route IDs</th>",
     ]
     # numeric headers
     html += [
@@ -1064,7 +1139,7 @@ def routes_subclustering_report(
         /* Optional: Add some basic styling */
         .table {{ border-collapse: collapse; width: 100%; }}
         th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-        tr:nth-child(even) {{ background-color: #f2f2f2; }}
+        tr:nth-child(even) {{ background-color: #ffffff; }}
         caption {{ caption-side: top; font-size: 1.5em; margin: 1em 0; }}
         svg {{ max-width: 100%; height: auto; }}
     </style>
@@ -1090,7 +1165,7 @@ def routes_subclustering_report(
 
     # --- Build HTML Table ---
     table = f"""
-    <table class="table table-striped table-hover caption-top">
+    <table class="table table-hover caption-top">
     <caption><h3>Retrosynthetic Routes Report - Cluster {group_index}.{cluster_num}</h3></caption>
     <tbody>"""
 
