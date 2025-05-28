@@ -85,7 +85,7 @@ def get_clean_mapping(
     return dict_map
 
 
-def validate_molecule_components(curr_mol: MoleculeContainer, node_id: int):
+def validate_molecule_components(curr_mol: MoleculeContainer, route_id: int):
     """
     Validate that a molecule has only one connected component.
 
@@ -97,12 +97,12 @@ def validate_molecule_components(curr_mol: MoleculeContainer, node_id: int):
 
     Args:
         curr_mol (MoleculeContainer): The MoleculeContainer object to validate.
-        node_id (int): The ID of the tree node associated with this molecule,
+        route_id (int): The ID of the tree route associated with this molecule,
                        used for reporting purposes in the error message.
     """
     new_rmol = [curr_mol.substructure(c) for c in curr_mol.connected_components]
     if len(new_rmol) > 1:
-        print(f"Error tree {node_id}: We have more than one molecule in one node")
+        print(f"Error tree {route_id}: We have more than one molecule in one node")
 
 
 def get_leaving_groups(products: list):
@@ -132,7 +132,7 @@ def get_leaving_groups(products: list):
     return lg_atom_nums
 
 
-def process_first_reaction(first_react: ReactionContainer, tree: Tree, node_id: int):
+def process_first_reaction(first_react: ReactionContainer, tree: Tree, route_id: int):
     """
     Process the first reaction in a retrosynthetic route and initialize the building block set.
 
@@ -148,7 +148,7 @@ def process_first_reaction(first_react: ReactionContainer, tree: Tree, node_id: 
         first_react (ReactionContainer): The first ReactionContainer object in the route.
         tree (Tree): The Tree object containing the retrosynthetic search tree
                      and configuration (including `min_mol_size` and `building_blocks`).
-        node_id (int): The ID of the tree node associated with this reaction,
+        route_id (int): The ID of the tree node associated with this reaction,
                        used for validation reporting.
 
     Returns:
@@ -167,14 +167,14 @@ def process_first_reaction(first_react: ReactionContainer, tree: Tree, node_id: 
         ):
             bb_set = react_key_set
 
-        validate_molecule_components(curr_mol, node_id)
+        validate_molecule_components(curr_mol, route_id)
 
     return bb_set
 
 
 def update_reaction_dict(
     reaction: ReactionContainer,
-    node_id: int,
+    route_id: int,
     mapping: dict,
     react_dict: dict,
     tree: Tree,
@@ -194,7 +194,7 @@ def update_reaction_dict(
 
     Args:
         reaction (ReactionContainer): The ReactionContainer object representing the reaction.
-        node_id (int): The ID of the tree node associated with this synthethic route,
+        route_id (int): The ID of the tree node associated with this synthethic route,
                        used for validation reporting.
         mapping (dict): The primary atom mapping dictionary to filter and apply.
         react_dict (dict): The dictionary to update with filtered mappings for each reactant.
@@ -216,7 +216,7 @@ def update_reaction_dict(
         react_key = tuple(curr_mol._atoms)
         react_key_set = set(react_key)
 
-        validate_molecule_components(curr_mol, node_id)
+        validate_molecule_components(curr_mol, route_id)
 
         if (
             len(curr_mol) <= tree.config.min_mol_size
@@ -280,7 +280,7 @@ def process_target_blocks(
     return target_block
 
 
-def compose_route_cgr(tree_or_routes, node_id):
+def compose_route_cgr(tree_or_routes, route_id):
     """
     Process a single synthesis route maintaining consistent state.
 
@@ -288,7 +288,7 @@ def compose_route_cgr(tree_or_routes, node_id):
     ----------
     tree_or_routes : synplan.mcts.tree.Tree
         or dict mapping route_id -> {step_id: ReactionContainer}
-    node_id : int
+    route_id : int
         the route index (in the Tree’s winning_nodes, or the dict’s keys)
 
     Returns
@@ -300,10 +300,10 @@ def compose_route_cgr(tree_or_routes, node_id):
     # ----------- dict-based branch ------------
     if isinstance(tree_or_routes, dict):
         routes_dict = tree_or_routes
-        if node_id not in routes_dict:
-            raise KeyError(f"Route {node_id} not in provided dict.")
+        if route_id not in routes_dict:
+            raise KeyError(f"Route {route_id} not in provided dict.")
         # grab and sort the ReactionContainers in chronological order
-        step_map = routes_dict[node_id]
+        step_map = routes_dict[route_id]
         sorted_ids = sorted(step_map)
         reactions = [step_map[i] for i in sorted_ids]
 
@@ -323,13 +323,13 @@ def compose_route_cgr(tree_or_routes, node_id):
     tree = tree_or_routes
     try:
         # original tree-based logic:
-        reactions = tree.synthesis_route(node_id)
+        reactions = tree.synthesis_route(route_id)
 
         first_react = reactions[-1]
         reactions_dict = {len(reactions) - 1: first_react}
 
         accum_cgr = first_react.compose()
-        bb_set = process_first_reaction(first_react, tree, node_id)
+        bb_set = process_first_reaction(first_react, tree, route_id)
         react_dict = {}
         max_num = find_next_atom_num(reactions)
 
@@ -374,7 +374,7 @@ def compose_route_cgr(tree_or_routes, node_id):
 
             # update our react_dict & bb_set
             react_dict, bb_set = update_reaction_dict(
-                reaction, node_id, mapping, react_dict, tree, bb_set, prev_remap
+                reaction, route_id, mapping, react_dict, tree, bb_set, prev_remap
             )
 
             # apply the new overlap‐mapping
@@ -387,11 +387,11 @@ def compose_route_cgr(tree_or_routes, node_id):
         return {"cgr": accum_cgr, "reactions_dict": reactions_dict}
 
     except Exception as e:
-        print(f"Error processing node {node_id}: {e}")
+        print(f"Error processing route {route_id}: {e}")
         return None
 
 
-def compose_all_route_cgrs(tree_or_routes, node_id=None):
+def compose_all_route_cgrs(tree_or_routes, route_id=None):
     """
     Process routes (reassign atom mappings) to compose RouteCGR.
 
@@ -399,15 +399,15 @@ def compose_all_route_cgrs(tree_or_routes, node_id=None):
     ----------
     tree_or_routes : synplan.mcts.tree.Tree
         or dict mapping route_id -> {step_id: ReactionContainer}
-    node_id : int or None
-        if None, do *all* winning routes (or all keys of the dict);
+    route_id : int or None
+        if None, do *all* winning nodes (or all keys of the dict);
         otherwise only that specific route.
 
     Returns
     -------
     dict or None
-      - if node_id is None: {route_id: CGR, …}
-      - if node_id is given: {node_id: CGR}
+      - if route_id is None: {route_id: CGR, …}
+      - if route_id is given: {route_id: CGR}
       - returns None on error
     """
     # dict-based branch
@@ -418,10 +418,10 @@ def compose_all_route_cgrs(tree_or_routes, node_id=None):
             res = compose_route_cgr(routes_dict, rid)
             return res["cgr"] if res else None
 
-        if node_id is not None:
-            if node_id not in routes_dict:
-                raise KeyError(f"Route {node_id} not in provided dict.")
-            return {node_id: _single(node_id)}
+        if route_id is not None:
+            if route_id not in routes_dict:
+                raise KeyError(f"Route {route_id} not in provided dict.")
+            return {route_id: _single(route_id)}
 
         # all routes
         result = {rid: _single(rid) for rid in sorted(routes_dict)}
@@ -431,10 +431,10 @@ def compose_all_route_cgrs(tree_or_routes, node_id=None):
     tree = tree_or_routes
     route_cgrs = {}
 
-    if node_id is not None:
-        res = compose_route_cgr(tree, node_id)
+    if route_id is not None:
+        res = compose_route_cgr(tree, route_id)
         if res:
-            route_cgrs[node_id] = res["cgr"]
+            route_cgrs[route_id] = res["cgr"]
         else:
             return None
         return route_cgrs
@@ -447,11 +447,11 @@ def compose_all_route_cgrs(tree_or_routes, node_id=None):
     return route_cgrs
 
 
-def extract_reactions(tree: Tree, node_id=None):
+def extract_reactions(tree: Tree, route_id=None):
     """
     Collect mapped reaction sequences from a synthesis tree.
 
-    Traverses either a single branch (if `node_id` is given) or all winning routes,
+    Traverses either a single branch (if `route_id` is given) or all winning nodes,
     composing CGR-based reactions for each, and returns a dict of reaction mappings.
     Ensures that in every extracted reaction, atom indices are uniquely mapped (no overlaps)
 
@@ -460,29 +460,29 @@ def extract_reactions(tree: Tree, node_id=None):
     tree : ReactionTree
         A retrosynthetic tree object with a `.winning_nodes` attribute and
         supporting `compose_route_cgr(...)`.
-    node_id : hashable, optional
-        If provided, only extract reactions for this specific node/route.
+    route_id : hashable, optional
+        If provided, only extract reactions for this specific route/route.
 
     Returns
     -------
-    dict[node_id, dict]
-        Maps each route terminal node ID to its `reactions_dict` (as returned
-        by `compose_route_cgr`). Returns `None` if the specified `node_id` fails
+    dict[route_id, dict]
+        Maps each route terminal route ID to its `reactions_dict` (as returned
+        by `compose_route_cgr`). Returns `None` if the specified `route_id` fails
         to produce valid reactions.
     """
     react_dict = {}
-    if node_id is not None:
-        result = compose_route_cgr(tree, node_id)
+    if route_id is not None:
+        result = compose_route_cgr(tree, route_id)
         if result:
-            react_dict[node_id] = result["reactions_dict"]
+            react_dict[route_id] = result["reactions_dict"]
         else:
             return None
         return react_dict
 
-    for node_id in set(tree.winning_nodes):
-        result = compose_route_cgr(tree, node_id)
+    for route_id in set(tree.winning_nodes):
+        result = compose_route_cgr(tree, route_id)
         if result:
-            react_dict[node_id] = result["reactions_dict"]
+            react_dict[route_id] = result["reactions_dict"]
 
     return dict(sorted(react_dict.items()))
 

@@ -4,6 +4,7 @@ import base64
 from itertools import count, islice
 from collections import deque
 from typing import Any, Dict, List, Union
+from datetime import datetime
 
 from CGRtools.containers.molecule import MoleculeContainer
 from CGRtools import smiles as read_smiles
@@ -491,11 +492,13 @@ def generate_results_html(
         html_file.write(template_end)
 
 
-def html_top_routes_cluster(clusters: dict, tree: Tree, target_smiles: str) -> str:
-    """9. Clustering Results Download: Providing functionality to download the clustering results with styled HTML report."""
+def html_top_routes_cluster(
+    clusters: dict, tree: Tree, target_smiles: str, html_path: str = None
+) -> str:
+    """Clustering Results Download: Providing functionality to download the clustering results with styled HTML report."""
 
     # Compute summary
-    total_routes = sum(len(data.get("node_ids", [])) for data in clusters.values())
+    total_routes = sum(len(data.get("route_ids", [])) for data in clusters.values())
     total_clusters = len(clusters)
 
     # Build styled HTML report using Bootstrap
@@ -530,12 +533,12 @@ def html_top_routes_cluster(clusters: dict, tree: Tree, target_smiles: str) -> s
 
     # Rows per cluster
     for cluster_num, group_data in clusters.items():
-        node_ids = group_data.get("node_ids", [])
-        if not node_ids:
+        route_ids = group_data.get("route_ids", [])
+        if not route_ids:
             continue
-        node_id = node_ids[0]
+        route_id = route_ids[0]
         # Get SVGs
-        svg = get_route_svg(tree, node_id)
+        svg = get_route_svg(tree, route_id)
         r_cgr = group_data.get("r_route_cgr")
         r_cgr_svg = None
         if r_cgr:
@@ -543,7 +546,7 @@ def html_top_routes_cluster(clusters: dict, tree: Tree, target_smiles: str) -> s
             r_cgr_svg = cgr_display(r_cgr)
         # Start row
         html.append(f"<tr><td>{cluster_num}</td>")
-        html.append(f"<td>{len(node_ids)}</td>")
+        html.append(f"<td>{len(route_ids)}</td>")
         # ReducedRouteCGR cell
         html.append("<td>")
         if r_cgr_svg:
@@ -557,7 +560,7 @@ def html_top_routes_cluster(clusters: dict, tree: Tree, target_smiles: str) -> s
         if svg:
             b64_svg = base64.b64encode(svg.encode("utf-8")).decode()
             html.append(
-                f"<img src='data:image/svg+xml;base64,{b64_svg}' alt='Route {node_id}' class='img-fluid'/>"
+                f"<img src='data:image/svg+xml;base64,{b64_svg}' alt='Route {route_id}' class='img-fluid'/>"
             )
         html.append("</td></tr>")
 
@@ -566,6 +569,10 @@ def html_top_routes_cluster(clusters: dict, tree: Tree, target_smiles: str) -> s
     html.append("</div></body></html>")
 
     report_html = "".join(html)
+    if html_path:
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(report_html)
+        return f"Written to {html_path}"
     return report_html
 
 
@@ -593,7 +600,7 @@ def routes_clustering_report(
                                      a routes JSON file.
         clusters (dict): A dictionary containing clustering results. It should
                        contain information about different clusters, typically
-                       including a list of 'node_ids' for each cluster.
+                       including a list of 'route_ids' for each cluster.
         group_index (str): The key identifying the specific cluster within the
                            `clusters` dictionary for which the report should be
                            generated.
@@ -642,18 +649,18 @@ def routes_clustering_report(
     if group is None:
         return f"<html><body>Error: no group with index {group_index!r}.</body></html>"
 
-    cluster_node_ids = group.get("node_ids", [])
+    cluster_route_ids = group.get("route_ids", [])
     # Filter valid routes
     valid_routes = []
 
     if using_tree:
-        for nid in cluster_node_ids:
+        for nid in cluster_route_ids:
             if nid in tree.nodes and tree.nodes[nid].is_solved():
                 valid_routes.append(nid)
     else:
-        # JSON mode: check if the node ID exists in the routes_dict
+        # JSON mode: check if the route ID exists in the routes_dict
         routes_dict = make_dict(routes_json)
-        for nid in cluster_node_ids:
+        for nid in cluster_route_ids:
             if nid in routes_dict.keys():
                 valid_routes.append(nid)
     if not valid_routes:
@@ -760,7 +767,7 @@ def routes_clustering_report(
             else:
                 table += f"<tr>{td}{font_normal}Cluster Representative ReducedRouteCGR (from Route {first_route_id}):{font_close}<br><i>Invalid SVG format retrieved.</i></td></tr>"
                 print(
-                    f"Warning: Expected SVG for ReducedRouteCGR of node {first_route_id}, but got: {r_route_cgr_svg[:100]}..."
+                    f"Warning: Expected SVG for ReducedRouteCGR of route {first_route_id}, but got: {r_route_cgr_svg[:100]}..."
                 )
         except Exception as e:
             table += f"<tr>{td}{font_normal}Cluster Representative ReducedRouteCGR (from Route {first_route_id}):{font_close}<br><i>Error retrieving/displaying ReducedRouteCGR: {e}</i></td></tr>"
@@ -819,23 +826,23 @@ def routes_clustering_report(
     return html
 
 
-def lg_table_2_html(subcluster, nodes_to_display=[], if_display=True):
+def lg_table_2_html(subcluster, routes_to_display=[], if_display=True):
     """
     Generates an HTML table visualizing leaving groups (X) 'marks' for routes within a subcluster.
 
     This function creates an HTML table where each row represents a routes
-    from the specified subcluster (or a subset of nodes), and columns
-    represent unique 'marks' found across the nodes. The cells contain
-    the SVG depiction of the corresponding mark for that node.
+    from the specified subcluster (or a subset of routes), and columns
+    represent unique 'marks' found across the routes. The cells contain
+    the SVG depiction of the corresponding mark for that route.
 
     Args:
         subcluster (dict): A dictionary containing subcluster data, expected
-                           to have a 'nodes_data' key mapping node IDs to
+                           to have a 'routes_data' key mapping route IDs to
                            dictionaries of marks and their associated data
                            (where the first element is a depictable object).
-        nodes_to_display (list, optional): A list of specific node IDs to
+        routes_to_display (list, optional): A list of specific route IDs to
                                            include in the table. If empty,
-                                           all nodes in `subcluster["nodes_data"]`
+                                           all routes in `subcluster["routes_data"]`
                                            are included. Defaults to [].
         if_display (bool, optional): If True, the generated HTML is
                                      displayed directly using `display(HTML())`.
@@ -847,10 +854,10 @@ def lg_table_2_html(subcluster, nodes_to_display=[], if_display=True):
     # Create HTML table header
     html = "<table style='border-collapse: collapse;'><tr><th style='border: 1px solid black; padding: 4px;'>Route ID</th>"
 
-    # Extract all unique marks across all nodes to form consistent columns
+    # Extract all unique marks across all routes to form consistent columns
     all_marks = set()
-    for node_data in subcluster["nodes_data"].values():
-        all_marks.update(node_data.keys())
+    for route_data in subcluster["routes_data"].values():
+        all_marks.update(route_data.keys())
     all_marks = sorted(all_marks)  # sort for consistent ordering
 
     # Add marks as headers
@@ -859,34 +866,32 @@ def lg_table_2_html(subcluster, nodes_to_display=[], if_display=True):
     html += "</tr>"
 
     # Fill in the rows
-    if len(nodes_to_display) == 0:
-        for node_id, node_data in subcluster["nodes_data"].items():
-            html += (
-                f"<tr><td style='border: 1px solid black; padding: 4px;'>{node_id}</td>"
-            )
+    if len(routes_to_display) == 0:
+        for route_id, route_data in subcluster["routes_data"].items():
+            html += f"<tr><td style='border: 1px solid black; padding: 4px;'>{route_id}</td>"
             for mark in all_marks:
                 html += "<td style='border: 1px solid black; padding: 4px;'>"
-                if mark in node_data:
-                    svg = node_data[mark][0].depict()  # Get SVG data as string
+                if mark in route_data:
+                    svg = route_data[mark][0].depict()  # Get SVG data as string
                     html += svg
                 html += "</td>"
             html += "</tr>"
     else:
-        for node_id in nodes_to_display:
-            # Check if the node_id exists in the subcluster data
-            if node_id in subcluster["nodes_data"]:
-                node_data = subcluster["nodes_data"][node_id]
-                html += f"<tr><td style='border: 1px solid black; padding: 4px;'>{node_id}</td>"
+        for route_id in routes_to_display:
+            # Check if the route_id exists in the subcluster data
+            if route_id in subcluster["routes_data"]:
+                route_data = subcluster["routes_data"][route_id]
+                html += f"<tr><td style='border: 1px solid black; padding: 4px;'>{route_id}</td>"
                 for mark in all_marks:
                     html += "<td style='border: 1px solid black; padding: 4px;'>"
-                    if mark in node_data:
-                        svg = node_data[mark][0].depict()  # Get SVG data as string
+                    if mark in route_data:
+                        svg = route_data[mark][0].depict()  # Get SVG data as string
                         html += svg
                     html += "</td>"
                 html += "</tr>"
             else:
-                # Optionally, you can note that the node_id was not found
-                html += f"<tr><td colspan='{len(all_marks)+1}' style='border: 1px solid black; padding: 4px; color:red;'>Route ID {node_id} not found.</td></tr>"
+                # Optionally, you can note that the route_id was not found
+                html += f"<tr><td colspan='{len(all_marks)+1}' style='border: 1px solid black; padding: 4px; color:red;'>Route ID {route_id} not found.</td></tr>"
 
     html += "</table>"
 
@@ -906,7 +911,7 @@ def group_lg_table_2_html_fixed(
     Generates an HTML table visualizing leaving groups X 'marks' for representative routes in grouped data.
 
     This function takes a dictionary of grouped data, where each key represents
-    a group (e.g., a collection of node IDs of routes) and the value is a representative
+    a group (e.g., a collection of route IDs of routes) and the value is a representative
     dictionary of 'marks' for that group. It generates an HTML table with a
     fixed layout, where each row corresponds to a group, and columns show the
     SVG depiction or string representation of the 'marks' for the group's
@@ -914,7 +919,7 @@ def group_lg_table_2_html_fixed(
 
     Args:
         grouped (dict): A dictionary where keys are group identifiers (e.g.,
-                        tuples of node IDs of routes) and values are dictionaries
+                        tuples of route IDs of routes) and values are dictionaries
                         representing the 'marks' for the representative of
                         that group. The 'marks' dictionary should map mark
                         names (str) to objects that have a `.depict()` method
@@ -1006,7 +1011,7 @@ def routes_subclustering_report(
     subcluster, and a dictionary of ReducedRouteCGRs. It produces a detailed HTML report
     for the subcluster, including general cluster information, a representative
     ReducedRouteCGR, a synthon pseudo reaction, a table of leaving groups (either per
-    node or grouped), and SVG visualizations of each valid route within the
+    route or grouped), and SVG visualizations of each valid route within the
     subcluster.
 
     Args:
@@ -1015,8 +1020,8 @@ def routes_subclustering_report(
                                      search tree, or a dictionary loaded from
                                      a routes JSON file.
         subcluster (dict): A dictionary containing data for the specific
-                           subcluster. Expected keys include 'nodes_data'
-                           (mapping node IDs to mark data), 'synthon_reaction',
+                           subcluster. Expected keys include 'routes_data'
+                           (mapping route IDs to mark data), 'synthon_reaction',
                            and optionally 'group_lgs' if `if_lg_group` is True.
         group_index (str): The index of the main cluster to which this
                            subcluster belongs. Used for report titling.
@@ -1029,7 +1034,7 @@ def routes_subclustering_report(
                                      display grouped leaving groups from
                                      `subcluster['group_lgs']`. If False, it
                                      will display leaving groups per individual
-                                     node from `subcluster['nodes_data']`.
+                                     route from `subcluster['routes_data']`.
                                      Defaults to False.
         aam (bool, optional): Whether to enable atom-atom mapping visualization
                               in molecule depictions. Defaults to False.
@@ -1069,17 +1074,17 @@ def routes_subclustering_report(
     if not isinstance(subcluster, dict):
         return "<html><body>Error: groups must be a dict.</body></html>"
 
-    subcluster_node_ids = list(subcluster["nodes_data"].keys())
+    subcluster_route_ids = list(subcluster["routes_data"].keys())
     # Filter valid routes
     valid_routes = []
 
     if using_tree:
-        for nid in subcluster_node_ids:
+        for nid in subcluster_route_ids:
             if nid in tree.nodes and tree.nodes[nid].is_solved():
                 valid_routes.append(nid)
     else:
         # JSON mode: just keep those IDs present in the JSON
-        for nid in subcluster_node_ids:
+        for nid in subcluster_route_ids:
             if nid in routes_json:
                 valid_routes.append(nid)
         routes_dict = make_dict(routes_json)
@@ -1190,7 +1195,7 @@ def routes_subclustering_report(
             else:
                 table += f"<tr>{td}{font_normal}Cluster Representative ReducedRouteCGR (from Route {first_route_id}):{font_close}<br><i>Invalid SVG format retrieved.</i></td></tr>"
                 print(
-                    f"Warning: Expected SVG for ReducedRouteCGR of node {first_route_id}, but got: {r_route_cgr_svg[:100]}..."
+                    f"Warning: Expected SVG for ReducedRouteCGR of route {first_route_id}, but got: {r_route_cgr_svg[:100]}..."
                 )
         except Exception as e:
             table += f"<tr>{td}{font_normal}Cluster Representative ReducedRouteCGR (from Route {first_route_id}):{font_close}<br><i>Error retrieving/displaying ReducedRouteCGR: {e}</i></td></tr>"

@@ -219,7 +219,7 @@ def setup_sidebar():
 
 
 def handle_molecule_input():
-    """3. Molecule Input: Managing the input area for molecule data."""
+    """3. Molecule Input: Managing the input area for molecule data with two-way synchronization."""
     st.header("Molecule input")
     st.markdown(
         """
@@ -228,42 +228,60 @@ def handle_molecule_input():
         * Draw it + Apply
         """
     )
-    # Use st.session_state.ketcher to persist drawn molecule
-    molecule_text_input = st.text_input(
-        "SMILES:", value=st.session_state.ketcher, key="smiles_text_input_key"
+
+    if "shared_smiles" not in st.session_state:
+        st.session_state.shared_smiles = st.session_state.get("ketcher", DEFAULT_MOL)
+
+    if "ketcher_render_count" not in st.session_state:
+        st.session_state.ketcher_render_count = 0
+
+    def text_input_changed_callback():
+        new_text_value = (
+            st.session_state.smiles_text_input_key_for_sync
+        )  # Key of the text_input
+        if new_text_value != st.session_state.shared_smiles:
+            st.session_state.shared_smiles = new_text_value
+            st.session_state.ketcher = new_text_value
+            st.session_state.ketcher_render_count += 1
+
+    # SMILES Text Input
+    st.text_input(
+        "SMILES:",
+        value=st.session_state.shared_smiles,
+        key="smiles_text_input_key_for_sync",  # Unique key for this widget
+        on_change=text_input_changed_callback,
+        help="Enter SMILES string and press Enter. The drawing will update, and vice-versa.",
     )
 
-    smile_code_ketcher = st_ketcher(molecule_text_input, key="ketcher_widget")
-    # col_kethcer, col_info = st.columns([0.8, 0.2])
-    # with col_kethcer:
-    #     smile_code_ketcher = st_ketcher(molecule_text_input, key="ketcher_widget")
-    # with col_info:
-    #     st.subheader("Synthetic Complexity")
-    #     sascore = ()
-    #     st.markdown(f"SAScore: {sascore}")
-    #     syba_score = ()
-    #     st.markdown(f"SYBA: {sascore}")
-
-    current_smile_code = (
-        smile_code_ketcher  # The output from ketcher is the definitive SMILES
+    ketcher_key = f"ketcher_widget_for_sync_{st.session_state.ketcher_render_count}"
+    smile_code_output_from_ketcher = st_ketcher(
+        st.session_state.shared_smiles, key=ketcher_key
     )
 
+    if smile_code_output_from_ketcher != st.session_state.shared_smiles:
+        st.session_state.shared_smiles = smile_code_output_from_ketcher
+        st.session_state.ketcher = smile_code_output_from_ketcher
+        st.rerun()
+
+    current_smiles_for_planning = st.session_state.shared_smiles
+
+    last_planned_smiles = st.session_state.get("target_smiles")
     if (
-        "target_smiles" in st.session_state
-        and current_smile_code != st.session_state.target_smiles
+        last_planned_smiles
+        and current_smiles_for_planning != last_planned_smiles
+        and st.session_state.get("planning_done", False)
     ):
-        st.warning("Molecule structure changed. Please re-run planning.")
-        st.session_state.planning_done = False
-        st.session_state.clustering_done = False
-        st.session_state.subclustering_done = False
-        st.session_state.tree = None
-        st.session_state.res = None
-        st.session_state.clusters = None
-        st.session_state.reactions_dict = None
-        st.session_state.subclusters = None
-        st.session_state.ketcher = current_smile_code
+        st.warning(
+            "Molecule structure has changed since the last successful planning run. "
+            "Results shown below (if any) are for the previous molecule. "
+            "Please re-run planning for the current structure."
+        )
 
-    return current_smile_code
+    # Ensure st.session_state.ketcher is consistent for other parts of the app
+    if st.session_state.get("ketcher") != current_smiles_for_planning:
+        st.session_state.ketcher = current_smiles_for_planning
+
+    return current_smiles_for_planning
 
 
 def setup_planning_options():
@@ -272,9 +290,7 @@ def setup_planning_options():
     st.markdown(
         """If you modified the structure, please ensure you clicked on `Apply` (bottom right of the molecular editor)."""
     )
-    # This smile_code display will be updated if handle_molecule_input has run and returned a new smile_code
-    # However, to display it correctly, we need the current smile_code from the session or input handler.
-    # For simplicity, let's assume handle_molecule_input has updated st.session_state.ketcher
+
     st.markdown(
         f"The molecule SMILES is actually: ``{st.session_state.get('ketcher', DEFAULT_MOL)}``"
     )
@@ -419,7 +435,7 @@ def setup_planning_options():
 
                     mcts_progress_text = "Running MCTS iterations..."
                     mcts_bar = st.progress(0, text=mcts_progress_text)
-                    for step, (solved, node_id) in enumerate(tree):
+                    for step, (solved, route_id) in enumerate(tree):
                         progress_value = min(
                             1.0, (step + 1) / planning_params["max_iterations"]
                         )
@@ -464,34 +480,34 @@ def display_planning_results():
 
             st.subheader("Examples of found retrosynthetic routes")
             image_counter = 0
-            visualised_node_ids = set()
+            visualised_route_ids = set()
 
             if not winning_nodes:
                 st.warning(
                     "Planning solved, but no winning nodes found in the tree object."
                 )
             else:
-                for n, node_id in enumerate(winning_nodes):
+                for n, route_id in enumerate(winning_nodes):
                     if image_counter >= 3:
                         break
-                    if node_id not in visualised_node_ids:
+                    if route_id not in visualised_route_ids:
                         try:
-                            visualised_node_ids.add(node_id)
-                            num_steps = len(tree.synthesis_route(node_id))
-                            route_score = round(tree.route_score(node_id), 3)
-                            svg = get_route_svg(tree, node_id)
+                            visualised_route_ids.add(route_id)
+                            num_steps = len(tree.synthesis_route(route_id))
+                            route_score = round(tree.route_score(route_id), 3)
+                            svg = get_route_svg(tree, route_id)
                             if svg:
                                 st.image(
                                     svg,
-                                    caption=f"Route {node_id}; {num_steps} steps; Route score: {route_score}",
+                                    caption=f"Route {route_id}; {num_steps} steps; Route score: {route_score}",
                                 )
                                 image_counter += 1
                             else:
                                 st.warning(
-                                    f"Could not generate SVG for route {node_id}."
+                                    f"Could not generate SVG for route {route_id}."
                                 )
                         except Exception as e:
-                            st.error(f"Error displaying route {node_id}: {e}")
+                            st.error(f"Error displaying route {route_id}: {e}")
         else:  # Not solved
             st.header("Planning Results")
             st.warning(
@@ -667,19 +683,19 @@ def display_clustering_results():
         for cluster_num, group_data in first_items:
             if (
                 not group_data
-                or "node_ids" not in group_data
-                or not group_data["node_ids"]
+                or "route_ids" not in group_data
+                or not group_data["route_ids"]
             ):
-                st.warning(f"Cluster {cluster_num} has no data or node_ids.")
+                st.warning(f"Cluster {cluster_num} has no data or route_ids.")
                 continue
             st.markdown(
                 f"**Cluster {cluster_num}** (Size: {group_data.get('group_size', 'N/A')})"
             )
-            node_id = group_data["node_ids"][0]
+            route_id = group_data["route_ids"][0]
             try:
-                num_steps = len(tree.synthesis_route(node_id))
-                route_score = round(tree.route_score(node_id), 3)
-                svg = get_route_svg(tree, node_id)
+                num_steps = len(tree.synthesis_route(route_id))
+                route_score = round(tree.route_score(route_id), 3)
+                svg = get_route_svg(tree, route_id)
                 r_route_cgr = group_data.get("r_route_cgr")  # Safely get r_route_cgr
                 r_route_cgr_svg = None
                 if r_route_cgr:
@@ -693,23 +709,23 @@ def display_clustering_results():
                     with col2:
                         st.image(
                             svg,
-                            caption=f"Route {node_id}; {num_steps} steps; Route score: {route_score}",
+                            caption=f"Route {route_id}; {num_steps} steps; Route score: {route_score}",
                         )
                 elif svg:  # Only route SVG available
                     st.image(
                         svg,
-                        caption=f"Route {node_id}; {num_steps} steps; Route score: {route_score}",
+                        caption=f"Route {route_id}; {num_steps} steps; Route score: {route_score}",
                     )
                     st.warning(
                         f"ReducedRouteCGR could not be displayed for cluster {cluster_num}."
                     )
                 else:
                     st.warning(
-                        f"Could not generate SVG for route {node_id} or its ReducedRouteCGR."
+                        f"Could not generate SVG for route {route_id} or its ReducedRouteCGR."
                     )
             except Exception as e:
                 st.error(
-                    f"Error displaying route {node_id} for cluster {cluster_num}: {e}"
+                    f"Error displaying route {route_id} for cluster {cluster_num}: {e}"
                 )
 
         if remaining_items:
@@ -717,21 +733,21 @@ def display_clustering_results():
                 for cluster_num, group_data in remaining_items:
                     if (
                         not group_data
-                        or "node_ids" not in group_data
-                        or not group_data["node_ids"]
+                        or "route_ids" not in group_data
+                        or not group_data["route_ids"]
                     ):
                         st.warning(
-                            f"Cluster {cluster_num} in expansion has no data or node_ids."
+                            f"Cluster {cluster_num} in expansion has no data or route_ids."
                         )
                         continue
                     st.markdown(
                         f"**Cluster {cluster_num}** (Size: {group_data.get('group_size', 'N/A')})"
                     )
-                    node_id = group_data["node_ids"][0]
+                    route_id = group_data["route_ids"][0]
                     try:
-                        num_steps = len(tree.synthesis_route(node_id))
-                        route_score = round(tree.route_score(node_id), 3)
-                        svg = get_route_svg(tree, node_id)
+                        num_steps = len(tree.synthesis_route(route_id))
+                        route_score = round(tree.route_score(route_id), 3)
+                        svg = get_route_svg(tree, route_id)
                         r_route_cgr = group_data.get("r_route_cgr")
                         r_route_cgr_svg = None
                         if r_route_cgr:
@@ -745,23 +761,23 @@ def display_clustering_results():
                             with col2:
                                 st.image(
                                     svg,
-                                    caption=f"Route {node_id}; {num_steps} steps; Route score: {route_score}",
+                                    caption=f"Route {route_id}; {num_steps} steps; Route score: {route_score}",
                                 )
                         elif svg:
                             st.image(
                                 svg,
-                                caption=f"Route {node_id}; {num_steps} steps; Route score: {route_score}",
+                                caption=f"Route {route_id}; {num_steps} steps; Route score: {route_score}",
                             )
                             st.warning(
                                 f"ReducedRouteCGR could not be displayed for cluster {cluster_num}."
                             )
                         else:
                             st.warning(
-                                f"Could not generate SVG for route {node_id} or its ReducedRouteCGR."
+                                f"Could not generate SVG for route {route_id} or its ReducedRouteCGR."
                             )
                     except Exception as e:
                         st.error(
-                            f"Error displaying route {node_id} for cluster {cluster_num}: {e}"
+                            f"Error displaying route {route_id} for cluster {cluster_num}: {e}"
                         )
 
 
@@ -1002,14 +1018,14 @@ def display_subclustering_results():
                 subcluster_to_display = subcluster_content
                 if (
                     not subcluster_to_display
-                    or "nodes_data" not in subcluster_to_display
-                    or not subcluster_to_display["nodes_data"]
+                    or "routes_data" not in subcluster_to_display
+                    or not subcluster_to_display["routes_data"]
                 ):
                     st.info("No routes or data found for this subcluster selection.")
                 else:
                     MAX_ROUTES_PER_SUBCLUSTER = 5
                     all_route_ids_in_subcluster = list(
-                        subcluster_to_display["nodes_data"].keys()
+                        subcluster_to_display["routes_data"].keys()
                     )
                     routes_to_display_direct = all_route_ids_in_subcluster[
                         :MAX_ROUTES_PER_SUBCLUSTER
@@ -1025,6 +1041,7 @@ def display_subclustering_results():
                     if "synthon_reaction" in subcluster_to_display:
                         synthon_reaction = subcluster_to_display["synthon_reaction"]
                         try:
+                            synthon_reaction.clean2d()
                             st.image(
                                 depict_custom_reaction(synthon_reaction),
                                 caption=f"Markush-like pseudo reaction of subcluster",
@@ -1114,11 +1131,11 @@ def download_subclustering_results():
             processed_subcluster_data = post_process_subgroup(
                 subcluster_data_for_report
             )
-            if "nodes_data" in subcluster_data_for_report and isinstance(
-                subcluster_data_for_report["nodes_data"], dict
+            if "routes_data" in subcluster_data_for_report and isinstance(
+                subcluster_data_for_report["routes_data"], dict
             ):
                 processed_subcluster_data["group_lgs"] = group_by_identical_values(
-                    subcluster_data_for_report["nodes_data"]
+                    subcluster_data_for_report["routes_data"]
                 )
             else:
                 processed_subcluster_data["group_lgs"] = {}

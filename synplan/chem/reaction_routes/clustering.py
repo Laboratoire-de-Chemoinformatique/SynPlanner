@@ -202,25 +202,25 @@ def cluster_routes(r_route_cgrs: dict, use_strat=False):
       or CGRContainer object signature (not avoid mapping)
 
     Args:
-        r_route_cgrs: Dictionary mapping node_id to r_route_cgr objects.
+        r_route_cgrs: Dictionary mapping route_id to r_route_cgr objects.
 
     Returns:
         Dictionary with groups keyed by '{length}.{index}' containing
-        'r_route_cgr', 'node_ids', and 'strat_bonds'.
+        'r_route_cgr', 'route_ids', and 'strat_bonds'.
     """
     temp_groups = defaultdict(
-        lambda: {"node_ids": [], "r_route_cgr": None, "strat_bonds": None}
+        lambda: {"route_ids": [], "r_route_cgr": None, "strat_bonds": None}
     )
 
     # 1. Initial grouping based on the content of strategic bonds
-    for node_id, r_route_cgr in r_route_cgrs.items():
+    for route_id, r_route_cgr in r_route_cgrs.items():
         strat_bonds_list = extract_strat_bonds(r_route_cgr)
         if use_strat == True:
             group_key = tuple(strat_bonds_list)
         else:
             group_key = str(r_route_cgr)
 
-        if not temp_groups[group_key]["node_ids"]:  # First time seeing this group
+        if not temp_groups[group_key]["route_ids"]:  # First time seeing this group
             temp_groups[group_key][
                 "r_route_cgr"
             ] = r_route_cgr  # Store the first CGR as representative
@@ -228,13 +228,13 @@ def cluster_routes(r_route_cgrs: dict, use_strat=False):
                 "strat_bonds"
             ] = strat_bonds_list  # Store the actual list
 
-        temp_groups[group_key]["node_ids"].append(node_id)
+        temp_groups[group_key]["route_ids"].append(route_id)
         temp_groups[group_key][
-            "node_ids"
-        ].sort()  # Keep node_ids sorted for consistency
+            "route_ids"
+        ].sort()  # Keep route_ids sorted for consistency
 
     for group_key in temp_groups.keys():
-        temp_groups[group_key]["group_size"] = len(temp_groups[group_key]["node_ids"])
+        temp_groups[group_key]["group_size"] = len(temp_groups[group_key]["route_ids"])
 
     # 2. Format the output dictionary with desired keys '{length}.{index}'
     final_grouped_results = {}
@@ -322,11 +322,16 @@ def lg_replacer(route_cgr: CGRContainer):
 
     k = 1
     atom_nums = []
+    checked_atoms = set()
 
     for atom1, bond_set in bond_items:
         bond_set_items = list(bond_set.items())
         for atom2, bond in bond_set_items:
-            if bond.p_order is None and bond.order is not None:
+            if (
+                bond.p_order is None
+                and bond.order is not None
+                and tuple(sorted([atom1, atom2])) not in checked_atoms
+            ):
                 if atom1 <= max_in_target_mol:
                     lg = DynamicX()
                     lg.mark = k
@@ -338,6 +343,7 @@ def lg_replacer(route_cgr: CGRContainer):
                         target_cgr.substructure(c)
                         for c in target_cgr.connected_components
                     ]
+                    checked_atoms.add(tuple(sorted([atom1, atom2])))
                     if len(lg_cgrs) == 2:
                         lg_cgr = lg_cgrs[1]
                         lg_cgr = lg_process_reset(lg_cgr, atom2)
@@ -439,52 +445,52 @@ def subcluster_one_cluster(group, r_route_cgrs_dict, route_cgrs_dict):
     """
     Generate synthon data for each route in a single cluster.
 
-    For each route (node ID) in `group['node_ids']`, replaces RouteCGRs with
+    For each route (route ID) in `group['route_ids']`, replaces RouteCGRs with
     SynthonCGR, builds ReactionContainers before and after X replacement,
     and collects relevant data.
 
     Parameters
     ----------
     group : dict
-        Must include `'node_ids'`, a list of node identifiers.
+        Must include `'route_ids'`, a list of route identifiers.
     r_route_cgrs_dict : dict
-        Maps node IDs to their ReducedRouteCGR.
+        Maps route IDs to their ReducedRouteCGR.
     route_cgrs_dict : dict
-        Maps node IDs to their RouteCGR.
+        Maps route IDs to their RouteCGR.
 
     Returns
     -------
     dict or None
-        If successful, returns a dict mapping each `node_id` to a tuple:
+        If successful, returns a dict mapping each `route_id` to a tuple:
         `(r_route_cgr, original_reaction, synthon_cgr, new_reaction, lg_groups)`.
         Or raises SubclusterError on any failure: if any step (X replacement or reaction
-        parsing) fails for a node.
+        parsing) fails for a route.
 
     """
 
-    node_ids = group.get("node_ids")
-    if not isinstance(node_ids, (list, tuple)):
+    route_ids = group.get("route_ids")
+    if not isinstance(route_ids, (list, tuple)):
         raise SubclusterError(
-            f"'node_ids' must be a list or tuple, got {type(node_ids).__name__}"
+            f"'route_ids' must be a list or tuple, got {type(route_ids).__name__}"
         )
 
     result = {}
-    for node_id in node_ids:
-        r_route_cgr = r_route_cgrs_dict[node_id]
-        route_cgr = route_cgrs_dict[node_id]
+    for route_id in route_ids:
+        r_route_cgr = r_route_cgrs_dict[route_id]
+        route_cgr = route_cgrs_dict[route_id]
 
         # 1) Replace leaving groups in RouteCGR
         try:
             synthon_cgr, lg_groups = lg_replacer(route_cgr)
         except (KeyError, ValueError) as e:
-            raise SubclusterError(f"LG replacement failed for node {node_id}") from e
+            raise SubclusterError(f"LG replacement failed for route {route_id}") from e
 
         # 2) Build ReactionContainer for Abstracted RouteCGR
         try:
             synthon_rxn = ReactionContainer.from_cgr(synthon_cgr)
         except:  # replace with the actual exception class
             raise SubclusterError(
-                f"Failed to parse synthon CGR for node {node_id}"
+                f"Failed to parse synthon CGR for route {route_id}"
             ) from e
 
         # 3) Prepare for X-based reaction replacement
@@ -496,10 +502,10 @@ def subcluster_one_cluster(group, r_route_cgrs_dict, route_cgrs_dict):
             new_rxn = ReactionContainer(reactants=new_reactants, products=[target_mol])
         except (IndexError, TypeError) as e:
             raise SubclusterError(
-                f"Leaving group (X) reaction replacement failed for node {node_id}"
+                f"Leaving group (X) reaction replacement failed for route {route_id}"
             ) from e
 
-        result[node_id] = (
+        result[route_id] = (
             r_route_cgr,
             ReactionContainer(reactants=old_reactants, products=[target_mol]),
             synthon_cgr,
@@ -510,21 +516,21 @@ def subcluster_one_cluster(group, r_route_cgrs_dict, route_cgrs_dict):
     return result
 
 
-def group_nodes_by_synthon_detail(data_dict: dict):
+def group_routes_by_synthon_detail(data_dict: dict):
     """
-    Groups nodes based on synthon CGR (result[0]) and reaction (result[1]).
-    The output includes a dictionary mapping node IDs to their result[2] value.
+    Groups routes based on synthon CGR (result[0]) and reaction (result[1]).
+    The output includes a dictionary mapping route IDs to their result[2] value.
 
     Args:
-        data_dict: Dictionary {node_id: [synthon_cgr, synthon_reaction, node_data, ...]}.
+        data_dict: Dictionary {route_id: [synthon_cgr, synthon_reaction, route_data, ...]}.
 
     Returns:
         Dictionary {group_index: {'r_route_cgr': ... ,'synthon_cgr': ..., 'synthon_reaction': ...,
-                                  'nodes_data': {node_id1: node_data1, ...}}}.
+                                  'routes_data': {route_id1: route_data1, ...}}}.
     """
     temp_groups = defaultdict(list)
 
-    for node_id, result_list in data_dict.items():
+    for route_id, result_list in data_dict.items():
         if len(result_list) < 4:
             group_key = (result_list[0], None)  # Handle missing reaction
         else:
@@ -537,40 +543,42 @@ def group_nodes_by_synthon_detail(data_dict: dict):
                 )
             except TypeError:
                 print(
-                    f"Warning: Skipping node {node_id} because reaction data is not hashable: {type(result_list[1])}"
+                    f"Warning: Skipping route {route_id} because reaction data is not hashable: {type(result_list[1])}"
                 )
                 continue
 
-        temp_groups[group_key].append(node_id)
+        temp_groups[group_key].append(route_id)
 
     # 2. Format the output dictionary with sequential integer keys
-    #    and include the node-specific data (result[2]) in a sub-dictionary.
+    #    and include the route-specific data (result[2]) in a sub-dictionary.
     final_grouped_results = {}
     group_index = 1
 
     sorted_temp_groups = sorted(temp_groups.items(), key=lambda item: item[1])
-    for group_key, node_ids in sorted_temp_groups:
+    for group_key, route_ids in sorted_temp_groups:
 
         r_route_cgr, unlabeled_reaction, synthon_cgr, synthon_reaction = group_key
-        nodes_data_dict = {}
+        routes_data_dict = {}
 
-        # Iterate through the node IDs belonging to this group
-        for node_id in sorted(node_ids):  # Sort node IDs for consistent dict order
+        # Iterate through the route IDs belonging to this group
+        for route_id in sorted(route_ids):  # Sort route IDs for consistent dict order
             original_result = data_dict.get(
-                node_id, []
-            )  # Get original list for this node
-            node_specific_data = None  # Default value if index 2 is missing
+                route_id, []
+            )  # Get original list for this route
+            route_specific_data = None  # Default value if index 2 is missing
             if len(original_result) > 4:
-                node_specific_data = original_result[4]  # Get the third element
+                route_specific_data = original_result[4]  # Get the third element
 
-            nodes_data_dict[node_id] = node_specific_data  # Add to the sub-dictionary
+            routes_data_dict[route_id] = (
+                route_specific_data  # Add to the sub-dictionary
+            )
 
         final_grouped_results[group_index] = {
             "r_route_cgr": r_route_cgr,
             "unlabeled_reaction": unlabeled_reaction,
             "synthon_cgr": synthon_cgr,
             "synthon_reaction": synthon_reaction,
-            "nodes_data": nodes_data_dict,
+            "routes_data": routes_data_dict,
             "post_processed": False,
         }
         group_index += 1
@@ -583,7 +591,7 @@ def subcluster_all_clusters(groups, r_route_cgrs_dict, route_cgrs_dict):
     Subdivide each reaction cluster into detailed synthon-based subgroups.
 
     Iterates over all clusters in `groups`, applies `subcluster_one_cluster`
-    to generate per-cluster synthons, then organizes nodes by synthon detail.
+    to generate per-cluster synthons, then organizes routes by synthon detail.
 
     Parameters
     ----------
@@ -607,31 +615,31 @@ def subcluster_all_clusters(groups, r_route_cgrs_dict, route_cgrs_dict):
         )
         if group_synthons is None:
             return None
-        all_subgroups[group_index] = group_nodes_by_synthon_detail(group_synthons)
+        all_subgroups[group_index] = group_routes_by_synthon_detail(group_synthons)
     return all_subgroups
 
 
 def all_lg_collect(subgroup):
     """
-    Gather all leaving-group CGRContainers by node index.
+    Gather all leaving-group CGRContainers by route index.
 
-    Scans `subgroup['nodes_data']`, collects every CGRContainer per index,
+    Scans `subgroup['routes_data']`, collects every CGRContainer per index,
     and returns a mapping from each index to the list of distinct containers.
 
     Parameters
     ----------
     subgroup : dict
-        Must contain 'nodes_data', a dict mapping pathway keys to
-        dicts of {node_index: (CGRContainer, …)}.
+        Must contain 'routes_data', a dict mapping pathway keys to
+        dicts of {route_index: (CGRContainer, …)}.
 
     Returns
     -------
     dict[int, list[CGRContainer]]
-        For each node index, a list of unique CGRContainer objects
+        For each route index, a list of unique CGRContainer objects
         (duplicates by string are filtered out).
     """
     all_indices = set()
-    for sub_dict in subgroup["nodes_data"].values():
+    for sub_dict in subgroup["routes_data"].values():
         all_indices.update(sub_dict.keys())
 
     # Dynamically initialize result and seen dictionaries
@@ -639,7 +647,7 @@ def all_lg_collect(subgroup):
     seen = {idx: set() for idx in all_indices}
 
     # Populate the result with unique CGRContainer objects
-    for sub_dict in subgroup["nodes_data"].values():
+    for sub_dict in subgroup["routes_data"].values():
         for idx in sub_dict:
             cgr_container = sub_dict[idx][0]
             cgr_str = str(cgr_container)
@@ -657,7 +665,7 @@ def replace_leaving_groups_in_synthon(subgroup, to_remove):  # Under development
     Parameters:
         subgroup (dict): Must contain:
             - 'synthon_cgr': the CGR object representing the synthon graph
-            - 'nodes_data': mapping of node indices to LG replacement data
+            - 'routes_data': mapping of route indices to LG replacement data
         to_remove (List[int]): List of LG marks to remove and replace.
 
     Returns:
@@ -667,7 +675,7 @@ def replace_leaving_groups_in_synthon(subgroup, to_remove):  # Under development
     """
     # Extract the original CGR and leaving group replacement table
     original_cgr = subgroup["synthon_cgr"]
-    lg_table = next(iter(subgroup["nodes_data"].values()))
+    lg_table = next(iter(subgroup["routes_data"].values()))
 
     updated_cgr = original_cgr
 
@@ -767,12 +775,12 @@ def post_process_subgroup(
 
     Scans the subgroup for leaving-groups present in every route, removes those
     from the CGR, re-assembles a clean ReactionContainer with the original core,
-    updates `nodes_data`, and flags the dict as processed.
+    updates `routes_data`, and flags the dict as processed.
 
     Parameters
     ----------
     subgroup : dict
-        Must include keys for `nodes_data` and the helpers
+        Must include keys for `routes_data` and the helpers
         (`all_lg_collect`, `find_const_lg`, etc.). If already
         post_processed, returns immediately.
 
@@ -781,7 +789,7 @@ def post_process_subgroup(
     dict
         The same dict, now with:
         - `'synthon_reaction'`: cleaned ReactionContainer
-        - `'nodes_data'`: filtered node table
+        - `'routes_data'`: filtered route table
         - `'post_processed'`: True
     """
     if "post_processed" in subgroup.keys() and subgroup["post_processed"] == True:
@@ -803,13 +811,13 @@ def post_process_subgroup(
     )
     new_synthon_reaction.clean2d()
     subgroup["synthon_reaction"] = new_synthon_reaction
-    subgroup["nodes_data"] = remove_and_shift(subgroup["nodes_data"], to_remove)
+    subgroup["routes_data"] = remove_and_shift(subgroup["routes_data"], to_remove)
     subgroup["post_processed"] = True
-    subgroup["group_lgs"] = group_by_identical_values(subgroup["nodes_data"])
+    subgroup["group_lgs"] = group_by_identical_values(subgroup["routes_data"])
     return subgroup
 
 
-def group_by_identical_values(nodes_data):  # Under development
+def group_by_identical_values(routes_data):  # Under development
     """
     Groups entries in a nested dictionary based on identical sets of core values.
 
@@ -817,7 +825,7 @@ def group_by_identical_values(nodes_data):  # Under development
     same sequence of leaving groups, when ordered by subkey. These are collapsed into a single entry.
 
     Args:
-        nodes_data (dict): A dictionary mapping outer keys to inner dictionaries.
+        routes_data (dict): A dictionary mapping outer keys to inner dictionaries.
             Each inner dictionary maps subkeys to a tuple `(value_obj, other_info)`.
             `value_obj` is used for grouping, `other_info` is ignored.
             Example: {'route_1': {'pos_a': (1, 'infoA'), 'pos_b': (2, 'infoB')}, ...}
@@ -832,7 +840,7 @@ def group_by_identical_values(nodes_data):  # Under development
     """
     # Step 1: Build a signature for each outer key: the tuple of all first-elements in its inner dict
     signature_map = defaultdict(list)
-    for outer_key, inner_dict in nodes_data.items():
+    for outer_key, inner_dict in routes_data.items():
         # Sort inner_dict items by subkey to ensure consistent ordering
         sorted_items = sorted(inner_dict.items(), key=lambda kv: kv[0])
         # Extract only the first element of each (value_obj, other_info) tuple
@@ -843,7 +851,7 @@ def group_by_identical_values(nodes_data):  # Under development
     grouped = {}
     for signature, outer_keys in signature_map.items():
         # Use the representative inner dict from the first outer key in this group
-        rep_inner = nodes_data[outer_keys[0]]
+        rep_inner = routes_data[outer_keys[0]]
         # Build mapping subkey -> value_obj
         rep_values = {subkey: val_tuple[0] for subkey, val_tuple in rep_inner.items()}
         # Store under tuple of grouped outer keys

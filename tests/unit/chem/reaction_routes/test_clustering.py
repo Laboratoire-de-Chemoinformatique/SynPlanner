@@ -36,17 +36,17 @@ def test_cluster_routes_valid(r_routes_cgrs_dict, use_strat):
     assert isinstance(clusters, dict)
     # Every original route ID must appear in exactly one cluster
 
-    total = sum(len(cluster['node_ids']) for cluster in clusters.values())
+    total = sum(len(cluster['route_ids']) for cluster in clusters.values())
     assert total == len(r_routes_cgrs_dict)
 
     expected_keys = ['2.1', '3.1', '3.2', '4.1', '4.2', '4.3']
     assert list(clusters.keys()) == expected_keys
-    for node_id, value in clusters.items():
-        assert isinstance(node_id, str)
+    for route_id, value in clusters.items():
+        assert isinstance(route_id, str)
         assert isinstance(value, dict)
-        assert 'node_ids' in value.keys()
-        assert isinstance(value['node_ids'], list)
-        assert len(value['node_ids']) > 0
+        assert 'route_ids' in value.keys()
+        assert isinstance(value['route_ids'], list)
+        assert len(value['route_ids']) > 0
         assert 'r_route_cgr' in value.keys()
         assert 'strat_bonds' in value.keys()
         assert 'group_size' in value.keys()
@@ -58,15 +58,15 @@ def test_subcluster_one_cluster_valid(r_routes_cgrs_dict, routes_cgrs_dict):
     group = next(iter(clusters.values()))
     result = subcluster_one_cluster(group, r_routes_cgrs_dict, routes_cgrs_dict)
     assert isinstance(result, dict)
-    assert set(result.keys()) == set(group['node_ids'])
-    for node_id, value in result.items():
-        assert isinstance(node_id, int)
+    assert set(result.keys()) == set(group['route_ids'])
+    for route_id, value in result.items():
+        assert isinstance(route_id, int)
         assert isinstance(value, tuple)
         assert len(value) == 5
         r_route_cgr, unlabeled_rxn, synthon_cgr, new_rxn, lg_groups = value
 
         # The reduced-route-CGR should be exactly what we passed in
-        assert r_route_cgr is r_routes_cgrs_dict[node_id]
+        assert r_route_cgr is r_routes_cgrs_dict[route_id]
 
         # The “unlabeled” reaction comes from the original route-CGR
         assert isinstance(unlabeled_rxn, ReactionContainer)
@@ -87,7 +87,7 @@ def test_subcluster_one_cluster_valid(r_routes_cgrs_dict, routes_cgrs_dict):
 
 def test_subcluster_one_cluster_empty():
     """subcluster_one_cluster returns empty dict for empty group."""
-    result = subcluster_one_cluster({'node_ids': []}, {}, {})
+    result = subcluster_one_cluster({'route_ids': []}, {}, {})
     assert result == {}
 
 class SubclusterError(Exception):
@@ -97,30 +97,30 @@ def subcluster_one_cluster(group, r_route_cgrs_dict, route_cgrs_dict):
     """
     Generate synthon data for each route in a single cluster.
 
-    Returns a dict mapping node_id → (r_route_cgr, original_reaction,
+    Returns a dict mapping route_id → (r_route_cgr, original_reaction,
                                      synthon_cgr, new_reaction, lg_groups),
     or raises SubclusterError on any failure.
     """
-    node_ids = group.get("node_ids")
-    if not isinstance(node_ids, (list, tuple)):
-        raise SubclusterError(f"'node_ids' must be a list or tuple, got {type(node_ids).__name__}")
+    route_ids = group.get("route_ids")
+    if not isinstance(route_ids, (list, tuple)):
+        raise SubclusterError(f"'route_ids' must be a list or tuple, got {type(route_ids).__name__}")
 
     result = {}
-    for node_id in node_ids:
-        r_route_cgr = r_route_cgrs_dict[node_id]
-        route_cgr   = route_cgrs_dict[node_id]
+    for route_id in route_ids:
+        r_route_cgr = r_route_cgrs_dict[route_id]
+        route_cgr   = route_cgrs_dict[route_id]
 
-        # 1) Replace leaving groups
+        # 1) Replace leaving groups (LG) to X
         try:
             synthon_cgr, lg_groups = clustering.lg_replacer(route_cgr)
         except (KeyError, ValueError) as e:
-            raise SubclusterError(f"LG replacement failed for node {node_id}") from e
+            raise SubclusterError(f"LG replacement failed for route {route_id}") from e
 
         # 2) Build ReactionContainer
         try:
             synthon_rxn = ReactionContainer.from_cgr(synthon_cgr)
         except:  # replace with the actual exception class
-            raise SubclusterError(f"Failed to parse synthon CGR for node {node_id}") from e
+            raise SubclusterError(f"Failed to parse synthon CGR for route {route_id}") from e
 
         # 3) Prepare for LG-based reaction replacement
         try:
@@ -133,9 +133,9 @@ def subcluster_one_cluster(group, r_route_cgrs_dict, route_cgrs_dict):
                 products=[target_mol]
             )
         except (IndexError, TypeError) as e:
-            raise SubclusterError(f"LG reaction replacement failed for node {node_id}") from e
+            raise SubclusterError(f"LG reaction replacement failed for route {route_id}") from e
 
-        result[node_id] = (
+        result[route_id] = (
             r_route_cgr,
             ReactionContainer(reactants=old_reactants, products=[target_mol]),
             synthon_cgr,
@@ -146,9 +146,9 @@ def subcluster_one_cluster(group, r_route_cgrs_dict, route_cgrs_dict):
     return result
 
 
-def test_subcluster_one_cluster_invalid_node():
-    """subcluster_one_cluster returns None if node_id is missing in dicts."""
-    group = {'node_ids': ['nonexistent']}
+def test_subcluster_one_cluster_invalid_route():
+    """subcluster_one_cluster returns None if route_id is missing in dicts."""
+    group = {'route_ids': ['nonexistent']}
     with pytest.raises(KeyError):
         result = subcluster_one_cluster(group, {}, {})
         assert result is None
@@ -162,11 +162,11 @@ def test_subcluster_all_clusters(r_routes_cgrs_dict, routes_cgrs_dict):
     subclusters = subcluster_all_clusters(clusters, r_routes_cgrs_dict, routes_cgrs_dict)
     # Check that the result is as expected
     assert isinstance(subclusters, dict)
-    total_clusters = sum(len(cluster['node_ids']) for cluster in clusters.values())
+    total_clusters = sum(len(cluster['route_ids']) for cluster in clusters.values())
     total_subclusters = 0
     for cluster in subclusters.values():
         for subcluster in cluster.values():
             print(subcluster)
-            total_subclusters += len(subcluster['nodes_data'])
+            total_subclusters += len(subcluster['routes_data'])
 
     assert len(r_routes_cgrs_dict) == total_clusters == total_subclusters
