@@ -449,7 +449,7 @@ def compose_all_route_cgrs(tree_or_routes, route_id=None):
 
 def extract_reactions(tree: Tree, route_id=None):
     """
-    Collect mapped reaction sequences from a synthesis tree.
+    Collect mapped reaction sequences from a synthesis tree (basically routes_dict, which might be later convered to routes_json).
 
     Traverses either a single branch (if `route_id` is given) or all winning nodes,
     composing CGR-based reactions for each, and returns a dict of reaction mappings.
@@ -487,7 +487,7 @@ def extract_reactions(tree: Tree, route_id=None):
     return dict(sorted(react_dict.items()))
 
 
-def compose_reduced_route_cgr(route_cgr: CGRContainer):
+def compose_sb_cgr(route_cgr: CGRContainer):
     """
     Reduces a Routes Condensed Graph of reaction (RouteCGR) by performing the following steps:
 
@@ -509,9 +509,7 @@ def compose_reduced_route_cgr(route_cgr: CGRContainer):
     """
     # Get all connected components of the RouteCGR as separate substructures.
     cgr_prods = [route_cgr.substructure(c) for c in route_cgr.connected_components]
-    target_cgr = cgr_prods[
-        0
-    ]  # Choose the first substructure (main product) for further reduction.
+    target_cgr = cgr_prods[0]
 
     # Iterate over each bond in the target RouteCGR.
     bond_items = list(target_cgr._bonds.items())
@@ -537,24 +535,22 @@ def compose_reduced_route_cgr(route_cgr: CGRContainer):
                 target_cgr.add_bond(atom1, atom2, DynamicBond(p_order, p_order))
 
     # After modifying bonds, extract the reduced RouteCGR from the target's connected components.
-    reduced_route_cgr = [
-        target_cgr.substructure(c) for c in target_cgr.connected_components
-    ][0]
+    sb_cgr = [target_cgr.substructure(c) for c in target_cgr.connected_components][0]
 
     # Neutralize charges if the primary charges and current charges differ.
-    if reduced_route_cgr._p_charges != reduced_route_cgr._charges:
-        for num, charge in reduced_route_cgr._charges.items():
+    if sb_cgr._p_charges != sb_cgr._charges:
+        for num, charge in sb_cgr._charges.items():
             if charge != 0:
-                reduced_route_cgr._atoms[num].charge = 0
+                sb_cgr._atoms[num].charge = 0
 
-    return reduced_route_cgr
+    return sb_cgr
 
 
-def compose_all_reduced_route_cgrs(route_cgrs_dict: dict):
+def compose_all_sb_cgrs(route_cgrs_dict: dict):
     """
     Processes a collection (dictionary) of RouteCGRs to generate their reduced forms (ReducedRouteCGRs).
 
-    Iterates over each RouteCGR in the provided dictionary and applies the compose_reduced_route_cgr function.
+    Iterates over each RouteCGR in the provided dictionary and applies the compose_sb_cgr function.
 
     Args:
         route_cgrs_dict (dict): A dictionary where keys are identifiers (e.g., route numbers)
@@ -564,7 +560,7 @@ def compose_all_reduced_route_cgrs(route_cgrs_dict: dict):
         dict: A dictionary where each key corresponds to the original identifier from
               `route_cgrs_dict` and the value is the corresponding ReducedRouteCGR object.
     """
-    all_reduced_route_cgrs = dict()
+    all_sb_cgrs = dict()
     for num, cgr in route_cgrs_dict.items():
-        all_reduced_route_cgrs[num] = compose_reduced_route_cgr(cgr)
-    return all_reduced_route_cgrs
+        all_sb_cgrs[num] = compose_sb_cgr(cgr)
+    return all_sb_cgrs

@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from synplan.chem.utils import mol_from_smiles
-from synplan.chem.reaction_routes.route_cgr import compose_all_route_cgrs, compose_all_reduced_route_cgrs
+from synplan.chem.reaction_routes.route_cgr import compose_all_route_cgrs, compose_all_sb_cgrs
 from synplan.chem.reaction_routes.clustering import cluster_routes, subcluster_all_clusters
 from synplan.utils.loading import load_building_blocks, load_reaction_rules
 from synplan.mcts.tree import Tree
@@ -79,13 +79,13 @@ def run_clustering_workflow(target_smiles, building_blocks, reaction_rules, poli
     
     # Get route CGRs
     all_route_cgrs = compose_all_route_cgrs(tree)
-    all_reduced_route_cgrs = compose_all_reduced_route_cgrs(all_route_cgrs)
+    all_sb_cgrs = compose_all_sb_cgrs(all_route_cgrs)
     
     # Perform clustering
-    clusters = cluster_routes(all_reduced_route_cgrs, use_strat=False)
+    clusters = cluster_routes(all_sb_cgrs, use_strat=False)
     
     # Perform subclustering
-    subclusters = subcluster_all_clusters(clusters, all_reduced_route_cgrs, all_route_cgrs)
+    subclusters = subcluster_all_clusters(clusters, all_sb_cgrs, all_route_cgrs)
     return tree, clusters, subclusters
 
 def calc_num_routes_subclusters(subclusters):
@@ -93,7 +93,7 @@ def calc_num_routes_subclusters(subclusters):
     l = 0
     for cluster in subclusters.values():
         for subcluster in cluster.values():
-            l += len(subcluster['nodes_data'])
+            l += len(subcluster['routes_data'])
     return l
 
 @pytest.mark.integration

@@ -7,55 +7,48 @@ from CGRtools import smiles as read_smiles
 from synplan.mcts.tree import Tree
 
 
+def _collect_reactions(tree):
+    """
+    Traverse a reaction tree in post-order and collect all ReactionContainers.
+    Returns a dict mapping each reaction's new step ID (0, 1, …) to its container.
+    """
+    rxn_list = []
+
+    def recurse(node):
+        if not isinstance(node, dict):
+            return
+        for child in node.get("children", []) or []:
+            recurse(child)
+        if node.get("type") == "reaction":
+            rxn_list.append(read_smiles(node["smiles"]))
+
+    recurse(tree)
+    return {i: rxn for i, rxn in enumerate(rxn_list)}
+
+
 def make_dict(routes_json):
     """
-    routes_json : list of tree-dicts as produced by make_json()
+    routes_json : dict or list of tree-dicts as produced by make_json()
 
     Returns a dict mapping each route index (0, 1, …) to a sub-dict
     of {new_step_id: ReactionContainer}, where the step IDs run
     from the earliest reaction (0) up to the final (max).
     """
     routes_dict = {}
+
+    # Normalize to iterable of (route_idx, tree)
     if isinstance(routes_json, dict):
-        for route_idx, tree in routes_json.items():
-            rxn_list = []
-
-            def _postorder(node):
-                # first dive into any children, then record this reaction
-                for child in node.get("children", []):
-                    _postorder(child)
-                if node["type"] == "reaction":
-                    rxn_list.append(read_smiles(node["smiles"]))
-                # mol-nodes simply recurse (no record)
-
-            # collect all reactions in leaf→root order
-            _postorder(tree)
-
-            # now assign 0,1,2,… in that order
-            reactions = {i: rxn for i, rxn in enumerate(rxn_list)}
-            routes_dict[int(route_idx)] = reactions
-
-        return routes_dict
+        items = ((int(k), v) for k, v in routes_json.items())
     else:
-        for route_idx, tree in enumerate(routes_json):
-            rxn_list = []
+        items = enumerate(routes_json)
 
-            def _postorder(node):
-                # first dive into any children, then record this reaction
-                for child in node.get("children", []):
-                    _postorder(child)
-                if node["type"] == "reaction":
-                    rxn_list.append(read_smiles(node["smiles"]))
-                # mol-nodes simply recurse (no record)
+    for route_idx, tree in items:
+        try:
+            routes_dict[int(route_idx)] = _collect_reactions(tree)
+        except Exception as e:
+            print(f"Error processing route {route_idx}: {e}")
 
-            # collect all reactions in leaf→root order
-            _postorder(tree)
-
-            # now assign 0,1,2,… in that order
-            reactions = {i: rxn for i, rxn in enumerate(rxn_list)}
-            routes_dict[int(route_idx)] = reactions
-
-        return routes_dict
+    return routes_dict
 
 
 def read_routes_json(file_path="routes.csv", to_dict=False):

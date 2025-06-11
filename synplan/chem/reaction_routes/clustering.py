@@ -57,12 +57,12 @@ def run_cluster_cli(
     # Compose condensed graph representations
     route_cgrs = compose_all_route_cgrs(routes_dict)
     click.echo(f"Generating RouteCGR")
-    reduced_cgrs = compose_all_reduced_route_cgrs(route_cgrs)
-    click.echo(f"Generating ReducedRouteCGR")
+    sb_cgrs = compose_all_sb_cgrs(route_cgrs)
+    click.echo(f"Generating SB-CGR")
 
     # Perform clustering
     click.echo(f"\nClustering")
-    clusters = cluster_routes(reduced_cgrs, use_strat=False)
+    clusters = cluster_routes(sb_cgrs, use_strat=False)
 
     click.echo(f"Total number of routes: {len(routes_dict)}")
     click.echo(f"Found number of clusters: {len(clusters)} ({list(clusters.keys())})")
@@ -79,7 +79,7 @@ def run_cluster_cli(
     for idx in clusters:
         report_path = cluster_results_dir / f"{file_index}_cluster_{idx}.html"
         routes_clustering_report(
-            routes_json, clusters, idx, reduced_cgrs, html_path=str(report_path)
+            routes_json, clusters, idx, sb_cgrs, html_path=str(report_path)
         )
 
     # Optional subclustering (Under development)
@@ -88,7 +88,7 @@ def run_cluster_cli(
         sub_dir = cluster_results_dir / subcluster_results_dir
         sub_dir.mkdir(parents=True, exist_ok=True)
 
-        subclusters = subcluster_all_clusters(clusters, reduced_cgrs, route_cgrs)
+        subclusters = subcluster_all_clusters(clusters, sb_cgrs, route_cgrs)
         for cluster_idx, sub in subclusters.items():
             click.echo(f"Cluster {cluster_idx} has {len(sub)} subclusters")
             for sub_idx, subcluster in sub.items():
@@ -100,7 +100,7 @@ def run_cluster_cli(
                     subcluster,
                     cluster_idx,
                     sub_idx,
-                    reduced_cgrs,
+                    sb_cgrs,
                     aam=False,
                     html_path=str(subreport_path),
                 )
@@ -112,7 +112,7 @@ def cluster_route_from_csv(routes_file: str):
 
     This function orchestrates the process of loading retrosynthetic route data
     from a specified CSV file, converting the routes into Condensed Graph of
-    Reactions (CGRs), reducing these CGRs to a simplified form (ReducedRouteCGRs),
+    Reactions (CGRs), reducing these CGRs to a simplified form (SB-CGRs),
     and finally clustering the routes based on these reduced representations.
     It uses strategic bonds for clustering by default (as indicated by `use_strat=False`
     in `cluster_routes`, which implies clustering based on the graph structure
@@ -129,8 +129,8 @@ def cluster_route_from_csv(routes_file: str):
     """
     routes_dict = read_routes_csv(routes_file)
     route_cgrs_dict = compose_all_route_cgrs(routes_dict)
-    reduced_route_cgrs_dict = compose_all_reduced_route_cgrs(route_cgrs_dict)
-    clusters = cluster_routes(reduced_route_cgrs_dict, use_strat=False)
+    sb_cgrs_dict = compose_all_sb_cgrs(route_cgrs_dict)
+    clusters = cluster_routes(sb_cgrs_dict, use_strat=False)
     return clusters
 
 
@@ -157,8 +157,8 @@ def cluster_route_from_json(routes_file: str):
     routes_json = read_routes_json(routes_file)
     routes_dict = make_dict(routes_json)
     route_cgrs_dict = compose_all_route_cgrs(routes_dict)
-    reduced_route_cgrs_dict = compose_all_reduced_route_cgrs(route_cgrs_dict)
-    clusters = cluster_routes(reduced_route_cgrs_dict, use_strat=False)
+    sb_cgrs_dict = compose_all_sb_cgrs(route_cgrs_dict)
+    clusters = cluster_routes(sb_cgrs_dict, use_strat=False)
     return clusters
 
 
@@ -196,34 +196,34 @@ def extract_strat_bonds(target_cgr: CGRContainer):
     return sorted(result)
 
 
-def cluster_routes(r_route_cgrs: dict, use_strat=False):
+def cluster_routes(sb_cgrs: dict, use_strat=False):
     """
     Cluster routes objects based on their strategic bonds
       or CGRContainer object signature (not avoid mapping)
 
     Args:
-        r_route_cgrs: Dictionary mapping route_id to r_route_cgr objects.
+        sb_cgrs: Dictionary mapping route_id to sb_cgr objects.
 
     Returns:
         Dictionary with groups keyed by '{length}.{index}' containing
-        'r_route_cgr', 'route_ids', and 'strat_bonds'.
+        'sb_cgr', 'route_ids', and 'strat_bonds'.
     """
     temp_groups = defaultdict(
-        lambda: {"route_ids": [], "r_route_cgr": None, "strat_bonds": None}
+        lambda: {"route_ids": [], "sb_cgr": None, "strat_bonds": None}
     )
 
     # 1. Initial grouping based on the content of strategic bonds
-    for route_id, r_route_cgr in r_route_cgrs.items():
-        strat_bonds_list = extract_strat_bonds(r_route_cgr)
+    for route_id, sb_cgr in sb_cgrs.items():
+        strat_bonds_list = extract_strat_bonds(sb_cgr)
         if use_strat == True:
             group_key = tuple(strat_bonds_list)
         else:
-            group_key = str(r_route_cgr)
+            group_key = str(sb_cgr)
 
         if not temp_groups[group_key]["route_ids"]:  # First time seeing this group
             temp_groups[group_key][
-                "r_route_cgr"
-            ] = r_route_cgr  # Store the first CGR as representative
+                "sb_cgr"
+            ] = sb_cgr  # Store the first CGR as representative
             temp_groups[group_key][
                 "strat_bonds"
             ] = strat_bonds_list  # Store the actual list
@@ -441,7 +441,7 @@ class SubclusterError(Exception):
     """Raised when subcluster_one_cluster cannot complete successfully."""
 
 
-def subcluster_one_cluster(group, r_route_cgrs_dict, route_cgrs_dict):
+def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
     """
     Generate synthon data for each route in a single cluster.
 
@@ -453,8 +453,8 @@ def subcluster_one_cluster(group, r_route_cgrs_dict, route_cgrs_dict):
     ----------
     group : dict
         Must include `'route_ids'`, a list of route identifiers.
-    r_route_cgrs_dict : dict
-        Maps route IDs to their ReducedRouteCGR.
+    sb_cgrs_dict : dict
+        Maps route IDs to their SB-CGR.
     route_cgrs_dict : dict
         Maps route IDs to their RouteCGR.
 
@@ -462,7 +462,7 @@ def subcluster_one_cluster(group, r_route_cgrs_dict, route_cgrs_dict):
     -------
     dict or None
         If successful, returns a dict mapping each `route_id` to a tuple:
-        `(r_route_cgr, original_reaction, synthon_cgr, new_reaction, lg_groups)`.
+        `(sb_cgr, original_reaction, synthon_cgr, new_reaction, lg_groups)`.
         Or raises SubclusterError on any failure: if any step (X replacement or reaction
         parsing) fails for a route.
 
@@ -476,7 +476,7 @@ def subcluster_one_cluster(group, r_route_cgrs_dict, route_cgrs_dict):
 
     result = {}
     for route_id in route_ids:
-        r_route_cgr = r_route_cgrs_dict[route_id]
+        sb_cgr = sb_cgrs_dict[route_id]
         route_cgr = route_cgrs_dict[route_id]
 
         # 1) Replace leaving groups in RouteCGR
@@ -506,7 +506,7 @@ def subcluster_one_cluster(group, r_route_cgrs_dict, route_cgrs_dict):
             ) from e
 
         result[route_id] = (
-            r_route_cgr,
+            sb_cgr,
             ReactionContainer(reactants=old_reactants, products=[target_mol]),
             synthon_cgr,
             new_rxn,
@@ -525,7 +525,7 @@ def group_routes_by_synthon_detail(data_dict: dict):
         data_dict: Dictionary {route_id: [synthon_cgr, synthon_reaction, route_data, ...]}.
 
     Returns:
-        Dictionary {group_index: {'r_route_cgr': ... ,'synthon_cgr': ..., 'synthon_reaction': ...,
+        Dictionary {group_index: {'sb_cgr': ... ,'synthon_cgr': ..., 'synthon_reaction': ...,
                                   'routes_data': {route_id1: route_data1, ...}}}.
     """
     temp_groups = defaultdict(list)
@@ -557,7 +557,7 @@ def group_routes_by_synthon_detail(data_dict: dict):
     sorted_temp_groups = sorted(temp_groups.items(), key=lambda item: item[1])
     for group_key, route_ids in sorted_temp_groups:
 
-        r_route_cgr, unlabeled_reaction, synthon_cgr, synthon_reaction = group_key
+        sb_cgr, unlabeled_reaction, synthon_cgr, synthon_reaction = group_key
         routes_data_dict = {}
 
         # Iterate through the route IDs belonging to this group
@@ -574,7 +574,7 @@ def group_routes_by_synthon_detail(data_dict: dict):
             )
 
         final_grouped_results[group_index] = {
-            "r_route_cgr": r_route_cgr,
+            "sb_cgr": sb_cgr,
             "unlabeled_reaction": unlabeled_reaction,
             "synthon_cgr": synthon_cgr,
             "synthon_reaction": synthon_reaction,
@@ -586,7 +586,7 @@ def group_routes_by_synthon_detail(data_dict: dict):
     return final_grouped_results
 
 
-def subcluster_all_clusters(groups, r_route_cgrs_dict, route_cgrs_dict):
+def subcluster_all_clusters(groups, sb_cgrs_dict, route_cgrs_dict):
     """
     Subdivide each reaction cluster into detailed synthon-based subgroups.
 
@@ -597,8 +597,8 @@ def subcluster_all_clusters(groups, r_route_cgrs_dict, route_cgrs_dict):
     ----------
     groups : dict
         Mapping of cluster indices to cluster data.
-    r_route_cgrs_dict : dict
-        Dictionary of ReducedRoteCGRs
+    sb_cgrs_dict : dict
+        Dictionary of SB-CGRs
     route_cgrs_dict : dict
         Dictionary of RoteCGRs
 
@@ -610,9 +610,7 @@ def subcluster_all_clusters(groups, r_route_cgrs_dict, route_cgrs_dict):
     """
     all_subgroups = {}
     for group_index, group in groups.items():
-        group_synthons = subcluster_one_cluster(
-            group, r_route_cgrs_dict, route_cgrs_dict
-        )
+        group_synthons = subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict)
         if group_synthons is None:
             return None
         all_subgroups[group_index] = group_routes_by_synthon_detail(group_synthons)

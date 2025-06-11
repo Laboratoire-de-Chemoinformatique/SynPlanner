@@ -4,7 +4,7 @@ import os
 import csv
 
 # === Tests for route_cgr.py functions ===
-from synplan.chem.reaction_routes.route_cgr import compose_route_cgr, compose_reduced_route_cgr
+from synplan.chem.reaction_routes.route_cgr import compose_route_cgr, compose_sb_cgr
 from synplan.chem.reaction_routes.io import read_routes_csv, read_routes_json, TreeWrapper, make_dict
 from CGRtools.containers import (
     CGRContainer,
@@ -59,7 +59,7 @@ def routes_data_tree():
     tree = TreeWrapper.load_tree_from_id(mol_id, config, path)
     return tree
 
-# --- Parametrized dict-based tests for CSV and JSON ---
+
 @pytest.mark.parametrize(
     "routes_fixture",
     ["routes_data_csv_to_dict", "routes_data_json_to_dict"]
@@ -110,8 +110,8 @@ def test_compose_route_cgr_tree_based_invalid_route_id(routes_data_tree):
     print(set(routes_data_tree.winning_nodes))
     assert invalid_route_id not in set(routes_data_tree.winning_nodes)
 
-def test_compose_reduced_route_cgr_from_route_data(routes_data_csv_to_dict):
-    """Test compose_reduced_route_cgr with a CGR derived from actual route data."""
+def test_compose_sb_cgr_from_route_data(routes_data_csv_to_dict):
+    """Test compose_sb_cgr with a CGR derived from actual route data."""
     route_id_to_test = 38
     composed_route_info = compose_route_cgr(routes_data_csv_to_dict, route_id_to_test)
     
@@ -119,8 +119,7 @@ def test_compose_reduced_route_cgr_from_route_data(routes_data_csv_to_dict):
     original_route_cgr = composed_route_info["cgr"]
     assert isinstance(original_route_cgr, CGRContainer)
 
-    reduced_cgr = compose_reduced_route_cgr(original_route_cgr)
-    assert isinstance(reduced_cgr, CGRContainer)
+    sb_cgr = compose_sb_cgr(original_route_cgr)
+    assert isinstance(sb_cgr, CGRContainer)
 
-    assert len(reduced_cgr) < len(original_route_cgr)
-
+    assert len(sb_cgr) < len(original_route_cgr)

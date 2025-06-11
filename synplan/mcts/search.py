@@ -165,34 +165,35 @@ def run_search(
 
             # is solved
             n_solved += bool(tree.winning_nodes)
+            if bool(tree.winning_nodes):
 
-            # extract routes
-            extracted_routes.append(extract_routes(tree))
+                # extract routes
+                extracted_routes.append(extract_routes(tree))
 
-            # save routes
-            generate_results_html(
-                tree,
-                os.path.join(routes_folder, f"retroroutes_target_{ti}.html"),
-                extended=True,
-            )
+                # save routes
+                generate_results_html(
+                    tree,
+                    os.path.join(routes_folder, f"retroroutes_target_{ti}.html"),
+                    extended=True,
+                )
 
-            # save stats
-            statswriter.writerow(extract_tree_stats(tree, target_smi))
-            csvfile.flush()
+                # save stats
+                statswriter.writerow(extract_tree_stats(tree, target_smi))
+                csvfile.flush()
 
-            # save json routes
-            with open(routes_file, "w", encoding="utf-8") as f:
-                json.dump(extracted_routes, f)
+                # save json routes
+                with open(routes_file, "w", encoding="utf-8") as f:
+                    json.dump(extracted_routes, f)
 
-            # Save mapped reactions (CSV)
-            routes_dict = extract_reactions(tree)
-            write_routes_csv(
-                routes_dict, os.path.join(routes_folder, f"mapped_routes_{ti}.csv")
-            )
+                # Save mapped reactions (CSV)
+                routes_dict = extract_reactions(tree)
+                write_routes_csv(
+                    routes_dict, os.path.join(routes_folder, f"mapped_routes_{ti}.csv")
+                )
 
-            # save mapped reactions (JSON)
-            write_routes_json(
-                routes_dict, os.path.join(routes_folder, f"mapped_routes_{ti}.json")
-            )
+                # save mapped reactions (JSON)
+                write_routes_json(
+                    routes_dict, os.path.join(routes_folder, f"mapped_routes_{ti}.json")
+                )
 
     print(f"Number of solved target molecules: {n_solved}")
