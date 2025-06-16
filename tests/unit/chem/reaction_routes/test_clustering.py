@@ -15,7 +15,7 @@ from CGRtools.containers import (
 @pytest.fixture(scope="module")
 def sb_cgrs_dict():
     """Load precomputed SB-CGRs from pickle."""
-    with open('tests/data/r_route_cgrs_1_1.pkl', 'rb') as f:
+    with open('tests/data/sb_cgrs_1_1.pkl', 'rb') as f:
         return pickle.load(f)
     
 @pytest.fixture(scope="module")
@@ -47,7 +47,7 @@ def test_cluster_routes_valid(sb_cgrs_dict, use_strat):
         assert 'route_ids' in value.keys()
         assert isinstance(value['route_ids'], list)
         assert len(value['route_ids']) > 0
-        assert 'r_route_cgr' in value.keys()
+        assert 'sb_cgr' in value.keys()
         assert 'strat_bonds' in value.keys()
         assert 'group_size' in value.keys()
 
@@ -63,10 +63,10 @@ def test_subcluster_one_cluster_valid(sb_cgrs_dict, routes_cgrs_dict):
         assert isinstance(route_id, int)
         assert isinstance(value, tuple)
         assert len(value) == 5
-        r_route_cgr, unlabeled_rxn, synthon_cgr, new_rxn, lg_groups = value
+        sb_cgr, unlabeled_rxn, synthon_cgr, new_rxn, lg_groups = value
 
         # The SB-CGR should be exactly what we passed in
-        assert r_route_cgr is sb_cgrs_dict[route_id]
+        assert sb_cgr is sb_cgrs_dict[route_id]
 
         # The “unlabeled” reaction comes from the original route-CGR
         assert isinstance(unlabeled_rxn, ReactionContainer)
