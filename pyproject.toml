@@ -26,6 +26,7 @@ pytorch-lightning = ">=2"
 ipykernel = ">6.29.0"
 ipywidgets = ">8.1.0"
 streamlit = ">1.35.1"
+streamlit-ketcher = ">=0.0.1"
 
 [tool.poetry.group.dev]
 optional = true

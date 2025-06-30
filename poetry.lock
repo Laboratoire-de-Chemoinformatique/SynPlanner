@@ -4185,6 +4185,21 @@ watchdog = {version = ">=2.1.5,<7", markers = "platform_system != \"Darwin\""}
 snowflake = ["snowflake-connector-python (>=3.3.0) ; python_version < \"3.12\"", "snowflake-snowpark-python[modin] (>=1.17.0) ; python_version < \"3.12\""]
 
 [[package]]
+name = "streamlit-ketcher"
+version = "0.0.1"
+description = "Ketcher editor component for Streamlit."
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "streamlit_ketcher-0.0.1-py3-none-any.whl", hash = "sha256:b8e944e06e938c0b072ed013444d68213d807e224d96f5b1d6be39658ff6233a"},
+    {file = "streamlit_ketcher-0.0.1.tar.gz", hash = "sha256:bb6201f28fc3020579c74d56bc819d1ed99af3430cf164fb964f6adbdd0e8b89"},
+]
+
+[package.dependencies]
+streamlit = ">=1.0.0"
+
+[[package]]
 name = "sympy"
 version = "1.14.0"
 description = "Computer algebra system (CAS) in Python"
@@ -4866,4 +4881,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "4bb73573f3ae687b7fc14aeb5b5a9c5b171aaeb67ffe9e39480b74eb77b79677"
+content-hash = "b1f3df31bd34b2c9c00a2025e3cc1189bf0f6c946e7059f6aabb53a86c541781"
