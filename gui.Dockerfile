@@ -41,13 +41,10 @@ RUN poetry install --without dev --no-interaction && rm -rf /tmp/poetry-cache /t
 RUN apt-get purge -y --auto-remove build-essential python3-dev g++ curl \
     && rm -rf /var/lib/apt/lists/*
 
-# 7. Expose the default Streamlit port (8501)
-EXPOSE 8501
-
-# 8. Add a health check to ensure the Streamlit app is responsive
+# 7. Add a health check to ensure the Streamlit app is responsive
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s \
   CMD curl -f http://localhost:8501/_stcore/health || exit 1
 
-# 9. Set the entry point to run the Streamlit GUI script
+# 8. Set the entry point to run the Streamlit GUI script
 # This is the key change to run your GUI instead of the CLI
-ENTRYPOINT ["streamlit", "run", "synplan/interfaces/gui.py", "--server.port=8501", "--server.address=0.0.0.0"]
+ENTRYPOINT ["streamlit", "run", "synplan/interfaces/gui.py"]

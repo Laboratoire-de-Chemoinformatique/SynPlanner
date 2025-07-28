@@ -243,6 +243,8 @@ def get_route_svg(tree: Tree, node_id: int) -> str:
     :param node_id: The id of the node from which to visualize the route.
     :return: The SVG string.
     """
+    if node_id not in tree.winning_nodes:
+        return None
     nodes = tree.route_to_node(node_id)
     # Set up node_id types for different box colors
     for n in nodes:
@@ -557,9 +559,7 @@ def html_top_routes_cluster(
     html.append(
         "<table class='table report-table'><colgroup><col style='width:5%'><colgroup><col style='width:5%'><col style='width:15%'><col style='width:75%'></colgroup><thead><tr>"
     )
-    html.append(
-        "<th>Cluster index</th><th>Size</th><th>SB-CGR</th><th>Best Route</th>"
-    )
+    html.append("<th>Cluster index</th><th>Size</th><th>SB-CGR</th><th>Best Route</th>")
     html.append("</tr></thead><tbody>")
 
     # Rows per cluster

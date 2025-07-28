@@ -103,6 +103,9 @@ def validate_molecule_components(curr_mol: MoleculeContainer, route_id: int):
     new_rmol = [curr_mol.substructure(c) for c in curr_mol.connected_components]
     if len(new_rmol) > 1:
         print(f"Error tree {route_id}: We have more than one molecule in one node")
+        return 0
+
+    return 1
 
 
 def get_leaving_groups(products: list):
@@ -167,7 +170,8 @@ def process_first_reaction(first_react: ReactionContainer, tree: Tree, route_id:
         ):
             bb_set = react_key_set
 
-        validate_molecule_components(curr_mol, route_id)
+        if validate_molecule_components(curr_mol, route_id) == 0:
+            return set()
 
     return bb_set
 
@@ -216,7 +220,8 @@ def update_reaction_dict(
         react_key = tuple(curr_mol._atoms)
         react_key_set = set(react_key)
 
-        validate_molecule_components(curr_mol, route_id)
+        if validate_molecule_components(curr_mol, route_id) == 0:
+            return dict(), set()
 
         if (
             len(curr_mol) <= tree.config.min_mol_size
@@ -376,6 +381,8 @@ def compose_route_cgr(tree_or_routes, route_id):
             react_dict, bb_set = update_reaction_dict(
                 reaction, route_id, mapping, react_dict, tree, bb_set, prev_remap
             )
+            if not react_dict and not bb_set:
+                return None
 
             # apply the new overlap‐mapping
             if mapping:
@@ -414,8 +421,8 @@ def compose_all_route_cgrs(tree_or_routes, route_id=None):
     if isinstance(tree_or_routes, dict):
         routes_dict = tree_or_routes
 
-        def _single(rid):
-            res = compose_route_cgr(routes_dict, rid)
+        def _single(route_id):
+            res = compose_route_cgr(routes_dict, route_id)
             return res["cgr"] if res else None
 
         if route_id is not None:
@@ -424,7 +431,7 @@ def compose_all_route_cgrs(tree_or_routes, route_id=None):
             return {route_id: _single(route_id)}
 
         # all routes
-        result = {rid: _single(rid) for rid in sorted(routes_dict)}
+        result = {route_id: _single(route_id) for route_id in sorted(routes_dict)}
         return result
 
     # tree-based branch
@@ -439,10 +446,10 @@ def compose_all_route_cgrs(tree_or_routes, route_id=None):
             return None
         return route_cgrs
 
-    for rid in sorted(set(tree.winning_nodes)):
-        res = compose_route_cgr(tree, rid)
+    for route_id in sorted(set(tree.winning_nodes)):
+        res = compose_route_cgr(tree, route_id)
         if res:
-            route_cgrs[rid] = res["cgr"]
+            route_cgrs[route_id] = res["cgr"]
 
     return route_cgrs
 

@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import Dict, Any
 
 from pathlib import Path
 import pickle
@@ -482,6 +483,7 @@ def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
         # 1) Replace leaving groups in RouteCGR
         try:
             synthon_cgr, lg_groups = lg_replacer(route_cgr)
+            lg_sizes = len(lg_groups)
         except (KeyError, ValueError) as e:
             raise SubclusterError(f"LG replacement failed for route {route_id}") from e
 
@@ -511,79 +513,91 @@ def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
             synthon_cgr,
             new_rxn,
             lg_groups,
+            lg_sizes,
         )
 
     return result
 
 
-def group_routes_by_synthon_detail(data_dict: dict):
+def group_routes_by_synthon_detail(data_dict: Dict[Any, list]) -> Dict[str, dict]:
     """
-    Groups routes based on synthon CGR (result[0]) and reaction (result[1]).
-    The output includes a dictionary mapping route IDs to their result[2] value.
+    Groups routes based on synthon CGR (result_list[0]), reaction data, and lg_sizes.
+    The final group index is formatted as "{lg_sizes}_{temp_index}".
 
     Args:
-        data_dict: Dictionary {route_id: [synthon_cgr, synthon_reaction, route_data, ...]}.
+        data_dict: Dictionary {route_id: [sb_cgr, unlabeled_reaction, synthon_cgr, synthon_reaction,
+                                         route_specific_data, lg_sizes, ...]}.
 
     Returns:
-        Dictionary {group_index: {'sb_cgr': ... ,'synthon_cgr': ..., 'synthon_reaction': ...,
-                                  'routes_data': {route_id1: route_data1, ...}}}.
+        Dictionary {
+            group_index (str): {
+                'sb_cgr': ...,
+                'unlabeled_reaction': ...,
+                'synthon_cgr': ...,
+                'synthon_reaction': ...,
+                'routes_data': {route_id: route_specific_data, ...},
+                'lg_sizes': ...,
+                'post_processed': False
+            }
+        }
     """
+    # 1. Bucket route_ids by their grouping key
     temp_groups = defaultdict(list)
-
     for route_id, result_list in data_dict.items():
-        if len(result_list) < 4:
-            group_key = (result_list[0], None)  # Handle missing reaction
-        else:
-            try:
-                group_key = (
-                    result_list[0],
-                    result_list[1],
-                    result_list[2],
-                    result_list[3],
-                )
-            except TypeError:
-                print(
-                    f"Warning: Skipping route {route_id} because reaction data is not hashable: {type(result_list[1])}"
-                )
-                continue
+        # unpack values with defaults
+        sb_cgr = result_list[0] if len(result_list) > 0 else None
+        unlabeled_reaction = result_list[1] if len(result_list) > 1 else None
+        synthon_cgr = result_list[2] if len(result_list) > 2 else None
+        synthon_reaction = result_list[3] if len(result_list) > 3 else None
+        lg_sizes = result_list[5] if len(result_list) > 5 else None
+
+        # Attempt to use all parts of the key; skip if unhashable
+        try:
+            group_key = (
+                sb_cgr,
+                unlabeled_reaction,
+                synthon_cgr,
+                synthon_reaction,
+                lg_sizes,
+            )
+        except TypeError:
+            print(f"Warning: Skipping route {route_id} due to unhashable key element.")
+            continue
 
         temp_groups[group_key].append(route_id)
 
-    # 2. Format the output dictionary with sequential integer keys
-    #    and include the route-specific data (result[2]) in a sub-dictionary.
-    final_grouped_results = {}
-    group_index = 1
+    # 2. Sort groups for consistent ordering
+    sorted_groups = sorted(temp_groups.items(), key=lambda kv: kv[1])
 
-    sorted_temp_groups = sorted(temp_groups.items(), key=lambda item: item[1])
-    for group_key, route_ids in sorted_temp_groups:
+    # 3. Build final dict, numbering per lg_sizes
+    final_groups = {}
+    counters = defaultdict(int)  # counters per lg_sizes
 
-        sb_cgr, unlabeled_reaction, synthon_cgr, synthon_reaction = group_key
-        routes_data_dict = {}
+    for group_key, route_ids in sorted_groups:
+        sb_cgr, unlabeled_reaction, synthon_cgr, synthon_reaction, lg_sizes = group_key
 
-        # Iterate through the route IDs belonging to this group
-        for route_id in sorted(route_ids):  # Sort route IDs for consistent dict order
-            original_result = data_dict.get(
-                route_id, []
-            )  # Get original list for this route
-            route_specific_data = None  # Default value if index 2 is missing
-            if len(original_result) > 4:
-                route_specific_data = original_result[4]  # Get the third element
+        # Increment the counter for this lg_sizes
+        counters[lg_sizes] += 1
+        temp_index = counters[lg_sizes]
+        group_index = f"{lg_sizes}_{temp_index}"
 
-            routes_data_dict[route_id] = (
-                route_specific_data  # Add to the sub-dictionary
-            )
+        # Collect the route-specific data (at index 4) for each route
+        routes_data = {}
+        for rid in sorted(route_ids):
+            orig = data_dict.get(rid, [])
+            routes_data[rid] = orig[4] if len(orig) > 4 else None
 
-        final_grouped_results[group_index] = {
+        final_groups[group_index] = {
             "sb_cgr": sb_cgr,
             "unlabeled_reaction": unlabeled_reaction,
             "synthon_cgr": synthon_cgr,
             "synthon_reaction": synthon_reaction,
-            "routes_data": routes_data_dict,
+            "routes_data": routes_data,
+            "lg_sizes": lg_sizes,
             "post_processed": False,
         }
-        group_index += 1
 
-    return final_grouped_results
+    return final_groups
 
 
 def subcluster_all_clusters(groups, sb_cgrs_dict, route_cgrs_dict):

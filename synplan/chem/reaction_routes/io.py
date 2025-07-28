@@ -96,21 +96,24 @@ def make_json(routes_dict, keep_ids=True):
     for route_id, steps in routes_dict.items():
         if not steps:
             continue
+        try:
+            # Determine target molecule atoms from the final step of this route
+            final_step = max(steps)
+            target = steps[final_step].products[0]
+            atom_nums = set(target._atoms.keys())
 
-        # Determine target molecule atoms from the final step of this route
-        final_step = max(steps)
-        target = steps[final_step].products[0]
-        atom_nums = set(target._atoms.keys())
-
-        # Precompute canonical SMILES and producer mapping for all products
-        prod_map = {}  # smiles -> list of step_ids
-        for sid, rxn in steps.items():
-            for prod in rxn.products:
-                prod.kekule()
-                prod.implicify_hydrogens()
-                prod.thiele()
-                s = str(prod)
-                prod_map.setdefault(s, []).append(sid)
+            # Precompute canonical SMILES and producer mapping for all products
+            prod_map = {}  # smiles -> list of step_ids
+            for sid, rxn in steps.items():
+                for prod in rxn.products:
+                    prod.kekule()
+                    prod.implicify_hydrogens()
+                    prod.thiele()
+                    s = str(prod)
+                    prod_map.setdefault(s, []).append(sid)
+        except Exception as e:
+            print(f"Error processing route {route_id}: {e}")
+            continue
 
         def transform(mol):
             mol.kekule()
