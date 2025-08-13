@@ -4,6 +4,7 @@ retrosynthetic models."""
 import functools
 import pickle
 import zipfile
+import shutil
 from pathlib import Path
 from typing import List, Set, Union
 
@@ -16,6 +17,68 @@ from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.networks.value import ValueNetwork
 from synplan.utils.files import MoleculeReader
 
+REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
+
+
+def _extract_zip(zip_path: Path, out_dir: Path) -> None:
+    """Extract a zip into `out_dir` only if its contents are missing."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        for name in zf.namelist():
+            target = out_dir / name
+            if not target.exists():
+                zf.extract(name, out_dir)
+
+
+def download_selected_files(
+    files_to_get: list[tuple[str, str]],
+    save_to: str | Path = "./tutorials/synplan_data",
+    extract_zips: bool = True,
+    relocate_map: dict[str, str] | None = None,
+) -> Path:
+    """
+    Download specific files from the Hugging Face repo.
+
+    Parameters
+    ----------
+    files_to_get : list of (subfolder, filename)
+        Example: [("building_blocks", "building_blocks_em_sa_ln.smi.zip"),
+                  ("uspto", "uspto_reaction_rules.pickle"),
+                  ("weights", "ranking_policy_network.ckpt")]
+    save_to : path
+        Where to save everything locally.
+    extract_zips : bool
+        If True, extract .zip files to their containing folder.
+    relocate_map : dict[str, str]
+        Optional map { "weights/ranking_policy_network.ckpt": "uspto/weights/ranking_policy_network.ckpt" }
+        to copy/move files after download to match test paths.
+    """
+    root = Path(save_to).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+
+    for subfolder, filename in files_to_get:
+        local_path = Path(
+            hf_hub_download(
+                repo_id=REPO_ID,
+                subfolder=subfolder,
+                filename=filename,
+                local_dir=str(root),
+            )
+        )
+
+        if extract_zips and local_path.suffix == ".zip":
+            _extract_zip(local_path, local_path.parent)
+
+    if relocate_map:
+        for src_rel, dst_rel in relocate_map.items():
+            src = root / src_rel
+            dst = root / dst_rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            if src.exists() and not dst.exists():
+                shutil.copy2(src, dst)  # or shutil.move(src, dst)
+
+    return root
+
 
 def download_unpack_data(filename, subfolder, save_to="."):
     if isinstance(save_to, str):
@@ -24,7 +87,7 @@ def download_unpack_data(filename, subfolder, save_to="."):
 
     # Download the zip file from the repository
     file_path = hf_hub_download(
-        repo_id="Laboratoire-De-Chemoinformatique/SynPlanner",
+        repo_id=REPO_ID,
         filename=filename,
         subfolder=subfolder,
         local_dir=save_to,
@@ -45,9 +108,7 @@ def download_unpack_data(filename, subfolder, save_to="."):
 
 
 def download_all_data(save_to="."):
-    dir_path = snapshot_download(
-        repo_id="Laboratoire-De-Chemoinformatique/SynPlanner", local_dir=save_to
-    )
+    dir_path = snapshot_download(repo_id=REPO_ID, local_dir=save_to)
     dir_path = Path(dir_path).resolve()
     for zip_file in dir_path.rglob("*.zip"):
         with zipfile.ZipFile(zip_file, "r") as zip_ref:

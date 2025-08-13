@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "SynPlanner"
-version = "1.1.2"
+version = "1.2.0"
 description = "Toolbox for chemical synthesis planning"
 authors = ["Laboratoire de Chemoinformatique <tagirshin@gmail.com>"]
 license = "MIT"
@@ -25,6 +25,8 @@ torch-geometric = ">=2.4.0"
 pytorch-lightning = ">=2"
 ipykernel = ">6.29.0"
 ipywidgets = ">8.1.0"
+streamlit = ">1.35.1"
+streamlit-ketcher = ">=0.0.1"
 
 [tool.poetry.group.dev]
 optional = true
