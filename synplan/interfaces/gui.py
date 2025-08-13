@@ -149,7 +149,7 @@ def initialize_app():
         page_title="SynPlanner GUI",
         page_icon="🧪",
         layout="wide",
-        initial_sidebar_state="expanded"
+        initial_sidebar_state="expanded",
     )
 
     st.markdown(
@@ -160,7 +160,7 @@ def initialize_app():
         }
         </style>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     # Initialize session state variables if they don't exist.
@@ -227,14 +227,10 @@ def setup_sidebar():
     )
 
     st.sidebar.title("Preprint")
-    st.sidebar.markdown(
-        "[Link](https://doi.org/10.26434/chemrxiv-2024-bzpnd)"
-    )
+    st.sidebar.markdown("[Link](https://doi.org/10.26434/chemrxiv-2024-bzpnd)")
 
     st.sidebar.title("Paper")
-    st.sidebar.markdown(
-        "[Link](https://doi.org/10.1021/acs.jcim.4c02004)"
-    )
+    st.sidebar.markdown("[Link](https://doi.org/10.1021/acs.jcim.4c02004)")
 
     st.sidebar.title("Issues")
     st.sidebar.markdown(
@@ -1131,7 +1127,9 @@ def display_subclustering_results():
             st.info("No routes match the current filter settings.")
             return
 
-        st.markdown(f"--- \n**Displaying {len(filtered_routes)} routes (from {min_max_step[0]} to {min_max_step[1]} reaction steps)**")
+        st.markdown(
+            f"--- \n**Displaying {len(filtered_routes)} routes (from {min_max_step[0]} to {min_max_step[1]} reaction steps)**"
+        )
 
         # Display cached synthon reaction image
         if "synthon_reaction" in current_subcluster_data:

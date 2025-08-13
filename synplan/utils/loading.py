@@ -19,6 +19,7 @@ from synplan.utils.files import MoleculeReader
 
 REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
 
+
 def _extract_zip(zip_path: Path, out_dir: Path) -> None:
     """Extract a zip into `out_dir` only if its contents are missing."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -30,10 +31,10 @@ def _extract_zip(zip_path: Path, out_dir: Path) -> None:
 
 
 def download_selected_files(
-        files_to_get: list[tuple[str, str]],
-        save_to: str | Path = "./tutorials/synplan_data",
-        extract_zips: bool = True,
-        relocate_map: dict[str, str] | None = None,
+    files_to_get: list[tuple[str, str]],
+    save_to: str | Path = "./tutorials/synplan_data",
+    extract_zips: bool = True,
+    relocate_map: dict[str, str] | None = None,
 ) -> Path:
     """
     Download specific files from the Hugging Face repo.
@@ -107,9 +108,7 @@ def download_unpack_data(filename, subfolder, save_to="."):
 
 
 def download_all_data(save_to="."):
-    dir_path = snapshot_download(
-        repo_id=REPO_ID, local_dir=save_to
-    )
+    dir_path = snapshot_download(repo_id=REPO_ID, local_dir=save_to)
     dir_path = Path(dir_path).resolve()
     for zip_file in dir_path.rglob("*.zip"):
         with zipfile.ZipFile(zip_file, "r") as zip_ref:

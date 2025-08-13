@@ -5,7 +5,12 @@ import csv
 
 # === Tests for route_cgr.py functions ===
 from synplan.chem.reaction_routes.route_cgr import compose_route_cgr, compose_sb_cgr
-from synplan.chem.reaction_routes.io import read_routes_csv, read_routes_json, TreeWrapper, make_dict
+from synplan.chem.reaction_routes.io import (
+    read_routes_csv,
+    read_routes_json,
+    TreeWrapper,
+    make_dict,
+)
 from CGRtools.containers import (
     CGRContainer,
     MoleculeContainer,
@@ -39,7 +44,7 @@ def routes_data_csv_to_dict():
     #     tmp_csv.write(CSV_DATA)
     #     csv_file_path = tmp_csv.name*
 
-    csv_file_path = 'tests/data/routes_mol_1.csv'
+    csv_file_path = "tests/data/routes_mol_1.csv"
     data = read_routes_csv(csv_file_path)
     return data
 
@@ -47,22 +52,22 @@ def routes_data_csv_to_dict():
 @pytest.fixture(scope="module")
 def routes_data_json_to_dict():
     """Load reaction data from JSON into a nested dict via make_dict."""
-    json_file = 'tests/data/routes_mol_1.json'
+    json_file = "tests/data/routes_mol_1.json"
     raw = read_routes_json(json_file)
     return make_dict(raw)
+
 
 @pytest.fixture(scope="module")
 def routes_data_tree():
     mol_id = 1
     config = 1
-    path = 'tests/data/forest'
+    path = "tests/data/forest"
     tree = TreeWrapper.load_tree_from_id(mol_id, config, path)
     return tree
 
 
 @pytest.mark.parametrize(
-    "routes_fixture",
-    ["routes_data_csv_to_dict", "routes_data_json_to_dict"]
+    "routes_fixture", ["routes_data_csv_to_dict", "routes_data_json_to_dict"]
 )
 def test_compose_route_cgr_dict_based_single_route(routes_fixture, request):
     """Test compose_route_cgr with dict input for a valid route_id."""
@@ -80,9 +85,9 @@ def test_compose_route_cgr_dict_based_single_route(routes_fixture, request):
     for rxn in result["reactions_dict"].values():
         assert isinstance(rxn, ReactionContainer)
 
+
 @pytest.mark.parametrize(
-    "routes_fixture",
-    ["routes_data_csv_to_dict", "routes_data_json_to_dict"]
+    "routes_fixture", ["routes_data_csv_to_dict", "routes_data_json_to_dict"]
 )
 def test_compose_route_cgr_dict_based_invalid_route_id(routes_fixture, request):
     """compose_route_cgr should raise KeyError for invalid route_id."""
@@ -91,12 +96,13 @@ def test_compose_route_cgr_dict_based_invalid_route_id(routes_fixture, request):
     with pytest.raises(KeyError):
         compose_route_cgr(data, invalid_route_id)
 
+
 def test_compose_route_cgr_tree_based_single_route(routes_data_tree):
     """Test compose_route_cgr with a mock Tree input for a single route."""
-    route_id_to_test = 38 
+    route_id_to_test = 38
 
     result = compose_route_cgr(routes_data_tree, route_id_to_test)
-    
+
     assert result is not None
     assert "cgr" in result
     assert "reactions_dict" in result
@@ -106,15 +112,16 @@ def test_compose_route_cgr_tree_based_single_route(routes_data_tree):
 
 def test_compose_route_cgr_tree_based_invalid_route_id(routes_data_tree):
     """Test compose_route_cgr with dict input for an invalid route_id."""
-    invalid_route_id = 998 # Assuming this ID is not in CSV_DATA
+    invalid_route_id = 998  # Assuming this ID is not in CSV_DATA
     print(set(routes_data_tree.winning_nodes))
     assert invalid_route_id not in set(routes_data_tree.winning_nodes)
+
 
 def test_compose_sb_cgr_from_route_data(routes_data_csv_to_dict):
     """Test compose_sb_cgr with a CGR derived from actual route data."""
     route_id_to_test = 38
     composed_route_info = compose_route_cgr(routes_data_csv_to_dict, route_id_to_test)
-    
+
     assert composed_route_info is not None
     original_route_cgr = composed_route_info["cgr"]
     assert isinstance(original_route_cgr, CGRContainer)
