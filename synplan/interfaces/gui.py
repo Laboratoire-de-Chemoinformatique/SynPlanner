@@ -145,7 +145,23 @@ def load_planning_resources_cached():  # Renamed to avoid conflict if main calls
 
 def initialize_app():
     """1. Initialization: Setting up the main window, layout, and initial widgets."""
-    st.set_page_config(page_title="SynPlanner GUI", page_icon="🧪", layout="wide")
+    st.set_page_config(
+        page_title="SynPlanner GUI",
+        page_icon="🧪",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+
+    st.markdown(
+        """
+        <style>
+        :root {
+            color-scheme: light !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
     # Initialize session state variables if they don't exist.
     if "planning_done" not in st.session_state:
@@ -207,12 +223,17 @@ def setup_sidebar():
 
     st.sidebar.title("Tutorials")
     st.sidebar.markdown(
-        "https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials"
+        "[Link](https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials)"
+    )
+
+    st.sidebar.title("Preprint")
+    st.sidebar.markdown(
+        "[Link](https://doi.org/10.26434/chemrxiv-2024-bzpnd)"
     )
 
     st.sidebar.title("Paper")
     st.sidebar.markdown(
-        "https://chemrxiv.org/engage/chemrxiv/article-details/66add90bc9c6a5c07ae65796"
+        "[Link](https://doi.org/10.1021/acs.jcim.4c02004)"
     )
 
     st.sidebar.title("Issues")

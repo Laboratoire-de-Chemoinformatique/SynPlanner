@@ -1,5 +1,6 @@
 import pytest
 from pathlib import Path
+from synplan.utils.loading import download_all_data
 from synplan.chem.utils import mol_from_smiles
 from synplan.chem.reaction_routes.route_cgr import compose_all_route_cgrs, compose_all_sb_cgrs
 from synplan.chem.reaction_routes.clustering import cluster_routes, subcluster_all_clusters
@@ -17,8 +18,20 @@ TEST_MOLECULES = {
 
 @pytest.fixture(scope="module")
 def data_folder():
-    """Get the data folder path."""
-    return Path("./tutorials/synplan_data").resolve()
+    from synplan.utils.loading import download_selected_files
+
+    assets = [
+        ("building_blocks", "building_blocks_em_sa_ln.smi"),
+        ("uspto", "uspto_reaction_rules.pickle"),
+        ("uspto/weights", "ranking_policy_network.ckpt"),
+    ]
+
+    folder = download_selected_files(
+        files_to_get=assets,
+        save_to="./tutorials/synplan_data",
+        extract_zips=True,
+    )
+    return folder
 
 @pytest.fixture(scope="module")
 def building_blocks(data_folder):
