@@ -91,22 +91,22 @@ class RuleExtractionConfig(ConfigABC):
     """
 
     # default low-level parameters
-    single_reactant_only: bool = True
     keep_metadata: bool = False
     reactor_validation: bool = True
     reverse_rule: bool = True
     as_query_container: bool = True
-    include_func_groups: bool = False
-    func_groups_list: List[str] = field(default_factory=list)
+    single_reactant_only: bool = False
 
     # adjustable parameters
     environment_atom_count: int = 1
     min_popularity: int = 3
     include_rings: bool = True
     multicenter_rules: bool = True
+    include_func_groups: bool = False
     keep_leaving_groups: bool = True
     keep_incoming_groups: bool = True
     keep_reagents: bool = False
+    func_groups_list: List[str] = field(default_factory=list)
     atom_info_retention: Dict[str, Dict[str, bool]] = field(default_factory=dict)
 
     def __post_init__(self):
