@@ -1,10 +1,11 @@
 """Module containing a class Tree that used for tree search of retrosynthetic routes."""
+
 import logging
 import warnings
 from collections import defaultdict, deque
 from math import sqrt
 from random import choice, uniform
-from time import time
+from time import time, sleep
 from typing import Dict, List, Set, Tuple
 
 from CGRtools.reactor import Reactor
@@ -17,6 +18,64 @@ from synplan.mcts.evaluation import ValueNetworkFunction
 from synplan.mcts.expansion import PolicyNetworkFunction
 from synplan.mcts.node import Node
 from synplan.utils.config import TreeConfig
+
+from rdkit.Contrib.SA_Score import sascorer
+from rdkit import Chem
+from rdkit.Chem.Descriptors import ExactMolWt
+from rdkit.Chem.rdMolDescriptors import CalcNumHeavyAtoms
+from multiprocessing import Pool, Array, Manager, Queue, Process
+import sys
+import torch
+import psutil
+import copy
+
+manager = Manager()
+to_predict_queue = Queue()
+predicted_queue = Queue()
+to_expand_queue = Queue()
+expanded_queue = Queue()
+
+def expand_node_worker(arg_curr_node_curr_precursor_molecule, arg_rule, arg_rule_id, arg_prob,arg_min_mol_size):
+    new_precursors = []
+    scaled_probs = []
+    for products in apply_reaction_rule(arg_curr_node_curr_precursor_molecule, arg_rule):
+        if not products :
+            continue
+        for molecule in products:
+            molecule.meta["reactor_id"] = arg_rule_id
+
+        new_precursor = tuple(Precursor(mol) for mol in products)
+        scaled_prob = arg_prob * len(
+            list(filter(lambda x: len(x) > arg_min_mol_size, products))
+        )
+        new_precursors.append(new_precursor)
+        scaled_probs.append(scaled_prob)
+
+    return new_precursors, scaled_probs, arg_rule_id
+
+
+def expand_node_apply_rules_worker(arg_curr_node_curr_precursor_molecule, arg_rules):
+    list_products = []
+    for products in apply_reaction_rule(arg_curr_node_curr_precursor_molecule, arg_rules):
+        list_products.append(products)
+
+
+
+    return list_products
+
+def expand_node_rest_worker(arg_products, arg_rule_id, arg_prob,arg_min_mol_size):
+
+    for molecule in arg_products:
+        molecule.meta["reactor_id"] = arg_rule_id
+
+    new_precursor = tuple(Precursor(mol) for mol in arg_products)
+    scaled_prob = arg_prob * len(
+        list(filter(lambda x: len(x) > arg_min_mol_size, arg_products))
+    )
+
+
+    return new_precursor, scaled_prob, arg_rule_id
+
 
 
 class Tree:
@@ -46,7 +105,9 @@ class Tree:
         # config parameters
         self.config = config
 
-        assert isinstance(target, MoleculeContainer), "Target should be given as MoleculeContainer"
+        assert isinstance(
+            target, MoleculeContainer
+        ), "Target should be given as MoleculeContainer"
         assert len(target) > 3, "Target molecule has less than 3 atoms"
 
         target_molecule = Precursor(target)
@@ -58,6 +119,7 @@ class Tree:
         # tree structure init
         self.nodes: Dict[int, Node] = {1: target_node}
         self.parents: Dict[int, int] = {1: 0}
+        self.redundant_children: Dict[int, Set[int]] = {1: set()}
         self.children: Dict[int, Set[int]] = {1: set()}
         self.winning_nodes: List[int] = []
         self.visited_nodes: Set[int] = set()
@@ -101,7 +163,18 @@ class Tree:
         target_smiles = str(self.nodes[1].curr_precursor.molecule)
         if target_smiles in self.building_blocks:
             self.building_blocks.remove(target_smiles)
-            print("Target was found in building blocks and removed from building blocks.")
+            print(
+                "Target was found in building blocks and removed from building blocks."
+            )
+
+        # other tree search algorithms
+        self.stop_at_first = True
+        self.found_a_route = False
+        self.bfs_table = [] #(node_id, score, depth)
+        self.lnmcs_thresholds = [[] for _ in range(100)] #list of scores at depth
+        self.pool = Pool(10)
+        self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks = {}
+        self.big_dict_of_all_node_ids_NMCS_playout_values = {}
 
     def __len__(self) -> int:
         """Returns the current size (the number of nodes) in the tree."""
@@ -139,6 +212,8 @@ class Tree:
             raise StopIteration("Max tree size exceeded or all possible routes found.")
         if self.curr_time >= self.config.max_time:
             raise StopIteration("Time limit exceeded.")
+        if self.stop_at_first and self.found_a_route :
+            raise StopIteration("Already found a route.")
 
         # start new iteration
         self.curr_iteration += 1
@@ -146,77 +221,343 @@ class Tree:
 
         if self._tqdm:
             self._tqdm.update()
+        if self.config.algorithm == "UCT":
+            curr_depth, node_id = 0, 1  # start from the root node_id
 
-        curr_depth, node_id = 0, 1  # start from the root node_id
+            explore_route = True
+            while explore_route:
+                self.visited_nodes.add(node_id)
 
-        explore_route = True
-        while explore_route:
-            self.visited_nodes.add(node_id)
-
-            if self.nodes_visit[node_id]:  # already visited
-                if not self.children[node_id]:  # dead node
-                    self._update_visits(node_id)
-                    explore_route = False
-                else:
-                    node_id = self._select_node(node_id)  # select the child node
-                    curr_depth += 1
-            else:
-                if self.nodes[node_id].is_solved():  # found route
-                    self._update_visits(
-                        node_id
-                    )  # this prevents expanding of bb node_id
-                    self.winning_nodes.append(node_id)
-                    return True, [node_id]
-
-                if (
-                    curr_depth < self.config.max_depth
-                ):  # expand node if depth limit is not reached
-                    self._expand_node(node_id)
-                    if not self.children[node_id]:  # node was not expanded
-                        value_to_backprop = -1.0
+                if self.nodes_visit[node_id]:  # already visited
+                    if not self.children[node_id]:  # dead node
+                        self._update_visits(node_id)
+                        explore_route = False
                     else:
-                        self.expanded_nodes.add(node_id)
-
-                        if self.config.search_strategy == "evaluation_first":
-                            # recalculate node value based on children synthesisability and backpropagation
-                            child_values = [
-                                self.nodes_init_value[child_id]
-                                for child_id in self.children[node_id]
-                            ]
-
-                            if self.config.evaluation_agg == "max":
-                                value_to_backprop = max(child_values)
-
-                            elif self.config.evaluation_agg == "average":
-                                value_to_backprop = sum(child_values) / len(
-                                    self.children[node_id]
-                                )
-
-                        elif self.config.search_strategy == "expansion_first":
-                            value_to_backprop = self._get_node_value(node_id)
-
-                    # backpropagation
-                    self._backpropagate(node_id, value_to_backprop)
-                    self._update_visits(node_id)
-                    explore_route = False
-
-                    if self.children[node_id]:
-                        # found after expansion
-                        found_after_expansion = set()
-                        for child_id in iter(self.children[node_id]):
-                            if self.nodes[child_id].is_solved():
-                                found_after_expansion.add(child_id)
-                                self.winning_nodes.append(child_id)
-
-                        if found_after_expansion:
-                            return True, list(found_after_expansion)
-
+                        node_id = self._select_node(node_id)  # select the child node
+                        curr_depth += 1
                 else:
-                    self._backpropagate(node_id, self.nodes_total_value[node_id])
-                    self._update_visits(node_id)
-                    explore_route = False
+                    if self.nodes[node_id].is_solved():  # found route
+                        self._update_visits(
+                            node_id
+                        )  # this prevents expanding of bb node_id
+                        self.winning_nodes.append(node_id)
+                        self.found_a_route = True
+                        return True, [node_id]
 
-        return False, [node_id]
+                    if (
+                        curr_depth < self.config.max_depth
+                    ):  # expand node if depth limit is not reached
+                        self._expand_node(node_id)
+                        self.expanded_nodes.add(node_id)
+                        if not self.children[node_id]:  # node was not expanded
+                            value_to_backprop = -1.0
+                        else:
+                            self.expanded_nodes.add(node_id)
+
+                            if self.config.search_strategy == "evaluation_first":
+                                # recalculate node value based on children synthesisability and backpropagation
+                                child_values = [
+                                    self.nodes_init_value[child_id]
+                                    for child_id in self.children[node_id]
+                                ]
+
+                                if self.config.evaluation_agg == "max":
+                                    value_to_backprop = max(child_values)
+
+                                elif self.config.evaluation_agg == "average":
+                                    value_to_backprop = sum(child_values) / len(
+                                        self.children[node_id]
+                                    )
+
+                            elif self.config.search_strategy == "expansion_first":
+                                value_to_backprop = self._get_node_value(node_id)
+
+                        # backpropagation
+                        self._backpropagate(node_id, value_to_backprop)
+                        self._update_visits(node_id)
+                        explore_route = False
+
+                        if self.children[node_id]:
+                            # found after expansion
+                            found_after_expansion = set()
+                            for child_id in iter(self.children[node_id]):
+                                if self.nodes[child_id].is_solved():
+                                    found_after_expansion.add(child_id)
+                                    self.winning_nodes.append(child_id)
+
+                            if found_after_expansion:
+                                self.found_a_route = True
+                                return True, list(found_after_expansion)
+
+                    else:
+                        self._backpropagate(node_id, self.nodes_total_value[node_id])
+                        self._update_visits(node_id)
+                        explore_route = False
+
+            return False, [node_id]
+
+
+        if self.config.algorithm == "BEAM":
+            nodes_to_open = []
+            if self.bfs_table == []:
+                if self.curr_iteration > 1 :
+                    raise StopIteration("One deterministic beam search is enough")
+                nodes_to_open = [(1, 0, 1)]
+            else :
+                width=10
+                if width > len(self.bfs_table) :
+                    width = len(self.bfs_table)
+                for i in range(width) :
+                    nodes_to_open.append(self.bfs_table[i])
+            self.bfs_table = []
+
+            for node in nodes_to_open:
+                depth = node[2]
+                leaf_id = node[0]
+                self._expand_node(leaf_id)
+                self.expanded_nodes.add(leaf_id)
+
+                if self.children[leaf_id] and depth < self.config.max_depth:
+                    for child_id in self.children[leaf_id]:
+                        if self.nodes[child_id].is_solved():
+                            self.winning_nodes.append(child_id)
+                            self.found_a_route = True
+                            return True, [child_id]
+
+                        if self.config.evaluation_type == "score":
+                            self.insert_dicho_bfs_table(child_id, self._get_node_value(child_id), depth + 1, False)
+
+                        if self.config.evaluation_type == "rollout":
+                            nodeFinal, seq = self.nmcs_rollout(child_id, depth + 1, "greedy")
+                            if self.nodes[nodeFinal].is_solved():
+                                self.winning_nodes.append(nodeFinal)
+                                self.found_a_route = True
+                                return True, [nodeFinal]
+                            self.insert_dicho_bfs_table(child_id, self._get_node_value(nodeFinal), depth + 1, False)
+            return False, [1]
+
+
+
+        if self.config.algorithm == "BREADTH":
+            if self.bfs_table == []:
+                leaf_id = 1
+                depth = 1
+                if self.curr_iteration > 2:
+                    raise StopIteration("breadth exhausted the tree")
+            else :
+                depth = self.bfs_table[0][2]
+                leaf_id = self.bfs_table.pop(0)[0]
+
+            if self.nodes[leaf_id].is_solved():
+                self.winning_nodes.append(leaf_id)
+                self.found_a_route = True
+                return  True, [leaf_id]
+            self._expand_node(leaf_id)
+            self.expanded_nodes.add(leaf_id)
+            if self.children[leaf_id] and depth < self.config.max_depth:
+                for child_id in self.children[leaf_id]:
+                    if self.nodes[child_id].is_solved():
+                        self.winning_nodes.append(child_id)
+                        self.found_a_route = True
+                        return True, [child_id]
+                    self.bfs_table.append((child_id, 0, depth+1))
+
+            return False, [leaf_id]
+
+
+
+        if self.config.algorithm == "BFS":
+            if self.bfs_table == []:
+                leaf_id = 1
+                depth = 1
+                if self.curr_iteration > 1:
+                    raise StopIteration("BFS exhausted the tree")
+            else :
+                depth = self.bfs_table[0][2]
+                leaf_id = self.bfs_table.pop(0)[0]
+
+            if self.nodes[leaf_id].is_solved():
+                self.winning_nodes.append(leaf_id)
+                self.found_a_route = True
+                return  True, [leaf_id]
+            self._expand_node(leaf_id, depth = depth)
+            self.expanded_nodes.add(leaf_id)
+            if self.children[leaf_id] and depth < self.config.max_depth:
+                for child_id in self.children[leaf_id]:
+                    if self.nodes[child_id].is_solved():
+                        self.winning_nodes.append(child_id)
+                        self.found_a_route = True
+                        return True, [child_id]
+
+                    if self.config.evaluation_type == "score" :
+                        self.insert_dicho_bfs_table(child_id, self._get_node_value(child_id), depth+1, False)
+
+                    if self.config.evaluation_type == "rollout" :
+                        nodeFinal, seq = self.nmcs_rollout(child_id, depth + 1, "greedy" )
+                        if self.nodes[nodeFinal].is_solved():
+                            self.winning_nodes.append(nodeFinal)
+                            self.found_a_route = True
+                            return True, [nodeFinal]
+                        self.insert_dicho_bfs_table(child_id, self._get_node_value(nodeFinal), depth +1, False)
+            return False, [leaf_id]
+
+        if self.config.algorithm == "paBFS":
+            if self.bfs_table == []:
+                leaf_id = 1
+                depth = 1
+                self._expand_node(1)
+                self.expanded_nodes.add(1)
+                if self.curr_iteration > 1:
+                    raise StopIteration("BFS exhausted the tree")
+            else :
+                to_expand = []
+                to_expand_bfstable_index = []
+                for i in range(min(150, len(self.bfs_table))):
+                    if not self.bfs_table[i][3] :
+                        to_expand.append(self.bfs_table[i][0])
+                        to_expand_bfstable_index.append(i)
+                        if len(to_expand) >= 100 :
+                            break
+                if len(to_expand) >= min(100, len(self.bfs_table)) :
+                    self._expand_multiple_nodes(to_expand)
+                    for i in to_expand_bfstable_index :
+                        self.bfs_table[i][3] = True
+
+
+                leaf_id = -1
+                for i in range(min(150, len(self.bfs_table))) :
+                    if self.bfs_table[i][3]:
+                        depth = self.bfs_table[i][2]
+                        leaf_id = self.bfs_table.pop(i)[0]
+                        break
+
+
+
+
+            if self.children[leaf_id] and depth < self.config.max_depth:
+                for child_id in self.children[leaf_id]:
+                    if self.nodes[child_id].is_solved():
+                        self.winning_nodes.append(child_id)
+                        self.found_a_route = True
+                        return True, [child_id]
+
+                    if self.config.evaluation_type == "score" :
+                        self.insert_dicho_bfs_table(child_id, self._get_node_value(child_id), depth+1, False)
+
+                    if self.config.evaluation_type == "rollout" :
+                        nodeFinal, seq = self.nmcs_rollout(child_id, depth + 1, "greedy" )
+                        if self.nodes[nodeFinal].is_solved():
+                            self.winning_nodes.append(nodeFinal)
+                            self.found_a_route = True
+                            return True, [nodeFinal]
+                        self.insert_dicho_bfs_table(child_id, self._get_node_value(nodeFinal), depth +1, False)
+            return False, [leaf_id]
+
+        if self.config.algorithm == "BDFS":
+            if self.bfs_table == []:
+                leaf_id = 1
+                depth = 1
+            else :
+                depth = self.bfs_table[0][2]
+                leaf_id = self.bfs_table.pop(0)[0]
+
+            if self.nodes[leaf_id].is_solved():
+                self.winning_nodes.append(leaf_id)
+                self.found_a_route = True
+                return  True, [leaf_id]
+            self._expand_node(leaf_id)
+            self.expanded_nodes.add(leaf_id)
+            while self.children[leaf_id] and depth < self.config.max_depth:
+                chil = []
+                best_sc = 0
+                best_chil_id = -1
+                for child_id in self.children[leaf_id]:
+                    if self.nodes[child_id].is_solved():
+                        self.winning_nodes.append(child_id)
+                        self.found_a_route = True
+                        return True, [child_id]
+
+                    chil.append(child_id)
+                    sc = self._get_node_value(child_id)
+
+                    if sc > best_sc :
+                        best_sc = sc
+                        best_chil_id = child_id
+
+                for child_id in chil:
+                    if child_id != best_chil_id :
+                        self.insert_dicho_bfs_table(child_id, self._get_node_value(child_id), depth+1, False)
+                depth += 1
+                leaf_id = best_chil_id
+
+            return False, [leaf_id]
+
+        if self.config.algorithm == "NMCS":
+            if self.curr_iteration > 1:
+                raise StopIteration("One deterministic NMCS iteration is enough.")
+            node_id = 1
+            leaf, _ = self.NMCS(node_id, self.config.NMCS_level, 1)
+            if self.nodes[leaf].is_solved() :
+                self.winning_nodes.append(leaf)
+                self.found_a_route = True
+                return True, [leaf]
+            return False, [leaf]
+
+        if self.config.algorithm == "LNMCS":
+            self.bfs_table = []
+            self.lnmcs_thresholds = [[] for _ in range(100)]
+            if self.curr_iteration > 1:
+                raise StopIteration("One deterministic LNMCS iteration is enough.")
+            node_id = 1
+            leaf, _ = self.LNMCS(node_id, self.config.NMCS_level, 1, self.config.LNMCS_ratio)
+            if self.nodes[leaf].is_solved() :
+                self.winning_nodes.append(leaf)
+                self.found_a_route = True
+                return True, [leaf]
+            return False, [leaf]
+
+        if self.config.algorithm == "SCATTER":
+            if self.curr_iteration > 1:
+                raise StopIteration("One deterministic SCATTER iteration is enough.")
+            open_nodes = [1]
+            for i in range(self.config.NMCS_level) :
+                open_nodes_temp = []
+                for n in open_nodes:
+                    if len(open_nodes_temp) > 1000 :
+                        open_nodes_temp = open_nodes + open_nodes_temp
+                        break
+                    if self.nodes[n].is_solved():
+                        self.winning_nodes.append(n)
+                        self.found_a_route = True
+                        return True, [n]
+                    if not n in self.expanded_nodes:
+                        self._expand_node(n)
+                        self.expanded_nodes.add(n)
+                    for child_id in self.children[n]:
+                        open_nodes_temp.append(child_id)
+                open_nodes = open_nodes_temp
+
+            for n in open_nodes:
+                if time() - self.start_time > self.config.max_time:
+                    return False, [0]
+                if self.nodes[n].is_solved():
+                    self.winning_nodes.append(n)
+                    self.found_a_route = True
+                    return True, [n]
+                if not n in self.expanded_nodes:
+                    self._expand_node(n)
+                    self.expanded_nodes.add(n)
+                s, _ = self.nmcs_rollout(n, self.config.NMCS_level+1, "greedy")
+                if self.nodes[s].is_solved():
+                    self.winning_nodes.append(n)
+                    self.found_a_route = True
+                    return True, [s]
+            return False, [0]
+
+
+
+        print("unknown algorithm, please edit the configuration with a known algorithm: UCT, BFS, BDFS, NMCS, LNMCS, BREADTH, BEAM")
+        return False, [0]
 
     def _ucb(self, node_id: int) -> float:
         """Calculates the Upper Confidence Bound (UCB) statistics for a given node.
@@ -277,55 +618,249 @@ class Tree:
         :param node_id: The id the node to be expanded.
         :return: None.
         """
+        total_expanded = 0
         curr_node = self.nodes[node_id]
         prev_precursor = curr_node.curr_precursor.prev_precursors
 
         tmp_precursor = set()
         expanded = False
-        for prob, rule, rule_id in self.policy_network.predict_reaction_rules(
+        SINGLE_CORE = False
+        SINGLE_WORKER = True
+        args_to_launch_single = []
+        args_to_launch = []
+        args_to_launch2_part1 = []
+        args_to_launch2 = []
+
+        prediction = self.policy_network.predict_reaction_rules(
             curr_node.curr_precursor, self.reaction_rules
-        ):
-            for products in apply_reaction_rule(
-                curr_node.curr_precursor.molecule, rule
-            ):
-                # check repeated products
-                if not products or not set(products) - tmp_precursor:
-                    continue
-                tmp_precursor.update(products)
+        )
 
-                for molecule in products:
-                    molecule.meta["reactor_id"] = rule_id
+        for prob, rule, rule_id in prediction :
+            if SINGLE_CORE :
+                for products in apply_reaction_rule(curr_node.curr_precursor.molecule, rule):
 
-                new_precursor = tuple(Precursor(mol) for mol in products)
-                scaled_prob = prob * len(
-                    list(filter(lambda x: len(x) > self.config.min_mol_size, products))
-                )
+                    # check repeated products
+                    if not products or not set(products) - tmp_precursor:
+                        continue
+                    tmp_precursor.update(products)
 
-                if set(prev_precursor).isdisjoint(new_precursor):
-                    precursors_to_expand = (
-                        *curr_node.next_precursor,
-                        *(
-                            x
-                            for x in new_precursor
-                            if not x.is_building_block(
+                    for molecule in products:
+                        molecule.meta["reactor_id"] = rule_id
+
+                    new_precursor = tuple(Precursor(mol) for mol in products)
+                    scaled_prob = prob * len(
+                        list(filter(lambda x: len(x) > self.config.min_mol_size, products))
+                    )
+
+
+                    if set(prev_precursor).isdisjoint(new_precursor):
+                        precursors_to_expand = (
+                            *curr_node.next_precursor,
+                            *(
+                                x
+                                for x in new_precursor
+                                if not x.is_building_block(
                                 self.building_blocks, self.config.min_mol_size
                             )
-                        ),
-                    )
+                            ),
+                        )
 
-                    child_node = Node(
-                        precursors_to_expand=precursors_to_expand,
-                        new_precursors=new_precursor,
-                    )
+                        child_node = Node(
+                            precursors_to_expand=precursors_to_expand,
+                            new_precursors=new_precursor,
+                        )
 
-                    for new_precursor in new_precursor:
-                        new_precursor.prev_precursors = [new_precursor, *prev_precursor]
 
-                    self._add_node(node_id, child_node, scaled_prob, rule_id)
+                        for new_precursor in new_precursor:
+                            new_precursor.prev_precursors = [new_precursor, *prev_precursor]
 
-                    expanded = True
+
+                        self._add_node(node_id, child_node, scaled_prob, rule_id)
+                        total_expanded += 1
+                        expanded = True
+
+                        if total_expanded > self.config.max_rules_applied and False:
+                            break
+                    if total_expanded > self.config.max_rules_applied and False:
+                        break
+            else:
+                if SINGLE_WORKER:
+                    args_to_launch_single.append((curr_node.curr_precursor.molecule, rule, rule_id, prob, self.config.min_mol_size))
+                else:
+                    args_to_launch.append((curr_node.curr_precursor.molecule, rule))
+                    args_to_launch2_part1.append((rule_id, prob, self.config.min_mol_size))
+
+        if not SINGLE_CORE :
+            if SINGLE_WORKER:
+                res = self.pool.starmap(expand_node_worker, args_to_launch_single)
+                for r in res:
+                    for i in range(len(r[0])):
+                        new_precursors = r[0][i]
+
+                        temp = [p for p in new_precursors if not p.is_building_block(self.building_blocks, self.config.min_mol_size)]
+                        if not new_precursors or (not set(temp) - tmp_precursor and temp):
+                            continue
+                        else:
+                            tmp_precursor.update(temp)
+
+
+                        if set(prev_precursor).isdisjoint(new_precursors):
+                            precursors_to_expand = (
+                                *curr_node.next_precursor,
+                                *(
+                                    x
+                                    for x in new_precursors
+                                    if not x.is_building_block(self.building_blocks, self.config.min_mol_size)
+                                ),
+                            )
+
+                            if precursors_to_expand in self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks:
+                                id = self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[precursors_to_expand]
+                                self.redundant_children[node_id].add(id)
+                                total_expanded += 1
+                                expanded = True
+                                if total_expanded > self.config.max_rules_applied and False:
+                                    break
+                                continue
+                            else:
+                                self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[precursors_to_expand] = self.curr_tree_size
+
+
+                            child_node = Node(precursors_to_expand=precursors_to_expand, new_precursors=new_precursors)
+
+                            for new_precursor in new_precursors:
+                                new_precursor.prev_precursors = [new_precursor, *prev_precursor]
+
+                            self._add_node(node_id, child_node, r[1][i], r[2])
+                            total_expanded += 1
+                            expanded = True
+                            if total_expanded > self.config.max_rules_applied and False :
+                                break
+
+                    if total_expanded > self.config.max_rules_applied and False :
+                        break
+            else:
+                list_list_products = self.pool.starmap(expand_node_apply_rules_worker, args_to_launch)
+
+                for i in range(len(list_list_products)):
+                    for j in range(len(list_list_products[i])):
+
+                        products = list_list_products[i][j]
+                        if not products or not set(products) - tmp_precursor:
+                            continue
+                        else:
+                            tmp_precursor.update(products)
+                            args_to_launch2.append((products, args_to_launch2_part1[i][0], args_to_launch2_part1[i][1], args_to_launch2_part1[i][2]))
+
+                res = self.pool.starmap(expand_node_rest_worker, args_to_launch2)
+
+                for r in res:
+                    if set(prev_precursor).isdisjoint(r[0]):
+                        precursors_to_expand = (
+                            *curr_node.next_precursor,
+                            *(
+                                x
+                                for x in r[0]
+                                if not x.is_building_block(
+                                self.building_blocks, self.config.min_mol_size
+                            )
+                            ),
+                        )
+
+                        child_node = Node(
+                            precursors_to_expand=precursors_to_expand,
+                            new_precursors=r[0],
+                        )
+
+                        for new_precursor in r[0]:
+                            new_precursor.prev_precursors = [new_precursor, *prev_precursor]
+
+                        self._add_node(node_id, child_node, r[1], r[0])
+                        total_expanded += 1
+                        expanded = True
+
+                        if total_expanded > self.config.max_rules_applied and False:
+                            break
+
+                    if total_expanded > self.config.max_rules_applied and False:
+                        break
+
         if not expanded and node_id == 1:
             raise StopIteration("\nThe target molecule was not expanded.")
+
+
+    def _expand_multiple_nodes(self, nodes_ids: [int]) -> None:
+        """Expands the nodes by generating new precursor with policy (expansion) function.
+
+        :param nodes_ids: The ids the nodes to be expanded.
+        :return: None.
+        """
+
+        for node_id in nodes_ids:
+            curr_node = self.nodes[node_id]
+            to_predict_queue.put((curr_node.curr_precursor, len(self.reaction_rules), node_id))
+        total_predicted = 0
+        total_to_expand = 0
+        while total_predicted != len(nodes_ids) :
+            if not predicted_queue.empty():
+
+                pred_res = predicted_queue.get()
+                total_predicted += 1
+                node_id = pred_res[2]
+                curr_node = self.nodes[node_id]
+                for j in range(len(pred_res[0])):
+                    total_to_expand +=1
+                    prob = pred_res[0][j]
+                    rule_id = pred_res[1][j]
+                    rule = self.reaction_rules[rule_id]
+                    to_expand_queue.put((curr_node.curr_precursor.molecule, rule, rule_id, prob, self.config.min_mol_size, node_id))
+
+        total_expanded = 0
+
+        while total_expanded != total_to_expand:
+            if not expanded_queue.empty() :
+                total_expanded +=1
+                res = expanded_queue.get()
+                rule_id = res[2]
+                node_id = res[3]
+                curr_node = self.nodes[node_id]
+                prev_precursor = curr_node.curr_precursor.prev_precursors
+                tmp_precursor = set()
+
+                for i in range(len(res[0])):
+                    scaled_prob = res[1][i]
+                    new_precursors = res[0][i]
+
+                    temp = [p for p in new_precursors if not p.is_building_block(self.building_blocks, self.config.min_mol_size)]
+                    if not new_precursors or (not set(temp) - tmp_precursor and temp ):
+                        continue
+                    else:
+                        tmp_precursor.update(temp)
+
+                    if set(prev_precursor).isdisjoint(new_precursors):
+                        precursors_to_expand = (
+                            *curr_node.next_precursor,
+                            *(
+                                x
+                                for x in new_precursors
+                                if not x.is_building_block(
+                                self.building_blocks, self.config.min_mol_size
+                            )
+                            ),
+                        )
+
+                        child_node = Node(
+                            precursors_to_expand=precursors_to_expand,
+                            new_precursors=new_precursors,
+                        )
+
+                        for new_precursor in new_precursors:
+                            new_precursor.prev_precursors = [new_precursor, *prev_precursor]
+                        self._add_node(node_id, child_node, scaled_prob, rule_id)
+
+        for node_id in nodes_ids:
+            self.expanded_nodes.add(node_id)
+
 
     def _add_node(
         self,
@@ -348,6 +883,7 @@ class Tree:
 
         self.nodes[new_node_id] = new_node
         self.parents[new_node_id] = node_id
+        self.redundant_children[new_node_id] = set()
         self.children[node_id].add(new_node_id)
         self.children[new_node_id] = set()
         self.nodes_visit[new_node_id] = 0
@@ -374,10 +910,10 @@ class Tree:
 
         node = self.nodes[node_id]
 
-        if self.config.evaluation_type == "random":
+        if self.config.score_function == "random":
             node_value = uniform(0, 1)
 
-        elif self.config.evaluation_type == "rollout":
+        elif self.config.score_function == "rollout":
             node_value = min(
                 (
                     self._rollout_node(
@@ -388,7 +924,75 @@ class Tree:
                 default=1.0,
             )
 
-        elif self.config.evaluation_type == "gcn":
+        elif self.config.score_function == "sascore":
+            meanPrecursorSAS = 0
+            for p in node.precursors_to_expand:
+                try:
+                    m = Chem.MolFromSmiles(str(p.molecule))
+                    meanPrecursorSAS += sascorer.calculateScore(m)
+                except:
+                    meanPrecursorSAS += 10.0
+            meanPrecursorSAS = meanPrecursorSAS / len(node.precursors_to_expand)
+            node_value = 1.0-meanPrecursorSAS / 10.0
+
+        elif self.config.score_function == "policy":
+            node_value = self.nodes_prob[node_id]
+
+        elif self.config.score_function == "heavyAtomCount":
+            totalHeavy = 0
+            for p in node.precursors_to_expand:
+                try:
+                    m = Chem.MolFromSmiles(str(p.molecule))
+                    totalHeavy += CalcNumHeavyAtoms(m)
+                except:
+                    totalHeavy += 100.0
+
+            node_value = 1000 - totalHeavy
+            if node_value < 0:
+                node_value = 0
+
+        elif self.config.score_function == "weight":
+            totalWeight = 0
+            for p in node.precursors_to_expand:
+                try:
+                    m = Chem.MolFromSmiles(str(p.molecule))
+                    totalWeight += ExactMolWt(m)
+                except:
+                    totalWeight += 1000.0
+
+            node_value = 10000 - totalWeight
+            if node_value < 0:
+                node_value = 0
+
+        elif self.config.score_function == "weightXsascore":
+            total = 0.0
+            for p in node.precursors_to_expand:
+                try:
+                    m = Chem.MolFromSmiles(str(p.molecule))
+                    total += ExactMolWt(m) * sascorer.calculateScore(m)
+                except:
+                    total += 10000.0
+            if total == 0:
+                return 1
+            node_value = 1 / total
+            if node_value < 0:
+                node_value = 0
+
+        elif self.config.score_function == "WxWxSAS":
+            total = 0.0
+            for p in node.precursors_to_expand:
+                try:
+                    m = Chem.MolFromSmiles(str(p.molecule))
+                    total += ExactMolWt(m) ** 2 * sascorer.calculateScore(m)
+                except:
+                    total += 10000.0
+            if total == 0:
+                return 1
+            node_value = 1 / total
+            if node_value < 0:
+                node_value = 0
+
+        elif self.config.score_function == "gcn":
             node_value = self.value_network.predict_value(node.new_precursors)
 
         return node_value
@@ -595,7 +1199,7 @@ class Tree:
             :return: A string representation of a node in a Newick format.
             """
             assert (
-                current_node_id not in visited_nodes
+                    current_node_id not in visited_nodes
             ), "Error: The tree may not be circular!"
             node_visit = self.nodes_visit[current_node_id]
 
@@ -628,3 +1232,268 @@ class Tree:
             meta[node_id] = (node_value, node_synthesisability, visit_in_node)
 
         return newick_string, meta
+
+    def insert_dicho_bfs_table(self, elt, value, depth, expanded):
+        if len(self.bfs_table) == 0:
+            self.bfs_table.append([elt, value, depth, expanded])
+            return
+        i1 = 0
+        i2 = len(self.bfs_table)-1
+        i = len(self.bfs_table)//2
+        while i1 != i2 and i != i1 and i!=i2:
+            if value < self.bfs_table[i][1]:
+                i1 = i+1
+            if value > self.bfs_table[i][1]:
+                i2 = i
+            if value == self.bfs_table[i][1]:
+                self.bfs_table.insert(i, [elt, value, depth, expanded])
+                return
+            i = (i1+i2)//2
+        self.bfs_table.insert(i, [elt, value, depth, expanded])
+        return
+    def insert_dicho_LNMCS_tresh(self, value, depth):
+        if len(self.lnmcs_thresholds[depth]) == 0:
+            self.lnmcs_thresholds[depth].append(value)
+            return
+        i1 = 0
+        i2 = len(self.lnmcs_thresholds[depth])-1
+        i = len(self.lnmcs_thresholds[depth])//2
+        while i1 != i2 and i != i1 and i!=i2:
+            if value < self.lnmcs_thresholds[depth][i]:
+                i1 = i+1
+            if value > self.lnmcs_thresholds[depth][i]:
+                i2 = i
+            if value == self.lnmcs_thresholds[depth][i]:
+                self.lnmcs_thresholds[depth].insert(i, value)
+                return
+            i = (i1+i2)//2
+        self.lnmcs_thresholds[depth].insert(i, value)
+        return
+
+    def NMCS(self, node_id, n, depth):
+        best_node_id = node_id
+        best_sequence = []
+        return_sequence = []
+        if not node_id in self.expanded_nodes :
+            self._expand_node(node_id)
+            self.expanded_nodes.add(node_id)
+        best_score = -100000
+        all_child = self.children[node_id].union(self.redundant_children[node_id])
+        while all_child :
+            if time() - self.start_time > self.config.max_time :
+                return best_node_id, return_sequence + best_sequence
+            if self.nodes[node_id].is_solved():
+                self.winning_nodes.append(node_id)
+                self.found_a_route = True
+                if self.stop_at_first :
+                    return node_id, return_sequence
+
+            for child_id in all_child:
+                s1 = child_id
+                if self.nodes[child_id].is_solved():
+                    self.winning_nodes.append(child_id)
+                    self.found_a_route = True
+                    return_sequence.append(s1)
+                    if self.stop_at_first:
+                        return s1, return_sequence
+                if not child_id in self.expanded_nodes:
+                    self._expand_node(child_id)
+                    self.expanded_nodes.add(child_id)
+                if n == 1 :
+                    sequence = []
+                    if self.config.evaluation_type == "score" :
+                        sequence = []
+                    if self.config.evaluation_type == "rollout" :
+                        if s1 in self.big_dict_of_all_node_ids_NMCS_playout_values :
+                            (s1, sequence) = self.big_dict_of_all_node_ids_NMCS_playout_values[s1]
+                        else:
+                            s1key = s1
+                            s1, sequence = self.nmcs_rollout(s1, depth+1,"greedy")
+                            self.big_dict_of_all_node_ids_NMCS_playout_values[s1key] = (s1, sequence)
+                    sequence.insert(0, child_id)
+                else:
+                    s1, sequence = self.NMCS(s1, n-1, depth+1)
+                    sequence.insert(0, child_id)
+                if self.nodes[s1].is_solved():
+                    self.winning_nodes.append(s1)
+                    self.found_a_route = True
+                    if self.stop_at_first:
+                        return s1, return_sequence + sequence
+
+                score = self._get_node_value(s1)
+
+                if score > best_score:
+                    best_sequence = sequence
+                    best_score = score
+                    best_node_id = s1
+                if time() - self.start_time > self.config.max_time:
+                    return best_node_id, return_sequence + best_sequence
+            if len(best_sequence) == 0:
+                return node_id, return_sequence
+            node_id = best_sequence[0]
+            all_child = self.children[node_id].union(self.redundant_children[node_id])
+            depth += 1
+            return_sequence.append(best_sequence.pop(0))
+
+            if not node_id in self.expanded_nodes:
+                self._expand_node(node_id)
+                self.expanded_nodes.add(node_id)
+
+        return best_node_id, return_sequence
+
+    def LNMCS(self, node_id, n, depth, ratio):
+        best_node_id = node_id
+        best_sequence = []
+        return_sequence = []
+        if not node_id in self.expanded_nodes :
+            self._expand_node(node_id)
+            self.expanded_nodes.add(node_id)
+        best_score = -100000
+        while self.children[node_id] :
+            if time() - self.start_time > self.config.max_time :
+                return best_node_id, return_sequence + best_sequence
+            if self.nodes[node_id].is_solved():
+                self.winning_nodes.append(node_id)
+                self.found_a_route = True
+                return node_id, return_sequence
+
+            self.bfs_table = []
+            candidates = []
+
+            self.lnmcs_thresholds = [[] for _ in range(100)]
+
+            for child_id in self.children[node_id]:
+                if self.nodes[child_id].is_solved():
+                    self.winning_nodes.append(child_id)
+                    self.found_a_route = True
+                    return_sequence.append(child_id)
+                    return child_id, return_sequence
+                if not child_id in self.expanded_nodes:
+                    self._expand_node(child_id)
+                    self.expanded_nodes.add(child_id)
+
+                st_to_eval, seq = self.nmcs_rollout(child_id, depth + 1, "greedy")
+                if self.nodes[st_to_eval].is_solved():
+                    self.winning_nodes.append(st_to_eval)
+                    self.found_a_route = True
+                    return_sequence.append(st_to_eval)
+                    return st_to_eval, return_sequence + seq
+                eval_score = self._get_node_value(st_to_eval)
+
+                self.insert_dicho_LNMCS_tresh(eval_score, depth)
+                self.insert_dicho_bfs_table(child_id, eval_score, 0, False)
+
+            best_can = -1
+            max_score_can = -1
+            for e in self.bfs_table :
+                if e[1] > max_score_can :
+                    max_score_can = e[1]
+                    best_can = e[0]
+                if e[1] >= self.lnmcs_thresholds[depth][int(ratio*(len(self.lnmcs_thresholds[depth])-1))] :
+                    candidates.append(e[0])
+            if best_can != -1 and candidates == []:
+                candidates = [best_can]
+
+            for child_id in candidates:
+                s1 = child_id
+                if n == 1 :
+                    sequence = []
+                    if self.config.evaluation_type == "score" :
+                        sequence = []
+                    if self.config.evaluation_type == "rollout" :
+                        s1, sequence = self.nmcs_rollout(s1, depth+1, "policy")
+                    sequence.insert(0, child_id)
+                else:
+                    s1, sequence = self.LNMCS(s1, n - 1, depth + 1, ratio)
+                    sequence.insert(0, child_id)
+                if self.nodes[s1].is_solved():
+                    self.winning_nodes.append(s1)
+                    self.found_a_route = True
+                    return s1, return_sequence + sequence
+
+                score = self._get_node_value(s1)
+
+                if score > best_score:
+                    best_sequence = sequence
+                    best_score = score
+                    best_node_id = s1
+                if time() - self.start_time > self.config.max_time:
+                    return best_node_id, return_sequence + best_sequence
+            if len(best_sequence) == 0:
+                return node_id, return_sequence
+            node_id = best_sequence[0]
+            depth += 1
+            return_sequence.append(best_sequence.pop(0))
+
+            if not node_id in self.expanded_nodes:
+                self._expand_node(node_id)
+                self.expanded_nodes.add(node_id)
+
+        return best_node_id, return_sequence
+
+    def nmcs_rollout(self, node_id, node_depth, mode):
+        depth = node_depth
+        sequence = []
+        if time() - self.start_time > self.config.max_time :
+            return node_id, sequence
+        if not node_id in self.expanded_nodes:
+            self._expand_node(node_id)
+            self.expanded_nodes.add(node_id)
+
+        all_child = self.children[node_id].union(self.redundant_children[node_id])
+        while all_child and depth < self.config.max_depth:
+
+            if self.nodes[node_id].is_solved():
+                self.winning_nodes.append(st_to_eval)
+                self.found_a_route = True
+                return node_id, sequence
+            max = -1
+            i = -1
+            if mode == "greedy" :
+                vals = []
+                for e in range(len(self.children[node_id])):
+                    vals.append(0.00001)
+                    if self.nodes[list(self.children[node_id])[e]].is_solved():
+                        self.winning_nodes.append(list(self.children[node_id])[e])
+                        self.found_a_route = True
+                        sequence.append(list(self.children[node_id])[e])
+                        return list(self.children[node_id])[e], sequence
+
+                    vals[e] += self._get_node_value(list(self.children[node_id])[e])
+                    if vals[e] > max :
+                        max = vals[e]
+                        i = e
+            if mode == "random":
+                i = int(uniform(0, len(self.children[node_id])))
+                if self.nodes[list(self.children[node_id])[i]].is_solved():
+                    self.winning_nodes.append(list(self.children[node_id])[i])
+                    self.found_a_route = True
+                    sequence.append(list(self.children[node_id])[i])
+                    return list(self.children[node_id])[i], sequence
+            if mode == "policy":
+                vals = []
+                for e in range(len(self.children[node_id])):
+                    vals.append(0.00001)
+                    if self.nodes[list(self.children[node_id])[e]].is_solved():
+                        self.winning_nodes.append(list(self.children[node_id])[e])
+                        self.found_a_route = True
+                        sequence.append(list(self.children[node_id])[e])
+                        return list(self.children[node_id])[e], sequence
+
+                    vals[e] += self.nodes_prob[list(self.children[node_id])[e]]
+                    if vals[e] > max:
+                        max = vals[e]
+                        i = e
+            if i != -1:
+                selected = list(self.children[node_id])[i]
+                sequence.append(selected)
+                node_id = selected
+                all_child = self.children[node_id].union(self.redundant_children[node_id])
+                if not node_id in self.expanded_nodes:
+                    self._expand_node(node_id)
+                    self.expanded_nodes.add(node_id)
+            else:
+                return node_id, sequence
+            depth += 1
+        return node_id, sequence
+
