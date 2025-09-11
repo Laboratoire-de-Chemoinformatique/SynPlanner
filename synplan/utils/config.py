@@ -467,11 +467,17 @@ class TreeConfig(ConfigABC):
     search_strategy: str = "expansion_first"
     exclude_small: bool = True
     evaluation_agg: str = "max"
-    evaluation_type: str = "gcn"
+    evaluation_type: str = "score"
     init_node_value: float = 0.0
     epsilon: float = 0.0
     min_mol_size: int = 6
     silent: bool = False
+
+    algorithm: str = "NMCS"
+    NMCS_level: int = 2
+    LNMCS_ratio: float = 0.2
+    score_function: str = "weightXsascore"
+    max_rules_applied = 10
 
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "TreeConfig":
@@ -492,9 +498,17 @@ class TreeConfig(ConfigABC):
             raise ValueError(
                 "Invalid backprop_type. Allowed values are 'muzero', 'cumulative'."
             )
-        if params["evaluation_type"] not in ["random", "rollout", "gcn"]:
+        if params["evaluation_type"] not in ["score", "rollout"]:
             raise ValueError(
-                "Invalid evaluation_type. Allowed values are 'random', 'rollout', 'gcn'."
+                "Invalid evaluation_type. Allowed values are 'score', 'rollout'."
+            )
+        if params["score_function"] not in ["sascore", "weight", "policy", "heavyAtomCount", "weightXsascore", "WxWxSAS", "random", "gcn", "rollout"]:
+            raise ValueError(
+                "Invalid evaluation_type. Allowed values are 'policy', 'weight', 'sascore', 'weightXsascore', 'WxWxSAS', 'random', 'gcn', 'rollout'."
+            )
+        if not isinstance(params["stop_at_first"], bool):
+            raise ValueError(
+                "stop_at_first must be a boolean"
             )
         if params["evaluation_agg"] not in ["max", "average"]:
             raise ValueError(
