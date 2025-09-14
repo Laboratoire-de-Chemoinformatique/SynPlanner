@@ -22,7 +22,9 @@ def _read_version_from_pyproject():
             return None
 
         text = pyproject_path.read_text(encoding="utf-8", errors="ignore")
-        match = re.search(r'^\s*version\s*=\s*["\']([^"\']+)["\']\s*$', text, re.MULTILINE)
+        match = re.search(
+            r'^\s*version\s*=\s*["\']([^"\']+)["\']\s*$', text, re.MULTILINE
+        )
         if match:
             return match.group(1)
     except Exception:

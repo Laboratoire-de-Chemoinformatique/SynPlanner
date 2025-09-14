@@ -5,6 +5,7 @@ import os
 
 from CGRtools import smiles as read_smiles
 from synplan.mcts.tree import Tree
+from synplan.chem.reaction_routes.route_cgr import extract_reactions
 
 
 def _collect_reactions(tree):
@@ -190,6 +191,36 @@ def write_routes_csv(routes_dict, file_path="routes.csv"):
                 smiles = format(reaction, "m")
                 meta = ""  # or reaction.meta if you add that later
                 writer.writerow([route_id, step_id, smiles, meta])
+
+
+def export_tree_to_json(tree: Tree, file_path: str, route_id=None):
+    """
+    Export a retrosynthetic search tree directly to a JSON file.
+
+    Args:
+        tree: synplan.mcts.tree.Tree instance.
+        file_path: Output JSON path.
+        route_id: If provided, export only this specific route (node id).
+    """
+    routes_dict = extract_reactions(tree, route_id)
+    if routes_dict is None:
+        raise ValueError("Failed to extract reactions for the specified route_id.")
+    write_routes_json(routes_dict, file_path)
+
+
+def export_tree_to_csv(tree: Tree, file_path: str = "routes.csv", route_id=None):
+    """
+    Export a retrosynthetic search tree directly to a CSV file.
+
+    Args:
+        tree: synplan.mcts.tree.Tree instance.
+        file_path: Output CSV path.
+        route_id: If provided, export only this specific route (node id).
+    """
+    routes_dict = extract_reactions(tree, route_id)
+    if routes_dict is None:
+        raise ValueError("Failed to extract reactions for the specified route_id.")
+    write_routes_csv(routes_dict, file_path)
 
 
 class TreeWrapper:

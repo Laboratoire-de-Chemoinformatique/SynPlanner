@@ -27,6 +27,8 @@ def _resolve_cli_version() -> str:
         return _pkg_version
     except Exception:
         return "0.0.0+unknown"
+
+
 import yaml
 
 from synplan.chem.data.filtering import ReactionFilterConfig, filter_reactions_from_file

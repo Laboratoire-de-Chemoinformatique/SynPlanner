@@ -11,7 +11,7 @@ Docs_  |  Tutorials_  |  Preprint_  |  Paper_  |  `GUI demo`_
 .. _Paper: https://doi.org/10.1021/acs.jcim.4c02004
 .. _GUI demo: https://huggingface.co/spaces/Laboratoire-De-Chemoinformatique/SynPlanner
 
-|License Badge| |PyPI Version Badge| |Python Versions Badge|
+|License Badge| |PyPI Version Badge| |Python Versions Badge| |Open In Colab|
 
 .. |License Badge| image:: https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/SynPlanner
    :target: https://img.shields.io/github/license/Laboratoire-de-Chemoinformatique/SynPlanner
@@ -22,6 +22,10 @@ Docs_  |  Tutorials_  |  Preprint_  |  Paper_  |  `GUI demo`_
 .. |Python Versions Badge| image:: https://img.shields.io/pypi/pyversions/SynPlanner.svg
    :target: https://pypi.org/project/SynPlanner/
    :alt: Supported Python Versions
+
+.. |Open In Colab| image:: https://colab.research.google.com/assets/colab-badge.svg
+   :target: https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/routes_clustering.ipynb
+   :alt: Open In Colab
 
 ``SynPlanner`` is an open-source tool for retrosynthetic planning,
 designed to increase flexibility in training and developing
@@ -34,7 +38,7 @@ the synthesizability of intermediate products (value network).
 Overview
 =============================
 
-Unlock the power of ``SynPlanner`` for your chemical synthesis projects:
+``SynPlanner`` offers comprehensive capabilities for chemical synthesis planning:
 
 - ✅ **Ensure Data Quality:** Effortlessly standardize and filter raw chemical reaction data.
 - 🧪 **Customize Reaction Templates:** Extract versatile reaction rules (templates) with a wide array of options.
@@ -45,7 +49,7 @@ Unlock the power of ``SynPlanner`` for your chemical synthesis projects:
 🚀 Quick Start
 =============================
 
-Get started with ``SynPlanner`` in a flash!
+Get started with ``SynPlanner`` in a few steps:
 
 1.  **Download Essential Data:**
     Fetch the necessary pre-trained models and example data to begin your journey.
@@ -62,6 +66,15 @@ Get started with ``SynPlanner`` in a flash!
         synplan planning --config configs/planning.yaml --targets synplan_data/benchmarks/sascore/targets_with_sascore_1.5_2.5.smi --reaction_rules synplan_data/uspto/uspto_reaction_rules.pickle --building_blocks synplan_data/building_blocks/building_blocks_em_sa_ln.smi --policy_network synplan_data/uspto/weights/ranking_policy_network.ckpt --results_dir planning_results_quickstart
 
     (Note: Ensure ``configs/planning.yaml`` exists or adjust the path accordingly. You might need to create a basic one or use one from the cloned repository if you haven't installed all package data globally.)
+
+Colab tutorials
+-----------------------------
+
+Currently, three tutorials are available that can run with Google Colab:
+
+- `Retrosynthetic planning <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb>`_: plan routes for one target and inspect the search tree.
+- `SynPlanner benchmarking <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb>`_: run many targets and compare results.
+- `Route clustering by strategic bonds <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/routes_clustering.ipynb>`_: cluster planned routes by strategic bonds and view concise HTML reports.
 
 Installation
 =============================
@@ -143,49 +156,6 @@ You should see an entry similar to:
         --policy_network tutorials/synplan_data/uspto/weights/ranking_policy_network.ckpt \
         --results_dir tutorials/planning_results
 
-Tutorials
-=============================
-
-Colab
------------------------------
-
-    Colab tutorials do not require the local installation of ``SynPlanner`` but their performance is limited by available computational resources in Google Colab
-
-Currently, two tutorials are available:
-
-- `Retrosynthetic planning <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb>`_ can be used for retrosynthetic planning of any target molecule with pre-trained retrosynthetic models and advanced analysis of the search tree.
-- `SynPlanner benchmarking <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb>`_ can be used for retrosynthetic planning of many target molecules for benchmarking or comparison analysis.
-
-Jupyter
------------------------------
-
-    Jupyter Tutorials requires the local installation of ``SynPlanner`` but can be executed with advanced computational resources on local servers
-
-Currently, five tutorials are available:
-
-**Quick-start tutorials.** These tutorials can be used for easy execution of the default ``SynPlanner`` pipeline:
-
-- `SynPlanner pipeline <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/SynPlanner_Pipeline.ipynb>`_ presents the full pipeline of SynPlanner starting from raw reaction data and resulting in ready-to-use retrosynthetic planning.
-
-**Advanced tutorials.** These tutorials provide advanced explanations and options for each step in the ``SynPlanner`` pipeline:
-
-- `Step 1: Reaction data curation <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/Step-1_Data_Curation.ipynb>`_ can be used for reaction standardization and reaction filtration.
-- `Step 2: Reaction rules extraction <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/Step-2_Rules_Extraction.ipynb>`_  can be used for extracting reaction rules from curated reaction data.
-- `Step 3: Policy network training <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/Step-3_Policy_Training.ipynb>`_ can be used for policy network training.
-- `Step 4: Retrosynthetic planning <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/Step-4_Retrosynthetic_Planning.ipynb>`_ can be used for retrosynthetic planning.
-
-Command-line interface
-=============================
-
-``SynPlanner`` pipeline can be accessed by neat command-line interface (CLI). For example, retrosynthetic planning of several target molecules  with pre-trained models can performed with the following commands:
-
-.. code-block:: bash
-
-    synplan download_all_data --save_to synplan_data
-    synplan planning --config configs/planning.yaml --targets synplan_data/benchmarks/sascore/targets_with_sascore_1.5_2.5.smi --reaction_rules synplan_data/uspto/uspto_reaction_rules.pickle --building_blocks synplan_data/building_blocks/building_blocks_em_sa_ln.smi --policy_network synplan_data/uspto/weights/ranking_policy_network.ckpt --results_dir planning_results
-
-More details about CLI can be found in `SynPlanner Documentaion <https://synplanner.readthedocs.io/en/latest/interfaces/cli.html>`_
-
 Contributing
 =============================
 
@@ -204,6 +174,7 @@ Contributors
 
 * `Timur Madzhidov <tmadzhidov@gmail.com>`_
 * `Alexandre Varnek <varnek@unistra.fr>`_
+* `Almaz Gilmullin <https://github.com/Protolaw>`_
 * `Philippe Gantzer <https://github.com/PGantzer>`_
 * `Dmitry Babadeev <https://github.com/prog420>`_
 * `Anna Pinigina <anna.10081048@gmail.com>`_

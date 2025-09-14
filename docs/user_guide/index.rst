@@ -3,9 +3,29 @@ User Guide
 
 This guide is a practical, task-oriented path through SynPlanner.
 
-============
+Run in Google Colab
+-------------------
+
+Open selected tutorials directly in Google Colab (no local install):
+
+- Retrosynthetic planning |Colab-Retro|
+- SynPlanner benchmarking |Colab-Bench|
+- Route clustering by strategic bonds |Colab-Cluster|
+
+.. |Colab-Retro| image:: https://colab.research.google.com/assets/colab-badge.svg
+   :target: https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb
+   :alt: Open in Colab
+
+.. |Colab-Bench| image:: https://colab.research.google.com/assets/colab-badge.svg
+   :target: https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb
+   :alt: Open in Colab
+
+.. |Colab-Cluster| image:: https://colab.research.google.com/assets/colab-badge.svg
+   :target: https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/routes_clustering.ipynb
+   :alt: Open in Colab
+
 Tutorials
-============
+-------------------
 
 ``SynPlanner`` is supplemented by several tutorials explaining different aspects of tool usage. These tutorials included
 some advanced explanations and configurations, that can be used not only for demonstrative and educational purposes but
