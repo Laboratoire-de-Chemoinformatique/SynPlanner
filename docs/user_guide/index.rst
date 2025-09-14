@@ -1,4 +1,7 @@
-.. _tutorials:
+User Guide
+==========
+
+This guide is a practical, task-oriented path through SynPlanner.
 
 ============
 Tutorials
@@ -30,11 +33,12 @@ each ``SynPlanner`` pipeline step and allows for more sophisticated functionalit
 .. _Step-4. Retrosynthetic planning: Step-4_Retrosynthetic_Planning.ipynb
 
 .. toctree::
-    :hidden:
-    :titlesonly:
+    :maxdepth: 1
 
+    ten_minutes
     SynPlanner_Pipeline
     Step-1_Data_Curation
     Step-2_Rules_Extraction
     Step-3_Policy_Training
     Step-4_Retrosynthetic_Planning
+

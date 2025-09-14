@@ -73,11 +73,10 @@ The main steps of this pipeline are listed below.
     :caption: Navigation
     :titlesonly:
 
-    installation/installation
-    data/data
-    interfaces/interfaces
-    configuration/configuration
-    tutorials/tutorials
+    get_started/index
+    user_guide/index
     methods/methods
+    configuration/configuration
+    interfaces/interfaces
     api
 

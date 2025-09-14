@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # General configuration
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints']
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon', 'nbsphinx', 'nbsphinx_link']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon', 'sphinx.ext.intersphinx', 'nbsphinx', 'nbsphinx_link']
 source_suffix = '.rst'
 master_doc = 'index'
 
@@ -17,22 +17,49 @@ copyright = 'Laboratoire de Chemoinformatique'
 author = 'Tagir Akhmetshin / Dmitry Zankov'
 
 # Software version and release
-version = '1.0'
-release = '1.0'
+version = '1.2'
+release = '1.2'
+
+# Display project name without version in the navbar title
+html_title = 'SynPlanner documentation'
 
 # Options for HTML output
 html_theme = 'pydata_sphinx_theme'
 html_theme_options = {
     "show_nav_level": 4,
-    "github_url": "https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner",
     "show_prev_next": False,
-    "navbar_end": ["theme-switcher"],
+    "navbar_end": ["version-switcher", "theme-switcher", "navbar-icon-links"],
+    # Version switcher configuration (works locally with _static/switcher.json
+    # and on hosting when json_url points to a hosted file)
+    "switcher": {
+        "json_url": "_static/switcher.json",
+        "version_match": os.environ.get("READTHEDOCS_VERSION", release),
+    },
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner",
+            "icon": "fa-brands fa-github",
+            "type": "fontawesome",
+        },
+    ],
     "primary_sidebar_end": ["sidebar-ethical-ads"],
-    "secondary_sidebar_items": [],
+    "secondary_sidebar_items": ["page-toc"],
     "header_links_before_dropdown": 7
 }
 
 html_sidebars = {
-    "installation": [],  # removes Section Navigation sidebar
-    "data_download": [],
+    "get_started/*": [],  # hide left Section Navigation for Get started pages
+    "**": [
+        "sidebar-nav-bs",
+    ],
+}
+
+# Static assets (for version switcher JSON, images, etc.)
+html_static_path = ['_static']
+html_css_files = ['css/custom.css']
+
+# Intersphinx mappings for resolving external references (optional, helpful later)
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
 }
