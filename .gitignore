@@ -145,4 +145,6 @@ coverage/
 .LSOverride
 
 tutorials/tutorial_results/
+tutorials/synplan_data/
+uspto/
 *.smi

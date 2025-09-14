@@ -5,6 +5,28 @@ import warnings
 from pathlib import Path
 
 import click
+
+try:
+    from importlib.metadata import PackageNotFoundError, version as _dist_version
+except Exception:  # pragma: no cover
+    _dist_version = None  # type: ignore[assignment]
+    PackageNotFoundError = Exception  # type: ignore[assignment]
+
+
+def _resolve_cli_version() -> str:
+    # Prefer installed distribution version
+    if _dist_version is not None:
+        try:
+            return _dist_version("SynPlanner")
+        except PackageNotFoundError:
+            pass
+    # Fallback to package attribute in editable/dev mode
+    try:
+        from synplan import __version__ as _pkg_version
+
+        return _pkg_version
+    except Exception:
+        return "0.0.0+unknown"
 import yaml
 
 from synplan.chem.data.filtering import ReactionFilterConfig, filter_reactions_from_file
@@ -35,6 +57,7 @@ warnings.filterwarnings("ignore")
 
 
 @click.group(name="synplan")
+@click.version_option(version=_resolve_cli_version(), prog_name="synplan")
 def synplan():
     """SynPlanner command line interface."""
 

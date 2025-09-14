@@ -11,14 +11,32 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon', 'sphinx.ext.intersphi
 source_suffix = '.rst'
 master_doc = 'index'
 
+# nbsphinx configuration: do not execute notebooks during the build
+# This avoids long build times from heavy notebooks referenced via .nblink
+nbsphinx_execute = 'never'
+
 # General information about the project
 project = 'SynPlanner'
 copyright = 'Laboratoire de Chemoinformatique'
 author = 'Tagir Akhmetshin / Dmitry Zankov'
 
 # Software version and release
-version = '1.2'
-release = '1.2'
+try:
+    # Resolve version from installed distribution when docs are built in an env
+    from importlib.metadata import version as _dist_version
+
+    release = _dist_version('SynPlanner')
+    version = '.'.join(release.split('.')[:2])
+except Exception:
+    # Fallback for local builds without installed metadata
+    try:
+        from synplan import __version__ as _pkg_version
+
+        release = _pkg_version
+        version = '.'.join(release.split('.')[:2])
+    except Exception:
+        release = '0.0.0+unknown'
+        version = '0.0'
 
 # Display project name without version in the navbar title
 html_title = 'SynPlanner documentation'
