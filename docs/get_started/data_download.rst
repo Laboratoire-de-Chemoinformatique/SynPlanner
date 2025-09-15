@@ -13,7 +13,7 @@ Everything
 This creates subfolders like ``uspto/``, ``weights/``, and ``building_blocks/`` under ``tutorials/synplan_data``.
 
 Minimal set for planning
-~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 You typically need:
 
@@ -23,8 +23,8 @@ You typically need:
 - Targets file: a text file with SMILES, e.g. ``tutorials/synplan_data/benchmarks/sascore/targets_with_sascore_1.5_2.5.smi``
 
 Details
-~~~~~~~~~~~
+~~~~~~~
 
-For a full list of datasets and descriptions, see :doc:`../data/download`.
+For a full list of datasets and descriptions, see :doc:`/user_guide/data`.
 
 

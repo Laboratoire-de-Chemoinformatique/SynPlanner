@@ -3,6 +3,13 @@ User Guide
 
 This guide is a practical, task-oriented path through SynPlanner.
 
+What's inside
+-------------
+
+- Concepts and algorithms → see :doc:`/methods/methods`.
+- Configuration of pipelines (YAML and Python) → see :doc:`/configuration/configuration`.
+- CLI usage → see :doc:`cli_interface`.
+
 Run in Google Colab
 -------------------
 
@@ -61,9 +68,13 @@ each ``SynPlanner`` pipeline step and allows for more sophisticated functionalit
     :titlesonly:
 
     ten_minutes
+    cli_interface
+    data
     SynPlanner_Pipeline
     Step-1_Data_Curation
     Step-2_Rules_Extraction
     Step-3_Policy_Training
     Step-4_Retrosynthetic_Planning
     Step-5_Clustering
+    ../configuration/configuration
+    ../methods/methods

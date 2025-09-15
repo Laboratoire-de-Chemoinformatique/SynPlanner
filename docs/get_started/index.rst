@@ -5,6 +5,8 @@ Get started
 
 .. include:: data_download.rst
 
+.. include:: docker_images.rst
+
 Run in Google Colab
 -------------------
 

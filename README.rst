@@ -48,6 +48,47 @@ the synthesizability of intermediate products (value network).
 - 🗺️ **Flexible Retrosynthesis:** Perform in-depth retrosynthetic planning with diverse MCTS-based search strategies.
 - 📊 **Intuitive Visualization:** Clearly visualize discovered synthetic paths and interact with an easy-to-use graphical user interface.
 
+📦 Installation
+=============================
+
+PyPI / pip
+-----------------------------
+
+``SynPlanner`` can also be installed directly using pip:
+
+.. code-block:: bash
+
+    pip install SynPlanner
+
+You can find the package on PyPI: `SynPlanner on PyPI <https://pypi.org/project/SynPlanner/>`_.
+
+After installation, ``SynPlanner`` can be added to Jupyter platform:
+
+.. code-block:: bash
+
+    python -m ipykernel install --user --name synplan --display-name "synplan"
+
+🐳 Docker (prebuilt images)
+-----------------------------
+
+Prebuilt images are published to GHCR for Linux/AMD64.
+
+.. code-block:: bash
+
+    VERSION=1.2.1
+
+    # CLI: pull and show help
+    docker pull ghcr.io/laboratoire-de-chemoinformatique/synplanner:${VERSION}-cli-amd64
+    docker run --rm --platform linux/amd64 \
+      ghcr.io/laboratoire-de-chemoinformatique/synplanner:${VERSION}-cli-amd64 --help
+
+    # GUI: pull and run on http://localhost:8501
+    docker pull ghcr.io/laboratoire-de-chemoinformatique/synplanner:${VERSION}-gui-amd64
+    docker run --rm --platform linux/amd64 -p 8501:8501 \
+      ghcr.io/laboratoire-de-chemoinformatique/synplanner:${VERSION}-gui-amd64
+
+For a mounted-data planning example and more details, see the Get started docs: https://synplanner.readthedocs.io/en/latest/get_started/index.html
+
 🚀 Quick Start
 =============================
 
@@ -77,86 +118,6 @@ Currently, three tutorials are available that can run with Google Colab:
 - `Retrosynthetic planning <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb>`_: plan routes for one target and inspect the search tree.
 - `SynPlanner benchmarking <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb>`_: run many targets and compare results.
 - `Route clustering by strategic bonds <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/routes_clustering.ipynb>`_: cluster planned routes by strategic bonds and view concise HTML reports.
-
-📦 Installation
-=============================
-
-PyPI / pip
------------------------------
-
-``SynPlanner`` can also be installed directly using pip:
-
-.. code-block:: bash
-
-    pip install SynPlanner
-
-You can find the package on PyPI: `SynPlanner on PyPI <https://pypi.org/project/SynPlanner/>`_.
-
-After installation, ``SynPlanner`` can be added to Jupyter platform:
-
-.. code-block:: bash
-
-    pip install ipykernel
-    python -m ipykernel install --user --name synplan --display-name "synplan"
-
-🐳 Docker (CLI)
------------------------------
-
-You can run the SynPlanner command-line interface inside a Docker container. Follow these steps to build, name, and test the image.
-
-1. Build the image
-
-   Use the provided ``cli.Dockerfile`` to build a Linux AMD64 image. Name (tag) the image using the convention:
-
-   ``<semver>-<interface>-<platform>``
-
-   For example, to build version 1.1.0 with the CLI interface on AMD64:
-
-.. code-block:: bash
-
-       docker build \
-         --platform linux/amd64 \
-         -t synplan:1.1.0-cli-amd64 \
-         -f cli.Dockerfile .
-
-2. Verify the image
-
-   List your local images to confirm the tag:
-
-.. code-block:: bash
-
-       docker images | grep synplan
-
-You should see an entry similar to:
-
-       synplan   1.1.0-cli-amd64   ...
-
-3. Run and test the CLI
-
-   Launch a container to execute the ``--help`` command and confirm the CLI is working:
-
-.. code-block:: bash
-
-       docker run --rm --platform linux/amd64 -it synplan:1.1.0-cli-amd64 --help
-
-4. Example: planning with Docker
-
-   You can also mount a local directory for data persistence. For example:
-
-.. code-block:: bash
-
-    docker run --rm \
-      --platform linux/amd64 \
-      -v "$(pwd)":/app \
-      -w /app \
-      synplan:1.1.0-cli-amd64 \
-      planning \
-        --config configs/planning.yaml \
-        --targets tutorials/synplan_data/benchmarks/sascore/targets_with_sascore_1.5_2.5.smi \
-        --reaction_rules tutorials/synplan_data/uspto/uspto_reaction_rules.pickle \
-        --building_blocks tutorials/synplan_data/building_blocks/building_blocks_em_sa_ln.smi \
-        --policy_network tutorials/synplan_data/uspto/weights/ranking_policy_network.ckpt \
-        --results_dir tutorials/planning_results
 
 🤝 Contributing
 =============================
