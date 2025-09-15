@@ -142,14 +142,18 @@ jobs:
             -t synplan:${VERSION}-gui-amd64 \
             -f gui.Dockerfile .
 
-      - name: Smoke test GUI (start/stop)
+      - name: Smoke test GUI (health endpoint)
         run: |
+          set -euo pipefail
           VERSION="${{ steps.get_version.outputs.version }}"
           CID=$(docker run -d --rm --platform linux/amd64 -p 8501:8501 synplan:${VERSION}-gui-amd64)
-          # Give it a moment to start and then check it's running
-          sleep 5
-          docker ps | grep "$CID"
-          docker logs --tail 50 "$CID" || true
+          echo "Started container $CID, waiting for health..."
+          # Retry curl to health endpoint for up to ~45s
+          for i in {1..15}; do
+            if curl -fsS http://127.0.0.1:8501/_stcore/health >/dev/null; then
+              echo "GUI is healthy"; break; fi; sleep 3; done
+          curl -fsS http://127.0.0.1:8501/_stcore/health
+          docker logs --tail 100 "$CID" || true
           docker stop "$CID"
 
       - name: Save GUI Docker image as tarball
