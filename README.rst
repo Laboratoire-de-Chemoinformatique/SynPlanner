@@ -1,4 +1,6 @@
-.. image:: docs/images/banner.png
+.. image:: https://raw.githubusercontent.com/Laboratoire-de-Chemoinformatique/SynPlanner/main/docs/images/banner.png
+   :alt: SynPlanner banner
+   :align: center
 
 SynPlanner – a tool for synthesis planning
 ===========================================
@@ -10,6 +12,7 @@ Docs_  |  Tutorials_  |  Preprint_  |  Paper_  |  `GUI demo`_
 .. _Preprint: https://doi.org/10.26434/chemrxiv-2024-bzpnd
 .. _Paper: https://doi.org/10.1021/acs.jcim.4c02004
 .. _GUI demo: https://huggingface.co/spaces/Laboratoire-De-Chemoinformatique/SynPlanner
+
 
 |License Badge| |PyPI Version Badge| |Python Versions Badge| |Open In Colab|
 
@@ -34,8 +37,7 @@ It integrates Monte Carlo Tree Search (MCTS) with graph neural networks
 to evaluate applicable reaction rules (policy network) and
 the synthesizability of intermediate products (value network).
 
-
-Overview
+✨ Overview
 =============================
 
 ``SynPlanner`` offers comprehensive capabilities for chemical synthesis planning:
@@ -59,7 +61,7 @@ Get started with ``SynPlanner`` in a few steps:
         synplan download_all_data --save_to synplan_data
 
 2.  **Explore Planning:**
-    Once the data is downloaded, you can try running a planning example. For more detailed instructions, see the `Command-line interface`_ or `Tutorials`_ sections.
+    Once the data is downloaded, you can try running a planning example. For more detailed instructions, see the `Tutorials`_ sections.
 
     .. code-block:: bash
 
@@ -67,7 +69,7 @@ Get started with ``SynPlanner`` in a few steps:
 
     (Note: Ensure ``configs/planning.yaml`` exists or adjust the path accordingly. You might need to create a basic one or use one from the cloned repository if you haven't installed all package data globally.)
 
-Colab tutorials
+📓 Colab tutorials
 -----------------------------
 
 Currently, three tutorials are available that can run with Google Colab:
@@ -76,7 +78,7 @@ Currently, three tutorials are available that can run with Google Colab:
 - `SynPlanner benchmarking <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb>`_: run many targets and compare results.
 - `Route clustering by strategic bonds <https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/routes_clustering.ipynb>`_: cluster planned routes by strategic bonds and view concise HTML reports.
 
-Installation
+📦 Installation
 =============================
 
 PyPI / pip
@@ -94,10 +96,10 @@ After installation, ``SynPlanner`` can be added to Jupyter platform:
 
 .. code-block:: bash
 
-    conda install ipykernel
+    pip install ipykernel
     python -m ipykernel install --user --name synplan --display-name "synplan"
 
-Docker (CLI)
+🐳 Docker (CLI)
 -----------------------------
 
 You can run the SynPlanner command-line interface inside a Docker container. Follow these steps to build, name, and test the image.
@@ -156,20 +158,20 @@ You should see an entry similar to:
         --policy_network tutorials/synplan_data/uspto/weights/ranking_policy_network.ckpt \
         --results_dir tutorials/planning_results
 
-Contributing
+🤝 Contributing
 =============================
 
 Contributions are welcome, in the form of issues or pull requests.
 
 If you have a question or want to report a bug, please submit an issue.
 
-Maintainers
+👥 Maintainers
 =============================
 
 * `Tagir Akhmetshin <https://github.com/tagirshin>`_
 * `Dmitry Zankov <https://github.com/dzankov>`_
 
-Contributors
+👥 Contributors
 =============================
 
 * `Timur Madzhidov <tmadzhidov@gmail.com>`_

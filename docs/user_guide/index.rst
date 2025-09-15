@@ -37,8 +37,8 @@ each ``SynPlanner`` pipeline step and allows for more sophisticated functionalit
 
 **General tutorials:**
 
-- `SynPlanner Pipeline`_ - demonstrates the whole ``SynPlanner`` pipeline of reaction data curation, reaction rules extraction, retrosynthetic models training, retrosynthetic planning, and predicted retrosynthetic routes visualization. This tutorial can be used for routine creating ready-to-use planners for custom data and creating custom pipeline configurations.
 - `10 minutes to SynPlanner`_ - a quickstart guide to run planning via Python or CLI.
+- `SynPlanner Pipeline`_ - demonstrates the whole ``SynPlanner`` pipeline of reaction data curation, reaction rules extraction, retrosynthetic models training, retrosynthetic planning, and predicted retrosynthetic routes visualization. This tutorial can be used for routine creating ready-to-use planners for custom data and creating custom pipeline configurations.
 
 **Advanced tutorials:**
 
@@ -49,7 +49,7 @@ each ``SynPlanner`` pipeline step and allows for more sophisticated functionalit
 - `Step-5. Clustering`_ - demonstrates how to cluster predicted retrosynthetic routes in ``SynPlanner``.
 
 .. _SynPlanner Pipeline: SynPlanner_Pipeline.ipynb
-.. _10 minutes to SynPlanner: ten_minutes
+.. _10 minutes to SynPlanner: ten_minutes.rst
 .. _Step-1. Data curation: Step-1_Data_Curation.ipynb
 .. _Step-2. Reaction rules extraction: Step-2_Rules_Extraction.ipynb
 .. _Step-3. Policy network training: Step-3_Policy_Training.ipynb

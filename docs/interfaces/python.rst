@@ -4,4 +4,4 @@
 Python user interface
 ========================
 
-Python user interface is represented in :ref:`tutorials` and :ref:`api`.
+Python user interface is represented in :doc:`/user_guide/index` and :ref:`api`.
