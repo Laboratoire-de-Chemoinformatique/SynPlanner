@@ -67,6 +67,7 @@ html_theme_options = {
 
 html_sidebars = {
     "get_started/*": [],  # hide left Section Navigation for Get started pages
+    "development": [],  
 }
 
 # Static assets (for version switcher JSON, images, etc.)

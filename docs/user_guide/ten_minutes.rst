@@ -93,7 +93,7 @@ Plan a few targets (CLI)
 ------------------------
 
 You can batch-plan targets directly from the terminal using the ``synplan planning`` command.
-Parameters mirror those described in the :ref:`cli` reference. In brief:
+Parameters mirror those described in the :ref:`cli_interface` reference. In brief:
 
 - ``--config``: planning configuration file.
 - ``--targets``: SMILES file with target molecules (one per line).
@@ -115,7 +115,7 @@ Parameters mirror those described in the :ref:`cli` reference. In brief:
 
 Outputs go to ``tutorials/planning_results`` (CSV stats, JSON routes, HTML visualisations).
 
-For a complete overview of commands and parameters, see the :ref:`cli` documentation.
+For a complete overview of commands and parameters, see the :ref:`cli_interface` documentation.
 All pipeline steps are available as CLI commands, including data download, building block
 standardization, reaction standardization and filtration, reaction rule extraction,
 policy network training, value network training, and planning.

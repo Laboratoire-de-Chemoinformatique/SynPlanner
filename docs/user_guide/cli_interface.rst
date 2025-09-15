@@ -1,8 +1,12 @@
-.. _cli:
+.. _cli_interface:
 
-======================
+============================
 Command-line interface
-======================
+============================
+
+Use SynPlanner from the command line to run data curation, training, and planning.
+
+For installation and prebuilt Docker images, see :doc:`/get_started/index`. For Python usage, refer to :doc:`/api`.
 
 Data download
 ---------------------------
@@ -141,3 +145,4 @@ Retrosynthetic planning can be performed in ``SynPlanner``.
     - ``policy_network`` - the path to the file with trained policy network (ranking or filtering).
     - ``value_network`` - the path to the file with trained value network if available (default is None).
     - ``results_dir`` - the path to the directory where the trained value network will be to be stored.
+
