@@ -69,6 +69,7 @@ each ``SynPlanner`` pipeline step and allows for more sophisticated functionalit
 
     ten_minutes
     cli_interface
+    data
     SynPlanner_Pipeline
     Step-1_Data_Curation
     Step-2_Rules_Extraction
@@ -77,4 +78,3 @@ each ``SynPlanner`` pipeline step and allows for more sophisticated functionalit
     Step-5_Clustering
     ../configuration/configuration
     ../methods/methods
-    data
