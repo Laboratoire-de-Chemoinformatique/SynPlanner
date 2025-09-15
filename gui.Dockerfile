@@ -37,14 +37,17 @@ COPY README.rst /app/
 # The second install will now install the synplan package itself
 RUN poetry install --without dev --no-interaction && rm -rf /tmp/poetry-cache /tmp/pip-cache
 
-# 6. Remove build tools to keep the final image slim
-RUN apt-get purge -y --auto-remove build-essential python3-dev g++ curl \
+# 6. Remove build tools to keep the final image slim (keep curl for health checks)
+RUN apt-get purge -y --auto-remove build-essential python3-dev g++ \
     && rm -rf /var/lib/apt/lists/*
+
+# Expose Streamlit default port
+EXPOSE 8501
 
 # 7. Add a health check to ensure the Streamlit app is responsive
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s \
   CMD curl -f http://localhost:8501/_stcore/health || exit 1
 
 # 8. Set the entry point to run the Streamlit GUI script
-# This is the key change to run your GUI instead of the CLI
-ENTRYPOINT ["streamlit", "run", "synplan/interfaces/gui.py"]
+# Ensure Streamlit binds to all interfaces for container access
+ENTRYPOINT ["streamlit", "run", "synplan/interfaces/gui.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.headless=true"]
