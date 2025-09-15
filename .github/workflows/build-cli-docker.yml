@@ -1,0 +1,95 @@
+name: Build CLI Docker Image (linux/amd64)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-cli-docker:
+    name: Build and Package CLI Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Extract version from pyproject.toml
+        id: get_version
+        run: |
+          python - << 'PY'
+          import tomllib
+          with open('pyproject.toml', 'rb') as f:
+              data = tomllib.load(f)
+          version = data['tool']['poetry']['version']
+          print(version, end='')
+          PY
+          echo "version=$(python - << 'PY'
+          import tomllib
+          with open('pyproject.toml', 'rb') as f:
+              data = tomllib.load(f)
+          print(data['tool']['poetry']['version'], end='')
+          PY)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (linux/amd64)
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          echo "Building synplan:${VERSION}-cli-amd64"
+          docker buildx build \
+            --platform linux/amd64 \
+            --load \
+            -t synplan:${VERSION}-cli-amd64 \
+            -f cli.Dockerfile .
+
+      - name: Smoke test CLI (--help)
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          docker run --rm --platform linux/amd64 synplan:${VERSION}-cli-amd64 --help | head -n 50 || true
+
+      - name: Save Docker image as tarball
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          IMAGE_TAG="synplan:${VERSION}-cli-amd64"
+          TARBALL="synplan_${VERSION}_cli_amd64.tar"
+          echo "Saving ${IMAGE_TAG} to ${TARBALL}"
+          docker save -o "${TARBALL}" "${IMAGE_TAG}"
+          ls -lh "${TARBALL}"
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: synplan-${{ steps.get_version.outputs.version }}-cli-amd64-image
+          path: synplan_${{ steps.get_version.outputs.version }}_cli_amd64.tar
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push to GHCR
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          # Lowercase owner/repo for Docker tag compatibility
+          REPO_LC="${GITHUB_REPOSITORY,,}"
+          GHCR_TAG="ghcr.io/${REPO_LC}:${VERSION}-cli-amd64"
+          echo "Tagging and pushing ${GHCR_TAG}"
+          docker tag "synplan:${VERSION}-cli-amd64" "${GHCR_TAG}"
+          docker push "${GHCR_TAG}"
+
+
