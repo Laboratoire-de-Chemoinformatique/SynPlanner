@@ -65,6 +65,6 @@ Limitations and notes
   prefer Docker or a Linux environment (e.g., WSL2).
 - Example data and model weights are not included; download them with the CLI
   (see :doc:`data_download`).
-- To run the full planning quickstart in 10 minutes, continue to :doc:`quickstart`.
+- To run the full planning quickstart in 10 minutes, continue to :doc:`/user_guide/ten_minutes`.
 
 

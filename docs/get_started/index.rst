@@ -5,8 +5,6 @@ Get started
 
 .. include:: data_download.rst
 
-.. include:: quickstart.rst
-
 Run in Google Colab
 -------------------
 

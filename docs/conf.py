@@ -38,8 +38,7 @@ except Exception:
         release = '0.0.0+unknown'
         version = '0.0'
 
-# Display project name without version in the navbar title
-html_title = 'SynPlanner documentation'
+html_title = 'SynPlanner'
 
 # Options for HTML output
 html_theme = 'pydata_sphinx_theme'
@@ -68,9 +67,6 @@ html_theme_options = {
 
 html_sidebars = {
     "get_started/*": [],  # hide left Section Navigation for Get started pages
-    "**": [
-        "sidebar-nav-bs",
-    ],
 }
 
 # Static assets (for version switcher JSON, images, etc.)

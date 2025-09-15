@@ -19,7 +19,6 @@ Important recommendations
   both strategies work, but we still suggest ``expansion_first`` for speed.
 - For complex targets or limited reaction rules/building blocks, increase ``max_iterations`` and/or ``max_time``.
 - First building blocks load can be slow if they are standardized from SMILES. The CLI path standardizes on the fly.
-- Currently, SynPlanner may generate many similar retrosynthetic routes for a target molecule as there is no route clustering implemented yet.
 
 Plan via Python API
 -------------------
