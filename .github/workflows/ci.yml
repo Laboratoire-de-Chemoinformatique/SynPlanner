@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: "Unit‑tests (Python ${{ matrix.python-version }})"
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: 🛎️Checkout repo
+        uses: actions/checkout@v4
+
+      - name: 📦Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: "2.0.1"
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+
+      - name: 🐍Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "poetry"          # ↖ automatic dependency caching
+
+      - name: 🛠️ Install build tools (Ubuntu only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev
+          pip install --upgrade pip setuptools wheel
+
+      - name: 📚Install project (incl. dev extras)
+        run: |
+          poetry install --with dev --no-interaction
+          poetry build -f wheel      # guarantees the package itself is buildable
+        shell: bash
+
+      - name: ✅Run test‑suite + coverage
+        run: |
+          poetry run pytest --cov=synplan --cov-report=xml
+        shell: bash
+
+      - name: ⬆️Upload coverage artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.python-version }}-${{ matrix.os }}
+          path: coverage.xml
+
+  style:
+    name: "Stylecheck (black)"
+    runs-on: ubuntu-latest
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: snok/install-poetry@v1
+        with:
+          version: "2.0.1"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "poetry"
+      - run: |
+          poetry install --with dev --no-interaction --no-root
+          poetry run black --check synplan tests

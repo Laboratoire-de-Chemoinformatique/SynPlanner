@@ -7,6 +7,23 @@ Reaction filtration
 ``SynPlanner`` includes a variety of reaction filters.
 The list and order of application of filters can be specified in the configuration file.
 
+Download example configuration
+------------------------------
+
+- GitHub: `configs/filtration.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/filtration.yaml>`_
+
+Quickstart (CLI)
+----------------
+
+Run reaction filtration using the repository configuration in ``configs/filtration.yaml``:
+
+.. code-block:: bash
+
+   synplan reaction_filtering \
+     --config configs/filtration.yaml \
+     --input reaction_data_standardized.smi \
+     --output reaction_data_filtered.smi
+
 **Configuration file**
 
 .. code-block:: yaml

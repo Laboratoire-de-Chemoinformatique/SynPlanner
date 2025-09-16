@@ -9,9 +9,11 @@ from torch import Tensor
 from torch.nn import Linear
 from torch.nn.functional import binary_cross_entropy_with_logits
 from torch_geometric.data.batch import Batch
-from torchmetrics.functional.classification import (binary_f1_score,
-                                                    binary_recall,
-                                                    binary_specificity)
+from torchmetrics.functional.classification import (
+    binary_f1_score,
+    binary_recall,
+    binary_specificity,
+)
 
 from synplan.ml.networks.modules import MCTSNetwork
 

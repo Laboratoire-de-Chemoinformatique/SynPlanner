@@ -73,11 +73,18 @@ The main steps of this pipeline are listed below.
     :caption: Navigation
     :titlesonly:
 
-    installation/installation
-    data/data
-    interfaces/interfaces
-    configuration/configuration
-    tutorials/tutorials
-    methods/methods
+    get_started/index
+    user_guide/index
     api
+    development
+    release_notes
+
+How to navigate this documentation
+----------------------------------
+
+- Getting started: quick install and first runs → :doc:`get_started/index`
+- User Guide: tutorials and core topics (concepts, configuration, interfaces) → :doc:`user_guide/index`
+- API reference: Python package API → :doc:`api`
+- Development: contributing, local dev, building → :doc:`development`
+- Release notes: version changes → :doc:`release_notes`
 

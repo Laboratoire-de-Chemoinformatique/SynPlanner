@@ -8,14 +8,16 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import numpy as np
 import ray
 import yaml
-from CGRtools.containers import (CGRContainer, MoleculeContainer,
-                                 ReactionContainer)
-from StructureFingerprint import MorganFingerprint
+from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
+from chython.algorithms.fingerprints.morgan import MorganFingerprint
 from tqdm import tqdm
 
-from synplan.chem.data.standardizing import (AromaticFormStandardizer,
-                                             KekuleFormStandardizer,
-                                             RemoveReagentsStandardizer)
+from synplan.chem.data.standardizing import (
+    AromaticFormStandardizer,
+    KekuleFormStandardizer,
+    RemoveReagentsStandardizer,
+)
+from synplan.chem.utils import cgrtools_to_chython_molecule
 from synplan.utils.config import ConfigABC, convert_config_to_dict
 from synplan.utils.files import ReactionReader, ReactionWriter
 
@@ -86,8 +88,8 @@ class CompeteProductsFilter:
             for other_mol in reaction.products:
                 if len(mol) > 6 and len(other_mol) > 6:
                     # compute fingerprint similarity
-                    molf = mf.transform([mol])
-                    other_molf = mf.transform([other_mol])
+                    molf = mf.transform([cgrtools_to_chython_molecule(mol)])
+                    other_molf = mf.transform([cgrtools_to_chython_molecule(other_mol)])
                     fingerprint_tanimoto = tanimoto_kernel(molf, other_molf)[0][0]
 
                     # if fingerprint similarity is high enough, check for MCS similarity
@@ -191,7 +193,10 @@ class SmallMoleculesConfig(ConfigABC):
 
     def _validate_params(self, params: Dict[str, Any]) -> None:
         """Validate configuration parameters."""
-        if not isinstance(params.get("mol_max_size"), int) or params["mol_max_size"] < 1:
+        if (
+            not isinstance(params.get("mol_max_size"), int)
+            or params["mol_max_size"] < 1
+        ):
             raise ValueError("Invalid 'mol_max_size'; expected a positive integer")
 
 
@@ -483,6 +488,7 @@ class CCRingBreakingConfig:
     Object to pass to ReactionFilterConfig if you want to enable C-C ring breaking filter
 
     """
+
     pass
 
 

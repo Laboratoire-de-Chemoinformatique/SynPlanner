@@ -7,6 +7,26 @@ Value network
 The architecture of the value network, planning parameters, and value network tuning parameters can be specified
 with the configuration file.
 
+Download example configuration
+------------------------------
+
+- GitHub: `configs/tuning.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/tuning.yaml>`_
+
+Quickstart (CLI)
+----------------
+
+Run value network tuning using the repository configuration in ``configs/tuning.yaml``:
+
+.. code-block:: bash
+
+   synplan value_network_tuning \
+     --config configs/tuning.yaml \
+     --targets targets.smi \
+     --reaction_rules reaction_rules.pickle \
+     --policy_network policy_network.ckpt \
+     --building_blocks building_blocks.smi \
+     --results_dir value_network
+
 **Configuration file**
 
 .. code-block:: yaml

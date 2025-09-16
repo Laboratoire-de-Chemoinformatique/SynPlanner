@@ -7,6 +7,23 @@ Reaction standardization
 ``SynPlanner`` includes a variety of reaction standardizers.
 The list and order of application of standardizers can be specified in the configuration file.
 
+Download example configuration
+------------------------------
+
+- GitHub: `configs/standardization.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/standardization.yaml>`_
+
+Quickstart (CLI)
+----------------
+
+Run reaction standardization using the repository configuration in ``configs/standardization.yaml``:
+
+.. code-block:: bash
+
+   synplan reaction_standardizing \
+     --config configs/standardization.yaml \
+     --input reaction_data_original.smi \
+     --output reaction_data_standardized.smi
+
 **Configuration file**
 
 .. code-block:: yaml
