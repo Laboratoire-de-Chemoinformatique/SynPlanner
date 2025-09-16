@@ -478,6 +478,7 @@ class TreeConfig(ConfigABC):
     LNMCS_ratio: float = 0.2
     score_function: str = "weightXsascore"
     max_rules_applied = 10
+    stop_at_first = False
 
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "TreeConfig":
@@ -505,10 +506,6 @@ class TreeConfig(ConfigABC):
         if params["score_function"] not in ["sascore", "weight", "policy", "heavyAtomCount", "weightXsascore", "WxWxSAS", "random", "gcn", "rollout"]:
             raise ValueError(
                 "Invalid evaluation_type. Allowed values are 'policy', 'weight', 'sascore', 'weightXsascore', 'WxWxSAS', 'random', 'gcn', 'rollout'."
-            )
-        if not isinstance(params["stop_at_first"], bool):
-            raise ValueError(
-                "stop_at_first must be a boolean"
             )
         if params["evaluation_agg"] not in ["max", "average"]:
             raise ValueError(

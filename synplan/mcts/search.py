@@ -107,7 +107,7 @@ def run_search(
         value_function = None
 
     reaction_rules = load_reaction_rules(reaction_rules_path)
-    building_blocks = load_building_blocks(building_blocks_path, standardize=True )
+    building_blocks = load_building_blocks(building_blocks_path, standardize=True )#True PAr défaut c'est moi qui ai changé
 
     # run search
     n_solved = 0

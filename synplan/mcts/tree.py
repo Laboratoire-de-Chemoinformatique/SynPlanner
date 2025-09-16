@@ -163,7 +163,7 @@ class Tree:
             print("Target was found in building blocks and removed from building blocks.")
 
         # other tree search algorithms
-        self.stop_at_first = True
+        self.stop_at_first = False
         self.found_a_route = False
         self.bfs_table = [] #(node_id, score, depth)
         self.lnmcs_thresholds = [[] for _ in range(100)] #list of scores at depth
@@ -235,7 +235,8 @@ class Tree:
                         self._update_visits(
                             node_id
                         )  # this prevents expanding of bb node_id
-                        self.winning_nodes.append(node_id)
+                        if not node_id in self.winning_nodes:
+                            self.winning_nodes.append(node_id)
                         self.found_a_route = True
                         return True, [node_id]
 
@@ -278,7 +279,8 @@ class Tree:
                             for child_id in iter(self.children[node_id]):
                                 if self.nodes[child_id].is_solved():
                                     found_after_expansion.add(child_id)
-                                    self.winning_nodes.append(child_id)
+                                    if not child_id in self.winning_nodes:
+                                        self.winning_nodes.append(child_id)
 
                             if found_after_expansion:
                                 self.found_a_route = True
@@ -315,7 +317,8 @@ class Tree:
                 if self.children[leaf_id] and depth < self.config.max_depth:
                     for child_id in self.children[leaf_id]:
                         if self.nodes[child_id].is_solved():
-                            self.winning_nodes.append(child_id)
+                            if not child_id in self.winning_nodes:
+                                self.winning_nodes.append(child_id)
                             self.found_a_route = True
                             return True, [child_id]
 
@@ -325,7 +328,8 @@ class Tree:
                         if self.config.evaluation_type == "rollout":
                             nodeFinal, seq = self.nmcs_rollout(child_id, depth + 1, "greedy")
                             if self.nodes[nodeFinal].is_solved():
-                                self.winning_nodes.append(nodeFinal)
+                                if not nodeFinal in self.winning_nodes:
+                                    self.winning_nodes.append(nodeFinal)
                                 self.found_a_route = True
                                 return True, [nodeFinal]
                             self.insert_dicho_bfs_table(child_id, self._get_node_value(nodeFinal), depth + 1, False)
@@ -344,7 +348,8 @@ class Tree:
                 leaf_id = self.bfs_table.pop(0)[0]
 
             if self.nodes[leaf_id].is_solved():
-                self.winning_nodes.append(leaf_id)
+                if not leaf_id in self.winning_nodes:
+                    self.winning_nodes.append(leaf_id)
                 self.found_a_route = True
                 return  True, [leaf_id]
             self._expand_node(leaf_id)
@@ -352,7 +357,8 @@ class Tree:
             if self.children[leaf_id] and depth < self.config.max_depth:
                 for child_id in self.children[leaf_id]:
                     if self.nodes[child_id].is_solved():
-                        self.winning_nodes.append(child_id)
+                        if not child_id in self.winning_nodes:
+                            self.winning_nodes.append(child_id)
                         self.found_a_route = True
                         return True, [child_id]
                     self.bfs_table.append((child_id, 0, depth+1))
@@ -372,7 +378,8 @@ class Tree:
                 leaf_id = self.bfs_table.pop(0)[0]
 
             if self.nodes[leaf_id].is_solved():
-                self.winning_nodes.append(leaf_id)
+                if not leaf_id in self.winning_nodes:
+                    self.winning_nodes.append(leaf_id)
                 self.found_a_route = True
                 return  True, [leaf_id]
             self._expand_node(leaf_id, depth = depth)
@@ -380,7 +387,8 @@ class Tree:
             if self.children[leaf_id] and depth < self.config.max_depth:
                 for child_id in self.children[leaf_id]:
                     if self.nodes[child_id].is_solved():
-                        self.winning_nodes.append(child_id)
+                        if not child_id in self.winning_nodes:
+                            self.winning_nodes.append(child_id)
                         self.found_a_route = True
                         return True, [child_id]
 
@@ -390,7 +398,8 @@ class Tree:
                     if self.config.evaluation_type == "rollout" :
                         nodeFinal, seq = self.nmcs_rollout(child_id, depth + 1, "greedy" )
                         if self.nodes[nodeFinal].is_solved():
-                            self.winning_nodes.append(nodeFinal)
+                            if not nodeFinal in self.winning_nodes:
+                                self.winning_nodes.append(nodeFinal)
                             self.found_a_route = True
                             return True, [nodeFinal]
                         self.insert_dicho_bfs_table(child_id, self._get_node_value(nodeFinal), depth +1, False)
@@ -432,7 +441,8 @@ class Tree:
             if self.children[leaf_id] and depth < self.config.max_depth:
                 for child_id in self.children[leaf_id]:
                     if self.nodes[child_id].is_solved():
-                        self.winning_nodes.append(child_id)
+                        if not child_id in self.winning_nodes:
+                            self.winning_nodes.append(child_id)
                         self.found_a_route = True
                         return True, [child_id]
 
@@ -442,7 +452,8 @@ class Tree:
                     if self.config.evaluation_type == "rollout" :
                         nodeFinal, seq = self.nmcs_rollout(child_id, depth + 1, "greedy" )
                         if self.nodes[nodeFinal].is_solved():
-                            self.winning_nodes.append(nodeFinal)
+                            if not nodeFinal in self.winning_nodes:
+                                self.winning_nodes.append(nodeFinal)
                             self.found_a_route = True
                             return True, [nodeFinal]
                         self.insert_dicho_bfs_table(child_id, self._get_node_value(nodeFinal), depth +1, False)
@@ -457,7 +468,8 @@ class Tree:
                 leaf_id = self.bfs_table.pop(0)[0]
 
             if self.nodes[leaf_id].is_solved():
-                self.winning_nodes.append(leaf_id)
+                if not leaf_id in self.winning_nodes:
+                    self.winning_nodes.append(leaf_id)
                 self.found_a_route = True
                 return  True, [leaf_id]
             self._expand_node(leaf_id)
@@ -468,7 +480,8 @@ class Tree:
                 best_chil_id = -1
                 for child_id in self.children[leaf_id]:
                     if self.nodes[child_id].is_solved():
-                        self.winning_nodes.append(child_id)
+                        if not child_id in self.winning_nodes:
+                            self.winning_nodes.append(child_id)
                         self.found_a_route = True
                         return True, [child_id]
 
@@ -493,7 +506,8 @@ class Tree:
             node_id = 1
             leaf, _ = self.NMCS(node_id, self.config.NMCS_level, 1)
             if self.nodes[leaf].is_solved() :
-                self.winning_nodes.append(leaf)
+                if not leaf in self.winning_nodes:
+                    self.winning_nodes.append(leaf)
                 self.found_a_route = True
                 return True, [leaf]
             return False, [leaf]
@@ -506,7 +520,8 @@ class Tree:
             node_id = 1
             leaf, _ = self.LNMCS(node_id, self.config.NMCS_level, 1, self.config.LNMCS_ratio)
             if self.nodes[leaf].is_solved() :
-                self.winning_nodes.append(leaf)
+                if not leaf in self.winning_nodes:
+                    self.winning_nodes.append(leaf)
                 self.found_a_route = True
                 return True, [leaf]
             return False, [leaf]
@@ -522,7 +537,8 @@ class Tree:
                         open_nodes_temp = open_nodes + open_nodes_temp
                         break
                     if self.nodes[n].is_solved():
-                        self.winning_nodes.append(n)
+                        if not n in self.winning_nodes:
+                            self.winning_nodes.append(n)
                         self.found_a_route = True
                         return True, [n]
                     if not n in self.expanded_nodes:
@@ -536,7 +552,8 @@ class Tree:
                 if time() - self.start_time > self.config.max_time:
                     return False, [0]
                 if self.nodes[n].is_solved():
-                    self.winning_nodes.append(n)
+                    if not n in self.winning_nodes:
+                        self.winning_nodes.append(n)
                     self.found_a_route = True
                     return True, [n]
                 if not n in self.expanded_nodes:
@@ -544,7 +561,8 @@ class Tree:
                     self.expanded_nodes.add(n)
                 s, _ = self.nmcs_rollout(n, self.config.NMCS_level+1, "greedy")
                 if self.nodes[s].is_solved():
-                    self.winning_nodes.append(n)
+                    if not n in self.winning_nodes:
+                        self.winning_nodes.append(n)
                     self.found_a_route = True
                     return True, [s]
             return False, [0]
@@ -771,6 +789,7 @@ class Tree:
                             new_precursor.prev_precursors = [new_precursor, *prev_precursor]
 
                         self._add_node(node_id, child_node, r[1], r[0])
+                        print("hoooo")
                         total_expanded += 1
                         expanded = True
 
@@ -1278,7 +1297,8 @@ class Tree:
             if time() - self.start_time > self.config.max_time :
                 return best_node_id, return_sequence + best_sequence
             if self.nodes[node_id].is_solved():
-                self.winning_nodes.append(node_id)
+                if not node_id in self.winning_nodes:
+                    self.winning_nodes.append(node_id)
                 self.found_a_route = True
                 if self.stop_at_first :
                     return node_id, return_sequence
@@ -1286,11 +1306,13 @@ class Tree:
             for child_id in all_child:
                 s1 = child_id
                 if self.nodes[child_id].is_solved():
-                    self.winning_nodes.append(child_id)
+                    if not node_id in self.winning_nodes:
+                        self.winning_nodes.append(child_id)
                     self.found_a_route = True
                     return_sequence.append(s1)
                     if self.stop_at_first:
                         return s1, return_sequence
+                    continue
                 if not child_id in self.expanded_nodes:
                     self._expand_node(child_id)
                     self.expanded_nodes.add(child_id)
@@ -1310,7 +1332,8 @@ class Tree:
                     s1, sequence = self.NMCS(s1, n-1, depth+1)
                     sequence.insert(0, child_id)
                 if self.nodes[s1].is_solved():
-                    self.winning_nodes.append(s1)
+                    if not s1 in self.winning_nodes:
+                        self.winning_nodes.append(s1)
                     self.found_a_route = True
                     if self.stop_at_first:
                         return s1, return_sequence + sequence
@@ -1348,9 +1371,11 @@ class Tree:
             if time() - self.start_time > self.config.max_time :
                 return best_node_id, return_sequence + best_sequence
             if self.nodes[node_id].is_solved():
-                self.winning_nodes.append(node_id)
+                if not node_id in self.winning_nodes:
+                    self.winning_nodes.append(node_id)
                 self.found_a_route = True
-                return node_id, return_sequence
+                if self.stop_at_first:
+                    return node_id, return_sequence
 
             self.bfs_table = []
             candidates = []
@@ -1359,20 +1384,25 @@ class Tree:
 
             for child_id in self.children[node_id]:
                 if self.nodes[child_id].is_solved():
-                    self.winning_nodes.append(child_id)
+                    if not child_id in self.winning_nodes:
+                        self.winning_nodes.append(child_id)
                     self.found_a_route = True
-                    return_sequence.append(child_id)
-                    return child_id, return_sequence
+                    if self.stop_at_first:
+                        return_sequence.append(child_id)
+                        return child_id, return_sequence
+                    continue
                 if not child_id in self.expanded_nodes:
                     self._expand_node(child_id)
                     self.expanded_nodes.add(child_id)
 
                 st_to_eval, seq = self.nmcs_rollout(child_id, depth + 1, "greedy")
                 if self.nodes[st_to_eval].is_solved():
-                    self.winning_nodes.append(st_to_eval)
+                    if not st_to_eval in self.winning_nodes:
+                        self.winning_nodes.append(st_to_eval)
                     self.found_a_route = True
-                    return_sequence.append(st_to_eval)
-                    return st_to_eval, return_sequence + seq
+                    if self.stop_at_first:
+                        return_sequence.append(st_to_eval)
+                        return st_to_eval, return_sequence + seq
                 eval_score = self._get_node_value(st_to_eval)
 
                 self.insert_dicho_LNMCS_tresh(eval_score, depth)
@@ -1402,9 +1432,11 @@ class Tree:
                     s1, sequence = self.LNMCS(s1, n - 1, depth + 1, ratio)
                     sequence.insert(0, child_id)
                 if self.nodes[s1].is_solved():
-                    self.winning_nodes.append(s1)
+                    if not s1 in self.winning_nodes:
+                        self.winning_nodes.append(s1)
                     self.found_a_route = True
-                    return s1, return_sequence + sequence
+                    if self.stop_at_first:
+                        return s1, return_sequence + sequence
 
                 score = self._get_node_value(s1)
 
@@ -1439,7 +1471,8 @@ class Tree:
         while all_child and depth < self.config.max_depth:
 
             if self.nodes[node_id].is_solved():
-                self.winning_nodes.append(st_to_eval)
+                if not st_to_eval in self.winning_nodes:
+                    self.winning_nodes.append(st_to_eval)
                 self.found_a_route = True
                 return node_id, sequence
             max = -1
@@ -1449,7 +1482,8 @@ class Tree:
                 for e in range(len(self.children[node_id])):
                     vals.append(0.00001)
                     if self.nodes[list(self.children[node_id])[e]].is_solved():
-                        self.winning_nodes.append(list(self.children[node_id])[e])
+                        if not list(self.children[node_id])[e] in self.winning_nodes:
+                            self.winning_nodes.append(list(self.children[node_id])[e])
                         self.found_a_route = True
                         sequence.append(list(self.children[node_id])[e])
                         return list(self.children[node_id])[e], sequence
@@ -1461,7 +1495,8 @@ class Tree:
             if mode == "random":
                 i = int(uniform(0, len(self.children[node_id])))
                 if self.nodes[list(self.children[node_id])[i]].is_solved():
-                    self.winning_nodes.append(list(self.children[node_id])[i])
+                    if not list(self.children[node_id])[i] in self.winning_nodes:
+                        self.winning_nodes.append(list(self.children[node_id])[i])
                     self.found_a_route = True
                     sequence.append(list(self.children[node_id])[i])
                     return list(self.children[node_id])[i], sequence
@@ -1470,7 +1505,8 @@ class Tree:
                 for e in range(len(self.children[node_id])):
                     vals.append(0.00001)
                     if self.nodes[list(self.children[node_id])[e]].is_solved():
-                        self.winning_nodes.append(list(self.children[node_id])[e])
+                        if not list(self.children[node_id])[e] in self.winning_nodes:
+                            self.winning_nodes.append(list(self.children[node_id])[e])
                         self.found_a_route = True
                         sequence.append(list(self.children[node_id])[e])
                         return list(self.children[node_id])[e], sequence
