@@ -504,10 +504,6 @@ class TreeConfig(ConfigABC):
             raise ValueError(
                 "Invalid evaluation_type. Allowed values are 'policy', 'weight', 'sascore', 'weightXsascore', 'WxWxSAS', 'random', 'gcn', 'rollout'."
             )
-        if not isinstance(params["stop_at_first"], bool):
-            raise ValueError(
-                "stop_at_first must be a boolean"
-            )
         if params["evaluation_agg"] not in ["max", "average"]:
             raise ValueError(
                 "Invalid evaluation_agg. Allowed values are 'max', 'average'."
