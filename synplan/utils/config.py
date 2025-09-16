@@ -475,6 +475,7 @@ class TreeConfig(ConfigABC):
     LNMCS_ratio: float = 0.2
     score_function: str = "weightXsascore"
     max_rules_applied = 10
+    stop_at_first = False
 
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "TreeConfig":
