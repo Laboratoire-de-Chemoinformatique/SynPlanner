@@ -168,7 +168,7 @@ class Tree:
             )
 
         # other tree search algorithms
-        self.stop_at_first = True
+        self.stop_at_first = False
         self.found_a_route = False
         self.bfs_table = [] #(node_id, score, depth)
         self.lnmcs_thresholds = [[] for _ in range(100)] #list of scores at depth
