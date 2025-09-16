@@ -19,7 +19,11 @@ from CGRtools.reactor import Reactor
 from tqdm import tqdm
 
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
-from synplan.chem.utils import reverse_reaction, cgrtools_to_chython_molecule, chython_query_to_cgrtools
+from synplan.chem.utils import (
+    reverse_reaction,
+    cgrtools_to_chython_molecule,
+    chython_query_to_cgrtools,
+)
 from synplan.utils.config import RuleExtractionConfig
 from synplan.utils.files import ReactionReader
 

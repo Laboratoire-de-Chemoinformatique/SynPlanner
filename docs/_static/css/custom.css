@@ -1,0 +1,161 @@
+/* Minimal modern purple-dark for pydata_sphinx_theme
+   Goals: strong readability, subtle brand accent, low ornamentation, no font changes.
+   Keep both data attributes for theme compatibility.
+*/
+
+html[data-bs-theme="dark"],
+html[data-theme="dark"] {
+  /* Core palette */
+  --pst-color-background: #16121d;   /* page background: deep eggplant */
+  --pst-color-on-background: #16121d; /* nested surfaces */
+  --pst-color-surface: #241b2f;       /* cards/sidebars */
+  --pst-color-border: #3a2c4e;        /* dividers */
+  --pst-color-text: #edecf4;          /* primary text */
+  --pst-color-muted: #b8a1d9;         /* secondary text */
+
+  /* Brand accents */
+  --pst-color-primary: #b48ef7;       /* signature purple */
+  --pst-color-link: var(--pst-color-primary);
+  --pst-color-link-hover: #d7bfff;
+
+  /* Code (inline + blocks) */
+  --pst-color-inline-code: #eadcff;   /* legible on dark */
+  --pst-color-inline-code-bg: #2c2341;
+}
+
+/* Global surfaces/text */
+html[data-bs-theme="dark"] body,
+html[data-theme="dark"] body {
+  background: var(--pst-color-background);
+  color: var(--pst-color-text);
+}
+
+/* Header + separators */
+html[data-bs-theme="dark"] .bd-header,
+html[data-theme="dark"] .bd-header {
+  background: var(--pst-color-on-background);
+  border-bottom: 1px solid var(--pst-color-border);
+}
+
+/* Sidebars & ToC */
+html[data-bs-theme="dark"] .bd-sidebar,
+html[data-bs-theme="dark"] .bd-toc,
+html[data-theme="dark"] .bd-sidebar,
+html[data-theme="dark"] .bd-toc {
+  background: var(--pst-color-background);
+  border-right: 1px solid var(--pst-color-border);
+}
+html[data-bs-theme="dark"] .bd-sidebar .nav-link.active,
+html[data-theme="dark"] .bd-sidebar .nav-link.active,
+html[data-bs-theme="dark"] .bd-toc .nav-link.active,
+html[data-theme="dark"] .bd-toc .nav-link.active {
+  color: var(--pst-color-primary);
+  background: color-mix(in srgb, var(--pst-color-primary) 12%, transparent);
+  border-left: 2px solid var(--pst-color-primary);
+}
+
+/* Brighter non-active nav links for readability */
+html[data-bs-theme="dark"] .bd-sidebar .nav-link,
+html[data-theme="dark"] .bd-sidebar .nav-link,
+html[data-bs-theme="dark"] .bd-toc .nav-link,
+html[data-theme="dark"] .bd-toc .nav-link {
+  color: #d6d1e9;
+}
+html[data-bs-theme="dark"] .bd-sidebar .nav-link:hover,
+html[data-theme="dark"] .bd-sidebar .nav-link:hover,
+html[data-bs-theme="dark"] .bd-toc .nav-link:hover,
+html[data-theme="dark"] .bd-toc .nav-link:hover {
+  color: #ece8fb;
+}
+
+/* Links */
+html[data-bs-theme="dark"] a,
+html[data-theme="dark"] a {
+  color: var(--pst-color-link);
+  text-underline-offset: 2px;
+}
+html[data-bs-theme="dark"] a:hover,
+html[data-theme="dark"] a:hover {
+  color: var(--pst-color-link-hover);
+}
+
+/* Admonitions (clean, understated) */
+html[data-bs-theme="dark"] .bd-content .admonition,
+html[data-theme="dark"] .bd-content .admonition {
+  background: var(--pst-color-on-background);
+  border: 1px solid var(--pst-color-border);
+}
+html[data-bs-theme="dark"] .admonition .admonition-title,
+html[data-theme="dark"] .admonition .admonition-title {
+  color: var(--pst-color-text);
+  border-bottom: 1px solid var(--pst-color-border);
+}
+
+/* Code blocks: neutral, readable contrast */
+html[data-bs-theme="dark"] .highlight,
+html[data-bs-theme="dark"] .highlight pre,
+html[data-theme="dark"] .highlight,
+html[data-theme="dark"] .highlight pre {
+  background-color: #221c33;
+  border: 1px solid var(--pst-color-border);
+}
+
+/* Syntax highlighting: tone down comment yellow for better balance */
+html[data-bs-theme="dark"] .highlight .c,
+html[data-theme="dark"] .highlight .c,
+html[data-bs-theme="dark"] .highlight .cm,
+html[data-theme="dark"] .highlight .cm,
+html[data-bs-theme="dark"] .highlight .c1,
+html[data-theme="dark"] .highlight .c1,
+html[data-bs-theme="dark"] .highlight .cs,
+html[data-theme="dark"] .highlight .cs,
+html[data-bs-theme="dark"] .highlight .cp,
+html[data-theme="dark"] .highlight .cp {
+  color: #9fa3b8; /* muted slate instead of bright yellow */
+}
+
+/* Inline code */
+html[data-bs-theme="dark"] code,
+html[data-theme="dark"] code {
+  color: var(--pst-color-inline-code);
+  background: var(--pst-color-inline-code-bg);
+  padding: 0.08em 0.32em;
+  border-radius: 0.25rem;
+}
+
+/* Tables (subtle structure) */
+html[data-bs-theme="dark"] thead th,
+html[data-theme="dark"] thead th {
+  background: #282040;
+  color: var(--pst-color-text);
+  border-bottom: 1px solid var(--pst-color-border);
+}
+html[data-bs-theme="dark"] tbody tr:nth-child(odd),
+html[data-theme="dark"] tbody tr:nth-child(odd) {
+  background: #221b36;
+}
+
+/* Make table body text a bit brighter */
+html[data-bs-theme="dark"] .bd-content table td,
+html[data-theme="dark"] .bd-content table td,
+html[data-bs-theme="dark"] .bd-content table th:not(thead th),
+html[data-theme="dark"] .bd-content table th:not(thead th) {
+  color: #e9e7f4;
+}
+
+/* Focus visibility (accessible, brand-aligned) */
+html[data-bs-theme="dark"] :focus-visible,
+html[data-theme="dark"] :focus-visible {
+  outline: 2px solid var(--pst-color-primary);
+  outline-offset: 2px;
+}
+
+/* Selection (gentle purple tint) */
+html[data-bs-theme="dark"] ::selection,
+html[data-theme="dark"] ::selection {
+  background: color-mix(in srgb, var(--pst-color-primary) 35%, transparent);
+  color: #ffffff;
+}
+
+/* Optional: keep your original brand weight for the logo */
+.navbar-brand { font-weight: 600; }

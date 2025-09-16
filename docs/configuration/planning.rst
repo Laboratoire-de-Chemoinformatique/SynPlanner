@@ -6,6 +6,26 @@ Retrosynthetic planning
 
 The retrosynthesis planning algorithm can be adjusted by the configuration file.
 
+Download example configuration
+------------------------------
+
+- GitHub: `configs/planning.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/planning.yaml>`_
+
+Quickstart (CLI)
+----------------
+
+Run planning using the repository configuration in ``configs/planning.yaml``:
+
+.. code-block:: bash
+
+   synplan planning \
+     --config configs/planning.yaml \
+     --targets targets.smi \
+     --reaction_rules reaction_rules.pickle \
+     --building_blocks building_blocks_stand.smi \
+     --policy_network policy_network.ckpt \
+     --results_dir planning_results
+
 **Configuration file**
 
 .. code-block:: yaml

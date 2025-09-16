@@ -91,22 +91,22 @@ class RuleExtractionConfig(ConfigABC):
     """
 
     # default low-level parameters
-    single_reactant_only: bool = True
     keep_metadata: bool = False
     reactor_validation: bool = True
     reverse_rule: bool = True
     as_query_container: bool = True
-    include_func_groups: bool = False
-    func_groups_list: List[str] = field(default_factory=list)
+    single_reactant_only: bool = False
 
     # adjustable parameters
     environment_atom_count: int = 1
     min_popularity: int = 3
     include_rings: bool = True
     multicenter_rules: bool = True
+    include_func_groups: bool = False
     keep_leaving_groups: bool = True
     keep_incoming_groups: bool = True
     keep_reagents: bool = False
+    func_groups_list: List[str] = field(default_factory=list)
     atom_info_retention: Dict[str, Dict[str, bool]] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -146,7 +146,7 @@ class RuleExtractionConfig(ConfigABC):
                 query = smarts(group_smarts)
                 func_groups_list.append(query)
             except Exception as e:
-                print(f'Functional group {group_smarts} was not parsed because of {e}')
+                print(f"Functional group {group_smarts} was not parsed because of {e}")
         self.func_groups_list = func_groups_list
 
     @staticmethod
@@ -178,12 +178,9 @@ class RuleExtractionConfig(ConfigABC):
             raise ValueError("include_func_groups must be a boolean.")
 
         if params["func_groups_list"] is not None and not all(
-            isinstance(group, str)
-            for group in params["func_groups_list"]
+            isinstance(group, str) for group in params["func_groups_list"]
         ):
-            raise ValueError(
-                "func_groups_list must be a list of SMARTS."
-            )
+            raise ValueError("func_groups_list must be a list of SMARTS.")
 
         if not isinstance(params["include_rings"], bool):
             raise ValueError("include_rings must be a boolean.")

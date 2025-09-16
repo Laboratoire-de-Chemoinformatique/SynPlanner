@@ -17,8 +17,10 @@ from torch.utils.data import random_split
 from torch_geometric.data.lightning import LightningDataset
 
 from synplan.ml.networks.policy import PolicyNetwork
-from synplan.ml.training.preprocessing import (FilteringPolicyDataset,
-                                               RankingPolicyDataset)
+from synplan.ml.training.preprocessing import (
+    FilteringPolicyDataset,
+    RankingPolicyDataset,
+)
 from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.logging import DisableLogger, HiddenPrints
 
@@ -122,7 +124,9 @@ def run_policy_training(
         policy_type=config.policy_type,
     )
 
-    checkpoint = ModelCheckpoint(dirpath=results_path, filename=weights_file_name, monitor="val_loss", mode="min")
+    checkpoint = ModelCheckpoint(
+        dirpath=results_path, filename=weights_file_name, monitor="val_loss", mode="min"
+    )
 
     if silent:
         enable_progress_bar = False

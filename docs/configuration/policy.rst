@@ -6,6 +6,24 @@ Policy network
 
 The ranking or filtering policy network architecture and training hyperparameters can be adjusted in the training configuration file.
 
+Download example configuration
+------------------------------
+
+- GitHub: `configs/policy.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/policy.yaml>`_
+
+Quickstart (CLI)
+----------------
+
+Train a policy network using the repository configuration in ``configs/policy.yaml``:
+
+.. code-block:: bash
+
+   synplan ranking_policy_training \
+     --config configs/policy.yaml \
+     --reaction_data reaction_data_filtered.smi \
+     --reaction_rules reaction_rules.pickle \
+     --results_dir ranking_policy_network
+
 **Configuration file**
 
 .. code-block:: yaml

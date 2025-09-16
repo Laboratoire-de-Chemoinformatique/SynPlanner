@@ -24,4 +24,12 @@ The following subpackages are public.
     api_reference/modules.rst
 
 
+What this section is for
+------------------------
+
+This is the reference for the Python API (functions and classes). Use it when you are scripting SynPlanner in Python,
+writing integrations, or need detailed signatures. If you are looking for how to run CLI commands or configure YAML,
+see :doc:`/user_guide/cli_interface` and :doc:`/configuration/configuration`.
+
+
 

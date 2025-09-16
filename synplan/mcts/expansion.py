@@ -56,9 +56,10 @@ class PolicyNetworkFunction:
         out_dim = list(self.policy_net.modules())[-1].out_features
         if out_dim != len(reaction_rules):
             raise Exception(
-                   f'The policy network output dimensionality is {out_dim}, but the number of reaction rules is {len(reaction_rules)}. ' \
-                   'Probably you use a different version of the policy network. Be sure to retain the policy network ' \
-                   'with the current set of reaction rules')
+                f"The policy network output dimensionality is {out_dim}, but the number of reaction rules is {len(reaction_rules)}. "
+                "Probably you use a different version of the policy network. Be sure to retain the policy network "
+                "with the current set of reaction rules"
+            )
 
         pyg_graph = mol_to_pyg(precursor.molecule, canonicalize=False)
         if pyg_graph:

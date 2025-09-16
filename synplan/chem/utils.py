@@ -4,8 +4,12 @@ protocols."""
 import logging
 from typing import Iterable
 
-from CGRtools.containers import (CGRContainer, MoleculeContainer,
-                                 QueryContainer, ReactionContainer)
+from CGRtools.containers import (
+    CGRContainer,
+    MoleculeContainer,
+    QueryContainer,
+    ReactionContainer,
+)
 from CGRtools.exceptions import InvalidAromaticRing
 from tqdm import tqdm
 
@@ -16,10 +20,10 @@ from chython import MoleculeContainer as MoleculeContainerChython
 
 
 def mol_from_smiles(
-        smiles: str,
-        standardize: bool = True,
-        clean_stereo: bool = True,
-        clean2d: bool = True
+    smiles: str,
+    standardize: bool = True,
+    clean_stereo: bool = True,
+    clean2d: bool = True,
 ) -> MoleculeContainer:
     """Converts a SMILES string to a `MoleculeContainer` object and optionally
     standardizes, cleans stereochemistry, and cleans 2D coordinates.
@@ -46,7 +50,9 @@ def mol_from_smiles(
             tmp.clean2d()
         molecule = tmp
     except InvalidAromaticRing:
-        logging.warning("CGRtools was not able to standardize molecule due to invalid aromatic ring")
+        logging.warning(
+            "CGRtools was not able to standardize molecule due to invalid aromatic ring"
+        )
     return molecule
 
 
@@ -211,10 +217,9 @@ def chython_query_to_cgrtools(query):
             charge=atom.charge,
             neighbors=atom.neighbors,
             hybridization=atom.hybridization,
-            _map=n
+            _map=n,
         )
     for n, m, bond in query.bonds():
         cgrtools_query.add_bond(n, m, int(bond))
 
     return cgrtools_query
-
