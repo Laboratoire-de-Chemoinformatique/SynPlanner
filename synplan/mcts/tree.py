@@ -794,7 +794,6 @@ class Tree:
                             new_precursor.prev_precursors = [new_precursor, *prev_precursor]
 
                         self._add_node(node_id, child_node, r[1], r[0])
-                        print("hoooo")
                         total_expanded += 1
                         expanded = True
 
