@@ -1311,7 +1311,7 @@ class Tree:
             for child_id in all_child:
                 s1 = child_id
                 if self.nodes[child_id].is_solved():
-                    if not node_id in self.winning_nodes:
+                    if not child_id in self.winning_nodes:
                         self.winning_nodes.append(child_id)
                     self.found_a_route = True
                     return_sequence.append(s1)
@@ -1358,7 +1358,7 @@ class Tree:
             depth += 1
             return_sequence.append(best_sequence.pop(0))
 
-            if not node_id in self.expanded_nodes:
+            if not node_id in self.expanded_nodes and not node_id in self.winning_nodes:
                 self._expand_node(node_id)
                 self.expanded_nodes.add(node_id)
 
@@ -1457,7 +1457,7 @@ class Tree:
             depth += 1
             return_sequence.append(best_sequence.pop(0))
 
-            if not node_id in self.expanded_nodes:
+            if not node_id in self.expanded_nodes and not node_id in self.winning_nodes:
                 self._expand_node(node_id)
                 self.expanded_nodes.add(node_id)
 
@@ -1476,8 +1476,8 @@ class Tree:
         while all_child and depth < self.config.max_depth:
 
             if self.nodes[node_id].is_solved():
-                if not st_to_eval in self.winning_nodes:
-                    self.winning_nodes.append(st_to_eval)
+                if not node_id in self.winning_nodes:
+                    self.winning_nodes.append(node_id)
                 self.found_a_route = True
                 return node_id, sequence
             max = -1
