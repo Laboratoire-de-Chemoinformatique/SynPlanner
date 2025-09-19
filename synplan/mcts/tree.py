@@ -732,7 +732,7 @@ class Tree:
                                 ),
                             )
 
-                            if precursors_to_expand in self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks:
+                            if precursors_to_expand != () and precursors_to_expand in self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks:
                                 id = self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[precursors_to_expand]
                                 self.redundant_children[node_id].add(id)
                                 total_expanded += 1
@@ -740,6 +740,7 @@ class Tree:
                                 if total_expanded > self.config.max_rules_applied and False:
                                     break
                                 continue
+
                             else:
                                 self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[precursors_to_expand] = self.curr_tree_size
 
