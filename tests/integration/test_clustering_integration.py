@@ -73,6 +73,8 @@ def tree_config():
     return TreeConfig(
         search_strategy="expansion_first",
         evaluation_type="rollout",
+        algorithm="UCT",
+        score_function="rollout",
         max_iterations=300,
         max_time=120,
         max_depth=6,
