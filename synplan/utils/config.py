@@ -470,10 +470,10 @@ class TreeConfig(ConfigABC):
     min_mol_size: int = 6
     silent: bool = False
 
-    algorithm: str = "NMCS"
+    algorithm: str = "UCT"
     NMCS_level: int = 2
     LNMCS_ratio: float = 0.2
-    score_function: str = "weightXsascore"
+    score_function: str = "rollout"
     max_rules_applied = 10
     stop_at_first = False
 
