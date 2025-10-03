@@ -476,6 +476,7 @@ class TreeConfig(ConfigABC):
     score_function: str = "rollout"
     max_rules_applied = 10
     stop_at_first = False
+    single_core: bool = True
 
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "TreeConfig":

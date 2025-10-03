@@ -642,7 +642,7 @@ class Tree:
 
         tmp_precursor = set()
         expanded = False
-        SINGLE_CORE = False
+        SINGLE_CORE = self.config.single_core
         SINGLE_WORKER = True
         args_to_launch_single = []
         args_to_launch = []
