@@ -143,7 +143,7 @@ def load_reaction_rules(file: str) -> List[Reactor]:
 
 @functools.lru_cache(maxsize=None)
 def load_building_blocks(
-    building_blocks_path: Union[str, Path], standardize: bool = True
+    building_blocks_path: Union[str, Path], standardize: bool = True, silent: bool = True,
 ) -> Set[str]:
     """Loads building blocks data from a file and returns a frozen set of building
     blocks.
@@ -166,6 +166,7 @@ def load_building_blocks(
                 molecules,
                 desc="Number of building blocks processed: ",
                 bar_format="{desc}{n} [{elapsed}]",
+                disable=silent,
             ):
                 try:
                     mol.canonicalize()
