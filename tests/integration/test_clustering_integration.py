@@ -47,7 +47,7 @@ def building_blocks(data_folder):
     building_blocks_path = data_folder.joinpath(
         "building_blocks/building_blocks_em_sa_ln.smi"
     )
-    return load_building_blocks(building_blocks_path, standardize=True, silent=True)
+    return load_building_blocks(building_blocks_path, standardize=False, silent=True)
 
 
 @pytest.fixture(scope="module")
