@@ -82,6 +82,7 @@ def tree_config():
         init_node_value=0.5,
         ucb_type="uct",
         c_ucb=0.1,
+        silent=True,
     )
 
 
