@@ -477,6 +477,8 @@ class TreeConfig(ConfigABC):
     max_rules_applied = 10
     stop_at_first = False
     single_core: bool = True
+    single_worker: bool = True
+    num_cpus: int = 1
 
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "TreeConfig":

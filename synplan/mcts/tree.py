@@ -57,8 +57,6 @@ def expand_node_apply_rules_worker(arg_curr_node_curr_precursor_molecule, arg_ru
     for products in apply_reaction_rule(arg_curr_node_curr_precursor_molecule, arg_rules):
         list_products.append(products)
 
-
-
     return list_products
 
 def expand_node_rest_worker(arg_products, arg_rule_id, arg_prob,arg_min_mol_size):
@@ -70,7 +68,6 @@ def expand_node_rest_worker(arg_products, arg_rule_id, arg_prob,arg_min_mol_size
     scaled_prob = arg_prob * len(
         list(filter(lambda x: len(x) > arg_min_mol_size, arg_products))
     )
-
 
     return new_precursor, scaled_prob, arg_rule_id
 
@@ -100,40 +97,8 @@ class Tree:
             used as a default for node evaluation.
         """
 
-        # config parameters
+        # tree config parameters
         self.config = config
-
-        assert isinstance(
-            target, MoleculeContainer
-        ), "Target should be given as MoleculeContainer"
-        assert len(target) > 3, "Target molecule has less than 3 atoms"
-
-        target_molecule = Precursor(target)
-        target_molecule.prev_precursors.append(Precursor(target))
-        target_node = Node(
-            precursors_to_expand=(target_molecule,), new_precursors=(target_molecule,)
-        )
-
-        # tree structure init
-        self.nodes: Dict[int, Node] = {1: target_node}
-        self.parents: Dict[int, int] = {1: 0}
-        self.redundant_children: Dict[int, Set[int]] = {1: set()}
-        self.children: Dict[int, Set[int]] = {1: set()}
-        self.winning_nodes: List[int] = []
-        self.visited_nodes: Set[int] = set()
-        self.expanded_nodes: Set[int] = set()
-        self.nodes_visit: Dict[int, int] = {1: 0}
-        self.nodes_depth: Dict[int, int] = {1: 0}
-        self.nodes_prob: Dict[int, float] = {1: 0.0}
-        self.nodes_rules: Dict[int, float] = {}
-        self.nodes_init_value: Dict[int, float] = {1: 0.0}
-        self.nodes_total_value: Dict[int, float] = {1: 0.0}
-
-        # tree building limits
-        self.curr_iteration: int = 0
-        self.curr_tree_size: int = 2
-        self.start_time: float = 0
-        self.curr_time: float = 0
 
         # building blocks and reaction reaction_rules
         self.reaction_rules = reaction_rules
@@ -155,22 +120,37 @@ class Tree:
                 )
             self.value_network = evaluation_function
 
+        # tree initialization
+        target_node = self._create_target_node(target)
+        self.nodes: Dict[int, Node] = {1: target_node}
+        self.parents: Dict[int, int] = {1: 0}
+        self.redundant_children: Dict[int, Set[int]] = {1: set()}
+        self.children: Dict[int, Set[int]] = {1: set()}
+        self.winning_nodes: List[int] = []
+        self.visited_nodes: Set[int] = set()
+        self.expanded_nodes: Set[int] = set()
+        self.nodes_visit: Dict[int, int] = {1: 0}
+        self.nodes_depth: Dict[int, int] = {1: 0}
+        self.nodes_prob: Dict[int, float] = {1: 0.0}
+        self.nodes_rules: Dict[int, float] = {}
+        self.nodes_init_value: Dict[int, float] = {1: 0.0}
+        self.nodes_total_value: Dict[int, float] = {1: 0.0}
+
+        # tree building limits
+        self.curr_iteration: int = 0
+        self.curr_tree_size: int = 2
+        self.start_time: float = 0
+        self.curr_time: float = 0
+
         # utils
         self._tqdm = True  # needed to disable tqdm with multiprocessing module
-
-        target_smiles = str(self.nodes[1].curr_precursor.molecule)
-        if target_smiles in self.building_blocks:
-            self.building_blocks.remove(target_smiles)
-            print(
-                "Target was found in building blocks and removed from building blocks."
-            )
 
         # other tree search algorithms
         self.stop_at_first = False
         self.found_a_route = False
         self.bfs_table = [] #(node_id, score, depth)
         self.lnmcs_thresholds = [[] for _ in range(100)] #list of scores at depth
-        self.pool = Pool(10)
+        self.pool = Pool(self.config.num_cpus)
         self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks = {}
         self.big_dict_of_all_node_ids_NMCS_playout_values = {}
 
@@ -296,7 +276,6 @@ class Tree:
 
             return False, [node_id]
 
-
         if self.config.algorithm == "BEAM":
             nodes_to_open = []
             if self.bfs_table == []:
@@ -338,8 +317,6 @@ class Tree:
                             self.insert_dicho_bfs_table(child_id, self._get_node_value(nodeFinal), depth + 1, False)
             return False, [1]
 
-
-
         if self.config.algorithm == "BREADTH":
             if self.bfs_table == []:
                 leaf_id = 1
@@ -367,8 +344,6 @@ class Tree:
                     self.bfs_table.append((child_id, 0, depth+1))
 
             return False, [leaf_id]
-
-
 
         if self.config.algorithm == "BFS":
             if self.bfs_table == []:
@@ -437,9 +412,6 @@ class Tree:
                         depth = self.bfs_table[i][2]
                         leaf_id = self.bfs_table.pop(i)[0]
                         break
-
-
-
 
             if self.children[leaf_id] and depth < self.config.max_depth:
                 for child_id in self.children[leaf_id]:
@@ -573,34 +545,26 @@ class Tree:
         print("unknown algorithm, please edit the configuration with a known algorithm: UCT, BFS, BDFS, NMCS, LNMCS, BREADTH, BEAM")
         return False, [0]
 
-    def _ucb(self, node_id: int) -> float:
-        """Calculates the Upper Confidence Bound (UCB) statistics for a given node.
+    def _create_target_node(self, target: MoleculeContainer):
 
-        :param node_id: The id of the node.
-        :return: The calculated UCB.
-        """
+        assert isinstance(
+            target, MoleculeContainer
+        ), "Target should be given as MoleculeContainer"
+        assert len(target) > 3, "Target molecule has less than 3 atoms"
 
-        prob = self.nodes_prob[node_id]  # predicted by policy network score
-        visit = self.nodes_visit[node_id]
+        target_molecule = Precursor(target)
+        target_molecule.prev_precursors.append(Precursor(target))
+        target_node = Node(
+            precursors_to_expand=(target_molecule,), new_precursors=(target_molecule,))
 
-        if self.config.ucb_type == "puct":
-            u = (
-                self.config.c_ucb * prob * sqrt(self.nodes_visit[self.parents[node_id]])
-            ) / (visit + 1)
-            ucb_value = self.nodes_total_value[node_id] + u
-
-        if self.config.ucb_type == "uct":
-            u = (
-                self.config.c_ucb
-                * sqrt(self.nodes_visit[self.parents[node_id]])
-                / (visit + 1)
+        target_smiles = str(target_node.curr_precursor.molecule)
+        if target_smiles in self.building_blocks:
+            self.building_blocks.remove(target_smiles)
+            print(
+                "Target was found in building blocks and removed from building blocks."
             )
-            ucb_value = self.nodes_total_value[node_id] + u
 
-        if self.config.ucb_type == "value":
-            ucb_value = self.nodes_init_value[node_id] / (visit + 1)
-
-        return ucb_value
+        return target_node
 
     def _select_node(self, node_id: int) -> int:
         """Selects a node based on its UCB value and returns the id of the node with the
@@ -638,8 +602,6 @@ class Tree:
 
         tmp_precursor = set()
         expanded = False
-        SINGLE_CORE = self.config.single_core
-        SINGLE_WORKER = True
         args_to_launch_single = []
         args_to_launch = []
         args_to_launch2_part1 = []
@@ -650,7 +612,7 @@ class Tree:
         )
 
         for prob, rule, rule_id in prediction :
-            if SINGLE_CORE :
+            if self.config.single_core :
                 for products in apply_reaction_rule(curr_node.curr_precursor.molecule, rule):
 
                     # check repeated products
@@ -698,14 +660,14 @@ class Tree:
                     if total_expanded > self.config.max_rules_applied and False:
                         break
             else:
-                if SINGLE_WORKER:
+                if self.config.single_worker:
                     args_to_launch_single.append((curr_node.curr_precursor.molecule, rule, rule_id, prob, self.config.min_mol_size))
                 else:
                     args_to_launch.append((curr_node.curr_precursor.molecule, rule))
                     args_to_launch2_part1.append((rule_id, prob, self.config.min_mol_size))
 
-        if not SINGLE_CORE :
-            if SINGLE_WORKER:
+        if not self.config.single_core :
+            if self.config.single_core:
                 res = self.pool.starmap(expand_node_worker, args_to_launch_single)
                 for r in res:
                     for i in range(len(r[0])):
@@ -928,9 +890,6 @@ class Tree:
         if self.config.score_function == "random":
             node_value = uniform(0, 1)
 
-        elif self.config.score_function == "policy":
-            node_value = self.nodes_prob[node_id]
-
         elif self.config.score_function == "rollout":
             node_value = min(
                 (
@@ -944,6 +903,9 @@ class Tree:
 
         elif self.config.score_function == "gcn":
             node_value = self.value_network.predict_value(node.new_precursors)
+
+        elif self.config.score_function == "policy":
+            node_value = self.nodes_prob[node_id]
 
         elif self.config.score_function in ["sascore", "heavyAtomCount", "weight", "weightXsascore", "WxWxSAS"]:
             node_scorer = NodeScore(score_function=self.config.score_function)
@@ -1069,6 +1031,35 @@ class Tree:
 
         reward = 1.0
         return reward
+
+    def _ucb(self, node_id: int) -> float:
+        """Calculates the Upper Confidence Bound (UCB) statistics for a given node.
+
+        :param node_id: The id of the node.
+        :return: The calculated UCB.
+        """
+
+        prob = self.nodes_prob[node_id]  # predicted by policy network score
+        visit = self.nodes_visit[node_id]
+
+        if self.config.ucb_type == "puct":
+            u = (
+                self.config.c_ucb * prob * sqrt(self.nodes_visit[self.parents[node_id]])
+            ) / (visit + 1)
+            ucb_value = self.nodes_total_value[node_id] + u
+
+        if self.config.ucb_type == "uct":
+            u = (
+                self.config.c_ucb
+                * sqrt(self.nodes_visit[self.parents[node_id]])
+                / (visit + 1)
+            )
+            ucb_value = self.nodes_total_value[node_id] + u
+
+        if self.config.ucb_type == "value":
+            ucb_value = self.nodes_init_value[node_id] / (visit + 1)
+
+        return ucb_value
 
     def report(self) -> str:
         """Returns the string representation of the tree."""
