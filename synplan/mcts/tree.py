@@ -19,10 +19,8 @@ from synplan.mcts.expansion import PolicyNetworkFunction
 from synplan.mcts.node import Node
 from synplan.utils.config import TreeConfig
 
-from rdkit.Contrib.SA_Score import sascorer
-from rdkit import Chem
-from rdkit.Chem.Descriptors import ExactMolWt
-from rdkit.Chem.rdMolDescriptors import CalcNumHeavyAtoms
+from synplan.chem.rdkit_utils import NodeScore
+
 from multiprocessing import Pool, Array, Manager, Queue, Process
 import sys
 import torch
@@ -572,8 +570,6 @@ class Tree:
                     return True, [s]
             return False, [0]
 
-
-
         print("unknown algorithm, please edit the configuration with a known algorithm: UCT, BFS, BDFS, NMCS, LNMCS, BREADTH, BEAM")
         return False, [0]
 
@@ -932,6 +928,9 @@ class Tree:
         if self.config.score_function == "random":
             node_value = uniform(0, 1)
 
+        elif self.config.score_function == "policy":
+            node_value = self.nodes_prob[node_id]
+
         elif self.config.score_function == "rollout":
             node_value = min(
                 (
@@ -943,76 +942,12 @@ class Tree:
                 default=1.0,
             )
 
-        elif self.config.score_function == "sascore":
-            meanPrecursorSAS = 0
-            for p in node.precursors_to_expand:
-                try:
-                    m = Chem.MolFromSmiles(str(p.molecule))
-                    meanPrecursorSAS += sascorer.calculateScore(m)
-                except:
-                    meanPrecursorSAS += 10.0
-            meanPrecursorSAS = meanPrecursorSAS / len(node.precursors_to_expand)
-            node_value = 1.0-meanPrecursorSAS / 10.0
-
-        elif self.config.score_function == "policy":
-            node_value = self.nodes_prob[node_id]
-
-        elif self.config.score_function == "heavyAtomCount":
-            totalHeavy = 0
-            for p in node.precursors_to_expand:
-                try:
-                    m = Chem.MolFromSmiles(str(p.molecule))
-                    totalHeavy += CalcNumHeavyAtoms(m)
-                except:
-                    totalHeavy += 100.0
-
-            node_value = 1000 - totalHeavy
-            if node_value < 0:
-                node_value = 0
-
-        elif self.config.score_function == "weight":
-            totalWeight = 0
-            for p in node.precursors_to_expand:
-                try:
-                    m = Chem.MolFromSmiles(str(p.molecule))
-                    totalWeight += ExactMolWt(m)
-                except:
-                    totalWeight += 1000.0
-
-            node_value = 10000 - totalWeight
-            if node_value < 0:
-                node_value = 0
-
-        elif self.config.score_function == "weightXsascore":
-            total = 0.0
-            for p in node.precursors_to_expand:
-                try:
-                    m = Chem.MolFromSmiles(str(p.molecule))
-                    total += ExactMolWt(m) * sascorer.calculateScore(m)
-                except:
-                    total += 10000.0
-            if total == 0:
-                return 1
-            node_value = 1 / total
-            if node_value < 0:
-                node_value = 0
-
-        elif self.config.score_function == "WxWxSAS":
-            total = 0.0
-            for p in node.precursors_to_expand:
-                try:
-                    m = Chem.MolFromSmiles(str(p.molecule))
-                    total += ExactMolWt(m) ** 2 * sascorer.calculateScore(m)
-                except:
-                    total += 10000.0
-            if total == 0:
-                return 1
-            node_value = 1 / total
-            if node_value < 0:
-                node_value = 0
-
         elif self.config.score_function == "gcn":
             node_value = self.value_network.predict_value(node.new_precursors)
+
+        elif self.config.score_function in ["sascore", "heavyAtomCount", "weight", "weightXsascore", "WxWxSAS"]:
+            node_scorer = NodeScore(score_function=self.config.score_function)
+            node_value = node_scorer(node)
 
         return node_value
 
