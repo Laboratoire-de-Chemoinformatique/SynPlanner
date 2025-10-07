@@ -470,6 +470,7 @@ class TreeConfig(ConfigABC):
     min_mol_size: int = 6
     silent: bool = False
 
+    # new parameters
     algorithm: str = "UCT"
     NMCS_level: int = 2
     LNMCS_ratio: float = 0.2
