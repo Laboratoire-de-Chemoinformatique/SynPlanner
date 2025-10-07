@@ -331,7 +331,7 @@ class Tree:
                     args_to_launch2_part1.append((rule_id, prob, self.config.min_mol_size))
 
         if not self.config.single_core :
-            if self.config.single_core:
+            if self.config.single_worker:
                 res = self.pool.starmap(expand_node_worker, args_to_launch_single)
                 for r in res:
                     for i in range(len(r[0])):
