@@ -292,6 +292,7 @@ class NestedMonteCarloSearch(BaseSearchAlgorithm):
     def __init__(self, tree, level=2):
         super().__init__(tree)
         self.level = level
+        self.big_dict_of_all_node_ids_NMCS_playout_values = {}
 
     def step(self):
 
@@ -347,12 +348,12 @@ class NestedMonteCarloSearch(BaseSearchAlgorithm):
                     if self.tree.config.evaluation_type == "score" :
                         sequence = []
                     if self.tree.config.evaluation_type == "rollout" :
-                        if s1 in self.tree.big_dict_of_all_node_ids_NMCS_playout_values :
-                            (s1, sequence) = self.tree.big_dict_of_all_node_ids_NMCS_playout_values[s1]
+                        if s1 in self.big_dict_of_all_node_ids_NMCS_playout_values :
+                            (s1, sequence) = self.big_dict_of_all_node_ids_NMCS_playout_values[s1]
                         else:
                             s1key = s1
                             s1, sequence = self.nmcs_rollout(s1, depth+1,"greedy")
-                            self.tree.big_dict_of_all_node_ids_NMCS_playout_values[s1key] = (s1, sequence)
+                            self.big_dict_of_all_node_ids_NMCS_playout_values[s1key] = (s1, sequence)
                     sequence.insert(0, child_id)
                 else:
                     s1, sequence = self.NMCS(s1, n-1, depth+1)

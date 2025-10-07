@@ -155,7 +155,6 @@ class Tree:
         self.found_a_route = False
         self.pool = Pool(self.config.num_cpus)
         self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks = {}
-        self.big_dict_of_all_node_ids_NMCS_playout_values = {}
 
         # choose search algorithm
         self.algorithm = ALGORITHMS[config.algorithm](self)
