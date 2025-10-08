@@ -126,7 +126,7 @@ class Tree:
             self.value_network = evaluation_function
 
         # tree initialization
-        target_node = self._create_target_node(target)
+        target_node = self._target_node(target)
         self.nodes: Dict[int, Node] = {1: target_node}
         self.parents: Dict[int, int] = {1: 0}
         self.redundant_children: Dict[int, Set[int]] = {1: set()}
@@ -209,7 +209,7 @@ class Tree:
 
         return is_solved, last_node_id
 
-    def _create_target_node(self, target: MoleculeContainer):
+    def _target_node(self, target: MoleculeContainer):
 
         assert isinstance(
             target, MoleculeContainer
@@ -330,7 +330,7 @@ class Tree:
                     args_to_launch.append((curr_node.curr_precursor.molecule, rule))
                     args_to_launch2_part1.append((rule_id, prob, self.config.min_mol_size))
 
-        if not self.config.single_core :
+        if not self.config.single_core:
             if self.config.single_worker:
                 res = self.pool.starmap(expand_node_worker, args_to_launch_single)
                 for r in res:

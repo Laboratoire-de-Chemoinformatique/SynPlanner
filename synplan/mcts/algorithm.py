@@ -242,44 +242,75 @@ class BeamSearch(BaseSearchAlgorithm):
 
 class UpperConfidenceSearch(BaseSearchAlgorithm):
     def step(self):
-        curr_depth, node_id = 0, 1
-        explore_route = True
+        curr_depth, node_id = 0, 1  # start from the root node_id
 
+        explore_route = True
         while explore_route:
             self.tree.visited_nodes.add(node_id)
-            if self.tree.nodes_visit[node_id]:
-                if not self.tree.children[node_id]:
+
+            if self.tree.nodes_visit[node_id]:  # already visited
+                if not self.tree.children[node_id]:  # dead node
                     self.tree._update_visits(node_id)
                     explore_route = False
                 else:
-                    node_id = self.tree._select_node(node_id)
+                    node_id = self.tree._select_node(node_id)  # select the child node
                     curr_depth += 1
             else:
-                if self.tree.nodes[node_id].is_solved():
-                    self.tree._update_visits(node_id)
-                    if node_id not in self.tree.winning_nodes:
+                if self.tree.nodes[node_id].is_solved():  # found route
+                    self.tree._update_visits(
+                        node_id
+                    )  # this prevents expanding of bb node_id
+                    if not node_id in self.tree.winning_nodes:
                         self.tree.winning_nodes.append(node_id)
                     self.tree.found_a_route = True
                     return True, [node_id]
 
-                if curr_depth < self.tree.config.max_depth:
+                if (
+                        curr_depth < self.tree.config.max_depth
+                ):  # expand node if depth limit is not reached
                     self.tree._expand_node(node_id)
                     self.tree.expanded_nodes.add(node_id)
-
-                    if not self.tree.children[node_id]:
-                        value = -1.0
+                    if not self.tree.children[node_id]:  # node was not expanded
+                        value_to_backprop = -1.0
                     else:
-                        if self.tree.config.search_strategy == "evaluation_first":
-                            values = [self.tree.nodes_init_value[c]
-                                      for c in self.tree.children[node_id]]
-                            agg = self.tree.config.evaluation_agg
-                            value = max(values) if agg == "max" else sum(values)/len(values)
-                        else:
-                            value = self.tree._get_node_value(node_id)
+                        self.tree.expanded_nodes.add(node_id)
 
-                    self.tree._backpropagate(node_id, value)
+                        if self.tree.config.search_strategy == "evaluation_first":
+                            # recalculate node value based on children synthesisability and backpropagation
+                            child_values = [
+                                self.tree.nodes_init_value[child_id]
+                                for child_id in self.tree.children[node_id]
+                            ]
+
+                            if self.tree.config.evaluation_agg == "max":
+                                value_to_backprop = max(child_values)
+
+                            elif self.tree.config.evaluation_agg == "average":
+                                value_to_backprop = sum(child_values) / len(
+                                    self.children[node_id]
+                                )
+
+                        elif self.tree.config.search_strategy == "expansion_first":
+                            value_to_backprop = self.tree._get_node_value(node_id)
+
+                    # backpropagation
+                    self.tree._backpropagate(node_id, value_to_backprop)
                     self.tree._update_visits(node_id)
                     explore_route = False
+
+                    if self.tree.children[node_id]:
+                        # found after expansion
+                        found_after_expansion = set()
+                        for child_id in iter(self.tree.children[node_id]):
+                            if self.tree.nodes[child_id].is_solved():
+                                found_after_expansion.add(child_id)
+                                if not child_id in self.tree.winning_nodes:
+                                    self.tree.winning_nodes.append(child_id)
+
+                        if found_after_expansion:
+                            self.tree.found_a_route = True
+                            return True, list(found_after_expansion)
+
                 else:
                     self.tree._backpropagate(node_id, self.tree.nodes_total_value[node_id])
                     self.tree._update_visits(node_id)
