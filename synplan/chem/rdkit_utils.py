@@ -7,11 +7,14 @@ from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
 
 
-class NodeScore:
+class RDKitScore:
     """Node scoring function."""
 
     def __init__(self, score_function="heavyAtomCount") -> None:
         self.score_function = score_function
+        # Normalization constants to bound outputs to [0, 1]
+        self._H_MAX = 100.0
+        self._W_MAX = 1000.0
 
     def __call__(self, node):
 
@@ -25,7 +28,11 @@ class NodeScore:
                     meanPrecursorSAS += 10.0
 
             meanPrecursorSAS = meanPrecursorSAS / len(node.precursors_to_expand)
-            node_value = 1.0-meanPrecursorSAS / 10.0
+            node_value = 1.0 - meanPrecursorSAS / 10.0
+            if node_value < 0:
+                node_value = 0.0
+            if node_value > 1:
+                node_value = 1.0
 
             return node_value
 
@@ -38,9 +45,12 @@ class NodeScore:
                 except:
                     totalHeavy += 100.0
 
-            node_value = 1000 - totalHeavy
+            # Map to [0, 1]: higher heavy atom count -> lower score
+            node_value = 1.0 - (totalHeavy / self._H_MAX)
             if node_value < 0:
-                node_value = 0
+                node_value = 0.0
+            if node_value > 1:
+                node_value = 1.0
 
             return node_value
 
@@ -53,9 +63,12 @@ class NodeScore:
                 except:
                     totalWeight += 1000.0
 
-            node_value = 10000 - totalWeight
+            # Map to [0, 1]: higher weight -> lower score
+            node_value = 1.0 - (totalWeight / self._W_MAX)
             if node_value < 0:
-                node_value = 0
+                node_value = 0.0
+            if node_value > 1:
+                node_value = 1.0
 
             return node_value
 
@@ -67,11 +80,12 @@ class NodeScore:
                     total += ExactMolWt(m) * sascorer.calculateScore(m)
                 except:
                     total += 10000.0
-            if total == 0:
-                return 1
-            node_value = 1 / total
+            # Smoothly bound to (0, 1]
+            node_value = 1.0 / (1.0 + total)
             if node_value < 0:
-                node_value = 0
+                node_value = 0.0
+            if node_value > 1:
+                node_value = 1.0
 
             return node_value
 
@@ -83,10 +97,10 @@ class NodeScore:
                     total += ExactMolWt(m) ** 2 * sascorer.calculateScore(m)
                 except:
                     total += 10000.0
-            if total == 0:
-                return 1
-            node_value = 1 / total
+            node_value = 1.0 / (1.0 + total)
             if node_value < 0:
-                node_value = 0
+                node_value = 0.0
+            if node_value > 1:
+                node_value = 1.0
 
             return node_value

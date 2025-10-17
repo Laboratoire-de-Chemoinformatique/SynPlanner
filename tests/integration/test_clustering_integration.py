@@ -75,7 +75,7 @@ def tree_config():
         evaluation_type="rollout",
         algorithm="UCT",
         score_function="rollout",
-        single_core=True,
+        enable_pruning=False,
         max_iterations=300,
         max_time=120,
         max_depth=6,

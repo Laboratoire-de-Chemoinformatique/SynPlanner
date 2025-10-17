@@ -435,7 +435,8 @@ def setup_planning_options():
 
                     tree_config = TreeConfig(
                         search_strategy=planning_params["search_strategy"],
-                        evaluation_type="rollout",  # This was hardcoded, keeping it.
+                        evaluation_function="rollout",
+                        evaluation_type="rollout",  # legacy, mapped inside TreeConfig
                         max_iterations=planning_params["max_iterations"],
                         max_depth=planning_params["max_depth"],
                         min_mol_size=planning_params["min_mol_size"],
@@ -451,7 +452,7 @@ def setup_planning_options():
                         reaction_rules=reaction_rules,
                         building_blocks=building_blocks,
                         expansion_function=policy_function,
-                        evaluation_function=None,  # This was hardcoded
+                        evaluation_function=None,  # Value network set when score_function == 'gcn'
                     )
 
                     mcts_progress_text = "Running MCTS iterations..."

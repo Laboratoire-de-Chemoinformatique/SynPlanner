@@ -460,17 +460,20 @@ class TreeConfig(ConfigABC):
     max_depth: int = 6
     search_strategy: str = "expansion_first"
     exclude_small: bool = True
-    evaluation_type: str = "rollout"
+    evaluation_type: str = "rollout"  # deprecated: mapped to score_function for backward compatibility
     min_mol_size: int = 6
     silent: bool = False
 
     # new parameters
     algorithm: str = "UCT"
+    # Rename score_function -> evaluation_function (canonical)
     score_function: str = "rollout"
+    evaluation_function: str = "rollout"
+    normalize_scores: bool = False
     max_rules_applied = 10
     stop_at_first = False
-    single_core: bool = True
     num_cpus: int = 1
+    enable_pruning: bool = True
 
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "TreeConfig":
@@ -483,10 +486,15 @@ class TreeConfig(ConfigABC):
         return TreeConfig.from_dict(config_dict)
 
     def _validate_params(self, params):
-        if params["score_function"] not in ["sascore", "weight", "policy", "heavyAtomCount", "weightXsascore", "WxWxSAS", "random", "gcn", "rollout"]:
+        # Validate canonical evaluation function
+        if params.get("evaluation_function") is None:
+            self.evaluation_function = params.get("score_function", "rollout")
+        if self.evaluation_function not in ["sascore", "weight", "policy", "heavyAtomCount", "weightXsascore", "WxWxSAS", "random", "gcn", "rollout"]:
             raise ValueError(
                 "Invalid evaluation_type. Allowed values are 'policy', 'weight', 'sascore', 'weightXsascore', 'WxWxSAS', 'random', 'gcn', 'rollout'."
             )
+        # keep score_function equal for backward compatibility
+        self.score_function = self.evaluation_function
         if not isinstance(params["max_depth"], int) or params["max_depth"] < 1:
             raise ValueError("max_depth must be a positive integer.")
         if not isinstance(params["max_tree_size"], int) or params["max_tree_size"] < 1:
@@ -509,6 +517,17 @@ class TreeConfig(ConfigABC):
             )
         if not isinstance(params["min_mol_size"], int) or params["min_mol_size"] < 0:
             raise ValueError("min_mol_size must be a non-negative integer.")
+        if not isinstance(params.get("enable_pruning", True), bool):
+            raise ValueError("enable_pruning must be a boolean.")
+
+        # Backward compatibility: map evaluation_type to score_function if provided
+        et = params.get("evaluation_type")
+        sf = params.get("score_function")
+        mapping = {"rollout": "rollout", "random": "random", "gcn": "gcn"}
+        if et in mapping and sf != mapping[et]:
+            # silently map; callers can log warnings if needed
+            self.evaluation_function = mapping[et]
+            self.score_function = self.evaluation_function
 
 
 def convert_config_to_dict(config_attr: ConfigABC, config_type) -> Dict | None:

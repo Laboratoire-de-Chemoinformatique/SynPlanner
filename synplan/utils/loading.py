@@ -6,7 +6,7 @@ import pickle
 import zipfile
 import shutil
 from pathlib import Path
-from typing import List, Set, Union
+from typing import List, Set, FrozenSet, Tuple, Union
 
 from CGRtools.reactor.reactor import Reactor
 from torch import device
@@ -138,13 +138,13 @@ def load_reaction_rules(file: str) -> List[Reactor]:
     if not isinstance(reaction_rules[0][0], Reactor):
         reaction_rules = [Reactor(x) for x, _ in reaction_rules]
 
-    return reaction_rules
+    return tuple(reaction_rules)
 
 
 @functools.lru_cache(maxsize=None)
 def load_building_blocks(
     building_blocks_path: Union[str, Path], standardize: bool = True, silent: bool = True,
-) -> Set[str]:
+) -> FrozenSet[str]:
     """Loads building blocks data from a file and returns a frozen set of building
     blocks.
 
@@ -180,7 +180,7 @@ def load_building_blocks(
                 smiles = line.strip().split()[0]
                 building_blocks_smiles.add(smiles)
 
-    return building_blocks_smiles
+    return frozenset(building_blocks_smiles)
 
 
 def load_value_net(

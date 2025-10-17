@@ -162,17 +162,8 @@ class BestFirstSearch(BaseSearchAlgorithm):
                     self.tree.found_a_route = True
                     return True, [child_id]
 
-                if self.tree.config.evaluation_type == "score":
-                    self.insert_dicho_bfs_table(child_id, self.tree._get_node_value(child_id), depth + 1, False)
-
-                if self.tree.config.evaluation_type == "rollout":
-                    nodeFinal, seq = self.nmcs_rollout(child_id, depth + 1, "greedy")
-                    if self.tree.nodes[nodeFinal].is_solved():
-                        if not nodeFinal in self.tree.winning_nodes:
-                            self.tree.winning_nodes.append(nodeFinal)
-                        self.tree.found_a_route = True
-                        return True, [nodeFinal]
-                    self.insert_dicho_bfs_table(child_id, self.tree._get_node_value(nodeFinal), depth + 1, False)
+                # Always evaluate using unified node value
+                self.insert_dicho_bfs_table(child_id, self.tree._get_node_value(child_id), depth + 1, False)
         return False, [leaf_id]
 
 
@@ -227,17 +218,8 @@ class BeamSearch(BaseSearchAlgorithm):
                         self.tree.found_a_route = True
                         return True, [child_id]
 
-                    if self.tree.config.evaluation_type == "score":
-                        self.insert_dicho_bfs_table(child_id, self.tree._get_node_value(child_id), depth + 1, False)
-
-                    if self.tree.config.evaluation_type == "rollout":
-                        nodeFinal, seq = self.nmcs_rollout(child_id, depth + 1, "greedy")
-                        if self.tree.nodes[nodeFinal].is_solved():
-                            if not nodeFinal in self.tree.winning_nodes:
-                                self.tree.winning_nodes.append(nodeFinal)
-                            self.tree.found_a_route = True
-                            return True, [nodeFinal]
-                        self.insert_dicho_bfs_table(child_id, self.tree._get_node_value(nodeFinal), depth + 1, False)
+                    # Always evaluate using unified node value
+                    self.insert_dicho_bfs_table(child_id, self.tree._get_node_value(child_id), depth + 1, False)
 
         return False, [1]
 
@@ -456,15 +438,12 @@ class NestedMonteCarloSearch(BaseSearchAlgorithm):
                     self.tree.expanded_nodes.add(child_id)
                 if n == 1 :
                     sequence = []
-                    if self.tree.config.evaluation_type == "score" :
-                        sequence = []
-                    if self.tree.config.evaluation_type == "rollout" :
-                        if s1 in self.big_dict_of_all_node_ids_NMCS_playout_values :
-                            (s1, sequence) = self.big_dict_of_all_node_ids_NMCS_playout_values[s1]
-                        else:
-                            s1key = s1
-                            s1, sequence = self.nmcs_rollout(s1, depth+1,"greedy")
-                            self.big_dict_of_all_node_ids_NMCS_playout_values[s1key] = (s1, sequence)
+                    if s1 in self.big_dict_of_all_node_ids_NMCS_playout_values :
+                        (s1, sequence) = self.big_dict_of_all_node_ids_NMCS_playout_values[s1]
+                    else:
+                        s1key = s1
+                        s1, sequence = self.nmcs_rollout(s1, depth+1,"greedy")
+                        self.big_dict_of_all_node_ids_NMCS_playout_values[s1key] = (s1, sequence)
                     sequence.insert(0, child_id)
                 else:
                     s1, sequence = self.NMCS(s1, n-1, depth+1)
@@ -621,10 +600,7 @@ class LazyNestedMonteCarloSearch(BaseSearchAlgorithm):
                 s1 = child_id
                 if n == 1 :
                     sequence = []
-                    if self.tree.config.evaluation_type == "score" :
-                        sequence = []
-                    if self.tree.config.evaluation_type == "rollout" :
-                        s1, sequence = self.nmcs_rollout(s1, depth+1, "policy")
+                    s1, sequence = self.nmcs_rollout(s1, depth+1, "policy")
                     sequence.insert(0, child_id)
                 else:
                     s1, sequence = self.LNMCS(s1, n - 1, depth + 1, ratio)

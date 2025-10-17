@@ -12,14 +12,11 @@ from tqdm.auto import tqdm
 
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import Reaction, apply_reaction_rule
-from synplan.mcts.evaluation import ValueNetworkFunction
+from synplan.mcts.evaluation import ValueNetworkFunction, EvaluationService
 from synplan.mcts.expansion import PolicyNetworkFunction
 from synplan.mcts.node import Node
 from synplan.utils.config import TreeConfig
 
-from synplan.chem.rdkit_utils import NodeScore
-
-from multiprocessing import Pool, Array, Manager, Queue, Process
 
 from .algorithm import (BreadthFirstSearch, BestFirstSearch, BeamSearch,
                         UpperConfidenceSearch, NestedMonteCarloSearch, LazyNestedMonteCarloSearch)
@@ -33,23 +30,6 @@ ALGORITHMS = {
     "LNMCS":LazyNestedMonteCarloSearch
 }
 
-def expand_node_worker(arg_curr_node_curr_precursor_molecule, arg_rule, arg_rule_id, arg_prob,arg_min_mol_size):
-    new_precursors = []
-    scaled_probs = []
-    for products in apply_reaction_rule(arg_curr_node_curr_precursor_molecule, arg_rule):
-        if not products :
-            continue
-        for molecule in products:
-            molecule.meta["reactor_id"] = arg_rule_id
-
-        new_precursor = tuple(Precursor(mol) for mol in products)
-        scaled_prob = arg_prob * len(
-            list(filter(lambda x: len(x) > arg_min_mol_size, products))
-        )
-        new_precursors.append(new_precursor)
-        scaled_probs.append(scaled_prob)
-
-    return new_precursors, scaled_probs, arg_rule_id
 
 class Tree:
     """Tree class with attributes and methods for Monte-Carlo tree search."""
@@ -79,27 +59,24 @@ class Tree:
         self.config = config
 
         # building blocks and reaction reaction_rules
-        self.reaction_rules = reaction_rules
-        self.building_blocks = building_blocks
+        self.reaction_rules = tuple(reaction_rules)
+        self.building_blocks = frozenset(building_blocks)
 
-        # policy and value functions
+        # policy and evaluation services
         self.policy_network = expansion_function
-        if self.config.evaluation_type == "gcn":
-            if evaluation_function is None:
-                raise ValueError(
-                    "Value function not specified while evaluation type is 'gcn'"
-                )
-            if (
-                evaluation_function is not None
-                and self.config.evaluation_type == "rollout"
-            ):
-                raise ValueError(
-                    "Value function is not None while evaluation type is 'rollout'. What should  be evaluation type ?"
-                )
-            self.value_network = evaluation_function
+        self.evaluator = EvaluationService(
+            score_function=self.config.evaluation_function,
+            policy_network=self.policy_network,
+            reaction_rules=self.reaction_rules,
+            building_blocks=self.building_blocks,
+            min_mol_size=self.config.min_mol_size,
+            max_depth=self.config.max_depth,
+            value_network=evaluation_function,
+            normalize=self.config.normalize_scores,
+        )
 
         # tree initialization
-        target_node = self._target_node(target)
+        target_node = self._init_target_node(target)
         self.nodes: Dict[int, Node] = {1: target_node}
         self.parents: Dict[int, int] = {1: 0}
         self.redundant_children: Dict[int, Set[int]] = {1: set()}
@@ -129,7 +106,6 @@ class Tree:
         # other tree search algorithms
         self.stop_at_first = False
         self.found_a_route = False
-        self.pool = Pool(self.config.num_cpus)
         self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks = {}
 
         # choose search algorithm
@@ -185,7 +161,7 @@ class Tree:
 
         return is_solved, last_node_id
 
-    def _target_node(self, target: MoleculeContainer):
+    def _init_target_node(self, target: MoleculeContainer):
 
         assert isinstance(
             target, MoleculeContainer
@@ -198,127 +174,98 @@ class Tree:
             precursors_to_expand=(target_molecule,), new_precursors=(target_molecule,))
 
         target_smiles = str(target_node.curr_precursor.molecule)
-        if target_smiles in self.building_blocks:
-            self.building_blocks.remove(target_smiles)
-            print(
-                "Target was found in building blocks and removed from building blocks."
-            )
-
         return target_node
 
     def _expand_node(self, node_id: int) -> None:
-        """Expands the node by generating new precursor with policy (expansion) function.
+        """Expands the node by generating new precursors using the policy function.
 
-        :param node_id: The id the node to be expanded.
+        :param node_id: The id of the node to be expanded.
         :return: None.
         """
         total_expanded = 0
         curr_node = self.nodes[node_id]
         prev_precursor = curr_node.curr_precursor.prev_precursors
 
-        tmp_precursor = set()
+        # Track raw product molecules to avoid repeating equivalent expansions
+        tmp_products = set()
         expanded = False
 
         prediction = self.policy_network.predict_reaction_rules(
             curr_node.curr_precursor, self.reaction_rules
         )
 
-        for prob, rule, rule_id in prediction :
-            if self.config.single_core :
-                for products in apply_reaction_rule(curr_node.curr_precursor.molecule, rule):
+        for prob, rule, rule_id in prediction:
+            for products in apply_reaction_rule(curr_node.curr_precursor.molecule, rule):
+                # check repeated products against previously produced molecules
+                if not products or not (set(products) - tmp_products):
+                    continue
+                tmp_products.update(products)
 
-                    # check repeated products
-                    if not products or not set(products) - tmp_precursor:
-                        continue
-                    tmp_precursor.update(products)
+                for molecule in products:
+                    molecule.meta["reactor_id"] = rule_id
 
-                    for molecule in products:
-                        molecule.meta["reactor_id"] = rule_id
+                new_precursor = tuple(Precursor(mol) for mol in products)
+                scaled_prob = prob * len(
+                    list(filter(lambda x: len(x) > self.config.min_mol_size, products))
+                )
 
-                    new_precursor = tuple(Precursor(mol) for mol in products)
-                    scaled_prob = prob * len(
-                        list(filter(lambda x: len(x) > self.config.min_mol_size, products))
+                non_bb_precursors = [
+                    p
+                    for p in new_precursor
+                    if not p.is_building_block(
+                        self.building_blocks, self.config.min_mol_size
                     )
+                ]
 
-                    if set(prev_precursor).isdisjoint(new_precursor):
-                        precursors_to_expand = (
-                            *curr_node.next_precursor,
-                            *(
-                                x
-                                for x in new_precursor
-                                if not x.is_building_block(
+                if set(prev_precursor).isdisjoint(new_precursor):
+                    precursors_to_expand = (
+                        *curr_node.next_precursor,
+                        *(
+                            x
+                            for x in new_precursor
+                            if not x.is_building_block(
                                 self.building_blocks, self.config.min_mol_size
                             )
-                            ),
-                        )
+                        ),
+                    )
 
-                        child_node = Node(
-                            precursors_to_expand=precursors_to_expand,
-                            new_precursors=new_precursor,
-                        )
+                    # tree pruning start
+                    if self.config.enable_pruning:
+                        if (
+                            precursors_to_expand != ()
+                            and precursors_to_expand
+                            in self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks
+                        ):
+                            existing_id = self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[
+                                precursors_to_expand
+                            ]
+                            self.redundant_children[node_id].add(existing_id)
+                            total_expanded += 1
+                            expanded = True
+                            if total_expanded > self.config.max_rules_applied and False:
+                                break
+                            continue
+                        else:
+                            self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[
+                                precursors_to_expand
+                            ] = self.curr_tree_size
 
-                        for new_precursor in new_precursor:
-                            new_precursor.prev_precursors = [new_precursor, *prev_precursor]
+                    child_node = Node(
+                        precursors_to_expand=precursors_to_expand,
+                        new_precursors=new_precursor,
+                    )
+                    for np in new_precursor:
+                        np.prev_precursors = [np, *prev_precursor]
 
-
-                        self._add_node(node_id, child_node, scaled_prob, rule_id)
-                        total_expanded += 1
-                        expanded = True
-
-                        if total_expanded > self.config.max_rules_applied and False:
-                            break
+                    self._add_node(node_id, child_node, scaled_prob, rule_id)
+                    total_expanded += 1
+                    expanded = True
 
                     if total_expanded > self.config.max_rules_applied and False:
                         break
 
-            if not self.config.single_core:
-                args_to_launch_single = [(curr_node.curr_precursor.molecule, rule, rule_id, prob, self.config.min_mol_size)]
-                res = self.pool.starmap(expand_node_worker, args_to_launch_single)
-                for r in res:
-                    for i in range(len(r[0])):
-                        new_precursors = r[0][i]
-
-                        temp = [p for p in new_precursors if not p.is_building_block(self.building_blocks, self.config.min_mol_size)]
-                        if not new_precursors or (not set(temp) - tmp_precursor and temp):
-                            continue
-                        else:
-                            tmp_precursor.update(temp)
-
-                        if set(prev_precursor).isdisjoint(new_precursors):
-                            precursors_to_expand = (
-                                *curr_node.next_precursor,
-                                *(
-                                    x
-                                    for x in new_precursors
-                                    if not x.is_building_block(self.building_blocks, self.config.min_mol_size)
-                                ),
-                            )
-
-                            # tree pruning start
-                            if precursors_to_expand != () and precursors_to_expand in self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks:
-                                id = self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[precursors_to_expand]
-                                self.redundant_children[node_id].add(id)
-                                total_expanded += 1
-                                expanded = True
-                                if total_expanded > self.config.max_rules_applied and False:
-                                    break
-                                continue
-                            else:
-                                self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[precursors_to_expand] = self.curr_tree_size
-                            # tree pruning finish
-
-                            child_node = Node(precursors_to_expand=precursors_to_expand, new_precursors=new_precursors)
-                            for new_precursor in new_precursors:
-                                new_precursor.prev_precursors = [new_precursor, *prev_precursor]
-
-                            self._add_node(node_id, child_node, r[1][i], r[2])
-                            total_expanded += 1
-                            expanded = True
-                            if total_expanded > self.config.max_rules_applied and False :
-                                break
-
-                    if total_expanded > self.config.max_rules_applied and False :
-                        break
+            if total_expanded > self.config.max_rules_applied and False:
+                break
 
         if not expanded and node_id == 1:
             raise StopIteration("\nThe target molecule was not expanded.")
@@ -370,31 +317,12 @@ class Tree:
         """
 
         node = self.nodes[node_id]
-
-        if self.config.score_function == "random":
-            node_value = uniform(0, 1)
-
-        elif self.config.score_function == "rollout":
-            node_value = min(
-                (
-                    self._rollout_node(
-                        precursor, current_depth=self.nodes_depth[node_id]
-                    )
-                    for precursor in node.precursors_to_expand
-                ),
-                default=1.0,
-            )
-
-        elif self.config.score_function == "gcn":
-            node_value = self.value_network.predict_value(node.new_precursors)
-
-        elif self.config.score_function == "policy":
-            node_value = self.nodes_prob[node_id]
-
-        elif self.config.score_function in ["sascore", "heavyAtomCount", "weight", "weightXsascore", "WxWxSAS"]:
-            node_scorer = NodeScore(score_function=self.config.score_function)
-            node_value = node_scorer(node)
-
+        node_value = self.evaluator.evaluate_node(
+            node=node,
+            node_id=node_id,
+            nodes_depth=self.nodes_depth,
+            nodes_prob=self.nodes_prob,
+        )
         return node_value
 
     def _update_visits(self, node_id: int) -> None:
@@ -407,98 +335,6 @@ class Tree:
         while node_id:
             self.nodes_visit[node_id] += 1
             node_id = self.parents[node_id]
-
-    def _rollout_node(self, precursor: Precursor, current_depth: int = None) -> float:
-        """Performs a rollout simulation from a given node in the tree. Given the
-        current precursor, find the first successful reaction and return the new precursor.
-
-        If the precursor is a building_block, return 1.0, else check the
-        first successful reaction.
-
-        If the reaction is not successful, return -1.0.
-
-        If the reaction is successful, but the generated precursor are not
-        the building_blocks and the precursor cannot be generated without
-        exceeding current_depth threshold, return -0.5.
-
-        If the reaction is successful, but the precursor are not the
-        building_blocks and the precursor cannot be generated, return
-        -1.0.
-
-        :param precursor: The precursor to be evaluated.
-        :param current_depth: The current depth of the tree.
-        :return: The reward (value) assigned to the precursor.
-        """
-
-        max_depth = self.config.max_depth - current_depth
-
-        # precursor checking
-        if precursor.is_building_block(self.building_blocks, self.config.min_mol_size):
-            return 1.0
-
-        if max_depth == 0:
-            print("max depth reached in the beginning")
-
-        # precursor simulating
-        occurred_precursor = set()
-        precursor_to_expand = deque([precursor])
-        history = defaultdict(dict)
-        rollout_depth = 0
-        while precursor_to_expand:
-            # Iterate through reactors and pick first successful reaction.
-            # Check products of the reaction if you can find them in in-building_blocks data
-            # If not, then add missed products to precursor_to_expand and try to decompose them
-            if len(history) >= max_depth:
-                reward = -0.5
-                return reward
-
-            current_precursor = precursor_to_expand.popleft()
-            history[rollout_depth]["target"] = current_precursor
-            occurred_precursor.add(current_precursor)
-
-            # Pick the first successful reaction while iterating through reactors
-            reaction_rule_applied = False
-            for prob, rule, rule_id in self.policy_network.predict_reaction_rules(
-                current_precursor, self.reaction_rules
-            ):
-                for products in apply_reaction_rule(current_precursor.molecule, rule):
-                    if products:
-                        reaction_rule_applied = True
-                        break
-
-                if reaction_rule_applied:
-                    history[rollout_depth]["rule_index"] = rule_id
-                    break
-
-            if not reaction_rule_applied:
-                reward = -1.0
-                return reward
-
-            products = tuple(Precursor(product) for product in products)
-            history[rollout_depth]["products"] = products
-
-            # check loops
-            if any(x in occurred_precursor for x in products) and products:
-                # sometimes manual can create a loop, when
-                # print('occurred_precursor')
-                reward = -1.0
-                return reward
-
-            if occurred_precursor.isdisjoint(products):
-                # added number of atoms check
-                precursor_to_expand.extend(
-                    [
-                        x
-                        for x in products
-                        if not x.is_building_block(
-                            self.building_blocks, self.config.min_mol_size
-                        )
-                    ]
-                )
-                rollout_depth += 1
-
-        reward = 1.0
-        return reward
 
     def report(self) -> str:
         """Returns the string representation of the tree."""
