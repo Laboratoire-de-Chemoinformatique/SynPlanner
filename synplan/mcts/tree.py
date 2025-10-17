@@ -17,7 +17,7 @@ from synplan.mcts.expansion import PolicyNetworkFunction
 from synplan.mcts.node import Node
 from synplan.utils.config import TreeConfig
 
-from synplan.chem.rdkit_utils import NodeScore
+# from synplan.chem.rdkit_utils import NodeScore
 
 from multiprocessing import Pool, Array, Manager, Queue, Process
 

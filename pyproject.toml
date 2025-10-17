@@ -9,7 +9,6 @@ packages = [{ include = "synplan", from = "." }, ]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
-rdkit = ">2025.3.5"
 chython-synplan = ">=1.91"
 chytorch-synplan = ">=1.69"
 chytorch-rxnmap-synplan = ">=1.6"
@@ -28,6 +27,7 @@ ipykernel = ">6.29.0"
 ipywidgets = ">8.1.0"
 streamlit = ">1.35.1"
 streamlit-ketcher = ">=0.0.1"
+# rdkit = ">2025.3.5"
 
 [tool.poetry.group.dev]
 optional = true
