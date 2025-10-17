@@ -225,9 +225,6 @@ class Tree:
         tmp_precursor = set()
         expanded = False
         args_to_launch_single = []
-        args_to_launch = []
-        args_to_launch2_part1 = []
-        args_to_launch2 = []
 
         prediction = self.policy_network.predict_reaction_rules(
             curr_node.curr_precursor, self.reaction_rules
@@ -294,7 +291,6 @@ class Tree:
                     else:
                         tmp_precursor.update(temp)
 
-
                     if set(prev_precursor).isdisjoint(new_precursors):
                         precursors_to_expand = (
                             *curr_node.next_precursor,
@@ -313,10 +309,8 @@ class Tree:
                             if total_expanded > self.config.max_rules_applied and False:
                                 break
                             continue
-
                         else:
                             self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[precursors_to_expand] = self.curr_tree_size
-
 
                         child_node = Node(precursors_to_expand=precursors_to_expand, new_precursors=new_precursors)
 

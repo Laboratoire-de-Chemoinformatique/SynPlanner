@@ -469,7 +469,7 @@ class TreeConfig(ConfigABC):
     score_function: str = "rollout"
     max_rules_applied = 10
     stop_at_first = False
-    single_worker: bool = True
+    single_core: bool = True
     num_cpus: int = 1
 
     @staticmethod
