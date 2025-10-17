@@ -17,7 +17,7 @@ from synplan.mcts.expansion import PolicyNetworkFunction
 from synplan.mcts.node import Node
 from synplan.utils.config import TreeConfig
 
-# from synplan.chem.rdkit_utils import NodeScore
+from synplan.chem.rdkit_utils import NodeScore
 
 from multiprocessing import Pool, Array, Manager, Queue, Process
 
@@ -31,7 +31,6 @@ ALGORITHMS = {
     "UCT":UpperConfidenceSearch,
     "NMCS":NestedMonteCarloSearch,
     "LNMCS":LazyNestedMonteCarloSearch
-
 }
 
 manager = Manager()
@@ -141,6 +140,9 @@ class Tree:
         self.nodes_init_value: Dict[int, float] = {1: 0.0}
         self.nodes_total_value: Dict[int, float] = {1: 0.0}
 
+        # default search parameters
+        self.init_node_value: float = 0.5
+
         # tree building limits
         self.curr_iteration: int = 0
         self.curr_tree_size: int = 2
@@ -229,30 +231,6 @@ class Tree:
             )
 
         return target_node
-
-    def _select_node(self, node_id: int) -> int:
-        """Selects a node based on its UCB value and returns the id of the node with the
-        highest UCB.
-
-        :param node_id: The id of the node.
-        :return: The id of the node with the highest UCB.
-        """
-
-        if self.config.epsilon > 0:
-            n = uniform(0, 1)
-            if n < self.config.epsilon:
-                return choice(list(self.children[node_id]))
-
-        best_score, best_children = None, []
-        for child_id in self.children[node_id]:
-            score = self._ucb(child_id)
-            if best_score is None or score > best_score:
-                best_score, best_children = score, [child_id]
-            elif score == best_score:
-                best_children.append(child_id)
-
-        # is needed for tree search reproducibility, when all child nodes has the same score
-        return best_children[0]
 
     def _expand_node(self, node_id: int) -> None:
         """Expands the node by generating new precursor with policy (expansion) function.
@@ -462,7 +440,7 @@ class Tree:
         if self.config.search_strategy == "evaluation_first":
             node_value = self._get_node_value(new_node_id)
         elif self.config.search_strategy == "expansion_first":
-            node_value = self.config.init_node_value
+            node_value = self.init_node_value
 
         self.nodes_init_value[new_node_id] = node_value
         self.nodes_total_value[new_node_id] = node_value
@@ -512,22 +490,6 @@ class Tree:
 
         while node_id:
             self.nodes_visit[node_id] += 1
-            node_id = self.parents[node_id]
-
-    def _backpropagate(self, node_id: int, value: float) -> None:
-        """Backpropagates the value through the tree from the current.
-
-        :param node_id: The id of the node from which to backpropagate the value.
-        :param value: The value to backpropagate.
-        :return: None.
-        """
-        while node_id:
-            if self.config.backprop_type == "muzero":
-                self.nodes_total_value[node_id] = (
-                    self.nodes_total_value[node_id] * self.nodes_visit[node_id] + value
-                ) / (self.nodes_visit[node_id] + 1)
-            elif self.config.backprop_type == "cumulative":
-                self.nodes_total_value[node_id] += value
             node_id = self.parents[node_id]
 
     def _rollout_node(self, precursor: Precursor, current_depth: int = None) -> float:
@@ -621,35 +583,6 @@ class Tree:
 
         reward = 1.0
         return reward
-
-    def _ucb(self, node_id: int) -> float:
-        """Calculates the Upper Confidence Bound (UCB) statistics for a given node.
-
-        :param node_id: The id of the node.
-        :return: The calculated UCB.
-        """
-
-        prob = self.nodes_prob[node_id]  # predicted by policy network score
-        visit = self.nodes_visit[node_id]
-
-        if self.config.ucb_type == "puct":
-            u = (
-                self.config.c_ucb * prob * sqrt(self.nodes_visit[self.parents[node_id]])
-            ) / (visit + 1)
-            ucb_value = self.nodes_total_value[node_id] + u
-
-        if self.config.ucb_type == "uct":
-            u = (
-                self.config.c_ucb
-                * sqrt(self.nodes_visit[self.parents[node_id]])
-                / (visit + 1)
-            )
-            ucb_value = self.nodes_total_value[node_id] + u
-
-        if self.config.ucb_type == "value":
-            ucb_value = self.nodes_init_value[node_id] / (visit + 1)
-
-        return ucb_value
 
     def report(self) -> str:
         """Returns the string representation of the tree."""
