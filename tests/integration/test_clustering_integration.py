@@ -80,9 +80,6 @@ def tree_config():
         max_time=120,
         max_depth=6,
         min_mol_size=1,
-        init_node_value=0.5,
-        ucb_type="uct",
-        c_ucb=0.1,
         silent=True,
     )
 

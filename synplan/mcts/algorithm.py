@@ -1,4 +1,6 @@
 from time import time, sleep
+from random import choice, uniform
+from math import sqrt
 
 class BaseSearchAlgorithm:
     def __init__(self, tree):
@@ -55,7 +57,7 @@ class BaseSearchAlgorithm:
                     vals.append(0.00001)
                     if self.tree.nodes[list(self.tree.children[node_id])[e]].is_solved():
                         if not list(self.tree.children[node_id])[e] in self.tree.winning_nodes:
-                            self.tree.winning_nodes.append(list(self.children[node_id])[e])
+                            self.tree.winning_nodes.append(list(self.tree.children[node_id])[e])
                         self.tree.found_a_route = True
                         sequence.append(list(self.tree.children[node_id])[e])
                         return list(self.tree.children[node_id])[e], sequence
@@ -241,6 +243,84 @@ class BeamSearch(BaseSearchAlgorithm):
 
 
 class UpperConfidenceSearch(BaseSearchAlgorithm):
+
+    def __init__(self, tree):
+        super().__init__(tree)
+        self.c_ucb = 0.1
+        self.epsilon = 0
+        self.ucb_type = "uct" # ["uct", "puct", "value"]
+        self.backprop_type = "muzero" # ["muzero", "cumulative"]
+        self.evaluation_agg = "max"
+
+    def _ucb(self, node_id: int) -> float:
+        """Calculates the Upper Confidence Bound (UCB) statistics for a given node.
+
+        :param node_id: The id of the node.
+        :return: The calculated UCB.
+        """
+
+        prob = self.tree.nodes_prob[node_id]  # predicted by policy network score
+        visit = self.tree.nodes_visit[node_id]
+
+        if self.ucb_type == "puct":
+            u = (
+                self.c_ucb * prob * sqrt(self.tree.nodes_visit[self.tree.parents[node_id]])
+            ) / (visit + 1)
+            ucb_value = self.tree.nodes_total_value[node_id] + u
+
+        if self.ucb_type == "uct":
+            u = (
+                self.c_ucb
+                * sqrt(self.tree.nodes_visit[self.tree.parents[node_id]])
+                / (visit + 1)
+            )
+            ucb_value = self.tree.nodes_total_value[node_id] + u
+
+        if self.ucb_type == "value":
+            ucb_value = self.tree.nodes_init_value[node_id] / (visit + 1)
+
+        return ucb_value
+
+    def _select_node(self, node_id: int) -> int:
+        """Selects a node based on its UCB value and returns the id of the node with the
+        highest UCB.
+
+        :param node_id: The id of the node.
+        :return: The id of the node with the highest UCB.
+        """
+
+        if self.epsilon > 0:
+            n = uniform(0, 1)
+            if n < self.epsilon:
+                return choice(list(self.tree.children[node_id]))
+
+        best_score, best_children = None, []
+        for child_id in self.tree.children[node_id]:
+            score = self._ucb(child_id)
+            if best_score is None or score > best_score:
+                best_score, best_children = score, [child_id]
+            elif score == best_score:
+                best_children.append(child_id)
+
+        # is needed for tree search reproducibility, when all child nodes has the same score
+        return best_children[0]
+
+    def _backpropagate(self, node_id: int, value: float) -> None:
+        """Backpropagates the value through the tree from the current.
+
+        :param node_id: The id of the node from which to backpropagate the value.
+        :param value: The value to backpropagate.
+        :return: None.
+        """
+        while node_id:
+            if self.backprop_type == "muzero":
+                self.tree.nodes_total_value[node_id] = (
+                    self.tree.nodes_total_value[node_id] * self.tree.nodes_visit[node_id] + value
+                ) / (self.tree.nodes_visit[node_id] + 1)
+            elif self.backprop_type == "cumulative":
+                self.tree.nodes_total_value[node_id] += value
+            node_id = self.tree.parents[node_id]
+
     def step(self):
         curr_depth, node_id = 0, 1  # start from the root node_id
 
@@ -253,7 +333,7 @@ class UpperConfidenceSearch(BaseSearchAlgorithm):
                     self.tree._update_visits(node_id)
                     explore_route = False
                 else:
-                    node_id = self.tree._select_node(node_id)  # select the child node
+                    node_id = self._select_node(node_id)  # select the child node
                     curr_depth += 1
             else:
                 if self.tree.nodes[node_id].is_solved():  # found route
@@ -282,19 +362,19 @@ class UpperConfidenceSearch(BaseSearchAlgorithm):
                                 for child_id in self.tree.children[node_id]
                             ]
 
-                            if self.tree.config.evaluation_agg == "max":
+                            if self.evaluation_agg == "max":
                                 value_to_backprop = max(child_values)
 
-                            elif self.tree.config.evaluation_agg == "average":
+                            elif self.evaluation_agg == "average":
                                 value_to_backprop = sum(child_values) / len(
-                                    self.children[node_id]
+                                    self.tree.children[node_id]
                                 )
 
                         elif self.tree.config.search_strategy == "expansion_first":
                             value_to_backprop = self.tree._get_node_value(node_id)
 
                     # backpropagation
-                    self.tree._backpropagate(node_id, value_to_backprop)
+                    self._backpropagate(node_id, value_to_backprop)
                     self.tree._update_visits(node_id)
                     explore_route = False
 
@@ -312,7 +392,7 @@ class UpperConfidenceSearch(BaseSearchAlgorithm):
                             return True, list(found_after_expansion)
 
                 else:
-                    self.tree._backpropagate(node_id, self.tree.nodes_total_value[node_id])
+                    self._backpropagate(node_id, self.tree.nodes_total_value[node_id])
                     self.tree._update_visits(node_id)
                     explore_route = False
 
@@ -320,9 +400,9 @@ class UpperConfidenceSearch(BaseSearchAlgorithm):
 
 
 class NestedMonteCarloSearch(BaseSearchAlgorithm):
-    def __init__(self, tree, level=2):
+    def __init__(self, tree):
         super().__init__(tree)
-        self.level = level
+        self.NMCS_level = 2
         self.big_dict_of_all_node_ids_NMCS_playout_values = {}
 
     def step(self):
@@ -331,7 +411,7 @@ class NestedMonteCarloSearch(BaseSearchAlgorithm):
             raise StopIteration("One deterministic NMCS iteration is enough.")
 
         node_id = 1
-        best_node_id, _ = self.NMCS(node_id, self.level, 1)
+        best_node_id, _ = self.NMCS(node_id, self.NMCS_level, 1)
 
         if self.tree.nodes[best_node_id].is_solved():
             if not best_node_id in self.tree.winning_nodes:
@@ -422,6 +502,8 @@ class LazyNestedMonteCarloSearch(BaseSearchAlgorithm):
         super().__init__(tree)
         self.bfs_table = []  # (node_id, score, depth)
         self.lnmcs_thresholds = [[] for _ in range(100)]  # list of scores at depth
+        self.LNMCS_ratio = 0.2
+        self.NMCS_level = 2
 
     def step(self):
         self.bfs_table = []
@@ -429,7 +511,7 @@ class LazyNestedMonteCarloSearch(BaseSearchAlgorithm):
         if self.tree.curr_iteration > 1:
             raise StopIteration("One deterministic LNMCS iteration is enough.")
         node_id = 1
-        leaf, _ = self.LNMCS(node_id, self.tree.config.NMCS_level, 1, self.tree.config.LNMCS_ratio)
+        leaf, _ = self.LNMCS(node_id, self.NMCS_level, 1, self.LNMCS_ratio)
         if self.tree.nodes[leaf].is_solved():
             if not leaf in self.tree.winning_nodes:
                 self.tree.winning_nodes.append(leaf)

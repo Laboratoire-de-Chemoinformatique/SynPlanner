@@ -458,22 +458,14 @@ class TreeConfig(ConfigABC):
     max_tree_size: int = 1000000
     max_time: float = 600
     max_depth: int = 6
-    ucb_type: str = "uct"
-    c_ucb: float = 0.1
-    backprop_type: str = "muzero"
     search_strategy: str = "expansion_first"
     exclude_small: bool = True
-    evaluation_agg: str = "max"
-    evaluation_type: str = "score"
-    init_node_value: float = 0.0
-    epsilon: float = 0.0
+    evaluation_type: str = "rollout"
     min_mol_size: int = 6
     silent: bool = False
 
     # new parameters
     algorithm: str = "UCT"
-    NMCS_level: int = 2
-    LNMCS_ratio: float = 0.2
     score_function: str = "rollout"
     max_rules_applied = 10
     stop_at_first = False
@@ -492,28 +484,10 @@ class TreeConfig(ConfigABC):
         return TreeConfig.from_dict(config_dict)
 
     def _validate_params(self, params):
-        if params["ucb_type"] not in ["puct", "uct", "value"]:
-            raise ValueError(
-                "Invalid ucb_type. Allowed values are 'puct', 'uct', 'value'."
-            )
-        if params["backprop_type"] not in ["muzero", "cumulative"]:
-            raise ValueError(
-                "Invalid backprop_type. Allowed values are 'muzero', 'cumulative'."
-            )
-        if params["evaluation_type"] not in ["score", "rollout"]:
-            raise ValueError(
-                "Invalid evaluation_type. Allowed values are 'score', 'rollout'."
-            )
         if params["score_function"] not in ["sascore", "weight", "policy", "heavyAtomCount", "weightXsascore", "WxWxSAS", "random", "gcn", "rollout"]:
             raise ValueError(
                 "Invalid evaluation_type. Allowed values are 'policy', 'weight', 'sascore', 'weightXsascore', 'WxWxSAS', 'random', 'gcn', 'rollout'."
             )
-        if params["evaluation_agg"] not in ["max", "average"]:
-            raise ValueError(
-                "Invalid evaluation_agg. Allowed values are 'max', 'average'."
-            )
-        if not isinstance(params["c_ucb"], float):
-            raise TypeError("c_ucb must be a float.")
         if not isinstance(params["max_depth"], int) or params["max_depth"] < 1:
             raise ValueError("max_depth must be a positive integer.")
         if not isinstance(params["max_tree_size"], int) or params["max_tree_size"] < 1:
@@ -529,15 +503,11 @@ class TreeConfig(ConfigABC):
             raise TypeError("exclude_small must be a boolean.")
         if not isinstance(params["silent"], bool):
             raise TypeError("silent must be a boolean.")
-        if not isinstance(params["init_node_value"], float):
-            raise TypeError("init_node_value must be a float if provided.")
         if params["search_strategy"] not in ["expansion_first", "evaluation_first"]:
             raise ValueError(
                 f"Invalid search_strategy: {params['search_strategy']}: "
                 f"Allowed values are 'expansion_first', 'evaluation_first'"
             )
-        if not isinstance(params["epsilon"], float) or 0 >= params["epsilon"] >= 1:
-            raise ValueError("epsilon epsilon be a positive float between 0 and 1.")
         if not isinstance(params["min_mol_size"], int) or params["min_mol_size"] < 0:
             raise ValueError("min_mol_size must be a non-negative integer.")
 
