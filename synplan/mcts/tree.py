@@ -33,12 +33,6 @@ ALGORITHMS = {
     "LNMCS":LazyNestedMonteCarloSearch
 }
 
-manager = Manager()
-to_predict_queue = Queue()
-predicted_queue = Queue()
-to_expand_queue = Queue()
-expanded_queue = Queue()
-
 def expand_node_worker(arg_curr_node_curr_precursor_molecule, arg_rule, arg_rule_id, arg_prob,arg_min_mol_size):
     new_precursors = []
     scaled_probs = []
@@ -224,7 +218,6 @@ class Tree:
 
         tmp_precursor = set()
         expanded = False
-        args_to_launch_single = []
 
         prediction = self.policy_network.predict_reaction_rules(
             curr_node.curr_precursor, self.reaction_rules
@@ -247,7 +240,6 @@ class Tree:
                         list(filter(lambda x: len(x) > self.config.min_mol_size, products))
                     )
 
-
                     if set(prev_precursor).isdisjoint(new_precursor):
                         precursors_to_expand = (
                             *curr_node.next_precursor,
@@ -265,7 +257,6 @@ class Tree:
                             new_precursors=new_precursor,
                         )
 
-
                         for new_precursor in new_precursor:
                             new_precursor.prev_precursors = [new_precursor, *prev_precursor]
 
@@ -276,55 +267,58 @@ class Tree:
 
                         if total_expanded > self.config.max_rules_applied and False:
                             break
+
                     if total_expanded > self.config.max_rules_applied and False:
                         break
 
-        if not self.config.single_core:
-            res = self.pool.starmap(expand_node_worker, args_to_launch_single)
-            for r in res:
-                for i in range(len(r[0])):
-                    new_precursors = r[0][i]
+            if not self.config.single_core:
+                args_to_launch_single = [(curr_node.curr_precursor.molecule, rule, rule_id, prob, self.config.min_mol_size)]
+                res = self.pool.starmap(expand_node_worker, args_to_launch_single)
+                for r in res:
+                    for i in range(len(r[0])):
+                        new_precursors = r[0][i]
 
-                    temp = [p for p in new_precursors if not p.is_building_block(self.building_blocks, self.config.min_mol_size)]
-                    if not new_precursors or (not set(temp) - tmp_precursor and temp):
-                        continue
-                    else:
-                        tmp_precursor.update(temp)
-
-                    if set(prev_precursor).isdisjoint(new_precursors):
-                        precursors_to_expand = (
-                            *curr_node.next_precursor,
-                            *(
-                                x
-                                for x in new_precursors
-                                if not x.is_building_block(self.building_blocks, self.config.min_mol_size)
-                            ),
-                        )
-
-                        if precursors_to_expand != () and precursors_to_expand in self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks:
-                            id = self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[precursors_to_expand]
-                            self.redundant_children[node_id].add(id)
-                            total_expanded += 1
-                            expanded = True
-                            if total_expanded > self.config.max_rules_applied and False:
-                                break
+                        temp = [p for p in new_precursors if not p.is_building_block(self.building_blocks, self.config.min_mol_size)]
+                        if not new_precursors or (not set(temp) - tmp_precursor and temp):
                             continue
                         else:
-                            self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[precursors_to_expand] = self.curr_tree_size
+                            tmp_precursor.update(temp)
 
-                        child_node = Node(precursors_to_expand=precursors_to_expand, new_precursors=new_precursors)
+                        if set(prev_precursor).isdisjoint(new_precursors):
+                            precursors_to_expand = (
+                                *curr_node.next_precursor,
+                                *(
+                                    x
+                                    for x in new_precursors
+                                    if not x.is_building_block(self.building_blocks, self.config.min_mol_size)
+                                ),
+                            )
 
-                        for new_precursor in new_precursors:
-                            new_precursor.prev_precursors = [new_precursor, *prev_precursor]
+                            # tree pruning start
+                            if precursors_to_expand != () and precursors_to_expand in self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks:
+                                id = self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[precursors_to_expand]
+                                self.redundant_children[node_id].add(id)
+                                total_expanded += 1
+                                expanded = True
+                                if total_expanded > self.config.max_rules_applied and False:
+                                    break
+                                continue
+                            else:
+                                self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[precursors_to_expand] = self.curr_tree_size
+                            # tree pruning finish
 
-                        self._add_node(node_id, child_node, r[1][i], r[2])
-                        total_expanded += 1
-                        expanded = True
-                        if total_expanded > self.config.max_rules_applied and False :
-                            break
+                            child_node = Node(precursors_to_expand=precursors_to_expand, new_precursors=new_precursors)
+                            for new_precursor in new_precursors:
+                                new_precursor.prev_precursors = [new_precursor, *prev_precursor]
 
-                if total_expanded > self.config.max_rules_applied and False :
-                    break
+                            self._add_node(node_id, child_node, r[1][i], r[2])
+                            total_expanded += 1
+                            expanded = True
+                            if total_expanded > self.config.max_rules_applied and False :
+                                break
+
+                    if total_expanded > self.config.max_rules_applied and False :
+                        break
 
         if not expanded and node_id == 1:
             raise StopIteration("\nThe target molecule was not expanded.")
