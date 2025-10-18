@@ -21,31 +21,28 @@ ENV PATH="$POETRY_HOME/bin:$PATH"
 
 WORKDIR /app
 
-# 2. Install build tools & Poetry
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
          build-essential python3-dev g++ curl \
     && curl -sSL https://install.python-poetry.org | python3 - \
     && poetry config virtualenvs.create false
 
-# Preinstall CPU-only PyTorch 2.9 to avoid pulling CUDA dependencies during Poetry install
-RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu "torch==2.9.*"
-
-# 3. Copy only dependency-defining files to leverage Docker cache
+# 3. Copy dependency files and export requirements
 COPY pyproject.toml poetry.lock /app/
-# Refresh lock for torch only to align with preinstalled CPU torch 2.9
-RUN poetry update torch --lock
+RUN poetry export -f requirements.txt --without-hashes -o /tmp/requirements.txt \
+    && rm -rf /tmp/poetry-cache /tmp/pip-cache
 
-# 4. Install project dependencies (no-root means not installing the project itself yet)
-RUN poetry install --without dev --no-root --no-interaction && rm -rf /tmp/poetry-cache /tmp/pip-cache
+# 4. Install Torch explicitly (CPU by default) and remaining deps via pip
+ARG TORCH_VERSION=2.9.*
+ARG TORCH_CHANNEL=cpu
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/${TORCH_CHANNEL} "torch==${TORCH_VERSION}"
+RUN sed -i '/^torch[<>=!]/d' /tmp/requirements.txt || true \
+    && pip install --no-cache-dir -r /tmp/requirements.txt
 
-# 5. Copy the application code into the container
-# This copies your main application logic
+# 5. Copy application code and install the SynPlanner package itself
 COPY synplan /app/synplan
 COPY README.rst /app/
-
-# The second install will now install the synplan package itself
-RUN poetry install --without dev --no-interaction && rm -rf /tmp/poetry-cache /tmp/pip-cache
+RUN pip install --no-cache-dir .
 
 # 6. Remove build tools to keep the final image slim (keep curl for health checks)
 RUN apt-get purge -y --auto-remove build-essential python3-dev g++ \

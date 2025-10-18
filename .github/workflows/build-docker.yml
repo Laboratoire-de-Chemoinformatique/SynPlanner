@@ -46,6 +46,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          docker system prune -af || true
+          sudo apt-get clean
+
       - name: Build Docker image (linux/amd64)
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
@@ -60,23 +67,6 @@ jobs:
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
           docker run --rm --platform linux/amd64 synplan:${VERSION}-cli-amd64 --help | head -n 50 || true
-
-      - name: Save Docker image as tarball
-        run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          IMAGE_TAG="synplan:${VERSION}-cli-amd64"
-          TARBALL="synplan_${VERSION}_cli_amd64.tar"
-          echo "Saving ${IMAGE_TAG} to ${TARBALL}"
-          docker save -o "${TARBALL}" "${IMAGE_TAG}"
-          ls -lh "${TARBALL}"
-
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: synplan-${{ steps.get_version.outputs.version }}-cli-amd64-image
-          path: synplan_${{ steps.get_version.outputs.version }}_cli_amd64.tar
-          if-no-files-found: error
-          retention-days: 14
 
       - name: Log in to GHCR
         if: ${{ github.event_name != 'pull_request' }}
@@ -132,6 +122,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/lib/android
+          docker system prune -af || true
+          sudo apt-get clean
+
       - name: Build GUI Docker image (linux/amd64)
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
@@ -155,23 +153,6 @@ jobs:
           curl -fsS http://127.0.0.1:8501/_stcore/health
           docker logs --tail 100 "$CID" || true
           docker stop "$CID"
-
-      - name: Save GUI Docker image as tarball
-        run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          IMAGE_TAG="synplan:${VERSION}-gui-amd64"
-          TARBALL="synplan_${VERSION}_gui_amd64.tar"
-          echo "Saving ${IMAGE_TAG} to ${TARBALL}"
-          docker save -o "${TARBALL}" "${IMAGE_TAG}"
-          ls -lh "${TARBALL}"
-
-      - name: Upload GUI image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: synplan-${{ steps.get_version.outputs.version }}-gui-amd64-image
-          path: synplan_${{ steps.get_version.outputs.version }}_gui_amd64.tar
-          if-no-files-found: error
-          retention-days: 14
 
       - name: Log in to GHCR
         if: ${{ github.event_name != 'pull_request' }}
