@@ -10,7 +10,9 @@ ENV PYTHONUNBUFFERED=1 \
     POETRY_VIRTUALENVS_CREATE=false \
     POETRY_NO_INTERACTION=1 \
     POETRY_CACHE_DIR="/tmp/poetry-cache" \
-    PIP_CACHE_DIR="/tmp/pip-cache"
+    PIP_CACHE_DIR="/tmp/pip-cache" \
+    PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cpu" \
+    PIP_PREFER_BINARY=1
 
 ENV PATH="$POETRY_HOME/bin:$PATH"
 
