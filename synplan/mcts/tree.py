@@ -18,16 +18,22 @@ from synplan.mcts.node import Node
 from synplan.utils.config import TreeConfig
 
 
-from .algorithm import (BreadthFirstSearch, BestFirstSearch, BeamSearch,
-                        UpperConfidenceSearch, NestedMonteCarloSearch, LazyNestedMonteCarloSearch)
+from .algorithm import (
+    BreadthFirstSearch,
+    BestFirstSearch,
+    BeamSearch,
+    UpperConfidenceSearch,
+    NestedMonteCarloSearch,
+    LazyNestedMonteCarloSearch,
+)
 
 ALGORITHMS = {
-    "BREADTH":BreadthFirstSearch,
-    "BFS":BestFirstSearch,
-    "BEAM":BeamSearch,
-    "UCT":UpperConfidenceSearch,
-    "NMCS":NestedMonteCarloSearch,
-    "LNMCS":LazyNestedMonteCarloSearch
+    "BREADTH": BreadthFirstSearch,
+    "BFS": BestFirstSearch,
+    "BEAM": BeamSearch,
+    "UCT": UpperConfidenceSearch,
+    "NMCS": NestedMonteCarloSearch,
+    "LNMCS": LazyNestedMonteCarloSearch,
 }
 
 
@@ -147,7 +153,7 @@ class Tree:
             raise StopIteration("Max tree size exceeded or all possible routes found.")
         if self.curr_time >= self.config.max_time:
             raise StopIteration("Time limit exceeded.")
-        if self.stop_at_first and self.found_a_route :
+        if self.stop_at_first and self.found_a_route:
             raise StopIteration("Already found a route.")
 
         # start new iteration
@@ -171,7 +177,8 @@ class Tree:
         target_molecule = Precursor(target)
         target_molecule.prev_precursors.append(Precursor(target))
         target_node = Node(
-            precursors_to_expand=(target_molecule,), new_precursors=(target_molecule,))
+            precursors_to_expand=(target_molecule,), new_precursors=(target_molecule,)
+        )
 
         target_smiles = str(target_node.curr_precursor.molecule)
         return target_node
@@ -195,7 +202,9 @@ class Tree:
         )
 
         for prob, rule, rule_id in prediction:
-            for products in apply_reaction_rule(curr_node.curr_precursor.molecule, rule):
+            for products in apply_reaction_rule(
+                curr_node.curr_precursor.molecule, rule
+            ):
                 # check repeated products against previously produced molecules
                 if not products or not (set(products) - tmp_products):
                     continue
@@ -419,7 +428,7 @@ class Tree:
             :return: A string representation of a node in a Newick format.
             """
             assert (
-                    current_node_id not in visited_nodes
+                current_node_id not in visited_nodes
             ), "Error: The tree may not be circular!"
             node_visit = self.nodes_visit[current_node_id]
 
@@ -452,5 +461,3 @@ class Tree:
             meta[node_id] = (node_value, node_synthesisability, visit_in_node)
 
         return newick_string, meta
-
-

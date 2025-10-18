@@ -105,14 +105,16 @@ def run_search(
     policy_function = PolicyNetworkFunction(policy_config=policy_config)
     # Determine value network by evaluation_function or legacy evaluation_type
     eval_type = search_config.get("evaluation_type")
-    evaluation_function = search_config.get("evaluation_function", search_config.get("score_function", "rollout"))
+    evaluation_function = search_config.get(
+        "evaluation_function", search_config.get("score_function", "rollout")
+    )
     if ((eval_type == "gcn") or (evaluation_function == "gcn")) and value_network_path:
         value_function = ValueNetworkFunction(weights_path=value_network_path)
     else:
         value_function = None
 
     reaction_rules = load_reaction_rules(reaction_rules_path)
-    building_blocks = load_building_blocks(building_blocks_path, standardize=False )
+    building_blocks = load_building_blocks(building_blocks_path, standardize=False)
 
     # run search
     n_solved = 0

@@ -460,7 +460,9 @@ class TreeConfig(ConfigABC):
     max_depth: int = 6
     search_strategy: str = "expansion_first"
     exclude_small: bool = True
-    evaluation_type: str = "rollout"  # deprecated: mapped to score_function for backward compatibility
+    evaluation_type: str = (
+        "rollout"  # deprecated: mapped to score_function for backward compatibility
+    )
     min_mol_size: int = 6
     silent: bool = False
 
@@ -489,7 +491,17 @@ class TreeConfig(ConfigABC):
         # Validate canonical evaluation function
         if params.get("evaluation_function") is None:
             self.evaluation_function = params.get("score_function", "rollout")
-        if self.evaluation_function not in ["sascore", "weight", "policy", "heavyAtomCount", "weightXsascore", "WxWxSAS", "random", "gcn", "rollout"]:
+        if self.evaluation_function not in [
+            "sascore",
+            "weight",
+            "policy",
+            "heavyAtomCount",
+            "weightXsascore",
+            "WxWxSAS",
+            "random",
+            "gcn",
+            "rollout",
+        ]:
             raise ValueError(
                 "Invalid evaluation_type. Allowed values are 'policy', 'weight', 'sascore', 'weightXsascore', 'WxWxSAS', 'random', 'gcn', 'rollout'."
             )

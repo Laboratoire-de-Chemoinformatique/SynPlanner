@@ -14,6 +14,9 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cpu" \
     PIP_PREFER_BINARY=1
 
+# Explicitly disable CUDA discovery inside the container
+ENV CUDA_VISIBLE_DEVICES=-1
+
 ENV PATH="$POETRY_HOME/bin:$PATH"
 
 WORKDIR /app
@@ -25,8 +28,13 @@ RUN apt-get update \
     && curl -sSL https://install.python-poetry.org | python3 - \
     && poetry config virtualenvs.create false
 
+# Preinstall CPU-only PyTorch 2.9 to avoid pulling CUDA dependencies during Poetry install
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu "torch==2.9.*"
+
 # 3. Copy only dependency-defining files to leverage Docker cache
 COPY pyproject.toml poetry.lock /app/
+# Refresh lock for torch only to align with preinstalled CPU torch 2.9
+RUN poetry update torch --lock
 
 # 4. Install project dependencies (no-root means not installing the project itself yet)
 RUN poetry install --without dev --no-root --no-interaction && rm -rf /tmp/poetry-cache /tmp/pip-cache

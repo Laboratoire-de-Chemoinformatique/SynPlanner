@@ -2,9 +2,12 @@ from time import time, sleep
 from random import choice, uniform
 from math import sqrt
 
+
 class BaseSearchAlgorithm:
     def __init__(self, tree):
-        self.tree = tree  # reference to Tree, so algorithms can access nodes, config, etc.
+        self.tree = (
+            tree  # reference to Tree, so algorithms can access nodes, config, etc.
+        )
 
     def step(self) -> tuple[bool, list[int]]:
         raise NotImplementedError
@@ -12,13 +15,15 @@ class BaseSearchAlgorithm:
     def nmcs_rollout(self, node_id, node_depth, mode):
         depth = node_depth
         sequence = []
-        if time() - self.tree.start_time > self.tree.config.max_time :
+        if time() - self.tree.start_time > self.tree.config.max_time:
             return node_id, sequence
         if not node_id in self.tree.expanded_nodes:
             self.tree._expand_node(node_id)
             self.tree.expanded_nodes.add(node_id)
 
-        all_child = self.tree.children[node_id].union(self.tree.redundant_children[node_id])
+        all_child = self.tree.children[node_id].union(
+            self.tree.redundant_children[node_id]
+        )
         while all_child and depth < self.tree.config.max_depth:
 
             if self.tree.nodes[node_id].is_solved():
@@ -28,26 +33,40 @@ class BaseSearchAlgorithm:
                 return node_id, sequence
             max = -1
             i = -1
-            if mode == "greedy" :
+            if mode == "greedy":
                 vals = []
                 for e in range(len(self.tree.children[node_id])):
                     vals.append(0.00001)
-                    if self.tree.nodes[list(self.tree.children[node_id])[e]].is_solved():
-                        if not list(self.tree.children[node_id])[e] in self.tree.winning_nodes:
-                            self.tree.winning_nodes.append(list(self.tree.children[node_id])[e])
+                    if self.tree.nodes[
+                        list(self.tree.children[node_id])[e]
+                    ].is_solved():
+                        if (
+                            not list(self.tree.children[node_id])[e]
+                            in self.tree.winning_nodes
+                        ):
+                            self.tree.winning_nodes.append(
+                                list(self.tree.children[node_id])[e]
+                            )
                         self.tree.found_a_route = True
                         sequence.append(list(self.tree.children[node_id])[e])
                         return list(self.tree.children[node_id])[e], sequence
 
-                    vals[e] += self.tree._get_node_value(list(self.tree.children[node_id])[e])
-                    if vals[e] > max :
+                    vals[e] += self.tree._get_node_value(
+                        list(self.tree.children[node_id])[e]
+                    )
+                    if vals[e] > max:
                         max = vals[e]
                         i = e
             if mode == "random":
                 i = int(uniform(0, len(self.tree.children[node_id])))
                 if self.tree.nodes[list(self.tree.children[node_id])[i]].is_solved():
-                    if not list(self.tree.children[node_id])[i] in self.tree.winning_nodes:
-                        self.tree.winning_nodes.append(list(self.tree.children[node_id])[i])
+                    if (
+                        not list(self.tree.children[node_id])[i]
+                        in self.tree.winning_nodes
+                    ):
+                        self.tree.winning_nodes.append(
+                            list(self.tree.children[node_id])[i]
+                        )
                     self.tree.found_a_route = True
                     sequence.append(list(self.tree.children[node_id])[i])
                     return list(self.tree.children[node_id])[i], sequence
@@ -55,14 +74,23 @@ class BaseSearchAlgorithm:
                 vals = []
                 for e in range(len(self.tree.children[node_id])):
                     vals.append(0.00001)
-                    if self.tree.nodes[list(self.tree.children[node_id])[e]].is_solved():
-                        if not list(self.tree.children[node_id])[e] in self.tree.winning_nodes:
-                            self.tree.winning_nodes.append(list(self.tree.children[node_id])[e])
+                    if self.tree.nodes[
+                        list(self.tree.children[node_id])[e]
+                    ].is_solved():
+                        if (
+                            not list(self.tree.children[node_id])[e]
+                            in self.tree.winning_nodes
+                        ):
+                            self.tree.winning_nodes.append(
+                                list(self.tree.children[node_id])[e]
+                            )
                         self.tree.found_a_route = True
                         sequence.append(list(self.tree.children[node_id])[e])
                         return list(self.tree.children[node_id])[e], sequence
 
-                    vals[e] += self.tree.nodes_prob[list(self.tree.children[node_id])[e]]
+                    vals[e] += self.tree.nodes_prob[
+                        list(self.tree.children[node_id])[e]
+                    ]
                     if vals[e] > max:
                         max = vals[e]
                         i = e
@@ -70,7 +98,9 @@ class BaseSearchAlgorithm:
                 selected = list(self.tree.children[node_id])[i]
                 sequence.append(selected)
                 node_id = selected
-                all_child = self.tree.children[node_id].union(self.tree.redundant_children[node_id])
+                all_child = self.tree.children[node_id].union(
+                    self.tree.redundant_children[node_id]
+                )
                 if not node_id in self.tree.expanded_nodes:
                     self.tree._expand_node(node_id)
                     self.tree.expanded_nodes.add(node_id)
@@ -124,17 +154,17 @@ class BestFirstSearch(BaseSearchAlgorithm):
             self.bfs_table.append([elt, value, depth, expanded])
             return
         i1 = 0
-        i2 = len(self.bfs_table)-1
-        i = len(self.bfs_table)//2
-        while i1 != i2 and i != i1 and i!=i2:
+        i2 = len(self.bfs_table) - 1
+        i = len(self.bfs_table) // 2
+        while i1 != i2 and i != i1 and i != i2:
             if value < self.bfs_table[i][1]:
-                i1 = i+1
+                i1 = i + 1
             if value > self.bfs_table[i][1]:
                 i2 = i
             if value == self.bfs_table[i][1]:
                 self.bfs_table.insert(i, [elt, value, depth, expanded])
                 return
-            i = (i1+i2)//2
+            i = (i1 + i2) // 2
         self.bfs_table.insert(i, [elt, value, depth, expanded])
 
     def step(self):
@@ -163,7 +193,9 @@ class BestFirstSearch(BaseSearchAlgorithm):
                     return True, [child_id]
 
                 # Always evaluate using unified node value
-                self.insert_dicho_bfs_table(child_id, self.tree._get_node_value(child_id), depth + 1, False)
+                self.insert_dicho_bfs_table(
+                    child_id, self.tree._get_node_value(child_id), depth + 1, False
+                )
         return False, [leaf_id]
 
 
@@ -177,17 +209,17 @@ class BeamSearch(BaseSearchAlgorithm):
             self.bfs_table.append([elt, value, depth, expanded])
             return
         i1 = 0
-        i2 = len(self.bfs_table)-1
-        i = len(self.bfs_table)//2
-        while i1 != i2 and i != i1 and i!=i2:
+        i2 = len(self.bfs_table) - 1
+        i = len(self.bfs_table) // 2
+        while i1 != i2 and i != i1 and i != i2:
             if value < self.bfs_table[i][1]:
-                i1 = i+1
+                i1 = i + 1
             if value > self.bfs_table[i][1]:
                 i2 = i
             if value == self.bfs_table[i][1]:
                 self.bfs_table.insert(i, [elt, value, depth, expanded])
                 return
-            i = (i1+i2)//2
+            i = (i1 + i2) // 2
         self.bfs_table.insert(i, [elt, value, depth, expanded])
 
     def step(self):
@@ -219,7 +251,9 @@ class BeamSearch(BaseSearchAlgorithm):
                         return True, [child_id]
 
                     # Always evaluate using unified node value
-                    self.insert_dicho_bfs_table(child_id, self.tree._get_node_value(child_id), depth + 1, False)
+                    self.insert_dicho_bfs_table(
+                        child_id, self.tree._get_node_value(child_id), depth + 1, False
+                    )
 
         return False, [1]
 
@@ -230,8 +264,8 @@ class UpperConfidenceSearch(BaseSearchAlgorithm):
         super().__init__(tree)
         self.c_ucb = 0.1
         self.epsilon = 0
-        self.ucb_type = "uct" # ["uct", "puct", "value"]
-        self.backprop_type = "muzero" # ["muzero", "cumulative"]
+        self.ucb_type = "uct"  # ["uct", "puct", "value"]
+        self.backprop_type = "muzero"  # ["muzero", "cumulative"]
         self.evaluation_agg = "max"
 
     def _ucb(self, node_id: int) -> float:
@@ -246,7 +280,9 @@ class UpperConfidenceSearch(BaseSearchAlgorithm):
 
         if self.ucb_type == "puct":
             u = (
-                self.c_ucb * prob * sqrt(self.tree.nodes_visit[self.tree.parents[node_id]])
+                self.c_ucb
+                * prob
+                * sqrt(self.tree.nodes_visit[self.tree.parents[node_id]])
             ) / (visit + 1)
             ucb_value = self.tree.nodes_total_value[node_id] + u
 
@@ -297,7 +333,9 @@ class UpperConfidenceSearch(BaseSearchAlgorithm):
         while node_id:
             if self.backprop_type == "muzero":
                 self.tree.nodes_total_value[node_id] = (
-                    self.tree.nodes_total_value[node_id] * self.tree.nodes_visit[node_id] + value
+                    self.tree.nodes_total_value[node_id]
+                    * self.tree.nodes_visit[node_id]
+                    + value
                 ) / (self.tree.nodes_visit[node_id] + 1)
             elif self.backprop_type == "cumulative":
                 self.tree.nodes_total_value[node_id] += value
@@ -328,7 +366,7 @@ class UpperConfidenceSearch(BaseSearchAlgorithm):
                     return True, [node_id]
 
                 if (
-                        curr_depth < self.tree.config.max_depth
+                    curr_depth < self.tree.config.max_depth
                 ):  # expand node if depth limit is not reached
                     self.tree._expand_node(node_id)
                     self.tree.expanded_nodes.add(node_id)
@@ -408,13 +446,15 @@ class NestedMonteCarloSearch(BaseSearchAlgorithm):
         best_node_id = node_id
         best_sequence = []
         return_sequence = []
-        if not node_id in self.tree.expanded_nodes :
+        if not node_id in self.tree.expanded_nodes:
             self.tree._expand_node(node_id)
             self.tree.expanded_nodes.add(node_id)
         best_score = -100000
-        all_child = self.tree.children[node_id].union(self.tree.redundant_children[node_id])
+        all_child = self.tree.children[node_id].union(
+            self.tree.redundant_children[node_id]
+        )
         while all_child:
-            if time() - self.tree.start_time > self.tree.config.max_time :
+            if time() - self.tree.start_time > self.tree.config.max_time:
                 return best_node_id, return_sequence + best_sequence
             if self.tree.nodes[node_id].is_solved():
                 if not node_id in self.tree.winning_nodes:
@@ -436,17 +476,22 @@ class NestedMonteCarloSearch(BaseSearchAlgorithm):
                 if not child_id in self.tree.expanded_nodes:
                     self.tree._expand_node(child_id)
                     self.tree.expanded_nodes.add(child_id)
-                if n == 1 :
+                if n == 1:
                     sequence = []
-                    if s1 in self.big_dict_of_all_node_ids_NMCS_playout_values :
-                        (s1, sequence) = self.big_dict_of_all_node_ids_NMCS_playout_values[s1]
+                    if s1 in self.big_dict_of_all_node_ids_NMCS_playout_values:
+                        (s1, sequence) = (
+                            self.big_dict_of_all_node_ids_NMCS_playout_values[s1]
+                        )
                     else:
                         s1key = s1
-                        s1, sequence = self.nmcs_rollout(s1, depth+1,"greedy")
-                        self.big_dict_of_all_node_ids_NMCS_playout_values[s1key] = (s1, sequence)
+                        s1, sequence = self.nmcs_rollout(s1, depth + 1, "greedy")
+                        self.big_dict_of_all_node_ids_NMCS_playout_values[s1key] = (
+                            s1,
+                            sequence,
+                        )
                     sequence.insert(0, child_id)
                 else:
-                    s1, sequence = self.NMCS(s1, n-1, depth+1)
+                    s1, sequence = self.NMCS(s1, n - 1, depth + 1)
                     sequence.insert(0, child_id)
                 if self.tree.nodes[s1].is_solved():
                     if not s1 in self.tree.winning_nodes:
@@ -466,15 +511,21 @@ class NestedMonteCarloSearch(BaseSearchAlgorithm):
             if len(best_sequence) == 0:
                 return node_id, return_sequence
             node_id = best_sequence[0]
-            all_child = self.tree.children[node_id].union(self.tree.redundant_children[node_id])
+            all_child = self.tree.children[node_id].union(
+                self.tree.redundant_children[node_id]
+            )
             depth += 1
             return_sequence.append(best_sequence.pop(0))
 
-            if not node_id in self.tree.expanded_nodes and not node_id in self.tree.winning_nodes:
+            if (
+                not node_id in self.tree.expanded_nodes
+                and not node_id in self.tree.winning_nodes
+            ):
                 self.tree._expand_node(node_id)
                 self.tree.expanded_nodes.add(node_id)
 
         return best_node_id, return_sequence
+
 
 class LazyNestedMonteCarloSearch(BaseSearchAlgorithm):
     def __init__(self, tree, level=2):
@@ -503,17 +554,17 @@ class LazyNestedMonteCarloSearch(BaseSearchAlgorithm):
             self.bfs_table.append([elt, value, depth, expanded])
             return
         i1 = 0
-        i2 = len(self.bfs_table)-1
-        i = len(self.bfs_table)//2
-        while i1 != i2 and i != i1 and i!=i2:
+        i2 = len(self.bfs_table) - 1
+        i = len(self.bfs_table) // 2
+        while i1 != i2 and i != i1 and i != i2:
             if value < self.bfs_table[i][1]:
-                i1 = i+1
+                i1 = i + 1
             if value > self.bfs_table[i][1]:
                 i2 = i
             if value == self.bfs_table[i][1]:
                 self.bfs_table.insert(i, [elt, value, depth, expanded])
                 return
-            i = (i1+i2)//2
+            i = (i1 + i2) // 2
         self.bfs_table.insert(i, [elt, value, depth, expanded])
 
     def insert_dicho_LNMCS_tresh(self, value, depth):
@@ -524,15 +575,15 @@ class LazyNestedMonteCarloSearch(BaseSearchAlgorithm):
         i1 = 0
         i2 = len(self.lnmcs_thresholds[depth]) - 1
         i = len(self.lnmcs_thresholds[depth]) // 2
-        while i1 != i2 and i != i1 and i!=i2:
+        while i1 != i2 and i != i1 and i != i2:
             if value < self.lnmcs_thresholds[depth][i]:
-                i1 = i+1
+                i1 = i + 1
             if value > self.lnmcs_thresholds[depth][i]:
                 i2 = i
             if value == self.lnmcs_thresholds[depth][i]:
                 self.lnmcs_thresholds[depth].insert(i, value)
                 return
-            i = (i1+i2)//2
+            i = (i1 + i2) // 2
         self.lnmcs_thresholds[depth].insert(i, value)
         return
 
@@ -540,12 +591,12 @@ class LazyNestedMonteCarloSearch(BaseSearchAlgorithm):
         best_node_id = node_id
         best_sequence = []
         return_sequence = []
-        if not node_id in self.tree.expanded_nodes :
+        if not node_id in self.tree.expanded_nodes:
             self.tree._expand_node(node_id)
             self.tree.expanded_nodes.add(node_id)
         best_score = -100000
-        while self.tree.children[node_id] :
-            if time() - self.tree.start_time > self.tree.config.max_time :
+        while self.tree.children[node_id]:
+            if time() - self.tree.start_time > self.tree.config.max_time:
                 return best_node_id, return_sequence + best_sequence
             if self.tree.nodes[node_id].is_solved():
                 if not node_id in self.tree.winning_nodes:
@@ -587,20 +638,25 @@ class LazyNestedMonteCarloSearch(BaseSearchAlgorithm):
 
             best_can = -1
             max_score_can = -1
-            for e in self.bfs_table :
-                if e[1] > max_score_can :
+            for e in self.bfs_table:
+                if e[1] > max_score_can:
                     max_score_can = e[1]
                     best_can = e[0]
-                if e[1] >= self.lnmcs_thresholds[depth][int(ratio*(len(self.lnmcs_thresholds[depth])-1))] :
+                if (
+                    e[1]
+                    >= self.lnmcs_thresholds[depth][
+                        int(ratio * (len(self.lnmcs_thresholds[depth]) - 1))
+                    ]
+                ):
                     candidates.append(e[0])
             if best_can != -1 and candidates == []:
                 candidates = [best_can]
 
             for child_id in candidates:
                 s1 = child_id
-                if n == 1 :
+                if n == 1:
                     sequence = []
-                    s1, sequence = self.nmcs_rollout(s1, depth+1, "policy")
+                    s1, sequence = self.nmcs_rollout(s1, depth + 1, "policy")
                     sequence.insert(0, child_id)
                 else:
                     s1, sequence = self.LNMCS(s1, n - 1, depth + 1, ratio)
@@ -626,7 +682,10 @@ class LazyNestedMonteCarloSearch(BaseSearchAlgorithm):
             depth += 1
             return_sequence.append(best_sequence.pop(0))
 
-            if not node_id in self.tree.expanded_nodes and not node_id in self.tree.winning_nodes:
+            if (
+                not node_id in self.tree.expanded_nodes
+                and not node_id in self.tree.winning_nodes
+            ):
                 self.tree._expand_node(node_id)
                 self.tree.expanded_nodes.add(node_id)
 

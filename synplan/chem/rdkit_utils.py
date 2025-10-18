@@ -4,7 +4,8 @@ from rdkit.Chem.Descriptors import ExactMolWt
 from rdkit.Chem.rdMolDescriptors import CalcNumHeavyAtoms
 
 from rdkit import RDLogger
-RDLogger.DisableLog('rdApp.*')
+
+RDLogger.DisableLog("rdApp.*")
 
 
 class RDKitScore:

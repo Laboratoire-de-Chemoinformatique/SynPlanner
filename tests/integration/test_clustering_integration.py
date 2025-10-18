@@ -144,8 +144,7 @@ def test_simple_molecule_clustering(
     # Verify clustering results
     expected_clusters = ["1.1", "2.1", "2.2", "3.1", "3.2", "3.3", "4.1"]
     assert len(clusters) > 0, "Should have at least one cluster"
-    assert len(clusters) == len(
-        expected_clusters), "Should have 7 clusters"
+    assert len(clusters) == len(expected_clusters), "Should have 7 clusters"
     total_routes = sum(cluster["group_size"] for cluster in clusters.values())
     assert total_routes > 0, "Should have at least one route"
     assert (

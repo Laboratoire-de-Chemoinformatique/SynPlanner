@@ -12,7 +12,6 @@ from synplan.ml.training import mol_to_pyg
 from synplan.chem.rdkit_utils import RDKitScore
 
 
-
 class ValueNetworkFunction:
     """Value function implemented as a value neural network for node evaluation
     (synthesisability prediction) in tree search."""
@@ -138,7 +137,9 @@ class RolloutSimulator:
                     [
                         x
                         for x in products
-                        if not x.is_building_block(self.building_blocks, self.min_mol_size)
+                        if not x.is_building_block(
+                            self.building_blocks, self.min_mol_size
+                        )
                     ]
                 )
                 rollout_depth += 1
@@ -181,7 +182,7 @@ class EvaluationService:
         self.building_blocks = building_blocks
         self.min_mol_size = min_mol_size
         self.max_depth = max_depth
-        self.rollout = None 
+        self.rollout = None
 
     @staticmethod
     def _to_01(value: float, *, src_range: Tuple[float, float] = (0.0, 1.0)) -> float:
@@ -236,7 +237,9 @@ class EvaluationService:
             current_depth = nodes_depth[node_id]
             raw = min(
                 (
-                    self.rollout.simulate_precursor(precursor, current_depth=current_depth)
+                    self.rollout.simulate_precursor(
+                        precursor, current_depth=current_depth
+                    )
                     for precursor in node.precursors_to_expand
                 ),
                 default=1.0,

@@ -9,13 +9,18 @@ from pathlib import Path
 from typing import List, Set, FrozenSet, Tuple, Union
 
 from CGRtools.reactor.reactor import Reactor
+from CGRtools.files.SDFrw import SDFRead
 from torch import device
 from huggingface_hub import hf_hub_download, snapshot_download
 from tqdm import tqdm
+from concurrent.futures import ProcessPoolExecutor
+import os
 
 from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.networks.value import ValueNetwork
 from synplan.utils.files import MoleculeReader
+from synplan.chem import smiles_parser
+from synplan.chem.utils import safe_canonicalization, _standardize_one_smiles, _standardize_sdf_range
 
 REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
 
@@ -143,7 +148,11 @@ def load_reaction_rules(file: str) -> List[Reactor]:
 
 @functools.lru_cache(maxsize=None)
 def load_building_blocks(
-    building_blocks_path: Union[str, Path], standardize: bool = True, silent: bool = True,
+    building_blocks_path: Union[str, Path], 
+    standardize: bool = True, 
+    silent: bool = True,
+    num_workers: int | None = None, 
+    chunksize: int = 1000,
 ) -> FrozenSet[str]:
     """Loads building blocks data from a file and returns a frozen set of building
     blocks.
@@ -154,26 +163,70 @@ def load_building_blocks(
     """
 
     building_blocks_path = Path(building_blocks_path).resolve()
-    assert (
-        building_blocks_path.suffix == ".smi"
-        or building_blocks_path.suffix == ".smiles"
-    )
+    suffix = building_blocks_path.suffix.lower()
+    if not standardize:
+        assert suffix in {".smi", ".smiles"}
+    else:
+        assert suffix in {".smi", ".smiles", ".sdf"}
 
     building_blocks_smiles = set()
     if standardize:
-        with MoleculeReader(building_blocks_path) as molecules:
-            for mol in tqdm(
-                molecules,
-                desc="Number of building blocks processed: ",
-                bar_format="{desc}{n} [{elapsed}]",
-                disable=silent,
-            ):
-                try:
-                    mol.canonicalize()
-                    mol.clean_stereo()
-                    building_blocks_smiles.add(str(mol))
-                except:  # mol.canonicalize() / InvalidAromaticRing
-                    pass
+        if num_workers is None:
+            num_workers = max(1, os.cpu_count() - 1)
+
+        if suffix in {".smi", ".smiles"}:
+            def _line_iter():
+                with open(building_blocks_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        yield line.split()[0]
+
+            total = None
+            if not silent:
+                with open(building_blocks_path, "r", encoding="utf-8") as f:
+                    total = sum(1 for _ in f)
+
+            with ProcessPoolExecutor(max_workers=num_workers) as ex:
+                results = ex.map(_standardize_one_smiles, _line_iter(), chunksize=chunksize or 1000)
+                if not silent:
+                    results = tqdm(
+                        results,
+                        total=total,
+                        desc="Number of building blocks processed: ",
+                        bar_format="{desc}{n} [{elapsed}]",
+                        disable=silent,
+                    )
+                for res in results:
+                    if res:
+                        building_blocks_smiles.add(res)
+
+        elif suffix == ".sdf":
+            sdf = SDFRead(str(building_blocks_path), indexable=True)
+            n = len(sdf)
+            sdf.close()
+
+            step = max(1, chunksize or 5000)
+            ranges = [(str(building_blocks_path), i, min(i + step, n)) for i in range(0, n, step)]
+
+            progress = None
+            if not silent:
+                progress = tqdm(
+                    total=n,
+                    desc="Number of building blocks processed: ",
+                    bar_format="{desc}{n} [{elapsed}]",
+                    disable=silent,
+                )
+
+            with ProcessPoolExecutor(max_workers=num_workers) as ex:
+                for chunk_out in ex.map(lambda args: _standardize_sdf_range(*args), ranges):
+                    if chunk_out:
+                        building_blocks_smiles.update(chunk_out)
+                        if progress is not None:
+                            progress.update(len(chunk_out))
+            if progress is not None:
+                progress.close()
     else:
         with open(building_blocks_path, "r") as inp:
             for line in inp:
@@ -181,6 +234,7 @@ def load_building_blocks(
                 building_blocks_smiles.add(smiles)
 
     return frozenset(building_blocks_smiles)
+
 
 
 def load_value_net(

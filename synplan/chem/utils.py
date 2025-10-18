@@ -15,6 +15,7 @@ from tqdm import tqdm
 
 from synplan.chem import smiles_parser
 from synplan.utils.files import MoleculeReader, MoleculeWriter
+from CGRtools.files.SDFrw import SDFRead
 
 from chython import MoleculeContainer as MoleculeContainerChython
 
@@ -153,6 +154,31 @@ def standardize_building_blocks(input_file: str, output_file: str) -> str:
             out_file.write(mol)
 
     return output_file
+
+
+def _standardize_one_smiles(smiles_str: str) -> str | None:
+    try:
+        mol = smiles_parser(smiles_str)
+        mol = safe_canonicalization(mol)
+        return str(mol)
+    except Exception:
+        return None
+
+
+def _standardize_sdf_range(filename: str, start: int, end: int) -> list[str]:
+    out: list[str] = []
+    sdf = SDFRead(filename, indexable=True)
+    try:
+        for i in range(start, end):
+            try:
+                mol = sdf[i]
+                mol = safe_canonicalization(mol)
+                out.append(str(mol))
+            except Exception:
+                pass
+    finally:
+        sdf.close()
+    return out
 
 
 def cgr_from_reaction_rule(reaction_rule: ReactionContainer) -> CGRContainer:
