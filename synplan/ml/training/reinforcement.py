@@ -288,7 +288,7 @@ def run_planning(
     :param building_blocks_path:
     :param targets_batch_id:
     """
-    from tqdm import tqdm
+    from tqdm.auto import tqdm
 
     print(f"\nProcess batch number {targets_batch_id}")
     tree_list = []

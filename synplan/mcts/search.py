@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Union
 
 from CGRtools.containers import MoleculeContainer
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from synplan.chem.reaction_routes.route_cgr import extract_reactions
 from synplan.chem.reaction_routes.io import write_routes_csv, write_routes_json

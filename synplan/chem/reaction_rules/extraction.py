@@ -16,7 +16,7 @@ from CGRtools.containers.query import QueryContainer
 from CGRtools.containers.reaction import ReactionContainer
 from CGRtools.exceptions import InvalidAromaticRing
 from CGRtools.reactor import Reactor
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
 from synplan.chem.utils import (

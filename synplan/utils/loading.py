@@ -12,7 +12,7 @@ from CGRtools.reactor.reactor import Reactor
 from CGRtools.files.SDFrw import SDFRead
 from torch import device
 from huggingface_hub import hf_hub_download, snapshot_download
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from concurrent.futures import ProcessPoolExecutor
 import os
 
@@ -24,7 +24,16 @@ from synplan.chem.utils import (
     safe_canonicalization,
     _standardize_one_smiles,
     _standardize_sdf_range,
+    _standardize_sdf_text,
+    _standardize_smiles_batch,
 )
+from synplan.utils.files import (
+    count_sdf_records,
+    iter_sdf_text_blocks,
+    count_smiles_records,
+    iter_smiles_blocks,
+)
+from synplan.utils.parallel import process_pool_map_stream
 
 REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
 
@@ -168,10 +177,7 @@ def load_building_blocks(
 
     building_blocks_path = Path(building_blocks_path).resolve()
     suffix = building_blocks_path.suffix.lower()
-    if not standardize:
-        assert suffix in {".smi", ".smiles"}
-    else:
-        assert suffix in {".smi", ".smiles", ".sdf"}
+    assert suffix in {".smi", ".smiles", ".sdf"}
 
     building_blocks_smiles = set()
     if standardize:
@@ -180,70 +186,73 @@ def load_building_blocks(
 
         if suffix in {".smi", ".smiles"}:
 
-            def _line_iter():
-                with open(building_blocks_path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        yield line.split()[0]
+            total = count_smiles_records(building_blocks_path) if not silent else None
+            step = max(1, chunksize or 1000)
 
-            total = None
             if not silent:
-                with open(building_blocks_path, "r", encoding="utf-8") as f:
-                    total = sum(1 for _ in f)
-
-            with ProcessPoolExecutor(max_workers=num_workers) as ex:
-                results = ex.map(
-                    _standardize_one_smiles, _line_iter(), chunksize=chunksize or 1000
+                progress_iter = tqdm(
+                    total=total,
+                    desc="Building blocks",
+                    unit="mol",
+                    unit_scale=True,
+                    unit_divisor=1000,
+                    dynamic_ncols=True,
+                    smoothing=0.1,
+                    disable=silent,
                 )
-                if not silent:
-                    results = tqdm(
-                        results,
-                        total=total,
-                        desc="Number of building blocks processed: ",
-                        bar_format="{desc}{n} [{elapsed}]",
-                        disable=silent,
-                    )
-                for res in results:
-                    if res:
-                        building_blocks_smiles.add(res)
+            else:
+                progress_iter = None
+
+            for out in process_pool_map_stream(
+                iter_smiles_blocks(building_blocks_path, step),
+                _standardize_smiles_batch,
+                max_workers=num_workers,
+            ):
+                if out:
+                    building_blocks_smiles.update(out)
+                    if progress_iter is not None:
+                        progress_iter.update(len(out))
+            if progress_iter is not None:
+                progress_iter.close()
 
         elif suffix == ".sdf":
-            sdf = SDFRead(str(building_blocks_path), indexable=True)
-            n = len(sdf)
-            sdf.close()
-
+            n = count_sdf_records(building_blocks_path) if not silent else None
             step = max(1, chunksize or 5000)
-            ranges = [
-                (str(building_blocks_path), i, min(i + step, n))
-                for i in range(0, n, step)
-            ]
+            blocks = iter_sdf_text_blocks(building_blocks_path, step)
 
             progress = None
             if not silent:
                 progress = tqdm(
                     total=n,
-                    desc="Number of building blocks processed: ",
-                    bar_format="{desc}{n} [{elapsed}]",
+                    desc="Building blocks",
+                    unit="mol",
+                    unit_scale=True,
+                    unit_divisor=1000,
+                    dynamic_ncols=True,
+                    smoothing=0.1,
                     disable=silent,
                 )
 
-            with ProcessPoolExecutor(max_workers=num_workers) as ex:
-                for chunk_out in ex.map(
-                    lambda args: _standardize_sdf_range(*args), ranges
-                ):
-                    if chunk_out:
-                        building_blocks_smiles.update(chunk_out)
-                        if progress is not None:
-                            progress.update(len(chunk_out))
+            for chunk_out in process_pool_map_stream(
+                blocks, _standardize_sdf_text, max_workers=num_workers
+            ):
+                if chunk_out:
+                    building_blocks_smiles.update(chunk_out)
+                    if progress is not None:
+                        progress.update(len(chunk_out))
             if progress is not None:
                 progress.close()
     else:
-        with open(building_blocks_path, "r") as inp:
-            for line in inp:
-                smiles = line.strip().split()[0]
+        if suffix in {".smi", ".smiles"}:
+            for smiles in iter_smiles(building_blocks_path):
                 building_blocks_smiles.add(smiles)
+        elif suffix == ".sdf":
+            with SDFRead(str(building_blocks_path)) as sdf:
+                for mol in sdf:
+                    try:
+                        building_blocks_smiles.add(str(mol))
+                    except Exception:
+                        pass
 
     return frozenset(building_blocks_smiles)
 

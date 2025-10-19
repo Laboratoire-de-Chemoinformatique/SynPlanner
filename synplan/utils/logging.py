@@ -52,7 +52,7 @@ class TqdmHandler(logging.StreamHandler):
 
     def emit(self, record):
         try:
-            from tqdm import tqdm
+            from tqdm.auto import tqdm
 
             tqdm.write(self.format(record), end=self.terminator)
         except ModuleNotFoundError:

@@ -19,7 +19,7 @@ from torch_geometric.data import InMemoryDataset
 from torch_geometric.data.data import Data
 from torch_geometric.data.makedirs import makedirs
 from torch_geometric.transforms import ToUndirected
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from synplan.chem.utils import unite_molecules
 from synplan.utils.files import ReactionReader

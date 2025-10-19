@@ -11,7 +11,9 @@ from CGRtools.containers import (
     ReactionContainer,
 )
 from CGRtools.exceptions import InvalidAromaticRing
-from tqdm import tqdm
+from tqdm.auto import tqdm
+from io import StringIO
+from CGRtools.files.SDFrw import SDFRead
 
 from synplan.chem import smiles_parser
 from synplan.utils.files import MoleculeReader, MoleculeWriter
@@ -178,6 +180,34 @@ def _standardize_sdf_range(filename: str, start: int, end: int) -> list[str]:
                 pass
     finally:
         sdf.close()
+    return out
+
+
+def _standardize_sdf_text(block: str) -> list[str]:
+    """Standardize molecules from an SDF text block.
+
+    The block may contain one or multiple SDF records, separated by $$$$ lines.
+    """
+    out: list[str] = []
+    with StringIO(block) as fh:
+        with SDFRead(fh) as sdf:
+            for mol in sdf:
+                try:
+                    mol = safe_canonicalization(mol)
+                    out.append(str(mol))
+                except Exception:
+                    # ignore malformed entries
+                    pass
+    return out
+
+
+def _standardize_smiles_batch(batch: list[str]) -> list[str]:
+    """Standardize a batch of SMILES strings and return valid results."""
+    out: list[str] = []
+    for smiles_str in batch:
+        res = _standardize_one_smiles(smiles_str)
+        if res:
+            out.append(res)
     return out
 
 
