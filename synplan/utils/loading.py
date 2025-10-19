@@ -32,6 +32,7 @@ from synplan.utils.files import (
     iter_sdf_text_blocks,
     count_smiles_records,
     iter_smiles_blocks,
+    iter_smiles,
 )
 from synplan.utils.parallel import process_pool_map_stream
 

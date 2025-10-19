@@ -477,6 +477,14 @@ class TreeConfig(ConfigABC):
     num_cpus: int = 1
     enable_pruning: bool = True
 
+    # UCT configuration
+    ucb_type: str = "uct"  # one of: "uct", "puct", "value"
+    c_ucb: float = 0.1  # exploration constant >= 0
+    backprop_type: str = "muzero"  # one of: "muzero", "cumulative"
+    evaluation_agg: str = "max"  # one of: "max", "average"
+    epsilon: float = 0.0  # epsilon-greedy in [0.0, 1.0]
+    init_node_value: float = 0.5  # initial node value in [0.0, 1.0]
+
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "TreeConfig":
         return TreeConfig(**config_dict)
@@ -531,6 +539,24 @@ class TreeConfig(ConfigABC):
             raise ValueError("min_mol_size must be a non-negative integer.")
         if not isinstance(params.get("enable_pruning", True), bool):
             raise ValueError("enable_pruning must be a boolean.")
+
+        # Validate UCT-related parameters
+        if params.get("ucb_type") not in ["uct", "puct", "value"]:
+            raise ValueError("ucb_type must be 'uct', 'puct' or 'value'.")
+        if not isinstance(params.get("c_ucb"), (float, int)) or params.get("c_ucb") < 0:
+            raise ValueError("c_ucb must be a non-negative float.")
+        if params.get("backprop_type") not in ["muzero", "cumulative"]:
+            raise ValueError("backprop_type must be 'muzero' or 'cumulative'.")
+        if params.get("evaluation_agg") not in ["max", "average"]:
+            raise ValueError("evaluation_agg must be 'max' or 'average'.")
+        if not isinstance(params.get("epsilon"), (float, int)) or not (
+            0.0 <= float(params.get("epsilon")) <= 1.0
+        ):
+            raise ValueError("epsilon must be a float in [0.0, 1.0].")
+        if not isinstance(params.get("init_node_value"), (float, int)) or not (
+            0.0 <= float(params.get("init_node_value")) <= 1.0
+        ):
+            raise ValueError("init_node_value must be a float in [0.0, 1.0].")
 
         # Backward compatibility: map evaluation_type to score_function if provided
         et = params.get("evaluation_type")

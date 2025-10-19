@@ -98,7 +98,7 @@ class Tree:
         self.nodes_total_value: Dict[int, float] = {1: 0.0}
 
         # default search parameters
-        self.init_node_value: float = 0.5
+        self.init_node_value: float = self.config.init_node_value
 
         # tree building limits
         self.curr_iteration: int = 0

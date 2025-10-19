@@ -262,11 +262,29 @@ class UpperConfidenceSearch(BaseSearchAlgorithm):
 
     def __init__(self, tree):
         super().__init__(tree)
-        self.c_ucb = 0.1
-        self.epsilon = 0
-        self.ucb_type = "uct"  # ["uct", "puct", "value"]
-        self.backprop_type = "muzero"  # ["muzero", "cumulative"]
-        self.evaluation_agg = "max"
+        cfg = self.tree.config
+        if hasattr(cfg, "ucb_type") and isinstance(cfg.ucb_type, str):
+            ucb = cfg.ucb_type.strip().lower()
+            if ucb in ("uct", "puct", "value"):
+                self.ucb_type = ucb
+        if hasattr(cfg, "c_ucb"):
+            try:
+                self.c_ucb = max(0.0, float(cfg.c_ucb))
+            except (TypeError, ValueError):
+                pass
+        if hasattr(cfg, "backprop_type") and isinstance(cfg.backprop_type, str):
+            bpt = cfg.backprop_type.strip().lower()
+            if bpt in ("muzero", "cumulative"):
+                self.backprop_type = bpt
+        if hasattr(cfg, "evaluation_agg") and isinstance(cfg.evaluation_agg, str):
+            agg = cfg.evaluation_agg.strip().lower()
+            if agg in ("max", "average"):
+                self.evaluation_agg = agg
+        if hasattr(cfg, "epsilon"):
+            try:
+                self.epsilon = min(1.0, max(0.0, float(cfg.epsilon)))
+            except (TypeError, ValueError):
+                pass
 
     def _ucb(self, node_id: int) -> float:
         """Calculates the Upper Confidence Bound (UCB) statistics for a given node.
