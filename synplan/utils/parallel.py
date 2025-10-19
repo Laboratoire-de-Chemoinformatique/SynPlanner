@@ -53,5 +53,3 @@ def process_pool_map_stream(
                     pass
 
                 yield future.result()
-
-
