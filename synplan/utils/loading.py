@@ -20,7 +20,11 @@ from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.networks.value import ValueNetwork
 from synplan.utils.files import MoleculeReader
 from synplan.chem import smiles_parser
-from synplan.chem.utils import safe_canonicalization, _standardize_one_smiles, _standardize_sdf_range
+from synplan.chem.utils import (
+    safe_canonicalization,
+    _standardize_one_smiles,
+    _standardize_sdf_range,
+)
 
 REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
 
@@ -148,10 +152,10 @@ def load_reaction_rules(file: str) -> List[Reactor]:
 
 @functools.lru_cache(maxsize=None)
 def load_building_blocks(
-    building_blocks_path: Union[str, Path], 
-    standardize: bool = True, 
+    building_blocks_path: Union[str, Path],
+    standardize: bool = True,
     silent: bool = True,
-    num_workers: int | None = None, 
+    num_workers: int | None = None,
     chunksize: int = 1000,
 ) -> FrozenSet[str]:
     """Loads building blocks data from a file and returns a frozen set of building
@@ -175,6 +179,7 @@ def load_building_blocks(
             num_workers = max(1, os.cpu_count() - 1)
 
         if suffix in {".smi", ".smiles"}:
+
             def _line_iter():
                 with open(building_blocks_path, "r", encoding="utf-8") as f:
                     for line in f:
@@ -189,7 +194,9 @@ def load_building_blocks(
                     total = sum(1 for _ in f)
 
             with ProcessPoolExecutor(max_workers=num_workers) as ex:
-                results = ex.map(_standardize_one_smiles, _line_iter(), chunksize=chunksize or 1000)
+                results = ex.map(
+                    _standardize_one_smiles, _line_iter(), chunksize=chunksize or 1000
+                )
                 if not silent:
                     results = tqdm(
                         results,
@@ -208,7 +215,10 @@ def load_building_blocks(
             sdf.close()
 
             step = max(1, chunksize or 5000)
-            ranges = [(str(building_blocks_path), i, min(i + step, n)) for i in range(0, n, step)]
+            ranges = [
+                (str(building_blocks_path), i, min(i + step, n))
+                for i in range(0, n, step)
+            ]
 
             progress = None
             if not silent:
@@ -220,7 +230,9 @@ def load_building_blocks(
                 )
 
             with ProcessPoolExecutor(max_workers=num_workers) as ex:
-                for chunk_out in ex.map(lambda args: _standardize_sdf_range(*args), ranges):
+                for chunk_out in ex.map(
+                    lambda args: _standardize_sdf_range(*args), ranges
+                ):
                     if chunk_out:
                         building_blocks_smiles.update(chunk_out)
                         if progress is not None:
@@ -234,7 +246,6 @@ def load_building_blocks(
                 building_blocks_smiles.add(smiles)
 
     return frozenset(building_blocks_smiles)
-
 
 
 def load_value_net(

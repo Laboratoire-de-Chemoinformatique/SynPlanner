@@ -27,6 +27,9 @@ RUN apt-get update \
     && curl -sSL https://install.python-poetry.org | python3 - \
     && poetry config virtualenvs.create false
 
+# Enable 'poetry export' via official plugin
+RUN poetry self add poetry-plugin-export || "$POETRY_HOME/bin/python" -m pip install --no-cache-dir poetry-plugin-export
+
 # 3. Copy lockfiles and export requirements
 COPY pyproject.toml poetry.lock /app/
 RUN poetry export -f requirements.txt --without-hashes -o /tmp/requirements.txt \
