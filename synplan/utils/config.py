@@ -467,7 +467,7 @@ class TreeConfig(ConfigABC):
     silent: bool = False
 
     # new parameters
-    algorithm: str = "UCT"
+    algorithm: str = "uct"
     # Rename score_function -> evaluation_function (canonical)
     score_function: str = "rollout"
     evaluation_function: str = "rollout"
@@ -484,6 +484,7 @@ class TreeConfig(ConfigABC):
     evaluation_agg: str = "max"  # one of: "max", "average"
     epsilon: float = 0.0  # epsilon-greedy in [0.0, 1.0]
     init_node_value: float = 0.5  # initial node value in [0.0, 1.0]
+    beam_width: int = 10
 
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "TreeConfig":
@@ -557,6 +558,12 @@ class TreeConfig(ConfigABC):
             0.0 <= float(params.get("init_node_value")) <= 1.0
         ):
             raise ValueError("init_node_value must be a float in [0.0, 1.0].")
+        # Beam width
+        if (
+            not isinstance(params.get("beam_width", 10), int)
+            or params.get("beam_width", 10) <= 0
+        ):
+            raise ValueError("beam_width must be a positive integer.")
 
         # Backward compatibility: map evaluation_type to score_function if provided
         et = params.get("evaluation_type")

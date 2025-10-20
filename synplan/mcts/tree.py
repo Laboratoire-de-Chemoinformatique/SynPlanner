@@ -19,21 +19,21 @@ from synplan.utils.config import TreeConfig
 
 
 from .algorithm import (
-    BreadthFirstSearch,
-    BestFirstSearch,
-    BeamSearch,
-    UpperConfidenceSearch,
-    NestedMonteCarloSearch,
-    LazyNestedMonteCarloSearch,
+    BreadthFirst,
+    BestFirst,
+    Beam,
+    UCT,
+    NestedMonteCarlo,
+    LazyNestedMonteCarlo,
 )
 
 ALGORITHMS = {
-    "BREADTH": BreadthFirstSearch,
-    "BFS": BestFirstSearch,
-    "BEAM": BeamSearch,
-    "UCT": UpperConfidenceSearch,
-    "NMCS": NestedMonteCarloSearch,
-    "LNMCS": LazyNestedMonteCarloSearch,
+    "breadth_first": BreadthFirst,
+    "best_first": BestFirst,
+    "beam": Beam,
+    "uct": UCT,
+    "nmcs": NestedMonteCarlo,
+    "lazy_nmcs": LazyNestedMonteCarlo,
 }
 
 
@@ -114,8 +114,13 @@ class Tree:
         self.found_a_route = False
         self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks = {}
 
-        # choose search algorithm
-        self.algorithm = ALGORITHMS[config.algorithm](self)
+        # choose search algorithm (normalize key)
+        algo_key = str(config.algorithm).lower()
+        if algo_key not in ALGORITHMS:
+            raise ValueError(
+                f"Unknown algorithm '{config.algorithm}'. Allowed: {list(ALGORITHMS.keys())}"
+            )
+        self.algorithm = ALGORITHMS[algo_key](self)
 
     def __len__(self) -> int:
         """Returns the current size (the number of nodes) in the tree."""
