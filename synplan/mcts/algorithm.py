@@ -1,61 +1,80 @@
-from time import time, sleep
+from time import time
 from random import choice, uniform
 from math import sqrt
-from typing import List, Tuple
+from abc import ABC, abstractmethod
+from typing import List, Tuple, Literal, TYPE_CHECKING
+from bisect import bisect_right
+
+if TYPE_CHECKING:
+    from .tree import Tree
 
 
-class SearchStrategy:
-    """Abstract base for all search strategies that operate on a retrosynthesis `Tree`.
-
-    Each concrete strategy implements a single iteration via `step`, which performs
-    some combination of selection, expansion, evaluation and backpropagation. This
-    base also provides utility rollouts used by NMCS variants.
+class BaseSearchStrategy(ABC):
+    """Minimal abstract base for search strategies operating on a retrosynthesis `Tree`.
 
     Contract:
-    - The tree has a root node with id 1 and maintains `children`, `parents`,
+    - Holds a reference to `tree` with fields like `children`, `parents`,
       `nodes_visit`, `nodes_total_value`, etc.
-    - `step()` must return a tuple `(found_route, node_ids)` where `found_route`
-      indicates that a solved route was reached (directly or via children) and
-      `node_ids` contain the most relevant node ids for the caller (e.g. last
-      visited node or found winners).
+    - Subclasses must implement `step()` and return `(found_route, node_ids)`.
     """
 
-    def __init__(self, tree):
-        """Initialize strategy with a reference to the `Tree` instance."""
-        # reference to `Tree`, so strategies can access nodes, config, etc.
+    def __init__(self, tree: "Tree"):
         self.tree = tree
 
+    @abstractmethod
     def step(self) -> Tuple[bool, List[int]]:
-        """Perform a single algorithm-specific iteration.
-
-        Returns:
-            Tuple[bool, List[int]]: `(found_route, node_ids)`. When `found_route`
-            is True, `node_ids` usually list one or more winning nodes. When
-            False, `node_ids` typically contain the last visited/expanded node id.
-        """
+        """Perform a single algorithm-specific iteration."""
         raise NotImplementedError
 
+    def _mark_solved(self, node_id: int) -> None:
+        """Mark a node as solved, updating winners and the found flag."""
+        if node_id not in self.tree.winning_nodes:
+            self.tree.winning_nodes.append(node_id)
+        self.tree.found_a_route = True
+
+
+class ScoredFrontierMixin:
+    def insert_sorted_frontier(
+        self, node_id: int, score: float, depth: int, is_expanded: bool
+    ) -> None:
+        """Insert a node keeping frontier ordered by (score DESC, node_id ASC)."""
+        keys = [(-entry[1], entry[0]) for entry in self.frontier]
+        idx = bisect_right(keys, (-score, node_id))
+        self.frontier.insert(idx, [node_id, score, depth, is_expanded])
+
+
+class DepthThresholdsMixin:
+    def reset_depth_thresholds(self, max_depth_hint: int | None = None) -> None:
+        """(Re)initialize depth thresholds list; size driven by config.max_depth when available."""
+        if max_depth_hint is not None:
+            size = max(2, int(max_depth_hint) + 5)
+        else:
+            size = 100
+            tree = getattr(self, "tree", None)
+            if tree is not None and getattr(tree, "config", None) is not None:
+                try:
+                    max_depth = int(getattr(tree.config, "max_depth"))
+                    size = max(2, max_depth + 5)
+                except Exception:
+                    size = 100
+        self.depth_thresholds = [[] for _ in range(size)]
+
+    def insert_sorted_threshold(self, score: float, depth: int) -> None:
+        """Insert an evaluation score into the sorted list for a given depth."""
+        if depth >= len(self.depth_thresholds):
+            # extend to accommodate deeper levels than initially sized
+            for _ in range(depth - len(self.depth_thresholds) + 1):
+                self.depth_thresholds.append([])
+        arr = self.depth_thresholds[depth]
+        idx = bisect_right(arr, score)
+        arr.insert(idx, score)
+
+
+class NMCSPlayoutMixin:
     def select_nmcs_path(
-        self, node_id: int, node_depth: int, mode: str
+        self, node_id: int, node_depth: int, mode: Literal["greedy", "random", "policy"]
     ) -> Tuple[int, List[int]]:
-        """Run a simple playout used by NMCS variants starting at `node_id`.
-
-        The procedure repeatedly selects a child according to `mode` until there
-        are no children, the depth limit is reached, or a solved node is found.
-        At each step it considers the union of `children` and `redundant_children`.
-
-        Args:
-            node_id: Start node id.
-            node_depth: Current depth (used to respect `max_depth`).
-            mode: Selection mode:
-                - "greedy": select child with maximal evaluated node value.
-                - "random": select a uniformly random child.
-                - "policy": select child with maximal policy probability.
-
-        Returns:
-            Tuple[int, List[int]]: `(last_node_id, sequence)` where `sequence`
-            contains the ids traversed during the playout (excluding the start).
-        """
+        """Run a simple playout used by NMCS variants starting at `node_id`."""
         depth = node_depth
         sequence: List[int] = []
 
@@ -72,9 +91,7 @@ class SearchStrategy:
 
         while all_children and depth < self.tree.config.max_depth:
             if self.tree.nodes[node_id].is_solved():
-                if node_id not in self.tree.winning_nodes:
-                    self.tree.winning_nodes.append(node_id)
-                self.tree.found_a_route = True
+                self._mark_solved(node_id)
                 return node_id, sequence
 
             selected_id = None
@@ -82,9 +99,7 @@ class SearchStrategy:
                 best_value = -float("inf")
                 for cid in all_children:
                     if self.tree.nodes[cid].is_solved():
-                        if cid not in self.tree.winning_nodes:
-                            self.tree.winning_nodes.append(cid)
-                        self.tree.found_a_route = True
+                        self._mark_solved(cid)
                         sequence.append(cid)
                         return cid, sequence
                     value = self.tree._get_node_value(cid)
@@ -93,12 +108,9 @@ class SearchStrategy:
                         selected_id = cid
 
             elif mode == "random":
-                # Use safe random selection without off-by-one
                 candidate = choice(list(all_children))
                 if self.tree.nodes[candidate].is_solved():
-                    if candidate not in self.tree.winning_nodes:
-                        self.tree.winning_nodes.append(candidate)
-                    self.tree.found_a_route = True
+                    self._mark_solved(candidate)
                     sequence.append(candidate)
                     return candidate, sequence
                 selected_id = candidate
@@ -107,9 +119,7 @@ class SearchStrategy:
                 best_value = -float("inf")
                 for cid in all_children:
                     if self.tree.nodes[cid].is_solved():
-                        if cid not in self.tree.winning_nodes:
-                            self.tree.winning_nodes.append(cid)
-                        self.tree.found_a_route = True
+                        self._mark_solved(cid)
                         sequence.append(cid)
                         return cid, sequence
                     value = self.tree.nodes_prob[cid]
@@ -134,7 +144,7 @@ class SearchStrategy:
         return node_id, sequence
 
 
-class BreadthFirst(SearchStrategy):
+class BreadthFirst(BaseSearchStrategy):
     """Breadth-first search (BFS) over the tree frontier.
 
     Maintains a FIFO queue of nodes to expand in increasing depth order. On each
@@ -166,9 +176,7 @@ class BreadthFirst(SearchStrategy):
         node_id, depth = self.frontier.pop(0)
 
         if self.tree.nodes[node_id].is_solved():
-            if node_id not in self.tree.winning_nodes:
-                self.tree.winning_nodes.append(node_id)
-            self.tree.found_a_route = True
+            self._mark_solved(node_id)
             return True, [node_id]
 
         if node_id not in self.tree.expanded_nodes:
@@ -178,16 +186,14 @@ class BreadthFirst(SearchStrategy):
         if self.tree.children[node_id] and depth < self.tree.config.max_depth:
             for child_id in self.tree.children[node_id]:
                 if self.tree.nodes[child_id].is_solved():
-                    if child_id not in self.tree.winning_nodes:
-                        self.tree.winning_nodes.append(child_id)
-                    self.tree.found_a_route = True
+                    self._mark_solved(child_id)
                     return True, [child_id]
                 self.frontier.append((child_id, depth + 1))
 
         return False, [node_id]
 
 
-class BestFirst(SearchStrategy):
+class BestFirst(ScoredFrontierMixin, BaseSearchStrategy):
     """Best-first search ordered by node evaluation.
 
     Keeps a globally sorted frontier (highest score first) according to the
@@ -202,31 +208,6 @@ class BestFirst(SearchStrategy):
         self.frontier: List[List[int | float]] = (
             []
         )  # (node_id, score, depth, is_expanded)
-
-    def insert_sorted_frontier(
-        self, node_id: int, score: float, depth: int, is_expanded: bool
-    ) -> None:
-        """Insert a node into the frontier keeping it ordered by score.
-
-        Uses a dichotomic insertion to maintain descending order by `score`,
-        so popping from index 0 yields the current best candidate.
-        """
-        if len(self.frontier) == 0:
-            self.frontier.append([node_id, score, depth, is_expanded])
-            return
-        lo, hi = 0, len(self.frontier) - 1
-        mid = len(self.frontier) // 2
-        while lo != hi and mid != lo and mid != hi:
-            curr_score = self.frontier[mid][1]
-            if score < curr_score:
-                lo = mid + 1
-            if score > curr_score:
-                hi = mid
-            if score == curr_score:
-                self.frontier.insert(mid, [node_id, score, depth, is_expanded])
-                return
-            mid = (lo + hi) // 2
-        self.frontier.insert(mid, [node_id, score, depth, is_expanded])
 
     def step(self) -> Tuple[bool, List[int]]:
         """Expand the highest-scored node and re-enqueue evaluated children.
@@ -253,9 +234,7 @@ class BestFirst(SearchStrategy):
         if self.tree.children[node_id] and depth < self.tree.config.max_depth:
             for child_id in self.tree.children[node_id]:
                 if self.tree.nodes[child_id].is_solved():
-                    if child_id not in self.tree.winning_nodes:
-                        self.tree.winning_nodes.append(child_id)
-                    self.tree.found_a_route = True
+                    self._mark_solved(child_id)
                     return True, [child_id]
 
                 # Always evaluate using unified node value
@@ -265,7 +244,7 @@ class BestFirst(SearchStrategy):
         return False, [node_id]
 
 
-class Beam(SearchStrategy):
+class Beam(ScoredFrontierMixin, BaseSearchStrategy):
     """Beam search over a scored frontier with a fixed width.
 
     Similar to best-first but expands the top-`beam_width` nodes at each step,
@@ -278,27 +257,6 @@ class Beam(SearchStrategy):
         """Initialize beam search with an empty scored frontier."""
         super().__init__(tree)
         self.frontier: List[List[int | float]] = []  # (node_id, score, depth, expanded)
-
-    def insert_sorted_frontier(
-        self, node_id: int, score: float, depth: int, is_expanded: bool
-    ) -> None:
-        """Insert a node into the beam frontier ordered by score (descending)."""
-        if len(self.frontier) == 0:
-            self.frontier.append([node_id, score, depth, is_expanded])
-            return
-        lo, hi = 0, len(self.frontier) - 1
-        mid = len(self.frontier) // 2
-        while lo != hi and mid != lo and mid != hi:
-            curr_score = self.frontier[mid][1]
-            if score < curr_score:
-                lo = mid + 1
-            if score > curr_score:
-                hi = mid
-            if score == curr_score:
-                self.frontier.insert(mid, [node_id, score, depth, is_expanded])
-                return
-            mid = (lo + hi) // 2
-        self.frontier.insert(mid, [node_id, score, depth, is_expanded])
 
     def step(self) -> Tuple[bool, List[int]]:
         """Open up to `beam_width` best nodes, expand them, and enqueue children.
@@ -328,9 +286,7 @@ class Beam(SearchStrategy):
             if self.tree.children[node_id] and depth < self.tree.config.max_depth:
                 for child_id in self.tree.children[node_id]:
                     if self.tree.nodes[child_id].is_solved():
-                        if child_id not in self.tree.winning_nodes:
-                            self.tree.winning_nodes.append(child_id)
-                        self.tree.found_a_route = True
+                        self._mark_solved(child_id)
                         return True, [child_id]
 
                     # Always evaluate using unified node value
@@ -341,7 +297,7 @@ class Beam(SearchStrategy):
         return False, [1]
 
 
-class UCT(SearchStrategy):
+class UCT(BaseSearchStrategy):
     """Upper Confidence Tree (UCT/PUCT/value) search with epsilon-greedy.
 
     Selection uses one of:
@@ -470,10 +426,8 @@ class UCT(SearchStrategy):
                 if self.tree.nodes[node_id].is_solved():  # found route
                     self.tree._update_visits(
                         node_id
-                    )  # this prevents expanding of bb node_id
-                    if node_id not in self.tree.winning_nodes:
-                        self.tree.winning_nodes.append(node_id)
-                    self.tree.found_a_route = True
+                    )  # prevents expanding of bb node_id
+                    self._mark_solved(node_id)
                     return True, [node_id]
 
                 if (
@@ -506,15 +460,14 @@ class UCT(SearchStrategy):
 
                     if self.tree.children[node_id]:
                         # found after expansion
-                        found_after_expansion = set()
-                        for child_id in iter(self.tree.children[node_id]):
-                            if self.tree.nodes[child_id].is_solved():
-                                found_after_expansion.add(child_id)
-                                if child_id not in self.tree.winning_nodes:
-                                    self.tree.winning_nodes.append(child_id)
-
+                        found_after_expansion = {
+                            child_id
+                            for child_id in self.tree.children[node_id]
+                            if self.tree.nodes[child_id].is_solved()
+                        }
                         if found_after_expansion:
-                            self.tree.found_a_route = True
+                            for child_id in found_after_expansion:
+                                self._mark_solved(child_id)
                             return True, list(found_after_expansion)
 
                 else:
@@ -525,7 +478,7 @@ class UCT(SearchStrategy):
         return False, [node_id]
 
 
-class NestedMonteCarlo(SearchStrategy):
+class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
     """Nested Monte Carlo Search (NMCS) over the tree.
 
     Performs recursive rollouts with increasing nesting depth. At level 1, a
@@ -551,9 +504,7 @@ class NestedMonteCarlo(SearchStrategy):
         best_node_id, _ = self.NMCS(node_id, self.nmcs_level, 1)
 
         if self.tree.nodes[best_node_id].is_solved():
-            if best_node_id not in self.tree.winning_nodes:
-                self.tree.winning_nodes.append(best_node_id)
-            self.tree.found_a_route = True
+            self._mark_solved(best_node_id)
             return True, [best_node_id]
 
         return False, [best_node_id]
@@ -585,18 +536,14 @@ class NestedMonteCarlo(SearchStrategy):
             if time() - self.tree.start_time > self.tree.config.max_time:
                 return best_node_id, chosen_path + best_path
             if self.tree.nodes[node_id].is_solved():
-                if node_id not in self.tree.winning_nodes:
-                    self.tree.winning_nodes.append(node_id)
-                self.tree.found_a_route = True
+                self._mark_solved(node_id)
                 if self.tree.stop_at_first:
                     return node_id, chosen_path
 
             for child_id in all_children:
                 candidate_id = child_id
                 if self.tree.nodes[child_id].is_solved():
-                    if child_id not in self.tree.winning_nodes:
-                        self.tree.winning_nodes.append(child_id)
-                    self.tree.found_a_route = True
+                    self._mark_solved(child_id)
                     chosen_path.append(candidate_id)
                     if self.tree.stop_at_first:
                         return candidate_id, chosen_path
@@ -622,9 +569,7 @@ class NestedMonteCarlo(SearchStrategy):
                     candidate_id, path = self.NMCS(candidate_id, level - 1, depth + 1)
                     path.insert(0, child_id)
                 if self.tree.nodes[candidate_id].is_solved():
-                    if candidate_id not in self.tree.winning_nodes:
-                        self.tree.winning_nodes.append(candidate_id)
-                    self.tree.found_a_route = True
+                    self._mark_solved(candidate_id)
                     if self.tree.stop_at_first:
                         return candidate_id, chosen_path + path
 
@@ -654,7 +599,9 @@ class NestedMonteCarlo(SearchStrategy):
         return best_node_id, chosen_path
 
 
-class LazyNestedMonteCarlo(SearchStrategy):
+class LazyNestedMonteCarlo(
+    NMCSPlayoutMixin, ScoredFrontierMixin, DepthThresholdsMixin, BaseSearchStrategy
+):
     """Lazy NMCS variant using percentile thresholds to restrict candidates.
 
     For each node, it estimates rollout scores for children and keeps only those
@@ -668,70 +615,22 @@ class LazyNestedMonteCarlo(SearchStrategy):
         self.frontier: List[List[int | float]] = (
             []
         )  # (node_id, score, depth, is_expanded)
-        self.depth_thresholds = [[] for _ in range(100)]  # list of scores at depth
+        self.reset_depth_thresholds()
         self.lnmcs_ratio = 0.2
         self.nmcs_level = 2
 
     def step(self) -> Tuple[bool, List[int]]:
         """Perform one lazy NMCS iteration using percentile-based candidate pruning."""
         self.frontier = []
-        self.depth_thresholds = [[] for _ in range(100)]
+        self.reset_depth_thresholds()
         if self.tree.curr_iteration > 1:
             return False, [1]
         node_id = 1
         leaf_id, _ = self.LNMCS(node_id, self.nmcs_level, 1, self.lnmcs_ratio)
         if self.tree.nodes[leaf_id].is_solved():
-            if leaf_id not in self.tree.winning_nodes:
-                self.tree.winning_nodes.append(leaf_id)
-            self.tree.found_a_route = True
+            self._mark_solved(leaf_id)
             return True, [leaf_id]
         return False, [leaf_id]
-
-    def insert_sorted_frontier(
-        self, node_id: int, score: float, depth: int, is_expanded: bool
-    ) -> None:
-        """Insert a candidate into the local frontier ordered by score (descending)."""
-        if len(self.frontier) == 0:
-            self.frontier.append([node_id, score, depth, is_expanded])
-            return
-        lo = 0
-        hi = len(self.frontier) - 1
-        mid = len(self.frontier) // 2
-        while lo != hi and mid != lo and mid != hi:
-            curr_score = self.frontier[mid][1]
-            if score < curr_score:
-                lo = mid + 1
-            if score > curr_score:
-                hi = mid
-            if score == curr_score:
-                self.frontier.insert(mid, [node_id, score, depth, is_expanded])
-                return
-            mid = (lo + hi) // 2
-        self.frontier.insert(mid, [node_id, score, depth, is_expanded])
-
-    def insert_sorted_threshold(self, score: float, depth: int) -> None:
-        """Insert an evaluation score into the depth-specific thresholds list.
-
-        The list is kept sorted to enable percentile-based selection without
-        recomputing quantiles.
-        """
-        if len(self.depth_thresholds[depth]) == 0:
-            self.depth_thresholds[depth].append(score)
-            return
-        lo = 0
-        hi = len(self.depth_thresholds[depth]) - 1
-        mid = len(self.depth_thresholds[depth]) // 2
-        while lo != hi and mid != lo and mid != hi:
-            curr = self.depth_thresholds[depth][mid]
-            if score < curr:
-                lo = mid + 1
-            if score > curr:
-                hi = mid
-            if score == curr:
-                self.depth_thresholds[depth].insert(mid, score)
-                return
-            mid = (lo + hi) // 2
-        self.depth_thresholds[depth].insert(mid, score)
 
     def LNMCS(self, node_id, level, depth, prune_ratio):
         """Lazy NMCS recursion selecting candidates above a percentile cut-off.
@@ -756,22 +655,18 @@ class LazyNestedMonteCarlo(SearchStrategy):
             if time() - self.tree.start_time > self.tree.config.max_time:
                 return best_node_id, chosen_path + best_path
             if self.tree.nodes[node_id].is_solved():
-                if node_id not in self.tree.winning_nodes:
-                    self.tree.winning_nodes.append(node_id)
-                self.tree.found_a_route = True
+                self._mark_solved(node_id)
                 if self.tree.stop_at_first:
                     return node_id, chosen_path
 
             self.frontier = []
             candidates: List[int] = []
 
-            self.depth_thresholds = [[] for _ in range(100)]
+            self.reset_depth_thresholds()
 
             for child_id in self.tree.children[node_id]:
                 if self.tree.nodes[child_id].is_solved():
-                    if child_id not in self.tree.winning_nodes:
-                        self.tree.winning_nodes.append(child_id)
-                    self.tree.found_a_route = True
+                    self._mark_solved(child_id)
                     if self.tree.stop_at_first:
                         chosen_path.append(child_id)
                         return child_id, chosen_path
@@ -782,9 +677,7 @@ class LazyNestedMonteCarlo(SearchStrategy):
 
                 eval_id, path = self.select_nmcs_path(child_id, depth + 1, "greedy")
                 if self.tree.nodes[eval_id].is_solved():
-                    if eval_id not in self.tree.winning_nodes:
-                        self.tree.winning_nodes.append(eval_id)
-                    self.tree.found_a_route = True
+                    self._mark_solved(eval_id)
                     if self.tree.stop_at_first:
                         chosen_path.append(eval_id)
                         return eval_id, chosen_path + path
@@ -823,9 +716,7 @@ class LazyNestedMonteCarlo(SearchStrategy):
                     )
                     path.insert(0, child_id)
                 if self.tree.nodes[candidate_id].is_solved():
-                    if candidate_id not in self.tree.winning_nodes:
-                        self.tree.winning_nodes.append(candidate_id)
-                    self.tree.found_a_route = True
+                    self._mark_solved(candidate_id)
                     if self.tree.stop_at_first:
                         return candidate_id, chosen_path + path
 
