@@ -251,7 +251,6 @@ class EvaluationService:
             return raw
 
         # RDKit and other chemistry-derived scores are handled via RDKitScore
-
         scorer = RDKitScore(score_function=sf)
         score = float(scorer(node))
         return self._to_01(score) if self.normalize else score

@@ -569,7 +569,8 @@ class TreeConfig(ConfigABC):
         et = params.get("evaluation_type")
         sf = params.get("score_function")
         mapping = {"rollout": "rollout", "random": "random", "gcn": "gcn"}
-        if et in mapping and sf != mapping[et]:
+        # if et in mapping and sf != mapping[et]:
+        if False: # TODO score is always rollout, bug introduced
             # silently map; callers can log warnings if needed
             self.evaluation_function = mapping[et]
             self.score_function = self.evaluation_function
