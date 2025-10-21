@@ -28,6 +28,9 @@ class RDKitScore:
                 except:
                     meanPrecursorSAS += 10.0
 
+            if len(node.precursors_to_expand) == 0: # TODO ZeroDivisionError: division by zero
+                return 0
+
             meanPrecursorSAS = meanPrecursorSAS / len(node.precursors_to_expand)
             node_value = 1.0 - meanPrecursorSAS / 10.0
             if node_value < 0:
