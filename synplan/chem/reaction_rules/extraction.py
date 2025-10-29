@@ -517,6 +517,9 @@ def create_rule(
         else:
             rule.meta["reactor_validation"] = "failed"
 
+    # 11. Add reaction source label
+    rule.meta["label"] = reaction.meta["label"]
+
     return rule
 
 
@@ -625,40 +628,50 @@ def process_completed_batch(
 
 
 def sort_rules(
-    rules_stats: Dict, min_popularity: int, single_reactant_only: bool
-) -> List[Tuple[ReactionContainer, List[int]]]:
+        rules_stats: Dict,
+        min_popularity: dict = None,
+        single_reactant_only: bool = True
+) -> List[Tuple["ReactionContainer", List[int]]]:
     """
-    Sorts reaction rules based on their popularity and validation status. This
-    function sorts the given rules according to their popularity (i.e., the number of
-    times they have been applied) and filters out rules that haven't passed reactor
-    validation or are less popular than the specified minimum popularity threshold.
+    Filters and sorts reaction rules by popularity and validation status.
 
-    :param rules_stats: A dictionary where each key is a reaction rule and the value is
-        a list of integers. Each integer represents an index where the rule was applied.
-    :type rules_stats: The number of occurrence of the reaction rules.
-    :param min_popularity: The minimum number of times a rule must be applied to be
-        considered. Default is 3.
-    :type min_popularity: The minimum number of occurrence of the reaction rule to be
-        selected.
-    :param single_reactant_only: Whether to keep only reaction rules with a single
-        molecule on the right side of reaction arrow. Default is True.
+    Each rule is kept if:
+      - It has been applied at least `min_popularity` times.
+      - It passed reactor validation (`rule.meta["reactor_validation"] == "passed"`).
+      - If `single_reactant_only` is True, it has exactly one reactant.
 
-    :return: A list of tuples, where each tuple contains a reaction rule and a list of
-        indices representing the rule's applications. The list is sorted in descending
-        order of the rule's popularity.
+    The result is sorted by descending popularity (number of applications).
 
+    :param rules_stats:
+        Dictionary mapping each reaction rule to a list of indices where the rule was applied.
+    :param min_popularity:
+        Minimum number of applications for a rule to be included.
+    :param single_reactant_only:
+        If True, only include rules with a single reactant.
+    :return:
+        List of (rule, indices) tuples sorted by popularity (most popular first).
     """
 
-    return sorted(
-        (
-            (rule, indices)
-            for rule, indices in rules_stats.items()
-            if len(indices) >= min_popularity
-            and rule.meta["reactor_validation"] == "passed"
-            and (not single_reactant_only or len(rule.reactants) == 1)
-        ),
-        key=lambda x: -len(x[1]),
-    )
+    filtered_rules = []
+    for rule, indices in rules_stats.items():
+
+        # 1. Skip if rule is not popular enough
+        if rule.meta["label"] == "uspto" and len(indices) < min_popularity[rule.meta["label"]]:
+            continue
+
+        # 2. Skip if rule failed validation
+        if rule.meta.get("reactor_validation") != "passed":
+            continue
+
+        # 3. Skip if we only want single-reactant rules
+        if single_reactant_only and len(rule.reactants) != 1:
+            continue
+
+        filtered_rules.append((rule, indices))
+
+    # Sort rules by descending popularity
+    filtered_rules.sort(key=lambda x: len(x[1]), reverse=True)
+    return filtered_rules
 
 
 def extract_rules_from_reactions(
@@ -696,11 +709,12 @@ def extract_rules_from_reactions(
         max_concurrent_batches = num_cpus
         extracted_rules_and_statistics = defaultdict(list)
 
-        for index, reaction in tqdm(
+        for index, (reaction, label) in tqdm(
             enumerate(reactions),
             desc="Number of reactions processed: ",
             bar_format="{desc}{n} [{elapsed}]",
         ):
+            reaction.meta["label"] = label
 
             # reaction ready to use
             batch.append((index, reaction))
@@ -726,13 +740,15 @@ def extract_rules_from_reactions(
                 extracted_rules_and_statistics,
             )
 
+        ray.shutdown()
+
+
         sorted_rules = sort_rules(
             extracted_rules_and_statistics,
             min_popularity=config.min_popularity,
             single_reactant_only=config.single_reactant_only,
         )
 
-        ray.shutdown()
 
         with open(f"{reaction_rules_path}.pickle", "wb") as statistics_file:
             pickle.dump(sorted_rules, statistics_file)

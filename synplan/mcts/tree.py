@@ -68,6 +68,7 @@ class Tree:
         self.nodes_rules: Dict[int, float] = {}
         self.nodes_init_value: Dict[int, float] = {1: 0.0}
         self.nodes_total_value: Dict[int, float] = {1: 0.0}
+        self.predicted_rules = []
 
         # tree building limits
         self.curr_iteration: int = 0
@@ -285,9 +286,13 @@ class Tree:
         for prob, rule, rule_id in self.policy_network.predict_reaction_rules(
             curr_node.curr_precursor, self.reaction_rules
         ):
+
+            self.predicted_rules.append(rule_id)
+
             for products in apply_reaction_rule(
                 curr_node.curr_precursor.molecule, rule
             ):
+
                 # check repeated products
                 if not products or not set(products) - tmp_precursor:
                     continue

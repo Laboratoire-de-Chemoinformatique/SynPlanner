@@ -116,7 +116,7 @@ class RankingPolicyDataset(InMemoryDataset):
 
         with open(self.reaction_rules_path, "rb") as inp:
             reaction_rules = pickle.load(inp)
-        reaction_rules = sorted(reaction_rules, key=lambda x: len(x[1]), reverse=True)
+        # reaction_rules = sorted(reaction_rules, key=lambda x: len(x[1]), reverse=True)
 
         reaction_rule_pairs = {}
         for rule_i, (_, reactions_ids) in enumerate(reaction_rules):
@@ -127,29 +127,29 @@ class RankingPolicyDataset(InMemoryDataset):
         list_of_graphs = []
         with ReactionReader(self.reactions_path) as reactions:
 
-            for reaction_id, reaction in tqdm(
+            for reaction_id, (reaction, label) in tqdm(
                 enumerate(reactions),
                 desc="Number of reactions processed: ",
                 bar_format="{desc}{n} [{elapsed}]",
             ):
 
                 rule_id = reaction_rule_pairs.get(reaction_id)
-                if rule_id:
-                    try:  #  MENDEL_INFO does not contain cadmium (Cd) properties
-                        molecule = unite_molecules(reaction.products)
-                        pyg_graph = mol_to_pyg(molecule)
-
-                    except (
-                        Exception
-                    ) as e:  # TypeError: can't assign a NoneType to a torch.ByteTensor
-                        logging.debug(e)
-                        continue
-
-                    if pyg_graph is not None:
-                        pyg_graph.y_rules = torch.tensor([rule_id], dtype=torch.long)
-                        list_of_graphs.append(pyg_graph)
-                else:
+                if rule_id is None:
                     continue
+
+                try:  #  MENDEL_INFO does not contain cadmium (Cd) properties
+                    molecule = unite_molecules(reaction.products)
+                    pyg_graph = mol_to_pyg(molecule)
+                except (
+                    Exception
+                ) as e:  # TypeError: can't assign a NoneType to a torch.ByteTensor
+                    logging.debug(e)
+                    continue
+
+                if pyg_graph is not None:
+                    pyg_graph.y_rules = torch.tensor([rule_id], dtype=torch.long)
+                    list_of_graphs.append(pyg_graph)
+
 
         data, slices = self.collate(list_of_graphs)
         if self.output_path:
@@ -428,30 +428,28 @@ def mol_to_pyg(
 
     if len(molecule) == 1:  # to avoid a precursor to be a single atom
         return None
-
-    tmp_molecule = molecule.copy()
     try:
         if canonicalize:
-            tmp_molecule.canonicalize()
-        tmp_molecule.kekule()
-        if tmp_molecule.check_valence():
+            molecule.canonicalize()
+        molecule.kekule()
+        if molecule.check_valence():
             return None
     except InvalidAromaticRing:
         return None
 
     # remapping target for torch_geometric because
     # it is necessary that the elements in edge_index only hold nodes_idx in the range { 0, ..., num_nodes - 1}
-    new_mappings = {n: i for i, (n, _) in enumerate(tmp_molecule.atoms(), 1)}
-    tmp_molecule.remap(new_mappings)
+    new_mappings = {n: i for i, (n, _) in enumerate(molecule.atoms(), 1)}
+    molecule.remap(new_mappings)
 
     # get edge indexes from target mapping
     edge_index = []
-    for atom, neighbour, bond in tmp_molecule.bonds():
+    for atom, neighbour, bond in molecule.bonds():
         edge_index.append([atom - 1, neighbour - 1])
     edge_index = torch.tensor(edge_index, dtype=torch.long)
 
     #
-    x = mol_to_matrix(tmp_molecule)
+    x = mol_to_matrix(molecule)
 
     mol_pyg_graph = Data(x=x, edge_index=edge_index.t().contiguous())
     mol_pyg_graph = ToUndirected()(mol_pyg_graph)

@@ -66,6 +66,8 @@ def apply_reaction_rule(
     :return: An iterator yielding the products of reaction rule application.
     """
 
+    reaction_rule = Reactor(reaction_rule)
+
     reactants = add_small_mols(molecule, small_molecules=False)
 
     try:

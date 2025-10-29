@@ -91,7 +91,7 @@ class RuleExtractionConfig(ConfigABC):
     """
 
     # default low-level parameters
-    single_reactant_only: bool = True
+    single_reactant_only: bool = False
     keep_metadata: bool = False
     reactor_validation: bool = True
     reverse_rule: bool = True
@@ -101,7 +101,7 @@ class RuleExtractionConfig(ConfigABC):
 
     # adjustable parameters
     environment_atom_count: int = 1
-    min_popularity: int = 3
+    min_popularity: int | dict = 3
     include_rings: bool = True
     multicenter_rules: bool = True
     keep_leaving_groups: bool = True
@@ -200,8 +200,8 @@ class RuleExtractionConfig(ConfigABC):
         if not isinstance(params["environment_atom_count"], int):
             raise ValueError("environment_atom_count must be an integer.")
 
-        if not isinstance(params["min_popularity"], int):
-            raise ValueError("min_popularity must be an integer.")
+        if not isinstance(params["min_popularity"], dict):
+            raise ValueError("min_popularity must be a dict with reaction labels as keys.")
 
         if not isinstance(params["keep_metadata"], bool):
             raise ValueError("keep_metadata must be a boolean.")

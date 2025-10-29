@@ -16,6 +16,7 @@ from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.networks.value import ValueNetwork
 from synplan.utils.files import MoleculeReader
 
+from CGRtools import smiles as cgrtools_smiles
 
 def download_unpack_data(filename, subfolder, save_to="."):
     if isinstance(save_to, str):
@@ -74,9 +75,7 @@ def load_reaction_rules(file: str) -> List[Reactor]:
 
     with open(file, "rb") as f:
         reaction_rules = pickle.load(f)
-
-    if not isinstance(reaction_rules[0][0], Reactor):
-        reaction_rules = [Reactor(x) for x, _ in reaction_rules]
+    reaction_rules = [x for x, _ in reaction_rules]
 
     return reaction_rules
 
@@ -96,16 +95,32 @@ def load_building_blocks(building_blocks_path: Union[str, Path], standardize: bo
 
     building_blocks_smiles = set()
     if standardize:
-        with MoleculeReader(building_blocks_path) as molecules:
-            for mol in tqdm(molecules,
-                            desc="Number of building blocks processed: ",
-                            bar_format="{desc}{n} [{elapsed}]",):
+        # with MoleculeReader(building_blocks_path) as molecules:
+        #     for mol in tqdm(molecules,
+        #                     desc="Number of building blocks processed: ",
+        #                     bar_format="{desc}{n} [{elapsed}]",):
+        #         try:
+        #             mol.canonicalize()
+        #             mol.clean_stereo()
+        #             building_blocks_smiles.add(str(mol))
+        #         except Exception as e:  # mol.canonicalize() / InvalidAromaticRing
+        #             print(e)
+        #             pass
+
+        with open(building_blocks_path, "r") as inp:
+            for line in inp:
+                smi = line.strip().split()[0]
+
+                mol = cgrtools_smiles(smi)
+
                 try:
                     mol.canonicalize()
                     mol.clean_stereo()
-                    building_blocks_smiles.add(str(mol))
-                except:  # mol.canonicalize() / InvalidAromaticRing
-                    pass
+                except:
+                    continue
+
+                building_blocks_smiles.add(str(mol))
+
     else:
         with open(building_blocks_path, "r") as inp:
             for line in inp:

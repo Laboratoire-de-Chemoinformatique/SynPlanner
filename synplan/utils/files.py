@@ -23,7 +23,7 @@ class FileHandler:
         """
         self._file = None
         _, ext = splitext(filename)
-        file_types = {".smi": "SMI", ".smiles": "SMI", ".rdf": "RDF", ".sdf": "SDF"}
+        file_types = {".smi": "SMI", ".csv": "CSV", ".smiles": "SMI", ".rdf": "RDF", ".sdf": "SDF"}
         try:
             self._file_type = file_types[ext]
         except KeyError:
@@ -80,6 +80,24 @@ class SMILESRead:
                 x.meta["init_smiles"] = line
                 yield x
 
+class CSVRead:
+    def __init__(self, filename: Union[str, Path], **kwargs):
+        """CSVRead"""
+        filename = str(Path(filename).resolve(strict=True))
+        self._file = open(filename, "r", encoding="utf-8")
+        self._data = self.__data()
+
+    def __data(
+            self,
+    ) -> Iterable[Union[ReactionContainer, CGRContainer, MoleculeContainer]]:
+        for line in iter(self._file.readline, ""):
+            line = line.strip()
+            smi, label = line.split(",")
+            x = smiles(smi)
+            if isinstance(x, (ReactionContainer, CGRContainer, MoleculeContainer)):
+                x.meta["init_smiles"] = smi
+                yield x, label
+
     def __enter__(self):
         return self
 
@@ -130,6 +148,8 @@ class ReactionReader(Reader):
             self._file = SMILESRead(filename, **kwargs)
         elif self._file_type == "RDF":
             self._file = RDFRead(filename, indexable=True, **kwargs)
+        elif self._file_type == "CSV":
+            self._file = CSVRead(filename, indexable=True, **kwargs)
         else:
             raise ValueError("File type incompatible -", filename)
 
