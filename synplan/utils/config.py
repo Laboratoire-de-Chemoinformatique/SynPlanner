@@ -84,7 +84,7 @@ class RuleExtractionConfig(ConfigABC):
         applied to be considered for further analysis.
     :param keep_metadata: If True, retains metadata associated with the
         reaction in the extracted rule.
-    :param single_reactant_only: If True, includes only reaction rules
+    :param single_product_only: If True, includes only reaction rules
         with a single reactant molecule.
     :param atom_info_retention: Controls the amount of information about
         each atom to retain ('none', 'reaction_center', or 'all').
@@ -95,7 +95,7 @@ class RuleExtractionConfig(ConfigABC):
     reactor_validation: bool = True
     reverse_rule: bool = True
     as_query_container: bool = True
-    single_reactant_only: bool = False
+    single_product_only: bool = True
 
     # adjustable parameters
     environment_atom_count: int = 1

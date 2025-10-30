@@ -629,7 +629,7 @@ def process_completed_batch(
 
 
 def sort_rules(
-    rules_stats: Dict, min_popularity: int, single_reactant_only: bool
+    rules_stats: Dict, min_popularity: int, single_product_only: bool
 ) -> List[Tuple[ReactionContainer, List[int]]]:
     """
     Sorts reaction rules based on their popularity and validation status. This
@@ -644,7 +644,7 @@ def sort_rules(
         considered. Default is 3.
     :type min_popularity: The minimum number of occurrence of the reaction rule to be
         selected.
-    :param single_reactant_only: Whether to keep only reaction rules with a single
+    :param single_product_only: Whether to keep only reaction rules with a single
         molecule on the right side of reaction arrow. Default is True.
 
     :return: A list of tuples, where each tuple contains a reaction rule and a list of
@@ -659,7 +659,7 @@ def sort_rules(
             for rule, indices in rules_stats.items()
             if len(indices) >= min_popularity
             and rule.meta["reactor_validation"] == "passed"
-            and (not single_reactant_only or len(rule.reactants) == 1)
+            and (not single_product_only or len(rule.reactants) == 1)
         ),
         key=lambda x: -len(x[1]),
     )
@@ -733,7 +733,7 @@ def extract_rules_from_reactions(
         sorted_rules = sort_rules(
             extracted_rules_and_statistics,
             min_popularity=config.min_popularity,
-            single_reactant_only=config.single_reactant_only,
+            single_product_only=config.single_product_only,
         )
 
         ray.shutdown()
