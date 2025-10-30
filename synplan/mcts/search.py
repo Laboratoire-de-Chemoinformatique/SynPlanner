@@ -103,11 +103,9 @@ def run_search(
 
     # config
     policy_function = PolicyNetworkFunction(policy_config=policy_config)
-    # Determine value network by evaluation_function or legacy evaluation_type
-    eval_type = search_config.get("evaluation_type")
-    evaluation_function = search_config.get(
-        "evaluation_function", search_config.get("score_function", "rollout")
-    )
+    # Determine value network by evaluation_function or legacy evaluation_function
+    eval_type = search_config.get("evaluation_function")
+    evaluation_function = search_config.get("evaluation_function")
     if ((eval_type == "gcn") or (evaluation_function == "gcn")) and value_network_path:
         value_function = ValueNetworkFunction(weights_path=value_network_path)
     else:

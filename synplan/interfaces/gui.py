@@ -452,7 +452,7 @@ def setup_planning_options():
                         reaction_rules=reaction_rules,
                         building_blocks=building_blocks,
                         expansion_function=policy_function,
-                        evaluation_function=None,  # Value network set when score_function == 'gcn'
+                        evaluation_function=None,  # Value network set when evaluation_function == 'gcn'
                     )
 
                     mcts_progress_text = "Running MCTS iterations..."

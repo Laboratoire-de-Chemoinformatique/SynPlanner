@@ -74,7 +74,6 @@ def build_tree(
         ucb_type=ucb_type,
         epsilon=epsilon,
         evaluation_function=evaluation,
-        score_function=evaluation,
         min_mol_size=min_mol_size,
         silent=True,
         enable_pruning=False,

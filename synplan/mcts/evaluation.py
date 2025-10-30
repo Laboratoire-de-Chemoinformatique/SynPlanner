@@ -220,7 +220,7 @@ class EvaluationService:
 
         if sf == "gcn":
             if not self.value_network:
-                raise ValueError("Value network not provided but score_function='gcn'.")
+                raise ValueError("Value network not provided but evaluation_function='gcn'.")
             score = float(self.value_network.predict_value(node.new_precursors))
             # Value net is expected to be in [0,1]; clamp defensively
             return self._to_01(score) if self.normalize else score
