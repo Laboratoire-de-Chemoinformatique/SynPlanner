@@ -71,7 +71,7 @@ class Tree:
         # policy and evaluation services
         self.policy_network = expansion_function
         self.evaluator = EvaluationService(
-            score_function=self.config.evaluation_function,
+            evaluation_function=self.config.evaluation_function,
             policy_network=self.policy_network,
             reaction_rules=self.reaction_rules,
             building_blocks=self.building_blocks,
@@ -268,6 +268,7 @@ class Tree:
                         precursors_to_expand=precursors_to_expand,
                         new_precursors=new_precursor,
                     )
+
                     for np in new_precursor:
                         np.prev_precursors = [np, *prev_precursor]
 

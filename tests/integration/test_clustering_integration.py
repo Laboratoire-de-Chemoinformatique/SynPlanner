@@ -72,9 +72,8 @@ def tree_config():
     """Get tree configuration."""
     return TreeConfig(
         search_strategy="expansion_first",
-        evaluation_type="rollout",
+        evaluation_function="rollout",
         algorithm="UCT",
-        score_function="rollout",
         enable_pruning=False,
         max_iterations=300,
         max_time=120,

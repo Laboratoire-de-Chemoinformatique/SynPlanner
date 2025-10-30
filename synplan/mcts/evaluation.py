@@ -163,7 +163,7 @@ class EvaluationService:
     def __init__(
         self,
         *,
-        score_function: str,
+        evaluation_function: str,
         policy_network: PolicyNetworkFunction,
         reaction_rules,
         building_blocks: Set[str],
@@ -172,9 +172,9 @@ class EvaluationService:
         value_network: Optional[ValueNetworkFunction] = None,
         normalize: bool = False,
     ) -> None:
+
         # Canonical naming: evaluation_function
-        self.score_function = score_function
-        self.evaluation_function = score_function
+        self.evaluation_function = evaluation_function
         self.value_network = value_network
         self.normalize = normalize
         self.policy_network = policy_network
