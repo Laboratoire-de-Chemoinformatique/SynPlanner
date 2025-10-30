@@ -134,22 +134,23 @@ class RankingPolicyDataset(InMemoryDataset):
             ):
 
                 rule_id = reaction_rule_pairs.get(reaction_id)
-                if rule_id:
-                    try:  #  MENDEL_INFO does not contain cadmium (Cd) properties
-                        molecule = unite_molecules(reaction.products)
-                        pyg_graph = mol_to_pyg(molecule)
 
-                    except (
-                        Exception
-                    ) as e:  # TypeError: can't assign a NoneType to a torch.ByteTensor
-                        logging.debug(e)
-                        continue
+                if rule_id is None:
+                    continue
+
+                try:  #  MENDEL_INFO does not contain cadmium (Cd) properties
+                    molecule = unite_molecules(reaction.products)
+                    pyg_graph = mol_to_pyg(molecule)
 
                     if pyg_graph is not None:
                         pyg_graph.y_rules = torch.tensor([rule_id], dtype=torch.long)
                         list_of_graphs.append(pyg_graph)
-                else:
+                except (
+                    Exception
+                ) as e:  # TypeError: can't assign a NoneType to a torch.ByteTensor
+                    logging.debug(e)
                     continue
+
 
         data, slices = self.collate(list_of_graphs)
         if self.output_path:
