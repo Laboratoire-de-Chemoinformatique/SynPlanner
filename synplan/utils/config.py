@@ -203,8 +203,8 @@ class RuleExtractionConfig(ConfigABC):
         if not isinstance(params["keep_metadata"], bool):
             raise ValueError("keep_metadata must be a boolean.")
 
-        if not isinstance(params["single_reactant_only"], bool):
-            raise ValueError("single_reactant_only must be a boolean.")
+        if not isinstance(params["single_product_only"], bool):
+            raise ValueError("single_product_only must be a boolean.")
 
         if params["atom_info_retention"] is not None:
             if not isinstance(params["atom_info_retention"], dict):
@@ -458,26 +458,20 @@ class TreeConfig(ConfigABC):
     max_tree_size: int = 1000000
     max_time: float = 600
     max_depth: int = 6
-    search_strategy: str = "expansion_first"
     exclude_small: bool = True
-    evaluation_type: str = (
-        "rollout"  # deprecated: mapped to score_function for backward compatibility
-    )
     min_mol_size: int = 6
     silent: bool = False
 
     # new parameters
     algorithm: str = "uct"
-    # Rename score_function -> evaluation_function (canonical)
-    score_function: str = "rollout"
     evaluation_function: str = "rollout"
     normalize_scores: bool = False
-    max_rules_applied = 10
+    max_rules_applied = 10 # needed only in pruning
     stop_at_first = False
-    num_cpus: int = 1
-    enable_pruning: bool = True
+    enable_pruning: bool = False
 
     # UCT configuration
+    search_strategy: str = "expansion_first"
     ucb_type: str = "uct"  # one of: "uct", "puct", "value"
     c_ucb: float = 0.1  # exploration constant >= 0
     backprop_type: str = "muzero"  # one of: "muzero", "cumulative"
@@ -498,24 +492,21 @@ class TreeConfig(ConfigABC):
 
     def _validate_params(self, params):
         # Validate canonical evaluation function
-        if params.get("evaluation_function") is None:
-            self.evaluation_function = params.get("score_function", "rollout")
         if self.evaluation_function not in [
+            "random",
+            "rollout",
+            "policy",
+            "gcn",
             "sascore",
             "weight",
-            "policy",
             "heavyAtomCount",
             "weightXsascore",
             "WxWxSAS",
-            "random",
-            "gcn",
-            "rollout",
         ]:
             raise ValueError(
                 "Invalid evaluation_type. Allowed values are 'policy', 'weight', 'sascore', 'weightXsascore', 'WxWxSAS', 'random', 'gcn', 'rollout'."
             )
         # keep score_function equal for backward compatibility
-        self.score_function = self.evaluation_function
         if not isinstance(params["max_depth"], int) or params["max_depth"] < 1:
             raise ValueError("max_depth must be a positive integer.")
         if not isinstance(params["max_tree_size"], int) or params["max_tree_size"] < 1:
@@ -564,16 +555,6 @@ class TreeConfig(ConfigABC):
             or params.get("beam_width", 10) <= 0
         ):
             raise ValueError("beam_width must be a positive integer.")
-
-        # Backward compatibility: map evaluation_type to score_function if provided
-        et = params.get("evaluation_type")
-        sf = params.get("score_function")
-        mapping = {"rollout": "rollout", "random": "random", "gcn": "gcn"}
-        # if et in mapping and sf != mapping[et]:
-        if False: # TODO score is always rollout, bug introduced
-            # silently map; callers can log warnings if needed
-            self.evaluation_function = mapping[et]
-            self.score_function = self.evaluation_function
 
 
 def convert_config_to_dict(config_attr: ConfigABC, config_type) -> Dict | None:
