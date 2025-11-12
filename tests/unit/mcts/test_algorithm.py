@@ -124,7 +124,7 @@ def test_best_first_orders_by_policy_value():
         (0.1, FakeReactor(lambda: [make_mol(10)]), 0),
         (0.9, FakeReactor(lambda: [make_mol(12)]), 1),
     ]
-    tree = build_tree("best_first", rules, evaluation="policy")
+    tree = build_tree("best_first", rules)
 
     found, node_ids = tree.algorithm.step()
     assert found is False
@@ -140,7 +140,7 @@ def test_best_first_returns_solved_child_immediately():
         (0.2, FakeReactor(lambda: [make_mol(5)]), 0),  # solved
         (0.8, FakeReactor(lambda: [make_mol(10)]), 1),
     ]
-    tree = build_tree("best_first", rules, evaluation="policy")
+    tree = build_tree("best_first", rules)
 
     found, node_ids = tree.algorithm.step()
     assert found is True
@@ -157,7 +157,7 @@ def test_beam_top1_is_highest():
         (0.3, FakeReactor(lambda: [make_mol(10)]), 0),
         (0.7, FakeReactor(lambda: [make_mol(12)]), 1),
     ]
-    tree = build_tree("beam", rules, evaluation="policy", beam_width=1)
+    tree = build_tree("beam", rules, beam_width=1)
 
     found, node_ids = tree.algorithm.step()
     assert found is False
@@ -175,7 +175,7 @@ def test_uct_puct_selects_highest_prior_on_second_step():
         (0.4, FakeReactor(lambda: [make_mol(10)]), 0),
         (0.9, FakeReactor(lambda: [make_mol(12)]), 1),
     ]
-    tree = build_tree("uct", rules, evaluation="policy", ucb_type="puct", epsilon=0.0)
+    tree = build_tree("uct", rules, ucb_type="puct", epsilon=0.0)
 
     # step 1: expand root
     found, ids = tree.algorithm.step()
@@ -200,7 +200,7 @@ def test_nmcs_returns_best_leaf_id():
         (0.8, FakeReactor(lambda: [make_mol(12)]), 1),
     ]
     # disable deeper expansions so playout evaluation equals child's policy value
-    tree = build_tree("nmcs", rules, evaluation="policy", expand_deeper=False)
+    tree = build_tree("nmcs", rules, expand_deeper=False)
 
     # ensure children exist and time budget active before NMCS step
     tree._expand_node(1)
@@ -218,7 +218,7 @@ def test_nmcs_marks_solved_when_present():
         (0.9, FakeReactor(lambda: [make_mol(5)]), 0),  # solved child
         (0.1, FakeReactor(lambda: [make_mol(10)]), 1),
     ]
-    tree = build_tree("nmcs", rules, evaluation="policy", expand_deeper=False)
+    tree = build_tree("nmcs", rules, expand_deeper=False)
 
     # pre-expand to expose solved child and start timing
     tree._expand_node(1)
@@ -241,7 +241,7 @@ def test_lazy_nmcs_selects_best_candidate_after_pruning():
         (0.5, FakeReactor(lambda: [make_mol(11)]), 1),
         (0.9, FakeReactor(lambda: [make_mol(12)]), 2),
     ]
-    tree = build_tree("lazy_nmcs", rules, evaluation="policy", expand_deeper=False)
+    tree = build_tree("lazy_nmcs", rules, expand_deeper=False)
 
     # pre-expand root and start timing
     tree._expand_node(1)
@@ -263,7 +263,7 @@ def test_select_nmcs_path_greedy_policy_and_random_on_real_tree():
         (0.2, FakeReactor(lambda: [make_mol(10)]), 0),
         (0.8, FakeReactor(lambda: [make_mol(12)]), 1),
     ]
-    tree = build_tree("best_first", rules, evaluation="policy", expand_deeper=False)
+    tree = build_tree("best_first", rules, expand_deeper=False)
     # pre-expand to ensure children present and start timing
     tree._expand_node(1)
     tree.expanded_nodes.add(1)

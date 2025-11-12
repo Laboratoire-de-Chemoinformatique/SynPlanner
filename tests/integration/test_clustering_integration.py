@@ -15,7 +15,8 @@ from synplan.utils.loading import (
     load_policy_function,
 )
 from synplan.mcts.tree import Tree
-from synplan.utils.config import TreeConfig
+from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
+from synplan.utils.loading import download_selected_files, create_evaluator_from_config
 
 # Test molecules with different complexity levels
 TEST_MOLECULES = {
@@ -27,8 +28,7 @@ TEST_MOLECULES = {
 
 @pytest.fixture(scope="module")
 def data_folder():
-    from synplan.utils.loading import download_selected_files
-
+    """Load data."""
     assets = [
         ("building_blocks", "building_blocks_em_sa_ln.smi"),
         ("uspto", "uspto_reaction_rules.pickle"),
@@ -87,14 +87,12 @@ def run_clustering_workflow(
     target_smiles, building_blocks, reaction_rules, policy_network, tree_config
 ):
     """Helper function to run the complete clustering workflow."""
-    from synplan.utils.config import RolloutEvaluationConfig
-    from synplan.utils.loading import create_evaluator_from_config
-    
+
     # Create target molecule
     target_molecule = mol_from_smiles(
         target_smiles, clean2d=True, standardize=True, clean_stereo=True
     )
-    
+
     # Create evaluation config and strategy
     eval_config = RolloutEvaluationConfig(
         policy_network=policy_network,
@@ -163,23 +161,23 @@ def test_simple_molecule_clustering(
     assert len(clusters) == len(expected_clusters), "Should have 7 clusters"
     total_routes = sum(cluster["group_size"] for cluster in clusters.values())
     assert total_routes > 0, "Should have at least one route"
-    assert (
-        len(set(tree.winning_nodes)) == total_routes == 158
-    ), "Total routes should match winning nodes and 158 routes"
-    assert (
-        list(clusters.keys()) == expected_clusters
-    ), f"SubCluster keys should be {expected_clusters}"
+    assert len(set(tree.winning_nodes)) == total_routes == 158, (
+        "Total routes should match winning nodes and 158 routes"
+    )
+    assert list(clusters.keys()) == expected_clusters, (
+        f"SubCluster keys should be {expected_clusters}"
+    )
 
     # Verify subclustering results
     assert len(subclusters) > 0, "Should have at least one subcluster"
     total_subclusters = calc_num_routes_subclusters(subclusters)
     assert total_subclusters > 0, "Should have at least one subcluster group"
-    assert (
-        len(set(tree.winning_nodes)) == total_subclusters == 158
-    ), "Total subclusters should match winning nodes"
-    assert (
-        list(subclusters.keys()) == expected_clusters
-    ), f"SubCluster keys should be {expected_clusters}"
+    assert len(set(tree.winning_nodes)) == total_subclusters == 158, (
+        "Total subclusters should match winning nodes"
+    )
+    assert list(subclusters.keys()) == expected_clusters, (
+        f"SubCluster keys should be {expected_clusters}"
+    )
 
 
 @pytest.mark.integration
@@ -209,34 +207,34 @@ def test_medium_molecule_clustering(
         "6.1",
     ]
     assert len(clusters) > 0, "Should have at least one cluster"
-    assert len(clusters) == len(
-        expected_clusters
-    ), f"Should have {len(expected_clusters)} clusters"
+    assert len(clusters) == len(expected_clusters), (
+        f"Should have {len(expected_clusters)} clusters"
+    )
     total_routes = sum(cluster["group_size"] for cluster in clusters.values())
     assert total_routes > 0, "Should have at least one route"
-    assert (
-        len(set(tree.winning_nodes)) == total_routes
-    ), "Total routes should match winning nodes"
+    assert len(set(tree.winning_nodes)) == total_routes, (
+        "Total routes should match winning nodes"
+    )
     resulted_clusters = sorted(
         clusters.keys(), key=lambda s: [int(part) for part in s.split(".")]
     )
-    assert (
-        resulted_clusters == expected_clusters
-    ), f"SubCluster keys should be {expected_clusters}"
+    assert resulted_clusters == expected_clusters, (
+        f"SubCluster keys should be {expected_clusters}"
+    )
 
     # Verify subclustering results
     assert len(subclusters) > 0, "Should have at least one subcluster"
     total_subclusters = calc_num_routes_subclusters(subclusters)
     assert total_subclusters > 0, "Should have at least one subcluster group"
-    assert (
-        len(set(tree.winning_nodes)) == total_subclusters
-    ), "Total subclusters should match winning nodes"
+    assert len(set(tree.winning_nodes)) == total_subclusters, (
+        "Total subclusters should match winning nodes"
+    )
     resulted_subclusters = sorted(
         subclusters.keys(), key=lambda s: [int(part) for part in s.split(".")]
     )
-    assert (
-        resulted_subclusters == expected_clusters
-    ), f"SubCluster keys should be {expected_clusters}"
+    assert resulted_subclusters == expected_clusters, (
+        f"SubCluster keys should be {expected_clusters}"
+    )
 
 
 @pytest.mark.integration
@@ -265,31 +263,31 @@ def test_complex_molecule_clustering(
         "5.2",
     ]
     assert len(clusters) > 0, "Should have at least one cluster"
-    assert len(clusters) == len(
-        expected_clusters
-    ), f"Should have {len(expected_clusters)} clusters"
+    assert len(clusters) == len(expected_clusters), (
+        f"Should have {len(expected_clusters)} clusters"
+    )
     total_routes = sum(cluster["group_size"] for cluster in clusters.values())
     assert total_routes > 0, "Should have at least one route"
-    assert (
-        len(set(tree.winning_nodes)) == total_routes
-    ), "Total routes should match winning nodes"
+    assert len(set(tree.winning_nodes)) == total_routes, (
+        "Total routes should match winning nodes"
+    )
     resulted_clusters = sorted(
         clusters.keys(), key=lambda s: [int(part) for part in s.split(".")]
     )
-    assert (
-        resulted_clusters == expected_clusters
-    ), f"SubCluster keys should be {expected_clusters}"
+    assert resulted_clusters == expected_clusters, (
+        f"SubCluster keys should be {expected_clusters}"
+    )
 
     # Verify subclustering results
     assert len(subclusters) > 0, "Should have at least one subcluster"
     total_subclusters = calc_num_routes_subclusters(subclusters)
     assert total_subclusters > 0, "Should have at least one subcluster group"
-    assert (
-        len(set(tree.winning_nodes)) == total_subclusters
-    ), "Total subclusters should match winning nodes"
+    assert len(set(tree.winning_nodes)) == total_subclusters, (
+        "Total subclusters should match winning nodes"
+    )
     resulted_subclusters = sorted(
         subclusters.keys(), key=lambda s: [int(part) for part in s.split(".")]
     )
-    assert (
-        resulted_subclusters == expected_clusters
-    ), f"SubCluster keys should be {expected_clusters}"
+    assert resulted_subclusters == expected_clusters, (
+        f"SubCluster keys should be {expected_clusters}"
+    )

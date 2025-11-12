@@ -10,6 +10,7 @@ This module implements the Strategy pattern for different evaluation methods:
 
 from abc import ABC, abstractmethod
 from collections import defaultdict, deque
+from random import uniform
 from typing import Dict, List, Set, Tuple
 
 import torch
@@ -369,7 +370,5 @@ class RandomEvaluationStrategy(EvaluationStrategy):
         nodes_prob: Dict[int, float],
     ) -> float:
         """Evaluate node using random score."""
-        from random import uniform
-
         score = uniform(0.0, 1.0)
         return self._to_01(score) if self.normalize else score

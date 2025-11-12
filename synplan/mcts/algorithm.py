@@ -435,9 +435,9 @@ class UCT(BaseSearchStrategy):
                 ):  # expand node if depth limit is not reached
                     self.tree._expand_node(node_id)
                     self.tree.expanded_nodes.add(node_id)
-                    if not self.tree.children[node_id]:  # node was not expanded
-                        value_to_backprop = -1.0
-                    else:
+                    
+                    value_to_backprop = -1.0 # node was not expanded
+                    if self.tree.children[node_id]:
                         if self.tree.config.search_strategy == "evaluation_first":
                             # recalculate node value based on children synthesisability and backpropagation
                             child_values = [
@@ -460,16 +460,16 @@ class UCT(BaseSearchStrategy):
 
                     if self.tree.children[node_id]:
                         # found after expansion
-                        found_after_expansion = {
-                            child_id
-                            for child_id in self.tree.children[node_id]
-                            if self.tree.nodes[child_id].is_solved()
-                        }
-                        if found_after_expansion:
-                            for child_id in found_after_expansion:
-                                self._mark_solved(child_id)
-                            return True, list(found_after_expansion)
+                        found_after_expansion = set()
+                        for child_id in iter(self.tree.children[node_id]):
+                            if self.tree.nodes[child_id].is_solved():
+                                found_after_expansion.add(child_id)
+                                if child_id not in self.tree.winning_nodes:
+                                    self.tree.winning_nodes.append(child_id)
 
+                        if found_after_expansion:
+                            self.tree.found_a_route = True
+                            return True, list(found_after_expansion)
                 else:
                     self._backpropagate(node_id, self.tree.nodes_total_value[node_id])
                     self.tree._update_visits(node_id)
