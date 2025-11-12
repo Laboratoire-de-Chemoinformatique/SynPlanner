@@ -37,6 +37,7 @@ pytest = "^7.4.3"
 black = "^24.4.2"
 pytest-cov = "^4.0"
 twine = "^6.2.0"
+ruff = "^0.14.4"
 
 [tool.poetry.group.docs]
 optional = true

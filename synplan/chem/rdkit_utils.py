@@ -1,9 +1,8 @@
-from rdkit.Contrib.SA_Score import sascorer
 from rdkit import Chem
+from rdkit import RDLogger
 from rdkit.Chem.Descriptors import ExactMolWt
 from rdkit.Chem.rdMolDescriptors import CalcNumHeavyAtoms
-
-from rdkit import RDLogger
+from rdkit.Contrib.SA_Score import sascorer
 
 RDLogger.DisableLog("rdApp.*")
 
@@ -28,7 +27,9 @@ class RDKitScore:
                 except:
                     meanPrecursorSAS += 10.0
 
-            if len(node.precursors_to_expand) == 0: # TODO ZeroDivisionError: division by zero
+            if (
+                len(node.precursors_to_expand) == 0
+            ):  # TODO ZeroDivisionError: division by zero
                 return 0
 
             meanPrecursorSAS = meanPrecursorSAS / len(node.precursors_to_expand)

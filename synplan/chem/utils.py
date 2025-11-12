@@ -1,6 +1,7 @@
 """Module containing additional functions needed in different reaction data processing
 protocols."""
 
+from io import StringIO
 import logging
 from typing import Iterable
 
@@ -11,15 +12,12 @@ from CGRtools.containers import (
     ReactionContainer,
 )
 from CGRtools.exceptions import InvalidAromaticRing
-from tqdm.auto import tqdm
-from io import StringIO
 from CGRtools.files.SDFrw import SDFRead
+from chython import MoleculeContainer as MoleculeContainerChython
+from tqdm.auto import tqdm
 
 from synplan.chem import smiles_parser
 from synplan.utils.files import MoleculeReader, MoleculeWriter
-from CGRtools.files.SDFrw import SDFRead
-
-from chython import MoleculeContainer as MoleculeContainerChython
 
 
 def mol_from_smiles(

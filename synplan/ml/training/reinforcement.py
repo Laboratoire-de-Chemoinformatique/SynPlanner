@@ -15,8 +15,6 @@ from torch.utils.data import random_split
 from torch_geometric.data.lightning import LightningDataset
 
 from synplan.chem.precursor import compose_precursors
-from synplan.mcts.evaluation import ValueNetworkFunction
-from synplan.mcts.expansion import PolicyNetworkFunction
 from synplan.mcts.tree import Tree
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training.preprocessing import ValueNetworkDataset
@@ -31,6 +29,7 @@ from synplan.utils.loading import (
     load_building_blocks,
     load_reaction_rules,
     load_value_net,
+    load_policy_function,
 )
 from synplan.utils.logging import DisableLogger, HiddenPrints
 
@@ -113,13 +112,25 @@ def run_tree_search(
     """
 
     # policy and value function loading
-    policy_function = PolicyNetworkFunction(policy_config=policy_config)
-    value_function = ValueNetworkFunction(weights_path=value_config.weights_path)
+    from synplan.utils.config import ValueNetworkEvaluationConfig
+    from synplan.utils.loading import create_evaluator_from_config
+
+    policy_function = load_policy_function(policy_config=policy_config)
     reaction_rules = load_reaction_rules(reaction_rules_path)
     building_blocks = load_building_blocks(building_blocks_path, standardize=True)
+    # Adjust building blocks to exclude target before tree construction (Tree freezes later)
+    building_blocks = set(building_blocks)
+    if str(target) in building_blocks:
+        building_blocks.discard(str(target))
+
+    # Create evaluation config and strategy
+    eval_config = ValueNetworkEvaluationConfig(
+        weights_path=value_config.weights_path,
+        normalize=tree_config.normalize_scores,
+    )
+    evaluator = create_evaluator_from_config(eval_config)
 
     # initialize tree
-    tree_config.evaluation_type = "gcn"
     tree_config.silent = True
     tree = Tree(
         target=target,
@@ -127,13 +138,9 @@ def run_tree_search(
         reaction_rules=reaction_rules,
         building_blocks=building_blocks,
         expansion_function=policy_function,
-        evaluation_function=value_function,
+        evaluation_function=evaluator,
     )
     tree._tqdm = False
-
-    # remove target from buildings blocs
-    if str(target) in tree.building_blocks:
-        tree.building_blocks.remove(str(target))
 
     # run tree search
     _ = list(tree)

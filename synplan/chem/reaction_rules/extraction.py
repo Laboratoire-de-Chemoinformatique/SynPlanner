@@ -8,7 +8,6 @@ from os.path import splitext
 from typing import Dict, List, Set, Tuple
 
 import ray
-from chython import smarts
 from chython import QueryContainer as QueryContainerChython
 from CGRtools.containers.cgr import CGRContainer
 from CGRtools.containers.molecule import MoleculeContainer
@@ -22,7 +21,6 @@ from synplan.chem.data.standardizing import RemoveReagentsStandardizer
 from synplan.chem.utils import (
     reverse_reaction,
     cgrtools_to_chython_molecule,
-    chython_query_to_cgrtools,
 )
 from synplan.utils.config import RuleExtractionConfig
 from synplan.utils.files import ReactionReader
@@ -659,7 +657,7 @@ def sort_rules(
             for rule, indices in rules_stats.items()
             if len(indices) >= min_popularity
             and rule.meta["reactor_validation"] == "passed"
-            and (not single_product_only or len(rule.reactants) == 1)
+            and (not single_product_only or len(rule.products) == 1)
         ),
         key=lambda x: -len(x[1]),
     )

@@ -151,7 +151,6 @@ class RankingPolicyDataset(InMemoryDataset):
                     logging.debug(e)
                     continue
 
-
         data, slices = self.collate(list_of_graphs)
         if self.output_path:
             makedirs(os.path.dirname(self.output_path))

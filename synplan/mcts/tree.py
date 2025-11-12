@@ -1,30 +1,27 @@
 """Module containing a class Tree that used for tree search of retrosynthetic routes."""
 
-from collections import defaultdict, deque
-from math import sqrt
-from random import choice, uniform
-from time import time, sleep
+import logging
+from time import time
 from typing import Dict, List, Set, Tuple
 
-from CGRtools.reactor import Reactor
 from CGRtools.containers import MoleculeContainer
+from CGRtools.reactor import Reactor
 from tqdm.auto import tqdm
 
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import Reaction, apply_reaction_rule
-from synplan.mcts.evaluation import ValueNetworkFunction, EvaluationService
+from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.expansion import PolicyNetworkFunction
 from synplan.mcts.node import Node
 from synplan.utils.config import TreeConfig
 
-
 from .algorithm import (
-    BreadthFirst,
-    BestFirst,
     Beam,
-    UCT,
-    NestedMonteCarlo,
+    BestFirst,
+    BreadthFirst,
     LazyNestedMonteCarlo,
+    NestedMonteCarlo,
+    UCT,
 )
 
 ALGORITHMS = {
@@ -35,6 +32,8 @@ ALGORITHMS = {
     "nmcs": NestedMonteCarlo,
     "lazy_nmcs": LazyNestedMonteCarlo,
 }
+
+logger = logging.getLogger(__name__)
 
 
 class Tree:
@@ -47,7 +46,7 @@ class Tree:
         reaction_rules: List[Reactor],
         building_blocks: Set[str],
         expansion_function: PolicyNetworkFunction,
-        evaluation_function: ValueNetworkFunction = None,
+        evaluation_function: EvaluationStrategy = None,
     ):
         """Initializes a tree object with optional parameters for tree search for target
         molecule.
@@ -57,8 +56,8 @@ class Tree:
         :param reaction_rules: A loaded reaction rules.
         :param building_blocks: A loaded building blocks.
         :param expansion_function: A loaded policy function.
-        :param evaluation_function: A loaded value function. If None, the rollout is
-            used as a default for node evaluation.
+        :param evaluation_function: An evaluation strategy. If None, a random
+            evaluation strategy is used as default.
         """
 
         # tree config parameters
@@ -69,17 +68,11 @@ class Tree:
         self.building_blocks = frozenset(building_blocks)
 
         # policy and evaluation services
-        self.policy_network = expansion_function
-        self.evaluator = EvaluationService(
-            evaluation_function=self.config.evaluation_function,
-            policy_network=self.policy_network,
-            reaction_rules=self.reaction_rules,
-            building_blocks=self.building_blocks,
-            min_mol_size=self.config.min_mol_size,
-            max_depth=self.config.max_depth,
-            value_network=evaluation_function,
-            normalize=self.config.normalize_scores,
-        )
+        assert expansion_function is not None, "Expansion function is required"
+        self.expansion_function = expansion_function
+
+        assert evaluation_function is not None, "Evaluation function is required"
+        self.evaluator = evaluation_function
 
         # tree initialization
         target_node = self._init_target_node(target)
@@ -121,6 +114,20 @@ class Tree:
                 f"Unknown algorithm '{config.algorithm}'. Allowed: {list(ALGORITHMS.keys())}"
             )
         self.algorithm = ALGORITHMS[algo_key](self)
+
+        logger.debug(
+            f"Tree init: target={str(target)[:50]}, "
+            f"building_blocks={len(self.building_blocks)}, "
+            f"reaction_rules={len(self.reaction_rules)}, "
+            f"algorithm={algo_key}, "
+            f"max_iterations={config.max_iterations}, "
+            f"max_tree_size={config.max_tree_size}, "
+            f"max_time={config.max_time}, "
+            f"max_depth={config.max_depth}, "
+            f"min_mol_size={config.min_mol_size}, "
+            f"search_strategy={config.search_strategy}, "
+            f"normalize_scores={config.normalize_scores}, "
+        )
 
     def __len__(self) -> int:
         """Returns the current size (the number of nodes) in the tree."""
@@ -185,7 +192,6 @@ class Tree:
             precursors_to_expand=(target_molecule,), new_precursors=(target_molecule,)
         )
 
-        target_smiles = str(target_node.curr_precursor.molecule)
         return target_node
 
     def _expand_node(self, node_id: int) -> None:
@@ -202,7 +208,7 @@ class Tree:
         tmp_products = set()
         expanded = False
 
-        prediction = self.policy_network.predict_reaction_rules(
+        prediction = self.expansion_function.predict_reaction_rules(
             curr_node.curr_precursor, self.reaction_rules
         )
 
@@ -222,14 +228,6 @@ class Tree:
                 scaled_prob = prob * len(
                     list(filter(lambda x: len(x) > self.config.min_mol_size, products))
                 )
-
-                non_bb_precursors = [
-                    p
-                    for p in new_precursor
-                    if not p.is_building_block(
-                        self.building_blocks, self.config.min_mol_size
-                    )
-                ]
 
                 if set(prev_precursor).isdisjoint(new_precursor):
                     precursors_to_expand = (
@@ -256,8 +254,6 @@ class Tree:
                             self.redundant_children[node_id].add(existing_id)
                             total_expanded += 1
                             expanded = True
-                            if total_expanded > self.config.max_rules_applied and False:
-                                break
                             continue
                         else:
                             self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[
@@ -276,9 +272,11 @@ class Tree:
                     total_expanded += 1
                     expanded = True
 
+                    # TODO: Remove this once we have a better way to handle this
                     if total_expanded > self.config.max_rules_applied and False:
                         break
 
+            # TODO: Remove this once we have a better way to handle this
             if total_expanded > self.config.max_rules_applied and False:
                 break
 
@@ -339,6 +337,26 @@ class Tree:
             nodes_prob=self.nodes_prob,
         )
         return node_value
+
+    def _log_final_stats(self, reason: str = "completed") -> None:
+        """Logs final tree statistics after search completes.
+
+        :param reason: Reason for stopping (e.g., "iterations limit", "time limit").
+        """
+        max_depth = max(self.nodes_depth.values()) if self.nodes_depth else 0
+        logger.debug(
+            f"Tree finished ({reason}): "
+            f"iterations={self.curr_iteration}, "
+            f"tree_size={self.curr_tree_size}, "
+            f"nodes={len(self.nodes)}, "
+            f"visited_nodes={len(self.visited_nodes)}, "
+            f"expanded_nodes={len(self.expanded_nodes)}, "
+            f"winning_nodes={len(self.winning_nodes)}, "
+            f"max_depth={max_depth}, "
+            f"time={self.curr_time:.2f}s, "
+            f"children={sum(len(v) for v in self.children.values())}, "
+            f"redundant_children={sum(len(v) for v in self.redundant_children.values())}"
+        )
 
     def _update_visits(self, node_id: int) -> None:
         """Updates the number of visits from the current node to the root node.

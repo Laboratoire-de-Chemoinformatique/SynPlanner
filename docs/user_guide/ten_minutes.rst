@@ -28,9 +28,8 @@ and rollout evaluation (no value network).
 
 .. code-block:: python
 
-   from synplan.utils.loading import load_building_blocks, load_reaction_rules
-   from synplan.mcts.expansion import PolicyNetworkFunction
-   from synplan.utils.config import PolicyNetworkConfig, TreeConfig
+   from synplan.utils.loading import load_building_blocks, load_reaction_rules, load_policy_function
+   from synplan.utils.config import TreeConfig
    from synplan.chem.utils import mol_from_smiles
    from synplan.mcts.tree import Tree
 
@@ -47,8 +46,7 @@ and rollout evaluation (no value network).
    reaction_rules = load_reaction_rules(reaction_rules_path)
 
    # 3. Load policy network
-   policy_config = PolicyNetworkConfig(weights_path=policy_weights_path)
-   policy_network = PolicyNetworkFunction(policy_config=policy_config)
+   policy_network = load_policy_function(weights_path=policy_weights_path)
 
    # 4. Configure search
    tree_config = TreeConfig(

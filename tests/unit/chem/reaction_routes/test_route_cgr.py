@@ -1,7 +1,4 @@
 import pytest
-import tempfile
-import os
-import csv
 
 # === Tests for route_cgr.py functions ===
 from synplan.chem.reaction_routes.route_cgr import compose_route_cgr, compose_sb_cgr
@@ -13,12 +10,9 @@ from synplan.chem.reaction_routes.io import (
 )
 from CGRtools.containers import (
     CGRContainer,
-    MoleculeContainer,
     ReactionContainer,
 )
 
-import pickle
-from synplan.mcts.tree import Tree
 
 # --- Test Data ---
 CSV_DATA = """route_id,step_id,smiles,meta

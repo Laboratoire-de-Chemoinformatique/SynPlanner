@@ -3,10 +3,14 @@ Generic logging helpers for scripts, notebooks and Ray clusters.
 """
 
 from __future__ import annotations
-import logging, sys, os, warnings
-from pathlib import Path
 from datetime import datetime
-from typing import Iterable, Optional
+import logging
+import os
+from pathlib import Path
+import sys
+from typing import Iterable
+import warnings
+
 from IPython import get_ipython
 
 

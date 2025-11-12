@@ -1,15 +1,24 @@
-"""Module containing a class that represents a value function for prediction of
-synthesisablity of new nodes in the tree search."""
+"""Module containing evaluation strategies for node evaluation in tree search.
 
-from typing import List, Optional, Set, Dict, Tuple
+This module implements the Strategy pattern for different evaluation methods:
+- Rollout simulation
+- Value network (GCN)
+- RDKit-based scores
+- Policy probabilities
+- Random scores
+"""
+
+from abc import ABC, abstractmethod
+from collections import defaultdict, deque
+from typing import Dict, List, Set, Tuple
 
 import torch
 
 from synplan.chem.precursor import Precursor, compose_precursors
+from synplan.chem.rdkit_utils import RDKitScore
 from synplan.mcts.expansion import PolicyNetworkFunction
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training import mol_to_pyg
-from synplan.chem.rdkit_utils import RDKitScore
 
 
 class ValueNetworkFunction:
@@ -90,8 +99,6 @@ class RolloutSimulator:
         :return: The reward (value) assigned to the precursor.
         """
 
-        from collections import defaultdict, deque
-
         max_depth = self.max_depth - current_depth
 
         if precursor.is_building_block(self.building_blocks, self.min_mol_size):
@@ -111,7 +118,7 @@ class RolloutSimulator:
 
             reaction_rule_applied = False
             products = None
-            for prob, rule, rule_id in self.policy_network.predict_reaction_rules(
+            for _, rule, rule_id in self.policy_network.predict_reaction_rules(
                 current_precursor, self.reaction_rules
             ):
                 for prods in self._apply_rule(current_precursor, rule):
@@ -154,38 +161,39 @@ class RolloutSimulator:
         return apply_reaction_rule(precursor_mol.molecule, rule)
 
 
-class EvaluationService:
-    """Single entry-point to evaluate a node using configured scoring function.
+class EvaluationStrategy(ABC):
+    """Abstract base class for all evaluation strategies.
 
-    Produces values in [0, 1] if normalize=True.
+    Implements the Strategy pattern for node evaluation in tree search.
+    Each concrete strategy implements a different evaluation method.
     """
 
-    def __init__(
+    @abstractmethod
+    def evaluate_node(
         self,
-        *,
-        evaluation_function: str,
-        policy_network: PolicyNetworkFunction,
-        reaction_rules,
-        building_blocks: Set[str],
-        min_mol_size: int,
-        max_depth: int,
-        value_network: Optional[ValueNetworkFunction] = None,
-        normalize: bool = False,
-    ) -> None:
+        node,
+        node_id: int,
+        nodes_depth: Dict[int, int],
+        nodes_prob: Dict[int, float],
+    ) -> float:
+        """Evaluate a node and return its score.
 
-        # Canonical naming: evaluation_function
-        self.evaluation_function = evaluation_function
-        self.value_network = value_network
-        self.normalize = normalize
-        self.policy_network = policy_network
-        self.reaction_rules = reaction_rules
-        self.building_blocks = building_blocks
-        self.min_mol_size = min_mol_size
-        self.max_depth = max_depth
-        self.rollout = None
+        :param node: The node to evaluate.
+        :param node_id: ID of the node.
+        :param nodes_depth: Dictionary mapping node IDs to depths.
+        :param nodes_prob: Dictionary mapping node IDs to policy probabilities.
+        :return: Evaluation score for the node.
+        """
+        pass
 
     @staticmethod
     def _to_01(value: float, *, src_range: Tuple[float, float] = (0.0, 1.0)) -> float:
+        """Normalize value to [0, 1] range.
+
+        :param value: Value to normalize.
+        :param src_range: Source range (min, max).
+        :return: Normalized value in [0, 1].
+        """
         a, b = src_range
         if b == a:
             return 0.0
@@ -196,61 +204,172 @@ class EvaluationService:
             x = 1.0
         return float(x)
 
+
+class RolloutEvaluationStrategy(EvaluationStrategy):
+    """Evaluation strategy using rollout simulation.
+
+    Performs Monte Carlo rollout from the node to estimate synthesizability.
+    """
+
+    def __init__(
+        self,
+        policy_network: PolicyNetworkFunction,
+        reaction_rules,
+        building_blocks: Set[str],
+        min_mol_size: int,
+        max_depth: int,
+        normalize: bool = False,
+    ) -> None:
+        """Initialize rollout evaluation strategy.
+
+        :param policy_network: Policy network for selecting reactions during rollout.
+        :param reaction_rules: Available reaction rules.
+        :param building_blocks: Set of building block molecules.
+        :param min_mol_size: Minimum molecule size.
+        :param max_depth: Maximum rollout depth.
+        :param normalize: Whether to normalize scores to [0, 1].
+        """
+        self.rollout = RolloutSimulator(
+            policy_network=policy_network,
+            reaction_rules=reaction_rules,
+            building_blocks=building_blocks,
+            min_mol_size=min_mol_size,
+            max_depth=max_depth,
+        )
+        self.normalize = normalize
+
     def evaluate_node(
         self,
-        *,
         node,
         node_id: int,
         nodes_depth: Dict[int, int],
         nodes_prob: Dict[int, float],
     ) -> float:
-        """Evaluate and return a score. If normalize=True, output is in [0,1]."""
+        """Evaluate node using rollout simulation."""
+        current_depth = nodes_depth[node_id]
+        raw = min(
+            (
+                self.rollout.simulate_precursor(precursor, current_depth=current_depth)
+                for precursor in node.precursors_to_expand
+            ),
+            default=1.0,
+        )
+        if self.normalize:
+            # Map [-1, 1] -> [0, 1]
+            score = 0.5 * (raw + 1.0)
+            return self._to_01(score)
+        return raw
 
-        sf = self.evaluation_function
 
-        if sf == "random":
-            from random import uniform
+class ValueNetworkEvaluationStrategy(EvaluationStrategy):
+    """Evaluation strategy using a trained value neural network (GCN).
 
-            score = uniform(0.0, 1.0)
-            return self._to_01(score) if self.normalize else score
+    Predicts synthesizability using a graph convolutional network.
+    """
 
-        if sf == "policy":
-            score = nodes_prob.get(node_id, 0.0)
-            return self._to_01(score) if self.normalize else score
+    def __init__(
+        self,
+        value_network: ValueNetworkFunction,
+        normalize: bool = False,
+    ) -> None:
+        """Initialize value network evaluation strategy.
 
-        if sf == "gcn":
-            if not self.value_network:
-                raise ValueError("Value network not provided but evaluation_function='gcn'.")
-            score = float(self.value_network.predict_value(node.new_precursors))
-            # Value net is expected to be in [0,1]; clamp defensively
-            return self._to_01(score) if self.normalize else score
+        :param value_network: Trained value network function.
+        :param normalize: Whether to normalize scores to [0, 1].
+        """
+        self.value_network = value_network
+        self.normalize = normalize
 
-        if sf == "rollout":
-            if self.rollout is None:
-                self.rollout = RolloutSimulator(
-                    policy_network=self.policy_network,
-                    reaction_rules=self.reaction_rules,
-                    building_blocks=self.building_blocks,
-                    min_mol_size=self.min_mol_size,
-                    max_depth=self.max_depth,
-                )
-            current_depth = nodes_depth[node_id]
-            raw = min(
-                (
-                    self.rollout.simulate_precursor(
-                        precursor, current_depth=current_depth
-                    )
-                    for precursor in node.precursors_to_expand
-                ),
-                default=1.0,
-            )
-            if self.normalize:
-                # Map [-1, 1] -> [0, 1] only when normalization is requested
-                score = 0.5 * (raw + 1.0)
-                return self._to_01(score)
-            return raw
+    def evaluate_node(
+        self,
+        node,
+        node_id: int,
+        nodes_depth: Dict[int, int],
+        nodes_prob: Dict[int, float],
+    ) -> float:
+        """Evaluate node using value network."""
+        score = float(self.value_network.predict_value(node.new_precursors))
+        return self._to_01(score) if self.normalize else score
 
-        # RDKit and other chemistry-derived scores are handled via RDKitScore
-        scorer = RDKitScore(score_function=sf)
-        score = float(scorer(node))
+
+class RDKitEvaluationStrategy(EvaluationStrategy):
+    """Evaluation strategy using RDKit molecular descriptors.
+
+    Uses scores like SA score, molecular weight, etc.
+    """
+
+    def __init__(
+        self,
+        score_function: str,
+        normalize: bool = False,
+    ) -> None:
+        """Initialize RDKit evaluation strategy.
+
+        :param score_function: Name of the RDKit scoring function.
+        :param normalize: Whether to normalize scores to [0, 1].
+        """
+        self.scorer = RDKitScore(score_function=score_function)
+        self.normalize = normalize
+
+    def evaluate_node(
+        self,
+        node,
+        node_id: int,
+        nodes_depth: Dict[int, int],
+        nodes_prob: Dict[int, float],
+    ) -> float:
+        """Evaluate node using RDKit scorer."""
+        score = float(self.scorer(node))
+        return self._to_01(score) if self.normalize else score
+
+
+class PolicyEvaluationStrategy(EvaluationStrategy):
+    """Evaluation strategy using policy network probabilities.
+
+    Uses the policy probability of the node as its evaluation score.
+    """
+
+    def __init__(self, normalize: bool = False) -> None:
+        """Initialize policy evaluation strategy.
+
+        :param normalize: Whether to normalize scores to [0, 1].
+        """
+        self.normalize = normalize
+
+    def evaluate_node(
+        self,
+        node,
+        node_id: int,
+        nodes_depth: Dict[int, int],
+        nodes_prob: Dict[int, float],
+    ) -> float:
+        """Evaluate node using policy probability."""
+        score = nodes_prob.get(node_id, 0.0)
+        return self._to_01(score) if self.normalize else score
+
+
+class RandomEvaluationStrategy(EvaluationStrategy):
+    """Evaluation strategy using random scores.
+
+    Useful for testing and baseline comparisons.
+    """
+
+    def __init__(self, normalize: bool = False) -> None:
+        """Initialize random evaluation strategy.
+
+        :param normalize: Whether to normalize scores to [0, 1] (already in [0,1]).
+        """
+        self.normalize = normalize
+
+    def evaluate_node(
+        self,
+        node,
+        node_id: int,
+        nodes_depth: Dict[int, int],
+        nodes_prob: Dict[int, float],
+    ) -> float:
+        """Evaluate node using random score."""
+        from random import uniform
+
+        score = uniform(0.0, 1.0)
         return self._to_01(score) if self.normalize else score

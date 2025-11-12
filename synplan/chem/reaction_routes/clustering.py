@@ -1,22 +1,21 @@
 from collections import defaultdict
-from typing import Dict, Any
-
 from pathlib import Path
 import pickle
 import re
+from typing import Any, Dict
 
-from CGRtools.containers import ReactionContainer, CGRContainer
+from CGRtools.containers import CGRContainer, ReactionContainer
 from CGRtools.containers.bonds import DynamicBond
 
-from synplan.chem.reaction_routes.leaving_groups import *
-from synplan.chem.reaction_routes.visualisation import *
-from synplan.chem.reaction_routes.route_cgr import *
 from synplan.chem.reaction_routes.io import (
-    read_routes_csv,
-    read_routes_json,
     make_dict,
     make_json,
+    read_routes_csv,
+    read_routes_json,
 )
+from synplan.chem.reaction_routes.leaving_groups import *
+from synplan.chem.reaction_routes.route_cgr import *
+from synplan.chem.reaction_routes.visualisation import *
 from synplan.utils.visualisation import (
     routes_clustering_report,
     routes_subclustering_report,
@@ -57,12 +56,12 @@ def run_cluster_cli(
 
     # Compose condensed graph representations
     route_cgrs = compose_all_route_cgrs(routes_dict)
-    click.echo(f"Generating RouteCGR")
+    click.echo("Generating RouteCGR")
     sb_cgrs = compose_all_sb_cgrs(route_cgrs)
-    click.echo(f"Generating SB-CGR")
+    click.echo("Generating SB-CGR")
 
     # Perform clustering
-    click.echo(f"\nClustering")
+    click.echo("\nClustering")
     clusters = cluster_routes(sb_cgrs, use_strat=False)
 
     click.echo(f"Total number of routes: {len(routes_dict)}")

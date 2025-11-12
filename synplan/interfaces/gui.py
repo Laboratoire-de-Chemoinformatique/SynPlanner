@@ -1,39 +1,37 @@
 import base64
+import gc
+import io
 import pickle
 import re
 import uuid
-import io
 import zipfile
 
-import pandas as pd
-import streamlit as st
 from CGRtools.files import SMILESRead
-from streamlit_ketcher import st_ketcher
 from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import disable_progress_bars
+import pandas as pd
+import streamlit as st
+from streamlit_ketcher import st_ketcher
 
-
-from synplan.mcts.expansion import PolicyNetworkFunction
+from synplan.chem.reaction_routes.clustering import *
+from synplan.chem.reaction_routes.route_cgr import *
+from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.search import extract_tree_stats
 from synplan.mcts.tree import Tree
-from synplan.chem.utils import mol_from_smiles
-from synplan.chem.reaction_routes.route_cgr import *
-from synplan.chem.reaction_routes.clustering import *
-
+from synplan.utils.config import TreeConfig
+from synplan.utils.loading import (
+    load_building_blocks,
+    load_policy_function,
+    load_reaction_rules,
+)
 from synplan.utils.visualisation import (
-    routes_clustering_report,
-    routes_subclustering_report,
     generate_results_html,
-    html_top_routes_cluster,
     get_route_svg,
     get_route_svg_from_json,
+    html_top_routes_cluster,
+    routes_clustering_report,
+    routes_subclustering_report,
 )
-from synplan.utils.config import TreeConfig, PolicyNetworkConfig
-from synplan.utils.loading import load_reaction_rules, load_building_blocks
-
-
-import psutil
-import gc
 
 
 disable_progress_bars("huggingface_hub")
@@ -425,18 +423,13 @@ def setup_planning_options():
                         st.write("Loading reaction rules...")
                         reaction_rules = load_reaction_rules(reaction_rules_path)
                         st.write("Loading policy network...")
-                        policy_config = PolicyNetworkConfig(
+                        policy_function = load_policy_function(
                             weights_path=ranking_policy_weights_path
-                        )
-                        policy_function = PolicyNetworkFunction(
-                            policy_config=policy_config
                         )
                         status.update(label="Resources loaded!", state="complete")
 
                     tree_config = TreeConfig(
                         search_strategy=planning_params["search_strategy"],
-                        evaluation_function="rollout",
-                        evaluation_type="rollout",  # legacy, mapped inside TreeConfig
                         max_iterations=planning_params["max_iterations"],
                         max_depth=planning_params["max_depth"],
                         min_mol_size=planning_params["min_mol_size"],
@@ -446,13 +439,26 @@ def setup_planning_options():
                         silent=True,  # This was hardcoded
                     )
 
+                    # Create evaluation config and strategy
+                    from synplan.utils.config import RolloutEvaluationConfig
+                    from synplan.utils.loading import create_evaluator_from_config
+
+                    eval_config = RolloutEvaluationConfig(
+                        policy_network=policy_function,
+                        reaction_rules=reaction_rules,
+                        building_blocks=building_blocks,
+                        min_mol_size=tree_config.min_mol_size,
+                        max_depth=tree_config.max_depth,
+                    )
+                    evaluator = create_evaluator_from_config(eval_config)
+
                     tree = Tree(
                         target=target_molecule,
                         config=tree_config,
                         reaction_rules=reaction_rules,
                         building_blocks=building_blocks,
                         expansion_function=policy_function,
-                        evaluation_function=None,  # Value network set when evaluation_function == 'gcn'
+                        evaluation_function=evaluator,
                     )
 
                     mcts_progress_text = "Running MCTS iterations..."
@@ -1356,11 +1362,11 @@ def main():
                             st.session_state.target_smiles,
                         )
                         st.download_button(
-                            label=f"Download best route from each cluster",
+                            label="Download best route from each cluster",
                             data=best_route_html,
                             file_name=f"cluster_best_{st.session_state.target_smiles}.html",
                             mime="text/html",
-                            key=f"download_cluster_best",
+                            key="download_cluster_best",
                         )
                     else:
                         st.write("No valid cluster data to display statistics for.")

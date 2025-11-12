@@ -2,41 +2,39 @@
 retrosynthetic models."""
 
 import functools
-import pickle
-import zipfile
-import shutil
-from pathlib import Path
-from typing import List, Set, FrozenSet, Tuple, Union
-
-from CGRtools.reactor.reactor import Reactor
-from CGRtools.files.SDFrw import SDFRead
-from torch import device
-from huggingface_hub import hf_hub_download, snapshot_download
-from tqdm.auto import tqdm
-from concurrent.futures import ProcessPoolExecutor
+import logging
 import os
+from pathlib import Path
+import pickle
+import shutil
+from typing import FrozenSet, List, TYPE_CHECKING, Union
+import zipfile
 
+from CGRtools.files.SDFrw import SDFRead
+from CGRtools.reactor.reactor import Reactor
+from huggingface_hub import hf_hub_download, snapshot_download
+from torch import device
+from tqdm.auto import tqdm
+
+from synplan.chem.utils import _standardize_sdf_text, _standardize_smiles_batch
 from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.networks.value import ValueNetwork
-from synplan.utils.files import MoleculeReader
-from synplan.chem import smiles_parser
-from synplan.chem.utils import (
-    safe_canonicalization,
-    _standardize_one_smiles,
-    _standardize_sdf_range,
-    _standardize_sdf_text,
-    _standardize_smiles_batch,
-)
 from synplan.utils.files import (
     count_sdf_records,
-    iter_sdf_text_blocks,
     count_smiles_records,
-    iter_smiles_blocks,
+    iter_sdf_text_blocks,
     iter_smiles,
+    iter_smiles_blocks,
 )
 from synplan.utils.parallel import process_pool_map_stream
 
+if TYPE_CHECKING:
+    from synplan.utils.config import ValueNetworkConfig, PolicyNetworkConfig
+    from synplan.mcts.expansion import PolicyNetworkFunction
+    from synplan.mcts.evaluation import ValueNetworkFunction, EvaluationStrategy
+
 REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
+logger = logging.getLogger(__name__)
 
 
 def _extract_zip(zip_path: Path, out_dir: Path) -> None:
@@ -286,3 +284,167 @@ def load_policy_net(
     return model_class.load_from_checkpoint(
         policy_network_path, map_location, batch_size=1
     )
+
+
+def load_policy_function(
+    policy_config: Union["PolicyNetworkConfig", dict, None] = None,
+    weights_path: str = None,
+    **config_kwargs,
+) -> "PolicyNetworkFunction":
+    """Factory function to create PolicyNetworkFunction with flexible configuration.
+
+    Priority order: policy_config > weights_path + kwargs > defaults
+
+    :param policy_config: PolicyNetworkConfig object or dict with config parameters
+    :param weights_path: Direct path to weights file (shortcut for simple cases)
+    :param config_kwargs: Additional config parameters to override defaults
+    :return: PolicyNetworkFunction ready for use in tree search
+
+    Examples:
+        >>> # Using config object
+        >>> config = PolicyNetworkConfig(weights_path="path.ckpt", top_rules=50)
+        >>> policy_fn = load_policy_function(policy_config=config)
+        >>>
+        >>> # Using direct path (simplest)
+        >>> policy_fn = load_policy_function(weights_path="path.ckpt")
+        >>>
+        >>> # Using path with overrides
+        >>> policy_fn = load_policy_function(weights_path="path.ckpt", top_rules=100)
+    """
+    from synplan.mcts.expansion import PolicyNetworkFunction
+    from synplan.utils.config import PolicyNetworkConfig
+
+    # Priority 1: Use provided config
+    if policy_config is not None:
+        if isinstance(policy_config, dict):
+            policy_config = PolicyNetworkConfig.from_dict(policy_config)
+        return PolicyNetworkFunction(policy_config=policy_config)
+
+    # Priority 2: Create config from weights_path and kwargs
+    if weights_path is not None:
+        policy_config = PolicyNetworkConfig(weights_path=weights_path)
+        return PolicyNetworkFunction(policy_config=policy_config)
+
+    raise ValueError("Must provide either policy_config or weights_path")
+
+
+def load_value_function(
+    value_config: Union["ValueNetworkConfig", dict, None] = None,
+    weights_path: str = None,
+    **config_kwargs,
+) -> "ValueNetworkFunction":
+    """Factory function to create ValueNetworkFunction with flexible configuration.
+
+    Priority order: value_config > weights_path + kwargs > defaults
+
+    :param value_config: ValueNetworkConfig object or dict with config parameters
+    :param weights_path: Direct path to weights file (shortcut for simple cases)
+    :param config_kwargs: Additional config parameters to override defaults
+    :return: ValueNetworkFunction ready for use in tree search
+
+    Examples:
+        >>> # Using config object
+        >>> config = ValueNetworkConfig(weights_path="path.ckpt")
+        >>> value_fn = load_value_function(value_config=config)
+        >>>
+        >>> # Using direct path (simplest)
+        >>> value_fn = load_value_function(weights_path="path.ckpt")
+    """
+    from synplan.mcts.evaluation import ValueNetworkFunction
+    from synplan.utils.config import ValueNetworkConfig
+
+    # Priority 1: Use provided config
+    if value_config is not None:
+        if isinstance(value_config, dict):
+            value_config = ValueNetworkConfig.from_dict(value_config)
+        # ValueNetworkFunction only takes weights_path
+        return ValueNetworkFunction(weights_path=value_config.weights_path)
+
+    # Priority 2: Use direct weights_path
+    if weights_path is not None:
+        return ValueNetworkFunction(weights_path=weights_path)
+
+    raise ValueError("Must provide either value_config or weights_path")
+
+
+def create_evaluator_from_config(eval_config) -> "EvaluationStrategy":
+    """Create evaluation strategy from configuration.
+
+    This is the central factory function that creates the appropriate evaluation
+    strategy based on the config type. The config contains all necessary dependencies.
+
+    :param eval_config: Evaluation configuration object (self-contained).
+        Can be one of:
+        - RolloutEvaluationConfig
+        - ValueNetworkEvaluationConfig
+        - RDKitEvaluationConfig
+        - PolicyEvaluationConfig
+        - RandomEvaluationConfig
+    :return: Evaluation strategy ready to use in tree search.
+
+    Examples:
+        >>> # Rollout evaluation
+        >>> config = RolloutEvaluationConfig(
+        ...     policy_network=policy,
+        ...     reaction_rules=rules,
+        ...     building_blocks=bbs,
+        ...     max_depth=9
+        ... )
+        >>> evaluator = create_evaluator_from_config(config)
+        >>>
+        >>> # Value network evaluation
+        >>> config = ValueNetworkEvaluationConfig(weights_path="path.ckpt")
+        >>> evaluator = create_evaluator_from_config(config)
+    """
+    from synplan.mcts.evaluation import (
+        RolloutEvaluationStrategy,
+        ValueNetworkEvaluationStrategy,
+        RDKitEvaluationStrategy,
+        PolicyEvaluationStrategy,
+        RandomEvaluationStrategy,
+    )
+    from synplan.utils.config import (
+        RolloutEvaluationConfig,
+        ValueNetworkEvaluationConfig,
+        RDKitEvaluationConfig,
+        PolicyEvaluationConfig,
+        RandomEvaluationConfig,
+    )
+
+    logger.debug(f"create_evaluator config_type={type(eval_config).__name__}")
+    if isinstance(eval_config, RolloutEvaluationConfig):
+        return RolloutEvaluationStrategy(
+            policy_network=eval_config.policy_network,
+            reaction_rules=eval_config.reaction_rules,
+            building_blocks=eval_config.building_blocks,
+            min_mol_size=eval_config.min_mol_size,
+            max_depth=eval_config.max_depth,
+            normalize=eval_config.normalize,
+        )
+
+    elif isinstance(eval_config, ValueNetworkEvaluationConfig):
+        # Load value network from path in config
+        value_net = load_value_function(weights_path=eval_config.weights_path)
+        return ValueNetworkEvaluationStrategy(
+            value_network=value_net,
+            normalize=eval_config.normalize,
+        )
+
+    elif isinstance(eval_config, RDKitEvaluationConfig):
+        return RDKitEvaluationStrategy(
+            score_function=eval_config.score_function,
+            normalize=eval_config.normalize,
+        )
+
+    elif isinstance(eval_config, PolicyEvaluationConfig):
+        return PolicyEvaluationStrategy(normalize=eval_config.normalize)
+
+    elif isinstance(eval_config, RandomEvaluationConfig):
+        return RandomEvaluationStrategy(normalize=eval_config.normalize)
+
+    else:
+        raise ValueError(
+            f"Unknown evaluation config type: {type(eval_config)}. "
+            f"Expected one of: RolloutEvaluationConfig, ValueNetworkEvaluationConfig, "
+            f"RDKitEvaluationConfig, PolicyEvaluationConfig, RandomEvaluationConfig."
+        )

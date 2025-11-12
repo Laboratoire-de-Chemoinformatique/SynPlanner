@@ -1,6 +1,5 @@
+import logging
 import pytest
-from pathlib import Path
-from synplan.utils.loading import download_all_data
 from synplan.chem.utils import mol_from_smiles
 from synplan.chem.reaction_routes.route_cgr import (
     compose_all_route_cgrs,
@@ -10,10 +9,13 @@ from synplan.chem.reaction_routes.clustering import (
     cluster_routes,
     subcluster_all_clusters,
 )
-from synplan.utils.loading import load_building_blocks, load_reaction_rules
+from synplan.utils.loading import (
+    load_building_blocks,
+    load_reaction_rules,
+    load_policy_function,
+)
 from synplan.mcts.tree import Tree
-from synplan.mcts.expansion import PolicyNetworkFunction
-from synplan.utils.config import TreeConfig, PolicyNetworkConfig
+from synplan.utils.config import TreeConfig
 
 # Test molecules with different complexity levels
 TEST_MOLECULES = {
@@ -63,8 +65,7 @@ def policy_network(data_folder):
     ranking_policy_network = data_folder.joinpath(
         "uspto/weights/ranking_policy_network.ckpt"
     )
-    policy_config = PolicyNetworkConfig(weights_path=ranking_policy_network)
-    return PolicyNetworkFunction(policy_config=policy_config)
+    return load_policy_function(weights_path=ranking_policy_network)
 
 
 @pytest.fixture(scope="module")
@@ -72,7 +73,6 @@ def tree_config():
     """Get tree configuration."""
     return TreeConfig(
         search_strategy="expansion_first",
-        evaluation_function="rollout",
         algorithm="UCT",
         enable_pruning=False,
         max_iterations=300,
@@ -87,10 +87,24 @@ def run_clustering_workflow(
     target_smiles, building_blocks, reaction_rules, policy_network, tree_config
 ):
     """Helper function to run the complete clustering workflow."""
+    from synplan.utils.config import RolloutEvaluationConfig
+    from synplan.utils.loading import create_evaluator_from_config
+    
     # Create target molecule
     target_molecule = mol_from_smiles(
         target_smiles, clean2d=True, standardize=True, clean_stereo=True
     )
+    
+    # Create evaluation config and strategy
+    eval_config = RolloutEvaluationConfig(
+        policy_network=policy_network,
+        reaction_rules=reaction_rules,
+        building_blocks=building_blocks,
+        min_mol_size=tree_config.min_mol_size,
+        max_depth=tree_config.max_depth,
+        normalize=tree_config.normalize_scores,
+    )
+    evaluator = create_evaluator_from_config(eval_config)
 
     # Create and solve tree
     tree = Tree(
@@ -99,16 +113,18 @@ def run_clustering_workflow(
         reaction_rules=reaction_rules,
         building_blocks=building_blocks,
         expansion_function=policy_network,
+        evaluation_function=evaluator,
     )
 
     # Solve tree
     tree_solved = False
-    for solved, node_id in tree:
+    for solved, _ in tree:
         if solved:
             tree_solved = True
+    tree._log_final_stats("completed")
 
     if not tree_solved:
-        pytest.skip(f"Tree solving failed for molecule: {target_smiles}")
+        pytest.fail(f"Tree solving failed for molecule: {target_smiles}")
 
     # Get route CGRs
     all_route_cgrs = compose_all_route_cgrs(tree)
@@ -133,9 +149,10 @@ def calc_num_routes_subclusters(subclusters):
 
 @pytest.mark.integration
 def test_simple_molecule_clustering(
-    building_blocks, reaction_rules, policy_network, tree_config
+    building_blocks, reaction_rules, policy_network, tree_config, caplog
 ):
     """Test clustering workflow with a simple molecule (Aspirin)."""
+    caplog.set_level(logging.DEBUG)
     target_smiles = TEST_MOLECULES["simple"]
     tree, clusters, subclusters = run_clustering_workflow(
         target_smiles, building_blocks, reaction_rules, policy_network, tree_config
@@ -167,9 +184,10 @@ def test_simple_molecule_clustering(
 
 @pytest.mark.integration
 def test_medium_molecule_clustering(
-    building_blocks, reaction_rules, policy_network, tree_config
+    building_blocks, reaction_rules, policy_network, tree_config, caplog
 ):
     """Test clustering workflow with a medium complexity molecule (Capivasertib)."""
+    caplog.set_level(logging.DEBUG)
     target_smiles = TEST_MOLECULES["medium"]
     tree, clusters, subclusters = run_clustering_workflow(
         target_smiles, building_blocks, reaction_rules, policy_network, tree_config
@@ -223,9 +241,10 @@ def test_medium_molecule_clustering(
 
 @pytest.mark.integration
 def test_complex_molecule_clustering(
-    building_blocks, reaction_rules, policy_network, tree_config
+    building_blocks, reaction_rules, policy_network, tree_config, caplog
 ):
     """Test clustering workflow with a complex molecule (Ibuprofen)."""
+    caplog.set_level(logging.DEBUG)
     target_smiles = TEST_MOLECULES["complex"]
     tree, clusters, subclusters = run_clustering_workflow(
         target_smiles, building_blocks, reaction_rules, policy_network, tree_config

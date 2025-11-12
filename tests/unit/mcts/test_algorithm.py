@@ -5,7 +5,10 @@ from typing import Callable, List, Tuple
 from CGRtools.containers import MoleculeContainer
 
 from synplan.mcts.tree import Tree
-from synplan.utils.config import TreeConfig
+from synplan.utils.config import (
+    TreeConfig, RolloutEvaluationConfig
+)
+from synplan.utils.loading import create_evaluator_from_config
 from synplan.mcts.algorithm import NestedMonteCarlo
 
 
@@ -56,7 +59,6 @@ def build_tree(
     algorithm: str,
     rules: List[Tuple[float, FakeReactor, int]],
     *,
-    evaluation: str = "policy",
     min_mol_size: int = 6,
     beam_width: int = 1,
     ucb_type: str = "puct",
@@ -73,7 +75,6 @@ def build_tree(
         beam_width=beam_width,
         ucb_type=ucb_type,
         epsilon=epsilon,
-        evaluation_function=evaluation,
         min_mol_size=min_mol_size,
         silent=True,
         enable_pruning=False,
@@ -81,13 +82,15 @@ def build_tree(
     target = make_mol(7)  # ensure not a building block
     fake_policy = FakePolicy(rules, expand_deeper=expand_deeper)
     reactors = [r for _, r, _ in rules]
+    evaluation_config = RolloutEvaluationConfig(policy_network=fake_policy, reaction_rules=reactors, building_blocks=set())
+    evaluator = create_evaluator_from_config(evaluation_config)
     return Tree(
         target=target,
         config=cfg,
         reaction_rules=reactors,
         building_blocks=set(),
         expansion_function=fake_policy,
-        evaluation_function=None,
+        evaluation_function=evaluator,
     )
 
 
