@@ -5,9 +5,7 @@ from typing import Callable, List, Tuple
 from CGRtools.containers import MoleculeContainer
 
 from synplan.mcts.tree import Tree
-from synplan.utils.config import (
-    TreeConfig, RolloutEvaluationConfig
-)
+from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
 from synplan.utils.loading import create_evaluator_from_config
 from synplan.mcts.algorithm import NestedMonteCarlo
 
@@ -15,6 +13,7 @@ from synplan.mcts.algorithm import NestedMonteCarlo
 # ----------------------
 # Helper constructors
 # ----------------------
+
 
 def make_mol(n: int) -> MoleculeContainer:
     m = MoleculeContainer()
@@ -28,7 +27,9 @@ def make_mol(n: int) -> MoleculeContainer:
 
 
 class FakeReaction:
-    def __init__(self, reactants: List[MoleculeContainer], products: List[MoleculeContainer]):
+    def __init__(
+        self, reactants: List[MoleculeContainer], products: List[MoleculeContainer]
+    ):
         self.reactants = reactants
         self.products = products
 
@@ -42,7 +43,9 @@ class FakeReactor:
 
 
 class FakePolicy:
-    def __init__(self, rules: List[Tuple[float, FakeReactor, int]], expand_deeper: bool = False):
+    def __init__(
+        self, rules: List[Tuple[float, FakeReactor, int]], expand_deeper: bool = False
+    ):
         # rules: list of (prob, reactor, rule_id)
         self.rules = rules
         self.expand_deeper = expand_deeper
@@ -82,7 +85,9 @@ def build_tree(
     target = make_mol(7)  # ensure not a building block
     fake_policy = FakePolicy(rules, expand_deeper=expand_deeper)
     reactors = [r for _, r, _ in rules]
-    evaluation_config = RolloutEvaluationConfig(policy_network=fake_policy, reaction_rules=reactors, building_blocks=set())
+    evaluation_config = RolloutEvaluationConfig(
+        policy_network=fake_policy, reaction_rules=reactors, building_blocks=set()
+    )
     evaluator = create_evaluator_from_config(evaluation_config)
     return Tree(
         target=target,
@@ -97,6 +102,7 @@ def build_tree(
 # ----------------------
 # Breadth-First Search
 # ----------------------
+
 
 def test_breadth_first_returns_solved_child():
     # one rule yields building-block product (solved child), another yields large product (unsolved)
@@ -117,6 +123,7 @@ def test_breadth_first_returns_solved_child():
 # ----------------------
 # Best-First Search
 # ----------------------
+
 
 def test_best_first_orders_by_policy_value():
     # two unsolved children with different policy priors
@@ -152,6 +159,7 @@ def test_best_first_returns_solved_child_immediately():
 # Beam Search
 # ----------------------
 
+
 def test_beam_top1_is_highest():
     rules = [
         (0.3, FakeReactor(lambda: [make_mol(10)]), 0),
@@ -169,6 +177,7 @@ def test_beam_top1_is_highest():
 # ----------------------
 # UCT/PUCT
 # ----------------------
+
 
 def test_uct_puct_selects_highest_prior_on_second_step():
     rules = [
@@ -193,6 +202,7 @@ def test_uct_puct_selects_highest_prior_on_second_step():
 # ----------------------
 # Nested Monte Carlo (NMCS)
 # ----------------------
+
 
 def test_nmcs_returns_best_leaf_id():
     rules = [
@@ -235,6 +245,7 @@ def test_nmcs_marks_solved_when_present():
 # Lazy NMCS
 # ----------------------
 
+
 def test_lazy_nmcs_selects_best_candidate_after_pruning():
     rules = [
         (0.1, FakeReactor(lambda: [make_mol(10)]), 0),
@@ -258,6 +269,7 @@ def test_lazy_nmcs_selects_best_candidate_after_pruning():
 # NMCS playout helper on real tree
 # ----------------------
 
+
 def test_select_nmcs_path_greedy_policy_and_random_on_real_tree():
     rules = [
         (0.2, FakeReactor(lambda: [make_mol(10)]), 0),
@@ -273,7 +285,9 @@ def test_select_nmcs_path_greedy_policy_and_random_on_real_tree():
     # greedy should follow highest value (policy value here)
     last_greedy, seq_g = playout.select_nmcs_path(1, 1, "greedy")
     assert len(seq_g) == 1
-    best_by_value = max(list(tree.children[1]), key=lambda cid: tree._get_node_value(cid))
+    best_by_value = max(
+        list(tree.children[1]), key=lambda cid: tree._get_node_value(cid)
+    )
     assert seq_g[0] == best_by_value
     assert last_greedy in list(tree.children[1])
 
@@ -290,4 +304,3 @@ def test_select_nmcs_path_greedy_policy_and_random_on_real_tree():
     assert len(seq_r) == 1
     assert seq_r[0] in list(tree.children[1])
     assert last_rnd in list(tree.children[1])
-

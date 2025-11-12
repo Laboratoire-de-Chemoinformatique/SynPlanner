@@ -435,8 +435,8 @@ class UCT(BaseSearchStrategy):
                 ):  # expand node if depth limit is not reached
                     self.tree._expand_node(node_id)
                     self.tree.expanded_nodes.add(node_id)
-                    
-                    value_to_backprop = -1.0 # node was not expanded
+
+                    value_to_backprop = -1.0  # node was not expanded
                     if self.tree.children[node_id]:
                         if self.tree.config.search_strategy == "evaluation_first":
                             # recalculate node value based on children synthesisability and backpropagation
