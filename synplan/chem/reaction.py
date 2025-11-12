@@ -50,7 +50,7 @@ def apply_reaction_rule(
     molecule: MoleculeContainer,
     reaction_rule: Reactor,
     sort_reactions: bool = False,
-    top_reactions_num: int = 10,
+    top_reactions_num: int = 3,
     validate_products: bool = True,
     rebuild_with_cgr: bool = False,
 ) -> Iterator[List[MoleculeContainer,]]:
