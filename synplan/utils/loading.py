@@ -328,7 +328,7 @@ def load_policy_function(
     raise ValueError("Must provide either policy_config or weights_path")
 
 
-def load_value_function(
+def load_value_network(
     value_config: Union["ValueNetworkConfig", dict, None] = None,
     weights_path: str = None,
     **config_kwargs,
@@ -345,10 +345,10 @@ def load_value_function(
     Examples:
         >>> # Using config object
         >>> config = ValueNetworkConfig(weights_path="path.ckpt")
-        >>> value_fn = load_value_function(value_config=config)
+        >>> value_fn = load_value_network(value_config=config)
         >>>
         >>> # Using direct path (simplest)
-        >>> value_fn = load_value_function(weights_path="path.ckpt")
+        >>> value_fn = load_value_network(weights_path="path.ckpt")
     """
     from synplan.mcts.evaluation import ValueNetworkFunction
     from synplan.utils.config import ValueNetworkConfig
@@ -367,7 +367,7 @@ def load_value_function(
     raise ValueError("Must provide either value_config or weights_path")
 
 
-def create_evaluator_from_config(eval_config) -> "EvaluationStrategy":
+def load_evaluation_function(eval_config) -> "EvaluationStrategy":
     """Create evaluation strategy from configuration.
 
     This is the central factory function that creates the appropriate evaluation
@@ -390,11 +390,11 @@ def create_evaluator_from_config(eval_config) -> "EvaluationStrategy":
         ...     building_blocks=bbs,
         ...     max_depth=9
         ... )
-        >>> evaluator = create_evaluator_from_config(config)
+        >>> evaluator = load_evaluation_function(config)
         >>>
         >>> # Value network evaluation
         >>> config = ValueNetworkEvaluationConfig(weights_path="path.ckpt")
-        >>> evaluator = create_evaluator_from_config(config)
+        >>> evaluator = load_evaluation_function(config)
     """
     from synplan.mcts.evaluation import (
         RolloutEvaluationStrategy,
@@ -424,7 +424,7 @@ def create_evaluator_from_config(eval_config) -> "EvaluationStrategy":
 
     elif isinstance(eval_config, ValueNetworkEvaluationConfig):
         # Load value network from path in config
-        value_net = load_value_function(weights_path=eval_config.weights_path)
+        value_net = load_value_network(weights_path=eval_config.weights_path)
         return ValueNetworkEvaluationStrategy(
             value_network=value_net,
             normalize=eval_config.normalize,

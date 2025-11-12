@@ -16,7 +16,7 @@ from synplan.utils.loading import (
 )
 from synplan.mcts.tree import Tree
 from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
-from synplan.utils.loading import download_selected_files, create_evaluator_from_config
+from synplan.utils.loading import download_selected_files, load_evaluation_function
 
 # Test molecules with different complexity levels
 TEST_MOLECULES = {
@@ -102,7 +102,7 @@ def run_clustering_workflow(
         max_depth=tree_config.max_depth,
         normalize=tree_config.normalize_scores,
     )
-    evaluator = create_evaluator_from_config(eval_config)
+    evaluator = load_evaluation_function(eval_config)
 
     # Create and solve tree
     tree = Tree(

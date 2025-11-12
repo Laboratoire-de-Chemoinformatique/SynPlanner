@@ -6,7 +6,7 @@ from CGRtools.containers import MoleculeContainer
 
 from synplan.mcts.tree import Tree
 from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
-from synplan.utils.loading import create_evaluator_from_config
+from synplan.utils.loading import load_evaluation_function
 from synplan.mcts.algorithm import NestedMonteCarlo
 
 
@@ -88,7 +88,7 @@ def build_tree(
     evaluation_config = RolloutEvaluationConfig(
         policy_network=fake_policy, reaction_rules=reactors, building_blocks=set()
     )
-    evaluator = create_evaluator_from_config(evaluation_config)
+    evaluator = load_evaluation_function(evaluation_config)
     return Tree(
         target=target,
         config=cfg,

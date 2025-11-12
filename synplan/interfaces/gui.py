@@ -441,7 +441,7 @@ def setup_planning_options():
 
                     # Create evaluation config and strategy
                     from synplan.utils.config import RolloutEvaluationConfig
-                    from synplan.utils.loading import create_evaluator_from_config
+                    from synplan.utils.loading import load_evaluation_function
 
                     eval_config = RolloutEvaluationConfig(
                         policy_network=policy_function,
@@ -450,7 +450,7 @@ def setup_planning_options():
                         min_mol_size=tree_config.min_mol_size,
                         max_depth=tree_config.max_depth,
                     )
-                    evaluator = create_evaluator_from_config(eval_config)
+                    evaluator = load_evaluation_function(eval_config)
 
                     tree = Tree(
                         target=target_molecule,

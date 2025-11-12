@@ -1,16 +1,16 @@
 """Module containing functions for running value network tuning with reinforcement learning
 approach."""
 
-import os
-import random
 from collections import defaultdict
+import os
 from pathlib import Path
+import random
 from random import shuffle
 from typing import Dict, List
 
-import torch
 from CGRtools.containers import MoleculeContainer
 from pytorch_lightning import Trainer
+import torch
 from torch.utils.data import random_split
 from torch_geometric.data.lightning import LightningDataset
 
@@ -20,17 +20,19 @@ from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training.preprocessing import ValueNetworkDataset
 from synplan.utils.config import (
     PolicyNetworkConfig,
-    TuningConfig,
     TreeConfig,
+    TuningConfig,
     ValueNetworkConfig,
 )
+from synplan.utils.config import ValueNetworkEvaluationConfig
 from synplan.utils.files import MoleculeReader
 from synplan.utils.loading import (
     load_building_blocks,
+    load_policy_function,
     load_reaction_rules,
     load_value_net,
-    load_policy_function,
 )
+from synplan.utils.loading import load_evaluation_function
 from synplan.utils.logging import DisableLogger, HiddenPrints
 
 
@@ -112,8 +114,6 @@ def run_tree_search(
     """
 
     # policy and value function loading
-    from synplan.utils.config import ValueNetworkEvaluationConfig
-    from synplan.utils.loading import create_evaluator_from_config
 
     policy_function = load_policy_function(policy_config=policy_config)
     reaction_rules = load_reaction_rules(reaction_rules_path)
@@ -128,7 +128,7 @@ def run_tree_search(
         weights_path=value_config.weights_path,
         normalize=tree_config.normalize_scores,
     )
-    evaluator = create_evaluator_from_config(eval_config)
+    evaluator = load_evaluation_function(eval_config)
 
     # initialize tree
     tree_config.silent = True

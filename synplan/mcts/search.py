@@ -17,7 +17,7 @@ from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.tree import Tree, TreeConfig
 from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.loading import (
-    create_evaluator_from_config,
+    load_evaluation_function,
     load_building_blocks,
     load_policy_function,
     load_reaction_rules,
@@ -110,7 +110,7 @@ def run_search(
     building_blocks = load_building_blocks(building_blocks_path, standardize=False)
 
     # Create evaluation strategy from config
-    evaluation_function = create_evaluator_from_config(evaluation_config)
+    evaluation_function = load_evaluation_function(evaluation_config)
 
     # run search
     n_solved = 0

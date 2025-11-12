@@ -61,6 +61,18 @@ and rollout evaluation (no value network).
        c_ucb=0.1,
    )
 
+   # Create evaluation configuration
+   eval_config = RolloutEvaluationConfig(
+       policy_network=policy_network,
+       reaction_rules=reaction_rules,
+       building_blocks=building_blocks,
+       min_mol_size=tree_config.min_mol_size,
+       max_depth=tree_config.max_depth,
+   )
+
+   # Create evaluator from config
+   evaluation_function = load_evaluation_function(eval_config)
+
    # 5. Load target molecule
    # An example from the tutorial: capivasertib, an anti-cancer medication.
    example_smiles = "NC1(C(=O)N[C@@H](CCO)c2ccc(Cl)cc2)CCN(c2nc[nH]c3nccc2-3)CC1"
@@ -73,6 +85,7 @@ and rollout evaluation (no value network).
        reaction_rules=reaction_rules,
        building_blocks=building_blocks,
        expansion_function=policy_network,
+       evaluation_function=evaluation_function,
    )
 
    # 7. Run search
