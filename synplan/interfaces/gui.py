@@ -26,13 +26,11 @@ from synplan.utils.loading import (
 )
 from synplan.utils.visualisation import (
     generate_results_html,
-    get_route_svg,
     get_route_svg_from_json,
     html_top_routes_cluster,
     routes_clustering_report,
     routes_subclustering_report,
 )
-
 
 disable_progress_bars("huggingface_hub")
 
@@ -45,23 +43,7 @@ def download_button(
     object_to_download, download_filename, button_text, pickle_it=False
 ):
     """
-    Issued from
     Generates a link to download the given object_to_download.
-    Params:
-    ------
-    object_to_download:  The object to be downloaded.
-    download_filename (str): filename and extension of file. e.g. mydata.csv,
-    some_txt_output.txt download_link_text (str): Text to display for download
-    link.
-    button_text (str): Text to display on download button (e.g. 'click here to download file')
-    pickle_it (bool): If True, pickle file.
-    Returns:
-    -------
-    (str): the anchor tag to download object_to_download
-    Examples:
-    --------
-    download_link(your_df, 'YOUR_DF.csv', 'Click to download data!')
-    download_link(your_str, 'YOUR_STRING.txt', 'Click to download text!')
     """
     if pickle_it:
         try:
@@ -73,7 +55,6 @@ def download_button(
     else:
         if isinstance(object_to_download, bytes):
             pass
-
         elif isinstance(object_to_download, pd.DataFrame):
             object_to_download = object_to_download.to_csv(index=False).encode("utf-8")
 
@@ -83,7 +64,7 @@ def download_button(
         b64 = base64.b64encode(object_to_download).decode()
 
     button_uuid = str(uuid.uuid4()).replace("-", "")
-    button_id = re.sub("\d+", "", button_uuid)
+    button_id = re.sub(r"\d+", "", button_uuid)
 
     custom_css = f"""
         <style>
@@ -116,7 +97,7 @@ def download_button(
 
 
 @st.cache_resource
-def load_planning_resources_cached():  # Renamed to avoid conflict if main calls it directly
+def load_planning_resources_cached():
     building_blocks_path = hf_hub_download(
         repo_id="Laboratoire-De-Chemoinformatique/SynPlanner",
         filename="building_blocks_em_sa_ln.smi",
@@ -142,7 +123,6 @@ def load_planning_resources_cached():  # Renamed to avoid conflict if main calls
 
 
 def initialize_app():
-    """1. Initialization: Setting up the main window, layout, and initial widgets."""
     st.set_page_config(
         page_title="SynPlanner GUI",
         page_icon="🧪",
@@ -169,9 +149,7 @@ def initialize_app():
     if "res" not in st.session_state:
         st.session_state.res = None
     if "target_smiles" not in st.session_state:
-        st.session_state.target_smiles = (
-            ""  # Initial value, might be overwritten by ketcher
-        )
+        st.session_state.target_smiles = ""
 
     # Clustering state
     if "clustering_done" not in st.session_state:
@@ -180,7 +158,7 @@ def initialize_app():
         st.session_state.clusters = None
     if "reactions_dict" not in st.session_state:
         st.session_state.reactions_dict = None
-    if "num_clusters_setting" not in st.session_state:  # Store the setting used
+    if "num_clusters_setting" not in st.session_state:
         st.session_state.num_clusters_setting = 10
     if "route_cgrs_dict" not in st.session_state:
         st.session_state.route_cgrs_dict = None
@@ -192,14 +170,14 @@ def initialize_app():
     # Subclustering state
     if "subclustering_done" not in st.session_state:
         st.session_state.subclustering_done = False
-    if "subclusters" not in st.session_state:  # Renamed from 'sub' for clarity
+    if "subclusters" not in st.session_state:
         st.session_state.subclusters = None
 
-    # Download state (less critical now with direct download links)
-    if "clusters_downloaded" not in st.session_state:  # Example, might not be needed
+    # Download state
+    if "clusters_downloaded" not in st.session_state:
         st.session_state.clusters_downloaded = False
 
-    if "ketcher" not in st.session_state:  # For ketcher persistence
+    if "ketcher" not in st.session_state:
         st.session_state.ketcher = DEFAULT_MOL
 
     intro_text = """
@@ -214,8 +192,6 @@ def initialize_app():
 
 
 def setup_sidebar():
-    """2. Sidebar: Handling the widgets and logic within the sidebar area."""
-    # st.sidebar.image("img/logo.png") # Assuming img/logo.png is available
     st.sidebar.title("Docs")
     st.sidebar.markdown("https://synplanner.readthedocs.io/en/latest/")
 
@@ -237,7 +213,6 @@ def setup_sidebar():
 
 
 def handle_molecule_input():
-    """3. Molecule Input: Managing the input area for molecule data with two-way synchronization."""
     st.header("Molecule input")
     st.markdown(
         """
@@ -254,19 +229,16 @@ def handle_molecule_input():
         st.session_state.ketcher_render_count = 0
 
     def text_input_changed_callback():
-        new_text_value = (
-            st.session_state.smiles_text_input_key_for_sync
-        )  # Key of the text_input
+        new_text_value = st.session_state.smiles_text_input_key_for_sync
         if new_text_value != st.session_state.shared_smiles:
             st.session_state.shared_smiles = new_text_value
             st.session_state.ketcher = new_text_value
             st.session_state.ketcher_render_count += 1
 
-    # SMILES Text Input
     st.text_input(
         "SMILES:",
         value=st.session_state.shared_smiles,
-        key="smiles_text_input_key_for_sync",  # Unique key for this widget
+        key="smiles_text_input_key_for_sync",
         on_change=text_input_changed_callback,
         help="Enter SMILES string and press Enter. The drawing will update, and vice-versa.",
     )
@@ -295,7 +267,6 @@ def handle_molecule_input():
             "Please re-run planning for the current structure."
         )
 
-    # Ensure st.session_state.ketcher is consistent for other parts of the app
     if st.session_state.get("ketcher") != current_smiles_for_planning:
         st.session_state.ketcher = current_smiles_for_planning
 
@@ -303,7 +274,6 @@ def handle_molecule_input():
 
 
 def setup_planning_options():
-    """4. Planning: Encapsulating the logic related to the "planning" functionality."""
     st.header("Launch calculation")
     st.markdown(
         """If you modified the structure, please ensure you clicked on `Apply` (bottom right of the molecular editor)."""
@@ -337,7 +307,7 @@ def setup_planning_options():
             options=("uct", "puct", "value"),
             index=0,
             key="ucb_type_input",
-        )  # Fixed label
+        )
         c_ucb = st.number_input(
             "C coefficient of UCB",
             value=0.1,
@@ -397,12 +367,9 @@ def setup_planning_options():
         st.session_state.route_cgrs_dict = None
         st.session_state.sb_cgrs_dict = None
         st.session_state.route_json = None
-        active_smile_code = st.session_state.get(
-            "ketcher", DEFAULT_MOL
-        )  # Get current SMILES
-        st.session_state.target_smiles = (
-            active_smile_code  # Store the SMILES used for this run
-        )
+
+        active_smile_code = st.session_state.get("ketcher", DEFAULT_MOL)
+        st.session_state.target_smiles = active_smile_code
 
         try:
             target_molecule = mol_from_smiles(active_smile_code, clean_stereo=True)
@@ -428,20 +395,19 @@ def setup_planning_options():
                         )
                         status.update(label="Resources loaded!", state="complete")
 
+                    from synplan.utils.config import RolloutEvaluationConfig
+                    from synplan.utils.loading import load_evaluation_function
+
                     tree_config = TreeConfig(
                         search_strategy=planning_params["search_strategy"],
                         max_iterations=planning_params["max_iterations"],
                         max_depth=planning_params["max_depth"],
                         min_mol_size=planning_params["min_mol_size"],
-                        init_node_value=0.5,  # This was hardcoded
+                        init_node_value=0.5,
                         ucb_type=planning_params["ucb_type"],
                         c_ucb=planning_params["c_ucb"],
-                        silent=True,  # This was hardcoded
+                        silent=True,
                     )
-
-                    # Create evaluation config and strategy
-                    from synplan.utils.config import RolloutEvaluationConfig
-                    from synplan.utils.loading import load_evaluation_function
 
                     eval_config = RolloutEvaluationConfig(
                         policy_network=policy_function,
@@ -485,115 +451,72 @@ def setup_planning_options():
 
 
 def display_planning_results():
-    """5. Planning Results Display: Handling the presentation of results."""
-    if st.session_state.get("planning_done", False):
-        res = st.session_state.res
-        tree = st.session_state.tree
+    """
+    Planning results for the NOT-SOLVED case only.
+    For solved runs, we use the unified planning+clustering section.
+    """
+    if not st.session_state.get("planning_done", False):
+        return
 
-        if res is None or tree is None:
-            st.error(
-                "Planning results are missing from session state. Please re-run planning."
-            )
-            st.session_state.planning_done = False  # Reset state
-            return  # Exit this function if no results
+    res = st.session_state.res
+    tree = st.session_state.tree
 
-        if res.get("solved", False):  # Use .get for safety
-            st.header("Planning Results")
-            winning_nodes = (
-                sorted(set(tree.winning_nodes))
-                if hasattr(tree, "winning_nodes") and tree.winning_nodes
-                else []
-            )
-            st.subheader(f"Number of unique routes found: {len(winning_nodes)}")
+    if res is None or tree is None:
+        st.error(
+            "Planning results are missing from session state. Please re-run planning."
+        )
+        st.session_state.planning_done = False
+        return
 
-            st.subheader("Examples of found retrosynthetic routes")
-            image_counter = 0
-            visualised_route_ids = set()
+    if res.get("solved", False):
+        # Solved case handled in unified section.
+        return
 
-            if not winning_nodes:
-                st.warning(
-                    "Planning solved, but no winning nodes found in the tree object."
-                )
+    st.header("Planning results")
+    st.warning(
+        "No reaction path found for the target molecule with the current settings."
+    )
+    st.write(
+        "Consider adjusting planning options (e.g., increase iterations, adjust depth, check molecule validity)."
+    )
+    stat_col, _ = st.columns(2)
+    with stat_col:
+        st.subheader("Run statistics (no solution)")
+        try:
+            if "target_smiles" not in res and "target_smiles" in st.session_state:
+                res["target_smiles"] = st.session_state.target_smiles
+            cols_to_show = [
+                col
+                for col in [
+                    "target_smiles",
+                    "num_nodes",
+                    "num_iter",
+                    "search_time",
+                ]
+                if col in res
+            ]
+            if cols_to_show:
+                df = pd.DataFrame(res, index=[0])[cols_to_show]
+                st.dataframe(df)
             else:
-                for n, route_id in enumerate(winning_nodes):
-                    if image_counter >= 3:
-                        break
-                    if route_id not in visualised_route_ids:
-                        try:
-                            visualised_route_ids.add(route_id)
-                            num_steps = len(tree.synthesis_route(route_id))
-                            route_score = round(tree.route_score(route_id), 3)
-                            svg = get_route_svg(tree, route_id)
-                            # svg = get_route_svg_from_json(st.session_state.route_json, route_id)
-                            if svg:
-                                st.image(
-                                    svg,
-                                    caption=f"Route {route_id}; {num_steps} steps; Route score: {route_score}",
-                                )
-                                image_counter += 1
-                            else:
-                                st.warning(
-                                    f"Could not generate SVG for route {route_id}."
-                                )
-                        except Exception as e:
-                            st.error(f"Error displaying route {route_id}: {e}")
-        else:  # Not solved
-            st.header("Planning Results")
-            st.warning(
-                "No reaction path found for the target molecule with the current settings."
-            )
-            st.write(
-                "Consider adjusting planning options (e.g., increase iterations, adjust depth, check molecule validity)."
-            )
-            stat_col, _ = st.columns(2)
-            with stat_col:
-                st.subheader("Run Statistics (No Solution)")
-                try:
-                    if (
-                        "target_smiles" not in res
-                        and "target_smiles" in st.session_state
-                    ):
-                        res["target_smiles"] = st.session_state.target_smiles
-                    cols_to_show = [
-                        col
-                        for col in [
-                            "target_smiles",
-                            "num_nodes",
-                            "num_iter",
-                            "search_time",
-                        ]
-                        if col in res
-                    ]
-                    if cols_to_show:
-                        df = pd.DataFrame(res, index=[0])[cols_to_show]
-                        st.dataframe(df)
-                    else:
-                        st.write("No statistics to display for the unsuccessful run.")
-                except Exception as e:
-                    st.error(f"Error displaying statistics: {e}")
-                    st.write(res)
+                st.write("No statistics to display for the unsuccessful run.")
+        except Exception as e:
+            st.error(f"Error displaying statistics: {e}")
+            st.write(res)
 
 
 def download_planning_results():
-    """6. Planning Results Download: Providing functionality to download."""
+    """
+    Planning results download (full HTML report).
+    Only uses internal state; no headers here to keep UX unified.
+    """
     if (
         st.session_state.get("planning_done", False)
         and st.session_state.res
         and st.session_state.res.get("solved", False)
     ):
-        # res = st.session_state.res
-        # tree = st.session_state.tree
-        # This section is usually placed within a column in the original script
-        # We'll assume it's called after display_planning_results and can use a new column or area.
-        # For proper layout, this should be integrated with display_planning_results' columns.
-        # For now, creating a placeholder or separate section for downloads:
-        # st.subheader("Downloads") # This might be redundant if called within a layout context.
-
-        # The original code places downloads in the second column of planning results.
-        # To replicate, we'd need to pass the column object or call this within that context.
-        # Simulating this by just creating the download links:
         try:
-            if st.button("Generate Full HTML Report", key="gen_plan_html"):
+            if st.button("Generate full HTML report", key="gen_plan_html"):
                 with st.spinner("Generating HTML report..."):
                     st.session_state.planning_report_html = generate_results_html(
                         st.session_state.tree, html_path=None, extended=True
@@ -601,268 +524,137 @@ def download_planning_results():
 
             if st.session_state.get("planning_report_html"):
                 st.download_button(
-                    label="Download Full Report (HTML)",
+                    label="Download full planning report (HTML)",
                     data=st.session_state.planning_report_html,
                     file_name=f"full_report_{st.session_state.target_smiles}.html",
                     mime="text/html",
+                    key="download_full_planning_html",
                 )
-            # html_body = generate_results_html(tree, html_path=None, extended=True)
-            # dl_html = download_button(
-            #     html_body,
-            #     f"results_synplanner_{st.session_state.target_smiles}.html",
-            #     "Download results (HTML)",
-            # )
-            # if dl_html:
-            #     st.markdown(dl_html, unsafe_allow_html=True)
-
-            # try:
-            #     res_df = pd.DataFrame(res, index=[0])
-            #     dl_csv = download_button(
-            #         res_df,
-            #         f"stats_synplanner_{st.session_state.target_smiles}.csv",
-            #         "Download statistics (CSV)",
-            #     )
-            #     if dl_csv:
-            #         st.markdown(dl_csv, unsafe_allow_html=True)
-            # except Exception as e:
-            #     st.error(f"Could not prepare statistics CSV for download: {e}")
-
         except Exception as e:
             st.error(f"Error generating download links for planning results: {e}")
 
 
-def setup_clustering():
-    """7. Clustering: Encapsulating the logic related to the "clustering" functionality."""
-    if (
-        st.session_state.get("planning_done", False)
-        and st.session_state.res
-        and st.session_state.res.get("solved", False)
-    ):
-        st.divider()
-        st.header(
-            "Clustering the retrosynthetic routes",
-            help="The first number in the cluster index indicates the number of strategic bonds (SB) in the SB-CGR, while the second number represents the type of strategic bond pattern (SBP). For example, in cluster 2.1, “2” denotes two strategic bonds and “1” specifies the pattern type.",
-        )
+def filter_routes_for_clustering(
+    clusters: dict,
+    sb_cgrs_dict: dict,
+    route_cgrs_dict: dict,
+    skip_ids: set[int],
+):
+    """
+    Remove routes in skip_ids from:
+      - clusters (route_ids and group_size)
+      - SB-CGR dictionary
+      - RouteCGR dictionary
 
-        if st.button("Run Clustering", key="submit_clustering_button"):
-            # st.session_state.num_clusters_setting = num_clusters_input
-            st.session_state.clustering_done = False
-            st.session_state.subclustering_done = False
-            st.session_state.clusters = None
-            st.session_state.reactions_dict = None
-            st.session_state.subclusters = None
-            st.session_state.route_cgrs_dict = None
-            st.session_state.sb_cgrs_dict = None
-            st.session_state.route_json = None
+    Clusters that become empty are dropped.
+    """
+    if not skip_ids:
+        return clusters, sb_cgrs_dict, route_cgrs_dict
 
-            with st.spinner("Performing clustering..."):
-                try:
-                    current_tree = st.session_state.tree
-                    if not current_tree:
-                        st.error("Tree object not found. Please re-run planning.")
-                        return
+    # Filter SB-CGRs and RouteCGRs
+    sb_cgrs_filtered = {
+        rid: cgr for rid, cgr in sb_cgrs_dict.items() if rid not in skip_ids
+    }
+    route_cgrs_filtered = {
+        rid: cgr for rid, cgr in route_cgrs_dict.items() if rid not in skip_ids
+    }
 
-                    st.write("Calculating RoutesCGRs...")
-                    route_cgrs_dict = compose_all_route_cgrs(current_tree)
-                    st.write("Processing SB-CGRs...")
-                    sb_cgrs_dict = compose_all_sb_cgrs(route_cgrs_dict)
+    # Filter clusters and recompute group_size
+    filtered_clusters = {}
+    for cid, data in clusters.items():
+        route_ids = [rid for rid in data.get("route_ids", []) if rid not in skip_ids]
+        if not route_ids:
+            # whole cluster becomes empty -> drop it
+            continue
 
-                    results = cluster_routes(
-                        sb_cgrs_dict, use_strat=False
-                    )  # num_clusters was removed from args
-                    results = dict(sorted(results.items(), key=lambda x: float(x[0])))
+        new_data = dict(data)
+        new_data["route_ids"] = route_ids
+        new_data["group_size"] = len(route_ids)
+        filtered_clusters[cid] = new_data
 
-                    st.session_state.clusters = results
-                    st.session_state.route_cgrs_dict = route_cgrs_dict
-                    st.session_state.sb_cgrs_dict = sb_cgrs_dict
-                    st.write("Extracting reactions...")
-                    st.session_state.reactions_dict = extract_reactions(current_tree)
-                    st.session_state.route_json = make_json(
-                        st.session_state.reactions_dict
-                    )
-
-                    if (
-                        st.session_state.clusters is not None
-                        and st.session_state.reactions_dict is not None
-                    ):  # Check for None explicitly
-                        st.session_state.clustering_done = True
-                        st.success(
-                            f"Clustering complete. Found {len(st.session_state.clusters)} clusters."
-                        )
-                    else:
-                        st.error("Clustering failed or returned empty results.")
-                        st.session_state.clustering_done = False
-
-                    del results  # route_cgrs_dict, sb_cgrs_dict are stored
-                    gc.collect()
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"An error occurred during clustering: {e}")
-                    st.session_state.clustering_done = False
+    return filtered_clusters, sb_cgrs_filtered, route_cgrs_filtered
 
 
-def display_clustering_results():
-    """8. Clustering Results Display: Handling the presentation of results."""
-    if st.session_state.get("clustering_done", False):
-        clusters = st.session_state.clusters
-        # reactions_dict = st.session_state.reactions_dict # Needed for download, not directly for display here
-        tree = st.session_state.tree
-        MAX_DISPLAY_CLUSTERS_DATA = 10
+def run_clustering_core():
+    """Core clustering logic (no explicit UI button)."""
+    st.session_state.clustering_done = False
+    st.session_state.subclustering_done = False
+    st.session_state.clusters = None
+    st.session_state.reactions_dict = None
+    st.session_state.subclusters = None
+    st.session_state.route_cgrs_dict = None
+    st.session_state.sb_cgrs_dict = None
+    st.session_state.route_json = None
 
-        if (
-            clusters is None or tree is None
-        ):  # reactions_dict removed as not critical for display part
-            st.error(
-                "Clustering results (clusters or tree) are missing. Please re-run clustering."
-            )
-            st.session_state.clustering_done = False
-            return
+    with st.spinner("Performing clustering..."):
+        try:
+            current_tree = st.session_state.tree
+            if not current_tree:
+                st.error("Tree object not found. Please re-run planning.")
+                return
 
-        st.subheader(f"Best routes from {len(clusters)} Found Clusters")
-        clusters_items = list(clusters.items())
-        first_items = clusters_items[:MAX_DISPLAY_CLUSTERS_DATA]
-        remaining_items = clusters_items[MAX_DISPLAY_CLUSTERS_DATA:]
+            st.write("Calculating RouteCGRs...")
+            route_cgrs_dict = compose_all_route_cgrs(current_tree)
+            st.write("Processing SB-CGRs...")
+            sb_cgrs_dict = compose_all_sb_cgrs(route_cgrs_dict)
 
-        for cluster_num, group_data in first_items:
+            results = cluster_routes(sb_cgrs_dict, use_strat=False)
+            results = dict(sorted(results.items(), key=lambda x: float(x[0])))
+
+            st.session_state.clusters = results
+            st.session_state.route_cgrs_dict = route_cgrs_dict
+            st.session_state.sb_cgrs_dict = sb_cgrs_dict
+            st.write("Extracting reactions...")
+            st.session_state.reactions_dict = extract_reactions(current_tree)
+            st.session_state.route_json = make_json(st.session_state.reactions_dict)
+
             if (
-                not group_data
-                or "route_ids" not in group_data
-                or not group_data["route_ids"]
+                st.session_state.clusters is not None
+                and st.session_state.reactions_dict is not None
             ):
-                st.warning(f"Cluster {cluster_num} has no data or route_ids.")
-                continue
-            st.markdown(
-                f"**Cluster {cluster_num}** (Size: {group_data.get('group_size', 'N/A')})"
-            )
-            route_id = group_data["route_ids"][0]
-            try:
-                num_steps = len(tree.synthesis_route(route_id))
-                route_score = round(tree.route_score(route_id), 3)
-                # svg = get_route_svg(tree, route_id)
-                svg = get_route_svg_from_json(st.session_state.route_json, route_id)
-                sb_cgr = group_data.get("sb_cgr")  # Safely get sb_cgr
-                sb_cgr_svg = None
-                if sb_cgr:
-                    sb_cgr.clean2d()
-                    sb_cgr_svg = cgr_display(sb_cgr)
-
-                if svg and sb_cgr_svg:
-                    col1, col2 = st.columns([0.2, 0.8])
-                    with col1:
-                        st.image(sb_cgr_svg, caption="SB-CGR")
-                    with col2:
-                        st.image(
-                            svg,
-                            caption=f"Route {route_id}; {num_steps} steps; Route score: {route_score}",
-                        )
-                elif svg:  # Only route SVG available
-                    st.image(
-                        svg,
-                        caption=f"Route {route_id}; {num_steps} steps; Route score: {route_score}",
-                    )
-                    st.warning(
-                        f"SB-CGR could not be displayed for cluster {cluster_num}."
-                    )
-                else:
-                    st.warning(
-                        f"Could not generate SVG for route {route_id} or its SB-CGR."
-                    )
-            except Exception as e:
-                st.error(
-                    f"Error displaying route {route_id} for cluster {cluster_num}: {e}"
+                st.session_state.clustering_done = True
+                st.success(
+                    f"Clustering complete. Found {len(st.session_state.clusters)} clusters."
                 )
+            else:
+                st.error("Clustering failed or returned empty results.")
+                st.session_state.clustering_done = False
 
-        if remaining_items:
-            with st.expander(f"... and {len(remaining_items)} more clusters"):
-                for cluster_num, group_data in remaining_items:
-                    if (
-                        not group_data
-                        or "route_ids" not in group_data
-                        or not group_data["route_ids"]
-                    ):
-                        st.warning(
-                            f"Cluster {cluster_num} in expansion has no data or route_ids."
-                        )
-                        continue
-                    st.markdown(
-                        f"**Cluster {cluster_num}** (Size: {group_data.get('group_size', 'N/A')})"
-                    )
-                    route_id = group_data["route_ids"][0]
-                    try:
-                        num_steps = len(tree.synthesis_route(route_id))
-                        route_score = round(tree.route_score(route_id), 3)
-                        # svg = get_route_svg(tree, route_id)
-                        svg = get_route_svg_from_json(
-                            st.session_state.route_json, route_id
-                        )
-                        sb_cgr = group_data.get("sb_cgr")
-                        sb_cgr_svg = None
-                        if sb_cgr:
-                            sb_cgr.clean2d()
-                            sb_cgr_svg = cgr_display(sb_cgr)
-
-                        if svg and sb_cgr_svg:
-                            col1, col2 = st.columns([0.2, 0.8])
-                            with col1:
-                                st.image(sb_cgr_svg, caption="SB-CGR")
-                            with col2:
-                                st.image(
-                                    svg,
-                                    caption=f"Route {route_id}; {num_steps} steps; Route score: {route_score}",
-                                )
-                        elif svg:
-                            st.image(
-                                svg,
-                                caption=f"Route {route_id}; {num_steps} steps; Route score: {route_score}",
-                            )
-                            st.warning(
-                                f"SB-CGR could not be displayed for cluster {cluster_num}."
-                            )
-                        else:
-                            st.warning(
-                                f"Could not generate SVG for route {route_id} or its SB-CGR."
-                            )
-                    except Exception as e:
-                        st.error(
-                            f"Error displaying route {route_id} for cluster {cluster_num}: {e}"
-                        )
+            gc.collect()
+        except Exception as e:
+            st.error(f"An error occurred during clustering: {e}")
+            st.session_state.clustering_done = False
 
 
 def download_clustering_results():
-    """10. Clustering Results Download: Providing functionality to download."""
+    """Clustering results download: per-cluster reports + ZIP."""
     if st.session_state.get("clustering_done", False):
         tree_for_html = st.session_state.get("tree")
         clusters_for_html = st.session_state.get("clusters")
-        sb_cgrs_for_html = st.session_state.get(
-            "sb_cgrs_dict"
-        )  # This was used instead of reactions_dict in the original for report
+        sb_cgrs_for_html = st.session_state.get("sb_cgrs_dict")
 
         if not tree_for_html:
-            st.warning("MCTS Tree data not found. Cannot generate cluster reports.")
+            st.warning("MCTS tree data not found. Cannot generate cluster reports.")
             return
         if not clusters_for_html:
             st.warning("Cluster data not found. Cannot generate cluster reports.")
             return
-        # sb_cgrs_for_html is optional for routes_clustering_report if not essential
 
-        st.subheader("Cluster Reports")  # Changed subheader in original
-        st.write("Generate downloadable HTML reports for each cluster:")
+        st.caption("Generate downloadable HTML reports for each cluster.")
 
         MAX_DOWNLOAD_LINKS_DISPLAYED = 10
         num_clusters_total = len(clusters_for_html)
         clusters_items = list(clusters_for_html.items())
 
-        for i, (cluster_idx, group_data) in enumerate(
-            clusters_items
-        ):  # group_data might not be needed here if report uses cluster_idx
+        for i, (cluster_idx, group_data) in enumerate(clusters_items):
             if i >= MAX_DOWNLOAD_LINKS_DISPLAYED:
                 break
             try:
                 html_content = routes_clustering_report(
                     tree_for_html,
-                    clusters_for_html,  # Pass the whole dict
-                    str(cluster_idx),  # Pass the key of the cluster
-                    sb_cgrs_for_html,  # Pass the sb_cgrs dict
+                    clusters_for_html,
+                    str(cluster_idx),
+                    sb_cgrs_for_html,
                     aam=False,
                 )
                 st.download_button(
@@ -880,10 +672,7 @@ def download_clustering_results():
             remaining_count = len(remaining_items)
             expander_label = f"Show remaining {remaining_count} cluster reports"
             with st.expander(expander_label):
-                for (
-                    group_index,
-                    _,
-                ) in remaining_items:  # group_data not needed here either
+                for group_index, _ in remaining_items:
                     try:
                         html_content = routes_clustering_report(
                             tree_for_html,
@@ -904,12 +693,13 @@ def download_clustering_results():
                             f"Error generating report for cluster {group_index} (expanded): {e}"
                         )
 
+        # ZIP of all clusters
         try:
             buffer = io.BytesIO()
             with zipfile.ZipFile(
                 buffer, mode="w", compression=zipfile.ZIP_DEFLATED
             ) as zf:
-                for idx, _ in clusters_items:  # group_data not needed
+                for idx, _ in clusters_items:
                     html_content_zip = routes_clustering_report(
                         tree_for_html,
                         clusters_for_html,
@@ -922,7 +712,7 @@ def download_clustering_results():
             buffer.seek(0)
 
             st.download_button(
-                label="📦 Download all cluster reports as ZIP",
+                label="Download all cluster reports as ZIP",
                 data=buffer,
                 file_name=f"all_cluster_reports_{st.session_state.target_smiles}.zip",
                 mime="application/zip",
@@ -932,98 +722,221 @@ def download_clustering_results():
             st.error(f"Error generating ZIP file for cluster reports: {e}")
 
 
-def setup_subclustering():
-    """11. Subclustering: Encapsulating the logic related to the "subclustering" functionality."""
-    if st.session_state.get(
-        "clustering_done", False
-    ):  # Subclustering depends on clustering being done
-        st.divider()
-        st.header(
-            "Sub-Clustering within a selected Cluster",
-            help="The first two numbers define the cluster of interest (e.g., 2.1), while the final designation (such as 3_1) indicates that the selected subcluster contains three leaving groups in the Markush-like representation of the abstracted RouteCGR, with “1” specifying a particular set of leaving groups.",
+def display_planning_and_clustering_results_unified():
+    """
+    Overview tab: planning summary, cluster summary, and best routes from clusters.
+    """
+    res = st.session_state.res
+    tree = st.session_state.tree
+    clusters = st.session_state.clusters
+    route_json = st.session_state.route_json
+
+    if not (res and tree and clusters and route_json):
+        st.error(
+            "Missing data for unified planning+clustering display. Please re-run planning."
+        )
+        return
+
+    # --- Compact planning + cluster summaries instead of big tables ---
+    stat_col, cluster_stat_col = st.columns(2, gap="medium")
+
+    with stat_col:
+        st.subheader("Planning summary")
+        smi = st.session_state.get("target_smiles", "")
+        num_routes = res.get("num_routes", "—")
+        num_nodes = res.get("num_nodes", "—")
+        num_iter = res.get("num_iter", "—")
+        search_time = res.get("search_time", "—")
+
+        st.markdown(
+            f"""
+- **Target SMILES**: `{smi}`
+- **Routes explored**: **{num_routes}**
+- **Tree nodes**: {num_nodes}
+- **MCTS iterations**: {num_iter}
+- **Search time**: {search_time} s
+"""
         )
 
-        if st.button("Run Subclustering Analysis", key="submit_subclustering_button"):
-            st.session_state.subclustering_done = False
-            st.session_state.subclusters = None
-            with st.spinner("Performing subclustering analysis..."):
+    with cluster_stat_col:
+        st.subheader("Cluster summary")
+        clusters_dict = clusters or {}
+        non_empty_clusters = [v for v in clusters_dict.values() if v]
+        n_clusters = len(non_empty_clusters)
+        route_counts = [v.get("group_size", 0) for v in non_empty_clusters]
+        if route_counts:
+            min_routes = min(route_counts)
+            max_routes = max(route_counts)
+            avg_routes = sum(route_counts) / len(route_counts)
+        else:
+            min_routes = max_routes = avg_routes = 0
+
+        st.markdown(
+            f"""
+- **Number of clusters**: **{n_clusters}**
+- **Routes per cluster**: min {min_routes}, max {max_routes}, avg {avg_routes:.1f}
+"""
+        )
+
+        if clusters_dict:
+            best_route_html = html_top_routes_cluster(
+                clusters_dict,
+                st.session_state.tree,
+                st.session_state.target_smiles,
+            )
+            st.download_button(
+                label="Download best route from each cluster (HTML)",
+                data=best_route_html,
+                file_name=f"cluster_best_{st.session_state.target_smiles}.html",
+                mime="text/html",
+                key="download_cluster_best_unified",
+            )
+
+    st.markdown("---")
+    st.subheader(f"Best routes from {len(clusters)} found clusters")
+
+    # --- Best routes from clusters (always shown, not hidden in expanders) ---
+    MAX_DISPLAY_CLUSTERS_DATA = 10
+    clusters_items = list(clusters.items())
+    first_items = clusters_items[:MAX_DISPLAY_CLUSTERS_DATA]
+    remaining_items = clusters_items[MAX_DISPLAY_CLUSTERS_DATA:]
+
+    for cluster_num, group_data in first_items:
+        if (
+            not group_data
+            or "route_ids" not in group_data
+            or not group_data["route_ids"]
+        ):
+            st.warning(f"Cluster {cluster_num} has no data or route_ids.")
+            continue
+
+        st.markdown(
+            f"**Cluster {cluster_num}** (size: {group_data.get('group_size', 'N/A')})"
+        )
+        route_id = group_data["route_ids"][0]
+        try:
+            num_steps = len(tree.synthesis_route(route_id))
+            route_score = round(tree.route_score(route_id), 3)
+            svg = get_route_svg_from_json(route_json, route_id)
+
+            sb_cgr = group_data.get("sb_cgr")
+            sb_cgr_svg = None
+            if sb_cgr:
+                sb_cgr.clean2d()
+                sb_cgr_svg = cgr_display(sb_cgr)
+
+            if svg and sb_cgr_svg:
+                col1, col2 = st.columns([0.2, 0.8])
+                with col1:
+                    st.image(sb_cgr_svg, caption="SB-CGR")
+                with col2:
+                    st.image(
+                        svg,
+                        caption=f"Route {route_id}; {num_steps} steps; route score: {route_score}",
+                    )
+            elif svg:
+                st.image(
+                    svg,
+                    caption=f"Route {route_id}; {num_steps} steps; route score: {route_score}",
+                )
+                st.warning(f"SB-CGR could not be displayed for cluster {cluster_num}.")
+            else:
+                st.warning(
+                    f"Could not generate SVG for route {route_id} or its SB-CGR."
+                )
+        except Exception as e:
+            st.error(
+                f"Error displaying route {route_id} for cluster {cluster_num}: {e}"
+            )
+
+    if remaining_items:
+        with st.expander(f"... and {len(remaining_items)} more clusters"):
+            for cluster_num, group_data in remaining_items:
+                if (
+                    not group_data
+                    or "route_ids" not in group_data
+                    or not group_data["route_ids"]
+                ):
+                    st.warning(
+                        f"Cluster {cluster_num} in expansion has no data or route_ids."
+                    )
+                    continue
+                st.markdown(
+                    f"**Cluster {cluster_num}** (size: {group_data.get('group_size', 'N/A')})"
+                )
+                route_id = group_data["route_ids"][0]
                 try:
-                    clusters_for_sub = st.session_state.get("clusters")
-                    sb_cgrs_dict_for_sub = st.session_state.get("sb_cgrs_dict")
-                    route_cgrs_dict_for_sub = st.session_state.get("route_cgrs_dict")
+                    num_steps = len(tree.synthesis_route(route_id))
+                    route_score = round(tree.route_score(route_id), 3)
+                    svg = get_route_svg_from_json(route_json, route_id)
 
-                    if (
-                        clusters_for_sub
-                        and sb_cgrs_dict_for_sub
-                        and route_cgrs_dict_for_sub
-                    ):  # Ensure all are present
-                        all_subgroups = subcluster_all_clusters(
-                            clusters_for_sub,
-                            sb_cgrs_dict_for_sub,
-                            route_cgrs_dict_for_sub,
+                    sb_cgr = group_data.get("sb_cgr")
+                    sb_cgr_svg = None
+                    if sb_cgr:
+                        sb_cgr.clean2d()
+                        sb_cgr_svg = cgr_display(sb_cgr)
+
+                    if svg and sb_cgr_svg:
+                        col1, col2 = st.columns([0.2, 0.8])
+                        with col1:
+                            st.image(sb_cgr_svg, caption="SB-CGR")
+                        with col2:
+                            st.image(
+                                svg,
+                                caption=f"Route {route_id}; {num_steps} steps; route score: {route_score}",
+                            )
+                    elif svg:
+                        st.image(
+                            svg,
+                            caption=f"Route {route_id}; {num_steps} steps; route score: {route_score}",
                         )
-                        st.session_state.subclusters = all_subgroups
-                        st.session_state.subclustering_done = True
-                        st.success("Subclustering analysis complete.")
-                        gc.collect()
-                        st.rerun()
+                        st.warning(
+                            f"SB-CGR could not be displayed for cluster {cluster_num}."
+                        )
                     else:
-                        missing = []
-                        if not clusters_for_sub:
-                            missing.append("clusters")
-                        if not sb_cgrs_dict_for_sub:
-                            missing.append("SB-CGRs dictionary")
-                        if not route_cgrs_dict_for_sub:
-                            missing.append("RouteCGRs dictionary")
-                        st.error(
-                            f"Cannot run subclustering. Missing data: {', '.join(missing)}. Please ensure clustering ran successfully."
+                        st.warning(
+                            f"Could not generate SVG for route {route_id} or its SB-CGR."
                         )
-                        st.session_state.subclustering_done = False
-
                 except Exception as e:
-                    st.error(f"An error occurred during subclustering: {e}")
-                    st.session_state.subclustering_done = False
+                    st.error(
+                        f"Error displaying route {route_id} for cluster {cluster_num}: {e}"
+                    )
+
+
+# --- Subclustering-related cached helpers ---
 
 
 @st.cache_data
 def generate_sb_cgr_image(_cgr):
-    """Caches the generation of the SB-CGR image."""
     _cgr.clean2d()
     return _cgr.depict()
 
 
 @st.cache_data
 def generate_synthon_reaction_image(_synthon_reaction):
-    """Caches the generation of the Markush-like pseudo reaction image."""
     _synthon_reaction.clean2d()
-    # Assuming depict_custom_reaction returns an image-like object
     return depict_custom_reaction(_synthon_reaction)
 
 
 @st.cache_data
 def get_cached_route_svg(_route_json, route_id):
-    """Caches the SVG generation for a single route.
-    Using _route_json to associate the cache with the specific route data.
-    """
     return get_route_svg_from_json(_route_json, route_id)
 
 
 @st.cache_data
 def get_route_details(_tree, route_id):
-    """Caches the calculation of route score and length."""
     score = round(_tree.route_score(route_id), 3)
     length = len(_tree.synthesis_route(route_id))
     return {"score": score, "length": length}
 
 
 def display_single_route(route_id, route_json, details):
-    """Displays a single route's image and caption."""
     try:
         svg_sub = get_cached_route_svg(route_json, route_id)
         if svg_sub:
             st.image(
                 svg_sub,
-                caption=f"Route {route_id}; Score: {details['score']}; Steps: {details['length']}",
+                caption=f"Route {route_id}; score: {details['score']}; steps: {details['length']}",
             )
         else:
             st.warning(f"Could not generate SVG for route {route_id}.")
@@ -1031,9 +944,133 @@ def display_single_route(route_id, route_json, details):
         st.error(f"Error displaying route {route_id}: {e}")
 
 
+# --- Subclustering: core + UI + downloads ---
+
+
+def run_subclustering_core():
+    """
+    Core subclustering logic, with automatic skipping of problematic routes.
+
+    Strategy:
+    - Try subcluster_all_clusters.
+    - If it fails and the error message contains 'route <id>',
+      remove that route from all clustering dictionaries and retry.
+    - Repeat a few times; if still failing, give up with an error.
+    """
+    st.session_state.subclustering_done = False
+    st.session_state.subclusters = None
+
+    clusters = st.session_state.get("clusters")
+    sb_cgrs_dict = st.session_state.get("sb_cgrs_dict")
+    route_cgrs_dict = st.session_state.get("route_cgrs_dict")
+
+    if not (clusters and sb_cgrs_dict and route_cgrs_dict):
+        st.error(
+            "Cannot run subclustering. Missing clusters / SB-CGRs / RouteCGRs. "
+            "Please ensure clustering ran successfully."
+        )
+        return
+
+    skipped_routes = set()
+
+    # Arbitrary cap to avoid infinite loops if something else is wrong
+    MAX_ATTEMPTS = 5
+
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        with st.spinner(f"Performing subclustering analysis (attempt {attempt})..."):
+            try:
+                all_subgroups = subcluster_all_clusters(
+                    clusters,
+                    sb_cgrs_dict,
+                    route_cgrs_dict,
+                )
+
+                # Success
+                st.session_state.clusters = clusters
+                st.session_state.sb_cgrs_dict = sb_cgrs_dict
+                st.session_state.route_cgrs_dict = route_cgrs_dict
+                st.session_state.subclusters = all_subgroups
+                st.session_state.subclustering_done = True
+
+                if skipped_routes:
+                    st.info(
+                        "Subclustering finished after automatically skipping "
+                        f"{len(skipped_routes)} problematic route(s): "
+                        + ", ".join(str(r) for r in sorted(skipped_routes))
+                    )
+
+                gc.collect()
+                return
+
+            except Exception as e:
+                msg = str(e)
+                # Look for "... route 1267" in the error text
+                m = re.search(r"route\s+(\d+)", msg)
+                if not m:
+                    # No route id -> we cannot automatically fix this
+                    st.error(f"An error occurred during subclustering: {e}")
+                    st.session_state.subclustering_done = False
+                    return
+
+                bad_id = int(m.group(1))
+                if bad_id in skipped_routes:
+                    # We already skipped this one but it still fails -> abort
+                    st.error(
+                        "Subclustering still failing even after skipping route "
+                        f"{bad_id}. Last error: {e}"
+                    )
+                    st.session_state.subclustering_done = False
+                    return
+
+                skipped_routes.add(bad_id)
+                st.warning(
+                    f"Subclustering failed for route {bad_id}; "
+                    "it will be ignored in clusters, Overview and subclustering."
+                )
+
+                # Filter this route out and retry
+                clusters, sb_cgrs_dict, route_cgrs_dict = filter_routes_for_clustering(
+                    clusters,
+                    sb_cgrs_dict,
+                    route_cgrs_dict,
+                    {bad_id},
+                )
+
+    st.error(
+        "Subclustering failed after multiple attempts even after skipping "
+        "problematic routes."
+    )
+    st.session_state.subclustering_done = False
+
+
+def setup_subclustering():
+    """Subclustering tab header + optional re-run button."""
+    if not st.session_state.get("clustering_done", False):
+        return
+
+    st.header("Subclustering within a selected cluster")
+
+    with st.expander("What is subclustering?"):
+        st.markdown(
+            "The first two numbers define the cluster of interest (e.g., 2.1), "
+            "while the final designation (such as 3_1) indicates that the selected "
+            "subcluster contains three leaving groups in the Markush-like representation "
+            "of the abstracted RouteCGR, with “1” specifying a particular set of leaving groups."
+        )
+
+    st.caption(
+        "Subclustering is pre-computed after clustering so you can switch tabs without extra waiting."
+    )
+
+    if st.button("Re-run subclustering analysis", key="rerun_subclustering_button"):
+        run_subclustering_core()
+        st.rerun()
+
+
 def display_subclustering_results():
-    """12. Subclustering Results Display: Optimized for performance."""
+    """Subclustering results display."""
     if not st.session_state.get("subclustering_done", False):
+        st.info("Subclustering is not available. Please check clustering results.")
         return
 
     sub = st.session_state.get("subclusters")
@@ -1047,16 +1084,15 @@ def display_subclustering_results():
 
     sub_input_col, sub_display_col = st.columns([0.15, 0.85])
 
-    # --- Input Column (Left Side) ---
     with sub_input_col:
-        st.subheader("Select Cluster")
+        st.subheader("Select cluster")
         available_cluster_nums = sorted(list(sub.keys()))
         if not available_cluster_nums:
             st.warning("No clusters available in subclustering results.")
             return
 
         sel_cluster_num = st.selectbox(
-            "Select Cluster #:",
+            "Cluster #",
             options=available_cluster_nums,
             key="subcluster_num_select_key",
         )
@@ -1065,11 +1101,11 @@ def display_subclustering_results():
         allowed_subclusters = sorted(list(sub_step_cluster.keys()))
 
         if not allowed_subclusters:
-            st.warning(f"No subclusters found for Cluster {sel_cluster_num}.")
+            st.warning(f"No subclusters found for cluster {sel_cluster_num}.")
             return
 
         sel_subcluster_idx = st.selectbox(
-            "Select Subcluster Index:",
+            "Subcluster index",
             options=allowed_subclusters,
             key="subcluster_index_select_key",
         )
@@ -1080,20 +1116,12 @@ def display_subclustering_results():
             st.warning("Selected subcluster not found.")
             return
 
-        # Display cached SB-CGR image
         if "sb_cgr" in current_subcluster_data:
             st.image(
                 generate_sb_cgr_image(current_subcluster_data["sb_cgr"]),
-                caption=f"SB-CGR of parent Cluster {sel_cluster_num}",
+                caption=f"SB-CGR of parent cluster {sel_cluster_num}",
             )
-            # sb_cgr = current_subcluster_data["sb_cgr"]
-            # sb_cgr.clean2d()
-            # st.image(
-            #         sb_cgr.depict(),
-            #         caption=f"SB-CGR of parent Cluster {sel_cluster_num}",
-            #     )
 
-        # Efficiently get route details (length) for the slider
         all_routes_in_subcluster = current_subcluster_data.get("routes_data", {}).keys()
         route_details_list = [
             get_route_details(tree, rid) for rid in all_routes_in_subcluster
@@ -1116,14 +1144,12 @@ def display_subclustering_results():
             st.write(f"Routes with only one possible number of steps: **{min_steps}**")
             min_max_step = (min_steps, max_steps)
 
-    # --- Display Column (Right Side) ---
     with sub_display_col:
-
         st.subheader(
-            f"Details for Subcluster {sel_cluster_num}.{sel_subcluster_idx}: Total {len(all_routes_in_subcluster)} routes"
+            f"Details for subcluster {sel_cluster_num}.{sel_subcluster_idx}: "
+            f"total {len(all_routes_in_subcluster)} routes"
         )
 
-        # Filter routes based on the slider value (using pre-calculated lengths)
         filtered_routes = [
             (rid, details)
             for rid, details in zip(all_routes_in_subcluster, route_details_list)
@@ -1135,10 +1161,10 @@ def display_subclustering_results():
             return
 
         st.markdown(
-            f"--- \n**Displaying {len(filtered_routes)} routes (from {min_max_step[0]} to {min_max_step[1]} reaction steps)**"
+            f"--- \n**Displaying {len(filtered_routes)} routes "
+            f"(from {min_max_step[0]} to {min_max_step[1]} reaction steps)**"
         )
 
-        # Display cached synthon reaction image
         if "synthon_reaction" in current_subcluster_data:
             try:
                 st.image(
@@ -1165,7 +1191,7 @@ def display_subclustering_results():
 
 
 def download_subclustering_results():
-    """13. Subclustering Results Download: Providing functionality to download."""
+    """Subclustering results download for the currently selected subcluster."""
     if (
         st.session_state.get("subclustering_done", False)
         and "subcluster_num_select_key" in st.session_state
@@ -1174,9 +1200,7 @@ def download_subclustering_results():
 
         sub = st.session_state.get("subclusters")
         tree = st.session_state.get("tree")
-        sb_cgrs_for_report = st.session_state.get(
-            "sb_cgrs_dict"
-        )  # Used by routes_subclustering_report
+        sb_cgrs_for_report = st.session_state.get("sb_cgrs_dict")
 
         user_input_cluster_num_display = st.session_state.subcluster_num_select_key
         selected_subcluster_idx = st.session_state.subcluster_index_select_key
@@ -1195,7 +1219,6 @@ def download_subclustering_results():
             subcluster_data_for_report = sub[user_input_cluster_num_display][
                 selected_subcluster_idx
             ]
-            # Apply the same post-processing as in display
             processed_subcluster_data = post_process_subgroup(
                 subcluster_data_for_report
             )
@@ -1211,32 +1234,58 @@ def download_subclustering_results():
             try:
                 subcluster_html_content = routes_subclustering_report(
                     tree,
-                    processed_subcluster_data,  # Pass the specific post-processed subcluster data
+                    processed_subcluster_data,
                     user_input_cluster_num_display,
                     selected_subcluster_idx,
-                    sb_cgrs_for_report,  # Pass the whole sb_cgrs dict
-                    if_lg_group=True,  # This parameter was in the original call
+                    sb_cgrs_for_report,
+                    if_lg_group=True,
                 )
                 st.download_button(
-                    label=f"Download report for subcluster {user_input_cluster_num_display}.{selected_subcluster_idx}",
+                    label=(
+                        f"Download report for subcluster "
+                        f"{user_input_cluster_num_display}.{selected_subcluster_idx}"
+                    ),
                     data=subcluster_html_content,
-                    file_name=f"subcluster_{user_input_cluster_num_display}.{selected_subcluster_idx}_{st.session_state.target_smiles}.html",
+                    file_name=(
+                        f"subcluster_{user_input_cluster_num_display}."
+                        f"{selected_subcluster_idx}_{st.session_state.target_smiles}.html"
+                    ),
                     mime="text/html",
-                    key=f"download_subcluster_{user_input_cluster_num_display}_{selected_subcluster_idx}",
+                    key=(
+                        f"download_subcluster_{user_input_cluster_num_display}_"
+                        f"{selected_subcluster_idx}"
+                    ),
                 )
             except Exception as e:
                 st.error(
-                    f"Error generating download report for subcluster {user_input_cluster_num_display}.{selected_subcluster_idx}: {e}"
+                    f"Error generating download report for subcluster "
+                    f"{user_input_cluster_num_display}.{selected_subcluster_idx}: {e}"
                 )
-        # else:
-        # This case is handled by the display logic mostly, download button just won't appear or will be for previous valid selection.
+
+
+def display_downloads_tab():
+    """All download actions grouped in one place."""
+    st.subheader("Planning reports")
+    download_planning_results()
+
+    st.markdown("---")
+    st.subheader("Cluster reports")
+    download_clustering_results()
+
+    st.markdown("---")
+    st.subheader("Subclustering reports")
+    st.caption(
+        "Select a cluster and subcluster in the Subclustering tab first, "
+        "then return here to export the corresponding report."
+    )
+    download_subclustering_results()
 
 
 def implement_restart():
-    """14. Restart: Implementing the logic to reset or restart the application state."""
+    """Restart: reset application state."""
     st.divider()
-    st.header("Restart Application State")
-    if st.button("Clear All Results & Restart", key="restart_button"):
+    st.header("Restart application state")
+    if st.button("Clear all results & restart", key="restart_button"):
         keys_to_clear = [
             "planning_done",
             "tree",
@@ -1250,138 +1299,105 @@ def implement_restart():
             "sb_cgrs_dict",
             "route_json",
             "subclustering_done",
-            "subclusters",  # "sub" was renamed
+            "subclusters",
             "clusters_downloaded",
-            # Potentially ketcher related keys if they need manual reset beyond new input
             "ketcher_widget",
-            "smiles_text_input_key",  # Keys for widgets
+            "smiles_text_input_key",
             "subcluster_num_select_key",
             "subcluster_index_select_key",
+            "planning_report_html",
         ]
         for key in keys_to_clear:
             if key in st.session_state:
                 del st.session_state[key]
 
-        # Reset ketcher input to default by resetting its session state variable
         st.session_state.ketcher = DEFAULT_MOL
-        # Also explicitly set target_smiles to empty or default to avoid stale data
         st.session_state.target_smiles = ""
-
-        # It's generally better to let Streamlit manage widget state if possible,
-        # but for a full reset, clearing their explicit session state keys might be needed.
         st.rerun()
 
 
-# --- Main Application Flow ---
+# --- Main Application Flow with tabs ---
+
+
 def main():
     initialize_app()
     setup_sidebar()
+
+    # --- Top section: Input & Planning ---
     current_smile_code = handle_molecule_input()
-    # Update session_state.ketcher if current_smile_code has changed from ketcher output
     if st.session_state.get("ketcher") != current_smile_code:
         st.session_state.ketcher = current_smile_code
-        # No rerun here, let the flow continue. handle_molecule_input already warns.
 
-    setup_planning_options()  # This function now also handles the button press and logic for planning
+    setup_planning_options()
 
-    # Display planning results and download options together
-    if st.session_state.get("planning_done", False):
-        display_planning_results()  # Displays stats and routes
-        if st.session_state.res and st.session_state.res.get("solved", False):
-            stat_col, download_col = st.columns(
-                2, gap="medium"
-            )  # Placeholder for download column
-            with stat_col:
-                st.subheader("Statistics")
-                try:
-                    res = st.session_state.res
-                    if (
-                        "target_smiles" not in res
-                        and "target_smiles" in st.session_state
-                    ):
-                        res["target_smiles"] = st.session_state.target_smiles
-                    cols_to_show = [
-                        col
-                        for col in [
-                            "target_smiles",
-                            "num_routes",
-                            "num_nodes",
-                            "num_iter",
-                            "search_time",
-                        ]
-                        if col in res
-                    ]
-                    if cols_to_show:  # Ensure there are columns to show
-                        df = pd.DataFrame(res, index=[0])[cols_to_show]
-                        st.dataframe(df)
-                    else:
-                        st.write("No statistics to display from planning results.")
-                except Exception as e:
-                    st.error(f"Error displaying statistics: {e}")
-                    st.write(res)  # Show raw dict if DataFrame fails
-            with download_col:
-                st.subheader("Planning Downloads")  # Adding a subheader for clarity
-                download_planning_results()
+    # If nothing has been run yet, stop here
+    if not st.session_state.get("planning_done", False):
+        implement_restart()
+        return
 
-    # Clustering section (setup button, display, download)
-    if (
-        st.session_state.get("planning_done", False)
-        and st.session_state.res
-        and st.session_state.res.get("solved", False)
-    ):
-        setup_clustering()  # Contains the "Run Clustering" button and logic
-        if st.session_state.get("clustering_done", False):
-            display_clustering_results()  # Displays cluster routes and stats
-            cluster_stat_col, cluster_download_col = st.columns(2, gap="medium")
+    res = st.session_state.res
 
-            with cluster_stat_col:
-                clusters = st.session_state.clusters
-                cluster_sizes = [
-                    cluster.get("group_size", 0)
-                    for cluster in clusters.values()
-                    if cluster
-                ]  # Safe get
-                st.subheader("Cluster Statistics")
-                if cluster_sizes:
-                    cluster_df = pd.DataFrame(
-                        {
-                            "Cluster": [
-                                k for k, v in clusters.items() if v
-                            ],  # Filter out empty clusters
-                            "Number of Routes": [
-                                v["group_size"] for v in clusters.values() if v
-                            ],
-                        }
-                    )
-                    if not cluster_df.empty:
-                        cluster_df.index += 1
-                        st.dataframe(cluster_df)
-                        best_route_html = html_top_routes_cluster(
-                            clusters,
-                            st.session_state.tree,
-                            st.session_state.target_smiles,
-                        )
-                        st.download_button(
-                            label="Download best route from each cluster",
-                            data=best_route_html,
-                            file_name=f"cluster_best_{st.session_state.target_smiles}.html",
-                            mime="text/html",
-                            key="download_cluster_best",
-                        )
-                    else:
-                        st.write("No valid cluster data to display statistics for.")
-                    # download_top_routes_cluster()
-                else:
-                    st.write("No cluster data to display statistics for.")
-            with cluster_download_col:
-                download_clustering_results()
+    # Not solved: show simple planning section, no tabs needed
+    if not (res and res.get("solved", False)):
+        st.markdown("---")
+        st.header("Results")
+        display_planning_results()
+        implement_restart()
+        return
 
-    # Subclustering section (setup button, display, download)
-    if st.session_state.get("clustering_done", False):  # Depends on clustering
-        setup_subclustering()  # Contains "Run Subclustering" button
+    # Solved: run clustering (once)
+    if not st.session_state.get("clustering_done", False):
+        run_clustering_core()
+
+    if not st.session_state.get("clustering_done", False):
+        # Planning solved but clustering failed
+        st.markdown("---")
+        st.header("Results")
+        st.success("Planning succeeded.")
+        st.error(
+            "Clustering did not complete successfully. Please check logs or adjust settings."
+        )
+        st.subheader("Planning downloads")
+        download_planning_results()
+        implement_restart()
+        return
+
+    # Clustering done; pre-compute subclustering so navigation is instant
+    if not st.session_state.get("subclustering_done", False):
+        run_subclustering_core()
+
+    # From this point we have: planning_done, solved, clustering_done (+ usually subclustering_done)
+    # Clear separation between planning controls and results
+    st.markdown("---")
+    st.header("Results")
+
+    # Small status row
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Solution found", "Yes")
+    with col2:
+        st.metric("Routes", st.session_state.res.get("num_routes", "—"))
+    with col3:
+        st.metric("Clusters", len(st.session_state.clusters))
+
+    # Results tabs
+    tab_overview, tab_subclustering, tab_downloads = st.tabs(
+        ["Overview", "Subclustering", "Downloads"]
+    )
+
+    with tab_overview:
+        display_planning_and_clustering_results_unified()
+
+    with tab_subclustering:
+        setup_subclustering()
         if st.session_state.get("subclustering_done", False):
-            display_subclustering_results()  # Displays subcluster details and routes
-            download_subclustering_results()  # This needs to be called after selections are made in display.
+            st.caption(
+                "Select a cluster and subcluster, and optionally filter routes by number of steps."
+            )
+            display_subclustering_results()
+
+    with tab_downloads:
+        display_downloads_tab()
 
     implement_restart()
 
