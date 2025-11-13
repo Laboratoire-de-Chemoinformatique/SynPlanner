@@ -443,8 +443,6 @@ def setup_planning_options():
                     st.session_state["tree"] = tree
                     st.session_state["res"] = res
                     st.session_state.planning_done = True
-                    st.rerun()
-
         except Exception as e:
             st.error(f"An error occurred during planning: {e}")
             st.session_state.planning_done = False
