@@ -1,10 +1,41 @@
 """Module containing commands line scripts for training and planning steps."""
 
 import os
-import warnings
 from pathlib import Path
+import warnings
 
 import click
+import yaml
+
+from synplan.chem.data.filtering import ReactionFilterConfig, filter_reactions_from_file
+from synplan.chem.data.standardizing import (
+    ReactionStandardizationConfig,
+    standardize_reactions_from_file,
+)
+from synplan.chem.reaction_routes.clustering import run_cluster_cli
+from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions
+from synplan.chem.utils import standardize_building_blocks
+from synplan.mcts.search import run_search
+from synplan.ml.training.reinforcement import run_updating
+from synplan.ml.training.supervised import create_policy_dataset, run_policy_training
+from synplan.utils.config import (
+    PolicyEvaluationConfig,
+    PolicyNetworkConfig,
+    RDKitEvaluationConfig,
+    RandomEvaluationConfig,
+    RolloutEvaluationConfig,
+    RuleExtractionConfig,
+    TreeConfig,
+    TuningConfig,
+    ValueNetworkConfig,
+    ValueNetworkEvaluationConfig,
+)
+from synplan.utils.loading import (
+    download_all_data,
+    load_building_blocks,
+    load_policy_function,
+    load_reaction_rules,
+)
 
 try:
     from importlib.metadata import PackageNotFoundError, version as _dist_version
@@ -28,32 +59,6 @@ def _resolve_cli_version() -> str:
     except Exception:
         return "0.0.0+unknown"
 
-
-import yaml
-
-from synplan.chem.data.filtering import ReactionFilterConfig, filter_reactions_from_file
-from synplan.chem.data.standardizing import (
-    ReactionStandardizationConfig,
-    standardize_reactions_from_file,
-)
-from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions
-from synplan.chem.reaction_routes.clustering import run_cluster_cli
-from synplan.chem.utils import standardize_building_blocks
-from synplan.mcts.search import run_search
-from synplan.ml.training.supervised import create_policy_dataset, run_policy_training
-from synplan.ml.training.reinforcement import run_updating
-from synplan.utils.config import (
-    PolicyNetworkConfig,
-    RuleExtractionConfig,
-    TreeConfig,
-    TuningConfig,
-    ValueNetworkConfig,
-)
-from synplan.utils.loading import download_all_data
-from synplan.utils.visualisation import (
-    routes_clustering_report,
-    routes_subclustering_report,
-)
 
 warnings.filterwarnings("ignore")
 
@@ -469,13 +474,57 @@ def planning_cli(
         {**config["node_expansion"], **{"weights_path": policy_network}}
     )
 
+    # Create evaluation config based on evaluation_type
+    node_evaluation = config.get("node_evaluation", {})
+    evaluation_type = node_evaluation.get("evaluation_type", "rollout")
+
+    if evaluation_type == "gcn":
+        # Value network evaluation
+        if value_network is None:
+            raise ValueError("value_network is required when evaluation_type is 'gcn'")
+        evaluation_config = ValueNetworkEvaluationConfig(
+            weights_path=value_network,
+            normalize=node_evaluation.get("normalize", False),
+        )
+    elif evaluation_type == "rollout":
+        # Rollout evaluation - need to load resources
+        policy_function = load_policy_function(weights_path=policy_network)
+        reaction_rules_list = load_reaction_rules(reaction_rules)
+        building_blocks_set = load_building_blocks(building_blocks, standardize=False)
+        evaluation_config = RolloutEvaluationConfig(
+            policy_network=policy_function,
+            reaction_rules=reaction_rules_list,
+            building_blocks=building_blocks_set,
+            min_mol_size=search_config.get("min_mol_size", 6),
+            max_depth=search_config.get("max_depth", 6),
+            normalize=node_evaluation.get("normalize", False),
+        )
+    elif evaluation_type == "random":
+        evaluation_config = RandomEvaluationConfig(
+            normalize=node_evaluation.get("normalize", False),
+        )
+    elif evaluation_type == "policy":
+        evaluation_config = PolicyEvaluationConfig(
+            normalize=node_evaluation.get("normalize", False),
+        )
+    elif evaluation_type == "rdkit":
+        evaluation_config = RDKitEvaluationConfig(
+            score_function=node_evaluation.get("score_function", "sascore"),
+            normalize=node_evaluation.get("normalize", False),
+        )
+    else:
+        raise ValueError(
+            f"Unknown evaluation_type: {evaluation_type}. "
+            f"Expected one of: 'gcn', 'rollout', 'random', 'policy', 'rdkit'"
+        )
+
     run_search(
         targets_path=targets,
         search_config=search_config,
         policy_config=policy_config,
+        evaluation_config=evaluation_config,
         reaction_rules_path=reaction_rules,
         building_blocks_path=building_blocks,
-        value_network_path=value_network,
         results_root=results_dir,
     )
 

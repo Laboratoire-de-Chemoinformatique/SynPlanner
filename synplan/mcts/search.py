@@ -9,16 +9,19 @@ from pathlib import Path
 from typing import Union
 
 from CGRtools.containers import MoleculeContainer
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
-from synplan.chem.reaction_routes.route_cgr import extract_reactions
 from synplan.chem.reaction_routes.io import write_routes_csv, write_routes_json
+from synplan.chem.reaction_routes.route_cgr import extract_reactions
 from synplan.chem.utils import mol_from_smiles
-from synplan.mcts.evaluation import ValueNetworkFunction
-from synplan.mcts.expansion import PolicyNetworkFunction
 from synplan.mcts.tree import Tree, TreeConfig
 from synplan.utils.config import PolicyNetworkConfig
-from synplan.utils.loading import load_building_blocks, load_reaction_rules
+from synplan.utils.loading import (
+    load_evaluation_function,
+    load_building_blocks,
+    load_policy_function,
+    load_reaction_rules,
+)
 from synplan.utils.visualisation import extract_routes, generate_results_html
 
 
@@ -55,9 +58,9 @@ def run_search(
     targets_path: str,
     search_config: dict,
     policy_config: PolicyNetworkConfig,
+    evaluation_config,
     reaction_rules_path: str,
     building_blocks_path: str,
-    value_network_path: str = None,
     results_root: str = "search_results",
 ) -> None:
     """Performs a tree search on a set of target molecules using specified configuration
@@ -68,9 +71,9 @@ def run_search(
     :param search_config: The config object containing the configuration for the tree
         search.
     :param policy_config: The config object containing the configuration for the policy.
+    :param evaluation_config: The evaluation configuration object (e.g., RolloutEvaluationConfig).
     :param reaction_rules_path: The path to the file containing reaction rules.
     :param building_blocks_path: The path to the file containing building blocks.
-    :param value_network_path: The path to the file containing value weights (optional).
     :param results_root: The name of the folder where the results of the tree search
         will be saved.
     :return: None.
@@ -101,15 +104,13 @@ def run_search(
         "error",
     ]
 
-    # config
-    policy_function = PolicyNetworkFunction(policy_config=policy_config)
-    if search_config["evaluation_type"] == "gcn" and value_network_path:
-        value_function = ValueNetworkFunction(weights_path=value_network_path)
-    else:
-        value_function = None
-
+    # Load resources
+    policy_function = load_policy_function(policy_config=policy_config)
     reaction_rules = load_reaction_rules(reaction_rules_path)
-    building_blocks = load_building_blocks(building_blocks_path, standardize=True)
+    building_blocks = load_building_blocks(building_blocks_path, standardize=False)
+
+    # Create evaluation strategy from config
+    evaluation_function = load_evaluation_function(evaluation_config)
 
     # run search
     n_solved = 0
@@ -141,7 +142,7 @@ def run_search(
                     reaction_rules=reaction_rules,
                     building_blocks=building_blocks,
                     expansion_function=policy_function,
-                    evaluation_function=value_function,
+                    evaluation_function=evaluation_function,
                 )
 
                 _ = list(tree)

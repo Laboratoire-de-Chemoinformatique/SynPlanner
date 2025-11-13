@@ -1,6 +1,7 @@
 """Module containing additional functions needed in different reaction data processing
 protocols."""
 
+from io import StringIO
 import logging
 from typing import Iterable
 
@@ -11,12 +12,12 @@ from CGRtools.containers import (
     ReactionContainer,
 )
 from CGRtools.exceptions import InvalidAromaticRing
-from tqdm import tqdm
+from CGRtools.files.SDFrw import SDFRead
+from chython import MoleculeContainer as MoleculeContainerChython
+from tqdm.auto import tqdm
 
 from synplan.chem import smiles_parser
 from synplan.utils.files import MoleculeReader, MoleculeWriter
-
-from chython import MoleculeContainer as MoleculeContainerChython
 
 
 def mol_from_smiles(
@@ -153,6 +154,59 @@ def standardize_building_blocks(input_file: str, output_file: str) -> str:
             out_file.write(mol)
 
     return output_file
+
+
+def _standardize_one_smiles(smiles_str: str) -> str | None:
+    try:
+        mol = smiles_parser(smiles_str)
+        mol = safe_canonicalization(mol)
+        return str(mol)
+    except Exception:
+        return None
+
+
+def _standardize_sdf_range(filename: str, start: int, end: int) -> list[str]:
+    out: list[str] = []
+    sdf = SDFRead(filename, indexable=True)
+    try:
+        for i in range(start, end):
+            try:
+                mol = sdf[i]
+                mol = safe_canonicalization(mol)
+                out.append(str(mol))
+            except Exception:
+                pass
+    finally:
+        sdf.close()
+    return out
+
+
+def _standardize_sdf_text(block: str) -> list[str]:
+    """Standardize molecules from an SDF text block.
+
+    The block may contain one or multiple SDF records, separated by $$$$ lines.
+    """
+    out: list[str] = []
+    with StringIO(block) as fh:
+        with SDFRead(fh) as sdf:
+            for mol in sdf:
+                try:
+                    mol = safe_canonicalization(mol)
+                    out.append(str(mol))
+                except Exception:
+                    # ignore malformed entries
+                    pass
+    return out
+
+
+def _standardize_smiles_batch(batch: list[str]) -> list[str]:
+    """Standardize a batch of SMILES strings and return valid results."""
+    out: list[str] = []
+    for smiles_str in batch:
+        res = _standardize_one_smiles(smiles_str)
+        if res:
+            out.append(res)
+    return out
 
 
 def cgr_from_reaction_rule(reaction_rule: ReactionContainer) -> CGRContainer:

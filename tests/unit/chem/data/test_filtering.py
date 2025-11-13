@@ -1,10 +1,8 @@
-import pytest
 from CGRtools import smiles
 from synplan.chem.data.filtering import (
     CCsp3BreakingFilter,
     DynamicBondsFilter,
     NoReactionFilter,
-    MultiCenterFilter,
     WrongCHBreakingFilter,
     CCRingBreakingFilter,
 )

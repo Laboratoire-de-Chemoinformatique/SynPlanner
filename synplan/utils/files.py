@@ -3,7 +3,7 @@ reading/writing."""
 
 from os.path import splitext
 from pathlib import Path
-from typing import Iterable, Union
+from typing import Iterable, Union, Iterator
 
 from CGRtools import smiles
 from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
@@ -205,6 +205,70 @@ class MoleculeWriter(Writer):
             self._file.write(mol_str + "\n")
         elif self._file_type == "SDF":
             self._file.write(molecule)
+
+
+def count_sdf_records(path: Union[str, Path]) -> int:
+    """Count number of SDF records (by '$$$$' separators)."""
+    p = Path(path)
+    with open(p, "r", encoding="utf-8") as f:
+        return sum(1 for line in f if line.strip() == "$$$$")
+
+
+def iter_sdf_text_blocks(
+    path: Union[str, Path], records_per_block: int
+) -> Iterator[str]:
+    """Yield SDF text blocks containing up to `records_per_block` molecules.
+
+    Records are delimited by lines equal to '$$$$'. The block is a concatenated
+    string of lines that can be fed to StringIO and parsed by SDFRead.
+    """
+    p = Path(path)
+    buf: list[str] = []
+    count = 0
+    step = max(1, records_per_block)
+    with open(p, "r", encoding="utf-8") as f:
+        for line in f:
+            buf.append(line)
+            if line.strip() == "$$$$":
+                count += 1
+                if count % step == 0:
+                    yield "".join(buf)
+                    buf = []
+    if buf:
+        yield "".join(buf)
+
+
+def count_smiles_records(path: Union[str, Path]) -> int:
+    """Count number of non-empty SMILES records (lines)."""
+    p = Path(path)
+    with open(p, "r", encoding="utf-8") as f:
+        return sum(1 for line in f if line.strip())
+
+
+def iter_smiles(path: Union[str, Path]) -> Iterator[str]:
+    """Yield first whitespace-delimited token (SMILES) per non-empty line."""
+    p = Path(path)
+    with open(p, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            yield line.split()[0]
+
+
+def iter_smiles_blocks(
+    path: Union[str, Path], records_per_block: int
+) -> Iterator[list[str]]:
+    """Yield SMILES lists of up to `records_per_block` items from file."""
+    step = max(1, records_per_block)
+    block: list[str] = []
+    for smi in iter_smiles(path):
+        block.append(smi)
+        if len(block) == step:
+            yield block
+            block = []
+    if block:
+        yield block
 
 
 def to_reaction_smiles_record(reaction: ReactionContainer) -> str:

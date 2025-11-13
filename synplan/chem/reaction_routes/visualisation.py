@@ -1,16 +1,16 @@
+from collections import defaultdict
+from functools import partial
+from math import hypot
+from uuid import uuid4
+
 from CGRtools.algorithms.depict import (
     Depict,
-    DepictMolecule,
     DepictCGR,
-    rotate_vector,
+    DepictMolecule,
     _render_charge,
+    rotate_vector,
 )
-from CGRtools.containers import ReactionContainer, MoleculeContainer, CGRContainer
-
-from collections import defaultdict
-from uuid import uuid4
-from math import hypot
-from functools import partial
+from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
 
 
 class WideBondDepictCGR(DepictCGR):
@@ -850,7 +850,7 @@ def depict_custom_reaction(reaction: ReactionContainer):
 
     sings_plus = reaction._signs
     if sings_plus:
-        svg.append(f'  <g fill="none" stroke="black" stroke-width=".04">')
+        svg.append('  <g fill="none" stroke="black" stroke-width=".04">')
         for x in sings_plus:
             svg.append(
                 f'    <line x1="{x + .35:.2f}" y1="0" x2="{x + .65:.2f}" y2="0"/>'

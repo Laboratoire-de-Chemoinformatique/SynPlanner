@@ -1,17 +1,13 @@
 """Integration tests for the main SynPlanner pipeline components."""
 
-import os
 import pickle
 from pathlib import Path
-import logging
 from CGRtools import smiles as smiles_cgrtools
-from CGRtools.containers import ReactionContainer
 
 import pytest
 
 from synplan.chem.data.standardizing import (
     standardize_reactions_from_file,
-    standardize_reaction,
 )
 from synplan.chem.data.filtering import filter_reactions_from_file
 from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions

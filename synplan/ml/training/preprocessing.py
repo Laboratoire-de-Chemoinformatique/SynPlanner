@@ -1,25 +1,25 @@
 """Module containing functions for preparation of the training sets for policy and value
 network."""
 
+from abc import ABC
 import logging
 import os
 import pickle
-from abc import ABC
 from typing import Any, Dict, List, Optional, Tuple
 
-import ray
-import torch
 from CGRtools import smiles
 from CGRtools.containers import MoleculeContainer
 from CGRtools.exceptions import InvalidAromaticRing
 from CGRtools.reactor import Reactor
+import ray
 from ray.util.queue import Empty, Queue
+import torch
 from torch import Tensor
 from torch_geometric.data import InMemoryDataset
 from torch_geometric.data.data import Data
 from torch_geometric.data.makedirs import makedirs
 from torch_geometric.transforms import ToUndirected
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from synplan.chem.utils import unite_molecules
 from synplan.utils.files import ReactionReader
@@ -134,21 +134,21 @@ class RankingPolicyDataset(InMemoryDataset):
             ):
 
                 rule_id = reaction_rule_pairs.get(reaction_id)
-                if rule_id:
-                    try:  #  MENDEL_INFO does not contain cadmium (Cd) properties
-                        molecule = unite_molecules(reaction.products)
-                        pyg_graph = mol_to_pyg(molecule)
 
-                    except (
-                        Exception
-                    ) as e:  # TypeError: can't assign a NoneType to a torch.ByteTensor
-                        logging.debug(e)
-                        continue
+                if rule_id is None:
+                    continue
+
+                try:  #  MENDEL_INFO does not contain cadmium (Cd) properties
+                    molecule = unite_molecules(reaction.products)
+                    pyg_graph = mol_to_pyg(molecule)
 
                     if pyg_graph is not None:
                         pyg_graph.y_rules = torch.tensor([rule_id], dtype=torch.long)
                         list_of_graphs.append(pyg_graph)
-                else:
+                except (
+                    Exception
+                ) as e:  # TypeError: can't assign a NoneType to a torch.ByteTensor
+                    logging.debug(e)
                     continue
 
         data, slices = self.collate(list_of_graphs)
@@ -430,6 +430,7 @@ def mol_to_pyg(
         return None
 
     tmp_molecule = molecule.copy()
+
     try:
         if canonicalize:
             tmp_molecule.canonicalize()
@@ -446,11 +447,10 @@ def mol_to_pyg(
 
     # get edge indexes from target mapping
     edge_index = []
-    for atom, neighbour, bond in tmp_molecule.bonds():
+    for atom, neighbour, _ in tmp_molecule.bonds():
         edge_index.append([atom - 1, neighbour - 1])
     edge_index = torch.tensor(edge_index, dtype=torch.long)
 
-    #
     x = mol_to_matrix(tmp_molecule)
 
     mol_pyg_graph = Data(x=x, edge_index=edge_index.t().contiguous())

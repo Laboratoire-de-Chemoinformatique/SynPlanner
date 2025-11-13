@@ -3,10 +3,14 @@ Generic logging helpers for scripts, notebooks and Ray clusters.
 """
 
 from __future__ import annotations
-import logging, sys, os, warnings
-from pathlib import Path
 from datetime import datetime
-from typing import Iterable, Optional
+import logging
+import os
+from pathlib import Path
+import sys
+from typing import Iterable
+import warnings
+
 from IPython import get_ipython
 
 
@@ -52,7 +56,7 @@ class TqdmHandler(logging.StreamHandler):
 
     def emit(self, record):
         try:
-            from tqdm import tqdm
+            from tqdm.auto import tqdm
 
             tqdm.write(self.format(record), end=self.terminator)
         except ModuleNotFoundError:

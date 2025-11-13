@@ -9,7 +9,6 @@ import warnings
 from pathlib import Path
 from typing import Union, List
 
-import os
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint

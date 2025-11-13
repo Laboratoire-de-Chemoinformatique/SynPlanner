@@ -3,11 +3,10 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Union
-from chython import smarts
+from typing import Any, Dict, List
 
+from chython import smarts
 import yaml
-from CGRtools.containers import MoleculeContainer, QueryContainer
 
 
 @dataclass
@@ -84,7 +83,7 @@ class RuleExtractionConfig(ConfigABC):
         applied to be considered for further analysis.
     :param keep_metadata: If True, retains metadata associated with the
         reaction in the extracted rule.
-    :param single_reactant_only: If True, includes only reaction rules
+    :param single_product_only: If True, includes only reaction rules
         with a single reactant molecule.
     :param atom_info_retention: Controls the amount of information about
         each atom to retain ('none', 'reaction_center', or 'all').
@@ -95,7 +94,7 @@ class RuleExtractionConfig(ConfigABC):
     reactor_validation: bool = True
     reverse_rule: bool = True
     as_query_container: bool = True
-    single_reactant_only: bool = False
+    single_product_only: bool = True
 
     # adjustable parameters
     environment_atom_count: int = 1
@@ -203,8 +202,8 @@ class RuleExtractionConfig(ConfigABC):
         if not isinstance(params["keep_metadata"], bool):
             raise ValueError("keep_metadata must be a boolean.")
 
-        if not isinstance(params["single_reactant_only"], bool):
-            raise ValueError("single_reactant_only must be a boolean.")
+        if not isinstance(params["single_product_only"], bool):
+            raise ValueError("single_product_only must be a boolean.")
 
         if params["atom_info_retention"] is not None:
             if not isinstance(params["atom_info_retention"], dict):
@@ -438,8 +437,7 @@ class TreeConfig(ConfigABC):
         search.
     :param evaluation_agg: Method for aggregating evaluation scores.
         Options are "max", "average", defaults to "max".
-    :param evaluation_type: The method used for evaluating nodes.
-        Options are "random", "rollout", "gcn".
+    :param normalize_scores: Whether to normalize evaluation scores to [0, 1].
     :param init_node_value: Initial value for a new node.
     :param epsilon: A parameter in the epsilon-greedy search strategy
         representing the chance of random selection of reaction rules
@@ -458,17 +456,26 @@ class TreeConfig(ConfigABC):
     max_tree_size: int = 1000000
     max_time: float = 600
     max_depth: int = 6
-    ucb_type: str = "uct"
-    c_ucb: float = 0.1
-    backprop_type: str = "muzero"
-    search_strategy: str = "expansion_first"
     exclude_small: bool = True
-    evaluation_agg: str = "max"
-    evaluation_type: str = "gcn"
-    init_node_value: float = 0.0
-    epsilon: float = 0.0
     min_mol_size: int = 6
     silent: bool = False
+
+    # new parameters
+    algorithm: str = "uct"
+    normalize_scores: bool = False
+    max_rules_applied = 10  # needed only in pruning
+    stop_at_first = False
+    enable_pruning: bool = False
+
+    # UCT configuration
+    search_strategy: str = "expansion_first"
+    ucb_type: str = "uct"  # one of: "uct", "puct", "value"
+    c_ucb: float = 0.1  # exploration constant >= 0
+    backprop_type: str = "muzero"  # one of: "muzero", "cumulative"
+    evaluation_agg: str = "max"  # one of: "max", "average"
+    epsilon: float = 0.0  # epsilon-greedy in [0.0, 1.0]
+    init_node_value: float = 0.5  # initial node value in [0.0, 1.0]
+    beam_width: int = 10
 
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "TreeConfig":
@@ -481,24 +488,6 @@ class TreeConfig(ConfigABC):
         return TreeConfig.from_dict(config_dict)
 
     def _validate_params(self, params):
-        if params["ucb_type"] not in ["puct", "uct", "value"]:
-            raise ValueError(
-                "Invalid ucb_type. Allowed values are 'puct', 'uct', 'value'."
-            )
-        if params["backprop_type"] not in ["muzero", "cumulative"]:
-            raise ValueError(
-                "Invalid backprop_type. Allowed values are 'muzero', 'cumulative'."
-            )
-        if params["evaluation_type"] not in ["random", "rollout", "gcn"]:
-            raise ValueError(
-                "Invalid evaluation_type. Allowed values are 'random', 'rollout', 'gcn'."
-            )
-        if params["evaluation_agg"] not in ["max", "average"]:
-            raise ValueError(
-                "Invalid evaluation_agg. Allowed values are 'max', 'average'."
-            )
-        if not isinstance(params["c_ucb"], float):
-            raise TypeError("c_ucb must be a float.")
         if not isinstance(params["max_depth"], int) or params["max_depth"] < 1:
             raise ValueError("max_depth must be a positive integer.")
         if not isinstance(params["max_tree_size"], int) or params["max_tree_size"] < 1:
@@ -514,17 +503,205 @@ class TreeConfig(ConfigABC):
             raise TypeError("exclude_small must be a boolean.")
         if not isinstance(params["silent"], bool):
             raise TypeError("silent must be a boolean.")
-        if not isinstance(params["init_node_value"], float):
-            raise TypeError("init_node_value must be a float if provided.")
         if params["search_strategy"] not in ["expansion_first", "evaluation_first"]:
             raise ValueError(
                 f"Invalid search_strategy: {params['search_strategy']}: "
                 f"Allowed values are 'expansion_first', 'evaluation_first'"
             )
-        if not isinstance(params["epsilon"], float) or 0 >= params["epsilon"] >= 1:
-            raise ValueError("epsilon epsilon be a positive float between 0 and 1.")
         if not isinstance(params["min_mol_size"], int) or params["min_mol_size"] < 0:
             raise ValueError("min_mol_size must be a non-negative integer.")
+        if not isinstance(params.get("enable_pruning", True), bool):
+            raise ValueError("enable_pruning must be a boolean.")
+
+        # Validate UCT-related parameters
+        if params.get("ucb_type") not in ["uct", "puct", "value"]:
+            raise ValueError("ucb_type must be 'uct', 'puct' or 'value'.")
+        if not isinstance(params.get("c_ucb"), (float, int)) or params.get("c_ucb") < 0:
+            raise ValueError("c_ucb must be a non-negative float.")
+        if params.get("backprop_type") not in ["muzero", "cumulative"]:
+            raise ValueError("backprop_type must be 'muzero' or 'cumulative'.")
+        if params.get("evaluation_agg") not in ["max", "average"]:
+            raise ValueError("evaluation_agg must be 'max' or 'average'.")
+        if not isinstance(params.get("epsilon"), (float, int)) or not (
+            0.0 <= float(params.get("epsilon")) <= 1.0
+        ):
+            raise ValueError("epsilon must be a float in [0.0, 1.0].")
+        if not isinstance(params.get("init_node_value"), (float, int)) or not (
+            0.0 <= float(params.get("init_node_value")) <= 1.0
+        ):
+            raise ValueError("init_node_value must be a float in [0.0, 1.0].")
+        # Beam width
+        if (
+            not isinstance(params.get("beam_width", 10), int)
+            or params.get("beam_width", 10) <= 0
+        ):
+            raise ValueError("beam_width must be a positive integer.")
+
+
+@dataclass
+class RolloutEvaluationConfig(ConfigABC):
+    """Configuration for rollout-based evaluation strategy.
+
+    Contains all dependencies needed for rollout simulation.
+
+    :param policy_network: Policy network function for rollout simulation.
+    :param reaction_rules: List of reaction rules for applying transformations.
+    :param building_blocks: Set of building block molecules.
+    :param min_mol_size: Minimum molecule size to consider for expansion.
+    :param max_depth: Maximum depth for rollout simulation.
+    :param normalize: Whether to normalize scores to [0, 1].
+    """
+
+    policy_network: Any  # PolicyNetworkFunction - using Any to avoid circular import
+    reaction_rules: Any  # List[Reactor]
+    building_blocks: Any  # Set[str]
+    min_mol_size: int = 0
+    max_depth: int = 6
+    normalize: bool = False
+
+    @staticmethod
+    def from_dict(config_dict: Dict[str, Any]) -> "RolloutEvaluationConfig":
+        return RolloutEvaluationConfig(**config_dict)
+
+    @staticmethod
+    def from_yaml(file_path: str) -> "RolloutEvaluationConfig":
+        with open(file_path, "r", encoding="utf-8") as file:
+            config_dict = yaml.safe_load(file)
+        return RolloutEvaluationConfig.from_dict(config_dict)
+
+    def _validate_params(self, params: Dict[str, Any]):
+        if (
+            not isinstance(params.get("min_mol_size", 6), int)
+            or params.get("min_mol_size", 6) < 0
+        ):
+            raise ValueError("min_mol_size must be a non-negative integer.")
+        if (
+            not isinstance(params.get("max_depth", 9), int)
+            or params.get("max_depth", 9) < 1
+        ):
+            raise ValueError("max_depth must be a positive integer.")
+        if not isinstance(params.get("normalize", False), bool):
+            raise ValueError("normalize must be a boolean.")
+
+
+@dataclass
+class ValueNetworkEvaluationConfig(ConfigABC):
+    """Configuration for value network-based evaluation strategy.
+
+    :param weights_path: Path to the value network weights file.
+    :param normalize: Whether to normalize scores to [0, 1].
+    """
+
+    weights_path: str
+    normalize: bool = False
+
+    @staticmethod
+    def from_dict(config_dict: Dict[str, Any]) -> "ValueNetworkEvaluationConfig":
+        return ValueNetworkEvaluationConfig(**config_dict)
+
+    @staticmethod
+    def from_yaml(file_path: str) -> "ValueNetworkEvaluationConfig":
+        with open(file_path, "r", encoding="utf-8") as file:
+            config_dict = yaml.safe_load(file)
+        return ValueNetworkEvaluationConfig.from_dict(config_dict)
+
+    def _validate_params(self, params: Dict[str, Any]):
+        if not isinstance(params.get("weights_path"), str):
+            raise ValueError("weights_path must be a string.")
+        if not isinstance(params.get("normalize", False), bool):
+            raise ValueError("normalize must be a boolean.")
+
+
+@dataclass
+class RDKitEvaluationConfig(ConfigABC):
+    """Configuration for RDKit-based evaluation strategy.
+
+    Uses molecular descriptors like SA score, molecular weight, etc.
+
+    :param score_function: Name of the scoring function to use.
+        Options: "sascore", "weight", "heavyAtomCount", "weightXsascore", "WxWxSAS".
+    :param normalize: Whether to normalize scores to [0, 1].
+    """
+
+    score_function: str = "sascore"
+    normalize: bool = False
+
+    @staticmethod
+    def from_dict(config_dict: Dict[str, Any]) -> "RDKitEvaluationConfig":
+        return RDKitEvaluationConfig(**config_dict)
+
+    @staticmethod
+    def from_yaml(file_path: str) -> "RDKitEvaluationConfig":
+        with open(file_path, "r", encoding="utf-8") as file:
+            config_dict = yaml.safe_load(file)
+        return RDKitEvaluationConfig.from_dict(config_dict)
+
+    def _validate_params(self, params: Dict[str, Any]):
+        valid_functions = [
+            "sascore",
+            "weight",
+            "heavyAtomCount",
+            "weightXsascore",
+            "WxWxSAS",
+        ]
+        if params.get("score_function") not in valid_functions:
+            raise ValueError(
+                f"score_function must be one of {valid_functions}, got {params.get('score_function')}"
+            )
+        if not isinstance(params.get("normalize", False), bool):
+            raise ValueError("normalize must be a boolean.")
+
+
+@dataclass
+class PolicyEvaluationConfig(ConfigABC):
+    """Configuration for policy-based evaluation strategy.
+
+    Uses policy network probabilities as evaluation scores.
+
+    :param normalize: Whether to normalize scores to [0, 1].
+    """
+
+    normalize: bool = False
+
+    @staticmethod
+    def from_dict(config_dict: Dict[str, Any]) -> "PolicyEvaluationConfig":
+        return PolicyEvaluationConfig(**config_dict)
+
+    @staticmethod
+    def from_yaml(file_path: str) -> "PolicyEvaluationConfig":
+        with open(file_path, "r", encoding="utf-8") as file:
+            config_dict = yaml.safe_load(file)
+        return PolicyEvaluationConfig.from_dict(config_dict)
+
+    def _validate_params(self, params: Dict[str, Any]):
+        if not isinstance(params.get("normalize", False), bool):
+            raise ValueError("normalize must be a boolean.")
+
+
+@dataclass
+class RandomEvaluationConfig(ConfigABC):
+    """Configuration for random evaluation strategy.
+
+    Assigns random scores - useful for testing and baseline comparisons.
+
+    :param normalize: Whether to normalize scores to [0, 1].
+    """
+
+    normalize: bool = False
+
+    @staticmethod
+    def from_dict(config_dict: Dict[str, Any]) -> "RandomEvaluationConfig":
+        return RandomEvaluationConfig(**config_dict)
+
+    @staticmethod
+    def from_yaml(file_path: str) -> "RandomEvaluationConfig":
+        with open(file_path, "r", encoding="utf-8") as file:
+            config_dict = yaml.safe_load(file)
+        return RandomEvaluationConfig.from_dict(config_dict)
+
+    def _validate_params(self, params: Dict[str, Any]):
+        if not isinstance(params.get("normalize", False), bool):
+            raise ValueError("normalize must be a boolean.")
 
 
 def convert_config_to_dict(config_attr: ConfigABC, config_type) -> Dict | None:

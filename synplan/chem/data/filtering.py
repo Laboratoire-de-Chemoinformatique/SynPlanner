@@ -10,7 +10,7 @@ import ray
 import yaml
 from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from chython.algorithms.fingerprints.morgan import MorganFingerprint
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from synplan.chem.data.standardizing import (
     AromaticFormStandardizer,

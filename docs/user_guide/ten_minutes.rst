@@ -28,9 +28,8 @@ and rollout evaluation (no value network).
 
 .. code-block:: python
 
-   from synplan.utils.loading import load_building_blocks, load_reaction_rules
-   from synplan.mcts.expansion import PolicyNetworkFunction
-   from synplan.utils.config import PolicyNetworkConfig, TreeConfig
+   from synplan.utils.loading import load_building_blocks, load_reaction_rules, load_policy_function
+   from synplan.utils.config import TreeConfig
    from synplan.chem.utils import mol_from_smiles
    from synplan.mcts.tree import Tree
 
@@ -47,8 +46,7 @@ and rollout evaluation (no value network).
    reaction_rules = load_reaction_rules(reaction_rules_path)
 
    # 3. Load policy network
-   policy_config = PolicyNetworkConfig(weights_path=policy_weights_path)
-   policy_network = PolicyNetworkFunction(policy_config=policy_config)
+   policy_network = load_policy_function(weights_path=policy_weights_path)
 
    # 4. Configure search
    tree_config = TreeConfig(
@@ -63,6 +61,18 @@ and rollout evaluation (no value network).
        c_ucb=0.1,
    )
 
+   # Create evaluation configuration
+   eval_config = RolloutEvaluationConfig(
+       policy_network=policy_network,
+       reaction_rules=reaction_rules,
+       building_blocks=building_blocks,
+       min_mol_size=tree_config.min_mol_size,
+       max_depth=tree_config.max_depth,
+   )
+
+   # Create evaluator from config
+   evaluation_function = load_evaluation_function(eval_config)
+
    # 5. Load target molecule
    # An example from the tutorial: capivasertib, an anti-cancer medication.
    example_smiles = "NC1(C(=O)N[C@@H](CCO)c2ccc(Cl)cc2)CCN(c2nc[nH]c3nccc2-3)CC1"
@@ -75,6 +85,7 @@ and rollout evaluation (no value network).
        reaction_rules=reaction_rules,
        building_blocks=building_blocks,
        expansion_function=policy_network,
+       evaluation_function=evaluation_function,
    )
 
    # 7. Run search

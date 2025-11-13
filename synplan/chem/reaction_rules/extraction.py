@@ -8,7 +8,6 @@ from os.path import splitext
 from typing import Dict, List, Set, Tuple
 
 import ray
-from chython import smarts
 from chython import QueryContainer as QueryContainerChython
 from CGRtools.containers.cgr import CGRContainer
 from CGRtools.containers.molecule import MoleculeContainer
@@ -16,13 +15,12 @@ from CGRtools.containers.query import QueryContainer
 from CGRtools.containers.reaction import ReactionContainer
 from CGRtools.exceptions import InvalidAromaticRing
 from CGRtools.reactor import Reactor
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
 from synplan.chem.utils import (
     reverse_reaction,
     cgrtools_to_chython_molecule,
-    chython_query_to_cgrtools,
 )
 from synplan.utils.config import RuleExtractionConfig
 from synplan.utils.files import ReactionReader
@@ -629,7 +627,7 @@ def process_completed_batch(
 
 
 def sort_rules(
-    rules_stats: Dict, min_popularity: int, single_reactant_only: bool
+    rules_stats: Dict, min_popularity: int, single_product_only: bool
 ) -> List[Tuple[ReactionContainer, List[int]]]:
     """
     Sorts reaction rules based on their popularity and validation status. This
@@ -644,7 +642,7 @@ def sort_rules(
         considered. Default is 3.
     :type min_popularity: The minimum number of occurrence of the reaction rule to be
         selected.
-    :param single_reactant_only: Whether to keep only reaction rules with a single
+    :param single_product_only: Whether to keep only reaction rules with a single
         molecule on the right side of reaction arrow. Default is True.
 
     :return: A list of tuples, where each tuple contains a reaction rule and a list of
@@ -659,7 +657,7 @@ def sort_rules(
             for rule, indices in rules_stats.items()
             if len(indices) >= min_popularity
             and rule.meta["reactor_validation"] == "passed"
-            and (not single_reactant_only or len(rule.reactants) == 1)
+            and (not single_product_only or len(rule.products) == 1)
         ),
         key=lambda x: -len(x[1]),
     )
@@ -733,7 +731,7 @@ def extract_rules_from_reactions(
         sorted_rules = sort_rules(
             extracted_rules_and_statistics,
             min_popularity=config.min_popularity,
-            single_reactant_only=config.single_reactant_only,
+            single_product_only=config.single_product_only,
         )
 
         ray.shutdown()

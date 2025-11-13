@@ -5,31 +5,25 @@ https://github.com/Laboratoire-de-Chemoinformatique/Reaction_Data_Cleaning/blob/
 """
 
 from __future__ import annotations
-
-import logging
-from contextlib import suppress
-from dataclasses import dataclass
-from io import TextIOWrapper
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, Sequence, TextIO
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+import logging
 from pathlib import Path
-import sys
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-
-import ray
-import yaml
 from CGRtools import smiles as smiles_cgrtools
 from CGRtools.containers import MoleculeContainer
 from CGRtools.containers import ReactionContainer
 from CGRtools.containers import ReactionContainer as ReactionContainerCGRTools
 from chython import ReactionContainer as ReactionContainerChython
 from chython import smiles as smiles_chython
+import ray
 from tqdm.auto import tqdm
+import yaml
 
 from synplan.chem.utils import unite_molecules
 from synplan.utils.config import ConfigABC
 from synplan.utils.files import ReactionReader, ReactionWriter
-from synplan.utils.logging import init_logger, init_ray_logging
 
 logger = logging.getLogger("synplan.chem.data.standardizing")
 
@@ -975,7 +969,7 @@ def safe_standardize(
         if std is None:
             return reaction, False  # filtered → keep original
         return std, True
-    except Exception as exc:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         # keep the original container (parse if it was a string)
         if isinstance(item, ReactionContainer):
             return item, False
