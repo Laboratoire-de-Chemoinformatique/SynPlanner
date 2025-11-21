@@ -1,11 +1,14 @@
-from CGRtools import smiles
+from chython import smiles
+import pytest
+
 from synplan.chem.data.filtering import (
     CCsp3BreakingFilter,
+    CCRingBreakingFilter,
     DynamicBondsFilter,
     NoReactionFilter,
     WrongCHBreakingFilter,
-    CCRingBreakingFilter,
 )
+from synplan.chem.data.standardizing import StandardizationError
 
 
 def test_ccsp3_no_break(sample_reactions):
@@ -79,3 +82,9 @@ def test_cc_ring_no_breaking():
     )  # No ring breaking, just adding H to O
     f = CCRingBreakingFilter()
     assert not f(rxn)
+
+
+def test_standardization_error_contents():
+    err = StandardizationError("RemoveReagents", "react>>prod", ValueError("boom"))
+    assert "RemoveReagents" in str(err)
+    assert "react>>prod" in str(err)

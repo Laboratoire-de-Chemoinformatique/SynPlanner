@@ -8,7 +8,7 @@ import random
 from random import shuffle
 from typing import Dict, List
 
-from CGRtools.containers import MoleculeContainer
+from chython.containers import MoleculeContainer
 from pytorch_lightning import Trainer
 import torch
 from torch.utils.data import random_split

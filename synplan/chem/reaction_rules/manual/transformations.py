@@ -1,7 +1,7 @@
 """Module containing hardcoded transformation reaction rules."""
 
-from CGRtools import QueryContainer, ReactionContainer
-from CGRtools.periodictable import ListElement
+from chython import QueryContainer, ReactionContainer
+from chython.periodictable import ListElement
 
 rules = []
 

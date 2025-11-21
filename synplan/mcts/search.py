@@ -8,7 +8,7 @@ import os.path
 from pathlib import Path
 from typing import Union
 
-from CGRtools.containers import MoleculeContainer
+from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
 from synplan.chem.reaction_routes.io import write_routes_csv, write_routes_json

@@ -4,8 +4,8 @@ import logging
 from time import time
 from typing import Dict, List, Set, Tuple
 
-from CGRtools.containers import MoleculeContainer
-from CGRtools.reactor import Reactor
+from chython.containers import MoleculeContainer
+from chython.reactor import Reactor
 from tqdm.auto import tqdm
 
 from synplan.chem.precursor import Precursor

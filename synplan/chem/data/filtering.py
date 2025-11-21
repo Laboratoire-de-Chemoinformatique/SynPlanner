@@ -3,23 +3,27 @@
 import logging
 from dataclasses import dataclass
 from io import TextIOWrapper
+import pickle
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import ray
 import yaml
-from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from chython.algorithms.fingerprints.morgan import MorganFingerprint
+from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from tqdm.auto import tqdm
 
 from synplan.chem.data.standardizing import (
+    StandardizationError,
     AromaticFormStandardizer,
     KekuleFormStandardizer,
     RemoveReagentsStandardizer,
 )
-from synplan.chem.utils import cgrtools_to_chython_molecule
 from synplan.utils.config import ConfigABC, convert_config_to_dict
 from synplan.utils.files import ReactionReader, ReactionWriter
+
+
+logger = logging.getLogger("synplan.chem.data.filtering")
 
 
 @dataclass
@@ -80,7 +84,6 @@ class CompeteProductsFilter:
         :param reaction: Input reaction.
         :return: Returns True if the reaction has competing products, else False.
         """
-        mf = MorganFingerprint()
         is_compete = False
 
         # check for compete products using both fingerprint similarity and maximum common substructure (MCS) similarity
@@ -88,8 +91,8 @@ class CompeteProductsFilter:
             for other_mol in reaction.products:
                 if len(mol) > 6 and len(other_mol) > 6:
                     # compute fingerprint similarity
-                    molf = mf.transform([cgrtools_to_chython_molecule(mol)])
-                    other_molf = mf.transform([cgrtools_to_chython_molecule(other_mol)])
+                    molf = mol.morgan_fingerprint()
+                    other_molf = other_mol.morgan_fingerprint()
                     fingerprint_tanimoto = tanimoto_kernel(molf, other_molf)[0][0]
 
                     # if fingerprint similarity is high enough, check for MCS similarity
@@ -466,16 +469,17 @@ class CCsp3BreakingFilter:
 
         """
         cgr = ~reaction
-        reaction_center = cgr.augmented_substructure(cgr.center_atoms, deep=1)
-        for atom_id, neighbour_id, bond in reaction_center.bonds():
-            atom = reaction_center.atom(atom_id)
-            neighbour = reaction_center.atom(neighbour_id)
+        rc = cgr.augmented_substructure(cgr.center_atoms, deep=1)
+
+        for n, m, bond in rc.bonds():
+            atom = rc.atom(n)
+            neigh = rc.atom(m)
 
             is_bond_broken = bond.order is not None and bond.p_order is None
-            are_atoms_carbons = (
-                atom.atomic_symbol == "C" and neighbour.atomic_symbol == "C"
-            )
-            is_atom_sp3 = atom.hybridization == 1 or neighbour.hybridization == 1
+            are_atoms_carbons = atom.atomic_number == 6 and neigh.atomic_number == 6
+            hn = rc._hybridizations.get(n, 0)
+            hm = rc._hybridizations.get(m, 0)
+            is_atom_sp3 = hn == 1 or hm == 1
 
             if is_bond_broken and are_atoms_carbons and is_atom_sp3:
                 return True
@@ -784,7 +788,11 @@ def tanimoto_kernel(x: MorganFingerprint, y: MorganFingerprint) -> float:
 
 
 def filter_reaction(
-    reaction: ReactionContainer, config: ReactionFilterConfig, filters: list
+    reaction: ReactionContainer,
+    config: ReactionFilterConfig,
+    filters: list,
+    *,
+    ignore_errors: bool = False,
 ) -> Tuple[bool, ReactionContainer]:
     """Checks the input reaction. Returns True if reaction is detected as erroneous and
     returns reaction itself, which sometimes is modified and does not necessarily
@@ -793,6 +801,8 @@ def filter_reaction(
     :param reaction: Reaction to be filtered.
     :param config: Reaction filtration configuration.
     :param filters: The list of reaction filters.
+    :param ignore_errors: If True, keep processing when a standardization step fails;
+        otherwise re-raise to expose unexpected issues.
     :return: False and reaction if reaction is correct and True and reaction if reaction
         is filtered (erroneous).
     """
@@ -802,16 +812,28 @@ def filter_reaction(
     # run reaction standardization
 
     standardizers = [
-        RemoveReagentsStandardizer(),
+        # RemoveReagentsStandardizer(),
         KekuleFormStandardizer(),
         AromaticFormStandardizer(),
     ]
 
-    for reaction_standardizer in standardizers:
-        reaction = reaction_standardizer(reaction)
-        if not reaction:
-            is_filtered = True
-            break
+    try:
+        for reaction_standardizer in standardizers:
+            reaction = reaction_standardizer(reaction)
+            if not reaction:
+                is_filtered = True
+                break
+    except StandardizationError as error:
+        if not ignore_errors:
+            raise
+        logger.warning(
+            "%s failed during %s: %s",
+            error.stage,
+            reaction_standardizer.__class__.__name__,
+            error,
+        )
+        reaction.meta["standardization_log"] = error.stage
+        is_filtered = True
 
     # run reaction filtration
     if not is_filtered:
@@ -821,8 +843,16 @@ def filter_reaction(
                     # if filter returns True it means the reaction doesn't pass the filter
                     reaction.meta["filtration_log"] = reaction_filter.__class__.__name__
                     is_filtered = True
-            except Exception as e:
-                logging.debug(e)
+            except StandardizationError as error:
+                if not ignore_errors:
+                    raise
+                logger.warning(
+                    "%s failed during %s: %s",
+                    error.stage,
+                    reaction_filter.__class__.__name__,
+                    error,
+                )
+                reaction.meta["standardization_log"] = error.stage
                 is_filtered = True
 
     return is_filtered, reaction
@@ -830,33 +860,34 @@ def filter_reaction(
 
 @ray.remote
 def process_batch(
-    batch: List[Tuple[int, ReactionContainer]],
+    batch: List[ReactionContainer],
     config: ReactionFilterConfig,
     filters: list,
+    ignore_errors: bool = False,
 ) -> List[Tuple[bool, ReactionContainer]]:
     """
     Processes a batch of reactions to extract reaction rules based on the given
     configuration. This function operates as a remote task in a distributed system using
     Ray.
 
-    :param batch: A list where each element is a tuple containing an index (int) and a
-        ReactionContainer object. The index is typically used to keep track of the
-        reaction's position in a larger dataset.
+    :param batch: List of ReactionContainer objects.
     :param config: Reaction filtration configuration.
     :param filters: The list of reaction filters.
-    :return: The list of tuples where each tuple include the reaction index, is ir
-        filtered or not (True/False) and reaction itself.
+    :param ignore_errors: If True, keep processing when a standardization step fails.
+    :return: List of tuples where each tuple indicates if reaction was filtered and
+        includes the processed reaction.
 
     """
 
     processed_reaction_list = []
     for reaction in batch:
-        try:  # CGRtools.exceptions.MappingError: atoms with number {52} not equal
-            is_filtered, processed_reaction = filter_reaction(reaction, config, filters)
-            processed_reaction_list.append((is_filtered, processed_reaction))
-        except Exception as e:
-            logging.debug(e)
-            processed_reaction_list.append((True, reaction))
+        is_filtered, processed_reaction = filter_reaction(
+            reaction,
+            config,
+            filters,
+            ignore_errors=ignore_errors,
+        )
+        processed_reaction_list.append((is_filtered, processed_reaction))
     return processed_reaction_list
 
 
@@ -879,15 +910,62 @@ def process_completed_batch(
     completed_batch = ray.get(ready_id[0])
 
     # write results of the completed batch to file
+    batch_filtered = 0
+    batch_kept = 0
     for is_filtered, reaction in completed_batch:
-        if not is_filtered:
+        if is_filtered is False:
             result_file.write(reaction)
             n_filtered += 1
+            batch_kept += 1
+        else:
+            batch_filtered += 1
+
+    # Log batch completion statistics
+    logger.debug(
+        "Batch completed: %d total, %d kept, %d filtered out. Total kept so far: %d",
+        len(completed_batch),
+        batch_kept,
+        batch_filtered,
+        n_filtered,
+    )
 
     # remove completed future and update progress bar
     del futures[ready_id[0]]
 
     return n_filtered
+
+
+def _filter_reactions_serial(
+    config: ReactionFilterConfig,
+    filters: list,
+    input_reaction_data_path: str,
+    filtered_reaction_data_path: str,
+    *,
+    ignore_errors: bool,
+) -> Tuple[int, int]:
+    """Serial filtering loop used when ``num_cpus <= 1``."""
+    lines_counter = 0
+    n_filtered = 0
+    with ReactionReader(input_reaction_data_path) as reactions, ReactionWriter(
+        filtered_reaction_data_path
+    ) as result_file:
+        for reaction in tqdm(
+            reactions,
+            desc="Number of reactions processed: ",
+            bar_format="{desc}{n} [{elapsed}]",
+        ):
+            lines_counter += 1
+            is_filtered, processed_reaction = filter_reaction(
+                reaction,
+                config,
+                filters,
+                ignore_errors=ignore_errors,
+            )
+            if not is_filtered:
+                result_file.write(processed_reaction)
+                n_filtered += 1
+
+    return lines_counter, n_filtered
 
 
 def filter_reactions_from_file(
@@ -896,6 +974,8 @@ def filter_reactions_from_file(
     filtered_reaction_data_path: str = "reaction_data_filtered.smi",
     num_cpus: int = 1,
     batch_size: int = 100,
+    *,
+    ignore_errors: bool = False,
 ) -> None:
     """
     Processes reaction data, applying reaction filters based on the provided
@@ -908,6 +988,9 @@ def filter_reactions_from_file(
         reactions.
     :param num_cpus: Number of CPUs to use for processing.
     :param batch_size: Size of the batch for processing reactions.
+    :param ignore_errors: If True, suppress standardization failures and continue
+        processing (logging them instead). If False, standardization errors will stop
+        the pipeline so new issues are visible.
     :return: None. The function writes the processed reactions to specified RDF/smi
         files.
 
@@ -915,6 +998,20 @@ def filter_reactions_from_file(
 
     filters = config.create_filters()
 
+    # Simple serial path (works well with `init_logger` and is easy to debug).
+    if num_cpus <= 1:
+        lines_counter, n_filtered = _filter_reactions_serial(
+            config,
+            filters,
+            input_reaction_data_path,
+            filtered_reaction_data_path,
+            ignore_errors=ignore_errors,
+        )
+        print(f"Initial number of reactions: {lines_counter}")
+        print(f"Filtered number of reactions: {n_filtered}")
+        return
+
+    # Parallel path with Ray for `num_cpus > 1`
     ray.init(num_cpus=num_cpus, ignore_reinit_error=True, logging_level=logging.ERROR)
     max_concurrent_batches = num_cpus  # limit the number of concurrent batches
     lines_counter = 0
@@ -924,15 +1021,17 @@ def filter_reactions_from_file(
 
         batches_to_process, batch = {}, []
         n_filtered = 0
-        for index, reaction in tqdm(
-            enumerate(reactions),
+        for reaction in tqdm(
+            reactions,
             desc="Number of reactions processed: ",
             bar_format="{desc}{n} [{elapsed}]",
         ):
             lines_counter += 1
             batch.append(reaction)
             if len(batch) == batch_size:
-                batch_results = process_batch.remote(batch, config, filters)
+                batch_results = process_batch.remote(
+                    batch, config, filters, ignore_errors
+                )
                 batches_to_process[batch_results] = None
                 batch = []
 
@@ -946,7 +1045,9 @@ def filter_reactions_from_file(
 
         # process the last batch if it's not empty
         if batch:
-            batch_results = process_batch.remote(batch, config, filters)
+            batch_results = process_batch.remote(
+                batch, config, filters, ignore_errors=ignore_errors
+            )
             batches_to_process[batch_results] = None
 
         # process remaining batches

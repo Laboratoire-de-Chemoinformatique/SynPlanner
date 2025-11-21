@@ -1,4 +1,4 @@
-from CGRtools.periodictable import Core, At, DynamicElement
+from chython.periodictable import At, Core, DynamicElement
 from typing import Optional
 
 

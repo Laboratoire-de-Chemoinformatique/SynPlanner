@@ -3,14 +3,14 @@ from functools import partial
 from math import hypot
 from uuid import uuid4
 
-from CGRtools.algorithms.depict import (
+from chython.algorithms.depict import (
     Depict,
     DepictCGR,
     DepictMolecule,
     _render_charge,
     rotate_vector,
 )
-from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
+from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 
 
 class WideBondDepictCGR(DepictCGR):

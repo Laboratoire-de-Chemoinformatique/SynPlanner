@@ -5,7 +5,7 @@ from typing import Iterator, List, Tuple, Union
 
 import torch
 import torch_geometric
-from CGRtools.reactor.reactor import Reactor
+from chython.reactor.reactor import Reactor
 
 from synplan.chem.precursor import Precursor
 from synplan.ml.networks.policy import PolicyNetwork

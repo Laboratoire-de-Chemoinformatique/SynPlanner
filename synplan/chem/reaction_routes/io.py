@@ -1,11 +1,11 @@
 import csv
 import json
-import pickle
 import os
+import pickle
 
-from CGRtools import smiles as read_smiles
-from synplan.mcts.tree import Tree
+from chython import smiles as read_smiles
 from synplan.chem.reaction_routes.route_cgr import extract_reactions
+from synplan.mcts.tree import Tree
 
 
 def _collect_reactions(tree):

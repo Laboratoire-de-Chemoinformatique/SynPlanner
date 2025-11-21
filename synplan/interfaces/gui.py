@@ -6,7 +6,7 @@ import re
 import uuid
 import zipfile
 
-from CGRtools.files import SMILESRead
+from chython.files import SMILESRead
 from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import disable_progress_bars
 import pandas as pd

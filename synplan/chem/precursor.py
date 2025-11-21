@@ -3,7 +3,7 @@ the search tree."""
 
 from typing import Set
 
-from CGRtools.containers import MoleculeContainer
+from chython.containers import MoleculeContainer
 
 from synplan.chem.utils import safe_canonicalization
 

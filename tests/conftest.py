@@ -2,8 +2,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from CGRtools import smiles
-from CGRtools.containers import ReactionContainer, CGRContainer
+from chython import smiles
+from chython.containers import CGRContainer, ReactionContainer
 
 from synplan.chem.data.filtering import (
     ReactionFilterConfig,

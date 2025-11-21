@@ -4,8 +4,8 @@ import pickle
 import re
 from typing import Any, Dict
 
-from CGRtools.containers import CGRContainer, ReactionContainer
-from CGRtools.containers.bonds import DynamicBond
+from chython.containers import CGRContainer, ReactionContainer
+from chython.containers.bonds import DynamicBond
 
 from synplan.chem.reaction_routes.io import (
     make_dict,

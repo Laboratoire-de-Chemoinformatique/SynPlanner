@@ -6,8 +6,8 @@ from collections import deque
 from typing import Any, Dict, List, Union
 from datetime import datetime
 
-from CGRtools.containers.molecule import MoleculeContainer
-from CGRtools import smiles as read_smiles
+from chython import smiles as read_smiles
+from chython.containers.molecule import MoleculeContainer
 
 from synplan.chem.reaction_routes.visualisation import (
     cgr_display,

@@ -2,7 +2,7 @@ import random
 import time
 from typing import Callable, List, Tuple
 
-from CGRtools.containers import MoleculeContainer
+from chython.containers import MoleculeContainer
 
 from synplan.mcts.tree import Tree
 from synplan.utils.config import TreeConfig, RolloutEvaluationConfig

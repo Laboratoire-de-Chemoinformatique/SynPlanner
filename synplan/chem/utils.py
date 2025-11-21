@@ -1,22 +1,16 @@
 """Module containing additional functions needed in different reaction data processing
 protocols."""
 
-from io import StringIO
 import logging
+from io import StringIO
 from typing import Iterable
 
-from CGRtools.containers import (
-    CGRContainer,
-    MoleculeContainer,
-    QueryContainer,
-    ReactionContainer,
-)
-from CGRtools.exceptions import InvalidAromaticRing
-from CGRtools.files.SDFrw import SDFRead
-from chython import MoleculeContainer as MoleculeContainerChython
+from chython.containers import CGRContainer, MoleculeContainer, QueryContainer, ReactionContainer
+from chython.exceptions import InvalidAromaticRing
+from chython.files.SDFrw import SDFRead
 from tqdm.auto import tqdm
 
-from synplan.chem import smiles_parser
+from chython import smiles as smiles_parser
 from synplan.utils.files import MoleculeReader, MoleculeWriter
 
 
@@ -34,12 +28,12 @@ def mol_from_smiles(
     :param clean_stereo: Whether to remove the stereo marks on atoms of the molecule (default is True).
     :param clean2d: Whether to clean the 2D coordinates of the molecule (default is True).
     :return: The processed molecule object.
-    :raises ValueError: If the SMILES string could not be processed by CGRtools.
+    :raises ValueError: If the SMILES string could not be processed by chython.
     """
-    molecule = smiles_parser(smiles)
+    molecule = smiles_parser(smiles, ignore=True)
 
     if not isinstance(molecule, MoleculeContainer):
-        raise ValueError("SMILES string was not processed by CGRtools")
+        raise ValueError("SMILES string was not processed by chython")
 
     tmp = molecule.copy()
     try:
@@ -52,7 +46,7 @@ def mol_from_smiles(
         molecule = tmp
     except InvalidAromaticRing:
         logging.warning(
-            "CGRtools was not able to standardize molecule due to invalid aromatic ring"
+            "chython was not able to standardize molecule due to invalid aromatic ring"
         )
     return molecule
 
@@ -158,7 +152,7 @@ def standardize_building_blocks(input_file: str, output_file: str) -> str:
 
 def _standardize_one_smiles(smiles_str: str) -> str | None:
     try:
-        mol = smiles_parser(smiles_str)
+        mol = smiles_parser(smiles_str, ignore=True)
         mol = safe_canonicalization(mol)
         return str(mol)
     except Exception:
@@ -252,8 +246,12 @@ def reverse_reaction(
     return reversed_reaction
 
 
-def cgrtools_to_chython_molecule(molecule):
-    molecule_chython = MoleculeContainerChython()
+def to_chython_molecule(molecule):
+    """Compatibility shim: ensure a MoleculeContainer instance."""
+    if isinstance(molecule, MoleculeContainer):
+        return molecule
+
+    molecule_chython = MoleculeContainer()
     for n, atom in molecule.atoms():
         molecule_chython.add_atom(atom.atomic_symbol, n)
 
@@ -261,19 +259,3 @@ def cgrtools_to_chython_molecule(molecule):
         molecule_chython.add_bond(n, m, int(bond))
 
     return molecule_chython
-
-
-def chython_query_to_cgrtools(query):
-    cgrtools_query = QueryContainer()
-    for n, atom in query.atoms():
-        cgrtools_query.add_atom(
-            atom=atom.atomic_symbol,
-            charge=atom.charge,
-            neighbors=atom.neighbors,
-            hybridization=atom.hybridization,
-            _map=n,
-        )
-    for n, m, bond in query.bonds():
-        cgrtools_query.add_bond(n, m, int(bond))
-
-    return cgrtools_query

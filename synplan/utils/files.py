@@ -3,12 +3,12 @@ reading/writing."""
 
 from os.path import splitext
 from pathlib import Path
-from typing import Iterable, Union, Iterator
+from typing import Iterable, Iterator, Union
 
-from CGRtools import smiles
-from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
-from CGRtools.files.RDFrw import RDFRead, RDFWrite
-from CGRtools.files.SDFrw import SDFRead, SDFWrite
+from chython import smiles
+from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
+from chython.files.RDFrw import RDFRead, RDFWrite
+from chython.files.SDFrw import SDFRead, SDFWrite
 
 
 class FileHandler:

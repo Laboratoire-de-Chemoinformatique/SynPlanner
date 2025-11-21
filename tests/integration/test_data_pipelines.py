@@ -2,9 +2,9 @@
 
 import pickle
 from pathlib import Path
-from CGRtools import smiles as smiles_cgrtools
 
 import pytest
+from chython import smiles as smiles_chython
 
 from synplan.chem.data.standardizing import (
     standardize_reactions_from_file,
@@ -23,7 +23,7 @@ def debug_standardization(reaction_smiles: str, standardizers: list) -> None:
     print(f"\nDebugging reaction: {reaction_smiles}")
     try:
         # Parse the reaction
-        reaction = smiles_cgrtools(reaction_smiles)
+        reaction = smiles_chython(reaction_smiles)
         print(f"Successfully parsed reaction: {reaction}")
 
         # Apply each standardizer one by one
@@ -103,6 +103,38 @@ def test_filtering_keeps_some(
 
     kept = out.read_text().splitlines()
     assert 0 < len(kept) < len(open(sample_reactions_file).read().splitlines())
+
+
+def test_filtering_parallel_matches_serial(
+    tmp_path: Path,
+    sample_reactions_file: Path,
+    filt_config,
+):
+    serial_out = tmp_path / "filt_serial.smi"
+    parallel_out = tmp_path / "filt_parallel.smi"
+
+    filter_reactions_from_file(
+        config=filt_config,
+        input_reaction_data_path=str(sample_reactions_file),
+        filtered_reaction_data_path=str(serial_out),
+        num_cpus=1,
+        batch_size=2,
+    )
+
+    filter_reactions_from_file(
+        config=filt_config,
+        input_reaction_data_path=str(sample_reactions_file),
+        filtered_reaction_data_path=str(parallel_out),
+        num_cpus=2,
+        batch_size=2,
+    )
+
+    serial_lines = serial_out.read_text().splitlines()
+    parallel_lines = parallel_out.read_text().splitlines()
+
+    assert serial_lines, "serial filtering removed every reaction"
+    assert parallel_lines, "parallel filtering removed every reaction"
+    assert serial_lines == parallel_lines
 
 
 # --------------------------------------------------------------------------- #

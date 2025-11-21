@@ -5,13 +5,8 @@ from __future__ import annotations
 from typing import Iterable, Set
 
 import pytest
-from CGRtools import smiles
-from CGRtools.containers import (
-    CGRContainer,
-    MoleculeContainer,
-    QueryContainer,
-    ReactionContainer,
-)
+from chython import smiles
+from chython.containers import CGRContainer, MoleculeContainer, QueryContainer, ReactionContainer
 from chython import smarts as sq_chy
 
 from synplan.chem.reaction_rules.extraction import (
@@ -20,7 +15,7 @@ from synplan.chem.reaction_rules.extraction import (
     add_ring_structures,
     clean_molecules,
 )
-from synplan.chem.utils import cgrtools_to_chython_molecule
+from synplan.chem.utils import to_chython_molecule
 from synplan.utils.config import RuleExtractionConfig
 
 # ---------------------------------------------------------------------------
@@ -37,7 +32,7 @@ def default_config() -> RuleExtractionConfig:  # noqa: D401 – simple factory
 def _neighbours(mol: MoleculeContainer | CGRContainer, idx: int) -> Set[int]:
     """Return immediate neighbour atom numbers for *idx*.
 
-    Implementation relies on CGRtools' private `_bonds` mapping because the
+    Implementation relies on chython's private `_bonds` mapping because the
     public `Atom.neighbors` returns only a **count**.  Falls back to scanning
     `mol.bonds` if the mapping is unavailable.
     """
@@ -83,7 +78,7 @@ def test_add_functional_groups(
 ) -> None:
     centre = {3, 4, 5, 6}
     carbonyl = sq_chy("[C]=[O]")
-    r0_ch = cgrtools_to_chython_molecule(simple_esterification_reaction.reactants[0])
+    r0_ch = to_chython_molecule(simple_esterification_reaction.reactants[0])
 
     expected = centre.copy()
     for mp in carbonyl.get_mapping(r0_ch):

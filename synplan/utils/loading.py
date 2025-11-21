@@ -7,11 +7,11 @@ import os
 from pathlib import Path
 import pickle
 import shutil
-from typing import FrozenSet, List, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, FrozenSet, List, Union
 import zipfile
 
-from CGRtools.files.SDFrw import SDFRead
-from CGRtools.reactor.reactor import Reactor
+from chython.files.SDFrw import SDFRead
+from chython.reactor.reactor import Reactor
 from huggingface_hub import hf_hub_download, snapshot_download
 from torch import device
 from tqdm.auto import tqdm

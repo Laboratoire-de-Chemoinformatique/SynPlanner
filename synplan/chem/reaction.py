@@ -3,9 +3,9 @@ rules."""
 
 from typing import Any, Iterator, List, Optional
 
-from CGRtools.containers import MoleculeContainer, ReactionContainer
-from CGRtools.exceptions import InvalidAromaticRing
-from CGRtools.reactor import Reactor
+from chython.containers import MoleculeContainer, ReactionContainer
+from chython.exceptions import InvalidAromaticRing
+from chython.reactor import Reactor
 
 
 class Reaction(ReactionContainer):

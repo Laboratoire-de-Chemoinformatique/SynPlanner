@@ -1,5 +1,5 @@
-from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
-from CGRtools.containers.bonds import DynamicBond
+from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
+from chython.containers.bonds import DynamicBond
 
 from synplan.mcts.tree import Tree
 

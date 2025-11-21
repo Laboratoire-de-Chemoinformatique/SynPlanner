@@ -7,10 +7,10 @@ import os
 import pickle
 from typing import Any, Dict, List, Optional, Tuple
 
-from CGRtools import smiles
-from CGRtools.containers import MoleculeContainer
-from CGRtools.exceptions import InvalidAromaticRing
-from CGRtools.reactor import Reactor
+from chython import smiles
+from chython.containers import MoleculeContainer
+from chython.exceptions import InvalidAromaticRing
+from chython.reactor import Reactor
 import ray
 from ray.util.queue import Empty, Queue
 import torch

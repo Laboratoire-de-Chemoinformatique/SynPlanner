@@ -16,7 +16,7 @@ Overview of datasets
     ================================== =================================================================================
     Reactions                          Reactions can be loaded and stored as the list of reaction smiles in the file (.smi) or RDF File (.rdf)
     Molecules                          Molecules can be loaded and stored as the list of molecule smiles in the file (.smi) or SDF File (.sdf)
-    Reaction rules                     Reaction rules can be loaded and stored as the pickled list of CGRtools ReactionContainer objects (.pickle)
+    Reaction rules                     Reaction rules can be loaded and stored as the pickled list of chython ReactionContainer objects (.pickle)
     Retrosynthetic models              Retrosynthetic models (neural networks) can be loaded and stored as serialized PyTorch models (.ckpt)
     Retrosynthetic routes              Retrosynthetic routes can be visualized and stored as HTML files (.html) and can be stored as JSON files (.json)
     ================================== =================================================================================
@@ -68,5 +68,4 @@ Download from Hugging Face (browse)
   - `weights/ <https://huggingface.co/Laboratoire-De-Chemoinformatique/SynPlanner/tree/main/weights>`_
   - `benchmarks/ <https://huggingface.co/Laboratoire-De-Chemoinformatique/SynPlanner/tree/main/benchmarks>`_
   - `tutorial/ <https://huggingface.co/Laboratoire-De-Chemoinformatique/SynPlanner/tree/main/tutorial>`_
-
 

@@ -1,4 +1,4 @@
-from CGRtools.containers import MoleculeContainer
+from chython.containers import MoleculeContainer
 from .node import *
 from .tree import *
 

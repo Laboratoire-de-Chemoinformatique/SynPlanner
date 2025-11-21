@@ -1,16 +1,14 @@
 import pytest
 
+from chython.containers import CGRContainer, ReactionContainer
+
 # === Tests for route_cgr.py functions ===
 from synplan.chem.reaction_routes.route_cgr import compose_route_cgr, compose_sb_cgr
 from synplan.chem.reaction_routes.io import (
-    read_routes_csv,
-    read_routes_json,
     TreeWrapper,
     make_dict,
-)
-from CGRtools.containers import (
-    CGRContainer,
-    ReactionContainer,
+    read_routes_csv,
+    read_routes_json,
 )
 
 
