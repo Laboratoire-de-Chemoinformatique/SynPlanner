@@ -115,10 +115,10 @@ def apply_reaction_rule(
         if validate_products:
             for mol in reactants:
                 try:
-                    mol.kekule()
-                    if mol.check_valence():
+                    tmp_mol = mol.copy()
+                    tmp_mol.kekule()
+                    if tmp_mol.check_valence():
                         yield None
-                    mol.thiele()
                 except InvalidAromaticRing:
                     yield None
 

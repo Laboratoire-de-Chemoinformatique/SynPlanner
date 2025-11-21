@@ -262,8 +262,9 @@ def reaction_rules_appliance(
         try:
             for reaction in rule([molecule]):
                 for prod in reaction.products:
-                    prod.kekule()
-                    if prod.check_valence():
+                    tmp_prod = prod.copy()
+                    tmp_prod.kekule()
+                    if tmp_prod.check_valence():
                         break
                     rule_applied = True
 

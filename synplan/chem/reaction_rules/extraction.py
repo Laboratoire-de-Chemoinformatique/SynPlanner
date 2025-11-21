@@ -22,7 +22,7 @@ from chython.reactor import Reactor
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
 from synplan.chem.utils import reverse_reaction
 from synplan.utils.config import RuleExtractionConfig
-from synplan.utils.files import ReactionReader
+from synplan.utils.files import ReactionReader, ReactionWriter
 
 
 logger = logging.getLogger(__name__)
@@ -675,8 +675,8 @@ def extract_rules_from_reactions(
     This function initializes a Ray environment for distributed computing and processes
     each reaction in the provided reaction database to extract reaction rules. It
     handles the reactions in batches, parallelize the rule extraction process. Extracted
-    rules are written to RDF files and their statistics are recorded. The function also
-    sorts the rules based on their popularity and saves the sorted rules.
+    rules and their statistics are collected, then saved both as a pickle with
+    statistics and as mapped reaction SMILES (.smi) records for interoperability.
 
     :param config: Configuration settings for rule extraction, including file paths,
         batch size, and other parameters.
@@ -744,7 +744,16 @@ def extract_rules_from_reactions(
         single_product_only=config.single_product_only,
     )
 
+    # Save full statistics for downstream code that expects a pickle file.
     with open(f"{reaction_rules_path}.pickle", "wb") as statistics_file:
         pickle.dump(sorted_rules, statistics_file)
+
+    # Additionally, save reaction rules as mapped reaction SMILES (CXSMILES) text.
+    # This mirrors the reaction filtering protocol and allows interoperable,
+    # non-pickled serialization of rules.
+    rules_smiles_path = f"{reaction_rules_path}.smi"
+    with ReactionWriter(rules_smiles_path, mapping=True) as rules_file:
+        for rule, _indices in sorted_rules:
+            rules_file.write(rule)
 
     print(f"Number of extracted reaction rules: {len(sorted_rules)}")
