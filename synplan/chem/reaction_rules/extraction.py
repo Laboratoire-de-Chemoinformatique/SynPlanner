@@ -47,7 +47,8 @@ def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
     hg = getattr(mol, '_hydrogens', {}) or {}
     rs = getattr(mol, 'atoms_rings_sizes', {}) or {}
     plane = getattr(mol, '_plane', {}) if hasattr(mol, '_plane') else {}
-    q._neighbors = {n: (len(mol._bonds[n]),) for n in atoms}
+    bonds = getattr(mol, '_bonds', {}) or {}
+    q._neighbors = {n: (len(bonds.get(n, {})),) for n in atoms}
     q._hybridizations = {n: (sh.get(n, 0),) for n in atoms}
     q._hydrogens = {n: () if hg.get(n) is None else (hg[n],) for n in atoms}
     q._rings_sizes = {n: rs.get(n, ()) for n in atoms}
@@ -471,8 +472,18 @@ def create_rule(
     )
     # 7. clean atom marks in the molecules if they are being converted to query containers
     if config.as_query_container:
-        _ = clean_molecules(reactant_substructures, reaction.reactants, center_atoms, config.atom_info_retention)
-        _ = clean_molecules(product_substructures, reaction.products, center_atoms, config.atom_info_retention)
+        reactant_substructures = clean_molecules(
+            reactant_substructures,
+            reaction.reactants,
+            center_atoms,
+            config.atom_info_retention,
+        )
+        product_substructures = clean_molecules(
+            product_substructures,
+            reaction.products,
+            center_atoms,
+            config.atom_info_retention,
+        )
 
     # 8. assemble the final rule including metadata if specified
     rule = assemble_final_rule(reactant_substructures, product_substructures, reagents, meta_debug, config.keep_metadata, reaction)
