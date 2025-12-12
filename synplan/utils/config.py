@@ -704,6 +704,50 @@ class RandomEvaluationConfig(ConfigABC):
             raise ValueError("normalize must be a boolean.")
 
 
+@dataclass
+class CombinedPolicyConfig(ConfigABC):
+    """Configuration for combined filtering + ranking policy.
+
+    Combines filtering and ranking policies by multiplying their probabilities.
+    The filtering policy provides applicability probabilities (sigmoid outputs),
+    while the ranking policy provides relative ranking probabilities (softmax outputs).
+
+    :param filtering_weights_path: Path to the filtering policy network weights.
+    :param ranking_weights_path: Path to the ranking policy network weights.
+    :param top_rules: Number of top rules to return.
+    :param rule_prob_threshold: Minimum probability threshold for returning a rule.
+    :param priority_rules_fraction: Coefficient for combining priority rules in filtering.
+    """
+
+    filtering_weights_path: str
+    ranking_weights_path: str
+    top_rules: int = 50
+    rule_prob_threshold: float = 0.0
+    priority_rules_fraction: float = 0.5
+
+    @staticmethod
+    def from_dict(config_dict: Dict[str, Any]) -> "CombinedPolicyConfig":
+        return CombinedPolicyConfig(**config_dict)
+
+    @staticmethod
+    def from_yaml(file_path: str) -> "CombinedPolicyConfig":
+        with open(file_path, "r", encoding="utf-8") as file:
+            config_dict = yaml.safe_load(file)
+        return CombinedPolicyConfig.from_dict(config_dict)
+
+    def _validate_params(self, params: Dict[str, Any]):
+        if not isinstance(params.get("filtering_weights_path"), str):
+            raise ValueError("filtering_weights_path must be a string.")
+        if not isinstance(params.get("ranking_weights_path"), str):
+            raise ValueError("ranking_weights_path must be a string.")
+        if not isinstance(params.get("top_rules", 50), int) or params.get("top_rules", 50) <= 0:
+            raise ValueError("top_rules must be a positive integer.")
+        if not isinstance(params.get("rule_prob_threshold", 0.0), float):
+            raise ValueError("rule_prob_threshold must be a float.")
+        if not isinstance(params.get("priority_rules_fraction", 0.5), float):
+            raise ValueError("priority_rules_fraction must be a float.")
+
+
 def convert_config_to_dict(config_attr: ConfigABC, config_type) -> Dict | None:
     """Converts a configuration attribute to a dictionary if it's either a dictionary or
     an instance of a specified configuration type.

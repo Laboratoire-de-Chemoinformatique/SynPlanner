@@ -31,8 +31,8 @@ from synplan.utils.files import (
 from synplan.utils.parallel import process_pool_map_stream
 
 if TYPE_CHECKING:
-    from synplan.utils.config import ValueNetworkConfig, PolicyNetworkConfig
-    from synplan.mcts.expansion import PolicyNetworkFunction
+    from synplan.utils.config import ValueNetworkConfig, PolicyNetworkConfig, CombinedPolicyConfig
+    from synplan.mcts.expansion import PolicyNetworkFunction, CombinedPolicyNetworkFunction
     from synplan.mcts.evaluation import ValueNetworkFunction, EvaluationStrategy
 
 REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
@@ -377,6 +377,121 @@ def load_policy_function(
         return PolicyNetworkFunction(policy_config=policy_config)
 
     raise ValueError("Must provide either policy_config or weights_path")
+
+
+def load_combined_policy_function(
+    combined_config: Union["CombinedPolicyConfig", dict] = None,
+    filtering_config: Union["PolicyNetworkConfig", dict, str] = None,
+    ranking_config: Union["PolicyNetworkConfig", dict, str] = None,
+    filtering_weights_path: str = None,
+    ranking_weights_path: str = None,
+    top_rules: int = 50,
+    rule_prob_threshold: float = 0.0,
+    priority_rules_fraction: float = 0.5,
+) -> "CombinedPolicyNetworkFunction":
+    """Factory function to create CombinedPolicyNetworkFunction with flexible configuration.
+
+    Combines filtering and ranking policies by multiplying their probabilities.
+    The filtering policy provides applicability probabilities (sigmoid outputs),
+    while the ranking policy provides relative ranking probabilities (softmax outputs).
+
+    :param combined_config: CombinedPolicyConfig or dict with all parameters.
+    :param filtering_config: PolicyNetworkConfig or dict for filtering policy.
+    :param ranking_config: PolicyNetworkConfig or dict for ranking policy.
+    :param filtering_weights_path: Direct path to filtering weights (shortcut).
+    :param ranking_weights_path: Direct path to ranking weights (shortcut).
+    :param top_rules: Number of top rules to return.
+    :param rule_prob_threshold: Minimum probability threshold for returning a rule.
+    :param priority_rules_fraction: Coefficient for combining priority rules in filtering.
+    :return: CombinedPolicyNetworkFunction ready for use in tree search.
+
+    Examples:
+        >>> # Using CombinedPolicyConfig
+        >>> config = CombinedPolicyConfig(
+        ...     filtering_weights_path="filtering.ckpt",
+        ...     ranking_weights_path="ranking.ckpt",
+        ... )
+        >>> combined = load_combined_policy_function(combined_config=config)
+        >>>
+        >>> # Using config objects
+        >>> combined = load_combined_policy_function(
+        ...     filtering_config={"weights_path": "filtering.ckpt", "policy_type": "filtering"},
+        ...     ranking_config={"weights_path": "ranking.ckpt", "policy_type": "ranking"},
+        ... )
+        >>>
+        >>> # Using direct paths (simplest)
+        >>> combined = load_combined_policy_function(
+        ...     filtering_weights_path="filtering.ckpt",
+        ...     ranking_weights_path="ranking.ckpt",
+        ... )
+    """
+    from synplan.mcts.expansion import CombinedPolicyNetworkFunction
+    from synplan.utils.config import PolicyNetworkConfig, CombinedPolicyConfig
+
+    # Priority 1: Use CombinedPolicyConfig
+    if combined_config is not None:
+        if isinstance(combined_config, dict):
+            combined_config = CombinedPolicyConfig.from_dict(combined_config)
+        filtering_weights_path = combined_config.filtering_weights_path
+        ranking_weights_path = combined_config.ranking_weights_path
+        top_rules = combined_config.top_rules
+        rule_prob_threshold = combined_config.rule_prob_threshold
+        priority_rules_fraction = combined_config.priority_rules_fraction
+        filtering_config = PolicyNetworkConfig(
+            weights_path=filtering_weights_path, policy_type="filtering"
+        )
+        ranking_config = PolicyNetworkConfig(
+            weights_path=ranking_weights_path, policy_type="ranking"
+        )
+        return CombinedPolicyNetworkFunction(
+            filtering_config=filtering_config,
+            ranking_config=ranking_config,
+            top_rules=top_rules,
+            rule_prob_threshold=rule_prob_threshold,
+            priority_rules_fraction=priority_rules_fraction,
+        )
+
+    # Build filtering config
+    if filtering_config is not None:
+        if isinstance(filtering_config, str):
+            filtering_config = PolicyNetworkConfig(
+                weights_path=filtering_config, policy_type="filtering"
+            )
+        elif isinstance(filtering_config, dict):
+            filtering_config.setdefault("policy_type", "filtering")
+            filtering_config = PolicyNetworkConfig.from_dict(filtering_config)
+    elif filtering_weights_path is not None:
+        filtering_config = PolicyNetworkConfig(
+            weights_path=filtering_weights_path, policy_type="filtering"
+        )
+    else:
+        raise ValueError(
+            "Must provide either filtering_config or filtering_weights_path"
+        )
+
+    # Build ranking config
+    if ranking_config is not None:
+        if isinstance(ranking_config, str):
+            ranking_config = PolicyNetworkConfig(
+                weights_path=ranking_config, policy_type="ranking"
+            )
+        elif isinstance(ranking_config, dict):
+            ranking_config.setdefault("policy_type", "ranking")
+            ranking_config = PolicyNetworkConfig.from_dict(ranking_config)
+    elif ranking_weights_path is not None:
+        ranking_config = PolicyNetworkConfig(
+            weights_path=ranking_weights_path, policy_type="ranking"
+        )
+    else:
+        raise ValueError("Must provide either ranking_config or ranking_weights_path")
+
+    return CombinedPolicyNetworkFunction(
+        filtering_config=filtering_config,
+        ranking_config=ranking_config,
+        top_rules=top_rules,
+        rule_prob_threshold=rule_prob_threshold,
+        priority_rules_fraction=priority_rules_fraction,
+    )
 
 
 def load_value_network(
