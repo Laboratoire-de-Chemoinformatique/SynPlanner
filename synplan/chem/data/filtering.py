@@ -918,9 +918,10 @@ def filter_reactions_from_file(
     ray.init(num_cpus=num_cpus, ignore_reinit_error=True, logging_level=logging.ERROR)
     max_concurrent_batches = num_cpus  # limit the number of concurrent batches
     lines_counter = 0
-    with ReactionReader(input_reaction_data_path) as reactions, ReactionWriter(
-        filtered_reaction_data_path
-    ) as result_file:
+    with (
+        ReactionReader(input_reaction_data_path) as reactions,
+        ReactionWriter(filtered_reaction_data_path) as result_file,
+    ):
 
         batches_to_process, batch = {}, []
         n_filtered = 0

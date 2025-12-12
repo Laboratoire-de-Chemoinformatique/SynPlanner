@@ -1,9 +1,11 @@
 """Module containing classes and functions needed for reactions/molecules data
 reading/writing."""
 
+import csv
+import gzip
 from os.path import splitext
 from pathlib import Path
-from typing import Iterable, Union, Iterator
+from typing import Iterable, Iterator, TextIO, Union
 
 from CGRtools import smiles
 from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
@@ -238,6 +240,34 @@ def iter_sdf_text_blocks(
         yield "".join(buf)
 
 
+def open_text(path: Union[str, Path]) -> TextIO:
+    """Open a text file that may be gzip-compressed.
+
+    If the path ends with ".gz", the file is opened via gzip in text mode.
+    """
+    p = Path(path)
+    if p.suffix.lower() == ".gz":
+        return gzip.open(p, "rt", encoding="utf-8", newline="")
+    return open(p, "r", encoding="utf-8", newline="")
+
+
+def _resolve_csv_column(fieldnames: list[str] | None, column: str) -> str:
+    """Resolve CSV column name with a case-insensitive fallback."""
+    if not fieldnames:
+        raise ValueError("CSV header is missing field names.")
+    if column in fieldnames:
+        return column
+
+    matches = [name for name in fieldnames if name.lower() == column.lower()]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        raise ValueError(
+            f"Ambiguous CSV column name '{column}'. Case-insensitive matches: {matches}"
+        )
+    raise ValueError(f"Expected '{column}' column in CSV header, got {fieldnames}")
+
+
 def count_smiles_records(path: Union[str, Path]) -> int:
     """Count number of non-empty SMILES records (lines)."""
     p = Path(path)
@@ -263,6 +293,67 @@ def iter_smiles_blocks(
     step = max(1, records_per_block)
     block: list[str] = []
     for smi in iter_smiles(path):
+        block.append(smi)
+        if len(block) == step:
+            yield block
+            block = []
+    if block:
+        yield block
+
+
+def iter_csv_smiles(
+    path: Union[str, Path],
+    *,
+    header: bool = True,
+    delimiter: str = ",",
+    smiles_column: str = "SMILES",
+) -> Iterator[str]:
+    """Yield SMILES strings from a CSV/CSV.GZ file.
+
+    Parameters
+    ----------
+    path
+        Path to the CSV file. If it ends with ".gz", it's treated as gzipped CSV.
+    header
+        If True, treat the first row as a header and read from `smiles_column`.
+        If False, treat the first column as SMILES.
+    delimiter
+        CSV delimiter (default: ",").
+    smiles_column
+        Column name containing SMILES (used when `header=True`).
+    """
+    with open_text(path) as f:
+        if header:
+            reader = csv.DictReader(f, delimiter=delimiter)
+            column = _resolve_csv_column(reader.fieldnames, smiles_column)
+            for row in reader:
+                smi = (row.get(column) or "").strip()
+                if smi:
+                    yield smi
+        else:
+            reader = csv.reader(f, delimiter=delimiter)
+            for row in reader:
+                if not row:
+                    continue
+                smi = (row[0] or "").strip()
+                if smi:
+                    yield smi
+
+
+def iter_csv_smiles_blocks(
+    path: Union[str, Path],
+    records_per_block: int,
+    *,
+    header: bool = True,
+    delimiter: str = ",",
+    smiles_column: str = "SMILES",
+) -> Iterator[list[str]]:
+    """Yield SMILES lists of up to `records_per_block` items from a CSV/CSV.GZ file."""
+    step = max(1, records_per_block)
+    block: list[str] = []
+    for smi in iter_csv_smiles(
+        path, header=header, delimiter=delimiter, smiles_column=smiles_column
+    ):
         block.append(smi)
         if len(block) == step:
             yield block
