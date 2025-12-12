@@ -129,19 +129,20 @@ If you have a question or want to report a bug, please submit an issue.
 👥 Maintainers
 =============================
 
-* `Tagir Akhmetshin <https://github.com/tagirshin>`_
-* `Dmitry Zankov <https://github.com/dzankov>`_
+* `Tagir Akhmetshin <https://github.com/tagirshin>`_ - main developer and maintainer.
 
 👥 Contributors
 =============================
 
-* `Timur Madzhidov <tmadzhidov@gmail.com>`_
-* `Alexandre Varnek <varnek@unistra.fr>`_
-* `Almaz Gilmullin <https://github.com/Protolaw>`_
-* `Philippe Gantzer <https://github.com/PGantzer>`_
-* `Dmitry Babadeev <https://github.com/prog420>`_
-* `Anna Pinigina <anna.10081048@gmail.com>`_
-* `Mikhail Volkov <https://github.com/mbvolkoff>`_
+* `Timur Madzhidov <tmadzhidov@gmail.com>`_ - key contributor, main initiator and inspirator of the project.
+* `Alexandre Varnek <varnek@unistra.fr>`_ - supervisor of the project.
+* `Dmitry Zankov <https://github.com/dzankov>`_ - data curation adoption, tutorials, documentation and reproducibility of the results.
+* `Almaz Gilmullin <https://github.com/Protolaw>`_  - implementation of the clustreing module.
+* `Philippe Gantzer <https://github.com/PGantzer>`_ - implementation of inital graphical user interface and unified writing module.
+* `Dmitry Babadeev <https://github.com/prog420>`_ - implementation of the inital retrosynthetic planning module and routes visualization.
+* `Anna Pinigina <anna.10081048@gmail.com>`_ - implementation of the rule extraction module.
+* `Milo Roucairol <https://github.com/RoucairolMilo>`_ - implementation of the various search strategies.
+* `Mikhail Volkov <https://github.com/mbvolkoff>`_ - help in testing and debugging the code.
 
 📜 How to Cite
 =============================

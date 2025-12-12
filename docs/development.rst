@@ -1,26 +1,23 @@
 Development
 ================
 
-This page covers local development setup, Poetry usage, and building Docker images.
+This page covers local development setup, uv usage, and building Docker images.
 
-Poetry setup
-------------
+uv setup
+--------
 
 .. code-block:: bash
 
-   # Install Poetry (see https://python-poetry.org/docs/)
-   curl -sSL https://install.python-poetry.org | python3 -
-   export PATH="$HOME/.local/bin:$PATH"
+   # Install uv (see https://docs.astral.sh/uv/getting-started/installation/)
+   curl -LsSf https://astral.sh/uv/install.sh | sh
 
    # Clone and install with extras for docs/dev
    git clone https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner.git
    cd SynPlanner
-   poetry env use $(which python)
-   poetry install --with docs,dev
-   poetry shell
+   uv sync --group docs --group dev --extra cpu
 
    # Run tests
-   pytest -q
+   uv run pytest -q
 
 Build CLI Docker image
 ----------------------
@@ -46,7 +43,7 @@ To push locally (requires write permissions to the repo's packages):
 
 .. code-block:: bash
 
-   VERSION=$(python -c 'import tomllib,sys;print(tomllib.load(open("pyproject.toml","rb"))["tool"]["poetry"]["version"])')
+   VERSION=$(python -c 'import tomllib,sys;print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
    docker login ghcr.io -u USERNAME -p TOKEN
    REPO=ghcr.io/laboratoire-de-chemoinformatique/synplanner
    docker tag synplan:dev-cli-amd64 ${REPO}:${VERSION}-cli-amd64
