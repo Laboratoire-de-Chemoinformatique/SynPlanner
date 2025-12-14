@@ -85,15 +85,15 @@ DEFAULT_CONFIG_PATH = Path(__file__).parent / "config.yaml"
 def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
     """
     Load configuration from YAML file.
-    
+
     Auto-discovers config.yaml in the script's folder if no path specified.
-    
+
     Args:
         config_path: Path to YAML config file. If None, uses default config.yaml
-        
+
     Returns:
         Dictionary with configuration sections: paths, benchmark, policy, tree, evaluation
-        
+
     Example:
         >>> config = load_config()
         >>> print(config["policy"]["top_rules"])
@@ -101,33 +101,33 @@ def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
     """
     if config_path is None:
         config_path = DEFAULT_CONFIG_PATH
-    
+
     if not config_path.exists():
         raise FileNotFoundError(
             f"Config file not found: {config_path}\n"
             f"Expected at: {DEFAULT_CONFIG_PATH}"
         )
-    
+
     logger.info(f"Loading config from: {config_path}")
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
-    
+
     return config
 
 
 def load_policy_from_config(config_path: Optional[Path] = None):
     """
     Load just the combined policy function from config.
-    
+
     This is useful when you want to use the policy in your own code
     without running the full benchmark.
-    
+
     Args:
         config_path: Path to YAML config file. If None, uses default config.yaml
-        
+
     Returns:
         policy_function: The combined policy function ready to use
-        
+
     Example:
         >>> from scripts.sascore_bench.run_benchmark import load_policy_from_config
         >>> policy = load_policy_from_config()
@@ -136,16 +136,16 @@ def load_policy_from_config(config_path: Optional[Path] = None):
     config = load_config(config_path)
     paths_cfg = config["paths"]
     policy_cfg = config["policy"]
-    
+
     data_folder = Path(paths_cfg["data_folder"]).resolve()
     ranking_policy_path = data_folder / paths_cfg["ranking_policy"]
     filtering_policy_path = data_folder / paths_cfg["filtering_policy"]
-    
+
     # Verify paths exist
     for path in [ranking_policy_path, filtering_policy_path]:
         if not path.exists():
             raise FileNotFoundError(f"Required file not found: {path}")
-    
+
     logger.info("Loading combined policy (filtering + ranking)...")
     policy_function = load_combined_policy_function(
         filtering_weights_path=str(filtering_policy_path),
@@ -154,20 +154,20 @@ def load_policy_from_config(config_path: Optional[Path] = None):
         rule_prob_threshold=policy_cfg["rule_prob_threshold"],
         priority_rules_fraction=policy_cfg["priority_rules_fraction"],
     )
-    
+
     return policy_function
 
 
 def load_resources_from_config(config_path: Optional[Path] = None):
     """
     Load all resources (policy, reaction rules, building blocks) from config.
-    
+
     This is useful when you want to set up your own planning pipeline
     using the same configuration as the benchmark.
-    
+
     Args:
         config_path: Path to YAML config file. If None, uses default config.yaml
-        
+
     Returns:
         dict with keys:
             - policy_function: Combined policy function
@@ -175,7 +175,7 @@ def load_resources_from_config(config_path: Optional[Path] = None):
             - building_blocks: Loaded building blocks set
             - tree_config: TreeConfig object
             - config: Raw config dictionary
-            
+
     Example:
         >>> from scripts.sascore_bench.run_benchmark import load_resources_from_config
         >>> resources = load_resources_from_config()
@@ -191,19 +191,23 @@ def load_resources_from_config(config_path: Optional[Path] = None):
     paths_cfg = config["paths"]
     policy_cfg = config["policy"]
     tree_cfg = config["tree"]
-    
+
     data_folder = Path(paths_cfg["data_folder"]).resolve()
     ranking_policy_path = data_folder / paths_cfg["ranking_policy"]
     filtering_policy_path = data_folder / paths_cfg["filtering_policy"]
     reaction_rules_path = data_folder / paths_cfg["reaction_rules"]
     building_blocks_path = data_folder / paths_cfg["building_blocks"]
-    
+
     # Verify paths exist
-    for path in [ranking_policy_path, filtering_policy_path, 
-                 reaction_rules_path, building_blocks_path]:
+    for path in [
+        ranking_policy_path,
+        filtering_policy_path,
+        reaction_rules_path,
+        building_blocks_path,
+    ]:
         if not path.exists():
             raise FileNotFoundError(f"Required file not found: {path}")
-    
+
     # Load policy
     logger.info("Loading combined policy (filtering + ranking)...")
     policy_function = load_combined_policy_function(
@@ -213,15 +217,15 @@ def load_resources_from_config(config_path: Optional[Path] = None):
         rule_prob_threshold=policy_cfg["rule_prob_threshold"],
         priority_rules_fraction=policy_cfg["priority_rules_fraction"],
     )
-    
+
     # Load reaction rules
     logger.info("Loading reaction rules...")
     reaction_rules = load_reaction_rules(str(reaction_rules_path))
-    
+
     # Load building blocks
     logger.info("Loading building blocks...")
     building_blocks = load_building_blocks(building_blocks_path, standardize=True)
-    
+
     # Create tree config
     tree_config = TreeConfig(
         max_iterations=tree_cfg["max_iterations"],
@@ -240,7 +244,7 @@ def load_resources_from_config(config_path: Optional[Path] = None):
         enable_pruning=tree_cfg["enable_pruning"],
         silent=tree_cfg["silent"],
     )
-    
+
     return {
         "policy_function": policy_function,
         "reaction_rules": reaction_rules,
@@ -357,10 +361,11 @@ def main():
         description="Run SAScore benchmark with combined policy"
     )
     parser.add_argument(
-        "--config", "-c",
+        "--config",
+        "-c",
         type=Path,
         default=None,
-        help=f"Path to config YAML file (default: {DEFAULT_CONFIG_PATH})"
+        help=f"Path to config YAML file (default: {DEFAULT_CONFIG_PATH})",
     )
     args = parser.parse_args()
 
@@ -474,16 +479,14 @@ def main():
     logger.info(f"Config saved to: {config_file}")
 
     # Find all benchmark files
-    benchmark_files = sorted(
-        benchmark_folder.glob(benchmark_cfg["target_pattern"])
-    )
-    
+    benchmark_files = sorted(benchmark_folder.glob(benchmark_cfg["target_pattern"]))
+
     # Apply slice if specified
     slice_start = benchmark_cfg.get("file_slice_start")
     slice_end = benchmark_cfg.get("file_slice_end")
     if slice_start is not None or slice_end is not None:
         benchmark_files = benchmark_files[slice_start:slice_end]
-    
+
     if not benchmark_files:
         raise FileNotFoundError(f"No benchmark files found in {benchmark_folder}")
 

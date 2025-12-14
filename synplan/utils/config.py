@@ -559,8 +559,14 @@ class TreeConfig(ConfigABC):
             or params.get("nmcs_level", 2) < 1
         ):
             raise ValueError("nmcs_level must be a positive integer.")
-        if params.get("nmcs_playout_mode", "greedy") not in ["greedy", "random", "policy"]:
-            raise ValueError("nmcs_playout_mode must be 'greedy', 'random', or 'policy'.")
+        if params.get("nmcs_playout_mode", "greedy") not in [
+            "greedy",
+            "random",
+            "policy",
+        ]:
+            raise ValueError(
+                "nmcs_playout_mode must be 'greedy', 'random', or 'policy'."
+            )
 
         # LazyNMCS parameters
         if not isinstance(params.get("lnmcs_ratio", 0.2), (float, int)) or not (

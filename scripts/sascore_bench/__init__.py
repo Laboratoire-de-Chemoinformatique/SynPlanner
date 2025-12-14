@@ -39,7 +39,7 @@ from scripts.sascore_bench.run_benchmark import (
 
 __all__ = [
     "load_config",
-    "load_policy_from_config", 
+    "load_policy_from_config",
     "load_resources_from_config",
     "DEFAULT_CONFIG_PATH",
 ]

@@ -506,12 +506,15 @@ class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
         self._nodes_explored += 1
         self._current_depth = max(self._current_depth, depth)
         if self._progress_bar is not None:
-            self._progress_bar.set_postfix({
-                "nodes": self._nodes_explored,
-                "depth": self._current_depth,
-                "routes": self._routes_found,
-                "tree_size": len(self.tree.expanded_nodes),
-            }, refresh=True)
+            self._progress_bar.set_postfix(
+                {
+                    "nodes": self._nodes_explored,
+                    "depth": self._current_depth,
+                    "routes": self._routes_found,
+                    "tree_size": len(self.tree.expanded_nodes),
+                },
+                refresh=True,
+            )
             self._progress_bar.update(0)  # Refresh display
 
     def step(self) -> Tuple[bool, List[int]]:
@@ -522,6 +525,7 @@ class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
 
         # Initialize progress bar for NMCS
         from tqdm.auto import tqdm
+
         self._nodes_explored = 0
         self._current_depth = 0
         self._routes_found = 0
@@ -671,19 +675,24 @@ class LazyNestedMonteCarlo(
         self._current_depth = 0
         self._routes_found = 0
 
-    def _update_progress(self, depth: int, candidates_count: int, total_children: int) -> None:
+    def _update_progress(
+        self, depth: int, candidates_count: int, total_children: int
+    ) -> None:
         """Update progress bar with current search state."""
         self._nodes_explored += 1
         self._current_depth = max(self._current_depth, depth)
-        self._candidates_pruned += (total_children - candidates_count)
+        self._candidates_pruned += total_children - candidates_count
         if self._progress_bar is not None:
-            self._progress_bar.set_postfix({
-                "nodes": self._nodes_explored,
-                "depth": self._current_depth,
-                "pruned": self._candidates_pruned,
-                "routes": self._routes_found,
-                "tree_size": len(self.tree.expanded_nodes),
-            }, refresh=True)
+            self._progress_bar.set_postfix(
+                {
+                    "nodes": self._nodes_explored,
+                    "depth": self._current_depth,
+                    "pruned": self._candidates_pruned,
+                    "routes": self._routes_found,
+                    "tree_size": len(self.tree.expanded_nodes),
+                },
+                refresh=True,
+            )
             self._progress_bar.update(0)
 
     def step(self) -> Tuple[bool, List[int]]:
@@ -695,6 +704,7 @@ class LazyNestedMonteCarlo(
 
         # Initialize progress bar
         from tqdm.auto import tqdm
+
         self._nodes_explored = 0
         self._candidates_pruned = 0
         self._current_depth = 0
