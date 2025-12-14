@@ -1,0 +1,101 @@
+# =============================================================================
+# SAScore Benchmark Configuration
+# =============================================================================
+#
+# This config is auto-discovered by the benchmark script.
+# Modify values here to change benchmark behavior.
+#
+# Usage:
+#   uv run sascore-benchmark                    # Uses this config
+#   uv run sascore-benchmark --config my.yaml   # Uses custom config
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Data Paths (relative to current working directory)
+# -----------------------------------------------------------------------------
+paths:
+  # Root folder containing all SynPlanner data
+  data_folder: "synplan_data"
+  
+  # Output folder for benchmark results (timestamped subfolder will be created)
+  results_folder: "benchmark_results_combined_policy"
+  
+  # Policy network weights (relative to data_folder)
+  ranking_policy: "uspto/weights/ranking_policy_network.ckpt"
+  filtering_policy: "uspto/weights/filtering_policy_network.ckpt"
+  
+  # Reaction rules and building blocks (relative to data_folder)
+  reaction_rules: "uspto/uspto_reaction_rules.pickle"
+  building_blocks: "building_blocks/building_blocks_em_sa_ln.smi"
+  
+  # Benchmark targets folder (relative to data_folder)
+  benchmark_folder: "benchmarks/sascore"
+
+# -----------------------------------------------------------------------------
+# Benchmark Selection
+# -----------------------------------------------------------------------------
+benchmark:
+  # Pattern for target files (glob pattern)
+  target_pattern: "targets_with_sascore_*.smi"
+  
+  # Which SAScore ranges to run (0-indexed slice of sorted files)
+  # [1:4] means files 1, 2, 3 (skipping first, taking next 3)
+  # Set to null to run all files
+  file_slice_start: 1
+  file_slice_end: 4
+
+# -----------------------------------------------------------------------------
+# Combined Policy Configuration
+# -----------------------------------------------------------------------------
+policy:
+  # Number of top rules to consider
+  top_rules: 100
+  
+  # Minimum probability threshold for rules (0.0 = no threshold)
+  rule_prob_threshold: 0.0
+  
+  # Fraction of rules prioritized by filtering policy
+  priority_rules_fraction: 0.5
+
+# -----------------------------------------------------------------------------
+# Tree Search Configuration
+# -----------------------------------------------------------------------------
+tree:
+  # Search limits
+  max_iterations: 1000
+  max_time: 120        # seconds per target
+  max_depth: 9
+  max_tree_size: 1000000
+  
+  # Search strategy
+  search_strategy: "expansion_first"  # Options: expansion_first, evaluation_first
+  ucb_type: "uct"                     # Options: uct, puct
+  c_ucb: 0.1                          # UCB exploration constant
+  
+  # Backpropagation
+  backprop_type: "muzero"             # Options: muzero, cumulative, max
+  evaluation_agg: "max"               # Options: max, mean
+  
+  # Node initialization
+  init_node_value: 0.5
+  
+  # Molecule filtering
+  exclude_small: true
+  min_mol_size: 6
+  
+  # Exploration
+  epsilon: 0.0                        # Random action probability
+  
+  # Pruning
+  enable_pruning: false
+  
+  # Output
+  silent: true                        # Suppress per-target output
+
+# -----------------------------------------------------------------------------
+# Evaluation (Rollout) Configuration
+# -----------------------------------------------------------------------------
+evaluation:
+  # Whether to normalize evaluation scores
+  normalize: true

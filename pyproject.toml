@@ -27,6 +27,7 @@ dependencies = [
   "streamlit-ketcher>=0.0.1",
   "rdkit>2025.3.5",
   "matplotlib>=3.10.8",
+  "pyyaml>=6.0",
 ]
 
 # Extras to select PyTorch variant (cpu or cuda) - required for uv users
