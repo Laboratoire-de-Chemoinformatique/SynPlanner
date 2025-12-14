@@ -489,10 +489,33 @@ class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
     """
 
     def __init__(self, tree):
-        """Initialize NMCS with default nesting level and caches."""
+        """Initialize NMCS with nesting level from config and caches."""
         super().__init__(tree)
-        self.nmcs_level = 2
+        cfg = self.tree.config
+        self.nmcs_level = getattr(cfg, "nmcs_level", 2)
+        self.playout_mode = getattr(cfg, "nmcs_playout_mode", "greedy")
         self.rollout_cache = {}
+        # Progress tracking
+        self._progress_bar = None
+        self._nodes_explored = 0
+        self._current_depth = 0
+        self._routes_found = 0
+
+    def _update_progress(self, depth: int, node_id: int) -> None:
+        """Update progress bar with current search state."""
+        self._nodes_explored += 1
+        self._current_depth = max(self._current_depth, depth)
+        if self._progress_bar is not None:
+            self._progress_bar.set_postfix(
+                {
+                    "nodes": self._nodes_explored,
+                    "depth": self._current_depth,
+                    "routes": self._routes_found,
+                    "tree_size": len(self.tree.expanded_nodes),
+                },
+                refresh=True,
+            )
+            self._progress_bar.update(0)  # Refresh display
 
     def step(self) -> Tuple[bool, List[int]]:
         """Perform a single NMCS pass from the root (level = `NMCS_level`)."""
@@ -500,14 +523,34 @@ class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
             # Deterministic NMCS single pass
             return False, [1]
 
-        node_id = 1
-        best_node_id, _ = self.NMCS(node_id, self.nmcs_level, 1)
+        # Initialize progress bar for NMCS
+        from tqdm.auto import tqdm
 
-        if self.tree.nodes[best_node_id].is_solved():
-            self._mark_solved(best_node_id)
-            return True, [best_node_id]
+        self._nodes_explored = 0
+        self._current_depth = 0
+        self._routes_found = 0
 
-        return False, [best_node_id]
+        if not self.tree.config.silent:
+            self._progress_bar = tqdm(
+                desc=f"NMCS (level={self.nmcs_level})",
+                unit="nodes",
+                leave=True,
+                bar_format="{desc}: {elapsed} | {postfix}",
+            )
+
+        try:
+            node_id = 1
+            best_node_id, _ = self.NMCS(node_id, self.nmcs_level, 1)
+
+            if self.tree.nodes[best_node_id].is_solved():
+                self._mark_solved(best_node_id)
+                return True, [best_node_id]
+
+            return False, [best_node_id]
+        finally:
+            if self._progress_bar is not None:
+                self._progress_bar.close()
+                self._progress_bar = None
 
     def NMCS(self, node_id, level, depth):
         """Recursive nested Monte Carlo search.
@@ -542,8 +585,12 @@ class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
 
             for child_id in all_children:
                 candidate_id = child_id
+                # Update progress at top level
+                if level == self.nmcs_level:
+                    self._update_progress(depth, child_id)
                 if self.tree.nodes[child_id].is_solved():
                     self._mark_solved(child_id)
+                    self._routes_found += 1
                     chosen_path.append(candidate_id)
                     if self.tree.stop_at_first:
                         return candidate_id, chosen_path
@@ -558,7 +605,7 @@ class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
                     else:
                         candidate_key = candidate_id
                         candidate_id, path = self.select_nmcs_path(
-                            candidate_id, depth + 1, "greedy"
+                            candidate_id, depth + 1, self.playout_mode
                         )
                         self.rollout_cache[candidate_key] = (
                             candidate_id,
@@ -570,6 +617,7 @@ class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
                     path.insert(0, child_id)
                 if self.tree.nodes[candidate_id].is_solved():
                     self._mark_solved(candidate_id)
+                    self._routes_found += 1
                     if self.tree.stop_at_first:
                         return candidate_id, chosen_path + path
 
@@ -609,15 +657,43 @@ class LazyNestedMonteCarlo(
     branching factor. It then applies NMCS on that reduced set.
     """
 
-    def __init__(self, tree, level=2):
-        """Initialize lazy NMCS with thresholds and nesting level."""
+    def __init__(self, tree):
+        """Initialize lazy NMCS with thresholds and nesting level from config."""
         super().__init__(tree)
+        cfg = self.tree.config
         self.frontier: List[List[int | float]] = (
             []
         )  # (node_id, score, depth, is_expanded)
         self.reset_depth_thresholds()
-        self.lnmcs_ratio = 0.2
-        self.nmcs_level = 2
+        self.nmcs_level = getattr(cfg, "nmcs_level", 2)
+        self.playout_mode = getattr(cfg, "nmcs_playout_mode", "greedy")
+        self.lnmcs_ratio = getattr(cfg, "lnmcs_ratio", 0.2)
+        # Progress tracking
+        self._progress_bar = None
+        self._nodes_explored = 0
+        self._candidates_pruned = 0
+        self._current_depth = 0
+        self._routes_found = 0
+
+    def _update_progress(
+        self, depth: int, candidates_count: int, total_children: int
+    ) -> None:
+        """Update progress bar with current search state."""
+        self._nodes_explored += 1
+        self._current_depth = max(self._current_depth, depth)
+        self._candidates_pruned += total_children - candidates_count
+        if self._progress_bar is not None:
+            self._progress_bar.set_postfix(
+                {
+                    "nodes": self._nodes_explored,
+                    "depth": self._current_depth,
+                    "pruned": self._candidates_pruned,
+                    "routes": self._routes_found,
+                    "tree_size": len(self.tree.expanded_nodes),
+                },
+                refresh=True,
+            )
+            self._progress_bar.update(0)
 
     def step(self) -> Tuple[bool, List[int]]:
         """Perform one lazy NMCS iteration using percentile-based candidate pruning."""
@@ -625,12 +701,34 @@ class LazyNestedMonteCarlo(
         self.reset_depth_thresholds()
         if self.tree.curr_iteration > 1:
             return False, [1]
-        node_id = 1
-        leaf_id, _ = self.LNMCS(node_id, self.nmcs_level, 1, self.lnmcs_ratio)
-        if self.tree.nodes[leaf_id].is_solved():
-            self._mark_solved(leaf_id)
-            return True, [leaf_id]
-        return False, [leaf_id]
+
+        # Initialize progress bar
+        from tqdm.auto import tqdm
+
+        self._nodes_explored = 0
+        self._candidates_pruned = 0
+        self._current_depth = 0
+        self._routes_found = 0
+
+        if not self.tree.config.silent:
+            self._progress_bar = tqdm(
+                desc=f"LazyNMCS (level={self.nmcs_level}, ratio={self.lnmcs_ratio})",
+                unit="nodes",
+                leave=True,
+                bar_format="{desc}: {elapsed} | {postfix}",
+            )
+
+        try:
+            node_id = 1
+            leaf_id, _ = self.LNMCS(node_id, self.nmcs_level, 1, self.lnmcs_ratio)
+            if self.tree.nodes[leaf_id].is_solved():
+                self._mark_solved(leaf_id)
+                return True, [leaf_id]
+            return False, [leaf_id]
+        finally:
+            if self._progress_bar is not None:
+                self._progress_bar.close()
+                self._progress_bar = None
 
     def LNMCS(self, node_id, level, depth, prune_ratio):
         """Lazy NMCS recursion selecting candidates above a percentile cut-off.
@@ -667,6 +765,7 @@ class LazyNestedMonteCarlo(
             for child_id in self.tree.children[node_id]:
                 if self.tree.nodes[child_id].is_solved():
                     self._mark_solved(child_id)
+                    self._routes_found += 1
                     if self.tree.stop_at_first:
                         chosen_path.append(child_id)
                         return child_id, chosen_path
@@ -678,6 +777,7 @@ class LazyNestedMonteCarlo(
                 eval_id, path = self.select_nmcs_path(child_id, depth + 1, "greedy")
                 if self.tree.nodes[eval_id].is_solved():
                     self._mark_solved(eval_id)
+                    self._routes_found += 1
                     if self.tree.stop_at_first:
                         chosen_path.append(eval_id)
                         return eval_id, chosen_path + path
@@ -702,12 +802,17 @@ class LazyNestedMonteCarlo(
             if best_candidate_id != -1 and candidates == []:
                 candidates = [best_candidate_id]
 
+            # Update progress at top level
+            if level == self.nmcs_level:
+                total_children = len(self.tree.children[node_id])
+                self._update_progress(depth, len(candidates), total_children)
+
             for child_id in candidates:
                 candidate_id = child_id
                 if level == 1:
                     path: List[int] = []
                     candidate_id, path = self.select_nmcs_path(
-                        candidate_id, depth + 1, "policy"
+                        candidate_id, depth + 1, self.playout_mode
                     )
                     path.insert(0, child_id)
                 else:
@@ -717,6 +822,7 @@ class LazyNestedMonteCarlo(
                     path.insert(0, child_id)
                 if self.tree.nodes[candidate_id].is_solved():
                     self._mark_solved(candidate_id)
+                    self._routes_found += 1
                     if self.tree.stop_at_first:
                         return candidate_id, chosen_path + path
 

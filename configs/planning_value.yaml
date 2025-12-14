@@ -1,0 +1,21 @@
+tree:
+  max_iterations: 100
+  max_tree_size: 1000000
+  max_time: 600
+  max_depth: 6
+  search_strategy: evaluation_first
+  ucb_type: uct
+  c_ucb: 0.1
+  backprop_type: muzero
+  evaluation_agg: max
+  exclude_small: True
+  init_node_value: 0.5
+  min_mol_size: 6
+  epsilon: 0.0
+  silent: True
+node_evaluation:
+  evaluation_type: gcn
+node_expansion:
+  top_rules: 50
+  rule_prob_threshold: 0.0
+  priority_rules_fraction: 0.5

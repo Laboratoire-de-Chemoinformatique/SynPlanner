@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import pickle
 import shutil
-from typing import FrozenSet, List, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, FrozenSet, List, Union
 import zipfile
 
 from CGRtools.files.SDFrw import SDFRead
@@ -22,6 +22,8 @@ from synplan.ml.networks.value import ValueNetwork
 from synplan.utils.files import (
     count_sdf_records,
     count_smiles_records,
+    iter_csv_smiles,
+    iter_csv_smiles_blocks,
     iter_sdf_text_blocks,
     iter_smiles,
     iter_smiles_blocks,
@@ -29,12 +31,49 @@ from synplan.utils.files import (
 from synplan.utils.parallel import process_pool_map_stream
 
 if TYPE_CHECKING:
-    from synplan.utils.config import ValueNetworkConfig, PolicyNetworkConfig
-    from synplan.mcts.expansion import PolicyNetworkFunction
+    from synplan.utils.config import (
+        ValueNetworkConfig,
+        PolicyNetworkConfig,
+        CombinedPolicyConfig,
+    )
+    from synplan.mcts.expansion import (
+        PolicyNetworkFunction,
+        CombinedPolicyNetworkFunction,
+    )
     from synplan.mcts.evaluation import ValueNetworkFunction, EvaluationStrategy
 
 REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
 logger = logging.getLogger(__name__)
+
+
+def _building_blocks_progress(total: int | None, *, silent: bool):
+    """Create a consistent progress bar for building blocks loading."""
+    if silent:
+        return None
+    return tqdm(
+        total=total,
+        desc="Building blocks",
+        unit="mol",
+        unit_scale=True,
+        unit_divisor=1000,
+        dynamic_ncols=True,
+        smoothing=0.1,
+        disable=silent,
+    )
+
+
+def _map_blocks(blocks, worker_fn, *, num_workers: int):
+    """Map blocks through worker function, optionally using a process pool.
+
+    For `num_workers == 1`, this runs sequentially to avoid process-spawn overhead.
+    """
+    if num_workers < 1:
+        raise ValueError("num_workers must be >= 1")
+    if num_workers == 1:
+        for block in blocks:
+            yield worker_fn(block)
+        return
+    yield from process_pool_map_stream(blocks, worker_fn, max_workers=num_workers)
 
 
 def _extract_zip(zip_path: Path, out_dir: Path) -> None:
@@ -165,47 +204,70 @@ def load_building_blocks(
     silent: bool = True,
     num_workers: int | None = None,
     chunksize: int = 1000,
+    *,
+    header: bool = True,
+    delimiter: str = ",",
+    smiles_column: str = "SMILES",
 ) -> FrozenSet[str]:
     """Loads building blocks data from a file and returns a frozen set of building
     blocks.
 
     :param building_blocks_path: The path to the file containing the building blocks.
     :param standardize: Flag if building blocks have to be standardized before loading. Default=True.
+    :param header: For CSV/CSV.GZ files: treat the first row as header. Default=True.
+    :param delimiter: For CSV/CSV.GZ files: delimiter character. Default=",".
+    :param smiles_column: For CSV/CSV.GZ files: header column name containing SMILES.
+        Default="SMILES" (case-insensitive match is supported).
     :return: The set of building blocks smiles.
     """
 
     building_blocks_path = Path(building_blocks_path).resolve()
+    suffixes = "".join(building_blocks_path.suffixes).lower()
+    is_csv = suffixes.endswith(".csv") or suffixes.endswith(".csv.gz")
     suffix = building_blocks_path.suffix.lower()
-    assert suffix in {".smi", ".smiles", ".sdf"}
+    if not is_csv and suffix not in {".smi", ".smiles", ".sdf"}:
+        raise ValueError(
+            f"Unsupported building blocks file extension: '{building_blocks_path.name}'. "
+            "Supported: .smi, .smiles, .sdf, .csv, .csv.gz"
+        )
 
     building_blocks_smiles = set()
     if standardize:
         if num_workers is None:
             num_workers = max(1, os.cpu_count() - 1)
+        if num_workers < 1:
+            raise ValueError("num_workers must be >= 1")
 
         if suffix in {".smi", ".smiles"}:
 
             total = count_smiles_records(building_blocks_path) if not silent else None
             step = max(1, chunksize or 1000)
 
-            if not silent:
-                progress_iter = tqdm(
-                    total=total,
-                    desc="Building blocks",
-                    unit="mol",
-                    unit_scale=True,
-                    unit_divisor=1000,
-                    dynamic_ncols=True,
-                    smoothing=0.1,
-                    disable=silent,
-                )
-            else:
-                progress_iter = None
-
-            for out in process_pool_map_stream(
+            progress_iter = _building_blocks_progress(total, silent=silent)
+            for out in _map_blocks(
                 iter_smiles_blocks(building_blocks_path, step),
                 _standardize_smiles_batch,
-                max_workers=num_workers,
+                num_workers=num_workers,
+            ):
+                if out:
+                    building_blocks_smiles.update(out)
+                    if progress_iter is not None:
+                        progress_iter.update(len(out))
+            if progress_iter is not None:
+                progress_iter.close()
+
+        elif is_csv:
+            step = max(1, chunksize or 1000)
+            progress_iter = _building_blocks_progress(None, silent=silent)
+            blocks = iter_csv_smiles_blocks(
+                building_blocks_path,
+                step,
+                header=header,
+                delimiter=delimiter,
+                smiles_column=smiles_column,
+            )
+            for out in _map_blocks(
+                blocks, _standardize_smiles_batch, num_workers=num_workers
             ):
                 if out:
                     building_blocks_smiles.update(out)
@@ -219,21 +281,9 @@ def load_building_blocks(
             step = max(1, chunksize or 5000)
             blocks = iter_sdf_text_blocks(building_blocks_path, step)
 
-            progress = None
-            if not silent:
-                progress = tqdm(
-                    total=n,
-                    desc="Building blocks",
-                    unit="mol",
-                    unit_scale=True,
-                    unit_divisor=1000,
-                    dynamic_ncols=True,
-                    smoothing=0.1,
-                    disable=silent,
-                )
-
-            for chunk_out in process_pool_map_stream(
-                blocks, _standardize_sdf_text, max_workers=num_workers
+            progress = _building_blocks_progress(n, silent=silent)
+            for chunk_out in _map_blocks(
+                blocks, _standardize_sdf_text, num_workers=num_workers
             ):
                 if chunk_out:
                     building_blocks_smiles.update(chunk_out)
@@ -244,6 +294,14 @@ def load_building_blocks(
     else:
         if suffix in {".smi", ".smiles"}:
             for smiles in iter_smiles(building_blocks_path):
+                building_blocks_smiles.add(smiles)
+        elif is_csv:
+            for smiles in iter_csv_smiles(
+                building_blocks_path,
+                header=header,
+                delimiter=delimiter,
+                smiles_column=smiles_column,
+            ):
                 building_blocks_smiles.add(smiles)
         elif suffix == ".sdf":
             with SDFRead(str(building_blocks_path)) as sdf:
@@ -326,6 +384,131 @@ def load_policy_function(
         return PolicyNetworkFunction(policy_config=policy_config)
 
     raise ValueError("Must provide either policy_config or weights_path")
+
+
+def load_combined_policy_function(
+    combined_config: Union["CombinedPolicyConfig", dict] = None,
+    filtering_config: Union["PolicyNetworkConfig", dict, str] = None,
+    ranking_config: Union["PolicyNetworkConfig", dict, str] = None,
+    filtering_weights_path: str = None,
+    ranking_weights_path: str = None,
+    top_rules: int = 50,
+    rule_prob_threshold: float = 0.0,
+    ranking_weight: float = 1.0,
+    temperature: float = 1.0,
+) -> "CombinedPolicyNetworkFunction":
+    """Factory function to create CombinedPolicyNetworkFunction with flexible configuration.
+
+    Combines filtering and ranking policies by weighted addition of logits:
+        combined_logits = filtering_logits + ranking_weight * ranking_logits
+        combined_probs = softmax(combined_logits / temperature)
+
+    The filtering policy provides applicability scores (trained on multi-label applicability).
+    The ranking policy provides feasibility scores (trained on actual reactions).
+
+    :param combined_config: CombinedPolicyConfig or dict with all parameters.
+    :param filtering_config: PolicyNetworkConfig or dict for filtering policy.
+    :param ranking_config: PolicyNetworkConfig or dict for ranking policy.
+    :param filtering_weights_path: Direct path to filtering weights (shortcut).
+    :param ranking_weights_path: Direct path to ranking weights (shortcut).
+    :param top_rules: Number of top rules to return.
+    :param rule_prob_threshold: Minimum probability threshold for returning a rule.
+    :param ranking_weight: Weight for ranking logits (default 1.0).
+        Values > 1.0 give more weight to ranking (feasibility).
+    :param temperature: Temperature for softmax (default 1.0).
+        Values > 1.0 produce softer distributions (more exploration).
+    :return: CombinedPolicyNetworkFunction ready for use in tree search.
+
+    Examples:
+        >>> # Using CombinedPolicyConfig
+        >>> config = CombinedPolicyConfig(
+        ...     filtering_weights_path="filtering.ckpt",
+        ...     ranking_weights_path="ranking.ckpt",
+        ... )
+        >>> combined = load_combined_policy_function(combined_config=config)
+        >>>
+        >>> # Using config objects
+        >>> combined = load_combined_policy_function(
+        ...     filtering_config={"weights_path": "filtering.ckpt", "policy_type": "filtering"},
+        ...     ranking_config={"weights_path": "ranking.ckpt", "policy_type": "ranking"},
+        ... )
+        >>>
+        >>> # Using direct paths (simplest)
+        >>> combined = load_combined_policy_function(
+        ...     filtering_weights_path="filtering.ckpt",
+        ...     ranking_weights_path="ranking.ckpt",
+        ... )
+    """
+    from synplan.mcts.expansion import CombinedPolicyNetworkFunction
+    from synplan.utils.config import PolicyNetworkConfig, CombinedPolicyConfig
+
+    # Priority 1: Use CombinedPolicyConfig
+    if combined_config is not None:
+        if isinstance(combined_config, dict):
+            combined_config = CombinedPolicyConfig.from_dict(combined_config)
+        filtering_weights_path = combined_config.filtering_weights_path
+        ranking_weights_path = combined_config.ranking_weights_path
+        top_rules = combined_config.top_rules
+        rule_prob_threshold = combined_config.rule_prob_threshold
+        ranking_weight = combined_config.ranking_weight
+        temperature = combined_config.temperature
+        filtering_config = PolicyNetworkConfig(
+            weights_path=filtering_weights_path, policy_type="filtering"
+        )
+        ranking_config = PolicyNetworkConfig(
+            weights_path=ranking_weights_path, policy_type="ranking"
+        )
+        return CombinedPolicyNetworkFunction(
+            filtering_config=filtering_config,
+            ranking_config=ranking_config,
+            top_rules=top_rules,
+            rule_prob_threshold=rule_prob_threshold,
+            ranking_weight=ranking_weight,
+            temperature=temperature,
+        )
+
+    # Build filtering config
+    if filtering_config is not None:
+        if isinstance(filtering_config, str):
+            filtering_config = PolicyNetworkConfig(
+                weights_path=filtering_config, policy_type="filtering"
+            )
+        elif isinstance(filtering_config, dict):
+            filtering_config.setdefault("policy_type", "filtering")
+            filtering_config = PolicyNetworkConfig.from_dict(filtering_config)
+    elif filtering_weights_path is not None:
+        filtering_config = PolicyNetworkConfig(
+            weights_path=filtering_weights_path, policy_type="filtering"
+        )
+    else:
+        raise ValueError(
+            "Must provide either filtering_config or filtering_weights_path"
+        )
+
+    # Build ranking config
+    if ranking_config is not None:
+        if isinstance(ranking_config, str):
+            ranking_config = PolicyNetworkConfig(
+                weights_path=ranking_config, policy_type="ranking"
+            )
+        elif isinstance(ranking_config, dict):
+            ranking_config.setdefault("policy_type", "ranking")
+            ranking_config = PolicyNetworkConfig.from_dict(ranking_config)
+    elif ranking_weights_path is not None:
+        ranking_config = PolicyNetworkConfig(
+            weights_path=ranking_weights_path, policy_type="ranking"
+        )
+    else:
+        raise ValueError("Must provide either ranking_config or ranking_weights_path")
+
+    return CombinedPolicyNetworkFunction(
+        filtering_config=filtering_config,
+        ranking_config=ranking_config,
+        top_rules=top_rules,
+        rule_prob_threshold=rule_prob_threshold,
+        ranking_weight=ranking_weight,
+        temperature=temperature,
+    )
 
 
 def load_value_network(
@@ -420,6 +603,7 @@ def load_evaluation_function(eval_config) -> "EvaluationStrategy":
             min_mol_size=eval_config.min_mol_size,
             max_depth=eval_config.max_depth,
             normalize=eval_config.normalize,
+            stochastic=eval_config.stochastic,
         )
 
     elif isinstance(eval_config, ValueNetworkEvaluationConfig):

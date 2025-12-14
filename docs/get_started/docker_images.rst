@@ -13,7 +13,7 @@ Set your version once (replace with an existing tag if needed):
 
 .. code-block:: bash
 
-   VERSION=1.2.1
+   VERSION=1.3.2
 
 Pull images
 ~~~~~~~~~~~

@@ -138,9 +138,10 @@ def standardize_building_blocks(input_file: str, output_file: str) -> str:
     if input_file == output_file:
         raise ValueError("input_file name and output_file name cannot be the same.")
 
-    with MoleculeReader(input_file) as inp_file, MoleculeWriter(
-        output_file
-    ) as out_file:
+    with (
+        MoleculeReader(input_file) as inp_file,
+        MoleculeWriter(output_file) as out_file,
+    ):
         for mol in tqdm(
             inp_file,
             desc="Number of building blocks processed: ",

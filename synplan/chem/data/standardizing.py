@@ -1135,9 +1135,10 @@ def standardize_reactions_from_file(
         n_std += ok
 
     # -----------------------------  I/O  -------------------------------
-    with ReactionReader(input_reaction_data_path) as reader, ReactionWriter(
-        output_path
-    ) as writer:
+    with (
+        ReactionReader(input_reaction_data_path) as reader,
+        ReactionWriter(output_path) as writer,
+    ):
 
         write_fn = lambda reactions: [writer.write(r) for r in reactions]
 
