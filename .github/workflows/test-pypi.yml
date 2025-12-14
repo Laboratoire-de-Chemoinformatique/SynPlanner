@@ -38,4 +38,4 @@ jobs:
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
         run: |
-          uv publish --publish-url https://test.pypi.org/legacy/ --verbose dist/*
+          uv publish --publish-url https://test.pypi.org/legacy/ --skip-existing --verbose dist/*
