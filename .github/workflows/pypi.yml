@@ -36,4 +36,4 @@ jobs:
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          uv publish --skip-existing --verbose dist/*
+          uv publish --check-url https://pypi.org/simple/ --verbose dist/*
