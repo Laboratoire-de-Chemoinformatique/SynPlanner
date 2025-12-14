@@ -48,3 +48,4 @@ def test_load_building_blocks_csv_standardize_true_runs(tmp_path):
     expected = frozenset(_standardize_smiles_batch(["OCC", "CCN"]))
     bbs = load_building_blocks(path, standardize=True, silent=True, num_workers=1)
     assert bbs == expected
+

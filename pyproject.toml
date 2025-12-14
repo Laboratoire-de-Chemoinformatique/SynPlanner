@@ -26,6 +26,7 @@ dependencies = [
   "streamlit>1.35.1",
   "streamlit-ketcher>=0.0.1",
   "rdkit>2025.3.5",
+  "matplotlib>=3.10.8",
 ]
 
 # Extras to select PyTorch variant (cpu or cuda) - required for uv users
@@ -52,6 +53,8 @@ docs = [
 
 [project.scripts]
 synplan = "synplan.interfaces.cli:synplan"
+sascore-benchmark = "scripts.sascore_bench.run_benchmark:main"
+sascore-plot = "scripts.sascore_bench.plot_results:main"
 
 [build-system]
 requires = ["hatchling>=1.26"]
@@ -61,7 +64,7 @@ build-backend = "hatchling.build"
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["synplan"]
+packages = ["synplan", "scripts"]
 
 [tool.uv]
 # cpu and cuda extras are mutually exclusive

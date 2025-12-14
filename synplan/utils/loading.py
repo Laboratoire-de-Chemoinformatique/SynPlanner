@@ -31,8 +31,15 @@ from synplan.utils.files import (
 from synplan.utils.parallel import process_pool_map_stream
 
 if TYPE_CHECKING:
-    from synplan.utils.config import ValueNetworkConfig, PolicyNetworkConfig, CombinedPolicyConfig
-    from synplan.mcts.expansion import PolicyNetworkFunction, CombinedPolicyNetworkFunction
+    from synplan.utils.config import (
+        ValueNetworkConfig,
+        PolicyNetworkConfig,
+        CombinedPolicyConfig,
+    )
+    from synplan.mcts.expansion import (
+        PolicyNetworkFunction,
+        CombinedPolicyNetworkFunction,
+    )
     from synplan.mcts.evaluation import ValueNetworkFunction, EvaluationStrategy
 
 REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
@@ -387,13 +394,17 @@ def load_combined_policy_function(
     ranking_weights_path: str = None,
     top_rules: int = 50,
     rule_prob_threshold: float = 0.0,
-    priority_rules_fraction: float = 0.5,
+    ranking_weight: float = 1.0,
+    temperature: float = 1.0,
 ) -> "CombinedPolicyNetworkFunction":
     """Factory function to create CombinedPolicyNetworkFunction with flexible configuration.
 
-    Combines filtering and ranking policies by multiplying their probabilities.
-    The filtering policy provides applicability probabilities (sigmoid outputs),
-    while the ranking policy provides relative ranking probabilities (softmax outputs).
+    Combines filtering and ranking policies by weighted addition of logits:
+        combined_logits = filtering_logits + ranking_weight * ranking_logits
+        combined_probs = softmax(combined_logits / temperature)
+
+    The filtering policy provides applicability scores (trained on multi-label applicability).
+    The ranking policy provides feasibility scores (trained on actual reactions).
 
     :param combined_config: CombinedPolicyConfig or dict with all parameters.
     :param filtering_config: PolicyNetworkConfig or dict for filtering policy.
@@ -402,7 +413,10 @@ def load_combined_policy_function(
     :param ranking_weights_path: Direct path to ranking weights (shortcut).
     :param top_rules: Number of top rules to return.
     :param rule_prob_threshold: Minimum probability threshold for returning a rule.
-    :param priority_rules_fraction: Coefficient for combining priority rules in filtering.
+    :param ranking_weight: Weight for ranking logits (default 1.0).
+        Values > 1.0 give more weight to ranking (feasibility).
+    :param temperature: Temperature for softmax (default 1.0).
+        Values > 1.0 produce softer distributions (more exploration).
     :return: CombinedPolicyNetworkFunction ready for use in tree search.
 
     Examples:
@@ -436,7 +450,8 @@ def load_combined_policy_function(
         ranking_weights_path = combined_config.ranking_weights_path
         top_rules = combined_config.top_rules
         rule_prob_threshold = combined_config.rule_prob_threshold
-        priority_rules_fraction = combined_config.priority_rules_fraction
+        ranking_weight = combined_config.ranking_weight
+        temperature = combined_config.temperature
         filtering_config = PolicyNetworkConfig(
             weights_path=filtering_weights_path, policy_type="filtering"
         )
@@ -448,7 +463,8 @@ def load_combined_policy_function(
             ranking_config=ranking_config,
             top_rules=top_rules,
             rule_prob_threshold=rule_prob_threshold,
-            priority_rules_fraction=priority_rules_fraction,
+            ranking_weight=ranking_weight,
+            temperature=temperature,
         )
 
     # Build filtering config
@@ -490,7 +506,8 @@ def load_combined_policy_function(
         ranking_config=ranking_config,
         top_rules=top_rules,
         rule_prob_threshold=rule_prob_threshold,
-        priority_rules_fraction=priority_rules_fraction,
+        ranking_weight=ranking_weight,
+        temperature=temperature,
     )
 
 
@@ -586,6 +603,7 @@ def load_evaluation_function(eval_config) -> "EvaluationStrategy":
             min_mol_size=eval_config.min_mol_size,
             max_depth=eval_config.max_depth,
             normalize=eval_config.normalize,
+            stochastic=eval_config.stochastic,
         )
 
     elif isinstance(eval_config, ValueNetworkEvaluationConfig):
