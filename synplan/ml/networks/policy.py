@@ -23,7 +23,7 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
         n_rules: int,
         vector_dim: int,
         policy_type: str = "ranking",
-        **kwargs
+        **kwargs,
     ):
         """Initializes a policy network with the given number of reaction rules (output
         dimension) and vector graph embedding dimension, and creates linear layers for

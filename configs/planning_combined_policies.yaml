@@ -1,0 +1,24 @@
+# Planning configuration with combined filtering + ranking policy
+# The combined policy sums filtering and ranking probabilities for better rule selection
+
+tree:
+  max_iterations: 100
+  max_tree_size: 1000000
+  max_time: 600
+  max_depth: 6
+  search_strategy: expansion_first
+  ucb_type: uct
+  c_ucb: 0.1
+  backprop_type: muzero
+  evaluation_agg: max
+  exclude_small: True
+  init_node_value: 0.5
+  min_mol_size: 6
+  epsilon: 0.0
+  silent: True
+combined_policy:
+  filtering_weights_path: "path/to/filtering_policy_network.ckpt"
+  ranking_weights_path: "path/to/ranking_policy_network.ckpt"
+  top_rules: 50
+  rule_prob_threshold: 0.0
+  priority_rules_fraction: 0.5

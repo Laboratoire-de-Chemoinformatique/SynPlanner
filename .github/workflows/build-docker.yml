@@ -33,14 +33,14 @@ jobs:
           import tomllib
           with open('pyproject.toml', 'rb') as f:
               data = tomllib.load(f)
-          version = data['tool']['poetry']['version']
+          version = data['project']['version']
           print(version, end='')
           PY
           echo "version=$(python - << 'PY'
           import tomllib
           with open('pyproject.toml', 'rb') as f:
               data = tomllib.load(f)
-          print(data['tool']['poetry']['version'], end='')
+          print(data['project']['version'], end='')
           PY)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
@@ -109,14 +109,14 @@ jobs:
           import tomllib
           with open('pyproject.toml', 'rb') as f:
               data = tomllib.load(f)
-          version = data['tool']['poetry']['version']
+          version = data['project']['version']
           print(version, end='')
           PY
           echo "version=$(python - << 'PY'
           import tomllib
           with open('pyproject.toml', 'rb') as f:
               data = tomllib.load(f)
-          print(data['tool']['poetry']['version'], end='')
+          print(data['project']['version'], end='')
           PY)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx

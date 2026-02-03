@@ -31,6 +31,7 @@ Run planning using the repository configuration in ``configs/planning.yaml``:
 .. code-block:: yaml
 
     tree:
+      algorithm: uct
       max_iterations: 100
       max_tree_size: 10000
       max_time: 120
@@ -44,6 +45,10 @@ Run planning using the repository configuration in ``configs/planning.yaml``:
       min_mol_size: 6
       epsilon: 0
       silent: True
+      # NMCS-specific parameters (used when algorithm is "nmcs" or "lazy_nmcs")
+      nmcs_level: 2
+      nmcs_playout_mode: greedy
+      lnmcs_ratio: 0.2
     node_evaluation:
       evaluation_type: rollout
       evaluation_agg: max
@@ -60,6 +65,7 @@ Run planning using the repository configuration in ``configs/planning.yaml``:
     ======================================== ==========================================================
     Parameter                                Description
     ======================================== ==========================================================
+    tree:algorithm                           The search algorithm to use. Options are "uct" (Upper Confidence Tree, default), "nmcs" (Nested Monte Carlo Search), "lazy_nmcs" (Lazy NMCS with pruning), "best_first", "breadth_first", and "beam"
     tree:max_iterations                      The maximum number of iterations the tree search algorithm will perform
     tree:max_tree_size                       The maximum number of nodes that can be created in the search tree
     tree:max_time                            The maximum time (in seconds) for the tree search execution
@@ -72,6 +78,9 @@ Run planning using the repository configuration in ``configs/planning.yaml``:
     tree:init_node_value                     The initial value for newly created nodes in the tree (for expansion_first search strategy)
     tree:epsilon                             This parameter is used in the epsilon-greedy strategy during the node selection, representing the probability of choosing a random action for exploration. A higher value leads to more exploration
     tree:silent                              If True, suppresses the progress logging of the tree search
+    tree:nmcs_level                          Nesting level for NMCS and LazyNMCS algorithms. Higher levels provide more thorough search but are more computationally expensive. Defaults to 2
+    tree:nmcs_playout_mode                   Playout mode for NMCS base-level rollouts. Options are "greedy" (best value), "random", or "policy" (best policy probability). Defaults to "greedy"
+    tree:lnmcs_ratio                         Pruning percentile for LazyNMCS algorithm. Only candidates scoring above this percentile threshold are explored. Value in range [0.0, 1.0]. Defaults to 0.2
     node_evaluation:evaluation_agg           The way the evaluation scores are aggregated. Options are "max" (using the maximum score) and "average" (using the average score)
     node_evaluation:evaluation_type          The method used for node evaluation. Options include "random" (random number between 0 and 1), "rollout" (using rollout simulations), and "gcn" (graph convolutional networks)
     node_expansion:top_rules                 The maximum amount of rules to be selected for node expansion from the list of predicted reaction rules

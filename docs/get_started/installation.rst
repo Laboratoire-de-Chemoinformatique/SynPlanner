@@ -46,17 +46,15 @@ Build and run the CLI inside a container. The provided Dockerfile targets Linux/
    docker build --platform linux/amd64 -t synplan:latest-cli-amd64 -f cli.Dockerfile .
    docker run --rm --platform linux/amd64 -it synplan:latest-cli-amd64 --help
 
-From source with Poetry (dev)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+From source with uv (dev)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
    git clone https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner.git
    cd SynPlanner/
-   poetry env use $(which python)
-   poetry install   # add "--with docs,dev" if you need docs or dev extras
-   poetry shell
-   synplan --help
+   uv sync --extra cpu   # add "--group docs --group dev" if you need docs or dev extras
+   uv run synplan --help
 
 Limitations and notes
 ~~~~~~~~~~~~~~~~~~~~~

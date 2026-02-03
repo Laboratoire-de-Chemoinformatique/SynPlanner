@@ -6,14 +6,11 @@ build:
     python: "3.11"
   jobs:
     post_create_environment:
-      - pip install poetry
-      - poetry config virtualenvs.create false
+      - pip install uv
     post_install:
-      - poetry install --with docs
-      - pip install nbsphinx
-      - pip install pydata-sphinx-theme
-      - pip install nbsphinx-link
-      - pip install .
+      - uv sync --group docs --extra cpu
+      - uv pip install nbsphinx pydata-sphinx-theme nbsphinx-link
+      - uv pip install .
 
 sphinx:
   builder: html

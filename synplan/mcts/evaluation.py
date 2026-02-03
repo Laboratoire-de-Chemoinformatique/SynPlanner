@@ -8,6 +8,7 @@ This module implements the Strategy pattern for different evaluation methods:
 - Random scores
 """
 
+import random
 from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from random import uniform
@@ -62,6 +63,10 @@ class RolloutSimulator:
 
     Returns rollout rewards in [-1, 1] following the existing semantics in Tree._rollout_node.
     Normalization to [0, 1] is done by EvaluationService if requested.
+
+    Supports two modes:
+    - Greedy (default): Takes the first successful reaction rule
+    - Stochastic: Samples from valid rules proportionally to policy probabilities
     """
 
     def __init__(
@@ -71,35 +76,107 @@ class RolloutSimulator:
         building_blocks: Set[str],
         min_mol_size: int,
         max_depth: int,
+        stochastic: bool = False,
     ) -> None:
+        """Initialize the rollout simulator.
+
+        :param policy_network: Policy network for selecting reactions.
+        :param reaction_rules: Available reaction rules.
+        :param building_blocks: Set of building block molecules.
+        :param min_mol_size: Minimum molecule size.
+        :param max_depth: Maximum rollout depth.
+        :param stochastic: If True, sample from valid rules using policy probabilities.
+            If False (default), use greedy selection (first successful rule).
+        """
         self.policy_network = policy_network
         self.reaction_rules = reaction_rules
         self.building_blocks = building_blocks
         self.min_mol_size = min_mol_size
         self.max_depth = max_depth
+        self.stochastic = stochastic
+
+    def _select_reaction(self, current_precursor: Precursor) -> Tuple[bool, any, int]:
+        """Select a reaction rule to apply.
+
+        :param current_precursor: The precursor to expand.
+        :return: Tuple of (success, products, rule_id).
+        """
+        if self.stochastic:
+            return self._select_reaction_stochastic(current_precursor)
+        else:
+            return self._select_reaction_greedy(current_precursor)
+
+    def _select_reaction_greedy(
+        self, current_precursor: Precursor
+    ) -> Tuple[bool, any, int]:
+        """Greedy selection: take first successful rule.
+
+        :param current_precursor: The precursor to expand.
+        :return: Tuple of (success, products, rule_id).
+        """
+        for _, rule, rule_id in self.policy_network.predict_reaction_rules(
+            current_precursor, self.reaction_rules
+        ):
+            for prods in self._apply_rule(current_precursor, rule):
+                if prods:
+                    return True, prods, rule_id
+        return False, None, -1
+
+    def _select_reaction_stochastic(
+        self, current_precursor: Precursor
+    ) -> Tuple[bool, any, int]:
+        """Stochastic selection: sample from rules until a valid one is found.
+
+        Instead of applying all rules upfront, samples from the policy
+        distribution and tries to apply. If the sampled rule fails,
+        it's removed from candidates and we sample again.
+
+        :param current_precursor: The precursor to expand.
+        :return: Tuple of (success, products, rule_id).
+        """
+        # Collect all candidate rules with their probabilities
+        candidates = [
+            (prob, rule, rule_id)
+            for prob, rule, rule_id in self.policy_network.predict_reaction_rules(
+                current_precursor, self.reaction_rules
+            )
+        ]
+
+        if not candidates:
+            return False, None, -1
+
+        # Sample until we find a valid rule or exhaust all candidates
+        while candidates:
+            # Sample one rule proportionally to probabilities
+            probs = [c[0] for c in candidates]
+            idx = random.choices(range(len(candidates)), weights=probs, k=1)[0]
+            prob, rule, rule_id = candidates[idx]
+
+            # Try to apply the sampled rule
+            for prods in self._apply_rule(current_precursor, rule):
+                if prods:
+                    return True, prods, rule_id
+
+            # Rule failed, remove from candidates and try again
+            candidates.pop(idx)
+
+        return False, None, -1
 
     def simulate_precursor(self, precursor: Precursor, current_depth: int = 0) -> float:
-        """Performs a rollout simulation from a given node in the tree. Given the
-        current precursor, find the first successful reaction and return the new precursor.
+        """Performs a rollout simulation from a given node in the tree.
 
-        If the precursor is a building_block, return 1.0, else check the
-        first successful reaction.
+        If stochastic mode is enabled, samples from valid rules using policy
+        probabilities instead of always taking the first successful rule.
 
-        If the reaction is not successful, return -1.0.
-
-        If the reaction is successful, but the generated precursor are not
-        the building_blocks and the precursor cannot be generated without
-        exceeding current_depth threshold, return -0.5.
-
-        If the reaction is successful, but the precursor are not the
-        building_blocks and the precursor cannot be generated, return
-        -1.0.
+        Rewards:
+        - 1.0: All precursors are building blocks (success)
+        - -0.5: Max depth exceeded
+        - -1.0: No valid reaction found or cycle detected
 
         :param precursor: The precursor to be evaluated.
         :param current_depth: The current depth of the tree.
         :return: The reward (value) assigned to the precursor.
         """
-
         max_depth = self.max_depth - current_depth
 
         if precursor.is_building_block(self.building_blocks, self.min_mol_size):
@@ -109,6 +186,7 @@ class RolloutSimulator:
         precursor_to_expand = deque([precursor])
         history = defaultdict(dict)
         rollout_depth = 0
+
         while precursor_to_expand:
             if len(history) >= max_depth:
                 return -0.5
@@ -117,23 +195,15 @@ class RolloutSimulator:
             history[rollout_depth]["target"] = current_precursor
             occurred_precursor.add(current_precursor)
 
-            reaction_rule_applied = False
-            products = None
-            for _, rule, rule_id in self.policy_network.predict_reaction_rules(
-                current_precursor, self.reaction_rules
-            ):
-                for prods in self._apply_rule(current_precursor, rule):
-                    if prods:
-                        products = prods
-                        reaction_rule_applied = True
-                        break
-                if reaction_rule_applied:
-                    history[rollout_depth]["rule_index"] = rule_id
-                    break
+            # Select reaction (greedy or stochastic based on self.stochastic)
+            reaction_applied, products, rule_id = self._select_reaction(
+                current_precursor
+            )
 
-            if not reaction_rule_applied:
+            if not reaction_applied:
                 return -1.0
 
+            history[rollout_depth]["rule_index"] = rule_id
             products = tuple(Precursor(product) for product in products)
             history[rollout_depth]["products"] = products
 
@@ -210,6 +280,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
     """Evaluation strategy using rollout simulation.
 
     Performs Monte Carlo rollout from the node to estimate synthesizability.
+    Supports both greedy and stochastic (probability-weighted sampling) modes.
     """
 
     def __init__(
@@ -220,6 +291,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         min_mol_size: int,
         max_depth: int,
         normalize: bool = False,
+        stochastic: bool = False,
     ) -> None:
         """Initialize rollout evaluation strategy.
 
@@ -229,6 +301,8 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         :param min_mol_size: Minimum molecule size.
         :param max_depth: Maximum rollout depth.
         :param normalize: Whether to normalize scores to [0, 1].
+        :param stochastic: If True, sample from valid rules using policy probabilities.
+            If False (default), use greedy selection (first successful rule).
         """
         self.rollout = RolloutSimulator(
             policy_network=policy_network,
@@ -236,6 +310,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
             building_blocks=building_blocks,
             min_mol_size=min_mol_size,
             max_depth=max_depth,
+            stochastic=stochastic,
         )
         self.normalize = normalize
 

@@ -22,36 +22,29 @@ jobs:
       - name: 🛎️Checkout repo
         uses: actions/checkout@v4
 
-      - name: 📦Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: "2.0.1"
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          installer-parallel: true
+      - name: 📦Install uv
+        uses: astral-sh/setup-uv@v4
 
       - name: 🐍Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "poetry"          # ↖ automatic dependency caching
 
       - name: 🛠️ Install build tools (Ubuntu only)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential python3-dev
-          pip install --upgrade pip setuptools wheel
 
       - name: 📚Install project (incl. dev extras)
         run: |
-          poetry install --with dev --no-interaction
-          poetry build -f wheel      # guarantees the package itself is buildable
+          uv sync --group dev --extra cpu
+          uv build --wheel      # guarantees the package itself is buildable
         shell: bash
 
       - name: ✅Run test‑suite + coverage
         run: |
-          poetry run pytest --cov=synplan --cov-report=xml
+          uv run pytest --cov=synplan --cov-report=xml
         shell: bash
 
       - name: ⬆️Upload coverage artefact
@@ -66,13 +59,10 @@ jobs:
     needs: tests
     steps:
       - uses: actions/checkout@v4
-      - uses: snok/install-poetry@v1
-        with:
-          version: "2.0.1"
+      - uses: astral-sh/setup-uv@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "poetry"
       - run: |
-          poetry install --with dev --no-interaction --no-root
-          poetry run black --check synplan tests
+          uv sync --group dev --extra cpu --no-install-project
+          uv run black --check synplan tests

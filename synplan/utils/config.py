@@ -450,6 +450,15 @@ class TreeConfig(ConfigABC):
         the threshold for considering larger molecules in the search,
         defaults to 6.
     :param silent: Whether to suppress progress output.
+    :param nmcs_level: Nesting level for NMCS and LazyNMCS algorithms.
+        Higher levels provide more thorough search but are more
+        computationally expensive. Defaults to 2.
+    :param nmcs_playout_mode: Playout mode for NMCS base-level rollouts.
+        Options are "greedy" (best value), "random", or "policy"
+        (best policy probability). Defaults to "greedy".
+    :param lnmcs_ratio: Pruning percentile for LazyNMCS algorithm.
+        Only candidates scoring above this percentile threshold are
+        explored. Value in range [0.0, 1.0]. Defaults to 0.2.
     """
 
     max_iterations: int = 100
@@ -476,6 +485,13 @@ class TreeConfig(ConfigABC):
     epsilon: float = 0.0  # epsilon-greedy in [0.0, 1.0]
     init_node_value: float = 0.5  # initial node value in [0.0, 1.0]
     beam_width: int = 10
+
+    # NMCS configuration
+    nmcs_level: int = 2  # nesting level (higher = more thorough)
+    nmcs_playout_mode: str = "greedy"  # one of: "greedy", "random", "policy"
+
+    # LazyNMCS configuration
+    lnmcs_ratio: float = 0.2  # percentile threshold in [0.0, 1.0]
 
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "TreeConfig":
@@ -537,6 +553,27 @@ class TreeConfig(ConfigABC):
         ):
             raise ValueError("beam_width must be a positive integer.")
 
+        # NMCS parameters
+        if (
+            not isinstance(params.get("nmcs_level", 2), int)
+            or params.get("nmcs_level", 2) < 1
+        ):
+            raise ValueError("nmcs_level must be a positive integer.")
+        if params.get("nmcs_playout_mode", "greedy") not in [
+            "greedy",
+            "random",
+            "policy",
+        ]:
+            raise ValueError(
+                "nmcs_playout_mode must be 'greedy', 'random', or 'policy'."
+            )
+
+        # LazyNMCS parameters
+        if not isinstance(params.get("lnmcs_ratio", 0.2), (float, int)) or not (
+            0.0 <= float(params.get("lnmcs_ratio", 0.2)) <= 1.0
+        ):
+            raise ValueError("lnmcs_ratio must be a float in [0.0, 1.0].")
+
 
 @dataclass
 class RolloutEvaluationConfig(ConfigABC):
@@ -550,6 +587,8 @@ class RolloutEvaluationConfig(ConfigABC):
     :param min_mol_size: Minimum molecule size to consider for expansion.
     :param max_depth: Maximum depth for rollout simulation.
     :param normalize: Whether to normalize scores to [0, 1].
+    :param stochastic: If True, sample from valid rules using policy probabilities.
+        If False (default), use greedy selection (first successful rule).
     """
 
     policy_network: Any  # PolicyNetworkFunction - using Any to avoid circular import
@@ -558,6 +597,7 @@ class RolloutEvaluationConfig(ConfigABC):
     min_mol_size: int = 0
     max_depth: int = 6
     normalize: bool = False
+    stochastic: bool = False
 
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "RolloutEvaluationConfig":
@@ -582,6 +622,8 @@ class RolloutEvaluationConfig(ConfigABC):
             raise ValueError("max_depth must be a positive integer.")
         if not isinstance(params.get("normalize", False), bool):
             raise ValueError("normalize must be a boolean.")
+        if not isinstance(params.get("stochastic", False), bool):
+            raise ValueError("stochastic must be a boolean.")
 
 
 @dataclass
@@ -702,6 +744,68 @@ class RandomEvaluationConfig(ConfigABC):
     def _validate_params(self, params: Dict[str, Any]):
         if not isinstance(params.get("normalize", False), bool):
             raise ValueError("normalize must be a boolean.")
+
+
+@dataclass
+class CombinedPolicyConfig(ConfigABC):
+    """Configuration for combined filtering + ranking policy.
+
+    Combines filtering and ranking policies by weighted addition of logits:
+        combined_logits = filtering_logits + ranking_weight * ranking_logits
+        combined_probs = softmax(combined_logits / temperature)
+
+    The filtering policy provides applicability scores (trained on multi-label applicability).
+    The ranking policy provides feasibility scores (trained on actual reactions).
+
+    :param filtering_weights_path: Path to the filtering policy network weights.
+    :param ranking_weights_path: Path to the ranking policy network weights.
+    :param top_rules: Number of top rules to return.
+    :param rule_prob_threshold: Minimum probability threshold for returning a rule.
+    :param ranking_weight: Weight for ranking logits (default 1.0).
+        Values > 1.0 give more weight to ranking (feasibility).
+    :param temperature: Temperature for softmax (default 1.0).
+        Values > 1.0 produce softer distributions (more exploration).
+    """
+
+    filtering_weights_path: str
+    ranking_weights_path: str
+    top_rules: int = 50
+    rule_prob_threshold: float = 0.0
+    ranking_weight: float = 1.0
+    temperature: float = 1.0
+
+    @staticmethod
+    def from_dict(config_dict: Dict[str, Any]) -> "CombinedPolicyConfig":
+        return CombinedPolicyConfig(**config_dict)
+
+    @staticmethod
+    def from_yaml(file_path: str) -> "CombinedPolicyConfig":
+        with open(file_path, "r", encoding="utf-8") as file:
+            config_dict = yaml.safe_load(file)
+        return CombinedPolicyConfig.from_dict(config_dict)
+
+    def _validate_params(self, params: Dict[str, Any]):
+        if not isinstance(params.get("filtering_weights_path"), str):
+            raise ValueError("filtering_weights_path must be a string.")
+        if not isinstance(params.get("ranking_weights_path"), str):
+            raise ValueError("ranking_weights_path must be a string.")
+        if (
+            not isinstance(params.get("top_rules", 50), int)
+            or params.get("top_rules", 50) <= 0
+        ):
+            raise ValueError("top_rules must be a positive integer.")
+        if not isinstance(params.get("rule_prob_threshold", 0.0), float):
+            raise ValueError("rule_prob_threshold must be a float.")
+        if (
+            not isinstance(params.get("ranking_weight", 1.0), (int, float))
+            or params.get("ranking_weight", 1.0) <= 0
+        ):
+            raise ValueError("ranking_weight must be a positive number.")
+        if (
+            not isinstance(params.get("temperature", 1.0), (int, float))
+            or params.get("temperature", 1.0) <= 0
+        ):
+            raise ValueError("temperature must be a positive number.")
 
 
 def convert_config_to_dict(config_attr: ConfigABC, config_type) -> Dict | None:
