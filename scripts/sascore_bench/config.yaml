@@ -54,48 +54,35 @@ policy:
   
   # Minimum probability threshold for rules (0.0 = no threshold)
   rule_prob_threshold: 0.0
-  
-  # Fraction of rules prioritized by filtering policy
-  priority_rules_fraction: 0.5
 
 # -----------------------------------------------------------------------------
 # Tree Search Configuration
 # -----------------------------------------------------------------------------
 tree:
+  # Algorithm selection
+  # Options: uct, nmcs, lazy_nmcs, breadth_first, best_first, beam
+  algorithm: "nmcs"
+  
   # Search limits
-  max_iterations: 1000
-  max_time: 120        # seconds per target
-  max_depth: 9
-  max_tree_size: 1000000
-  
-  # Search strategy
-  search_strategy: "expansion_first"  # Options: expansion_first, evaluation_first
-  ucb_type: "uct"                     # Options: uct, puct
-  c_ucb: 0.1                          # UCB exploration constant
-  
-  # Backpropagation
-  backprop_type: "muzero"             # Options: muzero, cumulative, max
-  evaluation_agg: "max"               # Options: max, mean
-  
-  # Node initialization
-  init_node_value: 0.5
+  max_iterations: 100     # default
+  max_time: 120           # seconds per target (2 minutes)
+  max_depth: 6            # default
+  max_tree_size: 1000000  # default
   
   # Molecule filtering
-  exclude_small: true
-  min_mol_size: 6
-  
-  # Exploration
-  epsilon: 0.0                        # Random action probability
-  
-  # Pruning
-  enable_pruning: false
+  exclude_small: true     # default
+  min_mol_size: 0         # default
   
   # Output
-  silent: true                        # Suppress per-target output
+  silent: true            # Suppress per-target output
+  
+  # NMCS configuration (used when algorithm: "nmcs" or "lazy_nmcs")
+  nmcs_level: 2           # nesting level (default)
+  nmcs_playout_mode: "greedy"  # Options: greedy, random, policy (default: greedy)
 
 # -----------------------------------------------------------------------------
 # Evaluation (Rollout) Configuration
 # -----------------------------------------------------------------------------
 evaluation:
   # Whether to normalize evaluation scores
-  normalize: true
+  normalize: false

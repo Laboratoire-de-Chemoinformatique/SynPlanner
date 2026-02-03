@@ -16,16 +16,16 @@ QUICK START
    cd SynPlanner
    uv sync --extra cpu   # or --extra cuda for GPU support
 
-2. Download required data (reaction rules, policies, building blocks):
-
-   uv run synplan download_all_data --save_to synplan_data
-
-3. Run the benchmark:
+2. Run the benchmark (data will be auto-downloaded from Hugging Face):
 
    uv run sascore-benchmark
 
    Or directly:
    uv run python scripts/sascore_bench/run_benchmark.py
+
+Note: The script will automatically download required data (reaction rules, 
+      policies, building blocks, and benchmark targets) from Hugging Face 
+      on first run if they're not found locally.
 
 CONFIGURATION
 -------------
@@ -80,6 +80,117 @@ logger = logging.getLogger(__name__)
 
 # Default config location (same folder as this script)
 DEFAULT_CONFIG_PATH = Path(__file__).parent / "config.yaml"
+
+
+def ensure_data_downloaded(data_folder: Path, benchmark_folder: Path) -> None:
+    """
+    Download required data from Hugging Face if not present locally.
+    
+    This function checks if required files exist, and if not, downloads them
+    from the SynPlanner Hugging Face repository.
+    
+    Args:
+        data_folder: Root folder where data should be stored
+        benchmark_folder: Folder where benchmark data should be stored
+    """
+    from huggingface_hub import hf_hub_download
+    from huggingface_hub.errors import RemoteEntryNotFoundError
+    
+    # Define required files
+    required_files = [
+        ("ranking_policy", "uspto/weights/ranking_policy_network.ckpt"),
+        ("filtering_policy", "uspto/weights/filtering_policy_network.ckpt"),
+        ("reaction_rules", "uspto/uspto_reaction_rules.pickle"),
+        ("building_blocks", "building_blocks/building_blocks_em_sa_ln.smi"),
+    ]
+    
+    # Check which files are missing
+    missing_files = []
+    for name, rel_path in required_files:
+        full_path = data_folder / rel_path
+        if not full_path.exists():
+            missing_files.append((name, rel_path))
+    
+    # Check if benchmark files are missing
+    benchmark_missing = False
+    if not benchmark_folder.exists() or not any(benchmark_folder.glob("targets_with_sascore_*.smi")):
+        benchmark_missing = True
+        # Add benchmark files to download list
+        missing_files.append(("benchmark_data", "benchmarks/sascore"))
+    
+    # If any files are missing, download them
+    if missing_files:
+        logger.info(f"Downloading {len(missing_files)} missing files from Hugging Face...")
+        
+        # Download files individually
+        REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
+        
+        for name, rel_path in missing_files:
+            if name == "benchmark_data":
+                # For benchmark data, we need to download the whole folder
+                # List the known benchmark files
+                logger.info(f"  - benchmark files: benchmarks/sascore/*.smi")
+                for i in range(1, 6):  # sascore ranges 1.5_2.5, 2.5_3.5, 3.5_4.5, 4.5_5.5, 5.5_6.5
+                    sascore_low = 1.5 + (i - 1)
+                    sascore_high = sascore_low + 1.0
+                    filename = f"targets_with_sascore_{sascore_low}_{sascore_high}.smi"
+                    try:
+                        hf_hub_download(
+                            repo_id=REPO_ID,
+                            subfolder="benchmarks/sascore",
+                            filename=filename,
+                            local_dir=str(data_folder),
+                        )
+                    except RemoteEntryNotFoundError:
+                        logger.warning(f"    Benchmark file not found: {filename}")
+            else:
+                # Split path into subfolder and filename
+                parts = rel_path.split("/")
+                if len(parts) > 1:
+                    subfolder = "/".join(parts[:-1])
+                    filename = parts[-1]
+                else:
+                    subfolder = ""
+                    filename = rel_path
+                
+                logger.info(f"  - {name}: {rel_path}")
+                
+                # Try to download the file, first try .zip version for .smi files
+                downloaded = False
+                if filename.endswith(".smi"):
+                    try:
+                        zip_path = Path(hf_hub_download(
+                            repo_id=REPO_ID,
+                            subfolder=subfolder,
+                            filename=f"{filename}.zip",
+                            local_dir=str(data_folder),
+                        ))
+                        # Extract the zip file
+                        import zipfile
+                        with zipfile.ZipFile(zip_path, "r") as zf:
+                            zf.extractall(zip_path.parent)
+                        zip_path.unlink()  # Remove the zip file after extraction
+                        downloaded = True
+                    except RemoteEntryNotFoundError:
+                        # If .zip doesn't exist, try the plain file
+                        pass
+                
+                if not downloaded:
+                    # Download the file directly (not zipped)
+                    try:
+                        hf_hub_download(
+                            repo_id=REPO_ID,
+                            subfolder=subfolder,
+                            filename=filename,
+                            local_dir=str(data_folder),
+                        )
+                    except RemoteEntryNotFoundError:
+                        logger.error(f"    File not found on Hugging Face: {rel_path}")
+                        raise
+        
+        logger.info("Download completed successfully!")
+    else:
+        logger.info("All required data files found locally.")
 
 
 def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
@@ -152,7 +263,6 @@ def load_policy_from_config(config_path: Optional[Path] = None):
         ranking_weights_path=str(ranking_policy_path),
         top_rules=policy_cfg["top_rules"],
         rule_prob_threshold=policy_cfg["rule_prob_threshold"],
-        priority_rules_fraction=policy_cfg["priority_rules_fraction"],
     )
 
     return policy_function
@@ -215,7 +325,6 @@ def load_resources_from_config(config_path: Optional[Path] = None):
         ranking_weights_path=str(ranking_policy_path),
         top_rules=policy_cfg["top_rules"],
         rule_prob_threshold=policy_cfg["rule_prob_threshold"],
-        priority_rules_fraction=policy_cfg["priority_rules_fraction"],
     )
 
     # Load reaction rules
@@ -226,24 +335,45 @@ def load_resources_from_config(config_path: Optional[Path] = None):
     logger.info("Loading building blocks...")
     building_blocks = load_building_blocks(building_blocks_path, standardize=True)
 
-    # Create tree config
-    tree_config = TreeConfig(
-        max_iterations=tree_cfg["max_iterations"],
-        max_time=tree_cfg["max_time"],
-        max_depth=tree_cfg["max_depth"],
-        max_tree_size=tree_cfg["max_tree_size"],
-        search_strategy=tree_cfg["search_strategy"],
-        ucb_type=tree_cfg["ucb_type"],
-        c_ucb=tree_cfg["c_ucb"],
-        backprop_type=tree_cfg["backprop_type"],
-        evaluation_agg=tree_cfg["evaluation_agg"],
-        exclude_small=tree_cfg["exclude_small"],
-        init_node_value=tree_cfg["init_node_value"],
-        min_mol_size=tree_cfg["min_mol_size"],
-        epsilon=tree_cfg["epsilon"],
-        enable_pruning=tree_cfg["enable_pruning"],
-        silent=tree_cfg["silent"],
-    )
+    # Create tree config - build kwargs from config, using defaults for missing values
+    tree_kwargs = {
+        "algorithm": tree_cfg.get("algorithm", "nmcs"),
+        "max_iterations": tree_cfg.get("max_iterations", 100),
+        "max_time": tree_cfg.get("max_time", 120),
+        "max_depth": tree_cfg.get("max_depth", 6),
+        "max_tree_size": tree_cfg.get("max_tree_size", 1000000),
+        "exclude_small": tree_cfg.get("exclude_small", True),
+        "min_mol_size": tree_cfg.get("min_mol_size", 6),
+        "silent": tree_cfg.get("silent", True),
+    }
+    
+    # Add NMCS-specific parameters if present
+    if "nmcs_level" in tree_cfg:
+        tree_kwargs["nmcs_level"] = tree_cfg["nmcs_level"]
+    if "nmcs_playout_mode" in tree_cfg:
+        tree_kwargs["nmcs_playout_mode"] = tree_cfg["nmcs_playout_mode"]
+    if "lnmcs_ratio" in tree_cfg:
+        tree_kwargs["lnmcs_ratio"] = tree_cfg["lnmcs_ratio"]
+    
+    # Add UCT-specific parameters if present (for backwards compatibility)
+    if "search_strategy" in tree_cfg:
+        tree_kwargs["search_strategy"] = tree_cfg["search_strategy"]
+    if "ucb_type" in tree_cfg:
+        tree_kwargs["ucb_type"] = tree_cfg["ucb_type"]
+    if "c_ucb" in tree_cfg:
+        tree_kwargs["c_ucb"] = tree_cfg["c_ucb"]
+    if "backprop_type" in tree_cfg:
+        tree_kwargs["backprop_type"] = tree_cfg["backprop_type"]
+    if "evaluation_agg" in tree_cfg:
+        tree_kwargs["evaluation_agg"] = tree_cfg["evaluation_agg"]
+    if "init_node_value" in tree_cfg:
+        tree_kwargs["init_node_value"] = tree_cfg["init_node_value"]
+    if "epsilon" in tree_cfg:
+        tree_kwargs["epsilon"] = tree_cfg["epsilon"]
+    if "enable_pruning" in tree_cfg:
+        tree_kwargs["enable_pruning"] = tree_cfg["enable_pruning"]
+    
+    tree_config = TreeConfig(**tree_kwargs)
 
     return {
         "policy_function": policy_function,
@@ -390,7 +520,11 @@ def main():
     reaction_rules_path = data_folder / paths_cfg["reaction_rules"]
     building_blocks_path = data_folder / paths_cfg["building_blocks"]
 
-    # Verify paths exist
+    # Ensure all required data is downloaded from Hugging Face if missing
+    logger.info("Checking for required data files...")
+    ensure_data_downloaded(data_folder, benchmark_folder)
+
+    # Verify paths exist (should exist after download)
     for path in [
         ranking_policy_path,
         filtering_policy_path,
@@ -409,7 +543,6 @@ def main():
         ranking_weights_path=str(ranking_policy_path),
         top_rules=policy_cfg["top_rules"],
         rule_prob_threshold=policy_cfg["rule_prob_threshold"],
-        priority_rules_fraction=policy_cfg["priority_rules_fraction"],
     )
 
     # Load reaction rules and building blocks
@@ -419,24 +552,45 @@ def main():
     logger.info("Loading building blocks...")
     building_blocks = load_building_blocks(building_blocks_path, standardize=True)
 
-    # Tree configuration
-    tree_config = TreeConfig(
-        max_iterations=tree_cfg["max_iterations"],
-        max_time=tree_cfg["max_time"],
-        max_depth=tree_cfg["max_depth"],
-        max_tree_size=tree_cfg["max_tree_size"],
-        search_strategy=tree_cfg["search_strategy"],
-        ucb_type=tree_cfg["ucb_type"],
-        c_ucb=tree_cfg["c_ucb"],
-        backprop_type=tree_cfg["backprop_type"],
-        evaluation_agg=tree_cfg["evaluation_agg"],
-        exclude_small=tree_cfg["exclude_small"],
-        init_node_value=tree_cfg["init_node_value"],
-        min_mol_size=tree_cfg["min_mol_size"],
-        epsilon=tree_cfg["epsilon"],
-        enable_pruning=tree_cfg["enable_pruning"],
-        silent=tree_cfg["silent"],
-    )
+    # Tree configuration - build kwargs from config, using defaults for missing values
+    tree_kwargs = {
+        "algorithm": tree_cfg.get("algorithm", "nmcs"),
+        "max_iterations": tree_cfg.get("max_iterations", 100),
+        "max_time": tree_cfg.get("max_time", 120),
+        "max_depth": tree_cfg.get("max_depth", 6),
+        "max_tree_size": tree_cfg.get("max_tree_size", 1000000),
+        "exclude_small": tree_cfg.get("exclude_small", True),
+        "min_mol_size": tree_cfg.get("min_mol_size", 6),
+        "silent": tree_cfg.get("silent", True),
+    }
+    
+    # Add NMCS-specific parameters if present
+    if "nmcs_level" in tree_cfg:
+        tree_kwargs["nmcs_level"] = tree_cfg["nmcs_level"]
+    if "nmcs_playout_mode" in tree_cfg:
+        tree_kwargs["nmcs_playout_mode"] = tree_cfg["nmcs_playout_mode"]
+    if "lnmcs_ratio" in tree_cfg:
+        tree_kwargs["lnmcs_ratio"] = tree_cfg["lnmcs_ratio"]
+    
+    # Add UCT-specific parameters if present (for backwards compatibility)
+    if "search_strategy" in tree_cfg:
+        tree_kwargs["search_strategy"] = tree_cfg["search_strategy"]
+    if "ucb_type" in tree_cfg:
+        tree_kwargs["ucb_type"] = tree_cfg["ucb_type"]
+    if "c_ucb" in tree_cfg:
+        tree_kwargs["c_ucb"] = tree_cfg["c_ucb"]
+    if "backprop_type" in tree_cfg:
+        tree_kwargs["backprop_type"] = tree_cfg["backprop_type"]
+    if "evaluation_agg" in tree_cfg:
+        tree_kwargs["evaluation_agg"] = tree_cfg["evaluation_agg"]
+    if "init_node_value" in tree_cfg:
+        tree_kwargs["init_node_value"] = tree_cfg["init_node_value"]
+    if "epsilon" in tree_cfg:
+        tree_kwargs["epsilon"] = tree_cfg["epsilon"]
+    if "enable_pruning" in tree_cfg:
+        tree_kwargs["enable_pruning"] = tree_cfg["enable_pruning"]
+    
+    tree_config = TreeConfig(**tree_kwargs)
 
     # Evaluation configuration (rollout)
     eval_config = RolloutEvaluationConfig(
@@ -460,7 +614,6 @@ def main():
         "policy_config": {
             "top_rules": policy_cfg["top_rules"],
             "rule_prob_threshold": policy_cfg["rule_prob_threshold"],
-            "priority_rules_fraction": policy_cfg["priority_rules_fraction"],
         },
     }
 
@@ -492,7 +645,8 @@ def main():
 
     logger.info(f"Found {len(benchmark_files)} benchmark files")
     logger.info(
-        f"Configuration: max_time={tree_config.max_time}s, "
+        f"Configuration: algorithm={tree_config.algorithm}, "
+        f"max_time={tree_config.max_time}s, "
         f"max_depth={tree_config.max_depth}, "
         f"max_iterations={tree_config.max_iterations}"
     )
@@ -539,6 +693,7 @@ def main():
     print("\n" + "=" * 60)
     print("BENCHMARK SUMMARY")
     print("=" * 60)
+    print(f"Algorithm: {tree_config.algorithm}")
     print(f"Policy: Combined (filtering + ranking)")
     print(
         f"Config: max_time={tree_config.max_time}s, "
