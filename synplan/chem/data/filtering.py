@@ -946,9 +946,10 @@ def _filter_reactions_serial(
     """Serial filtering loop used when ``num_cpus <= 1``."""
     lines_counter = 0
     n_filtered = 0
-    with ReactionReader(input_reaction_data_path) as reactions, ReactionWriter(
-        filtered_reaction_data_path
-    ) as result_file:
+    with (
+        ReactionReader(input_reaction_data_path) as reactions,
+        ReactionWriter(filtered_reaction_data_path) as result_file,
+    ):
         for reaction in tqdm(
             reactions,
             desc="Number of reactions processed: ",

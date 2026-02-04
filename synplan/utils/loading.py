@@ -190,7 +190,7 @@ def _convert_cgrtools_query_container(cgr_qc):
     from chython.periodictable import QueryElement as ChyQueryElement
     from chython.periodictable.base.query import AnyElement, AnyMetal
 
-    chy_qc = ChyQueryContainer(smarts='')
+    chy_qc = ChyQueryContainer(smarts="")
 
     for n, atom in cgr_qc._atoms.items():
         symbol = atom.atomic_symbol
@@ -209,19 +209,26 @@ def _convert_cgrtools_query_container(cgr_qc):
             qe = qe_cls(neighbors=neighbors, hybridization=hybridization)
         elif qe_cls is AnyElement:
             qe = qe_cls(
-                charge=charge, is_radical=is_radical,
-                neighbors=neighbors, hybridization=hybridization,
-                heteroatoms=heteroatoms, ring_sizes=ring_sizes,
+                charge=charge,
+                is_radical=is_radical,
+                neighbors=neighbors,
+                hybridization=hybridization,
+                heteroatoms=heteroatoms,
+                ring_sizes=ring_sizes,
                 implicit_hydrogens=hydrogens,
             )
         else:
-            isotope = getattr(atom, 'isotope', None)
+            isotope = getattr(atom, "isotope", None)
             if isotope == 0:
                 isotope = None
             qe = qe_cls(
-                isotope=isotope, charge=charge, is_radical=is_radical,
-                neighbors=neighbors, hybridization=hybridization,
-                heteroatoms=heteroatoms, ring_sizes=ring_sizes,
+                isotope=isotope,
+                charge=charge,
+                is_radical=is_radical,
+                neighbors=neighbors,
+                hybridization=hybridization,
+                heteroatoms=heteroatoms,
+                ring_sizes=ring_sizes,
                 implicit_hydrogens=hydrogens,
             )
 

@@ -30,16 +30,23 @@ logger = logging.getLogger(__name__)
 
 def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
     atoms = set(atoms)
-    q = QueryContainer(smarts='')
+    q = QueryContainer(smarts="")
     for n in atoms:
         atom = mol.atom(n)
         if isinstance(atom, QueryElement):
             q.add_atom(atom.copy(full=True), n)
         else:
-            q.add_atom(QueryElement.from_atom(
-                atom, neighbors=True, hybridization=True,
-                hydrogens=True, ring_sizes=True, heteroatoms=True,
-            ), n)
+            q.add_atom(
+                QueryElement.from_atom(
+                    atom,
+                    neighbors=True,
+                    hybridization=True,
+                    hydrogens=True,
+                    ring_sizes=True,
+                    heteroatoms=True,
+                ),
+                n,
+            )
     for n, m, bond in mol.bonds():
         if n in atoms and m in atoms:
             if isinstance(bond, QueryBond):
@@ -47,7 +54,6 @@ def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
             elif isinstance(bond, Bond):
                 q.add_bond(n, m, QueryBond.from_bond(bond))
     return q
-
 
 
 def add_environment_atoms(
@@ -216,11 +222,15 @@ def clean_molecules(
 
                 if not all(atom_retention_details["reaction_center"].values()):
                     for n in rule_atoms & reaction_center_atoms:
-                        q_rule = clean_atom(q_rule, atom_retention_details["reaction_center"], n)
+                        q_rule = clean_atom(
+                            q_rule, atom_retention_details["reaction_center"], n
+                        )
 
                 if not all(atom_retention_details["environment"].values()):
                     for n in rule_atoms - reaction_center_atoms:
-                        q_rule = clean_atom(q_rule, atom_retention_details["environment"], n)
+                        q_rule = clean_atom(
+                            q_rule, atom_retention_details["environment"], n
+                        )
 
                 cleaned.append(q_rule)
                 break
@@ -381,7 +391,9 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
     """
 
     # build the query patterns and products as before
-    patterns = tuple(molecule_substructure_as_query(m, m.atoms_numbers) for m in rule.reactants)
+    patterns = tuple(
+        molecule_substructure_as_query(m, m.atoms_numbers) for m in rule.reactants
+    )
     products = tuple(rule.products)
     reactor = Reactor(patterns=patterns, products=products)
     try:
@@ -396,7 +408,9 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
                 except InvalidAromaticRing:
                     continue
                 result_products.append(result_product)
-            if set(reaction.products) == set(result_products) and len(reaction.products) == len(result_products):
+            if set(reaction.products) == set(result_products) and len(
+                reaction.products
+            ) == len(result_products):
                 return True
     except (KeyError, IndexError, InvalidAromaticRing):
         # KeyError - iteration over reactor is finished and products are different from the original reaction
@@ -478,8 +492,14 @@ def create_rule(
         )
 
     # 8. assemble the final rule including metadata if specified
-    rule = assemble_final_rule(reactant_substructures, product_substructures, reagents, meta_debug, config.keep_metadata, reaction)
-
+    rule = assemble_final_rule(
+        reactant_substructures,
+        product_substructures,
+        reagents,
+        meta_debug,
+        config.keep_metadata,
+        reaction,
+    )
 
     # 9. reverse extracted reaction rule and reaction
     if config.reverse_rule:

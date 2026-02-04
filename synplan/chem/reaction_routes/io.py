@@ -108,9 +108,12 @@ def make_json(routes_dict, keep_ids=True):
             prod_map = {}  # smiles -> list of step_ids
             for sid, rxn in steps.items():
                 for prod in rxn.products:
-                    prod.kekule()
-                    prod.implicify_hydrogens()
-                    prod.thiele()
+                    try:
+                        prod.kekule()
+                        prod.implicify_hydrogens()
+                        prod.thiele()
+                    except InvalidAromaticRing:
+                        pass
                     s = str(prod)
                     prod_map.setdefault(s, []).append(sid)
         except Exception as e:

@@ -143,6 +143,7 @@ def render_svg(pred, columns, box_colors):
     cx = count()
     cy = count()
     arrow_points = {}
+
     def _get_plane(mol):
         return {n: (a.x, a.y) for n, a in mol._atoms.items()}
 

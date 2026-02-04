@@ -6,7 +6,12 @@ from typing import Iterable, Set
 
 import pytest
 from chython import smiles
-from chython.containers import CGRContainer, MoleculeContainer, QueryContainer, ReactionContainer
+from chython.containers import (
+    CGRContainer,
+    MoleculeContainer,
+    QueryContainer,
+    ReactionContainer,
+)
 from chython import smarts as sq_chy
 
 from synplan.chem.reaction_rules.extraction import (

@@ -5,7 +5,12 @@ import logging
 from io import StringIO
 from typing import Iterable
 
-from chython.containers import CGRContainer, MoleculeContainer, QueryContainer, ReactionContainer
+from chython.containers import (
+    CGRContainer,
+    MoleculeContainer,
+    QueryContainer,
+    ReactionContainer,
+)
 from chython.exceptions import InvalidAromaticRing
 from chython.files.SDFrw import SDFRead
 from tqdm.auto import tqdm

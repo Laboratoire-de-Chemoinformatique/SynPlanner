@@ -105,7 +105,9 @@ def test_filtering_keeps_some(
     assert 0 < len(kept) < len(open(sample_reactions_file).read().splitlines())
 
 
-@pytest.mark.skip(reason="Ray parallel test is slow and has env resolution issues with local chython path")
+@pytest.mark.skip(
+    reason="Ray parallel test is slow and has env resolution issues with local chython path"
+)
 def test_filtering_parallel_matches_serial(
     tmp_path: Path,
     sample_reactions_file: Path,

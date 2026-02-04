@@ -10,6 +10,7 @@ class Marked:
     Uses __slots__ = () to avoid layout conflict with Element's slots.
     Concrete subclasses (MarkedAt) define the actual storage slot.
     """
+
     __slots__ = ()
 
     def __init__(self, *args, **kwargs):

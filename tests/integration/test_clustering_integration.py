@@ -163,9 +163,11 @@ def test_simple_molecule_clustering(
     # Verify subclustering results
     assert len(subclusters) > 0, "Should have at least one subcluster"
     total_subclusters = calc_num_routes_subclusters(subclusters)
-    assert total_subclusters == total_routes, "Total subclusters should match total routes"
     assert (
-        sorted(subclusters.keys()) == sorted(clusters.keys())
+        total_subclusters == total_routes
+    ), "Total subclusters should match total routes"
+    assert sorted(subclusters.keys()) == sorted(
+        clusters.keys()
     ), "Subcluster keys should match cluster keys"
 
 
@@ -188,9 +190,11 @@ def test_medium_molecule_clustering(
     # Verify subclustering results
     assert len(subclusters) > 0, "Should have at least one subcluster"
     total_subclusters = calc_num_routes_subclusters(subclusters)
-    assert total_subclusters == total_routes, "Total subclusters should match total routes"
     assert (
-        sorted(subclusters.keys()) == sorted(clusters.keys())
+        total_subclusters == total_routes
+    ), "Total subclusters should match total routes"
+    assert sorted(subclusters.keys()) == sorted(
+        clusters.keys()
     ), "Subcluster keys should match cluster keys"
 
 
@@ -213,7 +217,9 @@ def test_complex_molecule_clustering(
     # Verify subclustering results
     assert len(subclusters) > 0, "Should have at least one subcluster"
     total_subclusters = calc_num_routes_subclusters(subclusters)
-    assert total_subclusters == total_routes, "Total subclusters should match total routes"
     assert (
-        sorted(subclusters.keys()) == sorted(clusters.keys())
+        total_subclusters == total_routes
+    ), "Total subclusters should match total routes"
+    assert sorted(subclusters.keys()) == sorted(
+        clusters.keys()
     ), "Subcluster keys should match cluster keys"
