@@ -4,6 +4,7 @@ import os
 import pickle
 
 from chython import smiles as read_smiles
+from chython.exceptions import InvalidAromaticRing
 from synplan.chem.reaction_routes.route_cgr import extract_reactions
 from synplan.mcts.tree import Tree
 
@@ -117,9 +118,12 @@ def make_json(routes_dict, keep_ids=True):
             continue
 
         def transform(mol):
-            mol.kekule()
-            mol.implicify_hydrogens()
-            mol.thiele()
+            try:
+                mol.kekule()
+                mol.implicify_hydrogens()
+                mol.thiele()
+            except InvalidAromaticRing:
+                pass
             return str(mol)
 
         def build_mol_node(sid):

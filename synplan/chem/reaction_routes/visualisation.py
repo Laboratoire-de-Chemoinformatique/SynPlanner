@@ -813,7 +813,7 @@ def depict_custom_reaction(reaction: ReactionContainer):
                 mol.__class__ = type(custom_class_name, new_bases, {})
 
             # Depict using the (potentially) modified class
-            atoms, bonds, masks, min_x, min_y, max_x, max_y = mol.depict(embedding=True)
+            atoms, bonds, _, masks, _, min_x, min_y, max_x, max_y = mol.depict(_embedding=True)
             r_atoms.append(atoms)
             r_bonds.append(bonds)
             r_masks.append(masks)

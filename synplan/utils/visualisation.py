@@ -8,6 +8,7 @@ from datetime import datetime
 
 from chython import smiles as read_smiles
 from chython.containers.molecule import MoleculeContainer
+from chython.algorithms.depict import _render_config, _graph_svg
 
 from synplan.chem.reaction_routes.visualisation import (
     cgr_display,
@@ -142,20 +143,29 @@ def render_svg(pred, columns, box_colors):
     cx = count()
     cy = count()
     arrow_points = {}
+    def _get_plane(mol):
+        return {n: (a.x, a.y) for n, a in mol._atoms.items()}
+
+    def _set_plane(mol, plane):
+        for n, (x, y) in plane.items():
+            mol._atoms[n].xy = (x, y)
+
     for ms in columns:
         heights = []
         for m in ms:
             m.clean2d()
+            plane = _get_plane(m)
             # X-shift for target
-            min_x = min(x for x, y in m._plane.values()) - x_shift
-            min_y = min(y for x, y in m._plane.values())
-            m._plane = {n: (x - min_x, y - min_y) for n, (x, y) in m._plane.items()}
-            max_x = max(x for x, y in m._plane.values())
+            min_x = min(x for x, y in plane.values()) - x_shift
+            min_y = min(y for x, y in plane.values())
+            plane = {n: (x - min_x, y - min_y) for n, (x, y) in plane.items()}
+            _set_plane(m, plane)
+            max_x = max(x for x, y in plane.values())
 
             c_max_x = max(c_max_x, max_x)
 
             arrow_points[next(cx)] = [x_shift, max_x]
-            heights.append(max(y for x, y in m._plane.values()))
+            heights.append(max(y for x, y in plane.values()))
 
         x_shift = c_max_x + 5.0  # between columns gap
         # calculate Y-shift
@@ -165,13 +175,14 @@ def render_svg(pred, columns, box_colors):
 
         y_shift /= 2.0
         for m, h in zip(ms, heights):
-            m._plane = {n: (x, y - y_shift) for n, (x, y) in m._plane.items()}
+            plane = {n: (x, y - y_shift) for n, (x, y) in _get_plane(m).items()}
+            _set_plane(m, plane)
 
             # calculate coordinates for boxes
-            max_x = max(x for x, y in m._plane.values()) + 0.9  # max x
-            min_x = min(x for x, y in m._plane.values()) - 0.6  # min x
-            max_y = -(max(y for x, y in m._plane.values()) + 0.45)  # max y
-            min_y = -(min(y for x, y in m._plane.values()) - 0.45)  # min y
+            max_x = max(x for x, y in plane.values()) + 0.9  # max x
+            min_x = min(x for x, y in plane.values()) - 0.6  # min x
+            max_y = -(max(y for x, y in plane.values()) + 0.45)  # max y
+            min_y = -(min(y for x, y in plane.values()) - 0.45)  # min y
             x_delta = abs(max_x - min_x)
             y_delta = abs(max_y - min_y)
             box = (
@@ -180,7 +191,8 @@ def render_svg(pred, columns, box_colors):
             )
             arrow_points[next(cy)].append(y_shift - h / 2.0)
             y_shift -= h + 3.0
-            depicted_molecule = list(m.depict(embedding=True))[:3]
+            atoms, bonds, define, masks, uid, *_ = m.depict(_embedding=True)
+            depicted_molecule = [atoms, bonds, define, masks, uid]
             depicted_molecule.append(box)
             render.append(depicted_molecule)
 
@@ -202,7 +214,7 @@ def render_svg(pred, columns, box_colors):
         for p in ps:
             arrow_points[p].append(mid_x)
 
-    config = MoleculeContainer._render_config
+    config = _render_config
     font_size = config["font_size"]
     font125 = 1.25 * font_size
     width = c_max_x + 4.0 * font_size  # 3.0 by default
@@ -211,7 +223,7 @@ def render_svg(pred, columns, box_colors):
     svg = [
         f'<svg width="{0.6 * width:.2f}cm" height="{0.6 * height:.2f}cm" '
         f'viewBox="{-font125:.2f} {-box_y:.2f} {width:.2f} '
-        f'{height:.2f}" xmlns="http://www.w3.org/2000/svg" version="1.1">',
+        f'{height:.2f}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1">',
         '  <defs>\n    <marker id="arrow" markerWidth="10" markerHeight="10" '
         'refX="0" refY="3" orient="auto">\n      <path d="M0,0 L0,6 L9,3"/>\n    </marker>\n  </defs>',
     ]
@@ -226,11 +238,11 @@ def render_svg(pred, columns, box_colors):
         if p_y != s_y:
             arrow += f'  <circle cx="{mid_x}" cy="{p_y}" r="0.1"/>'
         svg.append(arrow)
-    for atoms, bonds, masks, box in render:
-        molecule_svg = MoleculeContainer._graph_svg(
-            atoms, bonds, masks, -font125, -box_y, width, height
+    for atoms, bonds, define, masks, uid, box in render:
+        molecule_svg = _graph_svg(
+            atoms, bonds, define, masks, uid, -font125, -box_y, width, height
         )
-        molecule_svg.insert(1, box)
+        molecule_svg.insert(0, box)
         svg.extend(molecule_svg)
     svg.append("</svg>")
     return "\n".join(svg)
