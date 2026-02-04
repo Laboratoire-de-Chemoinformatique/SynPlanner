@@ -14,6 +14,7 @@ from synplan.chem.reaction_rules.extraction import (
     add_functional_groups,
     add_ring_structures,
     clean_molecules,
+    molecule_substructure_as_query,
 )
 from synplan.chem.utils import to_chython_molecule
 from synplan.utils.config import RuleExtractionConfig
@@ -110,7 +111,8 @@ def test_add_ring_structures_ring_formed(diels_alder_cgr: CGRContainer) -> None:
 
 @pytest.fixture(scope="session")
 def query_ethanol() -> QueryContainer:
-    return smiles("CCO").substructure(smiles("CCO"), as_query=True)
+    mol = smiles("CCO")
+    return molecule_substructure_as_query(mol, mol.atoms_numbers)
 
 
 def test_clean_molecules(simple_esterification_reaction: ReactionContainer) -> None:
@@ -123,7 +125,7 @@ def test_clean_molecules(simple_esterification_reaction: ReactionContainer) -> N
         for m in mols:
             sel = rule_atoms & set(m.atoms_numbers)
             if sel:
-                out.append(m.substructure(atoms=sel, as_query=True))
+                out.append(molecule_substructure_as_query(m, sel))
         return out
 
     r_queries = _extract(rxn.reactants)

@@ -1,30 +1,37 @@
-from chython.periodictable import At, Core, DynamicElement
+from chython.periodictable import At, DynamicElement
 from typing import Optional
 
 
-class Marked(Core):
-    __slots__ = "__mark", "_isotope"
+class Marked:
+    """Mixin that adds a mark property and overrides isotope.
+
+    Must be used together with an Element-based class (e.g. At) via
+    multiple inheritance so the real atom behavior comes from Element.
+    Uses __slots__ = () to avoid layout conflict with Element's slots.
+    Concrete subclasses (MarkedAt) define the actual storage slot.
+    """
+    __slots__ = ()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__mark = None
-        self._isotope = 0  # Make sure this exists
+        self._mark = None
+        self._isotope = 0
 
     @property
     def mark(self):
-        return self.__mark
+        return self._mark
 
     @mark.setter
     def mark(self, mark):
-        self.__mark = mark
+        self._mark = mark
 
     @property
     def isotope(self):
-        return getattr(self, "_isotope", 0)  # Always returns int
+        return getattr(self, "_isotope", 0)
 
     @isotope.setter
     def isotope(self, value):
-        self._isotope = int(value)
+        self._isotope = int(value) if value is not None else 0
 
     def __repr__(self):
         return f"{self.symbol}({self.isotope})"
@@ -35,13 +42,14 @@ class Marked(Core):
 
     @property
     def symbol(self) -> str:
-        return "X"  # For human-readable representation
+        return "X"
 
     def __len__(self):
         return super().__len__()
 
 
 class MarkedAt(Marked, At):
+    __slots__ = ("_mark",)
     atomic_number = At.atomic_number
 
     @property

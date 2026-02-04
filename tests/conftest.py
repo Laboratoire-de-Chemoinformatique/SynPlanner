@@ -64,7 +64,7 @@ REACTIONS = [
         "Grignard addition",
     ),
     (
-        "[CH2:1]1[CH2:2][CH2:3][CH2:4][CH2:5][CH:6]1[OH:7]>[O:11]=[Cr:10](=[O:12])([OH:9])[OH:13]>[CH2:2]1[CH2:1][CH:6]([CH2:5][CH2:4][CH2:3]1)[CH:7]=[O:8]",
+        "[CH2:1]1[CH2:2][CH2:3][CH2:4][CH2:5][CH:6]1[OH:7]>[O:11]=[Cr:10](=[O:12])([OH:9])[OH:13]>[CH2:2]1[CH2:1][C:6](=[O:7])[CH2:5][CH2:4][CH2:3]1",
         "Jones oxidation",
     ),
     (

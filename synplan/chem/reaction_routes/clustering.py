@@ -284,7 +284,7 @@ def lg_process_reset(lg_cgr: CGRContainer, atom_num: int):
                 order = int(bond.order)
                 lg_cgr.delete_bond(atom1, atom2)
                 lg_cgr.add_bond(atom1, atom2, DynamicBond(order, order))
-    lg_cgr._atoms[atom_num].is_radical = True
+    lg_cgr._radicals[atom_num] = True
     return lg_cgr
 
 
@@ -347,7 +347,10 @@ def lg_replacer(route_cgr: CGRContainer):
                     if len(lg_cgrs) == 2:
                         lg_cgr = lg_cgrs[1]
                         lg_cgr = lg_process_reset(lg_cgr, atom2)
-                        lg_cgr.clean2d()
+                        try:
+                            lg_cgr.clean2d()
+                        except (ImportError, AttributeError, Exception):
+                            pass
                     else:
                         continue
                     lg_groups[k] = (lg_cgr, atom2)

@@ -36,24 +36,16 @@ def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
         if isinstance(atom, QueryElement):
             q.add_atom(atom.copy(full=True), n)
         else:
-            q.add_atom(QueryElement.from_atom(atom), n)
+            q.add_atom(QueryElement.from_atom(
+                atom, neighbors=True, hybridization=True,
+                hydrogens=True, ring_sizes=True, heteroatoms=True,
+            ), n)
     for n, m, bond in mol.bonds():
         if n in atoms and m in atoms:
             if isinstance(bond, QueryBond):
                 q.add_bond(n, m, bond.copy(full=True))
             elif isinstance(bond, Bond):
                 q.add_bond(n, m, QueryBond.from_bond(bond))
-    sh = getattr(mol, '_hybridizations', {}) or {}
-    hg = getattr(mol, '_hydrogens', {}) or {}
-    rs = getattr(mol, 'atoms_rings_sizes', {}) or {}
-    plane = getattr(mol, '_plane', {}) if hasattr(mol, '_plane') else {}
-    bonds = getattr(mol, '_bonds', {}) or {}
-    q._neighbors = {n: (len(bonds.get(n, {})),) for n in atoms}
-    q._hybridizations = {n: (sh.get(n, 0),) for n in atoms}
-    q._hydrogens = {n: () if hg.get(n) is None else (hg[n],) for n in atoms}
-    q._rings_sizes = {n: rs.get(n, ()) for n in atoms}
-    q._heteroatoms = {n: () for n in atoms}
-    q._plane = {n: plane.get(n, (0.0, 0.0)) for n in atoms}
     return q
 
 

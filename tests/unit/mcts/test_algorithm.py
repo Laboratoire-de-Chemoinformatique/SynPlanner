@@ -38,8 +38,8 @@ class FakeReactor:
     def __init__(self, products_fn: Callable[[], List[MoleculeContainer]]):
         self.products_fn = products_fn
 
-    def __call__(self, reactants: List[MoleculeContainer]):
-        return [FakeReaction(reactants, self.products_fn())]
+    def __call__(self, *reactants: MoleculeContainer):
+        return [FakeReaction(list(reactants), self.products_fn())]
 
 
 class FakePolicy:

@@ -1,8 +1,8 @@
-from chython.containers import MoleculeContainer
+from chython import depict_settings
 from .node import *
 from .tree import *
 
 
-MoleculeContainer.depict_settings(aam=False)
+depict_settings(aam=False)
 
 __all__ = ["Tree", "Node"]

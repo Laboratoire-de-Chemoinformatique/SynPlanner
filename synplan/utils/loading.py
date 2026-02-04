@@ -179,6 +179,67 @@ def download_all_data(save_to="."):
                     print(f"Extracted {file_name} to {zip_file.parent}")
 
 
+def _convert_cgrtools_query_container(cgr_qc):
+    """Convert a CGRtools QueryContainer to a chython QueryContainer.
+
+    CGRtools stores atom constraints (neighbors, hybridizations, etc.) in
+    container-level dicts, while chython stores them on the atom objects.
+    """
+    from chython.containers.query import QueryContainer as ChyQueryContainer
+    from chython.containers.bonds import QueryBond as ChyQueryBond
+    from chython.periodictable import QueryElement as ChyQueryElement
+    from chython.periodictable.base.query import AnyElement, AnyMetal
+
+    chy_qc = ChyQueryContainer(smarts='')
+
+    for n, atom in cgr_qc._atoms.items():
+        symbol = atom.atomic_symbol
+        qe_cls = ChyQueryElement.from_symbol(symbol)
+
+        # Read constraints from container-level dicts (CGRtools storage)
+        charge = cgr_qc._charges.get(n, 0)
+        is_radical = cgr_qc._radicals.get(n, False)
+        neighbors = cgr_qc._neighbors.get(n, ()) or None
+        hybridization = cgr_qc._hybridizations.get(n, ()) or None
+        hydrogens = cgr_qc._hydrogens.get(n, ()) or None
+        ring_sizes = cgr_qc._rings_sizes.get(n, ()) or None
+        heteroatoms = cgr_qc._heteroatoms.get(n, ()) or None
+
+        if qe_cls is AnyMetal:
+            qe = qe_cls(neighbors=neighbors, hybridization=hybridization)
+        elif qe_cls is AnyElement:
+            qe = qe_cls(
+                charge=charge, is_radical=is_radical,
+                neighbors=neighbors, hybridization=hybridization,
+                heteroatoms=heteroatoms, ring_sizes=ring_sizes,
+                implicit_hydrogens=hydrogens,
+            )
+        else:
+            isotope = getattr(atom, 'isotope', None)
+            if isotope == 0:
+                isotope = None
+            qe = qe_cls(
+                isotope=isotope, charge=charge, is_radical=is_radical,
+                neighbors=neighbors, hybridization=hybridization,
+                heteroatoms=heteroatoms, ring_sizes=ring_sizes,
+                implicit_hydrogens=hydrogens,
+            )
+
+        chy_qc.add_atom(qe, n)
+
+    seen = set()
+    for n, neighbors_dict in cgr_qc._bonds.items():
+        for m, bond in neighbors_dict.items():
+            if (n, m) in seen or (m, n) in seen:
+                continue
+            seen.add((n, m))
+            order = bond.order  # tuple of ints in CGRtools
+            chy_bond = ChyQueryBond(order=order)
+            chy_qc.add_bond(n, m, chy_bond)
+
+    return chy_qc
+
+
 @functools.lru_cache(maxsize=None)
 def load_reaction_rules(file: str) -> List[Reactor]:
     """Loads the reaction rules from a pickle file and converts them into a list of
@@ -192,7 +253,16 @@ def load_reaction_rules(file: str) -> List[Reactor]:
         reaction_rules = pickle.load(f)
 
     if not isinstance(reaction_rules[0][0], Reactor):
-        reaction_rules = [Reactor(x) for x, _ in reaction_rules]
+        converted = []
+        for rule, _ in reaction_rules:
+            patterns = tuple(
+                _convert_cgrtools_query_container(m) for m in rule.reactants
+            )
+            products = tuple(
+                _convert_cgrtools_query_container(m) for m in rule.products
+            )
+            converted.append(Reactor(patterns=patterns, products=products))
+        reaction_rules = converted
 
     return tuple(reaction_rules)
 

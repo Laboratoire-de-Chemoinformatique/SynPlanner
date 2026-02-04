@@ -70,7 +70,7 @@ def apply_reaction_rule(
 
     try:
         if sort_reactions:
-            unsorted_reactions = list(reaction_rule(reactants))
+            unsorted_reactions = list(reaction_rule(*reactants))
             sorted_reactions = sorted(
                 unsorted_reactions,
                 key=lambda react: len(
@@ -83,11 +83,11 @@ def apply_reaction_rule(
             reactions = sorted_reactions[:top_reactions_num]
         else:
             reactions = []
-            for reaction in reaction_rule(reactants):
+            for reaction in reaction_rule(*reactants):
                 reactions.append(reaction)
                 if len(reactions) == top_reactions_num:
                     break
-    except IndexError:
+    except (IndexError, InvalidAromaticRing):
         reactions = []
 
     for reaction in reactions:

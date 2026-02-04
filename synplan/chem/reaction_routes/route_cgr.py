@@ -376,7 +376,7 @@ def compose_route_cgr(tree_or_routes, route_id):
                     dict_map = clean_map
                     break
             if dict_map:
-                curr_cgr = curr_cgr.remap(dict_map, copy=False)
+                curr_cgr.remap(dict_map, copy=False)
 
             # update our react_dict & bb_set
             react_dict, bb_set = update_reaction_dict(
@@ -387,7 +387,7 @@ def compose_route_cgr(tree_or_routes, route_id):
 
             # apply the new overlap‐mapping
             if mapping:
-                curr_cgr = curr_cgr.remap(mapping, copy=False)
+                curr_cgr.remap(mapping, copy=False)
 
             reactions_dict[step] = ReactionContainer.from_cgr(curr_cgr)
             accum_cgr = curr_cgr.compose(accum_cgr)
@@ -549,7 +549,8 @@ def compose_sb_cgr(route_cgr: CGRContainer):
     if sb_cgr._p_charges != sb_cgr._charges:
         for num, charge in sb_cgr._charges.items():
             if charge != 0:
-                sb_cgr._atoms[num].charge = 0
+                sb_cgr._charges[num] = 0
+        sb_cgr.flush_cache()
 
     return sb_cgr
 
