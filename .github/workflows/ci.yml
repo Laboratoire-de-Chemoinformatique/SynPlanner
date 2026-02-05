@@ -38,8 +38,10 @@ jobs:
 
       - name: 📚Install project (incl. dev extras)
         run: |
-          uv sync --group dev --extra cpu
+          uv sync --group dev --extra cpu --refresh
           uv build --wheel      # guarantees the package itself is buildable
+        env:
+          UV_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
         shell: bash
 
       - name: ✅Run test‑suite + coverage
@@ -64,5 +66,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: |
-          uv sync --group dev --extra cpu --no-install-project
+          uv sync --group dev --extra cpu --no-install-project --refresh
           uv run black --check synplan tests
+        env:
+          UV_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
