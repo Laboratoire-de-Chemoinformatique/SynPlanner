@@ -11,7 +11,6 @@ dependencies = [
   "chython",
   "chytorch-synplan>=1.69",
   "chytorch-rxnmap-synplan>=1.6",
-  "cgrtools-stable==4.2.13",
   "numpy>=2",
   "pandas>=1.4",
   "toytree>=2.0",
