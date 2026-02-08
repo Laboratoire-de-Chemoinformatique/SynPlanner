@@ -716,7 +716,11 @@ def replace_leaving_groups_in_synthon(subgroup, to_remove):  # Under development
                 lg_fragment = lg_table[current_mark][0]
                 updated_cgr = updated_cgr.union(lg_fragment)
                 # Reset radical flag on the new atom and restore the bond
-                updated_cgr._atoms[atom_idx].is_radical = False
+                # DynamicElement.is_radical is read-only in chython;
+                # modify container dicts directly.
+                updated_cgr._radicals[atom_idx] = False
+                updated_cgr._p_radicals[atom_idx] = False
+                updated_cgr.flush_cache()
                 updated_cgr.add_bond(atom_idx, neighbor_idx, bond)
 
             removed_count += 1
