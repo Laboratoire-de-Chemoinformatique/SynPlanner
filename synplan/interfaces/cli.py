@@ -136,6 +136,12 @@ def building_blocks_standardizing_cli(input_file: str, output_file: str) -> None
     type=click.Path(),
     help="Write failed reactions here. Default: <output>.errors.tsv",
 )
+@click.option(
+    "--batch_size",
+    default=100,
+    type=int,
+    help="Number of reactions per batch sent to each worker.",
+)
 def reaction_standardizing_cli(
     config_path: str,
     input_file: str,
@@ -143,6 +149,7 @@ def reaction_standardizing_cli(
     num_cpus: int,
     ignore_errors: bool,
     error_file: str | None,
+    batch_size: int,
 ) -> None:
     """Standardizes reactions and remove duplicates."""
     stand_config = ReactionStandardizationConfig.from_yaml(config_path)
@@ -151,7 +158,7 @@ def reaction_standardizing_cli(
         input_reaction_data_path=input_file,
         standardized_reaction_data_path=output_file,
         num_cpus=num_cpus,
-        batch_size=100,
+        batch_size=batch_size,
         ignore_errors=ignore_errors,
         error_file_path=error_file,
     )
@@ -194,6 +201,12 @@ def reaction_standardizing_cli(
     type=click.Path(),
     help="Write failed/filtered reactions here. Default: <output>.errors.tsv",
 )
+@click.option(
+    "--batch_size",
+    default=100,
+    type=int,
+    help="Number of reactions per batch sent to each worker.",
+)
 def reaction_filtering_cli(
     config_path: str,
     input_file: str,
@@ -201,6 +214,7 @@ def reaction_filtering_cli(
     num_cpus: int,
     ignore_errors: bool,
     error_file: str | None,
+    batch_size: int,
 ):
     """Filters erroneous reactions."""
     reaction_check_config = ReactionFilterConfig().from_yaml(config_path)
@@ -209,7 +223,7 @@ def reaction_filtering_cli(
         input_reaction_data_path=input_file,
         filtered_reaction_data_path=output_file,
         num_cpus=num_cpus,
-        batch_size=100,
+        batch_size=batch_size,
         ignore_errors=ignore_errors,
         error_file_path=error_file,
     )
