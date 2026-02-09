@@ -21,7 +21,6 @@ from synplan.chem.reaction_rules.extraction import (
     clean_molecules,
     molecule_substructure_as_query,
 )
-from synplan.chem.utils import to_chython_molecule
 from synplan.utils.config import RuleExtractionConfig
 
 # ---------------------------------------------------------------------------
@@ -84,7 +83,7 @@ def test_add_functional_groups(
 ) -> None:
     centre = {3, 4, 5, 6}
     carbonyl = sq_chy("[C]=[O]")
-    r0_ch = to_chython_molecule(simple_esterification_reaction.reactants[0])
+    r0_ch = simple_esterification_reaction.reactants[0]
 
     expected = centre.copy()
     for mp in carbonyl.get_mapping(r0_ch):

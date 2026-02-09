@@ -33,8 +33,9 @@ def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
     q = QueryContainer(smarts="")
     for n in atoms:
         atom = mol.atom(n)
+        xy = atom.xy if hasattr(atom, 'xy') else None
         if isinstance(atom, QueryElement):
-            q.add_atom(atom.copy(full=True), n)
+            q.add_atom(atom.copy(full=True), n, xy=xy)
         else:
             q.add_atom(
                 QueryElement.from_atom(
@@ -46,6 +47,7 @@ def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
                     heteroatoms=True,
                 ),
                 n,
+                xy=xy,
             )
     for n, m, bond in mol.bonds():
         if n in atoms and m in atoms:

@@ -259,6 +259,11 @@ def load_reaction_rules(file: str) -> List[Reactor]:
     with open(file, "rb") as f:
         reaction_rules = pickle.load(f)
 
+    # Already a list of chython Reactors (converted pickle)
+    if isinstance(reaction_rules[0], Reactor):
+        return tuple(reaction_rules)
+
+    # Legacy format: list of (rule, priority) tuples with CGRtools objects
     if not isinstance(reaction_rules[0][0], Reactor):
         converted = []
         for rule, _ in reaction_rules:

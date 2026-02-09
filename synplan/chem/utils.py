@@ -251,17 +251,3 @@ def reverse_reaction(
 
     return reversed_reaction
 
-
-def to_chython_molecule(molecule):
-    """Compatibility shim: ensure a MoleculeContainer instance."""
-    if isinstance(molecule, MoleculeContainer):
-        return molecule
-
-    molecule_chython = MoleculeContainer()
-    for n, atom in molecule.atoms():
-        molecule_chython.add_atom(atom.atomic_symbol, n)
-
-    for n, m, bond in molecule.bonds():
-        molecule_chython.add_bond(n, m, int(bond))
-
-    return molecule_chython
