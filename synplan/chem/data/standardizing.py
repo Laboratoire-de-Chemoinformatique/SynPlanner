@@ -6,6 +6,7 @@ https://github.com/Laboratoire-de-Chemoinformatique/Reaction_Data_Cleaning/blob/
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from collections import Counter
 from dataclasses import dataclass
 import logging
 from pathlib import Path
@@ -25,16 +26,36 @@ logger = logging.getLogger("synplan.chem.data.standardizing")
 
 
 class StandardizationError(RuntimeError):
-    """Wraps the original exception and the reaction string that failed."""
+    """Wraps the original exception and the reaction string that failed.
+
+    Stores the original exception type name and message as strings so the
+    error is safely picklable by Ray (no reference to the live exception
+    object which may not be importable on the worker).
+    """
 
     def __init__(self, stage: str, reaction: str, original: Exception):
         self.stage = stage
         self.reaction = reaction
-        self.original = original
+        self.original_type = type(original).__qualname__
+        self.original_msg = str(original)
         super().__init__(f"{stage} failed on {reaction}: {original}")
 
-    def __str__(self) -> str:  # pragma: no cover - trivial
-        return f"{self.stage} failed on {self.reaction}: {self.original}"
+    def __reduce__(self):
+        """Make picklable for Ray (no reference to original exception object)."""
+        return (
+            self.__class__._from_pickle,
+            (self.stage, self.reaction, self.original_type, self.original_msg),
+        )
+
+    @classmethod
+    def _from_pickle(cls, stage, reaction, orig_type, orig_msg):
+        err = cls.__new__(cls)
+        err.stage = stage
+        err.reaction = reaction
+        err.original_type = orig_type
+        err.original_msg = orig_msg
+        RuntimeError.__init__(err, f"{stage} failed on {reaction}: {orig_type}: {orig_msg}")
+        return err
 
 
 class BaseStandardizer(ABC):
@@ -75,7 +96,7 @@ class BaseStandardizer(ABC):
             return self._run(rxn)
         except StandardizationError:
             raise
-        except (ValueError, TypeError, RuntimeError) as exc:
+        except Exception as exc:
             logging.debug("%s: %s", self.__class__.__name__, exc, exc_info=True)
             raise StandardizationError(self.__class__.__name__, str(rxn), exc) from exc
 
@@ -943,9 +964,11 @@ def safe_standardize(
     standardizers: Sequence,
     *,
     ignore_errors: bool = False,
-) -> Tuple[ReactionContainer, bool]:
+) -> Tuple[ReactionContainer, bool, Optional[StandardizationError]]:
     """
     Always returns a ReactionContainer. The boolean flags real success.
+    The third element is the :class:`StandardizationError` when the reaction
+    failed, or ``None`` on success.
 
     If ``ignore_errors`` is False (default), any :class:`StandardizationError`
     or unexpected exception is propagated so callers can see new failure modes.
@@ -958,8 +981,8 @@ def safe_standardize(
         reaction = item if isinstance(item, ReactionContainer) else smiles_chython(item)
         std = standardize_reaction(reaction, standardizers)
         if std is None:
-            return reaction, False  # filtered → keep original
-        return std, True
+            return reaction, False, None  # filtered → keep original
+        return std, True, None
     except StandardizationError as exc:
         logger.log(
             logging.ERROR if not ignore_errors else logging.WARNING,
@@ -969,12 +992,13 @@ def safe_standardize(
             exc_info=not ignore_errors,
         )
         if ignore_errors and reaction is not None:
-            return reaction, False
+            return reaction, False, exc
         raise
-    except (ValueError, TypeError, RuntimeError) as exc:
+    except Exception as exc:
         logger.exception("Unexpected error while standardizing %s", item)
         if ignore_errors and reaction is not None:
-            return reaction, False
+            wrapped = StandardizationError("parse", str(item), exc)
+            return reaction, False, wrapped
         raise
 
 
@@ -983,14 +1007,22 @@ def _process_batch(
     standardizers: Sequence,
     *,
     ignore_errors: bool = False,
-) -> Tuple[List[ReactionContainer], int]:
+) -> Tuple[List[ReactionContainer], int, List[Tuple[str, str, str, str]]]:
+    """Process a batch and return (results, n_ok, errors).
+
+    Each error entry is ``(original_smiles, stage, error_type, error_message)``.
+    """
     results: List[ReactionContainer] = []
+    errors: List[Tuple[str, str, str, str]] = []
     n_std = 0
     for item in batch:
-        rxn, ok = safe_standardize(item, standardizers, ignore_errors=ignore_errors)
+        rxn, ok, exc = safe_standardize(item, standardizers, ignore_errors=ignore_errors)
         results.append(rxn)
         n_std += ok
-    return results, n_std
+        if exc is not None:
+            orig_smi = rxn.meta.get("init_smiles", str(rxn)) if hasattr(rxn, "meta") else str(item)
+            errors.append((orig_smi, exc.stage, exc.original_type, exc.original_msg))
+    return results, n_std, errors
 
 
 @ray.remote
@@ -999,7 +1031,7 @@ def process_batch_remote(
     std_param: ray.ObjectRef,  # <-- receives a ref
     log_file_path: str | Path | None = None,
     ignore_errors: bool = False,
-) -> Tuple[List[ReactionContainer], int]:
+) -> Tuple[List[ReactionContainer], int, List[Tuple[str, str, str, str]]]:
     # Ray keeps a local cache of fetched objects, so the list is
     # deserialised only once per worker process, not once per task.
     if isinstance(std_param, ray.ObjectRef):  # handle?   get it
@@ -1054,6 +1086,54 @@ def chunked(iterable: Iterable, size: int):
         yield chunk
 
 
+# -- Error taxonomy for categorized summaries --
+# Stages / chython exceptions that represent noisy *data*, not pipeline bugs.
+_DATA_ERROR_STAGES = frozenset({
+    "CheckValence", "ReactionMapping", "SplitIons", "UnchangedParts",
+    "SmallMolecules", "RemoveReagents", "DuplicateReaction",
+})
+_DATA_ERROR_TYPES = frozenset({
+    "InvalidAromaticRing", "MappingError", "EmptyMolecule",
+    "EmptyReaction", "IncorrectSmiles", "ValenceError", "ValueError",
+})
+
+
+def _print_error_summary(
+    error_counts: Counter,
+    n_processed: int,
+    n_ok: int,
+    error_file_path: Path | None,
+) -> None:
+    """Print a categorized summary of errors to stdout and logger."""
+    n_failed = n_processed - n_ok
+    summary_lines = [
+        f"Finished: processed {n_processed}, succeeded {n_ok}, failed {n_failed}"
+    ]
+
+    if error_counts:
+        data_errors: list[str] = []
+        pipeline_errors: list[str] = []
+        for (stage, etype), count in error_counts.most_common():
+            label = f"{stage}/{etype}={count}"
+            if stage in _DATA_ERROR_STAGES or etype in _DATA_ERROR_TYPES:
+                data_errors.append(label)
+            else:
+                pipeline_errors.append(label)
+        if data_errors:
+            summary_lines.append(f"  Data errors:     {', '.join(data_errors)}")
+        if pipeline_errors:
+            summary_lines.append(
+                f"  Pipeline errors: {', '.join(pipeline_errors)}  <-- INVESTIGATE"
+            )
+
+    if error_file_path is not None:
+        summary_lines.append(f"Errors written to: {error_file_path}")
+
+    summary = "\n".join(summary_lines)
+    print(summary)
+    logger.info(summary)
+
+
 def standardize_reactions_from_file(
     config: "ReactionStandardizationConfig",
     input_reaction_data_path: str | Path,
@@ -1066,6 +1146,7 @@ def standardize_reactions_from_file(
     worker_log_level: int | str = logging.WARNING,
     log_file_path: str | Path | None = None,
     ignore_errors: bool = False,
+    error_file_path: str | Path | None = None,
 ) -> None:
     """
     Reads reactions, standardises them in parallel with Ray, writes results.
@@ -1087,9 +1168,18 @@ def standardize_reactions_from_file(
         log_file_path: Path to the log file for workers to write to.
         ignore_errors: If True, log standardization failures and keep processing;
             otherwise propagate exceptions to surface new issues.
+        error_file_path: Path to write failed reactions (TSV).  If None and
+            ``ignore_errors`` is True, defaults to ``<output>.errors.tsv``.
     """
     output_path = Path(standardized_reaction_data_path)
     standardizers = config.create_standardizers()
+
+    # Resolve error file path
+    _error_path: Path | None = None
+    if error_file_path is not None:
+        _error_path = Path(error_file_path)
+    elif ignore_errors:
+        _error_path = output_path.with_suffix(".errors.tsv")
 
     logger.info(
         "Standardizers: %s",
@@ -1123,6 +1213,8 @@ def standardize_reactions_from_file(
     pending: Dict[ray.ObjectRef, None] = {}
 
     n_processed = n_std = 0
+    error_counts: Counter = Counter()
+
     bar = tqdm(
         total=0,
         unit="rxn",
@@ -1131,63 +1223,79 @@ def standardize_reactions_from_file(
         dynamic_ncols=True,
     )
 
+    # Open error file (or use a no-op context)
+    error_file = open(_error_path, "w", encoding="utf-8") if _error_path else None
+    if error_file is not None:
+        error_file.write("# original_smiles\tstage\terror_type\terror_message\n")
+
+    def _write_errors(batch_errors: List[Tuple[str, str, str, str]]) -> None:
+        for smi, stage, etype, emsg in batch_errors:
+            error_counts[(stage, etype)] += 1
+            if error_file is not None:
+                error_file.write(f"{smi}\t{stage}\t{etype}\t{emsg}\n")
+
     # ------------------------  Helper function  ------------------------
     def _flush(ref: ray.ObjectRef, write_fn) -> None:
         """Fetch finished task, write its results, update counters & bar."""
         nonlocal n_processed, n_std
-        res, ok = ray.get(ref)
+        try:
+            res, ok, errs = ray.get(ref)
+        except Exception as exc:
+            logger.error("Batch failed entirely: %s", exc)
+            return
         write_fn(res)
+        _write_errors(errs)
         bar.update(len(res))
         n_processed += len(res)
         n_std += ok
 
-    # -----------------------------  I/O  -------------------------------
-    with (
-        ReactionReader(input_reaction_data_path) as reader,
-        ReactionWriter(output_path) as writer,
-    ):
+    try:
+        # -----------------------------  I/O  -------------------------------
+        with (
+            ReactionReader(input_reaction_data_path) as reader,
+            ReactionWriter(output_path) as writer,
+        ):
 
-        write_fn = lambda reactions: [writer.write(r) for r in reactions]
+            write_fn = lambda reactions: [writer.write(r) for r in reactions]
 
-        # ---------------------  Main read/compute loop  -----------------
-        for chunk in chunked(reader, batch_size):
-            bar.total += len(chunk)
-            bar.refresh()
+            # ---------------------  Main read/compute loop  -----------------
+            for chunk in chunked(reader, batch_size):
+                bar.total += len(chunk)
+                bar.refresh()
 
-            if num_cpus > 1:
-                # ---------- back‑pressure: keep ≤ max_pending ----------
-                while len(pending) >= max_pending:
-                    done, _ = ray.wait(list(pending), num_returns=1)
-                    _flush(done[0], write_fn)
-                    pending.pop(done[0], None)
+                if num_cpus > 1:
+                    # ---------- back‑pressure: keep ≤ max_pending ----------
+                    while len(pending) >= max_pending:
+                        done, _ = ray.wait(list(pending), num_returns=1)
+                        _flush(done[0], write_fn)
+                        pending.pop(done[0], None)
 
-                # ----------- schedule new task -------------------------
-                ref = process_batch_remote.remote(
-                    chunk, std_ref, log_file_path, ignore_errors
-                )
-                pending[ref] = None
-            else:
-                # --------------- serial fall‑back ----------------------
-                res, ok = _process_batch(
-                    chunk, standardizers, ignore_errors=ignore_errors
-                )
-                write_fn(res)
-                bar.update(len(res))
-                n_processed += len(res)
-                n_std += ok
+                    # ----------- schedule new task -------------------------
+                    ref = process_batch_remote.remote(
+                        chunk, std_ref, log_file_path, ignore_errors
+                    )
+                    pending[ref] = None
+                else:
+                    # --------------- serial fall‑back ----------------------
+                    res, ok, errs = _process_batch(
+                        chunk, standardizers, ignore_errors=ignore_errors
+                    )
+                    write_fn(res)
+                    _write_errors(errs)
+                    bar.update(len(res))
+                    n_processed += len(res)
+                    n_std += ok
 
-        # ------------------  Drain remaining Ray tasks  -----------------
-        while pending:
-            done, _ = ray.wait(list(pending), num_returns=1)
-            _flush(done[0], write_fn)
-            pending.pop(done[0], None)
+            # ------------------  Drain remaining Ray tasks  -----------------
+            while pending:
+                done, _ = ray.wait(list(pending), num_returns=1)
+                _flush(done[0], write_fn)
+                pending.pop(done[0], None)
+    finally:
+        if error_file is not None:
+            error_file.close()
 
     bar.close()
     ray.shutdown()
 
-    logger.info(
-        "Finished: processed %d, standardised %d, filtered %d",
-        n_processed,
-        n_std,
-        n_processed - n_std,
-    )
+    _print_error_summary(error_counts, n_processed, n_std, _error_path)

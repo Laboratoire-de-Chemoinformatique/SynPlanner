@@ -55,7 +55,7 @@ def building_blocks(data_folder):
 @pytest.fixture(scope="module")
 def reaction_rules(data_folder):
     """Load reaction rules."""
-    reaction_rules_path = data_folder.joinpath("uspto/uspto_reaction_rules.pickle")
+    reaction_rules_path = data_folder.joinpath("uspto/synplanner_article_rules.pickle")
     return load_reaction_rules(reaction_rules_path)
 
 

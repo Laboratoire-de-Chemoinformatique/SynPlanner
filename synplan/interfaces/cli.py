@@ -124,8 +124,25 @@ def building_blocks_standardizing_cli(input_file: str, output_file: str) -> None
 @click.option(
     "--num_cpus", default=4, type=int, help="The number of CPUs to use for processing."
 )
+@click.option(
+    "--ignore-errors/--no-ignore-errors",
+    default=True,
+    help="Skip bad reactions instead of crashing (default: skip).",
+)
+@click.option(
+    "--error-file",
+    "error_file",
+    default=None,
+    type=click.Path(),
+    help="Write failed reactions here. Default: <output>.errors.tsv",
+)
 def reaction_standardizing_cli(
-    config_path: str, input_file: str, output_file: str, num_cpus: int
+    config_path: str,
+    input_file: str,
+    output_file: str,
+    num_cpus: int,
+    ignore_errors: bool,
+    error_file: str | None,
 ) -> None:
     """Standardizes reactions and remove duplicates."""
     stand_config = ReactionStandardizationConfig.from_yaml(config_path)
@@ -135,6 +152,8 @@ def reaction_standardizing_cli(
         standardized_reaction_data_path=output_file,
         num_cpus=num_cpus,
         batch_size=100,
+        ignore_errors=ignore_errors,
+        error_file_path=error_file,
     )
 
 
@@ -163,8 +182,25 @@ def reaction_standardizing_cli(
 @click.option(
     "--num_cpus", default=4, type=int, help="The number of CPUs to use for processing."
 )
+@click.option(
+    "--ignore-errors/--no-ignore-errors",
+    default=True,
+    help="Skip bad reactions instead of crashing (default: skip).",
+)
+@click.option(
+    "--error-file",
+    "error_file",
+    default=None,
+    type=click.Path(),
+    help="Write failed/filtered reactions here. Default: <output>.errors.tsv",
+)
 def reaction_filtering_cli(
-    config_path: str, input_file: str, output_file: str, num_cpus: int
+    config_path: str,
+    input_file: str,
+    output_file: str,
+    num_cpus: int,
+    ignore_errors: bool,
+    error_file: str | None,
 ):
     """Filters erroneous reactions."""
     reaction_check_config = ReactionFilterConfig().from_yaml(config_path)
@@ -174,6 +210,8 @@ def reaction_filtering_cli(
         filtered_reaction_data_path=output_file,
         num_cpus=num_cpus,
         batch_size=100,
+        ignore_errors=ignore_errors,
+        error_file_path=error_file,
     )
 
 
