@@ -22,7 +22,7 @@ from synplan.chem.data.standardizing import (
     RemoveReagentsStandardizer,
 )
 from synplan.utils.config import ConfigABC, convert_config_to_dict
-from synplan.utils.files import ReactionReader, ReactionWriter
+from synplan.utils.files import RawReactionReader, ReactionWriter, parse_reaction
 
 
 logger = logging.getLogger("synplan.chem.data.filtering")
@@ -791,25 +791,38 @@ def tanimoto_kernel(x: MorganFingerprint, y: MorganFingerprint) -> float:
 
 
 def filter_reaction(
-    reaction: ReactionContainer,
+    item: str | ReactionContainer,
     config: ReactionFilterConfig,
     filters: list,
     *,
     ignore_errors: bool = False,
-) -> Tuple[bool, ReactionContainer, Optional[str]]:
+    fmt: str = "smi",
+) -> Tuple[bool, ReactionContainer | None, Optional[str]]:
     """Checks the input reaction. Returns True if reaction is detected as erroneous and
     returns reaction itself, which sometimes is modified and does not necessarily
     correspond to the initial reaction.
 
-    :param reaction: Reaction to be filtered.
+    :param item: Reaction to be filtered (raw string or already-parsed).
     :param config: Reaction filtration configuration.
     :param filters: The list of reaction filters.
     :param ignore_errors: If True, keep processing when a standardization step fails;
         otherwise re-raise to expose unexpected issues.
+    :param fmt: Format hint — ``"smi"`` for SMILES strings, ``"rdf"`` for RDF blocks.
     :return: 3-tuple ``(is_filtered, reaction, reason)`` where *reason* is
         ``None`` on success, a filter class name when filtered, or
         ``"stage/ErrorType: message"`` on standardization error.
+        *reaction* may be ``None`` when parsing fails completely.
     """
+
+    # --- Parse raw string into ReactionContainer ---
+    try:
+        reaction = parse_reaction(item, fmt) if isinstance(item, str) else item
+    except Exception as exc:
+        if not ignore_errors:
+            raise
+        exc_type = type(exc).__qualname__
+        logger.warning("parse raised %s: %s", exc_type, exc)
+        return True, None, f"parse/{exc_type}: {exc}"
 
     is_filtered = False
     reason: Optional[str] = None
@@ -886,31 +899,34 @@ def filter_reaction(
 
 @ray.remote
 def process_batch(
-    batch: List[ReactionContainer],
+    batch: List[str | ReactionContainer],
     config: ReactionFilterConfig,
     filters: list,
     ignore_errors: bool = False,
-) -> List[Tuple[bool, ReactionContainer, Optional[str]]]:
+    fmt: str = "smi",
+) -> List[Tuple[bool, ReactionContainer | None, Optional[str]]]:
     """
     Processes a batch of reactions to extract reaction rules based on the given
     configuration. This function operates as a remote task in a distributed system using
     Ray.
 
-    :param batch: List of ReactionContainer objects.
+    :param batch: List of raw strings or ReactionContainer objects.
     :param config: Reaction filtration configuration.
     :param filters: The list of reaction filters.
     :param ignore_errors: If True, keep processing when a standardization step fails.
+    :param fmt: Format hint — ``"smi"`` or ``"rdf"``.
     :return: List of 3-tuples ``(is_filtered, reaction, reason)``.
 
     """
 
     processed_reaction_list = []
-    for reaction in batch:
+    for item in batch:
         is_filtered, processed_reaction, reason = filter_reaction(
-            reaction,
+            item,
             config,
             filters,
             ignore_errors=ignore_errors,
+            fmt=fmt,
         )
         processed_reaction_list.append((is_filtered, processed_reaction, reason))
     return processed_reaction_list
@@ -948,14 +964,19 @@ def process_completed_batch(
     batch_filtered = 0
     batch_kept = 0
     for is_filtered, reaction, reason in completed_batch:
-        if is_filtered is False:
+        if is_filtered is False and reaction is not None:
             result_file.write(reaction)
             n_filtered += 1
             batch_kept += 1
         else:
             batch_filtered += 1
             if reason is not None and error_file is not None:
-                orig_smi = reaction.meta.get("init_smiles", str(reaction)) if hasattr(reaction, "meta") else str(reaction)
+                orig_smi = (
+                    reaction.meta.get("init_smiles", str(reaction))
+                    if reaction is not None and hasattr(reaction, "meta")
+                    else str(reaction) if reaction is not None
+                    else "(parse failed)"
+                )
                 error_file.write(f"{orig_smi}\t{reason}\n")
             if reason is not None and error_counts is not None:
                 error_counts[reason] += 1
@@ -982,6 +1003,7 @@ def _filter_reactions_serial(
     filtered_reaction_data_path: str,
     *,
     ignore_errors: bool,
+    fmt: str = "smi",
     error_file: TextIOWrapper | None = None,
     error_counts: Counter | None = None,
 ) -> Tuple[int, int]:
@@ -989,27 +1011,32 @@ def _filter_reactions_serial(
     lines_counter = 0
     n_filtered = 0
     with (
-        ReactionReader(input_reaction_data_path) as reactions,
+        RawReactionReader(input_reaction_data_path) as reactions,
         ReactionWriter(filtered_reaction_data_path) as result_file,
     ):
-        for reaction in tqdm(
+        for item in tqdm(
             reactions,
             desc="Number of reactions processed: ",
             bar_format="{desc}{n} [{elapsed}]",
         ):
             lines_counter += 1
             is_filtered, processed_reaction, reason = filter_reaction(
-                reaction,
+                item,
                 config,
                 filters,
                 ignore_errors=ignore_errors,
+                fmt=fmt,
             )
-            if not is_filtered:
+            if not is_filtered and processed_reaction is not None:
                 result_file.write(processed_reaction)
                 n_filtered += 1
             elif reason is not None:
                 if error_file is not None:
-                    orig_smi = processed_reaction.meta.get("init_smiles", str(processed_reaction)) if hasattr(processed_reaction, "meta") else str(processed_reaction)
+                    orig_smi = (
+                        processed_reaction.meta.get("init_smiles", str(processed_reaction))
+                        if processed_reaction is not None and hasattr(processed_reaction, "meta")
+                        else str(item)
+                    )
                     error_file.write(f"{orig_smi}\t{reason}\n")
                 if error_counts is not None:
                     error_counts[reason] += 1
@@ -1111,6 +1138,9 @@ def filter_reactions_from_file(
         error_file.write("# original_smiles\treason\n")
 
     try:
+        raw_reader = RawReactionReader(input_reaction_data_path)
+        fmt = raw_reader.format
+
         # Simple serial path (works well with `init_logger` and is easy to debug).
         if num_cpus <= 1:
             lines_counter, n_filtered = _filter_reactions_serial(
@@ -1119,6 +1149,7 @@ def filter_reactions_from_file(
                 input_reaction_data_path,
                 filtered_reaction_data_path,
                 ignore_errors=ignore_errors,
+                fmt=fmt,
                 error_file=error_file,
                 error_counts=error_counts,
             )
@@ -1130,22 +1161,22 @@ def filter_reactions_from_file(
         max_concurrent_batches = num_cpus  # limit the number of concurrent batches
         lines_counter = 0
         with (
-            ReactionReader(input_reaction_data_path) as reactions,
+            raw_reader,
             ReactionWriter(filtered_reaction_data_path) as result_file,
         ):
 
             batches_to_process, batch = {}, []
             n_filtered = 0
-            for reaction in tqdm(
-                reactions,
+            for item in tqdm(
+                raw_reader,
                 desc="Number of reactions processed: ",
                 bar_format="{desc}{n} [{elapsed}]",
             ):
                 lines_counter += 1
-                batch.append(reaction)
+                batch.append(item)
                 if len(batch) == batch_size:
                     batch_results = process_batch.remote(
-                        batch, config, filters, ignore_errors
+                        batch, config, filters, ignore_errors, fmt
                     )
                     batches_to_process[batch_results] = None
                     batch = []
@@ -1163,7 +1194,7 @@ def filter_reactions_from_file(
             # process the last batch if it's not empty
             if batch:
                 batch_results = process_batch.remote(
-                    batch, config, filters, ignore_errors=ignore_errors
+                    batch, config, filters, ignore_errors=ignore_errors, fmt=fmt
                 )
                 batches_to_process[batch_results] = None
 

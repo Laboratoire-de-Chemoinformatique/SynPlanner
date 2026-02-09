@@ -20,7 +20,7 @@ import yaml
 
 from synplan.chem.utils import unite_molecules
 from synplan.utils.config import ConfigABC
-from synplan.utils.files import ReactionReader, ReactionWriter
+from synplan.utils.files import RawReactionReader, ReactionReader, ReactionWriter, parse_reaction
 
 logger = logging.getLogger("synplan.chem.data.standardizing")
 
@@ -967,9 +967,14 @@ def safe_standardize(
     standardizers: Sequence,
     *,
     ignore_errors: bool = False,
-) -> Tuple[ReactionContainer, bool, Optional[StandardizationError]]:
+    fmt: str = "smi",
+) -> Tuple[ReactionContainer | None, bool, Optional[StandardizationError]]:
     """
-    Always returns a ReactionContainer. The boolean flags real success.
+    Returns ``(reaction, success, error)``.
+
+    *reaction* is a :class:`ReactionContainer` on success or when the original
+    could be recovered, or ``None`` when parsing failed completely.
+    The boolean flags real success.
     The third element is the :class:`StandardizationError` when the reaction
     failed, or ``None`` on success.
 
@@ -980,8 +985,7 @@ def safe_standardize(
     """
     reaction: ReactionContainer | None = None
     try:
-        # Parse only if needed
-        reaction = item if isinstance(item, ReactionContainer) else smiles_chython(item)
+        reaction = parse_reaction(item, fmt)
         std = standardize_reaction(reaction, standardizers)
         if std is None:
             return reaction, False, None  # filtered → keep original
@@ -994,14 +998,19 @@ def safe_standardize(
             exc,
             exc_info=not ignore_errors,
         )
-        if ignore_errors and reaction is not None:
-            return reaction, False, exc
+        if ignore_errors:
+            if reaction is not None:
+                return reaction, False, exc
+            return None, False, exc
         raise
     except Exception as exc:
         logger.exception("Unexpected error while standardizing %s", item)
-        if ignore_errors and reaction is not None:
-            wrapped = StandardizationError("parse", str(item), exc)
-            return reaction, False, wrapped
+        if ignore_errors:
+            orig = item if isinstance(item, str) else str(item)
+            wrapped = StandardizationError("parse", orig, exc)
+            if reaction is not None:
+                return reaction, False, wrapped
+            return None, False, wrapped
         raise
 
 
@@ -1010,6 +1019,7 @@ def _process_batch(
     standardizers: Sequence,
     *,
     ignore_errors: bool = False,
+    fmt: str = "smi",
 ) -> Tuple[List[ReactionContainer], int, List[Tuple[str, str, str, str]]]:
     """Process a batch and return (results, n_ok, errors).
 
@@ -1019,12 +1029,19 @@ def _process_batch(
     errors: List[Tuple[str, str, str, str]] = []
     n_std = 0
     for item in batch:
-        rxn, ok, exc = safe_standardize(item, standardizers, ignore_errors=ignore_errors)
-        results.append(rxn)
+        rxn, ok, exc = safe_standardize(
+            item, standardizers, ignore_errors=ignore_errors, fmt=fmt
+        )
+        if rxn is not None:
+            results.append(rxn)
         n_std += ok
         if exc is not None:
-            orig_smi = rxn.meta.get("init_smiles", str(rxn)) if hasattr(rxn, "meta") else str(item)
-            errors.append((orig_smi, exc.stage, exc.original_type, exc.original_msg))
+            orig = (
+                rxn.meta.get("init_smiles", str(rxn))
+                if rxn is not None and hasattr(rxn, "meta")
+                else str(item)
+            )
+            errors.append((orig, exc.stage, exc.original_type, exc.original_msg))
     return results, n_std, errors
 
 
@@ -1034,6 +1051,7 @@ def process_batch_remote(
     std_param: ray.ObjectRef,  # <-- receives a ref
     log_file_path: str | Path | None = None,
     ignore_errors: bool = False,
+    fmt: str = "smi",
 ) -> Tuple[List[ReactionContainer], int, List[Tuple[str, str, str, str]]]:
     # Ray keeps a local cache of fetched objects, so the list is
     # deserialised only once per worker process, not once per task.
@@ -1068,14 +1086,12 @@ def process_batch_remote(
                 worker_logger.propagate = (
                     False  # Avoid double logging if driver also logs
                 )
-                # Optional: Log that the handler was added
-                # worker_logger.info(f"Worker process attached file handler: {log_file_path}")
             except (OSError, ValueError) as e:
                 logging.error(
                     "Worker failed to create file handler %s: %s", log_file_path, e
                 )
 
-    return _process_batch(batch, standardizers, ignore_errors=ignore_errors)
+    return _process_batch(batch, standardizers, ignore_errors=ignore_errors, fmt=fmt)
 
 
 def chunked(iterable: Iterable, size: int):
@@ -1093,7 +1109,7 @@ def chunked(iterable: Iterable, size: int):
 # Stages / chython exceptions that represent noisy *data*, not pipeline bugs.
 _DATA_ERROR_STAGES = frozenset({
     "CheckValence", "ReactionMapping", "SplitIons", "UnchangedParts",
-    "SmallMolecules", "RemoveReagents", "DuplicateReaction",
+    "SmallMolecules", "RemoveReagents", "DuplicateReaction", "parse",
 })
 _DATA_ERROR_TYPES = frozenset({
     "InvalidAromaticRing", "MappingError", "EmptyMolecule",
@@ -1254,15 +1270,18 @@ def standardize_reactions_from_file(
 
     try:
         # -----------------------------  I/O  -------------------------------
+        raw_reader = RawReactionReader(input_reaction_data_path)
+        fmt = raw_reader.format
+
         with (
-            ReactionReader(input_reaction_data_path) as reader,
+            raw_reader,
             ReactionWriter(output_path) as writer,
         ):
 
             write_fn = lambda reactions: [writer.write(r) for r in reactions]
 
             # ---------------------  Main read/compute loop  -----------------
-            for chunk in chunked(reader, batch_size):
+            for chunk in chunked(raw_reader, batch_size):
                 bar.total += len(chunk)
                 bar.refresh()
 
@@ -1275,13 +1294,13 @@ def standardize_reactions_from_file(
 
                     # ----------- schedule new task -------------------------
                     ref = process_batch_remote.remote(
-                        chunk, std_ref, log_file_path, ignore_errors
+                        chunk, std_ref, log_file_path, ignore_errors, fmt
                     )
                     pending[ref] = None
                 else:
                     # --------------- serial fall‑back ----------------------
                     res, ok, errs = _process_batch(
-                        chunk, standardizers, ignore_errors=ignore_errors
+                        chunk, standardizers, ignore_errors=ignore_errors, fmt=fmt
                     )
                     write_fn(res)
                     _write_errors(errs)

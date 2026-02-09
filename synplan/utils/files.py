@@ -3,6 +3,7 @@ reading/writing."""
 
 import csv
 import gzip
+from io import StringIO
 from os.path import splitext
 from pathlib import Path
 from typing import Iterable, Iterator, TextIO, Union
@@ -360,6 +361,94 @@ def iter_csv_smiles_blocks(
             block = []
     if block:
         yield block
+
+
+def count_rdf_records(path: Union[str, Path]) -> int:
+    """Count number of RDF records (by $RFMT/$MFMT markers)."""
+    p = Path(path)
+    with open(p, "r", encoding="utf-8") as f:
+        return sum(1 for line in f if line.startswith(("$RFMT", "$MFMT")))
+
+
+def iter_rdf_text_blocks(
+    path: Union[str, Path], records_per_block: int
+) -> Iterator[str]:
+    """Yield RDF text blocks of up to `records_per_block` records.
+
+    Each block is a string containing one or more $RFMT/$MFMT records,
+    parseable via ``RDFRead(StringIO(block))``.
+    """
+    p = Path(path)
+    buf: list[str] = []
+    count = 0
+    step = max(1, records_per_block)
+    in_header = True
+    with open(p, "r", encoding="utf-8") as f:
+        for line in f:
+            if in_header:
+                if line.startswith(("$RFMT", "$MFMT", "$RXN")):
+                    in_header = False
+                    buf.append(line)
+                continue
+            if line.startswith(("$RFMT", "$MFMT")):
+                count += 1
+                if count % step == 0:
+                    yield "".join(buf)
+                    buf = [line]
+                    continue
+            buf.append(line)
+    if buf:
+        yield "".join(buf)
+
+
+def parse_reaction(item: Union[str, ReactionContainer], fmt: str = "smi") -> ReactionContainer:
+    """Parse a raw string into a ReactionContainer.
+
+    If *item* is already a ReactionContainer it is returned as-is.
+
+    :param item: A SMILES string, an RDF text block, or a ReactionContainer.
+    :param fmt: ``"smi"`` for SMILES strings, ``"rdf"`` for RDF text blocks.
+    :return: The parsed ReactionContainer.
+    """
+    if isinstance(item, ReactionContainer):
+        return item
+    if fmt == "smi":
+        rxn = smiles(item)
+        rxn.meta["init_smiles"] = item
+        return rxn
+    else:  # rdf block
+        with RDFRead(StringIO(item), ignore=True) as r:
+            rxn = next(iter(r))
+        return rxn
+
+
+class RawReactionReader:
+    """Yields raw unparsed items: str lines for SMILES, str blocks for RDF."""
+
+    def __init__(self, filename: Union[str, Path], batch_size: int = 1):
+        p = Path(filename)
+        ext = p.suffix.lower()
+        if ext in (".smi", ".smiles"):
+            self.format = "smi"
+        elif ext == ".rdf":
+            self.format = "rdf"
+        else:
+            raise ValueError(f"Unsupported extension for raw reading: {ext}")
+        self._path = p
+        self._batch_size = batch_size
+
+    def __iter__(self) -> Iterator[str]:
+        if self.format == "smi":
+            yield from iter_smiles(self._path)
+        else:
+            for block in iter_rdf_text_blocks(self._path, 1):
+                yield block
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        pass
 
 
 def to_reaction_smiles_record(reaction: ReactionContainer) -> str:
