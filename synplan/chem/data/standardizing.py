@@ -896,12 +896,15 @@ class ReactionStandardizationConfig(ConfigABC):
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "ReactionStandardizationConfig":
         """Create an instance of ReactionCheckConfig from a dictionary."""
+        from typing import get_type_hints
+        hints = get_type_hints(ReactionStandardizationConfig)
         config_kwargs = {}
-        for field_name, std_cls in STANDARDIZER_REGISTRY.items():
+        for field_name in STANDARDIZER_REGISTRY:
             if field_name in config_dict:
-                config_kwargs[field_name] = std_cls.__name__.replace(
-                    "Standardizer", "Config"
-                )()
+                cfg_cls = hints[field_name]
+                if hasattr(cfg_cls, "__args__"):  # Optional[X] → extract X
+                    cfg_cls = cfg_cls.__args__[0]
+                config_kwargs[field_name] = cfg_cls()
         return ReactionStandardizationConfig(**config_kwargs)
 
     @staticmethod
