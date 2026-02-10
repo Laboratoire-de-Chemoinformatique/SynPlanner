@@ -24,7 +24,7 @@ from chython.reactor import Reactor
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
 from synplan.chem.utils import reverse_reaction
 from synplan.utils.config import RuleExtractionConfig
-from synplan.utils.files import ReactionReader, ReactionWriter
+from synplan.utils.files import RawReactionReader, ReactionReader, ReactionWriter, parse_reaction
 
 
 logger = logging.getLogger(__name__)
@@ -561,28 +561,34 @@ def extract_rules(
 
 @ray.remote
 def process_reaction_batch(
-    batch: List[Tuple[int, ReactionContainer]],
+    batch: List[Tuple[int, str]],
     config: RuleExtractionConfig,
     ignore_errors: bool = False,
+    fmt: str = "smi",
 ) -> Tuple[List[Tuple[int, List[ReactionContainer]]], List[Tuple[str, str, str, str]]]:
     """Process a batch of reactions for rule extraction.
 
-    :param batch: List of ``(index, ReactionContainer)`` pairs.
+    Raw strings are parsed inside the worker so that SMILES parsing is
+    distributed across Ray workers instead of being a main-thread bottleneck.
+
+    :param batch: List of ``(index, raw_string)`` pairs.
     :param config: Rule extraction configuration.
     :param ignore_errors: If True, log failures and continue.
+    :param fmt: Format hint — ``"smi"`` or ``"rdf"``.
     :return: ``(results, errors)`` where *errors* is a list of
         ``(original_smiles, stage, error_type, error_message)`` tuples.
     """
     extracted_rules_list = []
     errors: List[Tuple[str, str, str, str]] = []
-    for index, reaction in batch:
+    for index, raw_item in batch:
         try:
+            reaction = parse_reaction(raw_item, fmt=fmt)
             extracted_rules = extract_rules(config, reaction)
             extracted_rules_list.append((index, extracted_rules))
         except Exception as e:
             if not ignore_errors:
                 raise
-            orig = reaction.meta.get("init_smiles", str(reaction)) if hasattr(reaction, "meta") else str(reaction)
+            orig = raw_item if isinstance(raw_item, str) else str(raw_item)
             etype = type(e).__qualname__
             stage = e.stage if hasattr(e, "stage") else "extract_rules"
             errors.append((orig, stage, etype, str(e)))
@@ -688,32 +694,34 @@ def _extract_rules_serial(
     ignore_errors: bool = False,
     error_file: TextIOWrapper | None = None,
     error_counts: Counter | None = None,
+    fmt: str = "smi",
 ) -> int:
     """Serial rules extraction path used when a single CPU is requested.
 
     Returns the total number of reactions processed.
     """
     n_processed = 0
-    with ReactionReader(reaction_data_path) as reactions:
-        for index, reaction in tqdm(
-            enumerate(reactions),
-            desc="Number of reactions processed: ",
-            bar_format="{desc}{n} [{elapsed}]",
-        ):
-            n_processed += 1
-            try:
-                extracted_rules = extract_rules(config, reaction)
-                _update_rules_statistics(rules_statistics, index, extracted_rules)
-            except Exception as e:
-                if not ignore_errors:
-                    raise
-                orig = reaction.meta.get("init_smiles", str(reaction)) if hasattr(reaction, "meta") else str(reaction)
-                etype = type(e).__qualname__
-                stage = e.stage if hasattr(e, "stage") else "extract_rules"
-                if error_file is not None:
-                    error_file.write(f"{orig}\t{stage}\t{etype}\t{e}\n")
-                if error_counts is not None:
-                    error_counts[(stage, etype)] += 1
+    raw_reader = RawReactionReader(reaction_data_path)
+    for index, raw_item in tqdm(
+        enumerate(raw_reader),
+        desc="Number of reactions processed: ",
+        bar_format="{desc}{n} [{elapsed}]",
+    ):
+        n_processed += 1
+        try:
+            reaction = parse_reaction(raw_item, fmt=fmt)
+            extracted_rules = extract_rules(config, reaction)
+            _update_rules_statistics(rules_statistics, index, extracted_rules)
+        except Exception as e:
+            if not ignore_errors:
+                raise
+            orig = raw_item if isinstance(raw_item, str) else str(raw_item)
+            etype = type(e).__qualname__
+            stage = e.stage if hasattr(e, "stage") else "extract_rules"
+            if error_file is not None:
+                error_file.write(f"{orig}\t{stage}\t{etype}\t{e}\n")
+            if error_counts is not None:
+                error_counts[(stage, etype)] += 1
     return n_processed
 
 
@@ -794,6 +802,9 @@ def extract_rules_from_reactions(
 
     n_processed = 0
 
+    raw_reader = RawReactionReader(reaction_data_path)
+    fmt = raw_reader.format
+
     try:
         # Simple serial path for a single CPU.
         if num_cpus <= 1:
@@ -804,52 +815,52 @@ def extract_rules_from_reactions(
                 ignore_errors=ignore_errors,
                 error_file=error_file,
                 error_counts=error_counts,
+                fmt=fmt,
             )
         else:
             ray.init(
                 num_cpus=num_cpus, ignore_reinit_error=True, logging_level=logging.ERROR
             )
-            with ReactionReader(reaction_data_path) as reactions:
 
-                futures = {}
-                batch = []
-                max_concurrent_batches = num_cpus
+            futures = {}
+            batch = []
+            max_concurrent_batches = num_cpus
 
-                for index, reaction in tqdm(
-                    enumerate(reactions),
-                    desc="Number of reactions processed: ",
-                    bar_format="{desc}{n} [{elapsed}]",
-                ):
-                    n_processed += 1
-                    batch.append((index, reaction))
-                    if len(batch) == batch_size:
-                        future = process_reaction_batch.remote(
-                            batch, config, ignore_errors
-                        )
-                        futures[future] = None
-                        batch = []
-
-                        while len(futures) >= max_concurrent_batches:
-                            process_completed_batch(
-                                futures,
-                                extracted_rules_and_statistics,
-                                error_file=error_file,
-                                error_counts=error_counts,
-                            )
-
-                if batch:
+            for index, raw_item in tqdm(
+                enumerate(raw_reader),
+                desc="Number of reactions processed: ",
+                bar_format="{desc}{n} [{elapsed}]",
+            ):
+                n_processed += 1
+                batch.append((index, raw_item))
+                if len(batch) == batch_size:
                     future = process_reaction_batch.remote(
-                        batch, config, ignore_errors
+                        batch, config, ignore_errors, fmt
                     )
                     futures[future] = None
+                    batch = []
 
-                while futures:
-                    process_completed_batch(
-                        futures,
-                        extracted_rules_and_statistics,
-                        error_file=error_file,
-                        error_counts=error_counts,
-                    )
+                    while len(futures) >= max_concurrent_batches:
+                        process_completed_batch(
+                            futures,
+                            extracted_rules_and_statistics,
+                            error_file=error_file,
+                            error_counts=error_counts,
+                        )
+
+            if batch:
+                future = process_reaction_batch.remote(
+                    batch, config, ignore_errors, fmt
+                )
+                futures[future] = None
+
+            while futures:
+                process_completed_batch(
+                    futures,
+                    extracted_rules_and_statistics,
+                    error_file=error_file,
+                    error_counts=error_counts,
+                )
 
             ray.shutdown()
     finally:
