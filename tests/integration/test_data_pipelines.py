@@ -1,6 +1,5 @@
 """Integration tests for the main SynPlanner pipeline components."""
 
-import pickle
 from pathlib import Path
 
 import pytest
@@ -141,7 +140,7 @@ def test_filtering_parallel_matches_serial(
 
 
 # --------------------------------------------------------------------------- #
-# 3. Basic rule extraction returns rules and TSV/pickle non‑empty             #
+# 3. Basic rule extraction returns rules as TSV                               #
 # --------------------------------------------------------------------------- #
 
 
@@ -151,7 +150,7 @@ def test_rule_extraction_basic(
     rule_cfg_factory,
 ):
     cfg = rule_cfg_factory()
-    out = tmp_path / "rules.pickle"
+    out = tmp_path / "rules.tsv"
 
     extract_rules_from_reactions(
         config=cfg,
@@ -161,17 +160,10 @@ def test_rule_extraction_basic(
         batch_size=2,
     )
 
-    # Verify pickle (backward compat)
-    with out.open("rb") as fh:
-        rules = pickle.load(fh)
-    assert rules, "no rules extracted"
-
-    # Verify TSV (primary format)
-    tsv_path = tmp_path / "rules.tsv"
-    assert tsv_path.exists(), "TSV file not created"
-    tsv_lines = tsv_path.read_text().splitlines()
+    assert out.exists(), "TSV file not created"
+    tsv_lines = out.read_text().splitlines()
     assert tsv_lines[0] == "rule_smarts\tpopularity\treaction_indices"
-    assert len(tsv_lines) - 1 == len(rules), "TSV row count != pickle rule count"
+    assert len(tsv_lines) > 1, "no rules extracted"
 
 
 def test_rule_extraction_tsv_roundtrip(
@@ -183,7 +175,7 @@ def test_rule_extraction_tsv_roundtrip(
     from synplan.utils.loading import load_reaction_rules
 
     cfg = rule_cfg_factory()
-    out = tmp_path / "rules.pickle"
+    out = tmp_path / "rules.tsv"
 
     extract_rules_from_reactions(
         config=cfg,
@@ -193,8 +185,7 @@ def test_rule_extraction_tsv_roundtrip(
         batch_size=2,
     )
 
-    tsv_path = tmp_path / "rules.tsv"
-    reactors = load_reaction_rules(str(tsv_path))
+    reactors = load_reaction_rules(str(out))
     assert reactors, "no reactors loaded from TSV"
 
     # Every loaded reactor should have a valid SMARTS representation
@@ -218,7 +209,7 @@ def test_rule_extraction_variants(
     popularity,
 ):
     cfg = rule_cfg_factory(environment_atom_count=env_cnt, min_popularity=popularity)
-    out = tmp_path / f"rules_env{env_cnt}_pop{popularity}.pickle"
+    out = tmp_path / f"rules_env{env_cnt}_pop{popularity}.tsv"
 
     extract_rules_from_reactions(
         config=cfg,
@@ -228,23 +219,16 @@ def test_rule_extraction_variants(
         batch_size=2,
     )
 
-    # Verify TSV
-    tsv_path = tmp_path / f"rules_env{env_cnt}_pop{popularity}.tsv"
-    assert tsv_path.exists(), "TSV file not created"
-    tsv_lines = tsv_path.read_text().splitlines()
-    n_tsv_rules = len(tsv_lines) - 1  # subtract header
-
-    # Also verify pickle for backward compat
-    with out.open("rb") as fh:
-        rules = pickle.load(fh)
-
-    assert n_tsv_rules == len(rules), "TSV and pickle rule counts differ"
+    assert out.exists(), "TSV file not created"
+    tsv_lines = out.read_text().splitlines()
+    n_rules = len(tsv_lines) - 1  # subtract header
 
     # For higher popularity thresholds, we might get no rules
     if popularity == 1:
-        assert rules  # at least one rule for min_popularity=1
+        assert n_rules > 0  # at least one rule for min_popularity=1
     # stricter popularity => never *more* rules
     if popularity > 1:
-        prev_file = tmp_path / f"rules_env{env_cnt}_pop1.pickle"
+        prev_file = tmp_path / f"rules_env{env_cnt}_pop1.tsv"
         if prev_file.exists():
-            assert len(rules) <= len(pickle.load(prev_file.open("rb")))
+            prev_n = len(prev_file.read_text().splitlines()) - 1
+            assert n_rules <= prev_n

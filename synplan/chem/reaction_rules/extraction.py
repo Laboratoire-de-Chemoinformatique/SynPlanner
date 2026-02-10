@@ -1,8 +1,6 @@
 """Module containing functions for protocol of reaction rules extraction."""
 
 import logging
-import pickle
-import warnings
 from collections import Counter, defaultdict
 from io import TextIOWrapper
 from itertools import islice
@@ -809,8 +807,7 @@ def extract_rules_from_reactions(
     This function initializes a Ray environment for distributed computing and processes
     each reaction in the provided reaction database to extract reaction rules. It
     handles the reactions in batches, parallelize the rule extraction process. Extracted
-    rules and their statistics are collected, then saved both as a pickle with
-    statistics and as mapped reaction SMILES (.smi) records for interoperability.
+    rules and their statistics are collected, then saved as a TSV file.
 
     :param config: Configuration settings for rule extraction, including file paths,
         batch size, and other parameters.
@@ -919,7 +916,7 @@ def extract_rules_from_reactions(
     )
     filter_stats["skipped_multi_product"] = n_multi_product
 
-    # Save rules as TSV (primary format: human-readable, safe, reproducible).
+    # Always save rules as TSV (primary format: human-readable, safe, reproducible).
     rules_tsv_path = f"{reaction_rules_path_base}.tsv"
     with open(rules_tsv_path, "w", encoding="utf-8") as tsv_file:
         tsv_file.write("rule_smarts\tpopularity\treaction_indices\n")
@@ -934,17 +931,5 @@ def extract_rules_from_reactions(
             tsv_file.write(
                 f"{smarts_str}\t{len(indices)}\t{','.join(map(str, indices))}\n"
             )
-
-    # Also save pickle for backward compatibility (deprecated).
-    pickle_path = f"{reaction_rules_path_base}.pickle"
-    with open(pickle_path, "wb") as statistics_file:
-        pickle.dump(sorted_rules, statistics_file)
-    warnings.warn(
-        f"Pickle file '{pickle_path}' written for backward compatibility. "
-        "Prefer the TSV file for loading rules. "
-        "Pickle support will be removed in a future release.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
 
     _print_extraction_summary(n_processed, sorted_rules, filter_stats, error_counts, _error_path)
