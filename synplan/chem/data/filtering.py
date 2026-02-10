@@ -821,7 +821,6 @@ def filter_reaction(
         if not ignore_errors:
             raise
         exc_type = type(exc).__qualname__
-        logger.warning("parse raised %s: %s", exc_type, exc)
         return True, None, f"parse/{exc_type}: {exc}"
 
     is_filtered = False
@@ -845,12 +844,6 @@ def filter_reaction(
     except StandardizationError as error:
         if not ignore_errors:
             raise
-        logger.warning(
-            "%s failed during %s: %s",
-            error.stage,
-            reaction_standardizer.__class__.__name__,
-            error,
-        )
         reaction.meta["standardization_log"] = error.stage
         is_filtered = True
         reason = f"{error.stage}/{error.original_type}: {error.original_msg}"
@@ -858,9 +851,8 @@ def filter_reaction(
     # run reaction filtration
     if not is_filtered:
         for reaction_filter in filters:
-            try:  # CGRTools ValueError: mapping of graphs is not disjoint
+            try:
                 if reaction_filter(reaction):
-                    # if filter returns True it means the reaction doesn't pass the filter
                     reaction.meta["filtration_log"] = reaction_filter.__class__.__name__
                     is_filtered = True
                     reason = reaction_filter.__class__.__name__
@@ -868,12 +860,6 @@ def filter_reaction(
             except StandardizationError as error:
                 if not ignore_errors:
                     raise
-                logger.warning(
-                    "%s failed during %s: %s",
-                    error.stage,
-                    reaction_filter.__class__.__name__,
-                    error,
-                )
                 reaction.meta["standardization_log"] = error.stage
                 is_filtered = True
                 reason = f"{error.stage}/{error.original_type}: {error.original_msg}"
@@ -883,12 +869,6 @@ def filter_reaction(
                     raise
                 filter_name = reaction_filter.__class__.__name__
                 exc_type = type(exc).__qualname__
-                logger.warning(
-                    "%s raised %s: %s",
-                    filter_name,
-                    exc_type,
-                    exc,
-                )
                 reaction.meta["filtration_log"] = filter_name
                 is_filtered = True
                 reason = f"{filter_name}/{exc_type}: {exc}"

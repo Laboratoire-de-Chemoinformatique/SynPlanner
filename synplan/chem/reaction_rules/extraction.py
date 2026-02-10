@@ -2,9 +2,11 @@
 
 import logging
 import pickle
-from collections import defaultdict
+from collections import Counter, defaultdict
+from io import TextIOWrapper
 from itertools import islice
 from os.path import splitext
+from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
 import ray
@@ -559,38 +561,32 @@ def extract_rules(
 
 @ray.remote
 def process_reaction_batch(
-    batch: List[Tuple[int, ReactionContainer]], config: RuleExtractionConfig
-) -> List[Tuple[int, List[ReactionContainer]]]:
+    batch: List[Tuple[int, ReactionContainer]],
+    config: RuleExtractionConfig,
+    ignore_errors: bool = False,
+) -> Tuple[List[Tuple[int, List[ReactionContainer]]], List[Tuple[str, str, str, str]]]:
+    """Process a batch of reactions for rule extraction.
+
+    :param batch: List of ``(index, ReactionContainer)`` pairs.
+    :param config: Rule extraction configuration.
+    :param ignore_errors: If True, log failures and continue.
+    :return: ``(results, errors)`` where *errors* is a list of
+        ``(original_smiles, stage, error_type, error_message)`` tuples.
     """
-    Processes a batch of reactions to extract reaction rules based on the given
-    configuration. This function operates as a remote task in a distributed system using
-    Ray. It takes a batch of reactions, where each reaction is paired with an index. For
-    each reaction in the batch, it extracts reaction rules as specified by the
-    configuration object. The extracted rules for each reaction are then returned along
-    with the corresponding index. This function is intended to be used in a distributed
-    manner with Ray to parallelize the rule extraction process across multiple
-    reactions.
-
-    :param batch: A list where each element is a tuple containing an index (int) and a
-        ReactionContainer object. The index is typically used to keep track of the
-        reaction's position in a larger dataset.
-    :param config: An instance of ExtractRuleConfig that provides settings and
-        parameters for the rule extraction process.
-    :return: A list where each element is a tuple. The first element of the tuple is an
-        index (int), and the second is a list of ReactionContainer objects representing
-        the extracted rules for the corresponding reaction.
-
-    """
-
     extracted_rules_list = []
+    errors: List[Tuple[str, str, str, str]] = []
     for index, reaction in batch:
-        # try:
-        extracted_rules = extract_rules(config, reaction)
-        extracted_rules_list.append((index, extracted_rules))
-        # except Exception as e:
-        #     logging.debug(e)
-        #     continue
-    return extracted_rules_list
+        try:
+            extracted_rules = extract_rules(config, reaction)
+            extracted_rules_list.append((index, extracted_rules))
+        except Exception as e:
+            if not ignore_errors:
+                raise
+            orig = reaction.meta.get("init_smiles", str(reaction)) if hasattr(reaction, "meta") else str(reaction)
+            etype = type(e).__qualname__
+            stage = e.stage if hasattr(e, "stage") else "extract_rules"
+            errors.append((orig, stage, etype, str(e)))
+    return extracted_rules_list, errors
 
 
 def _update_rules_statistics(
@@ -609,6 +605,8 @@ def _update_rules_statistics(
 def process_completed_batch(
     futures: Dict,
     rules_statistics: Dict,
+    error_file: TextIOWrapper | None = None,
+    error_counts: Counter | None = None,
 ) -> None:
     """
     Processes completed batches of reactions, updating the rules statistics and
@@ -619,14 +617,28 @@ def process_completed_batch(
 
     :param futures: A dictionary of futures representing ongoing batch processing tasks.
     :param rules_statistics: A dictionary to keep track of statistics for each rule.
+    :param error_file: Optional file handle to write failed reactions.
+    :param error_counts: Optional counter to accumulate error categories.
     :return: None
 
     """
 
     ready_id, running_id = ray.wait(list(futures.keys()), num_returns=1)
-    completed_batch = ray.get(ready_id[0])
-    for index, extracted_rules in completed_batch:
+    try:
+        results, errors = ray.get(ready_id[0])
+    except Exception as exc:
+        logger.error("Batch failed entirely: %s", exc)
+        del futures[ready_id[0]]
+        return
+
+    for index, extracted_rules in results:
         _update_rules_statistics(rules_statistics, index, extracted_rules)
+
+    for orig, stage, etype, emsg in errors:
+        if error_file is not None:
+            error_file.write(f"{orig}\t{stage}\t{etype}\t{emsg}\n")
+        if error_counts is not None:
+            error_counts[(stage, etype)] += 1
 
     del futures[ready_id[0]]
 
@@ -672,20 +684,65 @@ def _extract_rules_serial(
     config: RuleExtractionConfig,
     reaction_data_path: str,
     rules_statistics: Dict[ReactionContainer, List[int]],
-) -> None:
-    """Serial rules extraction path used when a single CPU is requested."""
+    *,
+    ignore_errors: bool = False,
+    error_file: TextIOWrapper | None = None,
+    error_counts: Counter | None = None,
+) -> int:
+    """Serial rules extraction path used when a single CPU is requested.
 
+    Returns the total number of reactions processed.
+    """
+    n_processed = 0
     with ReactionReader(reaction_data_path) as reactions:
         for index, reaction in tqdm(
             enumerate(reactions),
             desc="Number of reactions processed: ",
             bar_format="{desc}{n} [{elapsed}]",
         ):
-            # try:
-            extracted_rules = extract_rules(config, reaction)
-            _update_rules_statistics(rules_statistics, index, extracted_rules)
-            # except Exception as error:
-            #     logging.debug(error)
+            n_processed += 1
+            try:
+                extracted_rules = extract_rules(config, reaction)
+                _update_rules_statistics(rules_statistics, index, extracted_rules)
+            except Exception as e:
+                if not ignore_errors:
+                    raise
+                orig = reaction.meta.get("init_smiles", str(reaction)) if hasattr(reaction, "meta") else str(reaction)
+                etype = type(e).__qualname__
+                stage = e.stage if hasattr(e, "stage") else "extract_rules"
+                if error_file is not None:
+                    error_file.write(f"{orig}\t{stage}\t{etype}\t{e}\n")
+                if error_counts is not None:
+                    error_counts[(stage, etype)] += 1
+    return n_processed
+
+
+def _print_extraction_summary(
+    n_processed: int,
+    sorted_rules: List[Tuple[ReactionContainer, List[int]]],
+    error_counts: Counter,
+    error_file_path: Path | None,
+) -> None:
+    """Print a categorized summary of rule extraction results."""
+    n_rules = len(sorted_rules)
+    n_errors = sum(error_counts.values())
+    covered_reactions = set()
+    for _rule, indices in sorted_rules:
+        covered_reactions.update(indices)
+    n_covered = len(covered_reactions)
+    summary_lines = [
+        f"Finished: processed {n_processed}, extracted {n_rules} rules "
+        f"from {n_covered} reactions ({n_covered*100/n_processed:.1f}%), "
+        f"failed {n_errors}"
+    ]
+    if error_counts:
+        for (stage, etype), count in error_counts.most_common():
+            summary_lines.append(f"  {stage}/{etype}={count}")
+    if error_file_path is not None:
+        summary_lines.append(f"Errors written to: {error_file_path}")
+    summary = "\n".join(summary_lines)
+    print(summary)
+    logger.info(summary)
 
 
 def extract_rules_from_reactions(
@@ -694,6 +751,9 @@ def extract_rules_from_reactions(
     reaction_rules_path: str,
     num_cpus: int,
     batch_size: int,
+    *,
+    ignore_errors: bool = False,
+    error_file_path: str | Path | None = None,
 ) -> None:
     """
     Extracts reaction rules from a set of reactions based on the given configuration.
@@ -709,59 +769,92 @@ def extract_rules_from_reactions(
     :param reaction_rules_path: Name of the file to store the extracted rules.
     :param num_cpus: Number of CPU cores to use for processing. Defaults to 1.
     :param batch_size: Number of reactions to process in each batch. Defaults to 10.
+    :param ignore_errors: If True, log extraction failures and keep processing.
+    :param error_file_path: Path to write failed reactions (TSV). If None and
+        ``ignore_errors`` is True, defaults to ``<output>.errors.tsv``.
     :return: None
 
     """
 
-    reaction_rules_path, _ = splitext(reaction_rules_path)
+    reaction_rules_path_base, _ = splitext(reaction_rules_path)
     extracted_rules_and_statistics = defaultdict(list)
 
-    # Simple serial path for a single CPU.
-    if num_cpus <= 1:
-        _extract_rules_serial(
-            config, reaction_data_path, extracted_rules_and_statistics
-        )
-    else:
-        ray.init(
-            num_cpus=num_cpus, ignore_reinit_error=True, logging_level=logging.ERROR
-        )
-        with ReactionReader(reaction_data_path) as reactions:
+    # Resolve error file path
+    _error_path: Path | None = None
+    if error_file_path is not None:
+        _error_path = Path(error_file_path)
+    elif ignore_errors:
+        _error_path = Path(f"{reaction_rules_path_base}.errors.tsv")
 
-            futures = {}
-            batch = []
-            max_concurrent_batches = num_cpus
+    error_counts: Counter = Counter()
+    error_file = None
+    if _error_path is not None:
+        error_file = open(_error_path, "w", encoding="utf-8")
+        error_file.write("# original_smiles\tstage\terror_type\terror_message\n")
 
-            for index, reaction in tqdm(
-                enumerate(reactions),
-                desc="Number of reactions processed: ",
-                bar_format="{desc}{n} [{elapsed}]",
-            ):
+    n_processed = 0
 
-                # reaction ready to use
-                batch.append((index, reaction))
-                if len(batch) == batch_size:
-                    future = process_reaction_batch.remote(batch, config)
+    try:
+        # Simple serial path for a single CPU.
+        if num_cpus <= 1:
+            n_processed = _extract_rules_serial(
+                config,
+                reaction_data_path,
+                extracted_rules_and_statistics,
+                ignore_errors=ignore_errors,
+                error_file=error_file,
+                error_counts=error_counts,
+            )
+        else:
+            ray.init(
+                num_cpus=num_cpus, ignore_reinit_error=True, logging_level=logging.ERROR
+            )
+            with ReactionReader(reaction_data_path) as reactions:
 
-                    futures[future] = None
-                    batch = []
+                futures = {}
+                batch = []
+                max_concurrent_batches = num_cpus
 
-                    while len(futures) >= max_concurrent_batches:
-                        process_completed_batch(
-                            futures,
-                            extracted_rules_and_statistics,
+                for index, reaction in tqdm(
+                    enumerate(reactions),
+                    desc="Number of reactions processed: ",
+                    bar_format="{desc}{n} [{elapsed}]",
+                ):
+                    n_processed += 1
+                    batch.append((index, reaction))
+                    if len(batch) == batch_size:
+                        future = process_reaction_batch.remote(
+                            batch, config, ignore_errors
                         )
+                        futures[future] = None
+                        batch = []
 
-            if batch:
-                future = process_reaction_batch.remote(batch, config)
-                futures[future] = None
+                        while len(futures) >= max_concurrent_batches:
+                            process_completed_batch(
+                                futures,
+                                extracted_rules_and_statistics,
+                                error_file=error_file,
+                                error_counts=error_counts,
+                            )
 
-            while futures:
-                process_completed_batch(
-                    futures,
-                    extracted_rules_and_statistics,
-                )
+                if batch:
+                    future = process_reaction_batch.remote(
+                        batch, config, ignore_errors
+                    )
+                    futures[future] = None
 
-        ray.shutdown()
+                while futures:
+                    process_completed_batch(
+                        futures,
+                        extracted_rules_and_statistics,
+                        error_file=error_file,
+                        error_counts=error_counts,
+                    )
+
+            ray.shutdown()
+    finally:
+        if error_file is not None:
+            error_file.close()
 
     sorted_rules = sort_rules(
         extracted_rules_and_statistics,
@@ -770,15 +863,13 @@ def extract_rules_from_reactions(
     )
 
     # Save full statistics for downstream code that expects a pickle file.
-    with open(f"{reaction_rules_path}.pickle", "wb") as statistics_file:
+    with open(f"{reaction_rules_path_base}.pickle", "wb") as statistics_file:
         pickle.dump(sorted_rules, statistics_file)
 
     # Additionally, save reaction rules as mapped reaction SMILES (CXSMILES) text.
-    # This mirrors the reaction filtering protocol and allows interoperable,
-    # non-pickled serialization of rules.
-    rules_smiles_path = f"{reaction_rules_path}.smi"
+    rules_smiles_path = f"{reaction_rules_path_base}.smi"
     with ReactionWriter(rules_smiles_path, mapping=True) as rules_file:
         for rule, _indices in sorted_rules:
             rules_file.write(rule)
 
-    print(f"Number of extracted reaction rules: {len(sorted_rules)}")
+    _print_extraction_summary(n_processed, sorted_rules, error_counts, _error_path)

@@ -254,8 +254,32 @@ def reaction_filtering_cli(
 @click.option(
     "--num_cpus", default=4, type=int, help="The number of CPUs to use for processing."
 )
+@click.option(
+    "--ignore-errors/--no-ignore-errors",
+    default=True,
+    help="Skip bad reactions instead of crashing (default: skip).",
+)
+@click.option(
+    "--error-file",
+    "error_file",
+    default=None,
+    type=click.Path(),
+    help="Write failed reactions here. Default: <output>.errors.tsv",
+)
+@click.option(
+    "--batch_size",
+    default=100,
+    type=int,
+    help="Number of reactions per batch sent to each worker.",
+)
 def rule_extracting_cli(
-    config_path: str, input_file: str, output_file: str, num_cpus: int
+    config_path: str,
+    input_file: str,
+    output_file: str,
+    num_cpus: int,
+    ignore_errors: bool,
+    error_file: str | None,
+    batch_size: int,
 ):
     """Reaction rules extraction."""
     reaction_rule_config = RuleExtractionConfig.from_yaml(config_path)
@@ -264,7 +288,9 @@ def rule_extracting_cli(
         reaction_data_path=input_file,
         reaction_rules_path=output_file,
         num_cpus=num_cpus,
-        batch_size=100,
+        batch_size=batch_size,
+        ignore_errors=ignore_errors,
+        error_file_path=error_file,
     )
 
 

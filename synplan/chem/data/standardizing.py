@@ -944,21 +944,9 @@ def standardize_reaction(
     """
     std_rxn = reaction
     for std in standardizers:
-        logger.debug("  › %s(%s)", std.__class__.__name__, std_rxn)
-        try:
-            std_rxn = std(std_rxn)  # may return None
-            if std_rxn is None:  # soft filter
-                logger.info("%s filtered out reaction", std.__class__.__name__)
-                return None
-        except StandardizationError as exc:
-            # Log *once*, then re‑raise with full traceback intact
-            logger.warning(
-                "%s failed on reaction %s : %s",
-                std.__class__.__name__,
-                std_rxn,
-                exc,
-            )
-            raise  # re‑raise same object
+        std_rxn = std(std_rxn)  # may return None or raise
+        if std_rxn is None:
+            return None
     return std_rxn
 
 
@@ -991,20 +979,12 @@ def safe_standardize(
             return reaction, False, None  # filtered → keep original
         return std, True, None
     except StandardizationError as exc:
-        logger.log(
-            logging.ERROR if not ignore_errors else logging.WARNING,
-            "Standardization failed during %s: %s",
-            exc.stage,
-            exc,
-            exc_info=not ignore_errors,
-        )
         if ignore_errors:
             if reaction is not None:
                 return reaction, False, exc
             return None, False, exc
         raise
     except Exception as exc:
-        logger.exception("Unexpected error while standardizing %s", item)
         if ignore_errors:
             orig = item if isinstance(item, str) else str(item)
             wrapped = StandardizationError("parse", orig, exc)
