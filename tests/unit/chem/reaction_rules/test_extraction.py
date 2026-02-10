@@ -138,11 +138,11 @@ def test_clean_molecules(simple_esterification_reaction: ReactionContainer) -> N
     retention = {
         "reaction_center": {
             k: True
-            for k in ("neighbors", "hybridization", "implicit_hydrogens", "ring_sizes")
+            for k in ("neighbors", "implicit_hydrogens", "ring_sizes")
         },
         "environment": {
             k: False
-            for k in ("neighbors", "hybridization", "implicit_hydrogens", "ring_sizes")
+            for k in ("neighbors", "implicit_hydrogens", "ring_sizes")
         },
     }
 
@@ -154,10 +154,8 @@ def test_clean_molecules(simple_esterification_reaction: ReactionContainer) -> N
             for idx in o.atoms_numbers:
                 o_atom, c_atom = o.atom(idx), c.atom(idx)
                 if idx in centre:
-                    assert c_atom.hybridization not in ((), None)
                     assert c_atom.implicit_hydrogens not in ((), None)
                 else:
-                    assert c_atom.hybridization in ((), set())
                     assert c_atom.implicit_hydrogens in ((), set())
 
     _check(r_queries, cleaned_r)

@@ -83,8 +83,8 @@ class RuleExtractionConfig(ConfigABC):
         applied to be considered for further analysis.
     :param keep_metadata: If True, retains metadata associated with the
         reaction in the extracted rule.
-    :param single_product_only: If True, includes only reaction rules
-        with a single reactant molecule.
+    :param single_product_only: If True, skips reactions that have more than
+        one product (after reagent removal).
     :param atom_info_retention: Controls the amount of information about
         each atom to retain ('none', 'reaction_center', or 'all').
     """
@@ -118,13 +118,11 @@ class RuleExtractionConfig(ConfigABC):
         default_atom_info = {
             "reaction_center": {
                 "neighbors": True,
-                "hybridization": True,
                 "implicit_hydrogens": False,
                 "ring_sizes": False,
             },
             "environment": {
                 "neighbors": False,
-                "hybridization": False,
                 "implicit_hydrogens": False,
                 "ring_sizes": False,
             },
@@ -222,7 +220,6 @@ class RuleExtractionConfig(ConfigABC):
 
                 expected_subkeys = {
                     "neighbors",
-                    "hybridization",
                     "implicit_hydrogens",
                     "ring_sizes",
                 }

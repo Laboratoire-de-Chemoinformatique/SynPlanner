@@ -141,7 +141,7 @@ def test_filtering_parallel_matches_serial(
 
 
 # --------------------------------------------------------------------------- #
-# 3. Basic rule extraction returns rules and pickles non‑empty                #
+# 3. Basic rule extraction returns rules and TSV/pickle non‑empty             #
 # --------------------------------------------------------------------------- #
 
 
@@ -161,9 +161,46 @@ def test_rule_extraction_basic(
         batch_size=2,
     )
 
+    # Verify pickle (backward compat)
     with out.open("rb") as fh:
         rules = pickle.load(fh)
     assert rules, "no rules extracted"
+
+    # Verify TSV (primary format)
+    tsv_path = tmp_path / "rules.tsv"
+    assert tsv_path.exists(), "TSV file not created"
+    tsv_lines = tsv_path.read_text().splitlines()
+    assert tsv_lines[0] == "rule_smarts\tpopularity\treaction_indices"
+    assert len(tsv_lines) - 1 == len(rules), "TSV row count != pickle rule count"
+
+
+def test_rule_extraction_tsv_roundtrip(
+    tmp_path: Path,
+    sample_reactions_file: Path,
+    rule_cfg_factory,
+):
+    """Extract rules → save TSV → load back via load_reaction_rules."""
+    from synplan.utils.loading import load_reaction_rules
+
+    cfg = rule_cfg_factory()
+    out = tmp_path / "rules.pickle"
+
+    extract_rules_from_reactions(
+        config=cfg,
+        reaction_data_path=str(sample_reactions_file),
+        reaction_rules_path=str(out),
+        num_cpus=1,
+        batch_size=2,
+    )
+
+    tsv_path = tmp_path / "rules.tsv"
+    reactors = load_reaction_rules(str(tsv_path))
+    assert reactors, "no reactors loaded from TSV"
+
+    # Every loaded reactor should have a valid SMARTS representation
+    for reactor in reactors:
+        smarts_str = str(reactor)
+        assert ">>" in smarts_str, f"invalid SMARTS: {smarts_str}"
 
 
 # --------------------------------------------------------------------------- #
@@ -191,8 +228,17 @@ def test_rule_extraction_variants(
         batch_size=2,
     )
 
+    # Verify TSV
+    tsv_path = tmp_path / f"rules_env{env_cnt}_pop{popularity}.tsv"
+    assert tsv_path.exists(), "TSV file not created"
+    tsv_lines = tsv_path.read_text().splitlines()
+    n_tsv_rules = len(tsv_lines) - 1  # subtract header
+
+    # Also verify pickle for backward compat
     with out.open("rb") as fh:
         rules = pickle.load(fh)
+
+    assert n_tsv_rules == len(rules), "TSV and pickle rule counts differ"
 
     # For higher popularity thresholds, we might get no rules
     if popularity == 1:

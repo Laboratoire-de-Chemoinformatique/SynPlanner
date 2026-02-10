@@ -451,6 +451,30 @@ class RawReactionReader:
         pass
 
 
+def load_rule_index_mapping_tsv(tsv_path: Union[str, Path]) -> dict:
+    """Load reaction-to-rule index mapping from a rules TSV file.
+
+    The TSV is already sorted by descending popularity (same order as the
+    pickle), so the rule index is simply the row number (0-based).
+
+    :param tsv_path: Path to the TSV file with columns
+        ``rule_smarts``, ``popularity``, ``reaction_indices``.
+    :return: Dict mapping ``reaction_index → rule_index``.
+    """
+    reaction_rule_pairs = {}
+    with open(tsv_path, "r", encoding="utf-8") as f:
+        f.readline()  # skip header
+        for rule_i, line in enumerate(f):
+            line = line.rstrip("\n")
+            if not line:
+                continue
+            parts = line.split("\t")
+            indices_str = parts[2]
+            for reaction_id_str in indices_str.split(","):
+                reaction_rule_pairs[int(reaction_id_str)] = rule_i
+    return dict(sorted(reaction_rule_pairs.items()))
+
+
 def to_reaction_smiles_record(reaction: ReactionContainer) -> str:
     """Converts the reaction to the SMILES record. Needed for reaction/molecule writers.
 

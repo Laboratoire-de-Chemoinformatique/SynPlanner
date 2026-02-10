@@ -249,13 +249,43 @@ def _convert_cgrtools_query_container(cgr_qc):
 
 @functools.lru_cache(maxsize=None)
 def load_reaction_rules(file: str) -> List[Reactor]:
-    """Loads the reaction rules from a pickle file and converts them into a list of
-    Reactor objects if necessary.
+    """Loads the reaction rules from a TSV or pickle file and converts them into a
+    list of Reactor objects.
 
-    :param file: The path to the pickle file that stores the reaction rules.
+    Supported formats:
+    - ``.tsv`` — tab-separated text with ``rule_smarts``, ``popularity``,
+      ``reaction_indices`` columns (preferred).
+    - ``.pickle`` — legacy pickle format (deprecated).
+
+    :param file: The path to the file that stores the reaction rules.
     :return: A list of reaction rules as Reactor objects.
     """
+    ext = Path(file).suffix.lower()
 
+    if ext == ".tsv":
+        return _load_rules_tsv(file)
+
+    # Legacy pickle path
+    return _load_rules_pickle(file)
+
+
+def _load_rules_tsv(file: str) -> tuple:
+    """Load reaction rules from a TSV file."""
+    reactors = []
+    with open(file, "r", encoding="utf-8") as f:
+        header = f.readline()  # skip header
+        for line in f:
+            line = line.rstrip("\n")
+            if not line:
+                continue
+            parts = line.split("\t")
+            smarts_str = parts[0]
+            reactors.append(Reactor.from_smarts(smarts_str))
+    return tuple(reactors)
+
+
+def _load_rules_pickle(file: str) -> tuple:
+    """Load reaction rules from a legacy pickle file."""
     with open(file, "rb") as f:
         reaction_rules = pickle.load(f)
 

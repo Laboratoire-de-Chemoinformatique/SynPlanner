@@ -5,6 +5,7 @@ from abc import ABC
 import logging
 import os
 import pickle
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from chython import smiles
@@ -22,7 +23,7 @@ from torch_geometric.transforms import ToUndirected
 from tqdm.auto import tqdm
 
 from synplan.chem.utils import unite_molecules
-from synplan.utils.files import ReactionReader
+from synplan.utils.files import ReactionReader, load_rule_index_mapping_tsv
 from synplan.utils.loading import load_reaction_rules
 
 
@@ -114,15 +115,22 @@ class RankingPolicyDataset(InMemoryDataset):
         :return: The PyTorch geometric graphs and slices.
         """
 
-        with open(self.reaction_rules_path, "rb") as inp:
-            reaction_rules = pickle.load(inp)
-        reaction_rules = sorted(reaction_rules, key=lambda x: len(x[1]), reverse=True)
-
-        reaction_rule_pairs = {}
-        for rule_i, (_, reactions_ids) in enumerate(reaction_rules):
-            for reaction_id in reactions_ids:
-                reaction_rule_pairs[reaction_id] = rule_i
-        reaction_rule_pairs = dict(sorted(reaction_rule_pairs.items()))
+        ext = Path(self.reaction_rules_path).suffix.lower()
+        if ext == ".tsv":
+            reaction_rule_pairs = load_rule_index_mapping_tsv(
+                self.reaction_rules_path
+            )
+        else:
+            with open(self.reaction_rules_path, "rb") as inp:
+                reaction_rules = pickle.load(inp)
+            reaction_rules = sorted(
+                reaction_rules, key=lambda x: len(x[1]), reverse=True
+            )
+            reaction_rule_pairs = {}
+            for rule_i, (_, reactions_ids) in enumerate(reaction_rules):
+                for reaction_id in reactions_ids:
+                    reaction_rule_pairs[reaction_id] = rule_i
+            reaction_rule_pairs = dict(sorted(reaction_rule_pairs.items()))
 
         list_of_graphs = []
         with ReactionReader(self.reactions_path) as reactions:
