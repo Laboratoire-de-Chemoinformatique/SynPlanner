@@ -250,4 +250,3 @@ def reverse_reaction(
     reversed_reaction.name = reaction.name
 
     return reversed_reaction
-

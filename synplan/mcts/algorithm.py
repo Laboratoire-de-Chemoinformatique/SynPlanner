@@ -601,7 +601,7 @@ class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
                 if level == 1:
                     path: List[int] = []
                     if candidate_id in self.rollout_cache:
-                        (candidate_id, path) = self.rollout_cache[candidate_id]
+                        candidate_id, path = self.rollout_cache[candidate_id]
                     else:
                         candidate_key = candidate_id
                         candidate_id, path = self.select_nmcs_path(

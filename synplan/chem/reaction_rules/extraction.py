@@ -23,8 +23,12 @@ from chython.reactor import Reactor
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
 from synplan.chem.utils import reverse_reaction
 from synplan.utils.config import RuleExtractionConfig
-from synplan.utils.files import RawReactionReader, ReactionReader, ReactionWriter, parse_reaction
-
+from synplan.utils.files import (
+    RawReactionReader,
+    ReactionReader,
+    ReactionWriter,
+    parse_reaction,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +38,7 @@ def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
     q = QueryContainer(smarts="")
     for n in atoms:
         atom = mol.atom(n)
-        xy = atom.xy if hasattr(atom, 'xy') else None
+        xy = atom.xy if hasattr(atom, "xy") else None
         if isinstance(atom, QueryElement):
             q.add_atom(atom.copy(full=True), n, xy=xy)
         else:
@@ -555,7 +559,9 @@ def process_reaction_batch(
     config: RuleExtractionConfig,
     ignore_errors: bool = False,
     fmt: str = "smi",
-) -> Tuple[List[Tuple[int, List[ReactionContainer]]], List[Tuple[str, str, str, str]], int]:
+) -> Tuple[
+    List[Tuple[int, List[ReactionContainer]]], List[Tuple[str, str, str, str]], int
+]:
     """Process a batch of reactions for rule extraction.
 
     Raw strings are parsed inside the worker so that SMILES parsing is
@@ -932,4 +938,6 @@ def extract_rules_from_reactions(
                 f"{smarts_str}\t{len(indices)}\t{','.join(map(str, indices))}\n"
             )
 
-    _print_extraction_summary(n_processed, sorted_rules, filter_stats, error_counts, _error_path)
+    _print_extraction_summary(
+        n_processed, sorted_rules, filter_stats, error_counts, _error_path
+    )

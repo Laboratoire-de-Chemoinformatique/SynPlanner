@@ -24,7 +24,6 @@ from synplan.chem.data.standardizing import (
 from synplan.utils.config import ConfigABC, convert_config_to_dict
 from synplan.utils.files import RawReactionReader, ReactionWriter, parse_reaction
 
-
 logger = logging.getLogger("synplan.chem.data.filtering")
 
 
@@ -480,8 +479,7 @@ class CCsp3BreakingFilter:
             is_bond_broken = bond.order is not None and bond.p_order is None
             are_atoms_carbons = atom.atomic_number == 6 and neigh.atomic_number == 6
             is_atom_sp3 = (
-                rc._hybridizations.get(n, 0) == 1
-                or rc._hybridizations.get(m, 0) == 1
+                rc._hybridizations.get(n, 0) == 1 or rc._hybridizations.get(m, 0) == 1
             )
 
             if is_bond_broken and are_atoms_carbons and is_atom_sp3:
@@ -954,8 +952,7 @@ def process_completed_batch(
                 orig_smi = (
                     reaction.meta.get("init_smiles", str(reaction))
                     if reaction is not None and hasattr(reaction, "meta")
-                    else str(reaction) if reaction is not None
-                    else "(parse failed)"
+                    else str(reaction) if reaction is not None else "(parse failed)"
                 )
                 error_file.write(f"{orig_smi}\t{reason}\n")
             if reason is not None and error_counts is not None:
@@ -1013,8 +1010,11 @@ def _filter_reactions_serial(
             elif reason is not None:
                 if error_file is not None:
                     orig_smi = (
-                        processed_reaction.meta.get("init_smiles", str(processed_reaction))
-                        if processed_reaction is not None and hasattr(processed_reaction, "meta")
+                        processed_reaction.meta.get(
+                            "init_smiles", str(processed_reaction)
+                        )
+                        if processed_reaction is not None
+                        and hasattr(processed_reaction, "meta")
                         else str(item)
                     )
                     error_file.write(f"{orig_smi}\t{reason}\n")
@@ -1047,7 +1047,9 @@ def _print_filtering_summary(
             if "/" in reason:
                 # "stage/ErrorType: msg" pattern — extract stage and type
                 stage_type = reason.split(":")[0]  # "stage/ErrorType"
-                stage, etype = stage_type.split("/", 1) if "/" in stage_type else (stage_type, "")
+                stage, etype = (
+                    stage_type.split("/", 1) if "/" in stage_type else (stage_type, "")
+                )
                 if stage in _DATA_ERROR_STAGES or etype in _DATA_ERROR_TYPES:
                     data_reasons.append(label)
                 else:
@@ -1133,11 +1135,15 @@ def filter_reactions_from_file(
                 error_file=error_file,
                 error_counts=error_counts,
             )
-            _print_filtering_summary(lines_counter, n_filtered, error_counts, _error_path)
+            _print_filtering_summary(
+                lines_counter, n_filtered, error_counts, _error_path
+            )
             return
 
         # Parallel path with Ray for `num_cpus > 1`
-        ray.init(num_cpus=num_cpus, ignore_reinit_error=True, logging_level=logging.ERROR)
+        ray.init(
+            num_cpus=num_cpus, ignore_reinit_error=True, logging_level=logging.ERROR
+        )
         max_concurrent_batches = num_cpus  # limit the number of concurrent batches
         lines_counter = 0
         with (

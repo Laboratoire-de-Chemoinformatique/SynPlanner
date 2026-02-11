@@ -8,6 +8,8 @@ from pathlib import Path
 import pickle
 import shutil
 from typing import TYPE_CHECKING, FrozenSet, List, Union
+import warnings
+import yaml
 import zipfile
 
 from chython.files.SDFrw import SDFRead
@@ -42,7 +44,8 @@ if TYPE_CHECKING:
     )
     from synplan.mcts.evaluation import ValueNetworkFunction, EvaluationStrategy
 
-REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
+REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner-data"
+LEGACY_REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
 logger = logging.getLogger(__name__)
 
 
@@ -91,6 +94,7 @@ def download_selected_files(
     save_to: str | Path = "./tutorials/synplan_data",
     extract_zips: bool = True,
     relocate_map: dict[str, str] | None = None,
+    repo_id: str | None = None,
 ) -> Path:
     """
     Download specific files from the Hugging Face repo.
@@ -108,14 +112,17 @@ def download_selected_files(
     relocate_map : dict[str, str]
         Optional map { "weights/ranking_policy_network.ckpt": "uspto/weights/ranking_policy_network.ckpt" }
         to copy/move files after download to match test paths.
+    repo_id : str or None
+        Override the HuggingFace repo ID. Defaults to ``REPO_ID``.
     """
+    repo = repo_id or REPO_ID
     root = Path(save_to).resolve()
     root.mkdir(parents=True, exist_ok=True)
 
     for subfolder, filename in files_to_get:
         local_path = Path(
             hf_hub_download(
-                repo_id=REPO_ID,
+                repo_id=repo,
                 subfolder=subfolder,
                 filename=filename,
                 local_dir=str(root),
@@ -136,14 +143,15 @@ def download_selected_files(
     return root
 
 
-def download_unpack_data(filename, subfolder, save_to="."):
+def download_unpack_data(filename, subfolder, save_to=".", repo_id=None):
+    repo = repo_id or REPO_ID
     if isinstance(save_to, str):
         save_to = Path(save_to).resolve()
         save_to.mkdir(exist_ok=True)
 
-    # Download the zip file from the repository
+    # Download the file from the repository
     file_path = hf_hub_download(
-        repo_id=REPO_ID,
+        repo_id=repo,
         filename=filename,
         subfolder=subfolder,
         local_dir=save_to,
@@ -163,8 +171,67 @@ def download_unpack_data(filename, subfolder, save_to="."):
         return file_path
 
 
+def download_preset(
+    preset_name: str = "synplanner-article",
+    save_to: str | Path = ".",
+    repo_id: str | None = None,
+) -> dict[str, Path]:
+    """Download a ready-to-use data preset from HuggingFace.
+
+    The preset YAML lists explicit file paths under a ``files:`` key.
+    Each file is downloaded into the ``save_to`` directory, preserving
+    the repository folder structure.
+
+    :param preset_name: Name of the preset (e.g. ``"synplanner-article"``).
+    :param save_to: Local directory to save downloaded files.
+    :param repo_id: Override the HuggingFace repo ID.
+    :return: Dict mapping component keys to local file paths.
+    """
+    repo = repo_id or REPO_ID
+    root = Path(save_to).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+
+    # 1. Download and parse preset YAML
+    preset_path = Path(
+        hf_hub_download(
+            repo_id=repo,
+            filename=f"{preset_name}.yaml",
+            subfolder="presets",
+            local_dir=str(root),
+        )
+    )
+    with open(preset_path, "r", encoding="utf-8") as f:
+        preset = yaml.safe_load(f)
+
+    # 2. Download each file listed in the preset
+    result: dict[str, Path] = {}
+    for key, repo_path in preset.get("files", {}).items():
+        parts = Path(repo_path)
+        local_path = Path(
+            hf_hub_download(
+                repo_id=repo,
+                filename=parts.name,
+                subfolder=str(parts.parent),
+                local_dir=str(root),
+            )
+        )
+        result[key] = local_path
+
+    return result
+
+
 def download_all_data(save_to="."):
-    dir_path = snapshot_download(repo_id=REPO_ID, local_dir=save_to)
+    """Download all data from the legacy HuggingFace repo.
+
+    .. deprecated::
+        Use :func:`download_preset` instead.
+    """
+    warnings.warn(
+        "download_all_data() is deprecated. Use download_preset() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    dir_path = snapshot_download(repo_id=LEGACY_REPO_ID, local_dir=save_to)
     dir_path = Path(dir_path).resolve()
     for zip_file in dir_path.rglob("*.zip"):
         with zipfile.ZipFile(zip_file, "r") as zip_ref:
@@ -177,74 +244,6 @@ def download_all_data(save_to="."):
                     # Extract the file if it does not exist
                     zip_ref.extract(file_name, zip_file.parent)
                     print(f"Extracted {file_name} to {zip_file.parent}")
-
-
-def _convert_cgrtools_query_container(cgr_qc):
-    """Convert a CGRtools QueryContainer to a chython QueryContainer.
-
-    CGRtools stores atom constraints (neighbors, hybridizations, etc.) in
-    container-level dicts, while chython stores them on the atom objects.
-    """
-    from chython.containers.query import QueryContainer as ChyQueryContainer
-    from chython.containers.bonds import QueryBond as ChyQueryBond
-    from chython.periodictable import QueryElement as ChyQueryElement
-    from chython.periodictable.base.query import AnyElement, AnyMetal
-
-    chy_qc = ChyQueryContainer(smarts="")
-
-    for n, atom in cgr_qc._atoms.items():
-        symbol = atom.atomic_symbol
-        qe_cls = ChyQueryElement.from_symbol(symbol)
-
-        # Read constraints from container-level dicts (CGRtools storage)
-        charge = cgr_qc._charges.get(n, 0)
-        is_radical = cgr_qc._radicals.get(n, False)
-        neighbors = cgr_qc._neighbors.get(n, ()) or None
-        hybridization = cgr_qc._hybridizations.get(n, ()) or None
-        hydrogens = cgr_qc._hydrogens.get(n, ()) or None
-        ring_sizes = cgr_qc._rings_sizes.get(n, ()) or None
-        heteroatoms = cgr_qc._heteroatoms.get(n, ()) or None
-
-        if qe_cls is AnyMetal:
-            qe = qe_cls(neighbors=neighbors, hybridization=hybridization)
-        elif qe_cls is AnyElement:
-            qe = qe_cls(
-                charge=charge,
-                is_radical=is_radical,
-                neighbors=neighbors,
-                hybridization=hybridization,
-                heteroatoms=heteroatoms,
-                ring_sizes=ring_sizes,
-                implicit_hydrogens=hydrogens,
-            )
-        else:
-            isotope = getattr(atom, "isotope", None)
-            if isotope == 0:
-                isotope = None
-            qe = qe_cls(
-                isotope=isotope,
-                charge=charge,
-                is_radical=is_radical,
-                neighbors=neighbors,
-                hybridization=hybridization,
-                heteroatoms=heteroatoms,
-                ring_sizes=ring_sizes,
-                implicit_hydrogens=hydrogens,
-            )
-
-        chy_qc.add_atom(qe, n)
-
-    seen = set()
-    for n, neighbors_dict in cgr_qc._bonds.items():
-        for m, bond in neighbors_dict.items():
-            if (n, m) in seen or (m, n) in seen:
-                continue
-            seen.add((n, m))
-            order = bond.order  # tuple of ints in CGRtools
-            chy_bond = ChyQueryBond(order=order)
-            chy_qc.add_bond(n, m, chy_bond)
-
-    return chy_qc
 
 
 @functools.lru_cache(maxsize=None)
@@ -336,11 +335,15 @@ def load_building_blocks(
     building_blocks_path = Path(building_blocks_path).resolve()
     suffixes = "".join(building_blocks_path.suffixes).lower()
     is_csv = suffixes.endswith(".csv") or suffixes.endswith(".csv.gz")
+    is_tsv = suffixes.endswith(".tsv") or suffixes.endswith(".tsv.gz")
+    if is_tsv:
+        is_csv = True
+        delimiter = "\t"
     suffix = building_blocks_path.suffix.lower()
     if not is_csv and suffix not in {".smi", ".smiles", ".sdf"}:
         raise ValueError(
             f"Unsupported building blocks file extension: '{building_blocks_path.name}'. "
-            "Supported: .smi, .smiles, .sdf, .csv, .csv.gz"
+            "Supported: .smi, .smiles, .sdf, .csv, .csv.gz, .tsv, .tsv.gz"
         )
 
     building_blocks_smiles = set()

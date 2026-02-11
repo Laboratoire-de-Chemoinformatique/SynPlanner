@@ -32,6 +32,7 @@ from synplan.utils.config import (
 )
 from synplan.utils.loading import (
     download_all_data,
+    download_preset,
     load_building_blocks,
     load_policy_function,
     load_reaction_rules,
@@ -69,6 +70,24 @@ def synplan():
     """SynPlanner command line interface."""
 
 
+@synplan.command(name="download_preset")
+@click.option(
+    "--preset",
+    default="synplanner-article",
+    help="Preset name (e.g. 'synplanner-article').",
+)
+@click.option(
+    "--save_to", "save_to", default=".", help="Directory to save downloaded data."
+)
+def download_preset_cli(preset: str, save_to: str) -> None:
+    """Download a ready-to-use data preset from HuggingFace."""
+    paths = download_preset(preset_name=preset, save_to=save_to)
+    click.echo(f"Preset '{preset}' downloaded:")
+    for key, path in paths.items():
+        if path is not None:
+            click.echo(f"  {key}: {path}")
+
+
 @synplan.command(name="download_all_data")
 @click.option(
     "--save_to",
@@ -76,7 +95,7 @@ def synplan():
     help="Path to the folder where downloaded data will be stored.",
 )
 def download_all_data_cli(save_to: str = ".") -> None:
-    """Downloads all data for training, planning and benchmarking SynPlanner."""
+    """Downloads all data from the legacy repo. Deprecated: use download_preset instead."""
     download_all_data(save_to=save_to)
 
 

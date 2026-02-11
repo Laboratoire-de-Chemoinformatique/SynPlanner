@@ -16,7 +16,7 @@ What you get after install
 - CLI entrypoint: ``synplan``
 - Python API: ``import synplan``
 - Data and weights are not bundled. Fetch them with
-  ``synplan download_all_data --save_to tutorials/synplan_data`` or follow :doc:`data_download`.
+  ``synplan download_preset --preset synplanner-article --save_to synplan_data`` or follow :doc:`data_download`.
 
 Install with pip (recommended)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

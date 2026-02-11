@@ -117,9 +117,7 @@ class RankingPolicyDataset(InMemoryDataset):
 
         ext = Path(self.reaction_rules_path).suffix.lower()
         if ext == ".tsv":
-            reaction_rule_pairs = load_rule_index_mapping_tsv(
-                self.reaction_rules_path
-            )
+            reaction_rule_pairs = load_rule_index_mapping_tsv(self.reaction_rules_path)
         else:
             with open(self.reaction_rules_path, "rb") as inp:
                 reaction_rules = pickle.load(inp)

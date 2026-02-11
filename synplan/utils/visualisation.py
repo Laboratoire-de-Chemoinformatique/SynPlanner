@@ -554,8 +554,7 @@ def html_top_routes_cluster(
     )
     html.append("</head><body><div class='container my-4'>")
     # Report header
-    html.append(
-        f"""
+    html.append(f"""
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1 class="mb-0">Best route from each cluster</h1>
         <div class="text-end" style="min-width:180px;">
@@ -563,8 +562,7 @@ def html_top_routes_cluster(
             <p class="mb-0" style="font-size: 1rem;">{created_time}</p>
         </div>
     </div>
-    """
-    )
+    """)
     html.append(f"<p><strong>Target molecule (SMILES):</strong> {target_smiles}</p>")
     html.append(f"<p><strong>Total number of routes:</strong> {total_routes}</p>")
     html.append(f"<p><strong>Total number of clusters:</strong> {total_clusters}</p>")
