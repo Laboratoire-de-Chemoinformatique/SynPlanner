@@ -10,13 +10,14 @@ from synplan.chem.reaction_routes.clustering import (
     subcluster_all_clusters,
 )
 from synplan.utils.loading import (
+    download_preset,
     load_building_blocks,
     load_reaction_rules,
     load_policy_function,
+    load_evaluation_function,
 )
 from synplan.mcts.tree import Tree
 from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
-from synplan.utils.loading import download_selected_files, load_evaluation_function
 
 # Test molecules with different complexity levels
 TEST_MOLECULES = {
@@ -27,45 +28,27 @@ TEST_MOLECULES = {
 
 
 @pytest.fixture(scope="module")
-def data_folder():
-    """Load data."""
-    assets = [
-        ("building_blocks", "building_blocks_em_sa_ln.smi"),
-        ("uspto", "uspto_reaction_rules.pickle"),
-        ("uspto/weights", "ranking_policy_network.ckpt"),
-    ]
-
-    folder = download_selected_files(
-        files_to_get=assets,
-        save_to="./tutorials/synplan_data",
-        extract_zips=True,
-    )
-    return folder
+def data_paths():
+    """Download preset data."""
+    return download_preset(preset_name="synplanner-article", save_to="./tutorials/synplan_data")
 
 
 @pytest.fixture(scope="module")
-def building_blocks(data_folder):
+def building_blocks(data_paths):
     """Load building blocks."""
-    building_blocks_path = data_folder.joinpath(
-        "building_blocks/building_blocks_em_sa_ln_chython.smi"
-    )
-    return load_building_blocks(building_blocks_path, standardize=False, silent=True)
+    return load_building_blocks(data_paths["building_blocks"], standardize=False, silent=True)
 
 
 @pytest.fixture(scope="module")
-def reaction_rules(data_folder):
+def reaction_rules(data_paths):
     """Load reaction rules."""
-    reaction_rules_path = data_folder.joinpath("uspto/synplanner_article_rules.pickle")
-    return load_reaction_rules(reaction_rules_path)
+    return load_reaction_rules(data_paths["reaction_rules"])
 
 
 @pytest.fixture(scope="module")
-def policy_network(data_folder):
+def policy_network(data_paths):
     """Initialize policy network."""
-    ranking_policy_network = data_folder.joinpath(
-        "uspto/weights/ranking_policy_network.ckpt"
-    )
-    return load_policy_function(weights_path=ranking_policy_network)
+    return load_policy_function(weights_path=data_paths["ranking_policy"])
 
 
 @pytest.fixture(scope="module")

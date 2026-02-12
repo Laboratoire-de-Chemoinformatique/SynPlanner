@@ -10,8 +10,21 @@ For installation and prebuilt Docker images, see :doc:`/get_started/index`. For 
 
 Data download
 ---------------------------
-Reaction and molecule data needed for training retrosynthetic models and retrosynthetic planning with pre-trained models can be downloaded directly from ``SynPlanner``.
-See the purpose and description of downloaded data **here**.
+Download a ready-to-use data preset from HuggingFace with all components needed for planning:
+
+.. code-block:: bash
+
+    synplan download_preset --preset synplanner-article --save_to synplan_data
+
+**Parameters**:
+    - ``preset`` - preset name (default: ``synplanner-article``).
+    - ``save_to`` - the directory where downloaded data will be stored.
+
+Legacy download (deprecated)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. deprecated::
+   Use ``download_preset`` instead.
 
 .. code-block:: bash
 

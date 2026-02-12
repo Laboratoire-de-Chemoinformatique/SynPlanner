@@ -401,7 +401,9 @@ def iter_rdf_text_blocks(
         yield "".join(buf)
 
 
-def parse_reaction(item: Union[str, ReactionContainer], fmt: str = "smi") -> ReactionContainer:
+def parse_reaction(
+    item: Union[str, ReactionContainer], fmt: str = "smi"
+) -> ReactionContainer:
     """Parse a raw string into a ReactionContainer.
 
     If *item* is already a ReactionContainer it is returned as-is.

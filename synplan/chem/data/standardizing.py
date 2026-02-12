@@ -20,7 +20,12 @@ import yaml
 
 from synplan.chem.utils import unite_molecules
 from synplan.utils.config import ConfigABC
-from synplan.utils.files import RawReactionReader, ReactionReader, ReactionWriter, parse_reaction
+from synplan.utils.files import (
+    RawReactionReader,
+    ReactionReader,
+    ReactionWriter,
+    parse_reaction,
+)
 
 logger = logging.getLogger("synplan.chem.data.standardizing")
 
@@ -54,7 +59,9 @@ class StandardizationError(RuntimeError):
         err.reaction = reaction
         err.original_type = orig_type
         err.original_msg = orig_msg
-        RuntimeError.__init__(err, f"{stage} failed on {reaction}: {orig_type}: {orig_msg}")
+        RuntimeError.__init__(
+            err, f"{stage} failed on {reaction}: {orig_type}: {orig_msg}"
+        )
         return err
 
 
@@ -897,6 +904,7 @@ class ReactionStandardizationConfig(ConfigABC):
     def from_dict(config_dict: Dict[str, Any]) -> "ReactionStandardizationConfig":
         """Create an instance of ReactionCheckConfig from a dictionary."""
         from typing import get_type_hints
+
         hints = get_type_hints(ReactionStandardizationConfig)
         config_kwargs = {}
         for field_name in STANDARDIZER_REGISTRY:
@@ -1087,14 +1095,29 @@ def chunked(iterable: Iterable, size: int):
 
 # -- Error taxonomy for categorized summaries --
 # Stages / chython exceptions that represent noisy *data*, not pipeline bugs.
-_DATA_ERROR_STAGES = frozenset({
-    "CheckValence", "ReactionMapping", "SplitIons", "UnchangedParts",
-    "SmallMolecules", "RemoveReagents", "DuplicateReaction", "parse",
-})
-_DATA_ERROR_TYPES = frozenset({
-    "InvalidAromaticRing", "MappingError", "EmptyMolecule",
-    "EmptyReaction", "IncorrectSmiles", "ValenceError", "ValueError",
-})
+_DATA_ERROR_STAGES = frozenset(
+    {
+        "CheckValence",
+        "ReactionMapping",
+        "SplitIons",
+        "UnchangedParts",
+        "SmallMolecules",
+        "RemoveReagents",
+        "DuplicateReaction",
+        "parse",
+    }
+)
+_DATA_ERROR_TYPES = frozenset(
+    {
+        "InvalidAromaticRing",
+        "MappingError",
+        "EmptyMolecule",
+        "EmptyReaction",
+        "IncorrectSmiles",
+        "ValenceError",
+        "ValueError",
+    }
+)
 
 
 def _print_error_summary(

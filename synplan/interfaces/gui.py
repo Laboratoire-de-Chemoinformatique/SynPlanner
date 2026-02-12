@@ -7,7 +7,6 @@ import uuid
 import zipfile
 
 from chython.files import SMILESRead
-from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import disable_progress_bars
 import pandas as pd
 import streamlit as st
@@ -20,6 +19,7 @@ from synplan.mcts.search import extract_tree_stats
 from synplan.mcts.tree import Tree
 from synplan.utils.config import TreeConfig
 from synplan.utils.loading import (
+    download_preset,
     load_building_blocks,
     load_policy_function,
     load_reaction_rules,
@@ -98,25 +98,12 @@ def download_button(
 
 @st.cache_resource
 def load_planning_resources_cached():
-    building_blocks_path = hf_hub_download(
-        repo_id="Laboratoire-De-Chemoinformatique/SynPlanner",
-        filename="building_blocks_em_sa_ln.smi",
-        subfolder="building_blocks",
-        local_dir=".",
+    paths = download_preset(preset_name="synplanner-article", save_to=".")
+    return (
+        str(paths["building_blocks"]),
+        str(paths["ranking_policy"]),
+        str(paths["reaction_rules"]),
     )
-    ranking_policy_weights_path = hf_hub_download(
-        repo_id="Laboratoire-De-Chemoinformatique/SynPlanner",
-        filename="ranking_policy_network.ckpt",
-        subfolder="uspto/weights",
-        local_dir=".",
-    )
-    reaction_rules_path = hf_hub_download(
-        repo_id="Laboratoire-De-Chemoinformatique/SynPlanner",
-        filename="uspto_reaction_rules.pickle",
-        subfolder="uspto",
-        local_dir=".",
-    )
-    return building_blocks_path, ranking_policy_weights_path, reaction_rules_path
 
 
 # --- GUI Sections ---
@@ -214,13 +201,11 @@ def setup_sidebar():
 
 def handle_molecule_input():
     st.header("Molecule input")
-    st.markdown(
-        """
+    st.markdown("""
         You can provide a molecular structure by either providing:
         * SMILES string + Enter
         * Draw it + Apply
-        """
-    )
+        """)
 
     if "shared_smiles" not in st.session_state:
         st.session_state.shared_smiles = st.session_state.get("ketcher", DEFAULT_MOL)
@@ -284,12 +269,10 @@ def setup_planning_options():
     )
 
     st.subheader("Planning options")
-    st.markdown(
-        """
+    st.markdown("""
         The description of each option can be found in the
         [Retrosynthetic Planning Tutorial](https://synplanner.readthedocs.io/en/latest/tutorial_files/retrosynthetic_planning.html#Configuring-search-tree).
-        """
-    )
+        """)
 
     col_options_1, col_options_2 = st.columns(2, gap="medium")
     with col_options_1:
@@ -746,15 +729,13 @@ def display_planning_and_clustering_results_unified():
         num_iter = res.get("num_iter", "—")
         search_time = res.get("search_time", "—")
 
-        st.markdown(
-            f"""
+        st.markdown(f"""
 - **Target SMILES**: `{smi}`
 - **Routes explored**: **{num_routes}**
 - **Tree nodes**: {num_nodes}
 - **MCTS iterations**: {num_iter}
 - **Search time**: {search_time} s
-"""
-        )
+""")
 
     with cluster_stat_col:
         st.subheader("Cluster summary")
@@ -769,12 +750,10 @@ def display_planning_and_clustering_results_unified():
         else:
             min_routes = max_routes = avg_routes = 0
 
-        st.markdown(
-            f"""
+        st.markdown(f"""
 - **Number of clusters**: **{n_clusters}**
 - **Routes per cluster**: min {min_routes}, max {max_routes}, avg {avg_routes:.1f}
-"""
-        )
+""")
 
         if clusters_dict:
             best_route_html = html_top_routes_cluster(

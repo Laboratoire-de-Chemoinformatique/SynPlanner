@@ -95,18 +95,18 @@ For a mounted-data planning example and more details, see the Get started docs: 
 Get started with ``SynPlanner`` in a few steps:
 
 1.  **Download Essential Data:**
-    Fetch the necessary pre-trained models and example data to begin your journey.
+    Fetch pre-trained models, reaction rules, and building blocks from HuggingFace.
 
     .. code-block:: bash
 
-        synplan download_all_data --save_to synplan_data
+        synplan download_preset --preset synplanner-article --save_to synplan_data
 
 2.  **Explore Planning:**
     Once the data is downloaded, you can try running a planning example. For more detailed instructions, see the `Tutorials`_ sections.
 
     .. code-block:: bash
 
-        synplan planning --config configs/planning.yaml --targets synplan_data/benchmarks/sascore/targets_with_sascore_1.5_2.5.smi --reaction_rules synplan_data/uspto/uspto_reaction_rules.pickle --building_blocks synplan_data/building_blocks/building_blocks_em_sa_ln.smi --policy_network synplan_data/uspto/weights/ranking_policy_network.ckpt --results_dir planning_results_quickstart
+        synplan planning --config configs/planning.yaml --targets targets.smi --reaction_rules synplan_data/policy/supervised_gcn/v1/reaction_rules.tsv --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv --policy_network synplan_data/policy/supervised_gcn/v1/v1/ranking_policy.ckpt --results_dir planning_results_quickstart
 
     (Note: Ensure ``configs/planning.yaml`` exists or adjust the path accordingly. You might need to create a basic one or use one from the cloned repository if you haven't installed all package data globally.)
 
