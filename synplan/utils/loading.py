@@ -4,7 +4,7 @@ retrosynthetic models."""
 import functools
 import logging
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import pickle
 import shutil
 from typing import TYPE_CHECKING, Union
@@ -206,7 +206,7 @@ def download_preset(
     # 2. Download each file listed in the preset
     result: dict[str, Path] = {}
     for key, repo_path in preset.get("files", {}).items():
-        parts = Path(repo_path)
+        parts = PurePosixPath(repo_path)
         local_path = Path(
             hf_hub_download(
                 repo_id=repo,
