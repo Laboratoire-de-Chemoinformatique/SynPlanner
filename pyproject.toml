@@ -29,10 +29,11 @@ dependencies = [
   "pyyaml>=6.0",
 ]
 
-# Extras to select PyTorch variant (cpu or cuda) - required for uv users
+# Extras to select PyTorch variant - required for uv users
 [project.optional-dependencies]
 cpu = ["torch>=2.0"]
-cuda = ["torch>=2.0"]
+cu126 = ["torch>=2.0"]
+cu128 = ["torch>=2.0"]
 
 [dependency-groups]
 dev = [
@@ -68,18 +69,20 @@ allow-direct-references = true
 packages = ["synplan", "scripts"]
 
 [tool.uv]
-# cpu and cuda extras are mutually exclusive
+# PyTorch backend extras are mutually exclusive
 conflicts = [
   [
     { extra = "cpu" },
-    { extra = "cuda" },
+    { extra = "cu126" },
+    { extra = "cu128" },
   ],
 ]
 
 [tool.uv.sources]
 torch = [
   { index = "pytorch-cpu", extra = "cpu" },
-  { index = "pytorch-cuda", extra = "cuda" },
+  { index = "pytorch-cu126", extra = "cu126" },
+  { index = "pytorch-cu128", extra = "cu128" },
 ]
 
 [[tool.uv.index]]
@@ -88,6 +91,11 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [[tool.uv.index]]
-name = "pytorch-cuda"
-url = "https://download.pytorch.org/whl/cu124"
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
