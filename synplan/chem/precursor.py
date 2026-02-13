@@ -1,7 +1,6 @@
 """Module containing a class Precursor that represents a precursor (extend molecule object) in
 the search tree."""
 
-from typing import Set
 
 from chython.containers import MoleculeContainer
 
@@ -40,7 +39,7 @@ class Precursor:
         """Returns a SMILES of the Precursor."""
         return str(self.molecule)
 
-    def is_building_block(self, bb_stock: Set[str], min_mol_size: int = 6) -> bool:
+    def is_building_block(self, bb_stock: set[str], min_mol_size: int = 6) -> bool:
         """Checks if a Precursor is a building block.
 
         :param bb_stock: The list of building blocks. Each building block is represented

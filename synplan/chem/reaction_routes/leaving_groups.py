@@ -1,5 +1,4 @@
 from chython.periodictable import At, DynamicElement
-from typing import Optional
 
 
 class Marked:
@@ -136,5 +135,5 @@ class DynamicX(DynamicElement):
         return self.is_radical
 
     @property
-    def p_hybridization(self) -> Optional[int]:
+    def p_hybridization(self) -> int | None:
         return self.hybridization

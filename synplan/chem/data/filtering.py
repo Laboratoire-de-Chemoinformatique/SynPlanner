@@ -5,8 +5,8 @@ from collections import Counter
 from dataclasses import dataclass
 from io import TextIOWrapper
 from pathlib import Path
-import pickle
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any
+from collections.abc import Iterable
 
 import numpy as np
 import ray
@@ -19,7 +19,6 @@ from synplan.chem.data.standardizing import (
     StandardizationError,
     AromaticFormStandardizer,
     KekuleFormStandardizer,
-    RemoveReagentsStandardizer,
 )
 from synplan.utils.config import ConfigABC, convert_config_to_dict
 from synplan.utils.files import RawReactionReader, ReactionWriter, parse_reaction
@@ -33,18 +32,18 @@ class CompeteProductsConfig(ConfigABC):
     mcs_tanimoto_threshold: float = 0.6
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "CompeteProductsConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "CompeteProductsConfig":
         """Create an instance of CompeteProductsConfig from a dictionary."""
         return CompeteProductsConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "CompeteProductsConfig":
         """Deserialize a YAML file into a CompeteProductsConfig object."""
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return CompeteProductsConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]) -> None:
+    def _validate_params(self, params: dict[str, Any]) -> None:
         """Validate configuration parameters."""
         if not isinstance(params.get("fingerprint_tanimoto_threshold"), float) or not (
             0 <= params["fingerprint_tanimoto_threshold"] <= 1
@@ -125,18 +124,18 @@ class DynamicBondsConfig(ConfigABC):
     max_bonds_number: int = 6
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "DynamicBondsConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "DynamicBondsConfig":
         """Create an instance of DynamicBondsConfig from a dictionary."""
         return DynamicBondsConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "DynamicBondsConfig":
         """Deserialize a YAML file into a DynamicBondsConfig object."""
-        with open(file_path, "r") as file:
+        with open(file_path) as file:
             config_dict = yaml.safe_load(file)
         return DynamicBondsConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]) -> None:
+    def _validate_params(self, params: dict[str, Any]) -> None:
         """Validate configuration parameters."""
         if (
             not isinstance(params.get("min_bonds_number"), int)
@@ -184,18 +183,18 @@ class SmallMoleculesConfig(ConfigABC):
     mol_max_size: int = 6
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "SmallMoleculesConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "SmallMoleculesConfig":
         """Creates an instance of SmallMoleculesConfig from a dictionary."""
         return SmallMoleculesConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "SmallMoleculesConfig":
         """Deserialize a YAML file into a SmallMoleculesConfig object."""
-        with open(file_path, "r") as file:
+        with open(file_path) as file:
             config_dict = yaml.safe_load(file)
         return SmallMoleculesConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]) -> None:
+    def _validate_params(self, params: dict[str, Any]) -> None:
         """Validate configuration parameters."""
         if (
             not isinstance(params.get("mol_max_size"), int)
@@ -291,7 +290,7 @@ class RingsChangeFilter:
         return (r_arom_rings != p_arom_rings) or (r_rings != p_rings)
 
     @staticmethod
-    def _calc_rings(molecules: Iterable) -> Tuple[int, int]:
+    def _calc_rings(molecules: Iterable) -> tuple[int, int]:
         """
         Calculates number of all rings and number of aromatic rings in molecules.
 
@@ -579,17 +578,17 @@ class ReactionFilterConfig(ConfigABC):
     """
 
     # configuration for reaction filters
-    dynamic_bonds_config: Optional[DynamicBondsConfig] = None
-    small_molecules_config: Optional[SmallMoleculesConfig] = None
-    strange_carbons_config: Optional[StrangeCarbonsConfig] = None
-    compete_products_config: Optional[CompeteProductsConfig] = None
-    cgr_connected_components_config: Optional[CGRConnectedComponentsConfig] = None
-    rings_change_config: Optional[RingsChangeConfig] = None
-    no_reaction_config: Optional[NoReactionConfig] = None
-    multi_center_config: Optional[MultiCenterConfig] = None
-    wrong_ch_breaking_config: Optional[WrongCHBreakingConfig] = None
-    cc_sp3_breaking_config: Optional[CCsp3BreakingConfig] = None
-    cc_ring_breaking_config: Optional[CCRingBreakingConfig] = None
+    dynamic_bonds_config: DynamicBondsConfig | None = None
+    small_molecules_config: SmallMoleculesConfig | None = None
+    strange_carbons_config: StrangeCarbonsConfig | None = None
+    compete_products_config: CompeteProductsConfig | None = None
+    cgr_connected_components_config: CGRConnectedComponentsConfig | None = None
+    rings_change_config: RingsChangeConfig | None = None
+    no_reaction_config: NoReactionConfig | None = None
+    multi_center_config: MultiCenterConfig | None = None
+    wrong_ch_breaking_config: WrongCHBreakingConfig | None = None
+    cc_sp3_breaking_config: CCsp3BreakingConfig | None = None
+    cc_ring_breaking_config: CCRingBreakingConfig | None = None
 
     def to_dict(self):
         """Converts the configuration into a dictionary."""
@@ -628,7 +627,7 @@ class ReactionFilterConfig(ConfigABC):
         return filtered_config_dict
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "ReactionFilterConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "ReactionFilterConfig":
         """Create an instance of ReactionCheckConfig from a dictionary."""
         # Instantiate configuration objects if their corresponding dictionary is present
         dynamic_bonds_config = (
@@ -702,11 +701,11 @@ class ReactionFilterConfig(ConfigABC):
     @staticmethod
     def from_yaml(file_path: str) -> "ReactionFilterConfig":
         """Deserializes a YAML file into a ReactionCheckConfig object."""
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return ReactionFilterConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]):
+    def _validate_params(self, params: dict[str, Any]):
         pass
 
     def create_filters(self):
@@ -795,7 +794,7 @@ def filter_reaction(
     *,
     ignore_errors: bool = False,
     fmt: str = "smi",
-) -> Tuple[bool, ReactionContainer | None, Optional[str]]:
+) -> tuple[bool, ReactionContainer | None, str | None]:
     """Checks the input reaction. Returns True if reaction is detected as erroneous and
     returns reaction itself, which sometimes is modified and does not necessarily
     correspond to the initial reaction.
@@ -822,7 +821,7 @@ def filter_reaction(
         return True, None, f"parse/{exc_type}: {exc}"
 
     is_filtered = False
-    reason: Optional[str] = None
+    reason: str | None = None
 
     # run reaction standardization
 
@@ -877,12 +876,12 @@ def filter_reaction(
 
 @ray.remote
 def process_batch(
-    batch: List[str | ReactionContainer],
+    batch: list[str | ReactionContainer],
     config: ReactionFilterConfig,
     filters: list,
     ignore_errors: bool = False,
     fmt: str = "smi",
-) -> List[Tuple[bool, ReactionContainer | None, Optional[str]]]:
+) -> list[tuple[bool, ReactionContainer | None, str | None]]:
     """
     Processes a batch of reactions to extract reaction rules based on the given
     configuration. This function operates as a remote task in a distributed system using
@@ -911,7 +910,7 @@ def process_batch(
 
 
 def process_completed_batch(
-    futures: Dict,
+    futures: dict,
     result_file: TextIOWrapper,
     n_filtered: int = 0,
     error_file: TextIOWrapper | None = None,
@@ -983,7 +982,7 @@ def _filter_reactions_serial(
     fmt: str = "smi",
     error_file: TextIOWrapper | None = None,
     error_counts: Counter | None = None,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """Serial filtering loop used when ``num_cpus <= 1``."""
     lines_counter = 0
     n_filtered = 0

@@ -8,9 +8,9 @@ license = { text = "MIT" }
 authors = [{ name = "Laboratoire de Chemoinformatique", email = "tagirshin@gmail.com" }]
 
 dependencies = [
-  "chython",
-  "chytorch-synplan>=1.69",
-  "chytorch-rxnmap-synplan>=1.6",
+  "chython-synplan[racer-default]>=1.93",
+  "chytorch-synplan>=1.70",
+  "chytorch-rxnmap-synplan>=1.7",
   "numpy>=2",
   "pandas>=1.4",
   "toytree>=2.0",
@@ -24,8 +24,8 @@ dependencies = [
   "ipywidgets>8.1.0",
   "streamlit>1.35.1",
   "streamlit-ketcher>=0.0.1",
-  "rdkit>2025.3.5",
-  "matplotlib>=3.10.8",
+  "rdkit>=2023.9.1",
+  "matplotlib>=3.7",
   "pyyaml>=6.0",
 ]
 
@@ -77,7 +77,6 @@ conflicts = [
 ]
 
 [tool.uv.sources]
-chython = { git = "https://github.com/tagirshin/chython.git", branch = "adopt-cgr" }
 torch = [
   { index = "pytorch-cpu", extra = "cpu" },
   { index = "pytorch-cuda", extra = "cuda" },

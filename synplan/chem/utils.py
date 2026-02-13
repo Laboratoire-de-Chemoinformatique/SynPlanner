@@ -3,7 +3,7 @@ protocols."""
 
 import logging
 from io import StringIO
-from typing import Iterable
+from collections.abc import Iterable
 
 from chython.containers import (
     CGRContainer,

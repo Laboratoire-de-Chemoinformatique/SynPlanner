@@ -2,7 +2,6 @@
 
 import logging
 from time import time
-from typing import Dict, List, Set, Tuple
 
 from chython.containers import MoleculeContainer
 from chython.reactor import Reactor
@@ -43,8 +42,8 @@ class Tree:
         self,
         target: MoleculeContainer,
         config: TreeConfig,
-        reaction_rules: List[Reactor],
-        building_blocks: Set[str],
+        reaction_rules: list[Reactor],
+        building_blocks: set[str],
         expansion_function: PolicyNetworkFunction,
         evaluation_function: EvaluationStrategy = None,
     ):
@@ -76,19 +75,19 @@ class Tree:
 
         # tree initialization
         target_node = self._init_target_node(target)
-        self.nodes: Dict[int, Node] = {1: target_node}
-        self.parents: Dict[int, int] = {1: 0}
-        self.redundant_children: Dict[int, Set[int]] = {1: set()}
-        self.children: Dict[int, Set[int]] = {1: set()}
-        self.winning_nodes: List[int] = []
-        self.visited_nodes: Set[int] = set()
-        self.expanded_nodes: Set[int] = set()
-        self.nodes_visit: Dict[int, int] = {1: 0}
-        self.nodes_depth: Dict[int, int] = {1: 0}
-        self.nodes_prob: Dict[int, float] = {1: 0.0}
-        self.nodes_rules: Dict[int, float] = {}
-        self.nodes_init_value: Dict[int, float] = {1: 0.0}
-        self.nodes_total_value: Dict[int, float] = {1: 0.0}
+        self.nodes: dict[int, Node] = {1: target_node}
+        self.parents: dict[int, int] = {1: 0}
+        self.redundant_children: dict[int, set[int]] = {1: set()}
+        self.children: dict[int, set[int]] = {1: set()}
+        self.winning_nodes: list[int] = []
+        self.visited_nodes: set[int] = set()
+        self.expanded_nodes: set[int] = set()
+        self.nodes_visit: dict[int, int] = {1: 0}
+        self.nodes_depth: dict[int, int] = {1: 0}
+        self.nodes_prob: dict[int, float] = {1: 0.0}
+        self.nodes_rules: dict[int, float] = {}
+        self.nodes_init_value: dict[int, float] = {1: 0.0}
+        self.nodes_total_value: dict[int, float] = {1: 0.0}
 
         # default search parameters
         self.init_node_value: float = self.config.init_node_value
@@ -152,7 +151,7 @@ class Tree:
         the number of found routes)."""
         return self.report()
 
-    def __next__(self) -> [bool, List[int]]:
+    def __next__(self) -> [bool, list[int]]:
         """The __next__ method is used to do one iteration of the tree building.
 
         :return: Returns True if the route was found and the node id of the last node in
@@ -398,7 +397,7 @@ class Tree:
 
         return cumulated_nodes_value / (route_length**2)
 
-    def route_to_node(self, node_id: int) -> List[Node,]:
+    def route_to_node(self, node_id: int) -> list[Node,]:
         """Returns the route (list of id of nodes) to from the node current node to the
         root node.
 
@@ -412,7 +411,7 @@ class Tree:
             node_id = self.parents[node_id]
         return [self.nodes[node_id] for node_id in reversed(nodes)]
 
-    def synthesis_route(self, node_id: int) -> Tuple[Reaction,]:
+    def synthesis_route(self, node_id: int) -> tuple[Reaction,]:
         """Given a node_id, return a tuple of reactions that represent the
         retrosynthetic route from the current node.
 

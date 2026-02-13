@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 import random
 from random import shuffle
-from typing import Dict, List
 
 from chython.containers import MoleculeContainer
 from pytorch_lightning import Trainer
@@ -61,8 +60,8 @@ def create_value_network(value_config: ValueNetworkConfig) -> ValueNetwork:
 
 
 def create_targets_batch(
-    targets: List[MoleculeContainer], batch_size: int
-) -> List[List[MoleculeContainer]]:
+    targets: list[MoleculeContainer], batch_size: int
+) -> list[list[MoleculeContainer]]:
     """Creates the targets batches for planning simulations and value network tuning.
 
     :param targets: The list of target molecules.
@@ -148,7 +147,7 @@ def run_tree_search(
     return tree
 
 
-def extract_tree_precursor(tree_list: List[Tree]) -> Dict[str, float]:
+def extract_tree_precursor(tree_list: list[Tree]) -> dict[str, float]:
     """Takes the built tree and extracts the precursor for value network tuning. The
     precursor from found retrosynthetic routes are labeled as a positive class and precursor
     from not solved routes are labeled as a negative class.
@@ -193,7 +192,7 @@ def balance_extracted_precursor(extracted_precursor):
 
 
 def create_updating_set(
-    extracted_precursor: Dict[str, float], batch_size: int = 1
+    extracted_precursor: dict[str, float], batch_size: int = 1
 ) -> LightningDataset:
     """Creates the value network updating dataset from precursor extracted from the planning
     simulation.
@@ -256,7 +255,7 @@ def tune_value_network(
 
 
 def run_training(
-    extracted_precursor: Dict[str, float] = None,
+    extracted_precursor: dict[str, float] = None,
     value_config: ValueNetworkConfig = None,
 ) -> None:
     """Runs the training stage in value network tuning.
@@ -276,7 +275,7 @@ def run_training(
 
 
 def run_planning(
-    targets_batch: List[MoleculeContainer],
+    targets_batch: list[MoleculeContainer],
     tree_config: TreeConfig,
     policy_config: PolicyNetworkConfig,
     value_config: ValueNetworkConfig,

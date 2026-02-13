@@ -8,7 +8,7 @@ import logging
 import os
 from pathlib import Path
 import sys
-from typing import Iterable
+from collections.abc import Iterable
 import warnings
 
 from IPython import get_ipython
@@ -134,7 +134,7 @@ def init_ray_logging(
     backend_level: str = "error",
     log_to_driver: bool = False,
     filter_userwarnings: bool = True,
-) -> "ray.LoggingConfig":
+) -> ray.LoggingConfig:
     """
     Prepare environment + Ray LoggingConfig **before** `ray.init()`.
 

@@ -3,7 +3,7 @@
 import base64
 from itertools import count, islice
 from collections import deque
-from typing import Any, Dict, List, Union
+from typing import Any
 from datetime import datetime
 
 from chython import smiles as read_smiles
@@ -23,8 +23,8 @@ from IPython.display import display, HTML
 def get_child_nodes(
     tree: Tree,
     molecule: MoleculeContainer,
-    graph: Dict[MoleculeContainer, List[MoleculeContainer]],
-) -> Dict[str, Any]:
+    graph: dict[MoleculeContainer, list[MoleculeContainer]],
+) -> dict[str, Any]:
     """Extracts the child nodes of the given molecule.
 
     :param tree: The built tree.
@@ -53,7 +53,7 @@ def get_child_nodes(
 
 def extract_routes(
     tree: Tree, extended: bool = False, min_mol_size: int = 0
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Takes the target and the dictionary of successors and predecessors and returns a
     list of dictionaries that contain the target and the list of successors.
 
@@ -618,7 +618,7 @@ def html_top_routes_cluster(
 
 
 def routes_clustering_report(
-    source: Union[Tree, dict],
+    source: Tree | dict,
     clusters: dict,
     group_index: str,
     sb_cgrs_dict: dict,
@@ -1034,7 +1034,7 @@ def group_lg_table_2_html_fixed(
 
 
 def routes_subclustering_report(
-    source: Union[Tree, dict],
+    source: Tree | dict,
     subcluster: dict,
     group_index: str,
     cluster_num: int,

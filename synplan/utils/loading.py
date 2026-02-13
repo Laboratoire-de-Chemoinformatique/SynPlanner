@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import pickle
 import shutil
-from typing import TYPE_CHECKING, FrozenSet, List, Union
+from typing import TYPE_CHECKING, Union
 import warnings
 import yaml
 import zipfile
@@ -200,7 +200,7 @@ def download_preset(
             local_dir=str(root),
         )
     )
-    with open(preset_path, "r", encoding="utf-8") as f:
+    with open(preset_path, encoding="utf-8") as f:
         preset = yaml.safe_load(f)
 
     # 2. Download each file listed in the preset
@@ -246,8 +246,8 @@ def download_all_data(save_to="."):
                     print(f"Extracted {file_name} to {zip_file.parent}")
 
 
-@functools.lru_cache(maxsize=None)
-def load_reaction_rules(file: str) -> List[Reactor]:
+@functools.cache
+def load_reaction_rules(file: str) -> list[Reactor]:
     """Loads the reaction rules from a TSV or pickle file and converts them into a
     list of Reactor objects.
 
@@ -271,7 +271,7 @@ def load_reaction_rules(file: str) -> List[Reactor]:
 def _load_rules_tsv(file: str) -> tuple:
     """Load reaction rules from a TSV file."""
     reactors = []
-    with open(file, "r", encoding="utf-8") as f:
+    with open(file, encoding="utf-8") as f:
         header = f.readline()  # skip header
         for line in f:
             line = line.rstrip("\n")
@@ -308,9 +308,9 @@ def _load_rules_pickle(file: str) -> tuple:
     return tuple(reaction_rules)
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def load_building_blocks(
-    building_blocks_path: Union[str, Path],
+    building_blocks_path: str | Path,
     standardize: bool = True,
     silent: bool = True,
     num_workers: int | None = None,
@@ -319,7 +319,7 @@ def load_building_blocks(
     header: bool = True,
     delimiter: str = ",",
     smiles_column: str = "SMILES",
-) -> FrozenSet[str]:
+) -> frozenset[str]:
     """Loads building blocks data from a file and returns a frozen set of building
     blocks.
 
@@ -430,7 +430,7 @@ def load_building_blocks(
 
 
 def load_value_net(
-    model_class: ValueNetwork, value_network_path: Union[str, Path]
+    model_class: ValueNetwork, value_network_path: str | Path
 ) -> ValueNetwork:
     """Loads the value network.
 
@@ -444,7 +444,7 @@ def load_value_net(
 
 
 def load_policy_net(
-    model_class: PolicyNetwork, policy_network_path: Union[str, Path]
+    model_class: PolicyNetwork, policy_network_path: str | Path
 ) -> PolicyNetwork:
     """Loads the policy network.
 

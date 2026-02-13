@@ -54,7 +54,7 @@ def make_dict(routes_json):
 
 
 def read_routes_json(file_path="routes.csv", to_dict=False):
-    with open(file_path, "r") as file:
+    with open(file_path) as file:
         routes_json = json.load(file)
     if to_dict:
         return make_dict(routes_json)

@@ -6,7 +6,7 @@ import logging
 import os
 import pickle
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from chython import smiles
 from chython.containers import MoleculeContainer
@@ -30,7 +30,7 @@ from synplan.utils.loading import load_reaction_rules
 class ValueNetworkDataset(InMemoryDataset, ABC):
     """Value network dataset."""
 
-    def __init__(self, extracted_precursor: Dict[str, float]) -> None:
+    def __init__(self, extracted_precursor: dict[str, float]) -> None:
         """Initializes a value network dataset object.
 
         :param extracted_precursor: The dictionary with the extracted from the built
@@ -44,7 +44,7 @@ class ValueNetworkDataset(InMemoryDataset, ABC):
             )
 
     @staticmethod
-    def mol_to_graph(molecule: MoleculeContainer, label: float) -> Optional[Data]:
+    def mol_to_graph(molecule: MoleculeContainer, label: float) -> Data | None:
         """Takes a molecule as input, and converts the molecule to a PyTorch geometric
         graph, assigns the reward value (label) to the graph, and returns the graph.
 
@@ -62,8 +62,8 @@ class ValueNetworkDataset(InMemoryDataset, ABC):
         return None
 
     def graphs_from_extracted_precursor(
-        self, extracted_precursor: Dict[str, float]
-    ) -> Tuple[Data, Dict]:
+        self, extracted_precursor: dict[str, float]
+    ) -> tuple[Data, dict]:
         """Converts the extracted from the search trees precursor to the PyTorch geometric
         graphs.
 
@@ -108,7 +108,7 @@ class RankingPolicyDataset(InMemoryDataset):
     def num_classes(self) -> int:
         return self._infer_num_classes(self._data.y_rules)
 
-    def prepare_data(self) -> Tuple[Data, Dict[str, Tensor]]:
+    def prepare_data(self) -> tuple[Data, dict[str, Tensor]]:
         """Prepares data by loading reaction rules, preprocessing the molecules,
         collating the data, and returning the data and slices.
 
@@ -202,7 +202,7 @@ class FilteringPolicyDataset(InMemoryDataset):
     def num_classes(self) -> int:
         return self._data.y_rules.shape[1]
 
-    def prepare_data(self) -> Tuple[Data, Dict]:
+    def prepare_data(self) -> tuple[Data, dict]:
         """Prepares data by loading reaction rules, initializing Ray, preprocessing the
         molecules, collating the data, and returning the data and slices.
 
@@ -220,7 +220,7 @@ class FilteringPolicyDataset(InMemoryDataset):
             for _ in range(self.num_cpus)
         ]
 
-        with open(self.molecules_path, "r", encoding="utf-8") as inp_data:
+        with open(self.molecules_path, encoding="utf-8") as inp_data:
             for molecule in tqdm(
                 inp_data.read().splitlines(),
                 desc="Number of molecules processed: ",
@@ -247,8 +247,8 @@ class FilteringPolicyDataset(InMemoryDataset):
 
 
 def reaction_rules_appliance(
-    molecule: MoleculeContainer, reaction_rules: List[Reactor]
-) -> Tuple[List[int], List[int]]:
+    molecule: MoleculeContainer, reaction_rules: list[Reactor]
+) -> tuple[list[int], list[int]]:
     """Applies each reaction rule from the list of reaction rules to a given molecule
     and returns the indexes of the successfully applied regular and prioritized reaction
     rules.
@@ -305,8 +305,8 @@ def reaction_rules_appliance(
 
 @ray.remote
 def preprocess_filtering_policy_molecules(
-    to_process: Queue, reaction_rules: List[Reactor]
-) -> List[Optional[Data]]:
+    to_process: Queue, reaction_rules: list[Reactor]
+) -> list[Data | None]:
     """Preprocesses a list of molecules by applying reaction rules and converting
     molecules into PyTorch geometric graphs. Successfully applied reaction rules are
     converted to binary vectors for policy network training.
@@ -424,7 +424,7 @@ def mol_to_matrix(molecule: MoleculeContainer) -> Tensor:
 
 def mol_to_pyg(
     molecule: MoleculeContainer, canonicalize: bool = True
-) -> Optional[Data]:
+) -> Data | None:
     """Takes a list of molecules and returns a list of PyTorch Geometric graphs, a one-
     hot encoded vectors of the atoms, and a matrices of the bonds.
 

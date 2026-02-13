@@ -1,7 +1,8 @@
 """Module containing classes and functions for manipulating reactions and reaction
 rules."""
 
-from typing import Any, Iterator, List, Optional
+from typing import Any
+from collections.abc import Iterator
 
 from chython.containers import MoleculeContainer, ReactionContainer
 from chython.exceptions import InvalidAromaticRing
@@ -16,8 +17,8 @@ class Reaction(ReactionContainer):
 
 
 def add_small_mols(
-    big_mol: MoleculeContainer, small_molecules: Optional[Any] = None
-) -> List[MoleculeContainer]:
+    big_mol: MoleculeContainer, small_molecules: Any | None = None
+) -> list[MoleculeContainer]:
     """Takes a molecule and returns a list of modified molecules where each small
     molecule has been added to the big molecule.
 
@@ -53,7 +54,7 @@ def apply_reaction_rule(
     top_reactions_num: int = 3,
     validate_products: bool = True,
     rebuild_with_cgr: bool = False,
-) -> Iterator[List[MoleculeContainer,]]:
+) -> Iterator[list[MoleculeContainer,]]:
     """Applies a reaction rule to a given molecule.
 
     :param molecule: A molecule to which reaction rule will be applied.
