@@ -43,7 +43,7 @@ jobs:
 
       - name: ✅Run test‑suite + coverage
         run: |
-          uv run pytest --cov=synplan --cov-report=xml
+          uv run --no-sync pytest --cov=synplan --cov-report=xml
         shell: bash
 
       - name: ⬆️Upload coverage artefact
@@ -64,4 +64,4 @@ jobs:
           python-version: "3.12"
       - run: |
           uv sync --group dev --extra cpu --no-install-project
-          uv run black --check synplan tests
+          uv run --no-sync black --check synplan tests
