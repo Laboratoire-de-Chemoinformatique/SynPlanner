@@ -54,6 +54,7 @@ each ``SynPlanner`` pipeline step and allows for more sophisticated functionalit
 - `Step-3. Policy network training`_ - demonstrates how to train ranking and filtering policy network in ``SynPlanner``.
 - `Step-4. Retrosynthetic planning`_ - demonstrates how retrosynthetic planning can be performed for target molecules in ``SynPlanner``.
 - `Step-5. Clustering`_ - demonstrates how to cluster predicted retrosynthetic routes in ``SynPlanner``.
+- `Step-6. Protection Scoring`_ - demonstrates how to detect competing functional groups and score routes for selectivity issues, inspired by `Westerlund et al. (2025) <https://doi.org/10.26434/chemrxiv-2025-gdrr8>`_.
 
 .. _SynPlanner Pipeline: SynPlanner_Pipeline.ipynb
 .. _10 minutes to SynPlanner: ten_minutes.rst
@@ -62,6 +63,7 @@ each ``SynPlanner`` pipeline step and allows for more sophisticated functionalit
 .. _Step-3. Policy network training: Step-3_Policy_Training.ipynb
 .. _Step-4. Retrosynthetic planning: Step-4_Retrosynthetic_Planning.ipynb
 .. _Step-5. Clustering: Step-5_Clustering.ipynb
+.. _Step-6. Protection Scoring: Step-6_Protection_Scoring.ipynb
 
 .. toctree::
     :hidden:
@@ -76,5 +78,6 @@ each ``SynPlanner`` pipeline step and allows for more sophisticated functionalit
     Step-3_Policy_Training
     Step-4_Retrosynthetic_Planning
     Step-5_Clustering
+    Step-6_Protection_Scoring
     ../configuration/configuration
     ../methods/methods
