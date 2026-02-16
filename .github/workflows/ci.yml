@@ -10,13 +10,16 @@ on:
 jobs:
   tests:
     name: "Unit‑tests (Python ${{ matrix.python-version }})"
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        exclude:
+          - os: windows-latest
+            python-version: "3.13"
 
     steps:
       - name: 🛎️Checkout repo
@@ -39,15 +42,11 @@ jobs:
       - name: 📚Install project (incl. dev extras)
         run: |
           uv sync --group dev --extra cpu
-          uv build --wheel      # guarantees the package itself is buildable
-        env:
-          UV_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
-          UV_INDEX_STRATEGY: unsafe-best-match
         shell: bash
 
       - name: ✅Run test‑suite + coverage
         run: |
-          uv run pytest --cov=synplan --cov-report=xml
+          uv run --no-sync pytest --cov=synplan --cov-report=xml
         shell: bash
 
       - name: ⬆️Upload coverage artefact
@@ -68,7 +67,4 @@ jobs:
           python-version: "3.12"
       - run: |
           uv sync --group dev --extra cpu --no-install-project
-          uv run black --check synplan tests
-        env:
-          UV_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
-          UV_INDEX_STRATEGY: unsafe-best-match
+          uv run --no-sync black --check synplan tests

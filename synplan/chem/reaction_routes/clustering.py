@@ -2,7 +2,7 @@ from collections import defaultdict
 from pathlib import Path
 import pickle
 import re
-from typing import Any, Dict
+from typing import Any
 
 from chython.containers import CGRContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
@@ -521,7 +521,7 @@ def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
     return result
 
 
-def group_routes_by_synthon_detail(data_dict: Dict[Any, list]) -> Dict[str, dict]:
+def group_routes_by_synthon_detail(data_dict: dict[Any, list]) -> dict[str, dict]:
     """
     Groups routes based on synthon CGR (result_list[0]), reaction data, and lg_sizes.
     The final group index is formatted as "{lg_sizes}_{temp_index}".

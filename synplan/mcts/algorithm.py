@@ -2,7 +2,7 @@ from time import time
 from random import choice, uniform
 from math import sqrt
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Literal, TYPE_CHECKING
+from typing import Literal, TYPE_CHECKING
 from bisect import bisect_right
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ class BaseSearchStrategy(ABC):
         self.tree = tree
 
     @abstractmethod
-    def step(self) -> Tuple[bool, List[int]]:
+    def step(self) -> tuple[bool, list[int]]:
         """Perform a single algorithm-specific iteration."""
         raise NotImplementedError
 
@@ -73,10 +73,10 @@ class DepthThresholdsMixin:
 class NMCSPlayoutMixin:
     def select_nmcs_path(
         self, node_id: int, node_depth: int, mode: Literal["greedy", "random", "policy"]
-    ) -> Tuple[int, List[int]]:
+    ) -> tuple[int, list[int]]:
         """Run a simple playout used by NMCS variants starting at `node_id`."""
         depth = node_depth
-        sequence: List[int] = []
+        sequence: list[int] = []
 
         if time() - self.tree.start_time > self.tree.config.max_time:
             return node_id, sequence
@@ -157,10 +157,10 @@ class BreadthFirst(BaseSearchStrategy):
     def __init__(self, tree):
         """Initialize BFS with an empty frontier."""
         super().__init__(tree)
-        self.frontier: List[Tuple[int, int]] = []  # (node_id, depth)
+        self.frontier: list[tuple[int, int]] = []  # (node_id, depth)
         self.is_seeded: bool = False
 
-    def step(self) -> Tuple[bool, List[int]]:
+    def step(self) -> tuple[bool, list[int]]:
         """Expand one node in breadth-first order and enqueue its children.
 
         Returns (found_route, node_ids) where `node_ids` contains the last
@@ -205,11 +205,11 @@ class BestFirst(ScoredFrontierMixin, BaseSearchStrategy):
     def __init__(self, tree):
         """Initialize best-first search with a scored frontier."""
         super().__init__(tree)
-        self.frontier: List[List[int | float]] = (
+        self.frontier: list[list[int | float]] = (
             []
         )  # (node_id, score, depth, is_expanded)
 
-    def step(self) -> Tuple[bool, List[int]]:
+    def step(self) -> tuple[bool, list[int]]:
         """Expand the highest-scored node and re-enqueue evaluated children.
 
         Children are scored via `Tree._get_node_value` and inserted into the
@@ -256,15 +256,15 @@ class Beam(ScoredFrontierMixin, BaseSearchStrategy):
     def __init__(self, tree):
         """Initialize beam search with an empty scored frontier."""
         super().__init__(tree)
-        self.frontier: List[List[int | float]] = []  # (node_id, score, depth, expanded)
+        self.frontier: list[list[int | float]] = []  # (node_id, score, depth, expanded)
 
-    def step(self) -> Tuple[bool, List[int]]:
+    def step(self) -> tuple[bool, list[int]]:
         """Open up to `beam_width` best nodes, expand them, and enqueue children.
 
         The frontier is cleared and rebuilt from the newly generated children
         at each step, reflecting the sliding nature of beam search.
         """
-        batch: List[Tuple[int, float, int]] = []
+        batch: list[tuple[int, float, int]] = []
         if not self.frontier:
             batch = [(1, 0.0, 1)]
         else:
@@ -374,7 +374,7 @@ class UCT(BaseSearchStrategy):
                 return choice(list(self.tree.children[node_id]))
 
         best_score = None
-        best_children: List[int] = []
+        best_children: list[int] = []
         for child_id in self.tree.children[node_id]:
             score = self._ucb(child_id)
             if best_score is None or score > best_score:
@@ -401,7 +401,7 @@ class UCT(BaseSearchStrategy):
                 self.tree.nodes_total_value[node_id] += value
             node_id = self.tree.parents[node_id]
 
-    def step(self) -> Tuple[bool, List[int]]:
+    def step(self) -> tuple[bool, list[int]]:
         """Run one UCT iteration: selection → expansion/evaluation → backpropagation.
 
         On an unvisited node, either returns a solved node immediately or expands
@@ -517,7 +517,7 @@ class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
             )
             self._progress_bar.update(0)  # Refresh display
 
-    def step(self) -> Tuple[bool, List[int]]:
+    def step(self) -> tuple[bool, list[int]]:
         """Perform a single NMCS pass from the root (level = `NMCS_level`)."""
         if self.tree.curr_iteration > 1:
             # Deterministic NMCS single pass
@@ -566,8 +566,8 @@ class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
             of choices (node ids) that led there.
         """
         best_node_id = node_id
-        best_path: List[int] = []
-        chosen_path: List[int] = []
+        best_path: list[int] = []
+        chosen_path: list[int] = []
         if node_id not in self.tree.expanded_nodes:
             self.tree._expand_node(node_id)
             self.tree.expanded_nodes.add(node_id)
@@ -599,7 +599,7 @@ class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
                     self.tree._expand_node(child_id)
                     self.tree.expanded_nodes.add(child_id)
                 if level == 1:
-                    path: List[int] = []
+                    path: list[int] = []
                     if candidate_id in self.rollout_cache:
                         candidate_id, path = self.rollout_cache[candidate_id]
                     else:
@@ -661,7 +661,7 @@ class LazyNestedMonteCarlo(
         """Initialize lazy NMCS with thresholds and nesting level from config."""
         super().__init__(tree)
         cfg = self.tree.config
-        self.frontier: List[List[int | float]] = (
+        self.frontier: list[list[int | float]] = (
             []
         )  # (node_id, score, depth, is_expanded)
         self.reset_depth_thresholds()
@@ -695,7 +695,7 @@ class LazyNestedMonteCarlo(
             )
             self._progress_bar.update(0)
 
-    def step(self) -> Tuple[bool, List[int]]:
+    def step(self) -> tuple[bool, list[int]]:
         """Perform one lazy NMCS iteration using percentile-based candidate pruning."""
         self.frontier = []
         self.reset_depth_thresholds()
@@ -743,8 +743,8 @@ class LazyNestedMonteCarlo(
             Tuple[int, List[int]]: Best leaf id and chosen sequence.
         """
         best_node_id = node_id
-        best_path: List[int] = []
-        chosen_path: List[int] = []
+        best_path: list[int] = []
+        chosen_path: list[int] = []
         if node_id not in self.tree.expanded_nodes:
             self.tree._expand_node(node_id)
             self.tree.expanded_nodes.add(node_id)
@@ -758,7 +758,7 @@ class LazyNestedMonteCarlo(
                     return node_id, chosen_path
 
             self.frontier = []
-            candidates: List[int] = []
+            candidates: list[int] = []
 
             self.reset_depth_thresholds()
 
@@ -810,7 +810,7 @@ class LazyNestedMonteCarlo(
             for child_id in candidates:
                 candidate_id = child_id
                 if level == 1:
-                    path: List[int] = []
+                    path: list[int] = []
                     candidate_id, path = self.select_nmcs_path(
                         candidate_id, depth + 1, self.playout_mode
                     )

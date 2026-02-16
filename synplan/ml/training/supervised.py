@@ -7,7 +7,6 @@ process for the policy network.
 
 import warnings
 from pathlib import Path
-from typing import Union, List
 
 import torch
 from pytorch_lightning import Trainer
@@ -93,7 +92,7 @@ def run_policy_training(
     results_path: str,
     weights_file_name: str = "policy_network",
     accelerator: str = "gpu",
-    devices: Union[List[int], str, int] = "auto",
+    devices: list[int] | str | int = "auto",
     silent: bool = False,
 ) -> None:
     """

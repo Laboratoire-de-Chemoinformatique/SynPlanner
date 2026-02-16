@@ -1,7 +1,7 @@
 """Module containing a class that represents a policy function for node expansion in the
 tree search."""
 
-from typing import Iterator, List, Optional, Tuple, Union
+from collections.abc import Iterator
 
 import torch
 import torch_geometric
@@ -41,7 +41,7 @@ class PolicyNetworkFunction:
         else:
             self.policy_net = policy_net
 
-    def _get_graph(self, precursor: Precursor) -> Optional[torch_geometric.data.Data]:
+    def _get_graph(self, precursor: Precursor) -> torch_geometric.data.Data | None:
         """Convert precursor molecule to PyG graph.
 
         :param precursor: The precursor molecule.
@@ -57,7 +57,7 @@ class PolicyNetworkFunction:
         """
         return self.policy_net.embedder(pyg_graph, self.policy_net.batch_size)
 
-    def get_logits(self, precursor: Precursor) -> Optional[torch.Tensor]:
+    def get_logits(self, precursor: Precursor) -> torch.Tensor | None:
         """Get raw logits from the policy network (before sigmoid/softmax).
 
         Works for both filtering and ranking networks.
@@ -77,7 +77,7 @@ class PolicyNetworkFunction:
         del pyg_graph
         return logits
 
-    def get_probs(self, precursor: Precursor) -> Optional[torch.Tensor]:
+    def get_probs(self, precursor: Precursor) -> torch.Tensor | None:
         """Get probability tensor from the policy network.
 
         For filtering: returns sigmoid(logits) combined with priority if configured.
@@ -106,7 +106,7 @@ class PolicyNetworkFunction:
 
     def _predict_rules_common(
         self, precursor: Precursor, n_rules: int
-    ) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
+    ) -> tuple[torch.Tensor, torch.Tensor] | None:
         """Common logic for predicting reaction rules.
 
         :param precursor: The current precursor.
@@ -137,8 +137,8 @@ class PolicyNetworkFunction:
         return sorted_probs, sorted_rules
 
     def predict_reaction_rules(
-        self, precursor: Precursor, reaction_rules: List[Reactor]
-    ) -> Iterator[Union[Iterator, Iterator[Tuple[float, Reactor, int]]]]:
+        self, precursor: Precursor, reaction_rules: list[Reactor]
+    ) -> Iterator[Iterator | Iterator[tuple[float, Reactor, int]]]:
         """The policy function predicts the list of reaction rules for a given precursor.
 
         :param precursor: The current precursor for which the reaction rules are predicted.
@@ -160,7 +160,7 @@ class PolicyNetworkFunction:
 
     def predict_reaction_rules_light(
         self, precursor: Precursor, reaction_rules_len: int
-    ) -> Iterator[Union[Iterator, Iterator[Tuple[float, int]]]]:
+    ) -> Iterator[Iterator | Iterator[tuple[float, int]]]:
         """The policy function predicts the list of reaction rules for a given precursor.
 
         Light version that doesn't return Reactor objects.
@@ -180,7 +180,7 @@ class PolicyNetworkFunction:
             if prob > self.config.rule_prob_threshold:
                 yield prob, rule_id
 
-    def get_filtering_probs_only(self, precursor: Precursor) -> Optional[torch.Tensor]:
+    def get_filtering_probs_only(self, precursor: Precursor) -> torch.Tensor | None:
         """Get filtering probability tensor (y only, no priority mixing).
 
         :param precursor: The current precursor.
@@ -194,7 +194,7 @@ class PolicyNetworkFunction:
             return None
         return torch.sigmoid(logits)
 
-    def get_ranking_logits(self, precursor: Precursor) -> Optional[torch.Tensor]:
+    def get_ranking_logits(self, precursor: Precursor) -> torch.Tensor | None:
         """Get raw logits from ranking policy network (before softmax).
 
         :param precursor: The current precursor.
@@ -279,7 +279,7 @@ class CombinedPolicyNetworkFunction:
                 "Both policy networks must be trained on the same set of reaction rules."
             )
 
-    def _get_combined_probs(self, precursor: Precursor) -> Optional[torch.Tensor]:
+    def _get_combined_probs(self, precursor: Precursor) -> torch.Tensor | None:
         """Compute combined probabilities by weighted addition of logits.
 
         Formula: softmax((filtering_logits + ranking_weight * ranking_logits) / temperature)
@@ -302,7 +302,7 @@ class CombinedPolicyNetworkFunction:
 
     def _predict_rules_common(
         self, precursor: Precursor, n_rules: int
-    ) -> Optional[Tuple[List[float], List[int]]]:
+    ) -> tuple[list[float], list[int]] | None:
         """Common logic for predicting reaction rules.
 
         :param precursor: The current precursor.
@@ -323,8 +323,8 @@ class CombinedPolicyNetworkFunction:
         return sorted_probs, sorted_rules
 
     def predict_reaction_rules(
-        self, precursor: Precursor, reaction_rules: List[Reactor]
-    ) -> Iterator[Tuple[float, Reactor, int]]:
+        self, precursor: Precursor, reaction_rules: list[Reactor]
+    ) -> Iterator[tuple[float, Reactor, int]]:
         """Predicts reaction rules using Bayesian-style log-space combination.
 
         :param precursor: The current precursor for which the reaction rules are predicted.
@@ -342,7 +342,7 @@ class CombinedPolicyNetworkFunction:
 
     def predict_reaction_rules_light(
         self, precursor: Precursor, reaction_rules_len: int
-    ) -> Iterator[Tuple[float, int]]:
+    ) -> Iterator[tuple[float, int]]:
         """Predicts reaction rules using Bayesian-style log-space combination.
 
         Light version without returning Reactor objects.

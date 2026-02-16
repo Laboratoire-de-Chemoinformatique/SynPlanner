@@ -10,7 +10,8 @@ from collections import Counter
 from dataclasses import dataclass
 import logging
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any
+from collections.abc import Iterable, Sequence
 
 from chython import smiles as smiles_chython
 from chython.containers import MoleculeContainer, ReactionContainer
@@ -22,7 +23,6 @@ from synplan.chem.utils import unite_molecules
 from synplan.utils.config import ConfigABC
 from synplan.utils.files import (
     RawReactionReader,
-    ReactionReader,
     ReactionWriter,
     parse_reaction,
 )
@@ -69,7 +69,7 @@ class BaseStandardizer(ABC):
     """Template: subclasses override `_run` only."""
 
     @classmethod
-    def from_config(cls, _cfg: object) -> "BaseStandardizer":
+    def from_config(cls, _cfg: object) -> BaseStandardizer:
         return cls()
 
     @abstractmethod
@@ -343,7 +343,7 @@ class SplitIonsStandardizer(BaseStandardizer):
         """
         return sum(molecule._charges.values())
 
-    def _split_ions(self, reaction: ReactionContainer) -> Tuple[ReactionContainer, int]:
+    def _split_ions(self, reaction: ReactionContainer) -> tuple[ReactionContainer, int]:
         """Split ions in a reaction.
 
         Args:
@@ -477,7 +477,7 @@ class UnchangedPartsStandardizer(BaseStandardizer):
         self.keep_reagents = keep_reagents
 
     @classmethod
-    def from_config(cls, config: UnchangedPartsConfig) -> "UnchangedPartsStandardizer":
+    def from_config(cls, config: UnchangedPartsConfig) -> UnchangedPartsStandardizer:
         return cls()
 
     def _run(self, rxn: ReactionContainer) -> ReactionContainer:
@@ -537,18 +537,18 @@ class SmallMoleculesConfig:
     mol_max_size: int = 6
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "SmallMoleculesConfig":
+    def from_dict(config_dict: dict[str, Any]) -> SmallMoleculesConfig:
         """Create an instance of SmallMoleculesConfig from a dictionary."""
         return SmallMoleculesConfig(**config_dict)
 
     @staticmethod
-    def from_yaml(file_path: str) -> "SmallMoleculesConfig":
+    def from_yaml(file_path: str) -> SmallMoleculesConfig:
         """Deserialize a YAML file into a SmallMoleculesConfig object."""
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return SmallMoleculesConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]) -> None:
+    def _validate_params(self, params: dict[str, Any]) -> None:
         """Validate configuration parameters."""
         mol_max_size = params.get("mol_max_size", self.mol_max_size)
         if not isinstance(mol_max_size, int) or not (0 < mol_max_size):
@@ -562,12 +562,12 @@ class SmallMoleculesStandardizer(BaseStandardizer):
         self.mol_max_size = mol_max_size
 
     @classmethod
-    def from_config(cls, config: SmallMoleculesConfig) -> "SmallMoleculesStandardizer":
+    def from_config(cls, config: SmallMoleculesConfig) -> SmallMoleculesStandardizer:
         return cls(config.mol_max_size)
 
     def _split_molecules(
         self, molecules: Iterable, number_of_atoms: int
-    ) -> Tuple[List[MoleculeContainer], List[MoleculeContainer]]:
+    ) -> tuple[list[MoleculeContainer], list[MoleculeContainer]]:
         """Split molecules according to the number of heavy atoms.
 
         Args:
@@ -630,18 +630,18 @@ class RemoveReagentsConfig:
     reagent_max_size: int = 7
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "RemoveReagentsConfig":
+    def from_dict(config_dict: dict[str, Any]) -> RemoveReagentsConfig:
         """Create an instance of RemoveReagentsConfig from a dictionary."""
         return RemoveReagentsConfig(**config_dict)
 
     @staticmethod
-    def from_yaml(file_path: str) -> "RemoveReagentsConfig":
+    def from_yaml(file_path: str) -> RemoveReagentsConfig:
         """Deserialize a YAML file into a RemoveReagentsConfig object."""
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return RemoveReagentsConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]) -> None:
+    def _validate_params(self, params: dict[str, Any]) -> None:
         """Validate configuration parameters."""
         reagent_max_size = params.get("reagent_max_size", self.reagent_max_size)
         if not isinstance(reagent_max_size, int) or not (0 < reagent_max_size):
@@ -657,7 +657,7 @@ class RemoveReagentsStandardizer(BaseStandardizer):
         self.reagent_max_size = reagent_max_size
 
     @classmethod
-    def from_config(cls, config: RemoveReagentsConfig) -> "RemoveReagentsStandardizer":
+    def from_config(cls, config: RemoveReagentsConfig) -> RemoveReagentsStandardizer:
         return cls(config.reagent_max_size)
 
     def _run(self, rxn: ReactionContainer) -> ReactionContainer:
@@ -725,7 +725,7 @@ class RebalanceReactionStandardizer(BaseStandardizer):
     @classmethod
     def from_config(
         cls, config: RebalanceReactionConfig
-    ) -> "RebalanceReactionStandardizer":
+    ) -> RebalanceReactionStandardizer:
         return cls()
 
     def _run(self, rxn: ReactionContainer) -> ReactionContainer:
@@ -759,7 +759,7 @@ class DuplicateReactionConfig:
 class DuplicateReactionStandardizer(BaseStandardizer):
     """Cluster‑wide duplicate removal via a Ray actor."""
 
-    def __init__(self, dedup_actor: "ray.actor.ActorHandle"):
+    def __init__(self, dedup_actor: ray.actor.ActorHandle):
         self._actor = dedup_actor  # global singleton handle
         # local fast‑path cache to avoid actor call on obvious repeats *in
         # the same worker*; purely an optimisation, not required.
@@ -870,22 +870,22 @@ class ReactionStandardizationConfig(ConfigABC):
     """
 
     # configuration for reaction standardizers
-    reaction_mapping_config: Optional[ReactionMappingConfig] = None
-    functional_groups_config: Optional[FunctionalGroupsConfig] = None
-    kekule_form_config: Optional[KekuleFormConfig] = None
-    check_valence_config: Optional[CheckValenceConfig] = None
-    implicify_hydrogens_config: Optional[ImplicifyHydrogensConfig] = None
-    check_isotopes_config: Optional[CheckIsotopesConfig] = None
-    split_ions_config: Optional[SplitIonsConfig] = None
-    aromatic_form_config: Optional[AromaticFormConfig] = None
-    mapping_fix_config: Optional[MappingFixConfig] = None
-    unchanged_parts_config: Optional[UnchangedPartsConfig] = None
-    small_molecules_config: Optional[SmallMoleculesConfig] = None
-    remove_reagents_config: Optional[RemoveReagentsConfig] = None
-    rebalance_reaction_config: Optional[RebalanceReactionConfig] = None
-    duplicate_reaction_config: Optional[DuplicateReactionConfig] = None
+    reaction_mapping_config: ReactionMappingConfig | None = None
+    functional_groups_config: FunctionalGroupsConfig | None = None
+    kekule_form_config: KekuleFormConfig | None = None
+    check_valence_config: CheckValenceConfig | None = None
+    implicify_hydrogens_config: ImplicifyHydrogensConfig | None = None
+    check_isotopes_config: CheckIsotopesConfig | None = None
+    split_ions_config: SplitIonsConfig | None = None
+    aromatic_form_config: AromaticFormConfig | None = None
+    mapping_fix_config: MappingFixConfig | None = None
+    unchanged_parts_config: UnchangedPartsConfig | None = None
+    small_molecules_config: SmallMoleculesConfig | None = None
+    remove_reagents_config: RemoveReagentsConfig | None = None
+    rebalance_reaction_config: RebalanceReactionConfig | None = None
+    duplicate_reaction_config: DuplicateReactionConfig | None = None
 
-    def _validate_params(self, params: Dict[str, Any]) -> None:
+    def _validate_params(self, params: dict[str, Any]) -> None:
         """Validate configuration parameters."""
         for field_name, config in self.__dict__.items():
             if config is not None and hasattr(config, "_validate_params"):
@@ -901,7 +901,7 @@ class ReactionStandardizationConfig(ConfigABC):
         return config_dict
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "ReactionStandardizationConfig":
+    def from_dict(config_dict: dict[str, Any]) -> ReactionStandardizationConfig:
         """Create an instance of ReactionCheckConfig from a dictionary."""
         from typing import get_type_hints
 
@@ -916,9 +916,9 @@ class ReactionStandardizationConfig(ConfigABC):
         return ReactionStandardizationConfig(**config_kwargs)
 
     @staticmethod
-    def from_yaml(file_path: str) -> "ReactionStandardizationConfig":
+    def from_yaml(file_path: str) -> ReactionStandardizationConfig:
         """Deserializes a YAML file into a ReactionCheckConfig object."""
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return ReactionStandardizationConfig.from_dict(config_dict)
 
@@ -964,7 +964,7 @@ def safe_standardize(
     *,
     ignore_errors: bool = False,
     fmt: str = "smi",
-) -> Tuple[ReactionContainer | None, bool, Optional[StandardizationError]]:
+) -> tuple[ReactionContainer | None, bool, StandardizationError | None]:
     """
     Returns ``(reaction, success, error)``.
 
@@ -1008,13 +1008,13 @@ def _process_batch(
     *,
     ignore_errors: bool = False,
     fmt: str = "smi",
-) -> Tuple[List[ReactionContainer], int, List[Tuple[str, str, str, str]]]:
+) -> tuple[list[ReactionContainer], int, list[tuple[str, str, str, str]]]:
     """Process a batch and return (results, n_ok, errors).
 
     Each error entry is ``(original_smiles, stage, error_type, error_message)``.
     """
-    results: List[ReactionContainer] = []
-    errors: List[Tuple[str, str, str, str]] = []
+    results: list[ReactionContainer] = []
+    errors: list[tuple[str, str, str, str]] = []
     n_std = 0
     for item in batch:
         rxn, ok, exc = safe_standardize(
@@ -1040,7 +1040,7 @@ def process_batch_remote(
     log_file_path: str | Path | None = None,
     ignore_errors: bool = False,
     fmt: str = "smi",
-) -> Tuple[List[ReactionContainer], int, List[Tuple[str, str, str, str]]]:
+) -> tuple[list[ReactionContainer], int, list[tuple[str, str, str, str]]]:
     # Ray keeps a local cache of fetched objects, so the list is
     # deserialised only once per worker process, not once per task.
     if isinstance(std_param, ray.ObjectRef):  # handle?   get it
@@ -1157,7 +1157,7 @@ def _print_error_summary(
 
 
 def standardize_reactions_from_file(
-    config: "ReactionStandardizationConfig",
+    config: ReactionStandardizationConfig,
     input_reaction_data_path: str | Path,
     standardized_reaction_data_path: str | Path = "reaction_data_standardized.smi",
     *,
@@ -1232,7 +1232,7 @@ def standardize_reactions_from_file(
             std_ref = ray.put(standardizers)
 
     max_pending = max_pending_factor * num_cpus
-    pending: Dict[ray.ObjectRef, None] = {}
+    pending: dict[ray.ObjectRef, None] = {}
 
     n_processed = n_std = 0
     error_counts: Counter = Counter()
@@ -1250,7 +1250,7 @@ def standardize_reactions_from_file(
     if error_file is not None:
         error_file.write("# original_smiles\tstage\terror_type\terror_message\n")
 
-    def _write_errors(batch_errors: List[Tuple[str, str, str, str]]) -> None:
+    def _write_errors(batch_errors: list[tuple[str, str, str, str]]) -> None:
         for smi, stage, etype, emsg in batch_errors:
             error_counts[(stage, etype)] += 1
             if error_file is not None:

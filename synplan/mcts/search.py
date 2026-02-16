@@ -6,7 +6,6 @@ import json
 import logging
 import os.path
 from pathlib import Path
-from typing import Union
 
 from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
@@ -26,7 +25,7 @@ from synplan.utils.visualisation import extract_routes, generate_results_html
 
 
 def extract_tree_stats(
-    tree: Tree, target: Union[str, MoleculeContainer], init_smiles: str = None
+    tree: Tree, target: str | MoleculeContainer, init_smiles: str = None
 ):
     """Collects various statistics from a tree and returns them in a dictionary format.
 
@@ -119,7 +118,7 @@ def run_search(
     tree_config = TreeConfig.from_dict(search_config)
     tree_config.silent = True
     with (
-        open(targets_path, "r", encoding="utf-8") as targets,
+        open(targets_path, encoding="utf-8") as targets,
         open(stats_file, "w", encoding="utf-8", newline="\n") as csvfile,
     ):
 

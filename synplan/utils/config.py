@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from chython import smarts
 import yaml
@@ -15,10 +15,10 @@ class ConfigABC(ABC):
 
     @staticmethod
     @abstractmethod
-    def from_dict(config_dict: Dict[str, Any]):
+    def from_dict(config_dict: dict[str, Any]):
         """Create an instance of the configuration from a dictionary."""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the configuration into a dictionary."""
         return {
             k: str(v) if isinstance(v, Path) else v for k, v in self.__dict__.items()
@@ -38,7 +38,7 @@ class ConfigABC(ABC):
             yaml.dump(self.to_dict(), file)
 
     @abstractmethod
-    def _validate_params(self, params: Dict[str, Any]):
+    def _validate_params(self, params: dict[str, Any]):
         """Validate configuration parameters."""
 
     def __post_init__(self):
@@ -105,8 +105,8 @@ class RuleExtractionConfig(ConfigABC):
     keep_leaving_groups: bool = True
     keep_incoming_groups: bool = True
     keep_reagents: bool = False
-    func_groups_list: List[str] = field(default_factory=list)
-    atom_info_retention: Dict[str, Dict[str, bool]] = field(default_factory=dict)
+    func_groups_list: list[str] = field(default_factory=list)
+    atom_info_retention: dict[str, dict[str, bool]] = field(default_factory=dict)
 
     def __post_init__(self):
         super().__post_init__()
@@ -147,17 +147,17 @@ class RuleExtractionConfig(ConfigABC):
         self.func_groups_list = func_groups_list
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "RuleExtractionConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "RuleExtractionConfig":
         return RuleExtractionConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "RuleExtractionConfig":
 
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return RuleExtractionConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]) -> None:
+    def _validate_params(self, params: dict[str, Any]) -> None:
 
         if not isinstance(params["multicenter_rules"], bool):
             raise ValueError("multicenter_rules must be a boolean.")
@@ -264,16 +264,16 @@ class PolicyNetworkConfig(ConfigABC):
     top_rules: int = 50
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "PolicyNetworkConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "PolicyNetworkConfig":
         return PolicyNetworkConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "PolicyNetworkConfig":
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return PolicyNetworkConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]):
+    def _validate_params(self, params: dict[str, Any]):
 
         if params["policy_type"] not in ["filtering", "ranking"]:
             raise ValueError("policy_type must be either 'filtering' or 'ranking'.")
@@ -343,12 +343,12 @@ class ValueNetworkConfig(ConfigABC):
     num_epoch: int = 100
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "ValueNetworkConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "ValueNetworkConfig":
         return ValueNetworkConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "ValueNetworkConfig":
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return ValueNetworkConfig.from_dict(config_dict)
 
@@ -356,7 +356,7 @@ class ValueNetworkConfig(ConfigABC):
         with open(file_path, "w", encoding="utf-8") as file:
             yaml.dump(self.to_dict(), file)
 
-    def _validate_params(self, params: Dict[str, Any]):
+    def _validate_params(self, params: dict[str, Any]):
 
         if not isinstance(params["vector_dim"], int) or params["vector_dim"] <= 0:
             raise ValueError("vector_dim must be a positive integer.")
@@ -397,16 +397,16 @@ class TuningConfig(ConfigABC):
     num_simulations: int = 1
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "TuningConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "TuningConfig":
         return TuningConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "TuningConfig":
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return TuningConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]):
+    def _validate_params(self, params: dict[str, Any]):
 
         if not isinstance(params["batch_size"], int) or params["batch_size"] <= 0:
             raise ValueError("batch_size must be a positive integer.")
@@ -491,12 +491,12 @@ class TreeConfig(ConfigABC):
     lnmcs_ratio: float = 0.2  # percentile threshold in [0.0, 1.0]
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "TreeConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "TreeConfig":
         return TreeConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "TreeConfig":
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return TreeConfig.from_dict(config_dict)
 
@@ -597,16 +597,16 @@ class RolloutEvaluationConfig(ConfigABC):
     stochastic: bool = False
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "RolloutEvaluationConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "RolloutEvaluationConfig":
         return RolloutEvaluationConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "RolloutEvaluationConfig":
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return RolloutEvaluationConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]):
+    def _validate_params(self, params: dict[str, Any]):
         if (
             not isinstance(params.get("min_mol_size", 6), int)
             or params.get("min_mol_size", 6) < 0
@@ -635,16 +635,16 @@ class ValueNetworkEvaluationConfig(ConfigABC):
     normalize: bool = False
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "ValueNetworkEvaluationConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "ValueNetworkEvaluationConfig":
         return ValueNetworkEvaluationConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "ValueNetworkEvaluationConfig":
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return ValueNetworkEvaluationConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]):
+    def _validate_params(self, params: dict[str, Any]):
         if not isinstance(params.get("weights_path"), str):
             raise ValueError("weights_path must be a string.")
         if not isinstance(params.get("normalize", False), bool):
@@ -666,16 +666,16 @@ class RDKitEvaluationConfig(ConfigABC):
     normalize: bool = False
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "RDKitEvaluationConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "RDKitEvaluationConfig":
         return RDKitEvaluationConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "RDKitEvaluationConfig":
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return RDKitEvaluationConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]):
+    def _validate_params(self, params: dict[str, Any]):
         valid_functions = [
             "sascore",
             "weight",
@@ -703,16 +703,16 @@ class PolicyEvaluationConfig(ConfigABC):
     normalize: bool = False
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "PolicyEvaluationConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "PolicyEvaluationConfig":
         return PolicyEvaluationConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "PolicyEvaluationConfig":
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return PolicyEvaluationConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]):
+    def _validate_params(self, params: dict[str, Any]):
         if not isinstance(params.get("normalize", False), bool):
             raise ValueError("normalize must be a boolean.")
 
@@ -729,16 +729,16 @@ class RandomEvaluationConfig(ConfigABC):
     normalize: bool = False
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "RandomEvaluationConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "RandomEvaluationConfig":
         return RandomEvaluationConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "RandomEvaluationConfig":
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return RandomEvaluationConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]):
+    def _validate_params(self, params: dict[str, Any]):
         if not isinstance(params.get("normalize", False), bool):
             raise ValueError("normalize must be a boolean.")
 
@@ -772,16 +772,16 @@ class CombinedPolicyConfig(ConfigABC):
     temperature: float = 1.0
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "CombinedPolicyConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "CombinedPolicyConfig":
         return CombinedPolicyConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "CombinedPolicyConfig":
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, encoding="utf-8") as file:
             config_dict = yaml.safe_load(file)
         return CombinedPolicyConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]):
+    def _validate_params(self, params: dict[str, Any]):
         if not isinstance(params.get("filtering_weights_path"), str):
             raise ValueError("filtering_weights_path must be a string.")
         if not isinstance(params.get("ranking_weights_path"), str):
@@ -805,7 +805,7 @@ class CombinedPolicyConfig(ConfigABC):
             raise ValueError("temperature must be a positive number.")
 
 
-def convert_config_to_dict(config_attr: ConfigABC, config_type) -> Dict | None:
+def convert_config_to_dict(config_attr: ConfigABC, config_type) -> dict | None:
     """Converts a configuration attribute to a dictionary if it's either a dictionary or
     an instance of a specified configuration type.
 

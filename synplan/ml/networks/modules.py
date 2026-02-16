@@ -1,7 +1,6 @@
 """Module containing basic pytorch architectures of policy and value neural networks."""
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Tuple, Union
 
 import torch
 from adabelief_pytorch import AdaBelief
@@ -204,7 +203,7 @@ class MCTSNetwork(LightningModule, ABC):
 
     def configure_optimizers(
         self,
-    ) -> Tuple[List[AdaBelief], List[Dict[str, Union[bool, str, ReduceLROnPlateau]]]]:
+    ) -> tuple[list[AdaBelief], list[dict[str, bool | str | ReduceLROnPlateau]]]:
         """Returns an optimizer and a learning rate scheduler for training a model using
         the AdaBelief optimizer and ReduceLROnPlateau scheduler.
 

@@ -8,9 +8,9 @@ license = { text = "MIT" }
 authors = [{ name = "Laboratoire de Chemoinformatique", email = "tagirshin@gmail.com" }]
 
 dependencies = [
-  "chython",
-  "chytorch-synplan>=1.69",
-  "chytorch-rxnmap-synplan>=1.6",
+  "chython-synplan[racer-default]>=1.93",
+  "chytorch-synplan>=1.70",
+  "chytorch-rxnmap-synplan>=1.7",
   "numpy>=2",
   "pandas>=1.4",
   "toytree>=2.0",
@@ -24,15 +24,16 @@ dependencies = [
   "ipywidgets>8.1.0",
   "streamlit>1.35.1",
   "streamlit-ketcher>=0.0.1",
-  "rdkit>2025.3.5",
-  "matplotlib>=3.10.8",
+  "rdkit>=2023.9.1",
+  "matplotlib>=3.7",
   "pyyaml>=6.0",
 ]
 
-# Extras to select PyTorch variant (cpu or cuda) - required for uv users
+# Extras to select PyTorch variant - required for uv users
 [project.optional-dependencies]
 cpu = ["torch>=2.0"]
-cuda = ["torch>=2.0"]
+cu126 = ["torch>=2.0"]
+cu128 = ["torch>=2.0"]
 
 [dependency-groups]
 dev = [
@@ -68,19 +69,20 @@ allow-direct-references = true
 packages = ["synplan", "scripts"]
 
 [tool.uv]
-# cpu and cuda extras are mutually exclusive
+# PyTorch backend extras are mutually exclusive
 conflicts = [
   [
     { extra = "cpu" },
-    { extra = "cuda" },
+    { extra = "cu126" },
+    { extra = "cu128" },
   ],
 ]
 
 [tool.uv.sources]
-chython = { git = "https://github.com/tagirshin/chython.git", branch = "adopt-cgr" }
 torch = [
   { index = "pytorch-cpu", extra = "cpu" },
-  { index = "pytorch-cuda", extra = "cuda" },
+  { index = "pytorch-cu126", extra = "cu126" },
+  { index = "pytorch-cu128", extra = "cu128" },
 ]
 
 [[tool.uv.index]]
@@ -89,6 +91,11 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [[tool.uv.index]]
-name = "pytorch-cuda"
-url = "https://download.pytorch.org/whl/cu124"
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true

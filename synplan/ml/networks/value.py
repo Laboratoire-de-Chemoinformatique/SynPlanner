@@ -1,7 +1,7 @@
 """Module containing main class for value network."""
 
 from abc import ABC
-from typing import Any, Dict
+from typing import Any
 
 import torch
 from pytorch_lightning import LightningModule
@@ -44,7 +44,7 @@ class ValueNetwork(MCTSNetwork, LightningModule, ABC):
         x = torch.sigmoid(self.predictor(x))
         return x
 
-    def _get_loss(self, batch: Batch) -> Dict[str, Tensor]:
+    def _get_loss(self, batch: Batch) -> dict[str, Tensor]:
         """Calculates the loss and various classification metrics for a given batch for
         the precursor synthesysability prediction.
 

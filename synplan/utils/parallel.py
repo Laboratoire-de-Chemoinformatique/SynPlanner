@@ -8,7 +8,8 @@ parallel mapping with backpressure. Keep format-specific I/O utilities in
 from __future__ import annotations
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Any, Callable, Iterable, Iterator
+from typing import Any
+from collections.abc import Callable, Iterable, Iterator
 
 
 def process_pool_map_stream(

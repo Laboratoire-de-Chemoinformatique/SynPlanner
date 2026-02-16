@@ -6,7 +6,6 @@ from io import TextIOWrapper
 from itertools import islice
 from os.path import splitext
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
 
 import ray
 from tqdm.auto import tqdm
@@ -25,8 +24,6 @@ from synplan.chem.utils import reverse_reaction
 from synplan.utils.config import RuleExtractionConfig
 from synplan.utils.files import (
     RawReactionReader,
-    ReactionReader,
-    ReactionWriter,
     parse_reaction,
 )
 
@@ -62,8 +59,8 @@ def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
 
 
 def add_environment_atoms(
-    cgr: CGRContainer, center_atoms: Set[int], environment_atom_count: int
-) -> Set[int]:
+    cgr: CGRContainer, center_atoms: set[int], environment_atom_count: int
+) -> set[int]:
     """
     Adds environment atoms to the set of center atoms based on the specified depth.
 
@@ -89,9 +86,9 @@ def add_environment_atoms(
 
 def add_functional_groups(
     reaction: ReactionContainer,
-    center_atoms: Set[int],
-    func_groups_list: List[QueryContainer],
-) -> Set[int]:
+    center_atoms: set[int],
+    func_groups_list: list[QueryContainer],
+) -> set[int]:
     """
     Augments the set of reaction rule atoms with functional groups if specified.
 
@@ -120,7 +117,7 @@ def add_functional_groups(
     return rule_atoms
 
 
-def add_ring_structures(cgr: CGRContainer, rule_atoms: Set[int]) -> Set[int]:
+def add_ring_structures(cgr: CGRContainer, rule_atoms: set[int]) -> set[int]:
     """
     Adds ring structures to the set of rule atoms if they intersect with the reaction
     center atoms.
@@ -143,10 +140,10 @@ def add_ring_structures(cgr: CGRContainer, rule_atoms: Set[int]) -> Set[int]:
 
 def add_leaving_incoming_groups(
     reaction: ReactionContainer,
-    rule_atoms: Set[int],
+    rule_atoms: set[int],
     keep_leaving_groups: bool,
     keep_incoming_groups: bool,
-) -> Tuple[Set[int], Dict[str, Set]]:
+) -> tuple[set[int], dict[str, set]]:
     """
     Identifies and includes leaving and incoming groups to the rule atoms based on
     specified flags.
@@ -193,11 +190,11 @@ def add_leaving_incoming_groups(
 
 
 def clean_molecules(
-    rule_molecules: List[MoleculeContainer],
-    reaction_molecules: Tuple[MoleculeContainer],
-    reaction_center_atoms: Set[int],
-    atom_retention_details: Dict[str, Dict[str, bool]],
-) -> List[QueryContainer]:
+    rule_molecules: list[MoleculeContainer],
+    reaction_molecules: tuple[MoleculeContainer],
+    reaction_center_atoms: set[int],
+    atom_retention_details: dict[str, dict[str, bool]],
+) -> list[QueryContainer]:
     """
     Cleans rule molecules by removing specified information about atoms based on
     retention details provided.
@@ -244,7 +241,7 @@ def clean_molecules(
 
 def clean_atom(
     query_molecule: QueryContainer,
-    attributes_to_keep: Dict[str, bool],
+    attributes_to_keep: dict[str, bool],
     atom_number: int,
 ) -> QueryContainer:
     """
@@ -276,10 +273,10 @@ def clean_atom(
 
 def create_substructures_and_reagents(
     reaction: ReactionContainer,
-    rule_atoms: Set[int],
+    rule_atoms: set[int],
     as_query_container: bool,
     keep_reagents: bool,
-) -> Tuple[List[MoleculeContainer], List[MoleculeContainer], List]:
+) -> tuple[list[MoleculeContainer], list[MoleculeContainer], list]:
     """
     Creates substructures for reactants and products, and optionally includes
     reagents, based on specified parameters. The function processes the reaction to
@@ -320,10 +317,10 @@ def create_substructures_and_reagents(
 
 
 def assemble_final_rule(
-    reactant_substructures: List[QueryContainer],
-    product_substructures: List[QueryContainer],
-    reagents: List,
-    meta_debug: Dict[str, Set],
+    reactant_substructures: list[QueryContainer],
+    product_substructures: list[QueryContainer],
+    reagents: list,
+    meta_debug: dict[str, set],
     keep_metadata: bool,
     reaction: ReactionContainer,
 ) -> ReactionContainer:
@@ -397,7 +394,7 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
         molecule_substructure_as_query(m, m.atoms_numbers) for m in rule.reactants
     )
     products = tuple(rule.products)
-    reactor = Reactor(patterns=patterns, products=products)
+    reactor = Reactor(patterns=patterns, products=products, delete_atoms=False)
     try:
         for result_reaction in reactor(*reaction.reactants):  # unpack here
             result_products = []
@@ -517,7 +514,7 @@ def create_rule(
 
 def extract_rules(
     config: RuleExtractionConfig, reaction: ReactionContainer
-) -> Tuple[List[ReactionContainer], bool]:
+) -> tuple[list[ReactionContainer], bool]:
     """
     Extracts reaction rules from a given reaction based on the specified
     configuration.
@@ -555,12 +552,12 @@ def extract_rules(
 
 @ray.remote
 def process_reaction_batch(
-    batch: List[Tuple[int, str]],
+    batch: list[tuple[int, str]],
     config: RuleExtractionConfig,
     ignore_errors: bool = False,
     fmt: str = "smi",
-) -> Tuple[
-    List[Tuple[int, List[ReactionContainer]]], List[Tuple[str, str, str, str]], int
+) -> tuple[
+    list[tuple[int, list[ReactionContainer]]], list[tuple[str, str, str, str]], int
 ]:
     """Process a batch of reactions for rule extraction.
 
@@ -576,7 +573,7 @@ def process_reaction_batch(
         *n_multi_product* is the number of reactions skipped due to multiple products.
     """
     extracted_rules_list = []
-    errors: List[Tuple[str, str, str, str]] = []
+    errors: list[tuple[str, str, str, str]] = []
     n_multi_product = 0
     for index, raw_item in batch:
         try:
@@ -596,9 +593,9 @@ def process_reaction_batch(
 
 
 def _update_rules_statistics(
-    rules_statistics: Dict[ReactionContainer, List[int]],
+    rules_statistics: dict[ReactionContainer, list[int]],
     index: int,
-    extracted_rules: List[ReactionContainer],
+    extracted_rules: list[ReactionContainer],
 ) -> None:
     """Update rules statistics with the indices of reactions they came from."""
     for rule in extracted_rules:
@@ -609,11 +606,11 @@ def _update_rules_statistics(
 
 
 def process_completed_batch(
-    futures: Dict,
-    rules_statistics: Dict,
+    futures: dict,
+    rules_statistics: dict,
     error_file: TextIOWrapper | None = None,
     error_counts: Counter | None = None,
-    multi_product_count: List[int] | None = None,
+    multi_product_count: list[int] | None = None,
 ) -> None:
     """
     Processes completed batches of reactions, updating the rules statistics and
@@ -656,8 +653,8 @@ def process_completed_batch(
 
 
 def sort_rules(
-    rules_stats: Dict, min_popularity: int
-) -> Tuple[List[Tuple[ReactionContainer, List[int]]], Dict[str, int]]:
+    rules_stats: dict, min_popularity: int
+) -> tuple[list[tuple[ReactionContainer, list[int]]], dict[str, int]]:
     """
     Sorts reaction rules based on their popularity and validation status. This
     function sorts the given rules according to their popularity (i.e., the number of
@@ -705,13 +702,13 @@ def sort_rules(
 def _extract_rules_serial(
     config: RuleExtractionConfig,
     reaction_data_path: str,
-    rules_statistics: Dict[ReactionContainer, List[int]],
+    rules_statistics: dict[ReactionContainer, list[int]],
     *,
     ignore_errors: bool = False,
     error_file: TextIOWrapper | None = None,
     error_counts: Counter | None = None,
     fmt: str = "smi",
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """Serial rules extraction path used when a single CPU is requested.
 
     Returns ``(n_processed, n_multi_product)``.
@@ -746,8 +743,8 @@ def _extract_rules_serial(
 
 def _print_extraction_summary(
     n_processed: int,
-    sorted_rules: List[Tuple[ReactionContainer, List[int]]],
-    filter_stats: Dict[str, int],
+    sorted_rules: list[tuple[ReactionContainer, list[int]]],
+    filter_stats: dict[str, int],
     error_counts: Counter,
     error_file_path: Path | None,
 ) -> None:
@@ -932,7 +929,7 @@ def extract_rules_from_reactions(
                 for m in rule.reactants
             )
             products = tuple(rule.products)
-            reactor = Reactor(patterns=patterns, products=products)
+            reactor = Reactor(patterns=patterns, products=products, delete_atoms=False)
             smarts_str = str(reactor)
             tsv_file.write(
                 f"{smarts_str}\t{len(indices)}\t{','.join(map(str, indices))}\n"

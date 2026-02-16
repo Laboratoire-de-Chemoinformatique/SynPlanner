@@ -481,7 +481,7 @@ def value_network_tuning_cli(
 ):
     """Value network tuning."""
 
-    with open(config_path, "r", encoding="utf-8") as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     policy_config = PolicyNetworkConfig.from_dict(config["node_expansion"])
@@ -563,7 +563,7 @@ def planning_cli(
 ):
     """Retrosynthetic planning."""
 
-    with open(config_path, "r", encoding="utf-8") as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     search_config = {**config["tree"], **config["node_evaluation"]}
