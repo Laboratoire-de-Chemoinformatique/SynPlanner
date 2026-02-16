@@ -279,7 +279,7 @@ def _load_rules_tsv(file: str) -> tuple:
                 continue
             parts = line.split("\t")
             smarts_str = parts[0]
-            reactors.append(Reactor.from_smarts(smarts_str))
+            reactors.append(Reactor.from_smarts(smarts_str, delete_atoms=False))
     return tuple(reactors)
 
 
@@ -302,7 +302,7 @@ def _load_rules_pickle(file: str) -> tuple:
             products = tuple(
                 _convert_cgrtools_query_container(m) for m in rule.products
             )
-            converted.append(Reactor(patterns=patterns, products=products))
+            converted.append(Reactor(patterns=patterns, products=products, delete_atoms=False))
         reaction_rules = converted
 
     return tuple(reaction_rules)

@@ -394,7 +394,7 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
         molecule_substructure_as_query(m, m.atoms_numbers) for m in rule.reactants
     )
     products = tuple(rule.products)
-    reactor = Reactor(patterns=patterns, products=products)
+    reactor = Reactor(patterns=patterns, products=products, delete_atoms=False)
     try:
         for result_reaction in reactor(*reaction.reactants):  # unpack here
             result_products = []
@@ -929,7 +929,7 @@ def extract_rules_from_reactions(
                 for m in rule.reactants
             )
             products = tuple(rule.products)
-            reactor = Reactor(patterns=patterns, products=products)
+            reactor = Reactor(patterns=patterns, products=products, delete_atoms=False)
             smarts_str = str(reactor)
             tsv_file.write(
                 f"{smarts_str}\t{len(indices)}\t{','.join(map(str, indices))}\n"
