@@ -6,7 +6,7 @@ import re
 import uuid
 import zipfile
 
-from chython.files import SMILESRead
+from chython import smiles as smiles_parser
 from huggingface_hub.utils import disable_progress_bars
 import pandas as pd
 import streamlit as st
@@ -34,7 +34,6 @@ from synplan.utils.visualisation import (
 
 disable_progress_bars("huggingface_hub")
 
-smiles_parser = SMILESRead.create_parser(ignore=True)
 DEFAULT_MOL = "c1cc(ccc1Cl)C(CCO)NC(C2(CCN(CC2)c3c4cc[nH]c4ncn3)N)=O"
 
 

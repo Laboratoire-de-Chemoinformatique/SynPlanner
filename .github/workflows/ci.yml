@@ -51,9 +51,11 @@ jobs:
 
       - name: ⬆️Upload coverage artefact
         uses: actions/upload-artifact@v4
+        timeout-minutes: 5
         with:
           name: coverage-${{ matrix.python-version }}-${{ matrix.os }}
           path: coverage.xml
+          if-no-files-found: warn
 
   style:
     name: "Stylecheck (black)"
