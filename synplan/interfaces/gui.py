@@ -17,6 +17,7 @@ from synplan.chem.reaction_routes.route_cgr import *
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.search import extract_tree_stats
 from synplan.mcts.tree import Tree
+from synplan.route_quality.scorer import ProtectionRouteScorer
 from synplan.utils.config import TreeConfig
 from synplan.utils.loading import (
     download_preset,
@@ -400,6 +401,8 @@ def setup_planning_options():
                     )
                     evaluator = load_evaluation_function(eval_config)
 
+                    route_scorer = ProtectionRouteScorer.from_config()
+
                     tree = Tree(
                         target=target_molecule,
                         config=tree_config,
@@ -407,6 +410,7 @@ def setup_planning_options():
                         building_blocks=building_blocks,
                         expansion_function=policy_function,
                         evaluation_function=evaluator,
+                        route_scorer=route_scorer,
                     )
 
                     mcts_progress_text = "Running MCTS iterations..."

@@ -35,7 +35,8 @@ jobs:
         shell: bash
 
       - name: Publish to TestPyPI
+        continue-on-error: true
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
         run: |
-          uv publish --publish-url https://test.pypi.org/legacy/ --check-url https://test.pypi.org/simple/ --skip-existing --verbose dist/*
+          uv publish --publish-url https://test.pypi.org/legacy/ --check-url https://test.pypi.org/simple/ --verbose dist/*

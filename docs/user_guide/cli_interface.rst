@@ -20,19 +20,6 @@ Download a ready-to-use data preset from HuggingFace with all components needed 
     - ``preset`` - preset name (default: ``synplanner-article``).
     - ``save_to`` - the directory where downloaded data will be stored.
 
-Legacy download (deprecated)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. deprecated::
-   Use ``download_preset`` instead.
-
-.. code-block:: bash
-
-    synplan download_all_data --save_to synplan_data
-
-**Parameters**:
-    - ``save_to`` - the location where the downloaded data will be stored.
-
 Building blocks standardization
 -------------------------------
 It is crucial to standardize custom building blocks for compatibility with ``SynPlanner``.
@@ -82,17 +69,16 @@ Reaction rule extraction
 ---------------------------
 Reaction rules extraction should be performed for high-quality (cleaned, standardized, and filtered) reaction data
 to ensure the extraction of meaningful reaction rules. The specificity of extracted reaction rules can be adjusted by
-the configuration file (see the details here). The extracted reaction rules will be stored in a pickled list of reaction rules
-compatible with the CGRTools package.
+the configuration file (see the details here). The extracted reaction rules will be stored in TSV format (or legacy pickle format).
 
 .. code-block:: bash
 
-    synplan rule_extracting --config configs/extraction.yaml --input reaction_data_filtered.smi --output reaction_rules.pickle
+    synplan rule_extracting --config configs/extraction.yaml --input reaction_data_filtered.smi --output reaction_rules.tsv
 
 **Parameters**:
     - ``config`` - the path to the configuration file.
     - ``input`` - the path to the file (.smi or .rdf) with reactions for reaction rule extraction.
-    - ``output`` - the path to the file (.pickle) where extracted reactions rules to be stored.
+    - ``output`` - the path to the file (.tsv or .pickle) where extracted reaction rules will be stored.
 
 Policy networks training
 ---------------------------
@@ -103,7 +89,7 @@ types of policy networks is configured by the same configuration file (see the d
 
 .. code-block:: bash
 
-    synplan ranking_policy_training --config configs/policy.yaml --reaction_data reaction_data_filtered.smi --reaction_rules reaction_rules.pickle --results_dir ranking_policy_network
+    synplan ranking_policy_training --config configs/policy.yaml --reaction_data reaction_data_filtered.smi --reaction_rules reaction_rules.tsv --results_dir ranking_policy_network
 
 **Parameters**:
     - ``config`` - the path to the policy configuration file.
@@ -115,7 +101,7 @@ types of policy networks is configured by the same configuration file (see the d
 
 .. code-block:: bash
 
-    synplan filtering_policy_training --config configs/policy.yaml --molecule_data molecules_data.smi --reaction_rules reaction_rules.pickle --results_dir filtering_policy_network
+    synplan filtering_policy_training --config configs/policy.yaml --molecule_data molecules_data.smi --reaction_rules reaction_rules.tsv --results_dir filtering_policy_network
 
 **Parameters**:
     - ``config`` - the path to the policy configuration file.
@@ -125,14 +111,14 @@ types of policy networks is configured by the same configuration file (see the d
 
 Value network training
 ---------------------------
-Value neural networks (see the details here) can be used instead of rollout simulations I no evaluation in MCTS.
+Value neural networks (see the details here) can be used instead of rollout simulations for node evaluation in MCTS.
 The value network training involves the extracted reaction rules, trained policy network, and planning simulations.
 The architecture of the value network, planning parameters, and value network tuning parameters can be specified
 with the configuration file (see the details here).
 
 .. code-block:: bash
 
-    synplan value_network_tuning --config configs/tuning.yaml --targets targets.smi --reaction_rules reaction_rules.pickle --policy_network policy_network.ckpt --building_blocks building_blocks.smi --results_dir value_network
+    synplan value_network_tuning --config configs/tuning.yaml --targets targets.smi --reaction_rules reaction_rules.tsv --policy_network policy_network.ckpt --building_blocks building_blocks.smi --results_dir value_network
 
 **Parameters**:
     - ``config`` - the path to the configuration file.
@@ -148,7 +134,7 @@ Retrosynthetic planning can be performed in ``SynPlanner``.
 
 .. code-block:: bash
 
-    synplan planning --config configs/planning.yaml --targets targets.smi --reaction_rules reaction_rules.pickle --building_blocks building_blocks_stand.smi --policy_network policy_network.ckpt --results_dir planning_results
+    synplan planning --config configs/planning.yaml --targets targets.smi --reaction_rules reaction_rules.tsv --building_blocks building_blocks_stand.smi --policy_network policy_network.ckpt --results_dir planning_results
 
 **Parameters**:
     - ``config`` - the path to the configuration file.

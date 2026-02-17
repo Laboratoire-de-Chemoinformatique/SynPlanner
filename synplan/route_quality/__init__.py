@@ -33,6 +33,7 @@ from synplan.route_quality.protection.scanner import (
     RouteScanner,
 )
 from synplan.route_quality.protection.scorer import CompetingSitesScore
+from synplan.route_quality.scorer import ProtectionRouteScorer, RouteScorer
 
 __all__ = [
     "ProtectionConfig",
@@ -48,4 +49,6 @@ __all__ = [
     "IncompatibilityMatrix",
     "RouteScanner",
     "CompetingSitesScore",
+    "RouteScorer",
+    "ProtectionRouteScorer",
 ]

@@ -13,6 +13,7 @@ synplan.route\_quality.protection package
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 synplan.route\_quality.protection.config module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

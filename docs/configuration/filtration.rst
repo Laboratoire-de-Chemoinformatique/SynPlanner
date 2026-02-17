@@ -60,4 +60,4 @@ Run reaction filtration using the repository configuration in ``configs/filtrati
 .. note::
     1. If the reaction filter name is listed in the configuration file, it means that this filter will be activated.
     2. The order of filters listed in the configuration file defines the order of their application to the input reactions.
-    3. ASome filters requires additional parameters (e.g. ``small_molecules_config``).
+    3. Some filters require additional parameters (e.g. ``small_molecules_config``).

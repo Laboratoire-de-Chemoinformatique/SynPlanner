@@ -251,10 +251,11 @@ def load_reaction_rules(file: str) -> list[Reactor]:
     """Loads the reaction rules from a TSV or pickle file and converts them into a
     list of Reactor objects.
 
-    Supported formats:
-    - ``.tsv`` — tab-separated text with ``rule_smarts``, ``popularity``,
+    Supported formats
+
+    - ``.tsv`` -- tab-separated text with ``rule_smarts``, ``popularity``,
       ``reaction_indices`` columns (preferred).
-    - ``.pickle`` — legacy pickle format (deprecated).
+    - ``.pickle`` -- legacy pickle format (deprecated).
 
     :param file: The path to the file that stores the reaction rules.
     :return: A list of reaction rules as Reactor objects.

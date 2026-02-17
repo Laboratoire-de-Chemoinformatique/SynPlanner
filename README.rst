@@ -42,11 +42,11 @@ the synthesizability of intermediate products (value network).
 
 ``SynPlanner`` offers comprehensive capabilities for chemical synthesis planning:
 
-- ✅ **Ensure Data Quality:** Effortlessly standardize and filter raw chemical reaction data.
-- 🧪 **Customize Reaction Templates:** Extract versatile reaction rules (templates) with a wide array of options.
-- 🧠 **Advanced Model Training:** Train robust policy and value networks using both supervised and reinforcement learning techniques.
-- 🗺️ **Flexible Retrosynthesis:** Perform in-depth retrosynthetic planning with diverse MCTS-based search strategies.
-- 📊 **Intuitive Visualization:** Clearly visualize discovered synthetic paths and interact with an easy-to-use graphical user interface.
+- ✅ **Data Quality:** Standardize and filter raw chemical reaction data.
+- 🧪 **Reaction Templates:** Extract reaction rules (templates) with configurable specificity options.
+- 🧠 **Model Training:** Train policy and value networks using supervised and reinforcement learning techniques.
+- 🗺️ **Retrosynthesis:** Perform retrosynthetic planning with multiple MCTS-based search strategies.
+- 📊 **Visualization:** Visualize discovered synthetic paths and interact with a graphical user interface.
 
 📦 Installation
 =============================
@@ -130,16 +130,16 @@ If you have a question or want to report a bug, please submit an issue.
 =============================
 
 * `Tagir Akhmetshin <https://github.com/tagirshin>`_ - main developer and maintainer.
+* `Almaz Gilmullin <https://github.com/Protolaw>`_ - maintainer, implementation of the clustering module.
 
 👥 Contributors
 =============================
 
 * `Timur Madzhidov <tmadzhidov@gmail.com>`_ - key contributor, main initiator and inspirator of the project.
 * `Alexandre Varnek <varnek@unistra.fr>`_ - supervisor of the project.
-* `Dmitry Zankov <https://github.com/dzankov>`_ - data curation adoption, tutorials, documentation and reproducibility of the results.
-* `Almaz Gilmullin <https://github.com/Protolaw>`_  - implementation of the clustreing module.
-* `Philippe Gantzer <https://github.com/PGantzer>`_ - implementation of inital graphical user interface and unified writing module.
-* `Dmitry Babadeev <https://github.com/prog420>`_ - implementation of the inital retrosynthetic planning module and routes visualization.
+* `Dmitry Zankov <https://github.com/dzankov>`_ - data curation adoption, initial tutorials and documentation, SynPlanner article initial draft preparation, and reproducibility of the results.
+* `Philippe Gantzer <https://github.com/PGantzer>`_ - implementation of initial graphical user interface and unified writing module.
+* `Dmitry Babadeev <https://github.com/prog420>`_ - implementation of the initial retrosynthetic planning module and routes visualization.
 * `Anna Pinigina <anna.10081048@gmail.com>`_ - implementation of the rule extraction module.
 * `Milo Roucairol <https://github.com/RoucairolMilo>`_ - implementation of the various search strategies.
 * `Mikhail Volkov <https://github.com/mbvolkoff>`_ - help in testing and debugging the code.

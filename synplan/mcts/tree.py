@@ -12,6 +12,7 @@ from synplan.chem.reaction import Reaction, apply_reaction_rule
 from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.expansion import PolicyNetworkFunction
 from synplan.mcts.node import Node
+from synplan.route_quality.scorer import RouteScorer
 from synplan.utils.config import TreeConfig
 
 from .algorithm import (
@@ -46,6 +47,7 @@ class Tree:
         building_blocks: set[str],
         expansion_function: PolicyNetworkFunction,
         evaluation_function: EvaluationStrategy = None,
+        route_scorer: RouteScorer | None = None,
     ):
         """Initializes a tree object with optional parameters for tree search for target
         molecule.
@@ -57,6 +59,9 @@ class Tree:
         :param expansion_function: A loaded policy function.
         :param evaluation_function: An evaluation strategy. If None, a random
             evaluation strategy is used as default.
+        :param route_scorer: Optional post-search route scorer for
+            re-ranking winning routes.  When set, :meth:`route_score`
+            delegates to ``route_scorer.rescore(original, route)``.
         """
 
         # tree config parameters
@@ -72,6 +77,10 @@ class Tree:
 
         assert evaluation_function is not None, "Evaluation function is required"
         self.evaluator = evaluation_function
+
+        # post-search route re-ranking
+        self._route_scorer = route_scorer
+        self._rescore_cache: dict[int, float] = {}
 
         # tree initialization
         target_node = self._init_target_node(target)
@@ -382,20 +391,34 @@ class Tree:
 
     def route_score(self, node_id: int) -> float:
         """Calculates the score of a given route from the current node to the root node.
-        The score depends on cumulated node values nad the route length.
+        The score depends on cumulated node values and the route length.
+
+        When a ``route_scorer`` is set, the raw score is passed through
+        ``route_scorer.rescore(original, route)`` for post-search
+        re-ranking (e.g. protection-group penalty).
 
         :param node_id: The id of the current given node.
         :return: The route score.
         """
 
         cumulated_nodes_value, route_length = 0, 0
-        while node_id:
+        nid = node_id
+        while nid:
             route_length += 1
+            cumulated_nodes_value += self.nodes_total_value[nid]
+            nid = self.parents[nid]
 
-            cumulated_nodes_value += self.nodes_total_value[node_id]
-            node_id = self.parents[node_id]
+        original = cumulated_nodes_value / (route_length**2)
 
-        return cumulated_nodes_value / (route_length**2)
+        if self._route_scorer is None:
+            return original
+
+        if node_id not in self._rescore_cache:
+            route = self.synthesis_route(node_id)
+            self._rescore_cache[node_id] = self._route_scorer.rescore(
+                original, route
+            )
+        return self._rescore_cache[node_id]
 
     def route_to_node(self, node_id: int) -> list[Node,]:
         """Returns the route (list of id of nodes) to from the node current node to the

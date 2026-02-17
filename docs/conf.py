@@ -7,13 +7,17 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # General configuration
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints']
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon', 'sphinx.ext.intersphinx', 'nbsphinx', 'nbsphinx_link']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon', 'sphinx.ext.intersphinx', 'nbsphinx', 'nbsphinx_link', 'myst_parser']
 source_suffix = '.rst'
 master_doc = 'index'
 
 # nbsphinx configuration: do not execute notebooks during the build
 # This avoids long build times from heavy notebooks referenced via .nblink
 nbsphinx_execute = 'never'
+
+# Override nbsphinx's default which contains a lambda (unpickleable),
+# so Sphinx can cache the environment and do fast incremental builds
+nbsphinx_custom_formats = {}
 
 # General information about the project
 project = 'SynPlanner'
@@ -67,7 +71,8 @@ html_theme_options = {
 
 html_sidebars = {
     "get_started/*": [],  # hide left Section Navigation for Get started pages
-    "development": [],  
+    "development": [],
+    "release_notes": [],
 }
 
 # Static assets (for version switcher JSON, images, etc.)
@@ -78,3 +83,13 @@ html_css_files = ['css/custom.css']
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
 }
+
+# Autodoc settings
+autodoc_type_aliases = {
+    "Tree": "synplan.mcts.tree.Tree",
+}
+
+# Suppress warnings for modules that fail to import at doc-build time
+# (e.g. decompositions.py executes code at import that requires runtime deps)
+# Also suppress ambiguous cross-reference warnings for re-exported symbols (e.g. Tree)
+suppress_warnings = ["autodoc.import_object", "ref.python"]

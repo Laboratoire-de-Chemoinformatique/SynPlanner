@@ -7,7 +7,7 @@ Reaction rules
 Extraction protocol
 -----------------------------
 
-The protocol for reaction rule extraction in SynTool includes several steps:
+The protocol for reaction rule extraction in SynPlanner includes several steps:
 
 **1. CGR creation**
 
@@ -30,7 +30,7 @@ The extracted reaction center can be extended by the inclusion of neighboring at
 **4. Ring structures inclusion**
 
 If the reaction center atoms are part of ring structures or functional groups, they can be included in the reaction center.
-Ring structures are identified by the Smallest Set of Smallest Rings (SSSR) algorithm implemented in CGRTools.
+Ring structures are identified by the Smallest Set of Smallest Rings (SSSR) algorithm implemented in chython.
 If the ``include_rings`` parameter is ``True`` and any atom of the reaction center is part of the identified ring structure,
 the whole ring is included in the reaction center.
 

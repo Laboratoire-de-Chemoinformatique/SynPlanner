@@ -21,7 +21,7 @@ Run planning using the repository configuration in ``configs/planning.yaml``:
    synplan planning \
      --config configs/planning.yaml \
      --targets targets.smi \
-     --reaction_rules reaction_rules.pickle \
+     --reaction_rules reaction_rules.tsv \
      --building_blocks building_blocks_stand.smi \
      --policy_network policy_network.ckpt \
      --results_dir planning_results

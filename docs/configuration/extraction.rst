@@ -21,7 +21,7 @@ Extract rules using the repository configuration in ``configs/extraction.yaml``:
    synplan rule_extracting \
      --config configs/extraction.yaml \
      --input reaction_data_filtered.smi \
-     --output reaction_rules.pickle
+     --output reaction_rules.tsv
 
 **Configuration file**
 

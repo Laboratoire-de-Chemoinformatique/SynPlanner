@@ -36,8 +36,8 @@ Alternative Search Algorithms
 In addition to the standard UCT (Upper Confidence Tree) algorithm, ``SynPlanner`` supports several alternative search algorithms
 that can be selected via the ``algorithm`` configuration parameter.
 
-**Nested Monte Carlo Search (NMCS).** NMCS is a recursive search algorithm introduced by Cazenave (2009) that has shown
-superior performance in single-player optimization problems, including retrosynthesis planning. Unlike iterative MCTS,
+**Nested Monte Carlo Search (NMCS).** NMCS is a recursive search algorithm introduced by Cazenave (2009) for
+single-player optimization problems. Unlike iterative MCTS,
 NMCS performs a deterministic, nested search:
 
 - At **level 0**: A playout is performed using the configured mode (greedy, random, or policy-guided)
@@ -58,7 +58,7 @@ reduce the branching factor. For each decision point:
 1. All candidate moves are quickly evaluated using greedy playouts
 2. Only moves scoring above a configurable percentile threshold are explored with full NMCS recursion
 
-This approach significantly reduces computation time while maintaining search quality by focusing on the most promising branches.
+This approach reduces computation time while maintaining search quality by focusing on the most promising branches.
 
 Configuration parameters:
 

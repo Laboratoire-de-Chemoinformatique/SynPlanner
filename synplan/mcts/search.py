@@ -14,6 +14,7 @@ from synplan.chem.reaction_routes.io import write_routes_csv, write_routes_json
 from synplan.chem.reaction_routes.route_cgr import extract_reactions
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.tree import Tree, TreeConfig
+from synplan.route_quality.scorer import RouteScorer
 from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.loading import (
     load_evaluation_function,
@@ -61,6 +62,7 @@ def run_search(
     reaction_rules_path: str,
     building_blocks_path: str,
     results_root: str = "search_results",
+    route_scorer: RouteScorer | None = None,
 ) -> None:
     """Performs a tree search on a set of target molecules using specified configuration
     and reaction rules, logging the results and statistics.
@@ -75,6 +77,8 @@ def run_search(
     :param building_blocks_path: The path to the file containing building blocks.
     :param results_root: The name of the folder where the results of the tree search
         will be saved.
+    :param route_scorer: Optional post-search route scorer for re-ranking
+        winning routes (e.g. ProtectionRouteScorer).
     :return: None.
     """
 
@@ -142,6 +146,7 @@ def run_search(
                     building_blocks=building_blocks,
                     expansion_function=policy_function,
                     evaluation_function=evaluation_function,
+                    route_scorer=route_scorer,
                 )
 
                 _ = list(tree)

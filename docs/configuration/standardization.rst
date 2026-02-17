@@ -47,7 +47,7 @@ Run reaction standardization using the repository configuration in ``configs/sta
     ================================== =================================================================================
     Reaction standardizer              Description
     ================================== =================================================================================
-    reaction_mapping_config            Maps atoms of the reaction using chython (chytorch)
+    reaction_mapping_config            Maps atoms of the reaction using chython
     functional_groups_config           Standardization of functional groups
     kekule_form_config                 Transform molecules to Kekule form when possible
     check_valence_config               Check atom valences

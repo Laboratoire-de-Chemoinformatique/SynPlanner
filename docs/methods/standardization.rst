@@ -10,13 +10,12 @@ Reaction mapping
 --------------------------------
 
 Reaction atom-to-atom (AAM) mapping in SynPlanner is performed with GraphormerMapper,
-a new algorithm for AAM based on a transformer neural network adopted for the direct processing of molecular graphs
+an algorithm for AAM based on a transformer neural network adopted for the direct processing of molecular graphs
 as sets of atoms and bonds, as opposed to SMILES/SELFIES sequence-based approaches, in combination with the
 Bidirectional Encoder Representations from Transformers (BERT) network. The graph transformer serves to extract molecular
 features that are tied to atoms and bonds. The BERT network is used for chemical transformation learning.
-In a benchmarking study, it was demonstrated [https://doi.org/10.1021/acs.jcim.2c00344] that GraphormerMapper
-is superior to the state-of-the-art IBM RxnMapper algorithm in the “Golden” benchmarking data set
-(total correctly mapped reactions 89.5% vs. 84.5%).
+In a benchmarking study [https://doi.org/10.1021/acs.jcim.2c00344], GraphormerMapper achieved 89.5% correctly
+mapped reactions on the "Golden" benchmarking data set, compared to 84.5% for IBM RxnMapper.
 
 Reaction standardization
 --------------------------------

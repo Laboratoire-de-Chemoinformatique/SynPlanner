@@ -7,9 +7,39 @@ parallel mapping with backpressure. Keep format-specific I/O utilities in
 
 from __future__ import annotations
 
+import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Any
 from collections.abc import Callable, Iterable, Iterator
+
+import torch
+
+
+def select_device(device: str | None = None) -> torch.device:
+    """Auto-detect best available device: cuda > mps > cpu.
+
+    Parameters
+    ----------
+    device
+        Explicit device string (e.g. ``"cuda"``, ``"mps"``, ``"cpu"``).
+        When *None* the best available accelerator is chosen automatically.
+
+    Returns
+    -------
+    torch.device
+    """
+    if device is not None:
+        return torch.device(device)
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
+def default_num_workers(cap: int = 8) -> int:
+    """Return a sensible default worker count, capped at *cap*."""
+    return min(os.cpu_count() or 4, cap)
 
 
 def process_pool_map_stream(

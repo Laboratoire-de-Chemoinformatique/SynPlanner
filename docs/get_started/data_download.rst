@@ -31,17 +31,6 @@ Python API:
    policy_path = paths["ranking_policy"]
    bb_path = paths["building_blocks"]
 
-Legacy download (deprecated)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. deprecated::
-   ``download_all_data`` downloads from the old flat-structured repo.
-   Use ``download_preset`` instead.
-
-.. code-block:: bash
-
-   synplan download_all_data --save_to synplan_data
-
 Details
 ~~~~~~~
 

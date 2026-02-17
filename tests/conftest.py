@@ -1,9 +1,15 @@
 from __future__ import annotations
+import os
 from pathlib import Path
 
 import pytest
 from chython import smiles
 from chython.containers import CGRContainer, ReactionContainer
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Force-exit after test session to prevent hanging from Ray/PyTorch daemon threads."""
+    os._exit(exitstatus)
 
 from synplan.chem.data.filtering import (
     ReactionFilterConfig,

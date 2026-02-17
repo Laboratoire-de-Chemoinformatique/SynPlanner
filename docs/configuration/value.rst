@@ -22,7 +22,7 @@ Run value network tuning using the repository configuration in ``configs/tuning.
    synplan value_network_tuning \
      --config configs/tuning.yaml \
      --targets targets.smi \
-     --reaction_rules reaction_rules.pickle \
+     --reaction_rules reaction_rules.tsv \
      --policy_network policy_network.ckpt \
      --building_blocks building_blocks.smi \
      --results_dir value_network
@@ -95,4 +95,5 @@ Run value network tuning using the repository configuration in ``configs/tuning.
     value_network:num_epoch                  The number of training epochs
     value_network:batch_size                 The size of the batch of input molecular graphs
     reinforcement:batch_size                 The size of the batch of target molecules used for planning simulation and value network update
+    reinforcement:num_simulations            The number of planning simulations per reinforcement learning iteration
     ======================================== ==========================================================

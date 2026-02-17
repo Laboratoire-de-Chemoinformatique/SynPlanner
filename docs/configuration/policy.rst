@@ -21,7 +21,7 @@ Train a policy network using the repository configuration in ``configs/policy.ya
    synplan ranking_policy_training \
      --config configs/policy.yaml \
      --reaction_data reaction_data_filtered.smi \
-     --reaction_rules reaction_rules.pickle \
+     --reaction_rules reaction_rules.tsv \
      --results_dir ranking_policy_network
 
 **Configuration file**
