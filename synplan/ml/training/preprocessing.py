@@ -1,20 +1,20 @@
 """Module containing functions for preparation of the training sets for policy and value
 network."""
 
-from abc import ABC
 import logging
 import os
 import pickle
+from abc import ABC
 from pathlib import Path
 from typing import Any
 
+import ray
+import torch
 from chython import smiles
 from chython.containers import MoleculeContainer
 from chython.exceptions import InvalidAromaticRing
 from chython.reactor import Reactor
-import ray
 from ray.util.queue import Empty, Queue
-import torch
 from torch import Tensor
 from torch_geometric.data import InMemoryDataset
 from torch_geometric.data.data import Data
@@ -422,9 +422,7 @@ def mol_to_matrix(molecule: MoleculeContainer) -> Tensor:
     return atoms_vectors
 
 
-def mol_to_pyg(
-    molecule: MoleculeContainer, canonicalize: bool = True
-) -> Data | None:
+def mol_to_pyg(molecule: MoleculeContainer, canonicalize: bool = True) -> Data | None:
     """Takes a list of molecules and returns a list of PyTorch Geometric graphs, a one-
     hot encoded vectors of the atoms, and a matrices of the bonds.
 

@@ -1,17 +1,18 @@
 """Module containing functions for loading reaction rules, building blocks and
 retrosynthetic models."""
 
+import contextlib
 import functools
 import logging
 import os
-from pathlib import Path, PurePosixPath
 import pickle
 import shutil
-from typing import TYPE_CHECKING, Union
 import warnings
-import yaml
 import zipfile
+from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING, Union
 
+import yaml
 from chython.files.SDFrw import SDFRead
 from chython.reactor.reactor import Reactor
 from huggingface_hub import hf_hub_download, snapshot_download
@@ -33,16 +34,16 @@ from synplan.utils.files import (
 from synplan.utils.parallel import process_pool_map_stream
 
 if TYPE_CHECKING:
-    from synplan.utils.config import (
-        ValueNetworkConfig,
-        PolicyNetworkConfig,
-        CombinedPolicyConfig,
-    )
+    from synplan.mcts.evaluation import EvaluationStrategy, ValueNetworkFunction
     from synplan.mcts.expansion import (
-        PolicyNetworkFunction,
         CombinedPolicyNetworkFunction,
+        PolicyNetworkFunction,
     )
-    from synplan.mcts.evaluation import ValueNetworkFunction, EvaluationStrategy
+    from synplan.utils.config import (
+        CombinedPolicyConfig,
+        PolicyNetworkConfig,
+        ValueNetworkConfig,
+    )
 
 REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner-data"
 LEGACY_REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
@@ -273,7 +274,7 @@ def _load_rules_tsv(file: str) -> tuple:
     """Load reaction rules from a TSV file."""
     reactors = []
     with open(file, encoding="utf-8") as f:
-        header = f.readline()  # skip header
+        f.readline()  # skip header
         for line in f:
             line = line.rstrip("\n")
             if not line:
@@ -303,7 +304,9 @@ def _load_rules_pickle(file: str) -> tuple:
             products = tuple(
                 _convert_cgrtools_query_container(m) for m in rule.products
             )
-            converted.append(Reactor(patterns=patterns, products=products, delete_atoms=False))
+            converted.append(
+                Reactor(patterns=patterns, products=products, delete_atoms=False)
+            )
         reaction_rules = converted
 
     return tuple(reaction_rules)
@@ -422,10 +425,8 @@ def load_building_blocks(
         elif suffix == ".sdf":
             with SDFRead(str(building_blocks_path)) as sdf:
                 for mol in sdf:
-                    try:
+                    with contextlib.suppress(Exception):
                         building_blocks_smiles.add(str(mol))
-                    except Exception:
-                        pass
 
     return frozenset(building_blocks_smiles)
 
@@ -556,7 +557,7 @@ def load_combined_policy_function(
         ... )
     """
     from synplan.mcts.expansion import CombinedPolicyNetworkFunction
-    from synplan.utils.config import PolicyNetworkConfig, CombinedPolicyConfig
+    from synplan.utils.config import CombinedPolicyConfig, PolicyNetworkConfig
 
     # Priority 1: Use CombinedPolicyConfig
     if combined_config is not None:
@@ -696,18 +697,18 @@ def load_evaluation_function(eval_config) -> "EvaluationStrategy":
         >>> evaluator = load_evaluation_function(config)
     """
     from synplan.mcts.evaluation import (
-        RolloutEvaluationStrategy,
-        ValueNetworkEvaluationStrategy,
-        RDKitEvaluationStrategy,
         PolicyEvaluationStrategy,
         RandomEvaluationStrategy,
+        RDKitEvaluationStrategy,
+        RolloutEvaluationStrategy,
+        ValueNetworkEvaluationStrategy,
     )
     from synplan.utils.config import (
-        RolloutEvaluationConfig,
-        ValueNetworkEvaluationConfig,
-        RDKitEvaluationConfig,
         PolicyEvaluationConfig,
         RandomEvaluationConfig,
+        RDKitEvaluationConfig,
+        RolloutEvaluationConfig,
+        ValueNetworkEvaluationConfig,
     )
 
     logger.debug(f"create_evaluator config_type={type(eval_config).__name__}")

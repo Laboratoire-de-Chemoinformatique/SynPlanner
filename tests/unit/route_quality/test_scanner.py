@@ -50,25 +50,33 @@ def scanner_with_halogens(fg_detector, matrix, halogen_detector):
 
 def test_matrix_lookup_incompatible_pair(matrix):
     """Unprotected amino acid vs XKetone should be incompatible (2)."""
-    result = matrix.lookup("NonProlineAlphaAminoAcid_unprotected", "XKetoneAromaticBromide")
+    result = matrix.lookup(
+        "NonProlineAlphaAminoAcid_unprotected", "XKetoneAromaticBromide"
+    )
     assert result == "incompatible"
 
 
 def test_matrix_lookup_compatible_pair(matrix):
     """Protected amino acid vs aldehyde should be compatible (0)."""
-    result = matrix.lookup("NonProlineAlphaAminoAcid_protected", "Aldehyde_SaturatedAliphatic")
+    result = matrix.lookup(
+        "NonProlineAlphaAminoAcid_protected", "Aldehyde_SaturatedAliphatic"
+    )
     assert result == "compatible"
 
 
 def test_matrix_lookup_competing_pair(matrix):
     """Unprotected amino acid vs aldehyde should be competing (1)."""
-    result = matrix.lookup("NonProlineAlphaAminoAcid_unprotected", "Aldehyde_SaturatedAliphatic")
+    result = matrix.lookup(
+        "NonProlineAlphaAminoAcid_unprotected", "Aldehyde_SaturatedAliphatic"
+    )
     assert result == "competing"
 
 
 def test_matrix_lookup_amine_vs_xketone(matrix):
     """Primary amine vs XKetone should be incompatible."""
-    result = matrix.lookup("Amine_Primary_SaturatedAliphatic", "XKetoneAliphaticBromide")
+    result = matrix.lookup(
+        "Amine_Primary_SaturatedAliphatic", "XKetoneAliphaticBromide"
+    )
     assert result == "incompatible"
 
 
@@ -80,7 +88,9 @@ def test_matrix_lookup_alcohol_vs_alcohol(matrix):
 
 def test_matrix_lookup_aldehyde_vs_amino_acid(matrix):
     """Aldehyde (competing) vs unprotected amino acid (reacting) should be competing."""
-    result = matrix.lookup("Aldehyde_SaturatedAliphatic", "NonProlineAlphaAminoAcid_unprotected")
+    result = matrix.lookup(
+        "Aldehyde_SaturatedAliphatic", "NonProlineAlphaAminoAcid_unprotected"
+    )
     assert result == "competing"
 
 
@@ -189,8 +199,7 @@ def test_scan_route_with_halogen_detector(scanner_with_halogens):
     # Reaction on a molecule with two Br atoms (same family)
     # Using mapped SMILES for a substitution on Br where another Br is competing
     rxn = smiles(
-        "[Br:1]c1ccc([Br:2])cc1.[CH3:3][Li:4]>>"
-        "[CH3:3]c1ccc([Br:2])cc1.[Li:4][Br:1]"
+        "[Br:1]c1ccc([Br:2])cc1.[CH3:3][Li:4]>>" "[CH3:3]c1ccc([Br:2])cc1.[Li:4][Br:1]"
     )
     route = {0: rxn}
     interactions, halogen_count = scanner_with_halogens.scan_route(route)

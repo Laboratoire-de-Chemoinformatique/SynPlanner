@@ -30,13 +30,17 @@ TEST_MOLECULES = {
 @pytest.fixture(scope="module")
 def data_paths():
     """Download preset data."""
-    return download_preset(preset_name="synplanner-article", save_to="./tutorials/synplan_data")
+    return download_preset(
+        preset_name="synplanner-article", save_to="./tutorials/synplan_data"
+    )
 
 
 @pytest.fixture(scope="module")
 def building_blocks(data_paths):
     """Load building blocks."""
-    return load_building_blocks(data_paths["building_blocks"], standardize=False, silent=True)
+    return load_building_blocks(
+        data_paths["building_blocks"], standardize=False, silent=True
+    )
 
 
 @pytest.fixture(scope="module")

@@ -8,16 +8,15 @@ from os.path import splitext
 from pathlib import Path
 
 import ray
-from tqdm.auto import tqdm
-
+from chython.containers.bonds import Bond, QueryBond
 from chython.containers.cgr import CGRContainer
 from chython.containers.molecule import MoleculeContainer
 from chython.containers.query import QueryContainer
 from chython.containers.reaction import ReactionContainer
-from chython.containers.bonds import QueryBond, Bond
-from chython.periodictable import QueryElement
 from chython.exceptions import InvalidAromaticRing
+from chython.periodictable import QueryElement
 from chython.reactor import Reactor
+from tqdm.auto import tqdm
 
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
 from synplan.chem.utils import reverse_reaction
@@ -629,7 +628,7 @@ def process_completed_batch(
 
     """
 
-    ready_id, running_id = ray.wait(list(futures.keys()), num_returns=1)
+    ready_id, _running_id = ray.wait(list(futures.keys()), num_returns=1)
     try:
         results, errors, n_multi_product = ray.get(ready_id[0])
     except Exception as exc:

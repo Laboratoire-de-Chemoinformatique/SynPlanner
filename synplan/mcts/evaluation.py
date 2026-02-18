@@ -149,7 +149,7 @@ class RolloutSimulator:
             # Sample one rule proportionally to probabilities
             probs = [c[0] for c in candidates]
             idx = random.choices(range(len(candidates)), weights=probs, k=1)[0]
-            prob, rule, rule_id = candidates[idx]
+            _prob, rule, rule_id = candidates[idx]
 
             # Try to apply the sampled rule
             for prods in self._apply_rule(current_precursor, rule):

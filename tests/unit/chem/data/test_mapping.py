@@ -93,7 +93,9 @@ class TestMappingCLI:
         assert "--device" in result.output
 
     def test_missing_input(self):
-        result = CliRunner().invoke(synplan, ["reaction_mapping", "--output", "out.smi"])
+        result = CliRunner().invoke(
+            synplan, ["reaction_mapping", "--output", "out.smi"]
+        )
         assert result.exit_code != 0
 
     def test_listed_in_help(self):

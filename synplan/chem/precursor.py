@@ -1,7 +1,6 @@
 """Module containing a class Precursor that represents a precursor (extend molecule object) in
 the search tree."""
 
-
 from chython.containers import MoleculeContainer
 
 from synplan.chem.utils import safe_canonicalization

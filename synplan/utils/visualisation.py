@@ -1,23 +1,23 @@
 """Module containing functions for analysis and visualization of the built tree."""
 
 import base64
-from itertools import count, islice
+import contextlib
 from collections import deque
-from typing import Any
 from datetime import datetime
+from itertools import count, islice, pairwise
+from typing import Any
 
 from chython import smiles as read_smiles
+from chython.algorithms.depict import _graph_svg, _render_config
 from chython.containers.molecule import MoleculeContainer
-from chython.algorithms.depict import _render_config, _graph_svg
+from IPython.display import HTML, display
 
+from synplan.chem.reaction_routes.io import make_dict
 from synplan.chem.reaction_routes.visualisation import (
     cgr_display,
     depict_custom_reaction,
 )
-from synplan.chem.reaction_routes.io import make_dict
 from synplan.mcts.tree import Tree
-
-from IPython.display import display, HTML
 
 
 def get_child_nodes(
@@ -84,7 +84,7 @@ def extract_routes(
             # Create graph for route
             nodes = tree.route_to_node(winning_node)
             graph, pred = {}, {}
-            for before, after in zip(nodes, nodes[1:]):
+            for before, after in pairwise(nodes):
                 before = before.curr_precursor.molecule
                 graph[before] = after = [x.molecule for x in after.new_precursors]
                 for x in after:
@@ -207,8 +207,8 @@ def render_svg(pred, columns, box_colors):
     for s, ps in graph.items():
         mid_x = float("-inf")
         for p in ps:
-            s_min_x, s_max, s_y = arrow_points[s][:3]  # s
-            p_min_x, p_max, p_y = arrow_points[p][:3]  # p
+            s_min_x, _s_max, s_y = arrow_points[s][:3]  # s
+            _p_min_x, p_max, p_y = arrow_points[p][:3]  # p
             p_max += 1
             mid = p_max + (s_min_x - p_max) / 3
             mid_x = max(mid_x, mid)
@@ -230,8 +230,8 @@ def render_svg(pred, columns, box_colors):
     ]
 
     for s, p in pred:
-        s_min_x, s_max, s_y = arrow_points[s][:3]
-        p_min_x, p_max, p_y = arrow_points[p][:3]
+        s_min_x, _s_max, s_y = arrow_points[s][:3]
+        _p_min_x, p_max, p_y = arrow_points[p][:3]
         p_max += 1
         mid_x = arrow_points[p][-1]  # p_max + (s_min_x - p_max) / 3
         arrow = f"""  <polyline points="{p_max:.2f} {p_y:.2f}, {mid_x:.2f} {p_y:.2f}, {mid_x:.2f} {s_y:.2f}, {s_min_x - 1.:.2f} {s_y:.2f}"
@@ -435,10 +435,7 @@ def generate_results_html(
     else:
         routes = tree.winning_nodes
     # HTML Tags
-    th = '<th style="text-align: left; background-color:#978785; border: 1px solid black; border-spacing: 0">'
     td = '<td style="text-align: left; border: 1px solid black; border-spacing: 0">'
-    font_red = "<font color='red' style='font-weight: bold'>"
-    font_green = "<font color='light-green' style='font-weight: bold'>"
     font_head = "<font style='font-weight: bold; font-size: 18px'>"
     font_normal = "<font style='font-weight: normal; font-size: 18px'>"
     font_close = "</font>"
@@ -481,7 +478,7 @@ def generate_results_html(
     <tbody>"""
 
     # Gather path data
-    table += f"<tr>{td}{font_normal}Target Molecule: {str(tree.nodes[1].curr_precursor)}{font_close}</td></tr>"
+    table += f"<tr>{td}{font_normal}Target Molecule: {tree.nodes[1].curr_precursor!s}{font_close}</td></tr>"
     table += f"<tr>{td}{font_normal}Tree Size: {len(tree)}{font_close} nodes</td></tr>"
     table += f"<tr>{td}{font_normal}Number of visited nodes: {len(tree.visited_nodes)}{font_close}</td></tr>"
     table += f"<tr>{td}{font_normal}Found paths: {len(routes)}{font_close}</td></tr>"
@@ -506,7 +503,7 @@ def generate_results_html(
         step = 1
         reactions = ""
         for synth_step in full_route:
-            reactions += f"<b>Step {step}:</b> {str(synth_step)}<br>"
+            reactions += f"<b>Step {step}:</b> {synth_step!s}<br>"
             step += 1
         # Concatenate all content of path
         route_score = round(tree.route_score(route), 3)
@@ -554,7 +551,8 @@ def html_top_routes_cluster(
     )
     html.append("</head><body><div class='container my-4'>")
     # Report header
-    html.append(f"""
+    html.append(
+        f"""
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1 class="mb-0">Best route from each cluster</h1>
         <div class="text-end" style="min-width:180px;">
@@ -562,7 +560,8 @@ def html_top_routes_cluster(
             <p class="mb-0" style="font-size: 1rem;">{created_time}</p>
         </div>
     </div>
-    """)
+    """
+    )
     html.append(f"<p><strong>Target molecule (SMILES):</strong> {target_smiles}</p>")
     html.append(f"<p><strong>Total number of routes:</strong> {total_routes}</p>")
     html.append(f"<p><strong>Total number of clusters:</strong> {total_clusters}</p>")
@@ -665,10 +664,8 @@ def routes_clustering_report(
              not found.
     """
     # --- Depict Settings ---
-    try:
+    with contextlib.suppress(Exception):
         MoleculeContainer.depict_settings(aam=bool(aam))
-    except Exception:
-        pass
 
     # --- Figure out what `source` is ---
     using_tree = False
@@ -701,7 +698,7 @@ def routes_clustering_report(
         # JSON mode: check if the route ID exists in the routes_dict
         routes_dict = make_dict(routes_json)
         for nid in cluster_route_ids:
-            if nid in routes_dict.keys():
+            if nid in routes_dict:
                 valid_routes.append(nid)
     if not valid_routes:
         return f"""
@@ -737,9 +734,7 @@ def routes_clustering_report(
             target_smiles = routes_json[valid_routes[0]]["smiles"]
 
     # --- HTML Templates & Tags ---
-    th = '<th style="text-align: left; background-color:#978785; border: 1px solid black; border-spacing: 0">'
     td = '<td style="text-align: left; border: 1px solid black; border-spacing: 0">'
-    font_head = "<font style='font-weight: bold; font-size: 18px'>"
     font_normal = "<font style='font-weight: normal; font-size: 18px'>"
     font_close = "</font>"
 
@@ -836,7 +831,7 @@ def routes_clustering_report(
             score = round(tree.route_score(route_id), 3)
             # build reaction list
             reac_html = "".join(
-                f"<b>Step {i+1}:</b> {str(r)}<br>" for i, r in enumerate(steps)
+                f"<b>Step {i+1}:</b> {r!s}<br>" for i, r in enumerate(steps)
             )
             header = f"Route {route_id} — {len(steps)} steps, score={score}"
             table += f"<tr><td><b>{header}</b></td></tr>"
@@ -847,7 +842,7 @@ def routes_clustering_report(
             svg = get_route_svg_from_json(routes_json, route_id)
             steps = routes_dict[route_id]
             reac_html = "".join(
-                f"<b>Step {i+1}:</b> {str(r)}<br>" for i, r in steps.items()
+                f"<b>Step {i+1}:</b> {r!s}<br>" for i, r in steps.items()
             )
 
             header = f"Route {route_id} — {len(steps)} steps"
@@ -866,7 +861,7 @@ def routes_clustering_report(
     return html
 
 
-def lg_table_2_html(subcluster, routes_to_display=[], if_display=True):
+def lg_table_2_html(subcluster, routes_to_display=None, if_display=True):
     """
     Generates an HTML table visualizing leaving groups (X) 'marks' for routes within a subcluster.
 
@@ -892,6 +887,8 @@ def lg_table_2_html(subcluster, routes_to_display=[], if_display=True):
         str: The generated HTML string for the table.
     """
     # Create HTML table header
+    if routes_to_display is None:
+        routes_to_display = []
     html = "<table style='border-collapse: collapse;'><tr><th style='border: 1px solid black; padding: 4px;'>Route ID</th>"
 
     # Extract all unique marks across all routes to form consistent columns
@@ -985,7 +982,7 @@ def group_lg_table_2_html_fixed(
         groups = [g for g in groups_to_display if g in grouped]
 
     # 2) collect all marks for the header
-    all_marks = sorted({m for rep in grouped.values() for m in rep.keys()})
+    all_marks = sorted({m for rep in grouped.values() for m in rep})
 
     # 3) build table start with auto layout
     html = [
@@ -1094,10 +1091,8 @@ def routes_subclustering_report(
              invalid.
     """
     # --- Depict Settings ---
-    try:
+    with contextlib.suppress(Exception):
         MoleculeContainer.depict_settings(aam=bool(aam))
-    except Exception:
-        pass
 
     # --- Figure out what `source` is ---
     using_tree = False
@@ -1163,9 +1158,7 @@ def routes_subclustering_report(
     # legend row omitted…
 
     # --- HTML Templates & Tags ---
-    th = '<th style="text-align: left; background-color:#978785; border: 1px solid black; border-spacing: 0">'
     td = '<td style="text-align: left; border: 1px solid black; border-spacing: 0">'
-    font_head = "<font style='font-weight: bold; font-size: 18px'>"
     font_normal = "<font style='font-weight: normal; font-size: 18px'>"
     font_close = "</font>"
 
@@ -1284,7 +1277,7 @@ def routes_subclustering_report(
             score = round(tree.route_score(route_id), 3)
             # build reaction list
             reac_html = "".join(
-                f"<b>Step {i+1}:</b> {str(r)}<br>" for i, r in enumerate(steps)
+                f"<b>Step {i+1}:</b> {r!s}<br>" for i, r in enumerate(steps)
             )
             header = f"Route {route_id} — {len(steps)} steps, score={score}"
             table += f"<tr><td><b>{header}</b></td></tr>"
@@ -1296,7 +1289,7 @@ def routes_subclustering_report(
             svg = get_route_svg_from_json(routes_json, route_id)
             steps = routes_dict[route_id]
             reac_html = "".join(
-                f"<b>Step {i+1}:</b> {str(r)}<br>" for i, r in steps.items()
+                f"<b>Step {i+1}:</b> {r!s}<br>" for i, r in steps.items()
             )
 
             header = f"Route {route_id} — {len(steps)} steps"

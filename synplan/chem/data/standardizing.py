@@ -5,19 +5,20 @@ https://github.com/Laboratoire-de-Chemoinformatique/Reaction_Data_Cleaning/blob/
 """
 
 from __future__ import annotations
+
+import logging
 from abc import ABC, abstractmethod
 from collections import Counter
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-import logging
 from pathlib import Path
 from typing import Any
-from collections.abc import Iterable, Sequence
 
+import ray
+import yaml
 from chython import smiles as smiles_chython
 from chython.containers import MoleculeContainer, ReactionContainer
-import ray
 from tqdm.auto import tqdm
-import yaml
 
 from synplan.chem.utils import unite_molecules
 from synplan.utils.config import ConfigABC
@@ -551,7 +552,7 @@ class SmallMoleculesConfig:
     def _validate_params(self, params: dict[str, Any]) -> None:
         """Validate configuration parameters."""
         mol_max_size = params.get("mol_max_size", self.mol_max_size)
-        if not isinstance(mol_max_size, int) or not (0 < mol_max_size):
+        if not isinstance(mol_max_size, int) or not (mol_max_size > 0):
             raise ValueError("Invalid 'mol_max_size'; expected an integer more than 1")
 
 
@@ -644,7 +645,7 @@ class RemoveReagentsConfig:
     def _validate_params(self, params: dict[str, Any]) -> None:
         """Validate configuration parameters."""
         reagent_max_size = params.get("reagent_max_size", self.reagent_max_size)
-        if not isinstance(reagent_max_size, int) or not (0 < reagent_max_size):
+        if not isinstance(reagent_max_size, int) or not (reagent_max_size > 0):
             raise ValueError(
                 "Invalid 'reagent_max_size'; expected an integer more than 1"
             )
@@ -1221,9 +1222,9 @@ def standardize_reactions_from_file(
         DEDUP_NAME = "duplicate_rxn_actor"
 
         try:
-            dedup_actor = ray.get_actor(DEDUP_NAME)  # already running?
+            ray.get_actor(DEDUP_NAME)  # already running?
         except ValueError:
-            dedup_actor = DedupActor.options(
+            DedupActor.options(
                 name=DEDUP_NAME, lifetime="detached"  # survives driver exit
             ).remote()
 
@@ -1281,7 +1282,8 @@ def standardize_reactions_from_file(
             ReactionWriter(output_path) as writer,
         ):
 
-            write_fn = lambda reactions: [writer.write(r) for r in reactions]
+            def write_fn(reactions):
+                return [writer.write(r) for r in reactions]
 
             # ---------------------  Main read/compute loop  -----------------
             for chunk in chunked(raw_reader, batch_size):

@@ -11,6 +11,7 @@ def pytest_sessionfinish(session, exitstatus):
     """Force-exit after test session to prevent hanging from Ray/PyTorch daemon threads."""
     os._exit(exitstatus)
 
+
 from synplan.chem.data.filtering import (
     ReactionFilterConfig,
     CCsp3BreakingConfig,

@@ -20,15 +20,24 @@ from queue import Queue
 from typing import Any
 
 import torch
-from numpy import argmax, array, concatenate, isclose, ix_, nonzero, ones, unravel_index, zeros
-from scipy.linalg import block_diag
-from torch.utils.data import DataLoader
-from tqdm.auto import tqdm
-
 from chython import smiles as parse_smiles
 from chython.containers import ReactionContainer
 from chytorch.utils.data import ReactionEncoderDataset, collate_encoded_reactions
 from chytorch.zoo.rxnmap import Model
+from numpy import (
+    argmax,
+    array,
+    concatenate,
+    isclose,
+    ix_,
+    nonzero,
+    ones,
+    unravel_index,
+    zeros,
+)
+from scipy.linalg import block_diag
+from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 
 from synplan.utils.config import ConfigABC
 from synplan.utils.files import count_smiles_records
@@ -40,6 +49,7 @@ _RECYCLE_WORKERS = sys.version_info >= (3, 11)  # max_tasks_per_child added in 3
 
 
 # -- Configuration -----------------------------------------------------------
+
 
 @dataclass
 class MappingConfig(ConfigABC):
@@ -81,6 +91,7 @@ class MappingConfig(ConfigABC):
 
 # -- Worker functions (module-level for ProcessPool pickling) ----------------
 
+
 def _parse_one(line: str):
     """Parse a single SMILES line → ``(ReactionContainer | None, error | None)``."""
     try:
@@ -120,14 +131,21 @@ def _side_info(molecules):
     """
     atom_map = [n for m in molecules for n in m]
     adj_blocks = [m.adjacency_matrix() for m in molecules]
-    adj = block_diag(*adj_blocks).astype(bool) if adj_blocks else zeros((0, 0), dtype=bool)
+    adj = (
+        block_diag(*adj_blocks).astype(bool)
+        if adj_blocks
+        else zeros((0, 0), dtype=bool)
+    )
     atomic_nums = array(
-        [a.atomic_number for m in molecules for _, a in m.atoms()], dtype=int,
+        [a.atomic_number for m in molecules for _, a in m.atoms()],
+        dtype=int,
     )
     # Role mask: [sep, sep, atoms..., sep, atoms..., ...]
-    mask = concatenate(
-        [[False], *[[False] + [True] * len(m) for m in molecules]]
-    ) if molecules else array([False])
+    mask = (
+        concatenate([[False], *[[False] + [True] * len(m) for m in molecules]])
+        if molecules
+        else array([False])
+    )
     return atom_map, adj, atomic_nums, mask
 
 
@@ -221,6 +239,7 @@ def _map_reaction(rxn, am, multiplier=1.75):
 
 # -- GPU inference -----------------------------------------------------------
 
+
 def _batched_attention(model, reactions, batch_size, device, use_amp=False):
     """Compute attention matrices for *reactions* using batched GPU inference."""
     if not reactions:
@@ -241,7 +260,9 @@ def _batched_attention(model, reactions, batch_size, device, use_amp=False):
 
     ds = ReactionEncoderDataset([reactions[i] for i in order])
     dl = DataLoader(
-        ds, batch_size=batch_size, shuffle=False,
+        ds,
+        batch_size=batch_size,
+        shuffle=False,
         collate_fn=collate_encoded_reactions,
     )
 
@@ -258,9 +279,9 @@ def _batched_attention(model, reactions, batch_size, device, use_amp=False):
         d_mask = d_mask.view(-1, 1, 1, n).expand(-1, model.nhead, n, -1)
 
         with amp_ctx:
-            x = model.molecule_encoder(
-                (atoms, neighbors, distances)
-            ) * (roles > 1).unsqueeze_(-1)
+            x = model.molecule_encoder((atoms, neighbors, distances)) * (
+                roles > 1
+            ).unsqueeze_(-1)
             x = x + model.role_encoder(roles)
             for lr in model.layers[:-1]:
                 x, _ = lr(x, d_mask)
@@ -284,6 +305,7 @@ def _batched_attention(model, reactions, batch_size, device, use_amp=False):
 
 # -- I/O helpers -------------------------------------------------------------
 
+
 def _read_chunks(path, chunk_size):
     """Yield ``(offset, lines)`` chunks without loading the whole file."""
     chunk, offset = [], 0
@@ -301,6 +323,7 @@ def _read_chunks(path, chunk_size):
 
 
 # -- Main pipeline -----------------------------------------------------------
+
 
 def map_reactions_from_file(
     config: MappingConfig,
@@ -348,7 +371,9 @@ def map_reactions_from_file(
     mapped_q: Queue = Queue(maxsize=4)
     stop = threading.Event()
     errors: dict[str, Exception | None] = {
-        "parser": None, "writer": None, "gpu": None,
+        "parser": None,
+        "writer": None,
+        "gpu": None,
     }
     stats = {"mapped": 0, "failed": 0}
 
@@ -392,7 +417,8 @@ def map_reactions_from_file(
 
                 results = (
                     list(pool.map(_map_and_format, zip(rxns, attns), chunksize=16))
-                    if rxns else []
+                    if rxns
+                    else []
                 )
 
                 out_lines = list(lines)
@@ -400,7 +426,9 @@ def map_reactions_from_file(
                     ci = idx[ri]
                     if smi is not None:
                         parts = lines[ci].split("\t", 1)
-                        out_lines[ci] = smi + ("\t" + parts[1] if len(parts) > 1 else "")
+                        out_lines[ci] = smi + (
+                            "\t" + parts[1] if len(parts) > 1 else ""
+                        )
                     else:
                         fails.append((ci, lines[ci], err))
 
@@ -437,7 +465,9 @@ def map_reactions_from_file(
         ):
             thr_p = threading.Thread(target=_parser, args=(pool,), daemon=True)
             thr_w = threading.Thread(
-                target=_writer, args=(pool, out, fail_out, pbar), daemon=True,
+                target=_writer,
+                args=(pool, out, fail_out, pbar),
+                daemon=True,
             )
             thr_p.start()
             thr_w.start()
@@ -454,7 +484,11 @@ def map_reactions_from_file(
                         try:
                             with torch.no_grad():
                                 attns = _batched_attention(
-                                    model, rxns, config.batch_size, dev, use_amp,
+                                    model,
+                                    rxns,
+                                    config.batch_size,
+                                    dev,
+                                    use_amp,
                                 )
                         except torch.cuda.OutOfMemoryError:
                             torch.cuda.empty_cache()

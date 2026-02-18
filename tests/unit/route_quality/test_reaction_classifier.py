@@ -32,9 +32,7 @@ def diels_alder():
 @pytest.fixture(scope="module")
 def bond_breaking_rxn():
     """Simple C-C bond breaking reaction."""
-    return smiles(
-        "[CH3:1][CH2:2][CH2:3][CH3:4]>>[CH3:1][CH3:2].[CH3:3][CH3:4]"
-    )
+    return smiles("[CH3:1][CH2:2][CH2:3][CH3:4]>>[CH3:1][CH3:2].[CH3:3][CH3:4]")
 
 
 # --- get_reaction_center_atoms tests ---
@@ -99,9 +97,7 @@ def test_classify_no_change():
 
 def test_classify_sn2_substitution():
     """SN2 substitution: bond formed + bond broken."""
-    rxn = smiles(
-        "[C-:3]#[N:4].[CH3:1][Br:2]>>[N:4]#[C:3][CH3:1].[Br-:2]"
-    )
+    rxn = smiles("[C-:3]#[N:4].[CH3:1][Br:2]>>[N:4]#[C:3][CH3:1].[Br-:2]")
     rtype = classify_reaction_type(rxn)
     assert rtype == "substitution"
 
@@ -122,7 +118,9 @@ def test_classify_returns_string():
 
 def test_broad_classifier_matches_default(esterification):
     """classify_reaction_type and classify_reaction_type_broad should agree."""
-    assert classify_reaction_type(esterification) == classify_reaction_type_broad(esterification)
+    assert classify_reaction_type(esterification) == classify_reaction_type_broad(
+        esterification
+    )
 
 
 # --- classify_reaction_type_detailed tests ---
@@ -136,9 +134,7 @@ def test_detailed_classifier_esterification(esterification):
 
 def test_detailed_classifier_sn2():
     """SN2 with cyanide should classify specifically."""
-    rxn = smiles(
-        "[C-:3]#[N:4].[CH3:1][Br:2]>>[N:4]#[C:3][CH3:1].[Br-:2]"
-    )
+    rxn = smiles("[C-:3]#[N:4].[CH3:1][Br:2]>>[N:4]#[C:3][CH3:1].[Br-:2]")
     rtype = classify_reaction_type_detailed(rxn)
     assert isinstance(rtype, str)
     # Could be alkylation, dehalogenation, or other specific type

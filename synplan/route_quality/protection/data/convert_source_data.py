@@ -19,17 +19,16 @@ directory containing the original .txt / .csv / .json files.
 
 import argparse
 import csv
-import json
 import shutil
 from collections import OrderedDict
 from pathlib import Path
 
 import yaml
 
-
 # ---------------------------------------------------------------------------
 # YAML representer for OrderedDict (preserves insertion order)
 # ---------------------------------------------------------------------------
+
 
 def _represent_ordereddict(dumper, data):
     return dumper.represent_mapping("tag:yaml.org,2002:map", data.items())
@@ -60,6 +59,7 @@ def _derive_halogen_family(name: str) -> str:
 # Converters
 # ---------------------------------------------------------------------------
 
+
 def convert_competing_groups(src_path: Path, dst_path: Path) -> int:
     """Convert protection_reactive_function_SMARTS.txt -> competing_groups.yaml.
 
@@ -84,7 +84,7 @@ def convert_competing_groups(src_path: Path, dst_path: Path) -> int:
     groups = OrderedDict()
     count = 0
 
-    with open(src_path, "r", encoding="utf-8") as fh:
+    with open(src_path, encoding="utf-8") as fh:
         reader = csv.reader(fh, delimiter="\t")
         for row in reader:
             if len(row) < 8:
@@ -126,8 +126,14 @@ def convert_competing_groups(src_path: Path, dst_path: Path) -> int:
     )
     with open(dst_path, "w", encoding="utf-8") as fh:
         fh.write(header)
-        yaml.dump(dict(groups), fh, default_flow_style=False, allow_unicode=True,
-                  sort_keys=False, width=200)
+        yaml.dump(
+            dict(groups),
+            fh,
+            default_flow_style=False,
+            allow_unicode=True,
+            sort_keys=False,
+            width=200,
+        )
 
     return count
 
@@ -148,7 +154,7 @@ def convert_halogen_groups(src_path: Path, dst_path: Path) -> int:
     halogens = OrderedDict()
     count = 0
 
-    with open(src_path, "r", encoding="utf-8") as fh:
+    with open(src_path, encoding="utf-8") as fh:
         reader = csv.reader(fh, delimiter="\t")
         for row in reader:
             if len(row) < 8:
@@ -188,8 +194,14 @@ def convert_halogen_groups(src_path: Path, dst_path: Path) -> int:
     )
     with open(dst_path, "w", encoding="utf-8") as fh:
         fh.write(header)
-        yaml.dump(dict(halogens), fh, default_flow_style=False, allow_unicode=True,
-                  sort_keys=False, width=200)
+        yaml.dump(
+            dict(halogens),
+            fh,
+            default_flow_style=False,
+            allow_unicode=True,
+            sort_keys=False,
+            width=200,
+        )
 
     return count
 
@@ -206,7 +218,7 @@ def convert_incompatibility_matrix(src_path: Path, dst_path: Path) -> int:
         First row: empty cell + N column names (tab-separated)
         Data rows: row_name + N values (tab-separated)
     """
-    with open(src_path, "r", encoding="utf-8") as fh:
+    with open(src_path, encoding="utf-8") as fh:
         reader = csv.reader(fh, delimiter="\t")
         rows = list(reader)
 
@@ -220,20 +232,23 @@ def convert_incompatibility_matrix(src_path: Path, dst_path: Path) -> int:
     with open(dst_path, "w", encoding="utf-8", newline="") as fh:
         writer = csv.writer(fh, delimiter="\t")
         # Header row: empty first cell + column names
-        writer.writerow([""] + header)
+        writer.writerow(["", *header])
         # Data rows: row name + values
         for i, data_row in enumerate(data_rows):
             if i >= n_cols:
                 break
             row_name = header[i]
-            writer.writerow([row_name] + data_row[:n_cols])
+            writer.writerow([row_name, *data_row[:n_cols]])
 
     return n_cols
 
 
 def copy_supporting_files(src_dir: Path, dst_dir: Path) -> None:
     """Copy protection_group_templates.csv and reactive_function_label_mapping.json."""
-    for name in ("protection_group_templates.csv", "reactive_function_label_mapping.json"):
+    for name in (
+        "protection_group_templates.csv",
+        "reactive_function_label_mapping.json",
+    ):
         src = src_dir / name
         dst = dst_dir / name
         if src.exists():
@@ -247,15 +262,23 @@ def copy_supporting_files(src_dir: Path, dst_dir: Path) -> None:
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Convert Westerlund dataset to SynPlanner YAML")
+    parser = argparse.ArgumentParser(
+        description="Convert Westerlund dataset to SynPlanner YAML"
+    )
     parser.add_argument("source_dir", help="Path to Westerlund dataset directory")
-    parser.add_argument("--output-dir", default=None,
-                        help="Output directory (default: same directory as this script)")
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Output directory (default: same directory as this script)",
+    )
     args = parser.parse_args()
 
     src_dir = Path(args.source_dir)
-    dst_dir = Path(args.output_dir) if args.output_dir else Path(__file__).resolve().parent
+    dst_dir = (
+        Path(args.output_dir) if args.output_dir else Path(__file__).resolve().parent
+    )
 
     if not src_dir.is_dir():
         parser.error(f"Source directory not found: {src_dir}")
@@ -286,14 +309,14 @@ def main():
     copy_supporting_files(src_dir, dst_dir)
 
     # 5. Sanity check: FG names in SMARTS should match matrix header
-    with open(fg_dst, "r", encoding="utf-8") as fh:
+    with open(fg_dst, encoding="utf-8") as fh:
         fg_data = yaml.safe_load(fh)
     fg_names = set()
     for entries in fg_data.values():
         for e in entries:
             fg_names.add(e["name"])
 
-    with open(mat_dst, "r", encoding="utf-8") as fh:
+    with open(mat_dst, encoding="utf-8") as fh:
         reader = csv.reader(fh, delimiter="\t")
         mat_header = next(reader)  # first cell is empty, rest are column names
         mat_names = set(mat_header[1:])
@@ -303,9 +326,13 @@ def main():
 
     print()
     if in_matrix_not_smarts:
-        print(f"WARNING: {len(in_matrix_not_smarts)} names in matrix but not in SMARTS: {in_matrix_not_smarts}")
+        print(
+            f"WARNING: {len(in_matrix_not_smarts)} names in matrix but not in SMARTS: {in_matrix_not_smarts}"
+        )
     if in_smarts_not_matrix:
-        print(f"WARNING: {len(in_smarts_not_matrix)} names in SMARTS but not in matrix: {in_smarts_not_matrix}")
+        print(
+            f"WARNING: {len(in_smarts_not_matrix)} names in SMARTS but not in matrix: {in_smarts_not_matrix}"
+        )
     if not in_matrix_not_smarts and not in_smarts_not_matrix:
         print(f"OK: all {len(fg_names)} FG names match between SMARTS and matrix")
 

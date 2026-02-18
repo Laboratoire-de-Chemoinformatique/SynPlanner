@@ -3,11 +3,11 @@ reading/writing."""
 
 import csv
 import gzip
+from collections.abc import Iterable, Iterator
 from io import StringIO
 from os.path import splitext
 from pathlib import Path
 from typing import TextIO
-from collections.abc import Iterable, Iterator
 
 from chython import smiles
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
@@ -218,9 +218,7 @@ def count_sdf_records(path: str | Path) -> int:
         return sum(1 for line in f if line.strip() == "$$$$")
 
 
-def iter_sdf_text_blocks(
-    path: str | Path, records_per_block: int
-) -> Iterator[str]:
+def iter_sdf_text_blocks(path: str | Path, records_per_block: int) -> Iterator[str]:
     """Yield SDF text blocks containing up to `records_per_block` molecules.
 
     Records are delimited by lines equal to '$$$$'. The block is a concatenated
@@ -288,9 +286,7 @@ def iter_smiles(path: str | Path) -> Iterator[str]:
             yield line.split()[0]
 
 
-def iter_smiles_blocks(
-    path: str | Path, records_per_block: int
-) -> Iterator[list[str]]:
+def iter_smiles_blocks(path: str | Path, records_per_block: int) -> Iterator[list[str]]:
     """Yield SMILES lists of up to `records_per_block` items from file."""
     step = max(1, records_per_block)
     block: list[str] = []
@@ -371,9 +367,7 @@ def count_rdf_records(path: str | Path) -> int:
         return sum(1 for line in f if line.startswith(("$RFMT", "$MFMT")))
 
 
-def iter_rdf_text_blocks(
-    path: str | Path, records_per_block: int
-) -> Iterator[str]:
+def iter_rdf_text_blocks(path: str | Path, records_per_block: int) -> Iterator[str]:
     """Yield RDF text blocks of up to `records_per_block` records.
 
     Each block is a string containing one or more $RFMT/$MFMT records,

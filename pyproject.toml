@@ -100,3 +100,40 @@ explicit = true
 name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+extend-exclude = ["synplan/chem/reaction_routes"]
+
+[tool.ruff.lint]
+select = [
+    "F",      # pyflakes
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # bugbear
+    "SIM",    # simplify
+    "RUF",    # ruff-specific
+]
+ignore = [
+    "E501",   # line too long — handled by black
+    "E722",   # bare except — to be addressed later
+    "B905",   # zip() without strict= — too noisy for scientific code
+    "SIM108", # ternary operator — sometimes if/else is clearer
+    "SIM115", # open-file-with-context-handler — needs refactoring
+    "RUF002", # ambiguous unicode in docstrings — non-breaking hyphens
+    "RUF003", # ambiguous unicode in comments — non-breaking hyphens
+    "RUF013", # implicit Optional — to be addressed later
+    "F405",   # names from star imports — to be addressed later
+    "F403",   # star imports — suppressed globally, per-file for __init__
+    "F821",   # undefined names — to be investigated
+    "B006",   # mutable argument default — to be addressed later
+    "B904",   # raise-without-from — to be addressed later
+    "RUF012", # mutable class default without ClassVar — to be addressed later
+    "SIM102", # collapsible-if — sometimes nested ifs are clearer
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]

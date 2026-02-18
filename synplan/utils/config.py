@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from chython import smarts
 import yaml
+from chython import smarts
 
 
 @dataclass

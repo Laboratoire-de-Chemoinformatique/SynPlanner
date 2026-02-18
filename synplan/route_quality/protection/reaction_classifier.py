@@ -6,7 +6,6 @@ functional group incompatibilities at each synthetic step.
 """
 
 import logging
-from typing import Optional, Set
 
 from chython.containers import ReactionContainer
 from chython.containers.cgr import CGRContainer
@@ -16,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 def get_reaction_center_atoms(
     reaction: ReactionContainer,
-    cgr: Optional[CGRContainer] = None,
-) -> Set[int]:
+    cgr: CGRContainer | None = None,
+) -> set[int]:
     """Extract atoms involved in bond or charge changes using CGR.
 
     Uses ``reaction.compose()`` to obtain the CGR, then returns atoms
@@ -165,7 +164,7 @@ def classify_reaction_type_detailed(
                     if a1 in center_atoms or a2 in center_atoms:
                         return True
         # Also check for C=O among changed bonds (order or p_order == 2)
-        for a1, a2, bond in info["changed_pairs"]:
+        for a1, a2, _bond in info["changed_pairs"]:
             syms = {atom_symbols.get(a1, ""), atom_symbols.get(a2, "")}
             if syms == {"C", "O"}:
                 return True
@@ -208,7 +207,7 @@ def classify_reaction_type_detailed(
     has_ring_opening = False
 
     # For ring closure, check if formed bond creates a cycle in products
-    for a1, a2, bond in info["formed_pairs"]:
+    for a1, a2, _bond in info["formed_pairs"]:
         # Check if both atoms are in the same ring in the CGR
         # (product-side ring membership)
         if a1 in center_atoms and a2 in center_atoms:
@@ -224,7 +223,7 @@ def classify_reaction_type_detailed(
         if has_ring_closure:
             break
 
-    for a1, a2, bond in info["broken_pairs"]:
+    for a1, a2, _bond in info["broken_pairs"]:
         try:
             for ring in cgr.sssr:
                 if a1 in ring and a2 in ring:
@@ -237,14 +236,14 @@ def classify_reaction_type_detailed(
 
     # Net bond order change for oxidation/reduction detection
     net_order_change = 0
-    for a1, a2, bond in info["changed_pairs"]:
+    for _a1, _a2, bond in info["changed_pairs"]:
         old_order = bond.order if bond.order is not None else 0
         new_order = bond.p_order if bond.p_order is not None else 0
         net_order_change += new_order - old_order
-    for a1, a2, bond in info["formed_pairs"]:
+    for _a1, _a2, bond in info["formed_pairs"]:
         new_order = bond.p_order if bond.p_order is not None else 0
         net_order_change += new_order
-    for a1, a2, bond in info["broken_pairs"]:
+    for _a1, _a2, bond in info["broken_pairs"]:
         old_order = bond.order if bond.order is not None else 0
         net_order_change -= old_order
 

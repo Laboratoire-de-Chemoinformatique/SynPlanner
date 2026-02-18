@@ -8,9 +8,9 @@ parallel mapping with backpressure. Keep format-specific I/O utilities in
 from __future__ import annotations
 
 import os
+from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Any
-from collections.abc import Callable, Iterable, Iterator
 
 import torch
 

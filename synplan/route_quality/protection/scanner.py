@@ -14,7 +14,6 @@ The competing-sites identification approach is inspired by the methodology of:
 import csv
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
 
 from chython.containers import ReactionContainer
 
@@ -45,8 +44,8 @@ class CompetingInteraction:
 
     step_id: int
     fg_name: str
-    fg_atoms: Tuple[int, ...]
-    reacting_fg: Optional[str]
+    fg_atoms: tuple[int, ...]
+    reacting_fg: str | None
     severity: str
 
 
@@ -62,8 +61,8 @@ class IncompatibilityMatrix:
     """
 
     def __init__(self, config_path: str):
-        self._matrix: Dict[str, Dict[str, int]] = {}
-        with open(config_path, "r", encoding="utf-8") as fh:
+        self._matrix: dict[str, dict[str, int]] = {}
+        with open(config_path, encoding="utf-8") as fh:
             reader = csv.reader(fh, delimiter="\t")
             header = next(reader)
             col_names = header[1:]  # skip empty first cell
@@ -106,15 +105,15 @@ class RouteScanner:
         self,
         fg_detector: FunctionalGroupDetector,
         incompatibility: IncompatibilityMatrix,
-        halogen_detector: Optional[HalogenDetector] = None,
+        halogen_detector: HalogenDetector | None = None,
     ):
         self._fg_detector = fg_detector
         self._incompatibility = incompatibility
         self._halogen_detector = halogen_detector
 
     def scan_route(
-        self, route: Dict[int, ReactionContainer]
-    ) -> Tuple[List[CompetingInteraction], int]:
+        self, route: dict[int, ReactionContainer]
+    ) -> tuple[list[CompetingInteraction], int]:
         """Walk a route step-by-step and collect competing interactions.
 
         For each step the scanner:
@@ -135,7 +134,7 @@ class RouteScanner:
             is a list of CompetingInteraction objects and halogen_count is
             the total number of same-family competing halogen sites.
         """
-        interactions: List[CompetingInteraction] = []
+        interactions: list[CompetingInteraction] = []
         total_halogen_count = 0
 
         for step_id in sorted(route):
@@ -151,9 +150,7 @@ class RouteScanner:
             try:
                 cgr = ~reaction
             except Exception:
-                logger.warning(
-                    "Could not compose CGR for step %d, skipping.", step_id
-                )
+                logger.warning("Could not compose CGR for step %d, skipping.", step_id)
                 continue
 
             # 3. Find reaction center atoms (reuse CGR)
@@ -176,16 +173,12 @@ class RouteScanner:
 
             # Fallback: check the product side if no reactant FG found
             if reacting_fg_name is None:
-                product_match = self._fg_detector.detect_reacting(
-                    product, center_atoms
-                )
+                product_match = self._fg_detector.detect_reacting(product, center_atoms)
                 if product_match is not None:
                     reacting_fg_name = product_match.name
 
             # 5. Detect competing FGs on product (not overlapping reaction center)
-            competing_fgs = self._fg_detector.detect_competing(
-                product, center_atoms
-            )
+            competing_fgs = self._fg_detector.detect_competing(product, center_atoms)
 
             # 6. Look up severity for each competing FG against reacting FG.
             #    If no reacting FG could be identified (reaction type not
@@ -193,9 +186,7 @@ class RouteScanner:
             #    since the matrix has no information for unknown FG pairs.
             for fg in competing_fgs:
                 if reacting_fg_name is not None:
-                    severity = self._incompatibility.lookup(
-                        fg.name, reacting_fg_name
-                    )
+                    severity = self._incompatibility.lookup(fg.name, reacting_fg_name)
                 else:
                     severity = "compatible"
                 interactions.append(
@@ -220,9 +211,9 @@ class RouteScanner:
 
     @staticmethod
     def classify_interactions(
-        interactions: List[CompetingInteraction],
+        interactions: list[CompetingInteraction],
         halogen_count: int = 0,
-    ) -> Tuple[int, int, int]:
+    ) -> tuple[int, int, int]:
         """Count interactions by severity category.
 
         :param interactions: List of CompetingInteraction objects.

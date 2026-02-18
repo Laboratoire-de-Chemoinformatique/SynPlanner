@@ -17,8 +17,8 @@ from synplan.mcts.tree import Tree, TreeConfig
 from synplan.route_quality.scorer import RouteScorer
 from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.loading import (
-    load_evaluation_function,
     load_building_blocks,
+    load_evaluation_function,
     load_policy_function,
     load_reaction_rules,
 )
@@ -50,7 +50,7 @@ def extract_tree_stats(
         "search_time": round(tree.curr_time, 1),
         "newick_tree": newick_tree,
         "newick_meta": newick_meta_line,
-        "solved": True if len(tree.winning_nodes) > 0 else False,
+        "solved": len(tree.winning_nodes) > 0,
     }
 
 

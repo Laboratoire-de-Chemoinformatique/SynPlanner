@@ -2,12 +2,11 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import yaml
 
 from synplan.utils.config import ConfigABC
-
 
 _DATA_DIR = Path(__file__).resolve().parent / "data"
 
@@ -35,16 +34,16 @@ class ProtectionConfig(ConfigABC):
     enable_reranking: bool = True
 
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "ProtectionConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "ProtectionConfig":
         return ProtectionConfig(**config_dict)
 
     @staticmethod
     def from_yaml(file_path: str) -> "ProtectionConfig":
-        with open(file_path, "r", encoding="utf-8") as fh:
+        with open(file_path, encoding="utf-8") as fh:
             config_dict = yaml.safe_load(fh)
         return ProtectionConfig.from_dict(config_dict)
 
-    def _validate_params(self, params: Dict[str, Any]) -> None:
+    def _validate_params(self, params: dict[str, Any]) -> None:
         # competing_groups_path
         if not isinstance(params["competing_groups_path"], str):
             raise ValueError("competing_groups_path must be a string.")

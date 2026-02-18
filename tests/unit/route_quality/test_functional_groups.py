@@ -125,11 +125,7 @@ def test_match_is_frozen():
 
 def test_detector_with_custom_yaml(tmp_path):
     """Detector should load from a custom YAML config."""
-    yaml_content = (
-        "custom_group:\n"
-        "  - name: test_alkene\n"
-        '    smarts: "C=C"\n'
-    )
+    yaml_content = "custom_group:\n" "  - name: test_alkene\n" '    smarts: "C=C"\n'
     cfg_file = tmp_path / "fg.yaml"
     cfg_file.write_text(yaml_content)
     det = FunctionalGroupDetector(str(cfg_file))
@@ -305,11 +301,7 @@ def test_count_same_family_no_center_halogens(halogen_detector):
 
 def test_halogen_detector_with_custom_yaml(tmp_path):
     """HalogenDetector should load from a custom YAML config."""
-    yaml_content = (
-        "test_chloride:\n"
-        '  smarts: "[Cl]C"\n'
-        "  family: chloride\n"
-    )
+    yaml_content = "test_chloride:\n" '  smarts: "[Cl]C"\n' "  family: chloride\n"
     cfg_file = tmp_path / "hal.yaml"
     cfg_file.write_text(yaml_content)
     det = HalogenDetector(str(cfg_file))

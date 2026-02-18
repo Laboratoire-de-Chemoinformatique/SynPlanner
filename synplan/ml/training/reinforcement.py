@@ -1,15 +1,15 @@
 """Module containing functions for running value network tuning with reinforcement learning
 approach."""
 
-from collections import defaultdict
 import os
-from pathlib import Path
 import random
+from collections import defaultdict
+from pathlib import Path
 from random import shuffle
 
+import torch
 from chython.containers import MoleculeContainer
 from pytorch_lightning import Trainer
-import torch
 from torch.utils.data import random_split
 from torch_geometric.data.lightning import LightningDataset
 
@@ -22,16 +22,16 @@ from synplan.utils.config import (
     TreeConfig,
     TuningConfig,
     ValueNetworkConfig,
+    ValueNetworkEvaluationConfig,
 )
-from synplan.utils.config import ValueNetworkEvaluationConfig
 from synplan.utils.files import MoleculeReader
 from synplan.utils.loading import (
     load_building_blocks,
+    load_evaluation_function,
     load_policy_function,
     load_reaction_rules,
     load_value_net,
 )
-from synplan.utils.loading import load_evaluation_function
 from synplan.utils.logging import DisableLogger, HiddenPrints
 
 

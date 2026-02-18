@@ -2,11 +2,11 @@
 
 import logging
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass
 from io import TextIOWrapper
 from pathlib import Path
 from typing import Any
-from collections.abc import Iterable
 
 import numpy as np
 import ray
@@ -16,9 +16,9 @@ from chython.containers import CGRContainer, MoleculeContainer, ReactionContaine
 from tqdm.auto import tqdm
 
 from synplan.chem.data.standardizing import (
-    StandardizationError,
     AromaticFormStandardizer,
     KekuleFormStandardizer,
+    StandardizationError,
 )
 from synplan.utils.config import ConfigABC, convert_config_to_dict
 from synplan.utils.files import RawReactionReader, ReactionWriter, parse_reaction
@@ -216,7 +216,7 @@ class SmallMoleculesFilter:
         return SmallMoleculesFilter(config.mol_max_size)
 
     def __call__(self, reaction: ReactionContainer) -> bool:
-        if (
+        return bool(
             (
                 len(reaction.reactants) == 1
                 and self.are_only_small_molecules(reaction.reactants)
@@ -229,9 +229,7 @@ class SmallMoleculesFilter:
                 self.are_only_small_molecules(reaction.reactants)
                 and self.are_only_small_molecules(reaction.products)
             )
-        ):
-            return True
-        return False
+        )
 
     def are_only_small_molecules(self, molecules: Iterable[MoleculeContainer]) -> bool:
         """Checks if all molecules in the given iterable are small molecules."""
@@ -435,15 +433,16 @@ class WrongCHBreakingFilter:
 
                 if is_c_h_breaking and is_c_c_formation:
                     # check for presence of heteroatoms in the first environment of 2 bonding carbons
-                    if any(
-                        cgr.atom(nid).atomic_symbol not in ("C", "H")
-                        for nid in cgr._bonds[c_with_h_id]
-                    ) or any(
-                        cgr.atom(nid).atomic_symbol not in ("C", "H")
-                        for nid in cgr._bonds[another_c_id]
-                    ):
-                        return False
-                    return True
+                    return not (
+                        any(
+                            cgr.atom(nid).atomic_symbol not in ("C", "H")
+                            for nid in cgr._bonds[c_with_h_id]
+                        )
+                        or any(
+                            cgr.atom(nid).atomic_symbol not in ("C", "H")
+                            for nid in cgr._bonds[another_c_id]
+                        )
+                    )
 
         return False
 
@@ -928,7 +927,7 @@ def process_completed_batch(
 
     """
 
-    ready_id, running_id = ray.wait(list(futures.keys()), num_returns=1)
+    ready_id, _running_id = ray.wait(list(futures.keys()), num_returns=1)
 
     try:
         completed_batch = ray.get(ready_id[0])

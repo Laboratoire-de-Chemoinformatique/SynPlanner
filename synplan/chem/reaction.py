@@ -1,8 +1,8 @@
 """Module containing classes and functions for manipulating reactions and reaction
 rules."""
 
-from typing import Any
 from collections.abc import Iterator
+from typing import Any
 
 from chython.containers import MoleculeContainer, ReactionContainer
 from chython.exceptions import InvalidAromaticRing

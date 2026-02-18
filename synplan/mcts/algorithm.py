@@ -1,9 +1,9 @@
-from time import time
-from random import choice, uniform
-from math import sqrt
 from abc import ABC, abstractmethod
-from typing import Literal, TYPE_CHECKING
 from bisect import bisect_right
+from math import sqrt
+from random import choice, uniform
+from time import time
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from .tree import Tree
@@ -53,7 +53,7 @@ class DepthThresholdsMixin:
             tree = getattr(self, "tree", None)
             if tree is not None and getattr(tree, "config", None) is not None:
                 try:
-                    max_depth = int(getattr(tree.config, "max_depth"))
+                    max_depth = int(tree.config.max_depth)
                     size = max(2, max_depth + 5)
                 except Exception:
                     size = 100

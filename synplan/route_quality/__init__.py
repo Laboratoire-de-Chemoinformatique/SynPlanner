@@ -36,19 +36,19 @@ from synplan.route_quality.protection.scorer import CompetingSitesScore
 from synplan.route_quality.scorer import ProtectionRouteScorer, RouteScorer
 
 __all__ = [
-    "ProtectionConfig",
+    "CompetingInteraction",
+    "CompetingSitesScore",
     "FunctionalGroupDetector",
     "FunctionalGroupMatch",
     "HalogenDetector",
     "HalogenMatch",
+    "IncompatibilityMatrix",
+    "ProtectionConfig",
+    "ProtectionRouteScorer",
+    "RouteScanner",
+    "RouteScorer",
     "classify_reaction_type",
     "classify_reaction_type_broad",
     "classify_reaction_type_detailed",
     "get_reaction_center_atoms",
-    "CompetingInteraction",
-    "IncompatibilityMatrix",
-    "RouteScanner",
-    "CompetingSitesScore",
-    "RouteScorer",
-    "ProtectionRouteScorer",
 ]

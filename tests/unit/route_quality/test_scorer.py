@@ -177,7 +177,7 @@ def test_score_with_halogen_count_partial():
     mock_scanner = MagicMock(spec=RouteScanner)
     mock_scanner.scan_route.return_value = (
         [],  # no FG interactions
-        1,   # 1 halogen
+        1,  # 1 halogen
     )
     scorer = CompetingSitesScore(mock_scanner)
     route = {0: MagicMock(), 1: MagicMock()}

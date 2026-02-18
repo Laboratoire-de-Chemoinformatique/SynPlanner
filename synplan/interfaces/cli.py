@@ -1,8 +1,8 @@
 """Module containing commands line scripts for training and planning steps."""
 
 import os
-from pathlib import Path
 import warnings
+from pathlib import Path
 
 import click
 import yaml
@@ -22,8 +22,8 @@ from synplan.ml.training.supervised import create_policy_dataset, run_policy_tra
 from synplan.utils.config import (
     PolicyEvaluationConfig,
     PolicyNetworkConfig,
-    RDKitEvaluationConfig,
     RandomEvaluationConfig,
+    RDKitEvaluationConfig,
     RolloutEvaluationConfig,
     RuleExtractionConfig,
     TreeConfig,
@@ -40,7 +40,8 @@ from synplan.utils.loading import (
 )
 
 try:
-    from importlib.metadata import PackageNotFoundError, version as _dist_version
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _dist_version
 except Exception:  # pragma: no cover
     _dist_version = None  # type: ignore[assignment]
     PackageNotFoundError = Exception  # type: ignore[assignment]
@@ -251,35 +252,63 @@ def reaction_filtering_cli(
 
 @synplan.command(name="reaction_mapping")
 @click.option(
-    "--config", "config_path", default=None, type=click.Path(exists=True),
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(exists=True),
     help="YAML configuration file (optional; defaults used if omitted).",
 )
 @click.option(
-    "--input", "input_file", required=True, type=click.Path(exists=True),
+    "--input",
+    "input_file",
+    required=True,
+    type=click.Path(exists=True),
     help="Path to the file with reactions to be mapped.",
 )
 @click.option(
-    "--output", "output_file", required=True, type=click.Path(),
+    "--output",
+    "output_file",
+    required=True,
+    type=click.Path(),
     help="Path to the file where mapped reactions will be stored.",
 )
-@click.option("--workers", "num_workers", default=0, type=int, help="CPU workers (0 = auto).")
 @click.option(
-    "--device", default=None, type=click.Choice(["cuda", "mps", "cpu"], case_sensitive=False),
+    "--workers", "num_workers", default=0, type=int, help="CPU workers (0 = auto)."
+)
+@click.option(
+    "--device",
+    default=None,
+    type=click.Choice(["cuda", "mps", "cpu"], case_sensitive=False),
     help="Torch device (default: auto-detect).",
 )
-@click.option("--no-amp", "no_amp", is_flag=True, help="Disable automatic mixed precision.")
-@click.option("--batch-size", "batch_size", default=None, type=int, help="GPU batch size.")
 @click.option(
-    "--ignore-errors/--no-ignore-errors", default=True,
+    "--no-amp", "no_amp", is_flag=True, help="Disable automatic mixed precision."
+)
+@click.option(
+    "--batch-size", "batch_size", default=None, type=int, help="GPU batch size."
+)
+@click.option(
+    "--ignore-errors/--no-ignore-errors",
+    default=True,
     help="Skip bad reactions instead of crashing (default: skip).",
 )
 @click.option(
-    "--error-file", "error_file", default=None, type=click.Path(),
+    "--error-file",
+    "error_file",
+    default=None,
+    type=click.Path(),
     help="Write failed reactions here. Default: <output>.errors.tsv",
 )
 def reaction_mapping_cli(
-    config_path, input_file, output_file, num_workers, device, no_amp,
-    batch_size, ignore_errors, error_file,
+    config_path,
+    input_file,
+    output_file,
+    num_workers,
+    device,
+    no_amp,
+    batch_size,
+    ignore_errors,
+    error_file,
 ):
     """Map reaction atoms using a neural attention model."""
     config = MappingConfig.from_yaml(config_path) if config_path else MappingConfig()

@@ -137,12 +137,10 @@ def test_clean_molecules(simple_esterification_reaction: ReactionContainer) -> N
 
     retention = {
         "reaction_center": {
-            k: True
-            for k in ("neighbors", "implicit_hydrogens", "ring_sizes")
+            k: True for k in ("neighbors", "implicit_hydrogens", "ring_sizes")
         },
         "environment": {
-            k: False
-            for k in ("neighbors", "implicit_hydrogens", "ring_sizes")
+            k: False for k in ("neighbors", "implicit_hydrogens", "ring_sizes")
         },
     }
 

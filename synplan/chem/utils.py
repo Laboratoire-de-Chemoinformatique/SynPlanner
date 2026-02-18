@@ -2,9 +2,10 @@
 protocols."""
 
 import logging
-from io import StringIO
 from collections.abc import Iterable
+from io import StringIO
 
+from chython import smiles as smiles_parser
 from chython.containers import (
     CGRContainer,
     MoleculeContainer,
@@ -15,7 +16,6 @@ from chython.exceptions import InvalidAromaticRing
 from chython.files.SDFrw import SDFRead
 from tqdm.auto import tqdm
 
-from chython import smiles as smiles_parser
 from synplan.utils.files import MoleculeReader, MoleculeWriter
 
 
@@ -187,15 +187,14 @@ def _standardize_sdf_text(block: str) -> list[str]:
     The block may contain one or multiple SDF records, separated by $$$$ lines.
     """
     out: list[str] = []
-    with StringIO(block) as fh:
-        with SDFRead(fh) as sdf:
-            for mol in sdf:
-                try:
-                    mol = safe_canonicalization(mol)
-                    out.append(str(mol))
-                except Exception:
-                    # ignore malformed entries
-                    pass
+    with StringIO(block) as fh, SDFRead(fh) as sdf:
+        for mol in sdf:
+            try:
+                mol = safe_canonicalization(mol)
+                out.append(str(mol))
+            except Exception:
+                # ignore malformed entries
+                pass
     return out
 
 

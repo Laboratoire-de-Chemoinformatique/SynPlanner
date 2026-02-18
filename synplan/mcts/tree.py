@@ -1,5 +1,6 @@
 """Module containing a class Tree that used for tree search of retrosynthetic routes."""
 
+import itertools
 import logging
 from time import time
 
@@ -16,12 +17,12 @@ from synplan.route_quality.scorer import RouteScorer
 from synplan.utils.config import TreeConfig
 
 from .algorithm import (
+    UCT,
     Beam,
     BestFirst,
     BreadthFirst,
     LazyNestedMonteCarlo,
     NestedMonteCarlo,
-    UCT,
 )
 
 ALGORITHMS = {
@@ -281,11 +282,11 @@ class Tree:
                     expanded = True
 
                     # TODO: Remove this once we have a better way to handle this
-                    if total_expanded > self.config.max_rules_applied and False:
+                    if False:
                         break
 
             # TODO: Remove this once we have a better way to handle this
-            if total_expanded > self.config.max_rules_applied and False:
+            if False:
                 break
 
         if not expanded and node_id == 1:
@@ -381,7 +382,7 @@ class Tree:
         """Returns the string representation of the tree."""
 
         return (
-            f"Tree for: {str(self.nodes[1].precursors_to_expand[0])}\n"
+            f"Tree for: {self.nodes[1].precursors_to_expand[0]!s}\n"
             f"Time: {round(self.curr_time, 1)} seconds\n"
             f"Number of nodes: {len(self)}\n"
             f"Number of iterations: {self.curr_iteration}\n"
@@ -415,9 +416,7 @@ class Tree:
 
         if node_id not in self._rescore_cache:
             route = self.synthesis_route(node_id)
-            self._rescore_cache[node_id] = self._route_scorer.rescore(
-                original, route
-            )
+            self._rescore_cache[node_id] = self._route_scorer.rescore(original, route)
         return self._rescore_cache[node_id]
 
     def route_to_node(self, node_id: int) -> list[Node,]:
@@ -449,7 +448,7 @@ class Tree:
                 [x.molecule for x in after.new_precursors],
                 [before.curr_precursor.molecule],
             )
-            for before, after in zip(nodes, nodes[1:])
+            for before, after in itertools.pairwise(nodes)
         ]
 
         for r in reaction_sequence:

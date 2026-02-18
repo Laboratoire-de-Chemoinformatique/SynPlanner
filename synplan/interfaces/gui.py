@@ -6,10 +6,9 @@ import re
 import uuid
 import zipfile
 
-from chython import smiles as smiles_parser
-from huggingface_hub.utils import disable_progress_bars
 import pandas as pd
 import streamlit as st
+from huggingface_hub.utils import disable_progress_bars
 from streamlit_ketcher import st_ketcher
 
 from synplan.chem.reaction_routes.clustering import *
@@ -201,11 +200,13 @@ def setup_sidebar():
 
 def handle_molecule_input():
     st.header("Molecule input")
-    st.markdown("""
+    st.markdown(
+        """
         You can provide a molecular structure by either providing:
         * SMILES string + Enter
         * Draw it + Apply
-        """)
+        """
+    )
 
     if "shared_smiles" not in st.session_state:
         st.session_state.shared_smiles = st.session_state.get("ketcher", DEFAULT_MOL)
@@ -269,10 +270,12 @@ def setup_planning_options():
     )
 
     st.subheader("Planning options")
-    st.markdown("""
+    st.markdown(
+        """
         The description of each option can be found in the
         [Retrosynthetic Planning Tutorial](https://synplanner.readthedocs.io/en/latest/tutorial_files/retrosynthetic_planning.html#Configuring-search-tree).
-        """)
+        """
+    )
 
     col_options_1, col_options_2 = st.columns(2, gap="medium")
     with col_options_1:
@@ -415,7 +418,7 @@ def setup_planning_options():
 
                     mcts_progress_text = "Running MCTS iterations..."
                     mcts_bar = st.progress(0, text=mcts_progress_text)
-                    for step, (solved, route_id) in enumerate(tree):
+                    for step, (_solved, _route_id) in enumerate(tree):
                         progress_value = min(
                             1.0, (step + 1) / planning_params["max_iterations"]
                         )
@@ -630,7 +633,7 @@ def download_clustering_results():
         num_clusters_total = len(clusters_for_html)
         clusters_items = list(clusters_for_html.items())
 
-        for i, (cluster_idx, group_data) in enumerate(clusters_items):
+        for i, (cluster_idx, _group_data) in enumerate(clusters_items):
             if i >= MAX_DOWNLOAD_LINKS_DISPLAYED:
                 break
             try:
@@ -732,13 +735,15 @@ def display_planning_and_clustering_results_unified():
         num_iter = res.get("num_iter", "—")
         search_time = res.get("search_time", "—")
 
-        st.markdown(f"""
+        st.markdown(
+            f"""
 - **Target SMILES**: `{smi}`
 - **Routes explored**: **{num_routes}**
 - **Tree nodes**: {num_nodes}
 - **MCTS iterations**: {num_iter}
 - **Search time**: {search_time} s
-""")
+"""
+        )
 
     with cluster_stat_col:
         st.subheader("Cluster summary")
@@ -753,10 +758,12 @@ def display_planning_and_clustering_results_unified():
         else:
             min_routes = max_routes = avg_routes = 0
 
-        st.markdown(f"""
+        st.markdown(
+            f"""
 - **Number of clusters**: **{n_clusters}**
 - **Routes per cluster**: min {min_routes}, max {max_routes}, avg {avg_routes:.1f}
-""")
+"""
+        )
 
         if clusters_dict:
             best_route_html = html_top_routes_cluster(

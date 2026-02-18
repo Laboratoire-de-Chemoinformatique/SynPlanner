@@ -7,7 +7,6 @@ strategies during synthesis.
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Set, Tuple
 
 import yaml
 from chython import smarts
@@ -28,7 +27,7 @@ class FunctionalGroupMatch:
 
     name: str
     category: str
-    atom_indices: Tuple[int, ...]
+    atom_indices: tuple[int, ...]
 
 
 class FunctionalGroupDetector:
@@ -46,12 +45,12 @@ class FunctionalGroupDetector:
     """
 
     def __init__(self, config_path: str):
-        self._patterns: List[Dict] = []
-        self._cache: Dict[str, List[FunctionalGroupMatch]] = {}
+        self._patterns: list[dict] = []
+        self._cache: dict[str, list[FunctionalGroupMatch]] = {}
         self._load_config(config_path)
 
     def _load_config(self, config_path: str) -> None:
-        with open(config_path, "r", encoding="utf-8") as fh:
+        with open(config_path, encoding="utf-8") as fh:
             raw = yaml.safe_load(fh)
 
         for category, entries in raw.items():
@@ -80,9 +79,7 @@ class FunctionalGroupDetector:
         """Return a canonical SMILES string suitable as a cache key."""
         return format(molecule, "h")
 
-    def detect_all(
-        self, molecule: MoleculeContainer
-    ) -> List[FunctionalGroupMatch]:
+    def detect_all(self, molecule: MoleculeContainer) -> list[FunctionalGroupMatch]:
         """Detect all functional group matches in a molecule.
 
         Applies every loaded SMARTS pattern and returns deduplicated
@@ -98,8 +95,8 @@ class FunctionalGroupDetector:
         if cached is not None:
             return cached
 
-        matches: List[FunctionalGroupMatch] = []
-        seen: Set[Tuple[str, Tuple[int, ...]]] = set()
+        matches: list[FunctionalGroupMatch] = []
+        seen: set[tuple[str, tuple[int, ...]]] = set()
 
         for pat in self._patterns:
             query = pat["query"]
@@ -123,8 +120,8 @@ class FunctionalGroupDetector:
     def detect_competing(
         self,
         molecule: MoleculeContainer,
-        reaction_center_atoms: Set[int],
-    ) -> List[FunctionalGroupMatch]:
+        reaction_center_atoms: set[int],
+    ) -> list[FunctionalGroupMatch]:
         """Detect functional groups NOT overlapping with the reaction center.
 
         These are "competing" sites that may interfere with the intended
@@ -136,16 +133,14 @@ class FunctionalGroupDetector:
         """
         all_matches = self.detect_all(molecule)
         return [
-            m
-            for m in all_matches
-            if not set(m.atom_indices) & reaction_center_atoms
+            m for m in all_matches if not set(m.atom_indices) & reaction_center_atoms
         ]
 
     def detect_reacting(
         self,
         molecule: MoleculeContainer,
-        reaction_center_atoms: Set[int],
-    ) -> Optional[FunctionalGroupMatch]:
+        reaction_center_atoms: set[int],
+    ) -> FunctionalGroupMatch | None:
         """Detect the functional group at the reaction center.
 
         Returns the first FG whose atoms overlap with the reaction center,
@@ -177,7 +172,7 @@ class HalogenMatch:
 
     name: str
     family: str
-    atom_indices: Tuple[int, ...]
+    atom_indices: tuple[int, ...]
 
 
 class HalogenDetector:
@@ -191,11 +186,11 @@ class HalogenDetector:
     """
 
     def __init__(self, config_path: str):
-        self._patterns: List[Dict] = []
+        self._patterns: list[dict] = []
         self._load_config(config_path)
 
     def _load_config(self, config_path: str) -> None:
-        with open(config_path, "r", encoding="utf-8") as fh:
+        with open(config_path, encoding="utf-8") as fh:
             raw = yaml.safe_load(fh)
 
         for name, entry in raw.items():
@@ -219,16 +214,14 @@ class HalogenDetector:
                 }
             )
 
-    def detect_all(
-        self, molecule: MoleculeContainer
-    ) -> List[HalogenMatch]:
+    def detect_all(self, molecule: MoleculeContainer) -> list[HalogenMatch]:
         """Detect all halogen matches in a molecule.
 
         :param molecule: A chython MoleculeContainer to search.
         :return: List of HalogenMatch objects.
         """
-        matches: List[HalogenMatch] = []
-        seen: Set[Tuple[str, Tuple[int, ...]]] = set()
+        matches: list[HalogenMatch] = []
+        seen: set[tuple[str, tuple[int, ...]]] = set()
 
         for pat in self._patterns:
             query = pat["query"]
@@ -251,8 +244,8 @@ class HalogenDetector:
     def detect_competing_halogens(
         self,
         molecule: MoleculeContainer,
-        reaction_center_atoms: Set[int],
-    ) -> List[HalogenMatch]:
+        reaction_center_atoms: set[int],
+    ) -> list[HalogenMatch]:
         """Detect halogen groups NOT overlapping with the reaction center.
 
         :param molecule: A chython MoleculeContainer to search.
@@ -261,16 +254,14 @@ class HalogenDetector:
         """
         all_matches = self.detect_all(molecule)
         return [
-            m
-            for m in all_matches
-            if not set(m.atom_indices) & reaction_center_atoms
+            m for m in all_matches if not set(m.atom_indices) & reaction_center_atoms
         ]
 
     def detect_reaction_center_halogens(
         self,
         molecule: MoleculeContainer,
-        reaction_center_atoms: Set[int],
-    ) -> List[HalogenMatch]:
+        reaction_center_atoms: set[int],
+    ) -> list[HalogenMatch]:
         """Detect halogen groups overlapping with the reaction center.
 
         :param molecule: A chython MoleculeContainer to search.
@@ -278,16 +269,12 @@ class HalogenDetector:
         :return: List of HalogenMatch objects at the reaction center.
         """
         all_matches = self.detect_all(molecule)
-        return [
-            m
-            for m in all_matches
-            if set(m.atom_indices) & reaction_center_atoms
-        ]
+        return [m for m in all_matches if set(m.atom_indices) & reaction_center_atoms]
 
     def count_same_family_competing(
         self,
         molecule: MoleculeContainer,
-        reaction_center_atoms: Set[int],
+        reaction_center_atoms: set[int],
     ) -> int:
         """Count competing halogens in the same family as reaction center halogens.
 
@@ -309,6 +296,4 @@ class HalogenDetector:
         competing_halogens = self.detect_competing_halogens(
             molecule, reaction_center_atoms
         )
-        return sum(
-            1 for h in competing_halogens if h.family in center_families
-        )
+        return sum(1 for h in competing_halogens if h.family in center_families)

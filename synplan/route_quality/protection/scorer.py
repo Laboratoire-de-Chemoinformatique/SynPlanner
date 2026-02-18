@@ -17,8 +17,6 @@ This avoids overwhelming the score when drug-like molecules contain
 many functional groups that each trigger a matrix lookup.
 """
 
-from typing import Dict, List, Optional, Tuple
-
 from chython.containers import ReactionContainer
 
 from synplan.route_quality.protection.scanner import CompetingInteraction, RouteScanner
@@ -53,8 +51,8 @@ class CompetingSitesScore:
         self._scanner = scanner
 
     def score_route(
-        self, route: Dict[int, ReactionContainer]
-    ) -> Tuple[float, List[CompetingInteraction]]:
+        self, route: dict[int, ReactionContainer]
+    ) -> tuple[float, list[CompetingInteraction]]:
         """Compute the S(T) score for a single route.
 
         :param route: A dict mapping step_id -> ReactionContainer.
@@ -64,7 +62,7 @@ class CompetingSitesScore:
         interactions, halogen_count = self._scanner.scan_route(route)
 
         # Worst-per-step: each step contributes at most max(severity).
-        step_worst: Dict[int, float] = {}
+        step_worst: dict[int, float] = {}
         for inter in interactions:
             p = self._SEVERITY_PENALTY.get(inter.severity, 0.0)
             if inter.step_id not in step_worst or p > step_worst[inter.step_id]:
@@ -77,10 +75,10 @@ class CompetingSitesScore:
 
     def rank_routes(
         self,
-        routes: Dict[int, Dict[int, ReactionContainer]],
-        existing_scores: Optional[Dict[int, float]] = None,
+        routes: dict[int, dict[int, ReactionContainer]],
+        existing_scores: dict[int, float] | None = None,
         weight: float = 0.5,
-    ) -> List[Tuple[int, float, float, float]]:
+    ) -> list[tuple[int, float, float, float]]:
         """Rank routes by a combined score mixing original and protection scores.
 
         combined = (1 - weight) * original_score_normalized + weight * S(T)
@@ -104,19 +102,22 @@ class CompetingSitesScore:
             max_score = max(existing_scores.values())
             if max_score <= 0:
                 max_score = 1.0
-            norm_scores = {
-                rid: s / max_score for rid, s in existing_scores.items()
-            }
+            norm_scores = {rid: s / max_score for rid, s in existing_scores.items()}
         else:
             norm_scores = {}
 
-        results: List[Tuple[int, float, float, float]] = []
+        results: list[tuple[int, float, float, float]] = []
         for route_id, route in routes.items():
             protection_score, _ = self.score_route(route)
             original = norm_scores.get(route_id, 0.0)
             combined = (1.0 - weight) * original + weight * protection_score
             results.append(
-                (route_id, combined, protection_score, existing_scores.get(route_id, 0.0))
+                (
+                    route_id,
+                    combined,
+                    protection_score,
+                    existing_scores.get(route_id, 0.0),
+                )
             )
 
         results.sort(key=lambda x: x[1], reverse=True)
