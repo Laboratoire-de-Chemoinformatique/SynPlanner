@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 import visualize_tree as base_vis
+from synplan.chem.precursor import Precursor
 from synplan.mcts.tree import Tree
 
 
@@ -35,9 +36,41 @@ def _node_status(tree: Tree, node_id: int) -> str:
     if node is None:
         return "unknown"
     try:
-        return "leaf" if node.is_solved() else "intermediate"
+        try:
+            if getattr(tree, "children", {}).get(node_id):
+                return "intermediate"
+        except Exception:
+            pass
+        precursor = getattr(node, "curr_precursor", None)
+        if precursor is None:
+            precursor = None
+        elif isinstance(precursor, (tuple, list, dict)) and len(precursor) == 0:
+            precursor = None
+        if precursor is not None and precursor.is_building_block(
+            tree.building_blocks, tree.config.min_mol_size
+        ):
+            return "leaf"
+
+        precursors_to_expand = getattr(node, "precursors_to_expand", None)
+        if precursors_to_expand:
+            try:
+                candidate = precursors_to_expand[0]
+            except Exception:
+                candidate = None
+            if candidate is not None and candidate.is_building_block(
+                tree.building_blocks, tree.config.min_mol_size
+            ):
+                return "leaf"
+        else:
+            new_precursors = getattr(node, "new_precursors", None) or ()
+            if new_precursors and all(
+                p.is_building_block(tree.building_blocks, tree.config.min_mol_size)
+                for p in new_precursors
+            ):
+                return "leaf"
     except Exception:
-        return "intermediate"
+        pass
+    return "intermediate"
 
 
 def _node_primary_smiles_and_svg(node, with_svg: bool) -> Tuple[Optional[str], Optional[str]]:
@@ -144,9 +177,8 @@ def _spread_product_positions(
     else:
         base_angle = math.atan2(dy, dx)
 
-    # Use a small ring whose radius grows gently with the product count.
-    ring_scale = 2.2 + 0.45 * math.sqrt(max(0, count - 1))
-    ring_radius = bubble_radius * ring_scale
+    # Keep same-tree bubbles overlapping by half of their size.
+    ring_radius = bubble_radius
 
     # Keep the primary (anchor) product at the base position to preserve layout.
     positions: List[Tuple[float, float]] = [(base_x, base_y)]
@@ -175,7 +207,7 @@ def _select_node_ids(tree: Tree, max_nodes: Optional[int]) -> List[int]:
 
 
 def _creation_steps(node_ids: Iterable[int], sample_step: int) -> Dict[int, int]:
-    sample_step = max(1, int(sample_step))
+    sample_step = 1
     ordered = sorted(set(int(nid) for nid in node_ids))
     steps: Dict[int, int] = {}
     for idx, node_id in enumerate(ordered):
@@ -368,6 +400,431 @@ def _scale_positions(
     return {node_id: (x * scale, y * scale) for node_id, (x, y) in positions.items()}
 
 
+def _reorder_children_for_layout(
+    children_map: Dict[int, List[int]],
+    leaf_counts: Dict[int, int],
+) -> Dict[int, List[int]]:
+    """Ensure the first non-extended child sits next to the extended child."""
+    reordered: Dict[int, List[int]] = {}
+    for parent_id, children in children_map.items():
+        if len(children) < 2:
+            reordered[parent_id] = list(children)
+            continue
+        expanded = [c for c in children if children_map.get(c)]
+        if not expanded:
+            reordered[parent_id] = list(children)
+            continue
+        unexpanded = [c for c in children if c not in expanded]
+        if not unexpanded:
+            reordered[parent_id] = list(children)
+            continue
+        pivot = max(expanded, key=lambda cid: leaf_counts.get(cid, 1))
+        first_unexpanded = unexpanded[0]
+        new_order: List[int] = []
+        for candidate in (pivot, first_unexpanded):
+            if candidate in children and candidate not in new_order:
+                new_order.append(candidate)
+        for child_id in children:
+            if child_id not in new_order:
+                new_order.append(child_id)
+        reordered[parent_id] = new_order
+    return reordered
+
+
+def _petal_layout_from_depth1(
+    children_map: Dict[int, List[int]],
+    nodes_depth: Dict[int, int],
+    parents: Dict[int, int],
+    *,
+    step: float,
+    bubble_radius: float,
+    root_id: int = 1,
+    arc_span: float = math.pi,
+    depth1_angles: Optional[Dict[int, float]] = None,
+) -> Dict[int, Tuple[float, float]]:
+    """Root uses a full circle; depth>=2 uses parent-centric 180° petals."""
+    if not children_map or root_id not in children_map:
+        return {}
+    if step <= 0:
+        return {}
+
+    positions: Dict[int, Tuple[float, float]] = {root_id: (0.0, 0.0)}
+    headings: Dict[int, float] = {}
+    bubble_size = max(0.0, float(bubble_radius) * 2.0)
+    radius_growth = float(step)  # grow radius_step by +step/2 per depth
+    min_dist_sq = (bubble_size) ** 2 if bubble_size > 0 else 0.0
+
+    # Depth 1: regular circle around the target.
+    depth1_children = [c for c in children_map.get(root_id, []) if nodes_depth.get(c) == 1]
+    if depth1_children:
+        if depth1_angles:
+            ordered = sorted(depth1_children, key=lambda cid: depth1_angles.get(cid, 0.0))
+        else:
+            ordered = list(depth1_children)
+        count = len(ordered)
+        step_angle = (2.0 * math.pi) / max(1, count)
+        start = -math.pi / 2.0
+        for idx, child_id in enumerate(ordered):
+            angle = depth1_angles.get(child_id, start + step_angle * idx) if depth1_angles else (start + step_angle * idx)
+            depth = int(nodes_depth.get(child_id, 1))
+            radius = float(step) + radius_growth * max(0, depth - 1)
+            x = radius * math.cos(angle)
+            y = radius * math.sin(angle)
+            positions[child_id] = (x, y)
+            headings[child_id] = angle
+
+    def _span_for_count(count: int) -> float:
+        # min_span = 2.0 * math.pi / 3.0  # 120 degrees
+        min_span = math.pi / 2.0  # 90 degrees
+        max_span = float(arc_span) if arc_span > 0 else math.pi
+        if count <= 25:
+            return min_span
+        if count >= 50:
+            return max_span
+        ratio = (count - 25) / 25.0
+        return min_span + (max_span - min_span) * ratio
+
+    queue: List[int] = [c for c in depth1_children if c in positions]
+    while queue:
+        parent_id = queue.pop(0)
+        children = children_map.get(parent_id, [])
+        if not children:
+            continue
+        parent_pos = positions.get(parent_id)
+        if parent_pos is None:
+            continue
+        px, py = parent_pos
+        grandparent_id = int(parents.get(parent_id, 0) or 0)
+        if grandparent_id in positions:
+            gx, gy = positions[grandparent_id]
+            center_angle = math.atan2(py - gy, px - gx)
+        else:
+            center_angle = headings.get(parent_id, 0.0)
+
+        span = _span_for_count(len(children))
+        count = len(children)
+        step_angle = span / max(1, count)
+        start = center_angle - span / 2.0 + step_angle / 2.0
+
+        sibling_positions: List[Tuple[float, float]] = []
+        for idx, child_id in enumerate(children):
+            depth = int(nodes_depth.get(child_id, nodes_depth.get(parent_id, 0) + 1))
+            angle = start + step_angle * idx
+            radius = float(step) + radius_growth * max(0, depth - 1)
+            attempts = 0
+            while bubble_size > 0 and attempts < 6:
+                x = px + radius * math.cos(angle)
+                y = py + radius * math.sin(angle)
+                overlap = False
+                for sx, sy in sibling_positions:
+                    dx = x - sx
+                    dy = y - sy
+                    if (dx * dx + dy * dy) < min_dist_sq:
+                        overlap = True
+                        break
+                if not overlap:
+                    break
+                radius += bubble_size
+                attempts += 1
+            x = px + radius * math.cos(angle)
+            y = py + radius * math.sin(angle)
+            positions[child_id] = (x, y)
+            headings[child_id] = angle
+            sibling_positions.append((x, y))
+            queue.append(child_id)
+
+    return positions
+
+
+def _collect_subtree_nodes(children_map: Dict[int, List[int]], root_id: int) -> Set[int]:
+    if root_id not in children_map:
+        return set()
+    collected: Set[int] = set()
+    stack = [root_id]
+    while stack:
+        node_id = stack.pop()
+        if node_id in collected:
+            continue
+        collected.add(node_id)
+        stack.extend(children_map.get(node_id, []))
+    return collected
+
+
+def _apply_depth2_parent_arc_gap(
+    positions: Dict[int, Tuple[float, float]],
+    children_map: Dict[int, List[int]],
+    nodes_depth: Dict[int, int],
+    *,
+    bubble_radius: float,
+    gap_diameters: float = 2.0,
+    root_id: int = 1,
+) -> Dict[int, Tuple[float, float]]:
+    """Insert an angular gap between depth-2 groups from different depth-1 parents."""
+    if not positions or not children_map or not nodes_depth:
+        return positions
+    if bubble_radius <= 0:
+        return positions
+
+    depth1_nodes = [n for n in children_map.get(root_id, []) if nodes_depth.get(n) == 1]
+    if len(depth1_nodes) < 2:
+        return positions
+
+    full_turn = 2.0 * math.pi
+
+    def _norm(angle: float) -> float:
+        return angle % full_turn
+
+    def _group_bounds(angles: List[float]) -> Tuple[float, float, float]:
+        if not angles:
+            return 0.0, 0.0, 0.0
+        if len(angles) == 1:
+            ang = _norm(angles[0])
+            return ang, ang, 0.0
+        angles = sorted(_norm(a) for a in angles)
+        gaps = [angles[i + 1] - angles[i] for i in range(len(angles) - 1)]
+        gaps.append(angles[0] + full_turn - angles[-1])
+        max_gap = max(gaps)
+        idx = gaps.index(max_gap)
+        start = angles[(idx + 1) % len(angles)]
+        end = angles[idx]
+        span = (end - start) % full_turn
+        return start, end, span
+
+    groups: List[Dict[str, object]] = []
+    for parent_id in depth1_nodes:
+        depth2_children = [
+            c
+            for c in children_map.get(parent_id, [])
+            if nodes_depth.get(c) == 2 and c in positions
+        ]
+        if not depth2_children:
+            continue
+        angles = [math.atan2(positions[c][1], positions[c][0]) for c in depth2_children]
+        start, end, span = _group_bounds(angles)
+        radius = sum(math.hypot(positions[c][0], positions[c][1]) for c in depth2_children) / len(
+            depth2_children
+        )
+        groups.append(
+            {
+                "parent": parent_id,
+                "depth2": depth2_children,
+                "start": start,
+                "end": end,
+                "span": span,
+                "radius": radius,
+                "order": min(depth2_children),
+            }
+        )
+
+    if len(groups) < 2:
+        return positions
+
+    groups.sort(key=lambda g: int(g["order"]))
+    bubble_size = bubble_radius * 2.0
+
+    updated = dict(positions)
+    cumulative_shift = 0.0
+    prev_end_unwrapped: Optional[float] = None
+
+    for group in groups:
+        start = float(group["start"])
+        span = float(group["span"])
+        radius = max(1e-6, float(group["radius"]))
+        gap_angle = (gap_diameters * bubble_size) / radius
+
+        base_start = start + cumulative_shift
+        if prev_end_unwrapped is not None:
+            while base_start < prev_end_unwrapped:
+                base_start += full_turn
+            min_start = prev_end_unwrapped + gap_angle
+            if base_start < min_start:
+                shift_needed = min_start - base_start
+                cumulative_shift += shift_needed
+                base_start += shift_needed
+        base_end = base_start + span
+        prev_end_unwrapped = base_end
+
+        if abs(cumulative_shift) < 1e-9:
+            continue
+
+        rotate_nodes: Set[int] = set()
+        for depth2_id in group["depth2"]:
+            rotate_nodes.update(_collect_subtree_nodes(children_map, int(depth2_id)))
+
+        if not rotate_nodes:
+            continue
+
+        delta = cumulative_shift % full_turn
+        cos_a = math.cos(delta)
+        sin_a = math.sin(delta)
+        for node_id in rotate_nodes:
+            if node_id not in updated:
+                continue
+            x, y = updated[node_id]
+            updated[node_id] = (x * cos_a - y * sin_a, x * sin_a + y * cos_a)
+
+    return updated
+
+
+def _apply_sibling_ladder_to_render_positions(
+    render_positions: Dict[int, Tuple[float, float]],
+    nodes_payload: List[Dict[str, object]],
+    *,
+    bubble_radius: float,
+) -> Dict[int, Tuple[float, float]]:
+    
+    num_layers = 4
+    """Apply a ladder shift for siblings that overlap."""
+    if not render_positions or not nodes_payload:
+        return render_positions
+    if bubble_radius <= 0:
+        return render_positions
+
+    updated = dict(render_positions)
+    bubble_size = bubble_radius * 2.0
+    twin_distance = bubble_radius  # twins spaced by one radius
+    min_distance_diff = bubble_radius * 2.0  # different tree ids at least one diameter apart
+    min_distance_diff_sq = min_distance_diff * min_distance_diff
+    arc_shift = bubble_size / 1.5
+
+    meta_by_id: Dict[int, Dict[str, object]] = {
+        int(node["id"]): node for node in nodes_payload if "id" in node
+    }
+    siblings_by_parent: Dict[int, List[int]] = {}
+    same_tree_groups: Dict[int, List[int]] = {}
+    for node_meta in nodes_payload:
+        try:
+            rid = int(node_meta.get("id", 0))
+            parent_id = int(node_meta.get("parent", 0))
+            tree_id = int(node_meta.get("tree_id", 0))
+        except Exception:
+            continue
+        siblings_by_parent.setdefault(parent_id, []).append(rid)
+        same_tree_groups.setdefault(tree_id, []).append(rid)
+
+    locked_same_tree: Set[int] = set()
+    for tree_id, group in same_tree_groups.items():
+        if len(group) < 2:
+            continue
+        anchor_id = tree_id if tree_id in group else group[0]
+        if anchor_id not in updated:
+            continue
+        ax, ay = updated[anchor_id]
+        r = math.hypot(ax, ay)
+        if r <= 1e-6:
+            continue
+        base_angle = math.atan2(ay, ax)
+        step_angle = 2.0 * math.asin(min(1.0, twin_distance / (2.0 * r)))
+        ordered = sorted(
+            group,
+            key=lambda rid: int(meta_by_id.get(rid, {}).get("product_index", 0)),
+        )
+        idx_offset = 0
+        for rid in ordered:
+            locked_same_tree.add(rid)
+            if rid == anchor_id:
+                continue
+            idx_offset += 1
+            angle = base_angle + step_angle * idx_offset
+            updated[rid] = (r * math.cos(angle), r * math.sin(angle))
+
+    for parent_id, render_ids in siblings_by_parent.items():
+        if len(render_ids) < 2:
+            continue
+        ordered_all = sorted(
+            [rid for rid in render_ids if rid in updated],
+            key=lambda rid: math.atan2(updated[rid][1], updated[rid][0]),
+        )
+        placed: List[int] = [rid for rid in ordered_all if rid in locked_same_tree]
+        ordered = [rid for rid in ordered_all if rid not in locked_same_tree]
+        layer_index = 0
+        arc_steps = 0
+
+        for rid in ordered:
+            x, y = updated[rid]
+            tree_id = None
+            try:
+                tree_id = int(meta_by_id.get(rid, {}).get("tree_id"))
+            except Exception:
+                tree_id = None
+            base_r = math.hypot(x, y)
+            base_angle = math.atan2(y, x)
+            attempts = 0
+            max_attempts = 12
+
+            while True:
+                too_close_diff = False
+                for placed_id in placed:
+                    ox, oy = updated[placed_id]
+                    dx = x - ox
+                    dy = y - oy
+                    if (dx * dx + dy * dy) <= min_distance_diff_sq:
+                        try:
+                            placed_tree_id = int(meta_by_id.get(placed_id, {}).get("tree_id"))
+                        except Exception:
+                            placed_tree_id = None
+                        if placed_tree_id is None or tree_id is None or placed_tree_id != tree_id:
+                            too_close_diff = True
+                            break
+
+                if not too_close_diff or attempts >= max_attempts:
+                    break
+
+                layer_index = (layer_index + 1) % num_layers
+                arc_steps += 1
+                
+                new_r = base_r + (layer_index * bubble_size)
+                angle = base_angle + ((arc_shift * arc_steps) / max(new_r, 1e-6))
+                x, y = (new_r * math.cos(angle), new_r * math.sin(angle))
+                attempts += 1
+
+            updated[rid] = (x, y)
+            if not too_close_diff:
+                layer_index = 0
+                arc_steps = 0
+
+            # Final on-the-fly arc shift to avoid any overlap at the same radius.
+            min_dist_sq = bubble_size * bubble_size
+            if base_r > 1e-9:
+                angle = math.atan2(y, x)
+                arc_step = bubble_size / max(base_r, 1e-6)
+                arc_attempts = 0
+                while arc_attempts < 24:
+                    overlap_any = False
+                    for placed_id in placed:
+                        ox, oy = updated[placed_id]
+                        dx = x - ox
+                        dy = y - oy
+                        try:
+                            placed_tree_id = int(meta_by_id.get(placed_id, {}).get("tree_id"))
+                        except Exception:
+                            placed_tree_id = None
+                        local_min_sq = min_dist_sq
+                        if placed_tree_id is not None and tree_id is not None and placed_tree_id == tree_id:
+                            local_min_sq = twin_distance * twin_distance
+                        if (dx * dx + dy * dy) <= local_min_sq:
+                            overlap_any = True
+                            break
+                    if not overlap_any:
+                        break
+                    angle += arc_step
+                    x, y = (base_r * math.cos(angle), base_r * math.sin(angle))
+                    arc_attempts += 1
+                updated[rid] = (x, y)
+            placed.append(rid)
+
+    for node_meta in nodes_payload:
+        try:
+            rid = int(node_meta.get("id", 0))
+        except Exception:
+            continue
+        if rid in updated:
+            node_meta["x"], node_meta["y"] = updated[rid]
+
+    return updated
+
+
+
 def _bounds_with_pad(
     positions: Dict[int, Tuple[float, float]],
     base_radius: float,
@@ -402,20 +859,35 @@ def _build_payload(
     nodes_depth_tree = base_vis._compute_depths(children_map)
     if not nodes_depth_tree:
         raise ValueError("Tree has no nodes to render.")
+    leaf_counts = base_vis._compute_subtree_leaf_counts(children_map)
+    layout_children_map = _reorder_children_for_layout(children_map, leaf_counts)
 
     num_nodes = len(nodes_depth_tree)
     base_radius = node_radius if node_radius is not None else _auto_node_radius(num_nodes)
     bubble_scale = max(0.1, float(bubble_scale))
     has_expandable_nodes = _has_expandable_nodes(tree, allowed_tree_nodes)
-    layout_positions = base_vis._radial_layout(
-        nodes_depth_tree,
-        children_map,
-        radius_step=radius_step,
-        node_radius=base_radius,
-    )
-    positions_tree = _scale_positions(layout_positions, render_scale)
     base_scaled_radius = base_radius * max(0.01, float(render_scale))
     bubble_radius = base_scaled_radius * bubble_scale
+    step_distance = float(radius_step) * max(0.01, float(render_scale))
+    angles = base_vis._assign_subtree_angles(layout_children_map, leaf_counts)
+    positions_tree = _petal_layout_from_depth1(
+        layout_children_map,
+        nodes_depth_tree,
+        getattr(tree, "parents", {}) or {},
+        step=step_distance,
+        bubble_radius=bubble_radius,
+        root_id=1,
+        arc_span= math.pi/2,
+        depth1_angles=angles,
+    )
+    positions_tree = _apply_depth2_parent_arc_gap(
+        positions_tree,
+        children_map,
+        nodes_depth_tree,
+        bubble_radius=bubble_radius,
+        gap_diameters=2.0,
+        root_id=1,
+    )
 
     winning_nodes = list(getattr(tree, "winning_nodes", []) or [])
     route_index_by_tree = {int(node_id): idx for idx, node_id in enumerate(winning_nodes)}
@@ -477,7 +949,16 @@ def _build_payload(
         render_ids: List[int] = []
         anchor_render_id = int(node_id)
         extra_counter = 0
-        for product_index, molecule in enumerate(molecules):
+        node_status = _node_status(tree, node_id)
+        if node_status == "leaf" and product_count > 1:
+            product_order = [i for i in range(product_count) if i != anchor_index] + [
+                anchor_index
+            ]
+        else:
+            product_order = list(range(product_count))
+
+        for product_index in product_order:
+            molecule = molecules[product_index]
             is_anchor = product_index == anchor_index
             if is_anchor:
                 render_id = int(node_id)
@@ -497,6 +978,15 @@ def _build_payload(
             render_steps[render_id] = int(tree_steps.get(node_id, 0))
 
             smiles, svg = _molecule_smiles_and_svg(molecule, with_svg=with_svg)
+            product_status = node_status
+            if molecule is not None:
+                try:
+                    if Precursor(molecule).is_building_block(
+                        tree.building_blocks, tree.config.min_mol_size
+                    ):
+                        product_status = "leaf"
+                except Exception:
+                    pass
             num_children = int(len(children.get(node_id, []))) if is_anchor else 0
             display_id = str(node_id) if is_anchor else f"{node_id}.{extra_rank}"
 
@@ -514,12 +1004,13 @@ def _build_payload(
                     "x": float(px),
                     "y": float(py),
                     "depth": int(nodes_depth_tree.get(node_id, 0)),
-                    "parent": int(parent_tree_id) if parent_tree_id else 0,
+                    "parent": int(parent_tree_id) if is_anchor else int(node_id),
                     "visits": int(nodes_visit.get(node_id, 0)),
                     "num_children": num_children,
                     "rule_id": nodes_rules.get(node_id),
                     "rule_label": nodes_rule_label.get(node_id),
-                    "status": _node_status(tree, node_id),
+                    "status": product_status,
+                    "is_solved": bool(getattr(node, "is_solved", lambda: False)()),
                     "step": int(render_steps.get(render_id, 0)),
                     "route_index": route_index_by_tree.get(node_id),
                     "smiles": smiles,
@@ -529,6 +1020,10 @@ def _build_payload(
 
         tree_to_render_ids[node_id] = render_ids
         anchor_by_tree[node_id] = anchor_render_id
+
+    render_positions = _apply_sibling_ladder_to_render_positions(
+        render_positions, nodes_payload, bubble_radius=bubble_radius
+    )
 
     # Render edges: connect each parent anchor to every product bubble.
     edges_payload: List[Dict[str, object]] = []
@@ -541,15 +1036,30 @@ def _build_payload(
 
         parent_anchor = int(anchor_by_tree.get(parent_id, parent_id))
         child_render_ids = tree_to_render_ids.get(int(child_id)) or [int(child_id)]
+        child_anchor = int(anchor_by_tree.get(child_id, child_id))
         tree_edge_key = _edge_key(parent_id, child_id)
 
-        render_keys: List[str] = []
+        # Main tree edge: parent anchor -> child anchor.
+        main_key = _edge_key(parent_anchor, child_anchor)
+        edges_payload.append(
+            {
+                "parent": int(parent_anchor),
+                "child": int(child_anchor),
+                "step": int(tree_steps.get(child_id, 0)),
+                "key": main_key,
+                "tree_key": tree_edge_key,
+                "winning": False,
+            }
+        )
+
+        # Extra product bubbles: connect from child anchor to each extra product.
         for render_child_id in child_render_ids:
-            render_key = _edge_key(parent_anchor, render_child_id)
-            render_keys.append(render_key)
+            if int(render_child_id) == int(child_anchor):
+                continue
+            render_key = _edge_key(child_anchor, render_child_id)
             edges_payload.append(
                 {
-                    "parent": int(parent_anchor),
+                    "parent": int(child_anchor),
                     "child": int(render_child_id),
                     "step": int(tree_steps.get(child_id, 0)),
                     "key": render_key,
@@ -557,7 +1067,8 @@ def _build_payload(
                     "winning": False,
                 }
             )
-        render_edge_keys_by_tree_edge[tree_edge_key] = render_keys
+
+        render_edge_keys_by_tree_edge[tree_edge_key] = [main_key]
 
     winning_edge_keys, winning_paths, win_first_step, win_last_step = _winning_route_paths(
         tree,
@@ -631,7 +1142,7 @@ def _build_payload(
             "renderedEdges": int(len(edges_payload)),
             "maxDepth": int(max_depth),
             "totalSteps": int(total_steps),
-            "sampleStep": int(max(1, sample_step)),
+            "totalIterations": int(getattr(tree, "curr_iteration", total_steps)),
             "withSvg": bool(with_svg),
             "bubbleScale": float(bubble_scale),
             "spacingScale": float(1.0),
@@ -732,6 +1243,11 @@ def generate_expansion_html(
         height: 100%;
         display: block;
         background: radial-gradient(1200px 900px at 50% 45%, #0f1623 0%, var(--bg) 70%);
+        cursor: grab;
+      }}
+
+      svg.panning {{
+        cursor: grabbing;
       }}
 
       .edges line {{
@@ -811,10 +1327,33 @@ def generate_expansion_html(
       }}
 
       #hide-panel {{
-        left: 14px;
+        left: 50%;
         bottom: 14px;
+        transform: translateX(-50%);
         padding: 8px 10px;
         z-index: 2;
+      }}
+
+      #recenter-panel {{
+        left: 50%;
+        top: 14px;
+        transform: translateX(-50%);
+        padding: 6px 10px;
+        z-index: 2;
+      }}
+
+      #branch-btn {{
+        position: absolute;
+        z-index: 3;
+        display: none;
+        padding: 4px 8px;
+        font-size: 12px;
+        border-radius: 8px;
+        border: 1px solid #1a2437;
+        background: #101826;
+        color: var(--text);
+        cursor: pointer;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
       }}
 
       #hide-panel button.active {{
@@ -990,10 +1529,18 @@ def generate_expansion_html(
 
       #mol-svg {{
         margin-top: 8px;
+        margin-bottom: 6px;
         border: 1px solid #1a2437;
         border-radius: 8px;
         padding: 6px;
         background: #ffffff;
+      }}
+
+      #mol-svg svg {{
+        width: 70%;
+        height: auto;
+        display: block;
+        margin: 0 auto;
       }}
 
       #legend {{
@@ -1038,6 +1585,11 @@ def generate_expansion_html(
             <span id="step-label">0</span>
           </div>
           <div class="row">
+            <label for="iteration">Iterations</label>
+            <input id="iteration" type="range" min="0" value="0" />
+            <span id="iteration-label">0</span>
+          </div>
+          <div class="row">
             <label>Playback</label>
             <button id="play">Play</button>
             <button id="reset">Reset</button>
@@ -1072,6 +1624,12 @@ def generate_expansion_html(
         <button id="hide-nonwinning-btn" type="button" aria-pressed="false">Hide</button>
       </div>
 
+      <div class="panel" id="recenter-panel">
+        <button id="recenter-btn" type="button">Recenter</button>
+      </div>
+
+      <button id="branch-btn" type="button">Hide branch</button>
+
       <div class="panel" id="info" role="dialog" aria-live="polite">
         <div class="panel-header">
           <h3>Node Details</h3>
@@ -1079,8 +1637,8 @@ def generate_expansion_html(
         </div>
         <div id="info-body">
           <div class="muted">Click a node to inspect it.</div>
-          <div class="kv" id="kv"></div>
           <div id="mol-svg"></div>
+          <div class="kv" id="kv"></div>
         </div>
       </div>
     </div>
@@ -1098,6 +1656,8 @@ def generate_expansion_html(
       const nodesGroup = document.getElementById("nodes");
       const stepInput = document.getElementById("step");
       const stepLabel = document.getElementById("step-label");
+      const iterationInput = document.getElementById("iteration");
+      const iterationLabel = document.getElementById("iteration-label");
       const playBtn = document.getElementById("play");
       const resetBtn = document.getElementById("reset");
       const speedSel = document.getElementById("speed");
@@ -1106,6 +1666,8 @@ def generate_expansion_html(
       const statsEl = document.getElementById("stats");
       const hidePanelEl = document.getElementById("hide-panel");
       const hideNonWinningBtn = document.getElementById("hide-nonwinning-btn");
+      const recenterBtn = document.getElementById("recenter-btn");
+      const branchBtn = document.getElementById("branch-btn");
       const winningPanelEl = document.getElementById("winning-panel");
       const winningToggleBtn = document.getElementById("winning-toggle");
       const winningSummaryEl = document.getElementById("winning-summary");
@@ -1116,14 +1678,152 @@ def generate_expansion_html(
       const molSvgEl = document.getElementById("mol-svg");
 
       const totalSteps = Math.max(0, stats.totalSteps || 0);
+      const totalIterations = Math.max(0, stats.totalIterations || totalSteps);
       stepInput.max = String(totalSteps);
+      if (iterationInput) iterationInput.max = String(totalIterations);
 
-      svg.setAttribute(
-        "viewBox",
-        [viewBox.minX, viewBox.minY, viewBox.width, viewBox.height].join(" ")
-      );
+      const baseViewBox = {{
+        x: Number(viewBox.minX || 0),
+        y: Number(viewBox.minY || 0),
+        width: Number(viewBox.width || 1),
+        height: Number(viewBox.height || 1),
+      }};
+      const viewBoxState = {{
+        x: baseViewBox.x,
+        y: baseViewBox.y,
+        width: baseViewBox.width,
+        height: baseViewBox.height,
+      }};
+
+      function applyViewBox() {{
+        svg.setAttribute(
+          "viewBox",
+          [viewBoxState.x, viewBoxState.y, viewBoxState.width, viewBoxState.height].join(" ")
+        );
+        updateBranchButtonPosition();
+      }}
+
+      function getSvgPoint(evt) {{
+        const point = svg.createSVGPoint();
+        point.x = evt.clientX;
+        point.y = evt.clientY;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return {{ x: 0, y: 0 }};
+        const inverse = ctm.inverse();
+        const svgPoint = point.matrixTransform(inverse);
+        return {{ x: svgPoint.x, y: svgPoint.y }};
+      }}
+
+      function svgPointToClient(x, y) {{
+        const rect = svg.getBoundingClientRect();
+        const scaleX = rect.width / viewBoxState.width;
+        const scaleY = rect.height / viewBoxState.height;
+        return {{
+          x: rect.left + (x - viewBoxState.x) * scaleX,
+          y: rect.top + (y - viewBoxState.y) * scaleY,
+        }};
+      }}
+
+      const zoomMin = 0.1;
+      const zoomMax = 10.0;
+
+      function zoomAt(point, factor) {{
+        if (!Number.isFinite(factor) || factor <= 0) return;
+
+        const minWidth = baseViewBox.width * zoomMin;
+        const maxWidth = baseViewBox.width * zoomMax;
+        const nextWidth = viewBoxState.width * factor;
+        const clampedWidth = Math.max(minWidth, Math.min(maxWidth, nextWidth));
+        const actualFactor = clampedWidth / viewBoxState.width;
+        const clampedHeight = viewBoxState.height * actualFactor;
+
+        viewBoxState.x = point.x - (point.x - viewBoxState.x) * actualFactor;
+        viewBoxState.y = point.y - (point.y - viewBoxState.y) * actualFactor;
+        viewBoxState.width = clampedWidth;
+        viewBoxState.height = clampedHeight;
+        applyViewBox();
+      }}
+
+      function resetViewBox() {{
+        viewBoxState.x = baseViewBox.x;
+        viewBoxState.y = baseViewBox.y;
+        viewBoxState.width = baseViewBox.width;
+        viewBoxState.height = baseViewBox.height;
+        applyViewBox();
+      }}
+
+      function onWheel(evt) {{
+        evt.preventDefault();
+        const point = getSvgPoint(evt);
+        const direction = evt.deltaY > 0 ? 1 : -1;
+        const factor = direction > 0 ? 1.1 : 0.9;
+        zoomAt(point, factor);
+      }}
+
+      let isPanning = false;
+      let panStart = null;
+      let panStartViewBox = null;
+
+      function startPan(evt) {{
+        if (evt.button !== 0) return;
+        if (evt.target && evt.target.closest && evt.target.closest("circle, rect")) return;
+        isPanning = true;
+        svg.classList.add("panning");
+        panStart = getSvgPoint(evt);
+        panStartViewBox = {{ ...viewBoxState }};
+      }}
+
+      function movePan(evt) {{
+        if (!isPanning || !panStart || !panStartViewBox) return;
+        const point = getSvgPoint(evt);
+        const dx = panStart.x - point.x;
+        const dy = panStart.y - point.y;
+        viewBoxState.x = panStartViewBox.x + dx;
+        viewBoxState.y = panStartViewBox.y + dy;
+        applyViewBox();
+      }}
+
+      function endPan() {{
+        if (!isPanning) return;
+        isPanning = false;
+        svg.classList.remove("panning");
+        panStart = null;
+        panStartViewBox = null;
+      }}
+
+      svg.addEventListener("wheel", onWheel, {{ passive: false }});
+      svg.addEventListener("mousedown", startPan);
+      window.addEventListener("mousemove", movePan);
+      window.addEventListener("mouseup", endPan);
+      svg.addEventListener("mouseleave", endPan);
+      svg.addEventListener("dblclick", (evt) => {{
+        evt.preventDefault();
+        resetViewBox();
+      }});
+      svg.addEventListener("click", (evt) => {{
+        if (evt.target && evt.target.closest && evt.target.closest("circle")) return;
+        hideBranchButton();
+      }});
 
       const nodeMeta = new Map(nodes.map((n) => [n.id, n]));
+      const treeParentById = new Map();
+      const treeChildrenById = new Map();
+      const renderIdsByTree = new Map();
+      for (const node of nodes) {{
+        const treeId = Number(node.tree_id ?? node.treeId ?? node.tree_id);
+        if (!Number.isFinite(treeId)) continue;
+        if (!treeParentById.has(treeId)) {{
+          const parentVal = Number(node.parent || 0);
+          treeParentById.set(treeId, Number.isFinite(parentVal) ? parentVal : 0);
+        }}
+        if (!renderIdsByTree.has(treeId)) renderIdsByTree.set(treeId, []);
+        renderIdsByTree.get(treeId).push(Number(node.id));
+      }}
+      for (const [treeId, parentId] of treeParentById) {{
+        if (!parentId) continue;
+        if (!treeChildrenById.has(parentId)) treeChildrenById.set(parentId, []);
+        treeChildrenById.get(parentId).push(treeId);
+      }}
 
       const nodesByStepMeta = Array.from({{ length: totalSteps + 1 }}, () => []);
       const edgesByStepMeta = Array.from({{ length: totalSteps + 1 }}, () => []);
@@ -1134,6 +1834,9 @@ def generate_expansion_html(
       const edgeEls = new Map();
       const edgeMetaByKey = new Map();
       let builtStep = -1;
+      const hiddenBranches = new Set();
+      let branchTargetId = null;
+      applyViewBox();
 
       function stepIndex(value) {{
         const num = Number.isFinite(value) ? value : parseInt(value, 10);
@@ -1145,6 +1848,55 @@ def generate_expansion_html(
         if (status === "target") return "status-target";
         if (status === "leaf") return "status-leaf";
         return "status-intermediate";
+      }}
+
+      function isHiddenByBranch(treeId) {{
+        let current = Number(treeId);
+        if (!Number.isFinite(current) || current <= 0) return false;
+        const seen = new Set();
+        while (current && !seen.has(current)) {{
+          if (hiddenBranches.has(current)) return current !== treeId;
+          seen.add(current);
+          current = treeParentById.get(current) || 0;
+        }}
+        return false;
+      }}
+
+      function updateBranchButtonPosition() {{
+        if (!branchBtn || !branchBtn.style || branchBtn.style.display === "none") return;
+        if (!branchTargetId) return;
+        const meta = nodeMeta.get(branchTargetId);
+        if (!meta) return;
+        const client = svgPointToClient(meta.x, meta.y);
+        branchBtn.style.left = `${{client.x + 10}}px`;
+        branchBtn.style.top = `${{client.y + 10}}px`;
+      }}
+
+      function showBranchButton(node) {{
+        if (!branchBtn || !node) return;
+        const treeId = Number(node.tree_id ?? node.treeId ?? node.tree_id);
+        if (!Number.isFinite(treeId) || treeId <= 0) return;
+        branchTargetId = Number(node.id);
+        branchBtn.dataset.treeId = String(treeId);
+        branchBtn.textContent = hiddenBranches.has(treeId) ? "Show branch" : "Hide branch";
+        branchBtn.style.display = "block";
+        updateBranchButtonPosition();
+      }}
+
+      function hideBranchButton() {{
+        if (!branchBtn) return;
+        branchBtn.style.display = "none";
+        branchTargetId = null;
+      }}
+
+      function recenterToTarget() {{
+        const target = nodeMeta.get(1);
+        if (!target) return;
+        const width = viewBoxState.width;
+        const height = viewBoxState.height;
+        viewBoxState.x = Number(target.x) - width / 2.0;
+        viewBoxState.y = Number(target.y) - height / 2.0;
+        applyViewBox();
       }}
 
       for (const node of nodes) {{
@@ -1175,6 +1927,7 @@ def generate_expansion_html(
 
             circle.addEventListener("click", () => {{
               setActiveNode(node.id);
+              showBranchButton(node);
             }});
           }}
           if (nodeFrag.childNodes.length) {{
@@ -1222,7 +1975,7 @@ def generate_expansion_html(
       statsEl.appendChild(statCard("Edges", stats.renderedEdges));
       statsEl.appendChild(statCard("Max Depth", stats.maxDepth));
       statsEl.appendChild(statCard("Steps", stats.totalSteps));
-      statsEl.appendChild(statCard("Sample", stats.sampleStep));
+      statsEl.appendChild(statCard("Iterations", stats.totalIterations));
       statsEl.appendChild(statCard("Bubble", stats.bubbleScale));
 
       let currentStep = -1;
@@ -1262,6 +2015,15 @@ def generate_expansion_html(
           winningEdgeConnectedNodeIds.add(childId);
         }}
       }}
+      const winningTreeIds = new Set();
+      for (const nodeId of winningEdgeConnectedNodeIds) {{
+        const meta = nodeMeta.get(nodeId);
+        if (!meta) continue;
+        const treeId = Number(meta.tree_id ?? meta.treeId ?? meta.tree_id);
+        if (Number.isFinite(treeId) && treeId > 0) {{
+          winningTreeIds.add(treeId);
+        }}
+      }}
 
       let hideNonWinning = false;
 
@@ -1274,16 +2036,28 @@ def generate_expansion_html(
 
       function shouldHideNonWinningNode(nodeId) {{
         if (!hideNonWinning) return false;
+        if (Number(nodeId) === 1) return false;
+        if (winningEdgeConnectedNodeIds.has(nodeId)) return false;
+        const meta = nodeMeta.get(nodeId);
+        if (!meta) return true;
+        const treeId = Number(meta.tree_id ?? meta.treeId ?? meta.tree_id);
+        if (Number.isFinite(treeId) && winningTreeIds.has(treeId)) return false;
+        return true;
+      }}
+
+      function shouldHideNode(nodeId) {{
         const meta = nodeMeta.get(nodeId);
         if (!meta) return false;
-        return meta.status === "intermediate" && !winningEdgeConnectedNodeIds.has(nodeId);
+        if (Number(nodeId) === 1) return false;
+        const treeId = Number(meta.tree_id ?? meta.treeId ?? meta.tree_id);
+        if (isHiddenByBranch(treeId)) return true;
+        return shouldHideNonWinningNode(nodeId);
       }}
 
       function shouldHideNonWinningEdge(edgeKey) {{
-        if (!hideNonWinning) return false;
         const meta = edgeMetaByKey.get(String(edgeKey));
         if (!meta) return false;
-        return shouldHideNonWinningNode(meta.parent) || shouldHideNonWinningNode(meta.child);
+        return shouldHideNode(meta.parent) || shouldHideNode(meta.child);
       }}
 
       function updateHiddenNonWinningEdges() {{
@@ -1295,7 +2069,7 @@ def generate_expansion_html(
 
       function updateHiddenNonWinningNodes() {{
         for (const [nodeId, el] of nodeEls) {{
-          const hidden = shouldHideNonWinningNode(nodeId);
+          const hidden = shouldHideNode(nodeId);
           el.classList.toggle("hidden-nonwinning", hidden);
         }}
         updateHiddenNonWinningEdges();
@@ -1310,6 +2084,27 @@ def generate_expansion_html(
         hideNonWinningBtn.addEventListener("click", () => {{
           hideNonWinning = !hideNonWinning;
           updateHideButton();
+          updateHiddenNonWinningNodes();
+        }});
+      }}
+
+      if (recenterBtn) {{
+        recenterBtn.addEventListener("click", () => {{
+          recenterToTarget();
+        }});
+      }}
+
+      if (branchBtn) {{
+        branchBtn.addEventListener("click", (e) => {{
+          e.stopPropagation();
+          const treeId = Number(branchBtn.dataset.treeId || 0);
+          if (!Number.isFinite(treeId) || treeId <= 0) return;
+          if (hiddenBranches.has(treeId)) {{
+            hiddenBranches.delete(treeId);
+          }} else {{
+            hiddenBranches.add(treeId);
+          }}
+          branchBtn.textContent = hiddenBranches.has(treeId) ? "Show branch" : "Hide branch";
           updateHiddenNonWinningNodes();
         }});
       }}
@@ -1367,6 +2162,23 @@ def generate_expansion_html(
         return Math.max(0, Math.min(totalSteps, Math.round(value)));
       }}
 
+      function clampIteration(value) {{
+        if (!Number.isFinite(value)) return 0;
+        return Math.max(0, Math.min(totalIterations, Math.round(value)));
+      }}
+
+      function iterationToStep(iteration) {{
+        if (!totalIterations) return clampStep(iteration);
+        const ratio = Math.max(0, Math.min(1, iteration / totalIterations));
+        return clampStep(ratio * totalSteps);
+      }}
+
+      function stepToIteration(step) {{
+        if (!totalSteps) return clampIteration(step);
+        const ratio = Math.max(0, Math.min(1, step / totalSteps));
+        return clampIteration(ratio * totalIterations);
+      }}
+
       function showStep(step) {{
         const idx = clampStep(step);
         buildStep(idx);
@@ -1400,6 +2212,9 @@ def generate_expansion_html(
         stepInput.value = String(target);
         const rendered = steps.cumulative?.[target] ?? "";
         stepLabel.textContent = `${{target}} / ${{totalSteps}} · nodes ${{rendered}}`;
+        const iterationValue = stepToIteration(target);
+        if (iterationInput) iterationInput.value = String(iterationValue);
+        if (iterationLabel) iterationLabel.textContent = `${{iterationValue}} / ${{totalIterations}}`;
         updateWinningHighlights(currentStep);
         updateHiddenNonWinningNodes();
       }}
@@ -1443,6 +2258,13 @@ def generate_expansion_html(
         const value = parseInt(e.target.value, 10);
         setStep(value);
       }});
+      if (iterationInput) {{
+        iterationInput.addEventListener("input", (e) => {{
+          stopPlaying();
+          const value = parseInt(e.target.value, 10);
+          setStep(iterationToStep(value));
+        }});
+      }}
 
       speedSel.addEventListener("change", () => {{
         if (playing) {{
@@ -1553,7 +2375,6 @@ def generate_expansion_html(
           ["Children", meta.num_children],
           ["Visits", meta.visits],
           ["Rule ID", safe(meta.rule_id)],
-          ["Rule Label", safe(meta.rule_label)],
           ["SMILES", safe(meta.smiles)],
           ["Status", meta.status],
         ];
@@ -1623,19 +2444,19 @@ def main() -> None:
     parser.add_argument(
         "--radius-step",
         type=float,
-        default=1.0,
+        default=20.0,
         help="Base radial step between depths (default: 1.0).",
     )
     parser.add_argument(
         "--render-scale",
         type=float,
-        default=220.0,
+        default=120.0,
         help="Scale factor from layout units to SVG units (default: 220).",
     )
     parser.add_argument(
         "--bubble-scale",
         type=float,
-        default=1.0,
+        default=10.0,
         help="Multiply node bubble radius by this factor (default: 10).",
     )
     parser.add_argument(
