@@ -19,7 +19,6 @@ from synplan.chem.data.filtering import (
 )
 from synplan.chem.data.standardizing import (
     ReactionStandardizationConfig,
-    ReactionMappingConfig,
     FunctionalGroupsConfig,
     KekuleFormConfig,
     CheckValenceConfig,
@@ -124,7 +123,6 @@ def sample_reactions_file(tmp_path: Path, sample_reactions) -> Path:
 def std_config() -> ReactionStandardizationConfig:
     """One fully‑loaded standardisation config reused across tests."""
     return ReactionStandardizationConfig(
-        reaction_mapping_config=ReactionMappingConfig(),
         functional_groups_config=FunctionalGroupsConfig(),
         kekule_form_config=KekuleFormConfig(),
         check_valence_config=CheckValenceConfig(),

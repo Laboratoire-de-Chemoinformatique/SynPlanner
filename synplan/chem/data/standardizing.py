@@ -109,63 +109,6 @@ class BaseStandardizer(ABC):
             raise StandardizationError(self.__class__.__name__, str(rxn), exc) from exc
 
 
-# Configuration classes
-@dataclass
-class ReactionMappingConfig:
-    pass
-
-
-class ReactionMappingStandardizer(BaseStandardizer):
-    """Maps atoms of the reaction using chython (chytorch)."""
-
-    def _map_and_remove_reagents(
-        self, reaction: ReactionContainer
-    ) -> ReactionContainer:
-        """Map and remove reagents from the reaction.
-
-        Args:
-            reaction: Input reaction
-
-        Returns:
-            The mapped reaction with reagents removed
-        """
-        reaction.reset_mapping()
-        reaction.remove_reagents()
-        return reaction
-
-    def _run(self, rxn: ReactionContainer) -> ReactionContainer:
-        """Map atoms of the reaction using chython.
-
-        Args:
-            rxn: Input reaction
-
-        Returns:
-            The mapped reaction
-
-        Raises:
-            StandardizationError: If mapping fails
-        """
-        # Convert to chython format
-        if isinstance(rxn, str):
-            chython_reaction = smiles_chython(rxn)
-        else:
-            reactants = ".".join(str(m) for m in rxn.reactants)
-            reagents = ".".join(str(m) for m in rxn.reagents)
-            products = ".".join(str(m) for m in rxn.products)
-            smiles = f"{reactants}>{reagents}>{products}"
-            chython_reaction = smiles_chython(smiles)
-            chython_reaction.meta.update(rxn.meta)
-            chython_reaction.name = rxn.name
-
-        reaction_mapped = self._map_and_remove_reagents(chython_reaction)
-        if not reaction_mapped:
-            raise StandardizationError(
-                "ReactionMapping", str(rxn), ValueError("Mapping failed")
-            )
-
-        return reaction_mapped
-
-
 @dataclass
 class FunctionalGroupsConfig:
     pass
@@ -828,7 +771,6 @@ class DedupActor:
 
 # Registry mapping config field names to standardizer classes
 STANDARDIZER_REGISTRY = {
-    "reaction_mapping_config": ReactionMappingStandardizer,
     "functional_groups_config": FunctionalGroupsStandardizer,
     "kekule_form_config": KekuleFormStandardizer,
     "check_valence_config": CheckValenceStandardizer,
@@ -851,7 +793,6 @@ class ReactionStandardizationConfig(ConfigABC):
     settings for various reaction filters, including paths, file formats, and filter-
     specific parameters.
 
-    :param reaction_mapping_config: Configuration for reaction mapping.
     :param functional_groups_config: Configuration for functional groups
         standardization.
     :param kekule_form_config: Configuration for reactants/reagents/products
@@ -871,7 +812,6 @@ class ReactionStandardizationConfig(ConfigABC):
     """
 
     # configuration for reaction standardizers
-    reaction_mapping_config: ReactionMappingConfig | None = None
     functional_groups_config: FunctionalGroupsConfig | None = None
     kekule_form_config: KekuleFormConfig | None = None
     check_valence_config: CheckValenceConfig | None = None

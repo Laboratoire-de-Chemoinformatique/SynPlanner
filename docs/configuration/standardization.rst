@@ -28,7 +28,6 @@ Run reaction standardization using the repository configuration in ``configs/sta
 
 .. code-block:: yaml
 
-    reaction_mapping_config:
     functional_groups_config:
     kekule_form_config:
     check_valence_config:
@@ -47,7 +46,6 @@ Run reaction standardization using the repository configuration in ``configs/sta
     ================================== =================================================================================
     Reaction standardizer              Description
     ================================== =================================================================================
-    reaction_mapping_config            Maps atoms of the reaction using chython
     functional_groups_config           Standardization of functional groups
     kekule_form_config                 Transform molecules to Kekule form when possible
     check_valence_config               Check atom valences

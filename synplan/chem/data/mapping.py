@@ -237,6 +237,35 @@ def _map_reaction(rxn, am, multiplier=1.75):
     return fixed
 
 
+# -- Single-reaction helper --------------------------------------------------
+
+
+def map_reaction(
+    rxn: ReactionContainer,
+    *,
+    device: str | None = None,
+    no_amp: bool = False,
+) -> ReactionContainer:
+    """Map a single reaction using GPU-accelerated neural attention.
+
+    :param rxn: Reaction to map.
+    :param device: ``"cuda"``, ``"mps"``, ``"cpu"`` or *None* (auto-detect).
+    :param no_amp: Disable automatic mixed precision.
+    :returns: The same reaction object with atom-atom mapping applied.
+    """
+    dev = select_device(device)
+    use_amp = not no_amp and dev.type in ("cuda", "mps")
+
+    model = Model()
+    model.to(dev).eval()
+
+    with torch.no_grad():
+        attns = _batched_attention(model, [rxn], batch_size=1, device=dev, use_amp=use_amp)
+
+    _map_reaction(rxn, attns[0])
+    return rxn
+
+
 # -- GPU inference -----------------------------------------------------------
 
 

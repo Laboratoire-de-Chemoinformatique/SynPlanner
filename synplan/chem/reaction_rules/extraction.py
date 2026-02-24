@@ -396,24 +396,28 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
     reactor = Reactor(patterns=patterns, products=products, delete_atoms=False)
     try:
         for result_reaction in reactor(*reaction.reactants):  # unpack here
-            result_products = []
-            for result_product in result_reaction.products:
-                tmp = result_product.copy()
-                try:
-                    tmp.kekule()
-                    if tmp.check_valence():
+            try:
+                result_products = []
+                for result_product in result_reaction.products:
+                    tmp = result_product.copy()
+                    try:
+                        tmp.kekule()
+                        if tmp.check_valence():
+                            continue
+                    except InvalidAromaticRing:
                         continue
-                except InvalidAromaticRing:
-                    continue
-                result_products.append(result_product)
-            if set(reaction.products) == set(result_products) and len(
-                reaction.products
-            ) == len(result_products):
-                return True
-    except (KeyError, IndexError, InvalidAromaticRing):
+                    result_products.append(result_product)
+                if set(reaction.products) == set(result_products) and len(
+                    reaction.products
+                ) == len(result_products):
+                    return True
+            except (KeyError, IndexError, InvalidAromaticRing):
+                # KeyError - iteration over reactor is finished and products are different from the original reaction
+                # IndexError - mistake in __contract_ions, possibly problems with charges in reaction rule
+                # InvalidAromaticRing - aromatic ring is invalid
+                continue
+    except KeyError:
         # KeyError - iteration over reactor is finished and products are different from the original reaction
-        # IndexError - mistake in __contract_ions, possibly problems with charges in reaction rule
-        # InvalidAromaticRing - aromatic ring is invalid
         return False
     return False
 
