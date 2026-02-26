@@ -6,12 +6,12 @@ import torch
 from adabelief_pytorch import AdaBelief
 from pytorch_lightning import LightningModule
 from torch import Tensor
-from torch.nn import GELU, Dropout, Linear, Module, ModuleDict, ModuleList
+from torch.nn import GELU, Dropout, Linear, Module, ModuleDict, ModuleList, Sequential
 from torch.nn.functional import relu
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch_geometric.data.batch import Batch
-from torch_geometric.nn.conv import GCNConv
-from torch_geometric.nn.pool import global_add_pool
+from torch_geometric.nn.conv import GCNConv, GINEConv, GPSConv
+from torch_geometric.nn.pool import global_add_pool, global_mean_pool
 
 
 class GraphEmbedding(Module):
@@ -47,12 +47,11 @@ class GraphEmbedding(Module):
             ]
         )
 
-    def forward(self, graph: Batch, batch_size: int) -> Tensor:
+    def forward(self, graph: Batch) -> Tensor:
         """Takes a graph as input and performs graph convolution on it.
 
         :param graph: The batch of molecular graphs, where each atom is represented by
             the atom/bond vector.
-        :param batch_size: The size of the batch.
         :return: Graph embedding.
         """
         atoms, connections = graph.x.float(), graph.edge_index.long()
@@ -61,7 +60,7 @@ class GraphEmbedding(Module):
         for gcn_conv in self.gcn_convs:
             atoms = atoms + self.dropout(relu(gcn_conv(atoms, connections)))
 
-        return global_add_pool(atoms, graph.batch, size=batch_size)
+        return global_add_pool(atoms, graph.batch)
 
 
 class GraphEmbeddingConcat(GraphEmbedding, Module):
@@ -88,12 +87,11 @@ class GraphEmbeddingConcat(GraphEmbedding, Module):
             ]
         )
 
-    def forward(self, graph: Batch, batch_size: int) -> Tensor:
+    def forward(self, graph: Batch) -> Tensor:
         """Takes a graph as input and performs graph convolution on it.
 
         :param graph: The batch of molecular graphs, where each atom is represented by
             the atom/bond vector.
-        :param batch_size: The size of the batch.
         :return: Graph embedding.
         """
 
@@ -110,7 +108,55 @@ class GraphEmbeddingConcat(GraphEmbedding, Module):
 
         atoms = torch.cat(collected_atoms, dim=-1)
 
-        return global_add_pool(atoms, graph.batch, size=batch_size)
+        return global_add_pool(atoms, graph.batch)
+
+
+class GraphEmbeddingGPS(Module):
+    """GPS-style graph embedder: GINEConv + Performer attention + LayerNorm + GELU."""
+
+    def __init__(
+        self,
+        vector_dim: int = 256,
+        edge_dim: int = 4,
+        dropout: float = 0.3,
+        num_conv_layers: int = 5,
+        heads: int = 4,
+    ):
+        super().__init__()
+        self.node_expansion = Linear(11, vector_dim)
+        self.edge_expansion = Linear(edge_dim, vector_dim)
+
+        self.convs = ModuleList()
+        for _ in range(num_conv_layers):
+            nn_layer = Sequential(
+                Linear(vector_dim, vector_dim),
+                GELU(),
+                Linear(vector_dim, vector_dim),
+            )
+            local_conv = GINEConv(nn_layer, edge_dim=vector_dim)
+            layer = GPSConv(
+                channels=vector_dim,
+                conv=local_conv,
+                heads=heads,
+                dropout=dropout,
+                act="gelu",
+                norm="layer_norm",
+                norm_kwargs={"mode": "node"},
+                attn_type="performer",
+            )
+            self.convs.append(layer)
+
+    def forward(self, graph: Batch) -> Tensor:
+        atoms = graph.x.float()
+        atoms = torch.log(atoms + 1)
+        atoms = self.node_expansion(atoms)
+
+        edge_attr = self.edge_expansion(graph.edge_attr.float())
+
+        for conv in self.convs:
+            atoms = conv(atoms, graph.edge_index, graph.batch, edge_attr=edge_attr)
+
+        return global_mean_pool(atoms, graph.batch)
 
 
 class MCTSNetwork(LightningModule, ABC):
@@ -124,6 +170,7 @@ class MCTSNetwork(LightningModule, ABC):
         num_conv_layers: int = 5,
         learning_rate: float = 0.001,
         gcn_concat: bool = False,
+        embedder_type: str = "gcn",
     ):
         """The basic class for MCTS graph convolutional neural networks (policy and
         value network).
@@ -136,10 +183,15 @@ class MCTSNetwork(LightningModule, ABC):
             convolutional module.
         :param learning_rate: The learning rate determines how quickly the model learns
             from the training data.
-        :param gcn_concat: ???. #TODO explain
+        :param gcn_concat: Legacy flag for concat embedder. Use embedder_type instead.
+        :param embedder_type: Embedder architecture: "gcn", "gcn_concat", or "gps".
         """
         super().__init__()
-        if gcn_concat:
+        if embedder_type == "gps":
+            self.embedder = GraphEmbeddingGPS(
+                vector_dim, dropout=dropout, num_conv_layers=num_conv_layers
+            )
+        elif gcn_concat or embedder_type == "gcn_concat":
             self.embedder = GraphEmbeddingConcat(vector_dim, dropout, num_conv_layers)
         else:
             self.embedder = GraphEmbedding(vector_dim, dropout, num_conv_layers)
@@ -222,7 +274,7 @@ class MCTSNetwork(LightningModule, ABC):
         )
 
         lr_scheduler = ReduceLROnPlateau(
-            optimizer, patience=3, factor=0.8, min_lr=5e-5, verbose=True
+            optimizer, patience=3, factor=0.8, min_lr=5e-5
         )
         scheduler = {
             "scheduler": lr_scheduler,

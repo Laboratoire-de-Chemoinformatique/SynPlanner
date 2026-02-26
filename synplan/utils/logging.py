@@ -75,7 +75,7 @@ def init_logger(
     file_level: str | int = "INFO",
     log_dir: str | os.PathLike = ".",
     redirect_tqdm: bool = True,
-) -> logging.Logger:
+) -> tuple[logging.Logger, str]:
     """
     Initialise (or fetch) a namespaced logger that works in scripts &
     notebooks.  Idempotent ‑ safe to call multiple times.

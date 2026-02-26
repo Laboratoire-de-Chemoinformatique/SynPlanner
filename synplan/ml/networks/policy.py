@@ -48,7 +48,7 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
         :return: Returns the vector of probabilities (given by sigmoid) of successful
             application of regular and priority reaction rules.
         """
-        x = self.embedder(batch, self.batch_size)
+        x = self.embedder(batch)
         y = self.y_predictor(x)
 
         if self.policy_type == "ranking":
@@ -69,7 +69,7 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
             prediction.
         """
         true_y = batch.y_rules.long()
-        x = self.embedder(batch, self.batch_size)
+        x = self.embedder(batch)
         pred_y = self.y_predictor(x)
 
         if self.policy_type == "ranking":

@@ -5,13 +5,15 @@ This module includes functions for creating training datasets and running the tr
 process for the policy network.
 """
 
+import random
 import warnings
+from collections import defaultdict
 from pathlib import Path
 
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
-from torch.utils.data import random_split
+from torch.utils.data import Subset, random_split
 from torch_geometric.data.lightning import LightningDataset
 
 from synplan.ml.networks.policy import PolicyNetwork
@@ -25,10 +27,82 @@ from synplan.utils.logging import DisableLogger, HiddenPrints
 warnings.filterwarnings("ignore")
 
 
+def _stratified_ranking_split(
+    dataset: RankingPolicyDataset,
+    min_rule_count: int = 20,
+    max_val_fraction: float = 0.1,
+    seed: int = 42,
+) -> tuple[list[int], list[int]]:
+    """Split a ranking policy dataset into train/val with stratification.
+
+    Rules with fewer than *min_rule_count* unique-product examples contribute
+    only to training.  For larger rules, at most *max_val_fraction* of their
+    unique-product examples go to validation.  Products that appear in more
+    than one example (i.e. identical molecules from different reactions) are
+    always placed in the training set to prevent data leakage.
+
+    :param dataset: A :class:`RankingPolicyDataset` with ``_product_keys``.
+    :param min_rule_count: Minimum number of unique-product candidates a rule
+        must have before any of its examples can go to validation.
+    :param max_val_fraction: Maximum fraction of a rule's candidates placed
+        into the validation set.
+    :param seed: Random seed for reproducibility.
+    :return: ``(train_indices, val_indices)``
+    """
+    y_rules = dataset._data.y_rules
+    labels = y_rules.view(-1).tolist() if y_rules.dim() > 1 else y_rules.tolist()
+    product_keys = dataset._product_keys
+
+    # Group indices by product key.
+    product_groups: dict[str, list[int]] = defaultdict(list)
+    for idx, pkey in enumerate(product_keys):
+        product_groups[pkey].append(idx)
+
+    # Separate: multi-occurrence products → train; single-occurrence → candidates.
+    train_indices: list[int] = []
+    # candidate indices grouped by rule_id
+    rule_candidates: dict[int, list[int]] = defaultdict(list)
+    n_leaked = 0
+
+    for pkey, indices in product_groups.items():
+        if len(indices) > 1:
+            train_indices.extend(indices)
+            n_leaked += len(indices)
+        else:
+            idx = indices[0]
+            rule_candidates[labels[idx]].append(idx)
+
+    # Per-rule stratified split of candidates.
+    val_indices: list[int] = []
+    rng = random.Random(seed)
+
+    for rule_id, candidates in rule_candidates.items():
+        if len(candidates) <= min_rule_count:
+            train_indices.extend(candidates)
+            continue
+        rng.shuffle(candidates)
+        n_val = max(1, int(len(candidates) * max_val_fraction))
+        val_indices.extend(candidates[:n_val])
+        train_indices.extend(candidates[n_val:])
+
+    n_total = len(train_indices) + len(val_indices)
+    n_rules_in_val = len({labels[i] for i in val_indices})
+    print(
+        f"Stratified split: {n_total} total, "
+        f"train {len(train_indices)}, val {len(val_indices)} "
+        f"({len(val_indices) / n_total * 100:.1f}%), "
+        f"{n_rules_in_val} rules in val, "
+        f"{n_leaked} examples forced to train (duplicate products)"
+    )
+
+    return train_indices, val_indices
+
+
 def create_policy_dataset(
-    reaction_rules_path: str,
-    molecules_or_reactions_path: str,
-    output_path: str,
+    policy_data_path: str | None = None,
+    reaction_rules_path: str | None = None,
+    molecules_or_reactions_path: str | None = None,
+    output_path: str = "",
     dataset_type: str = "filtering",
     batch_size: int = 100,
     num_cpus: int = 1,
@@ -37,16 +111,22 @@ def create_policy_dataset(
     """
     Create a training dataset for a policy network.
 
-    :param reaction_rules_path: Path to the reaction rules file.
-    :param molecules_or_reactions_path: Path to the molecules or reactions file used to create the training set.
-    :param output_path: Path to store the processed dataset.
-    :param dataset_type: Type of the dataset to be created ('ranking' or 'filtering').
-    :param batch_size: The size of batch of molecules/reactions.
-    :param training_data_ratio: Ratio of training data to total data.
-    :param num_cpus: Number of CPUs to use for data processing.
+    For ranking policy, provide *policy_data_path* (the mapping file produced
+    by rule extraction).  For filtering policy, provide *reaction_rules_path*
+    and *molecules_or_reactions_path*.
 
-    :return: A `LightningDataset` object containing training and validation datasets.
-
+    :param policy_data_path: Path to the policy training mapping file
+        (ranking policy only).
+    :param reaction_rules_path: Path to the reaction rules file
+        (filtering policy).
+    :param molecules_or_reactions_path: Path to the molecules file
+        (filtering policy).
+    :param output_path: Path to store the processed dataset cache.
+    :param dataset_type: ``'ranking'`` or ``'filtering'``.
+    :param batch_size: Batch size for the data module.
+    :param training_data_ratio: Train ratio for filtering policy (random split).
+    :param num_cpus: Number of CPUs (filtering policy only).
+    :return: A ``LightningDataset`` with train and validation splits.
     """
 
     with DisableLogger(), HiddenPrints():
@@ -57,30 +137,37 @@ def create_policy_dataset(
                 output_path=output_path,
                 num_cpus=num_cpus,
             )
-
         elif dataset_type == "ranking":
             full_dataset = RankingPolicyDataset(
-                reaction_rules_path=reaction_rules_path,
-                reactions_path=molecules_or_reactions_path,
+                policy_data_path=policy_data_path,
                 output_path=output_path,
             )
 
-    train_size = int(training_data_ratio * len(full_dataset))
-    val_size = len(full_dataset) - train_size
-
-    train_dataset, val_dataset = random_split(
-        full_dataset, [train_size, val_size], torch.Generator().manual_seed(42)
-    )
-    print(
-        f"Training set size: {len(train_dataset)}, validation set size: {len(val_dataset)}"
-    )
+    # Stratified split for ranking policy; random split for filtering.
+    if (
+        dataset_type == "ranking"
+        and hasattr(full_dataset, "_product_keys")
+        and full_dataset._product_keys is not None
+    ):
+        train_indices, val_indices = _stratified_ranking_split(full_dataset)
+        train_dataset = Subset(full_dataset, train_indices)
+        val_dataset = Subset(full_dataset, val_indices)
+    else:
+        train_size = int(training_data_ratio * len(full_dataset))
+        val_size = len(full_dataset) - train_size
+        train_dataset, val_dataset = random_split(
+            full_dataset, [train_size, val_size], torch.Generator().manual_seed(42)
+        )
+        print(
+            f"Training set size: {len(train_dataset)}, "
+            f"validation set size: {len(val_dataset)}"
+        )
 
     datamodule = LightningDataset(
         train_dataset,
         val_dataset,
         batch_size=batch_size,
         pin_memory=True,
-        drop_last=True,
     )
 
     return datamodule
@@ -98,16 +185,15 @@ def run_policy_training(
     """
     Trains a policy network using a given datamodule and training configuration.
 
-    :param datamodule: A PyTorch Lightning `DataModule` class instance. It is responsible for loading, processing, and preparing the training data for the model.
-    :param config: The dictionary that contains various configuration settings for the policy training process.
+    :param datamodule: A PyTorch Lightning ``DataModule`` instance.
+    :param config: Configuration for the policy training process.
     :param results_path: Path to store the training results and logs.
-    :param accelerator: Supports passing different accelerator types (“cpu”, “gpu”, “tpu”, “hpu”, “mps”, “auto”) as well as custom accelerator instances. Default: "gpu".
-    :param devices: The devices to use. Can be set to a positive number (int or str), a sequence of device indices (list or str), the value -1 to indicate all available devices should be used, or "auto" for automatic selection based on the chosen accelerator. Default: "auto".
-    :param silent: Run in the silent mode with no progress bars. Default: True.
-    :param weights_file_name: The name of weights file to be saved. Default: "policy_network".
-
+    :param accelerator: Lightning accelerator type. Default: ``"gpu"``.
+    :param devices: Lightning devices specification. Default: ``"auto"``.
+    :param silent: Suppress progress bars. Default: ``False``.
+    :param weights_file_name: Name of the saved weights file.
+        Default: ``"policy_network"``.
     :return: None.
-
     """
     results_path = Path(results_path)
     results_path.mkdir(exist_ok=True)
@@ -120,6 +206,7 @@ def run_policy_training(
         num_conv_layers=config.num_conv_layers,
         learning_rate=config.learning_rate,
         policy_type=config.policy_type,
+        embedder_type=config.embedder_type,
     )
 
     checkpoint = ModelCheckpoint(

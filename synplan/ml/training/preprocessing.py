@@ -3,9 +3,7 @@ network."""
 
 import logging
 import os
-import pickle
 from abc import ABC
-from pathlib import Path
 from typing import Any
 
 import ray
@@ -22,8 +20,6 @@ from torch_geometric.data.makedirs import makedirs
 from torch_geometric.transforms import ToUndirected
 from tqdm.auto import tqdm
 
-from synplan.chem.utils import unite_molecules
-from synplan.utils.files import ReactionReader, load_rule_index_mapping_tsv
 from synplan.utils.loading import load_reaction_rules
 
 
@@ -82,25 +78,31 @@ class ValueNetworkDataset(InMemoryDataset, ABC):
 
 
 class RankingPolicyDataset(InMemoryDataset):
-    """Ranking policy network dataset."""
+    """Ranking policy network dataset.
 
-    def __init__(self, reactions_path: str, reaction_rules_path: str, output_path: str):
-        """Initializes a policy network dataset.
+    Reads a policy training mapping file (TSV with ``product_smiles`` and
+    ``rule_id`` columns) produced by :func:`extract_rules_from_reactions`.
+    """
 
-        :param reactions_path: The path to the file containing the reaction data used
-            for extraction of reaction rules.
-        :param reaction_rules_path: The path to the file containing the reaction rules.
-        :param output_path: The output path to the file where policy network dataset
-            will be saved.
+    def __init__(self, policy_data_path: str, output_path: str):
+        """Initializes a ranking policy network dataset.
+
+        :param policy_data_path: Path to the policy training mapping file
+            (``*_policy_data.tsv``) generated during rule extraction.
+        :param output_path: Path where the cached PyG dataset will be saved.
         """
         super().__init__(None, None, None)
 
-        self.reactions_path = reactions_path
-        self.reaction_rules_path = reaction_rules_path
+        self.policy_data_path = policy_data_path
         self.output_path = output_path
+        self._product_keys: list[str] | None = None
 
         if output_path and os.path.exists(output_path):
-            self.data, self.slices = torch.load(self.output_path)
+            saved = torch.load(self.output_path, weights_only=False)
+            if isinstance(saved, tuple) and len(saved) == 3:
+                self.data, self.slices, self._product_keys = saved
+            else:
+                self.data, self.slices = saved
         else:
             self.data, self.slices = self.prepare_data()
 
@@ -109,58 +111,40 @@ class RankingPolicyDataset(InMemoryDataset):
         return self._infer_num_classes(self._data.y_rules)
 
     def prepare_data(self) -> tuple[Data, dict[str, Tensor]]:
-        """Prepares data by loading reaction rules, preprocessing the molecules,
-        collating the data, and returning the data and slices.
+        """Reads the policy mapping file and converts product SMILES to PyG graphs.
 
-        :return: The PyTorch geometric graphs and slices.
+        :return: The collated PyTorch Geometric data and slices.
         """
-
-        ext = Path(self.reaction_rules_path).suffix.lower()
-        if ext == ".tsv":
-            reaction_rule_pairs = load_rule_index_mapping_tsv(self.reaction_rules_path)
-        else:
-            with open(self.reaction_rules_path, "rb") as inp:
-                reaction_rules = pickle.load(inp)
-            reaction_rules = sorted(
-                reaction_rules, key=lambda x: len(x[1]), reverse=True
-            )
-            reaction_rule_pairs = {}
-            for rule_i, (_, reactions_ids) in enumerate(reaction_rules):
-                for reaction_id in reactions_ids:
-                    reaction_rule_pairs[reaction_id] = rule_i
-            reaction_rule_pairs = dict(sorted(reaction_rule_pairs.items()))
-
         list_of_graphs = []
-        with ReactionReader(self.reactions_path) as reactions:
+        product_keys: list[str] = []
 
-            for reaction_id, reaction in tqdm(
-                enumerate(reactions),
-                desc="Number of reactions processed: ",
+        with open(self.policy_data_path, encoding="utf-8") as f:
+            f.readline()  # skip header
+            for line in tqdm(
+                f,
+                desc="Building policy dataset: ",
                 bar_format="{desc}{n} [{elapsed}]",
             ):
-
-                rule_id = reaction_rule_pairs.get(reaction_id)
-
-                if rule_id is None:
-                    continue
-
-                try:  #  MENDEL_INFO does not contain cadmium (Cd) properties
-                    molecule = unite_molecules(reaction.products)
+                parts = line.rstrip("\n").split("\t")
+                product_smi, rule_id_str = parts[0], parts[1]
+                try:
+                    molecule = smiles(product_smi)
                     pyg_graph = mol_to_pyg(molecule)
-
                     if pyg_graph is not None:
-                        pyg_graph.y_rules = torch.tensor([rule_id], dtype=torch.long)
+                        pyg_graph.y_rules = torch.tensor(
+                            [int(rule_id_str)], dtype=torch.long
+                        )
                         list_of_graphs.append(pyg_graph)
-                except (
-                    Exception
-                ) as e:  # TypeError: can't assign a NoneType to a torch.ByteTensor
+                        product_keys.append(product_smi)
+                except Exception as e:
                     logging.debug(e)
                     continue
 
+        self._product_keys = product_keys
         data, slices = self.collate(list_of_graphs)
         if self.output_path:
             makedirs(os.path.dirname(self.output_path))
-            torch.save((data, slices), self.output_path)
+            torch.save((data, slices, product_keys), self.output_path)
 
         return data, slices
 
@@ -194,7 +178,7 @@ class FilteringPolicyDataset(InMemoryDataset):
         self.batch_size = 100
 
         if output_path and os.path.exists(output_path):
-            self.data, self.slices = torch.load(self.output_path)
+            self.data, self.slices = torch.load(self.output_path, weights_only=False)
         else:
             self.data, self.slices = self.prepare_data()
 
@@ -450,15 +434,27 @@ def mol_to_pyg(molecule: MoleculeContainer, canonicalize: bool = True) -> Data |
     new_mappings = {n: i for i, (n, _) in enumerate(tmp_molecule.atoms(), 1)}
     tmp_molecule.remap(new_mappings)
 
-    # get edge indexes from target mapping
+    # get edge indexes and edge features from target mapping
     edge_index = []
-    for atom, neighbour, _ in tmp_molecule.bonds():
+    edge_attr = []
+    for atom, neighbour, bond in tmp_molecule.bonds():
         edge_index.append([atom - 1, neighbour - 1])
+        edge_attr.append([
+            float(bond.order == 1),
+            float(bond.order == 2),
+            float(bond.order == 3),
+            float(bond.in_ring),
+        ])
     edge_index = torch.tensor(edge_index, dtype=torch.long)
+    edge_attr = torch.tensor(edge_attr, dtype=torch.float)
 
     x = mol_to_matrix(tmp_molecule)
 
-    mol_pyg_graph = Data(x=x, edge_index=edge_index.t().contiguous())
+    mol_pyg_graph = Data(
+        x=x,
+        edge_index=edge_index.t().contiguous(),
+        edge_attr=edge_attr,
+    )
     mol_pyg_graph = ToUndirected()(mol_pyg_graph)
 
     assert mol_pyg_graph.is_undirected()

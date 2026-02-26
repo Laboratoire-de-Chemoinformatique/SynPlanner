@@ -161,7 +161,7 @@ class Tree:
         the number of found routes)."""
         return self.report()
 
-    def __next__(self) -> [bool, list[int]]:
+    def __next__(self) -> tuple[bool, list[int]]:
         """The __next__ method is used to do one iteration of the tree building.
 
         :return: Returns True if the route was found and the node id of the last node in
@@ -280,14 +280,6 @@ class Tree:
                     self._add_node(node_id, child_node, scaled_prob, rule_id)
                     total_expanded += 1
                     expanded = True
-
-                    # TODO: Remove this once we have a better way to handle this
-                    if False:
-                        break
-
-            # TODO: Remove this once we have a better way to handle this
-            if False:
-                break
 
         if not expanded and node_id == 1:
             raise StopIteration("\nThe target molecule was not expanded.")

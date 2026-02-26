@@ -139,7 +139,7 @@ def download_selected_files(
             dst = root / dst_rel
             dst.parent.mkdir(parents=True, exist_ok=True)
             if src.exists() and not dst.exists():
-                shutil.copy2(src, dst)  # or shutil.move(src, dst)
+                shutil.copy2(src, dst)
 
     return root
 

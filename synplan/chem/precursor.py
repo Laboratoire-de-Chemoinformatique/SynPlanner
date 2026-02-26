@@ -22,7 +22,7 @@ class Precursor:
         """Return the number of atoms in Precursor."""
         return len(self.molecule)
 
-    def __hash__(self) -> hash:
+    def __hash__(self) -> int:
         """Returns the hash value of Precursor."""
         return hash(self.molecule)
 

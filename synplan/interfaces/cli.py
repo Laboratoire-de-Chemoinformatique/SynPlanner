@@ -404,16 +404,11 @@ def rule_extracting_cli(
     help="Path to the configuration file for ranking policy training.",
 )
 @click.option(
-    "--reaction_data",
+    "--policy_data",
     required=True,
     type=click.Path(exists=True),
-    help="Path to the file with reactions for ranking policy training.",
-)
-@click.option(
-    "--reaction_rules",
-    required=True,
-    type=click.Path(exists=True),
-    help="Path to the file with extracted reaction rules.",
+    help="Path to the policy training mapping file (*_policy_data.tsv) "
+    "generated during rule extraction.",
 )
 @click.option(
     "--results_dir",
@@ -421,18 +416,10 @@ def rule_extracting_cli(
     type=click.Path(),
     help="Path to the directory where the trained policy network will be stored.",
 )
-@click.option(
-    "--num_cpus",
-    default=4,
-    type=int,
-    help="The number of CPUs to use for training set preparation.",
-)
 def ranking_policy_training_cli(
     config_path: str,
-    reaction_data: str,
-    reaction_rules: str,
+    policy_data: str,
     results_dir: str,
-    num_cpus: int,
 ) -> None:
     """Ranking policy network training."""
     policy_config = PolicyNetworkConfig.from_yaml(config_path)
@@ -440,12 +427,10 @@ def ranking_policy_training_cli(
     policy_dataset_file = os.path.join(results_dir, "policy_dataset.dt")
 
     datamodule = create_policy_dataset(
-        reaction_rules_path=reaction_rules,
-        molecules_or_reactions_path=reaction_data,
+        policy_data_path=policy_data,
         output_path=policy_dataset_file,
         dataset_type="ranking",
         batch_size=policy_config.batch_size,
-        num_cpus=num_cpus,
     )
 
     run_policy_training(datamodule, config=policy_config, results_path=results_dir)
@@ -570,10 +555,8 @@ def value_network_tuning_cli(
     policy_config.weights_path = policy_network
 
     value_config = ValueNetworkConfig.from_dict(config["value_network"])
-    if value_network is None:
-        value_config.weights_path = os.path.join(
-            results_dir, "weights", "value_network.ckpt"
-        )
+    if value_network is not None:
+        value_config.weights_path = value_network
 
     tree_config = TreeConfig.from_dict(config["tree"])
     tuning_config = TuningConfig.from_dict(config["tuning"])
@@ -648,7 +631,7 @@ def planning_cli(
     with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
-    search_config = {**config["tree"], **config["node_evaluation"]}
+    search_config = {**config["tree"], **config.get("node_evaluation", {})}
     policy_config = PolicyNetworkConfig.from_dict(
         {**config["node_expansion"], **{"weights_path": policy_network}}
     )
@@ -729,8 +712,8 @@ def planning_cli(
 )
 @click.option(
     "--perform_subcluster",
-    default=None,
-    type=click.Path(exists=False),
+    is_flag=True,
+    default=False,
     help="Perform subclustering.",
 )
 @click.option(

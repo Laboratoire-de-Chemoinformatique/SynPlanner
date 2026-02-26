@@ -250,13 +250,14 @@ class PolicyNetworkConfig(ConfigABC):
     """
 
     policy_type: str = "ranking"
+    embedder_type: str = "gcn"
     vector_dim: int = 256
     batch_size: int = 500
     dropout: float = 0.4
     learning_rate: float = 0.008
     num_conv_layers: int = 5
     num_epoch: int = 100
-    weights_path: str = None
+    weights_path: str | None = None
 
     # for filtering policy
     priority_rules_fraction: float = 0.5
@@ -277,6 +278,9 @@ class PolicyNetworkConfig(ConfigABC):
 
         if params["policy_type"] not in ["filtering", "ranking"]:
             raise ValueError("policy_type must be either 'filtering' or 'ranking'.")
+
+        if params.get("embedder_type", "gcn") not in ("gcn", "gcn_concat", "gps"):
+            raise ValueError("embedder_type must be 'gcn', 'gcn_concat', or 'gps'.")
 
         if not isinstance(params["vector_dim"], int) or params["vector_dim"] <= 0:
             raise ValueError("vector_dim must be a positive integer.")
@@ -334,7 +338,7 @@ class ValueNetworkConfig(ConfigABC):
     :param num_epoch: Number of training epochs.
     """
 
-    weights_path: str = None
+    weights_path: str | None = None
     vector_dim: int = 256
     batch_size: int = 500
     dropout: float = 0.4
@@ -469,8 +473,8 @@ class TreeConfig(ConfigABC):
     # new parameters
     algorithm: str = "uct"
     normalize_scores: bool = False
-    max_rules_applied = 10  # needed only in pruning
-    stop_at_first = False
+    max_rules_applied: int = 10  # needed only in pruning
+    stop_at_first: bool = False
     enable_pruning: bool = False
 
     # UCT configuration
@@ -510,8 +514,8 @@ class TreeConfig(ConfigABC):
             or params["max_iterations"] < 1
         ):
             raise ValueError("max_iterations must be a positive integer.")
-        if not isinstance(params["max_time"], int) or params["max_time"] < 1:
-            raise ValueError("max_time must be a positive integer.")
+        if not isinstance(params["max_time"], (int, float)) or params["max_time"] < 1:
+            raise ValueError("max_time must be a positive number.")
         if not isinstance(params["exclude_small"], bool):
             raise TypeError("exclude_small must be a boolean.")
         if not isinstance(params["silent"], bool):

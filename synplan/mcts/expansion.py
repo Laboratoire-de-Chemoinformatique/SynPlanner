@@ -55,7 +55,7 @@ class PolicyNetworkFunction:
         :param pyg_graph: PyG graph of the molecule.
         :return: Embedding tensor.
         """
-        return self.policy_net.embedder(pyg_graph, self.policy_net.batch_size)
+        return self.policy_net.embedder(pyg_graph)
 
     def get_logits(self, precursor: Precursor) -> torch.Tensor | None:
         """Get raw logits from the policy network (before sigmoid/softmax).

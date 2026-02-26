@@ -221,7 +221,7 @@ def cgr_from_reaction_rule(reaction_rule: ReactionContainer) -> CGRContainer:
     return cgr_rule
 
 
-def hash_from_reaction_rule(reaction_rule: ReactionContainer) -> hash:
+def hash_from_reaction_rule(reaction_rule: ReactionContainer) -> int:
     """Generates hash for the given reaction rule.
 
     :param reaction_rule: The reaction rule to be converted.

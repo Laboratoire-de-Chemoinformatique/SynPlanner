@@ -19,10 +19,11 @@ from chython.reactor import Reactor
 from tqdm.auto import tqdm
 
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
-from synplan.chem.utils import reverse_reaction
+from synplan.chem.utils import reverse_reaction, unite_molecules
 from synplan.utils.config import RuleExtractionConfig
 from synplan.utils.files import (
     RawReactionReader,
+    load_rule_index_mapping_tsv,
     parse_reaction,
 )
 
@@ -941,3 +942,43 @@ def extract_rules_from_reactions(
     _print_extraction_summary(
         n_processed, sorted_rules, filter_stats, error_counts, _error_path
     )
+
+    # Generate policy training mapping file: product_smiles + rule_id per reaction.
+    policy_data_path = f"{reaction_rules_path_base}_policy_data.tsv"
+    reaction_rule_pairs = load_rule_index_mapping_tsv(rules_tsv_path)
+    n_mapped = 0
+    n_parse_errors = 0
+    n_small_products = 0
+    raw_reader = RawReactionReader(reaction_data_path)
+    with open(policy_data_path, "w", encoding="utf-8") as out:
+        out.write("product_smiles\trule_id\n")
+        for reaction_id, raw_item in enumerate(raw_reader):
+            rule_id = reaction_rule_pairs.get(reaction_id)
+            if rule_id is None:
+                continue
+            try:
+                reaction = parse_reaction(raw_item, fmt=raw_reader.format)
+                product = unite_molecules(reaction.products)
+                if product.atoms_count < 6:
+                    n_small_products += 1
+                out.write(f"{str(product)}\t{rule_id}\n")
+                n_mapped += 1
+            except Exception:
+                n_parse_errors += 1
+                continue
+    logger.info(
+        "Policy training data: %d examples written to %s", n_mapped, policy_data_path
+    )
+    if n_small_products:
+        logger.warning(
+            "%d reaction(s) had product fewer than 6 heavy atoms.",
+            n_small_products,
+        )
+    if n_parse_errors:
+        logger.warning(
+            "%d reaction(s) could not be parsed for policy data. "
+            "Consider running 'synplan reaction_standardizing' and "
+            "'synplan reaction_filtering' before rule extraction to ensure "
+            "clean input data.",
+            n_parse_errors,
+        )

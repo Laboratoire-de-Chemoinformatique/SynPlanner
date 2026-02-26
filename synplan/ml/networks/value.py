@@ -40,7 +40,7 @@ class ValueNetwork(MCTSNetwork, LightningModule, ABC):
         :return: The predicted synthesisability (between 0 and 1).
         """
 
-        x = self.embedder(batch, self.batch_size)
+        x = self.embedder(batch)
         x = torch.sigmoid(self.predictor(x))
         return x
 
@@ -55,7 +55,7 @@ class ValueNetwork(MCTSNetwork, LightningModule, ABC):
 
         true_y = batch.y.float()
         true_y = torch.unsqueeze(true_y, -1)
-        x = self.embedder(batch, self.batch_size)
+        x = self.embedder(batch)
         pred_y = self.predictor(x)
         # calc loss func
         loss = binary_cross_entropy_with_logits(pred_y, true_y)
