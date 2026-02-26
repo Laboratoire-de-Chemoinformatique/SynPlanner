@@ -42,7 +42,7 @@ also works as a general reaction data cleaner.
 
 .. code-block:: bash
 
-    synplan reaction_standardizing --config configs/standardization.yaml --input reaction_data_original.smi --output reaction_data_standardized.smi
+    synplan reaction_standardizing --config configs/reactions_standardization.yaml --input reaction_data_original.smi --output reaction_data_standardized.smi
 
 **Parameters**:
     - ``config`` - the path to the configuration file.
@@ -58,7 +58,7 @@ filters will be stored in the output file.
 
 .. code-block:: bash
 
-    synplan reaction_filtering --config configs/filtration.yaml --input reaction_data_standardized.smi --output reaction_data_filtered.smi
+    synplan reaction_filtering --config configs/reactions_filtration.yaml --input reaction_data_standardized.smi --output reaction_data_filtered.smi
 
 **Parameters**:
     - ``config`` - the path to the configuration file.
@@ -69,16 +69,19 @@ Reaction rule extraction
 ---------------------------
 Reaction rules extraction should be performed for high-quality (cleaned, standardized, and filtered) reaction data
 to ensure the extraction of meaningful reaction rules. The specificity of extracted reaction rules can be adjusted by
-the configuration file (see the details here). The extracted reaction rules will be stored in TSV format (or legacy pickle format).
+the configuration file (see the details here). The extracted reaction rules will be stored in TSV format.
+A policy training mapping file (``*_policy_data.tsv``) is also generated alongside the rules,
+containing product SMILES and rule IDs ready for ranking policy training.
 
 .. code-block:: bash
 
-    synplan rule_extracting --config configs/extraction.yaml --input reaction_data_filtered.smi --output reaction_rules.tsv
+    synplan rule_extracting --config configs/rules_extraction.yaml --input reaction_data_filtered.smi --output reaction_rules.tsv
 
 **Parameters**:
     - ``config`` - the path to the configuration file.
     - ``input`` - the path to the file (.smi or .rdf) with reactions for reaction rule extraction.
-    - ``output`` - the path to the file (.tsv or .pickle) where extracted reaction rules will be stored.
+    - ``output`` - the path to the file (.tsv) where extracted reaction rules will be stored.
+      A ``*_policy_data.tsv`` file for ranking policy training is generated alongside.
 
 Policy networks training
 ---------------------------
@@ -89,19 +92,18 @@ types of policy networks is configured by the same configuration file (see the d
 
 .. code-block:: bash
 
-    synplan ranking_policy_training --config configs/policy.yaml --reaction_data reaction_data_filtered.smi --reaction_rules reaction_rules.tsv --results_dir ranking_policy_network
+    synplan ranking_policy_training --config configs/policy_training.yaml --policy_data reaction_rules_policy_data.tsv --results_dir ranking_policy_network
 
 **Parameters**:
     - ``config`` - the path to the policy configuration file.
-    - ``reaction_data`` - the path to the file with reactions for ranking policy training.
-    - ``reaction_rules`` - the path to the file with extracted reaction rules.
+    - ``policy_data`` - the path to the policy training mapping file (``*_policy_data.tsv``) generated during rule extraction.
     - ``results_dir`` - the path to the directory where the trained policy network will be stored.
 
 **Filtering policy network**
 
 .. code-block:: bash
 
-    synplan filtering_policy_training --config configs/policy.yaml --molecule_data molecules_data.smi --reaction_rules reaction_rules.tsv --results_dir filtering_policy_network
+    synplan filtering_policy_training --config configs/policy_training.yaml --molecule_data molecules_data.smi --reaction_rules reaction_rules.tsv --results_dir filtering_policy_network
 
 **Parameters**:
     - ``config`` - the path to the policy configuration file.
@@ -134,7 +136,7 @@ Retrosynthetic planning can be performed in ``SynPlanner``.
 
 .. code-block:: bash
 
-    synplan planning --config configs/planning.yaml --targets targets.smi --reaction_rules reaction_rules.tsv --building_blocks building_blocks_stand.smi --policy_network policy_network.ckpt --results_dir planning_results
+    synplan planning --config configs/planning_standard.yaml --targets targets.smi --reaction_rules reaction_rules.tsv --building_blocks building_blocks_stand.smi --policy_network policy_network.ckpt --results_dir planning_results
 
 **Parameters**:
     - ``config`` - the path to the configuration file.

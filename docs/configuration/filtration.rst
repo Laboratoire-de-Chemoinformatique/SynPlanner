@@ -10,17 +10,17 @@ The list and order of application of filters can be specified in the configurati
 Download example configuration
 ------------------------------
 
-- GitHub: `configs/filtration.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/filtration.yaml>`_
+- GitHub: `configs/reactions_filtration.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/reactions_filtration.yaml>`_
 
 Quickstart (CLI)
 ----------------
 
-Run reaction filtration using the repository configuration in ``configs/filtration.yaml``:
+Run reaction filtration using the repository configuration in ``configs/reactions_filtration.yaml``:
 
 .. code-block:: bash
 
    synplan reaction_filtering \
-     --config configs/filtration.yaml \
+     --config configs/reactions_filtration.yaml \
      --input reaction_data_standardized.smi \
      --output reaction_data_filtered.smi
 
@@ -34,7 +34,7 @@ Run reaction filtration using the repository configuration in ``configs/filtrati
       min_bonds_number: 1
       max_bonds_number: 6
     small_molecules_config:
-      limit: 6
+      mol_max_size: 6
 
 **Configuration parameters**
 

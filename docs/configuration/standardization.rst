@@ -10,17 +10,17 @@ The list and order of application of standardizers can be specified in the confi
 Download example configuration
 ------------------------------
 
-- GitHub: `configs/standardization.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/standardization.yaml>`_
+- GitHub: `configs/reactions_standardization.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/reactions_standardization.yaml>`_
 
 Quickstart (CLI)
 ----------------
 
-Run reaction standardization using the repository configuration in ``configs/standardization.yaml``:
+Run reaction standardization using the repository configuration in ``configs/reactions_standardization.yaml``:
 
 .. code-block:: bash
 
    synplan reaction_standardizing \
-     --config configs/standardization.yaml \
+     --config configs/reactions_standardization.yaml \
      --input reaction_data_original.smi \
      --output reaction_data_standardized.smi
 

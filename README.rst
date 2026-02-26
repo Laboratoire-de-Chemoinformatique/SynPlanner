@@ -75,7 +75,7 @@ Prebuilt images are published to GHCR for Linux/AMD64.
 
 .. code-block:: bash
 
-    VERSION=1.3.2
+    VERSION=1.4.0
 
     # CLI: pull and show help
     docker pull ghcr.io/laboratoire-de-chemoinformatique/synplanner:${VERSION}-cli-amd64
@@ -101,14 +101,24 @@ Get started with ``SynPlanner`` in a few steps:
 
         synplan download_preset --preset synplanner-article --save_to synplan_data
 
-2.  **Explore Planning:**
-    Once the data is downloaded, you can try running a planning example. For more detailed instructions, see the `Tutorials`_ sections.
+2.  **Prepare a targets file:**
+    Create a plain-text file with one SMILES per line, e.g.:
 
     .. code-block:: bash
 
-        synplan planning --config configs/planning.yaml --targets targets.smi --reaction_rules synplan_data/policy/supervised_gcn/v1/reaction_rules.tsv --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv --policy_network synplan_data/policy/supervised_gcn/v1/v1/ranking_policy.ckpt --results_dir planning_results_quickstart
+        echo "NC1(C(=O)N[C@@H](CCO)c2ccc(Cl)cc2)CCN(c2nc[nH]c3nccc2-3)CC1" > targets.smi
 
-    (Note: Ensure ``configs/planning.yaml`` exists or adjust the path accordingly. You might need to create a basic one or use one from the cloned repository if you haven't installed all package data globally.)
+3.  **Run planning:**
+
+    .. code-block:: bash
+
+        synplan planning \
+          --config configs/planning_standard.yaml \
+          --targets targets.smi \
+          --reaction_rules synplan_data/policy/supervised_gcn/v1/reaction_rules.tsv \
+          --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \
+          --policy_network synplan_data/policy/supervised_gcn/v1/v1/ranking_policy.ckpt \
+          --results_dir planning_results_quickstart
 
 📓 Colab tutorials
 -----------------------------

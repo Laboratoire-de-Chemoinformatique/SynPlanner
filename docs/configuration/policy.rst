@@ -9,17 +9,17 @@ The ranking or filtering policy network architecture and training hyperparameter
 Download example configuration
 ------------------------------
 
-- GitHub: `configs/policy.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/policy.yaml>`_
+- GitHub: `configs/policy_training.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/policy_training.yaml>`_
 
 Quickstart (CLI)
 ----------------
 
-Train a policy network using the repository configuration in ``configs/policy.yaml``:
+Train a policy network using the repository configuration in ``configs/policy_training.yaml``:
 
 .. code-block:: bash
 
    synplan ranking_policy_training \
-     --config configs/policy.yaml \
+     --config configs/policy_training.yaml \
      --reaction_data reaction_data_filtered.smi \
      --reaction_rules reaction_rules.tsv \
      --results_dir ranking_policy_network

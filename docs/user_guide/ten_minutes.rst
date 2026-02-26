@@ -268,7 +268,7 @@ Batch-plan a list of targets from the command line:
 .. code-block:: bash
 
     synplan planning \
-      --config configs/planning.yaml \
+      --config configs/planning_standard.yaml \
       --targets targets.smi \
       --reaction_rules synplan_data/policy/supervised_gcn/v1/reaction_rules.tsv \
       --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \
@@ -284,7 +284,7 @@ To use the value network for faster evaluation (advanced):
 .. code-block:: bash
 
     synplan planning \
-      --config configs/planning.yaml \
+      --config configs/planning_standard.yaml \
       --targets targets.smi \
       --reaction_rules synplan_data/policy/supervised_gcn/v1/reaction_rules.tsv \
       --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \
@@ -309,7 +309,7 @@ Or generate visualisations from Python:
 
     from synplan.utils.visualisation import generate_results_html
 
-    generate_results_html(source=tree, html_path="routes.html")
+    generate_results_html(tree=tree, html_path="routes.html")
 
 Next steps
 ----------

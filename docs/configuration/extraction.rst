@@ -9,17 +9,17 @@ The reaction rules extraction protocol is flexible and can adjust the specificit
 Download example configuration
 --------------------------------
 
-- GitHub: `configs/extraction.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/extraction.yaml>`_
+- GitHub: `configs/rules_extraction.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/rules_extraction.yaml>`_
 
 Quickstart (CLI)
 ----------------
 
-Extract rules using the repository configuration in ``configs/extraction.yaml``:
+Extract rules using the repository configuration in ``configs/rules_extraction.yaml``:
 
 .. code-block:: bash
 
    synplan rule_extracting \
-     --config configs/extraction.yaml \
+     --config configs/rules_extraction.yaml \
      --input reaction_data_filtered.smi \
      --output reaction_rules.tsv
 
@@ -39,12 +39,10 @@ Extract rules using the repository configuration in ``configs/extraction.yaml``:
     atom_info_retention:
       reaction_center:
         neighbors: True
-        hybridization: True
         implicit_hydrogens: False
         ring_sizes: False
       environment:
         neighbors: False
-        hybridization: False
         implicit_hydrogens: False
         ring_sizes: False
 
