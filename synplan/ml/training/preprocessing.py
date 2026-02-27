@@ -4,6 +4,7 @@ network."""
 import logging
 import os
 from abc import ABC
+from concurrent.futures.process import BrokenProcessPool
 from typing import Any
 
 import ray
@@ -121,7 +122,7 @@ class RankingPolicyDataset(InMemoryDataset):
         self._product_keys: list[str] | None = None
 
         if output_path and os.path.exists(output_path):
-            data, slices, product_keys = load_pyg_dataset(output_path)
+            data, slices, product_keys, self._sf_handle = load_pyg_dataset(output_path)
             self.data, self.slices = data, slices
             self._product_keys = product_keys
         else:
@@ -154,31 +155,43 @@ class RankingPolicyDataset(InMemoryDataset):
         list_of_graphs: list[Data] = []
         product_keys: list[str] = []
 
-        if workers <= 1:
-            results = (
-                _convert_ranking_item(item)
-                for item in tqdm(
-                    items,
-                    desc="Building policy dataset: ",
-                    bar_format="{desc}{n}/{total} [{elapsed}]",
-                )
-            )
-        else:
-            results = tqdm(
-                process_pool_map_stream(
-                    items,
-                    _convert_ranking_item,
-                    max_workers=workers,
-                ),
-                total=len(items),
-                desc=f"Building policy dataset ({workers} workers): ",
+        def _collect_serial():
+            for item in tqdm(
+                items,
+                desc="Building policy dataset: ",
                 bar_format="{desc}{n}/{total} [{elapsed}]",
-            )
+            ):
+                result = _convert_ranking_item(item)
+                if result is not None:
+                    list_of_graphs.append(result[0])
+                    product_keys.append(result[1])
 
-        for result in results:
-            if result is not None:
-                list_of_graphs.append(result[0])
-                product_keys.append(result[1])
+        if workers <= 1:
+            _collect_serial()
+        else:
+            try:
+                for result in tqdm(
+                    process_pool_map_stream(
+                        items,
+                        _convert_ranking_item,
+                        max_workers=workers,
+                    ),
+                    total=len(items),
+                    desc=f"Building policy dataset ({workers} workers): ",
+                    bar_format="{desc}{n}/{total} [{elapsed}]",
+                ):
+                    if result is not None:
+                        list_of_graphs.append(result[0])
+                        product_keys.append(result[1])
+            except BrokenProcessPool:
+                logging.warning(
+                    "A worker process crashed — falling back to serial. "
+                    "This is usually caused by a malformed SMILES triggering "
+                    "a C-level error in chython."
+                )
+                list_of_graphs.clear()
+                product_keys.clear()
+                _collect_serial()
 
         self._product_keys = product_keys
         data, slices = self.collate(list_of_graphs)
@@ -217,7 +230,7 @@ class FilteringPolicyDataset(InMemoryDataset):
         self.batch_size = 100
 
         if output_path and os.path.exists(output_path):
-            data, slices, _ = load_pyg_dataset(output_path)
+            data, slices, _, self._sf_handle = load_pyg_dataset(output_path)
             self.data, self.slices = data, slices
         else:
             self.data, self.slices = self.prepare_data()
@@ -234,29 +247,32 @@ class FilteringPolicyDataset(InMemoryDataset):
         """
 
         ray.init(num_cpus=self.num_cpus, ignore_reinit_error=True)
-        reaction_rules = load_reaction_rules(self.reaction_rules_path)
-        reaction_rules_ids = ray.put(reaction_rules)
+        try:
+            reaction_rules = load_reaction_rules(self.reaction_rules_path)
+            reaction_rules_ids = ray.put(reaction_rules)
 
-        to_process = Queue(maxsize=self.batch_size * self.num_cpus)
-        processed_data = []
-        results_ids = [
-            preprocess_filtering_policy_molecules.remote(to_process, reaction_rules_ids)
-            for _ in range(self.num_cpus)
-        ]
+            to_process = Queue(maxsize=self.batch_size * self.num_cpus)
+            processed_data = []
+            results_ids = [
+                preprocess_filtering_policy_molecules.remote(
+                    to_process, reaction_rules_ids
+                )
+                for _ in range(self.num_cpus)
+            ]
 
-        with open(self.molecules_path, encoding="utf-8") as inp_data:
-            for molecule in tqdm(
-                inp_data.read().splitlines(),
-                desc="Number of molecules processed: ",
-                bar_format="{desc}{n} [{elapsed}]",
-            ):
+            with open(self.molecules_path, encoding="utf-8") as inp_data:
+                for molecule in tqdm(
+                    inp_data.read().splitlines(),
+                    desc="Number of molecules processed: ",
+                    bar_format="{desc}{n} [{elapsed}]",
+                ):
 
-                to_process.put(molecule)
+                    to_process.put(molecule)
 
-        results = [graph for res in ray.get(results_ids) if res for graph in res]
-        processed_data.extend(results)
-
-        ray.shutdown()
+            results = [graph for res in ray.get(results_ids) if res for graph in res]
+            processed_data.extend(results)
+        finally:
+            ray.shutdown()
 
         for pyg in processed_data:
             pyg.y_rules = pyg.y_rules.to_dense()

@@ -1,6 +1,7 @@
 """Module containing functions for protocol of reaction rules extraction."""
 
 import logging
+import tempfile
 from collections import Counter, defaultdict
 from io import TextIOWrapper
 from itertools import islice
@@ -572,7 +573,8 @@ def process_reaction_batch(
     :param config: Rule extraction configuration.
     :param ignore_errors: If True, log failures and continue.
     :param fmt: Format hint — ``"smi"`` or ``"rdf"``.
-    :return: ``(results, errors, n_multi_product)`` where *errors* is a list of
+    :return: ``(results, errors, n_multi_product)`` where *results* is a list of
+        ``(index, extracted_rules, product_smiles)`` tuples, *errors* is a list of
         ``(original_smiles, stage, error_type, error_message)`` tuples and
         *n_multi_product* is the number of reactions skipped due to multiple products.
     """
@@ -582,10 +584,11 @@ def process_reaction_batch(
     for index, raw_item in batch:
         try:
             reaction = parse_reaction(raw_item, fmt=fmt)
+            product_smi = str(unite_molecules(reaction.products))
             extracted_rules, skipped = extract_rules(config, reaction)
             if skipped:
                 n_multi_product += 1
-            extracted_rules_list.append((index, extracted_rules))
+            extracted_rules_list.append((index, extracted_rules, product_smi))
         except Exception as e:
             if not ignore_errors:
                 raise
@@ -615,6 +618,7 @@ def process_completed_batch(
     error_file: TextIOWrapper | None = None,
     error_counts: Counter | None = None,
     multi_product_count: list[int] | None = None,
+    products_file: TextIOWrapper | None = None,
 ) -> None:
     """
     Processes completed batches of reactions, updating the rules statistics and
@@ -629,6 +633,8 @@ def process_completed_batch(
     :param error_counts: Optional counter to accumulate error categories.
     :param multi_product_count: Single-element list used as mutable accumulator for
         multi-product reaction count.
+    :param products_file: Optional file handle to write ``reaction_id\\tproduct_smiles``
+        pairs for later policy data generation.
     :return: None
 
     """
@@ -641,8 +647,10 @@ def process_completed_batch(
         del futures[ready_id[0]]
         return
 
-    for index, extracted_rules in results:
+    for index, extracted_rules, product_smi in results:
         _update_rules_statistics(rules_statistics, index, extracted_rules)
+        if products_file is not None:
+            products_file.write(f"{index}\t{product_smi}\n")
 
     for orig, stage, etype, emsg in errors:
         if error_file is not None:
@@ -711,6 +719,7 @@ def _extract_rules_serial(
     ignore_errors: bool = False,
     error_file: TextIOWrapper | None = None,
     error_counts: Counter | None = None,
+    products_file: TextIOWrapper | None = None,
     fmt: str = "smi",
 ) -> tuple[int, int]:
     """Serial rules extraction path used when a single CPU is requested.
@@ -728,10 +737,13 @@ def _extract_rules_serial(
         n_processed += 1
         try:
             reaction = parse_reaction(raw_item, fmt=fmt)
+            product_smi = str(unite_molecules(reaction.products))
             extracted_rules, skipped = extract_rules(config, reaction)
             if skipped:
                 n_multi_product += 1
             _update_rules_statistics(rules_statistics, index, extracted_rules)
+            if products_file is not None:
+                products_file.write(f"{index}\t{product_smi}\n")
         except Exception as e:
             if not ignore_errors:
                 raise
@@ -851,6 +863,12 @@ def extract_rules_from_reactions(
     raw_reader = RawReactionReader(reaction_data_path)
     fmt = raw_reader.format
 
+    # Temp file to store reaction_id → product_smiles during extraction,
+    # so we don't need to re-parse the entire input file for policy data.
+    products_tmp = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".tsv", delete=False, encoding="utf-8"
+    )
+
     try:
         # Simple serial path for a single CPU.
         if num_cpus <= 1:
@@ -861,6 +879,7 @@ def extract_rules_from_reactions(
                 ignore_errors=ignore_errors,
                 error_file=error_file,
                 error_counts=error_counts,
+                products_file=products_tmp,
                 fmt=fmt,
             )
         else:
@@ -894,6 +913,7 @@ def extract_rules_from_reactions(
                             error_file=error_file,
                             error_counts=error_counts,
                             multi_product_count=multi_product_count,
+                            products_file=products_tmp,
                         )
 
             if batch:
@@ -909,13 +929,16 @@ def extract_rules_from_reactions(
                     error_file=error_file,
                     error_counts=error_counts,
                     multi_product_count=multi_product_count,
+                    products_file=products_tmp,
                 )
 
             n_multi_product = multi_product_count[0]
-            ray.shutdown()
     finally:
+        if ray.is_initialized():
+            ray.shutdown()
         if error_file is not None:
             error_file.close()
+        products_tmp.close()
 
     sorted_rules, filter_stats = sort_rules(
         extracted_rules_and_statistics,
@@ -943,42 +966,31 @@ def extract_rules_from_reactions(
         n_processed, sorted_rules, filter_stats, error_counts, _error_path
     )
 
-    # Generate policy training mapping file: product_smiles + rule_id per reaction.
+    # Generate policy training mapping file from the temp products file.
+    # No re-parsing needed — product SMILES were captured during extraction.
     policy_data_path = f"{reaction_rules_path_base}_policy_data.tsv"
     reaction_rule_pairs = load_rule_index_mapping_tsv(rules_tsv_path)
     n_mapped = 0
-    n_parse_errors = 0
     n_small_products = 0
-    raw_reader = RawReactionReader(reaction_data_path)
-    with open(policy_data_path, "w", encoding="utf-8") as out:
-        out.write("product_smiles\trule_id\n")
-        for reaction_id, raw_item in enumerate(raw_reader):
-            rule_id = reaction_rule_pairs.get(reaction_id)
-            if rule_id is None:
-                continue
-            try:
-                reaction = parse_reaction(raw_item, fmt=raw_reader.format)
-                product = unite_molecules(reaction.products)
-                if product.atoms_count < 6:
-                    n_small_products += 1
-                out.write(f"{str(product)}\t{rule_id}\n")
+    products_tmp_path = Path(products_tmp.name)
+    try:
+        with (
+            open(products_tmp_path, encoding="utf-8") as products_in,
+            open(policy_data_path, "w", encoding="utf-8") as out,
+        ):
+            out.write("product_smiles\trule_id\n")
+            for line in products_in:
+                reaction_id_str, product_smi = line.rstrip("\n").split("\t", 1)
+                rule_id = reaction_rule_pairs.get(int(reaction_id_str))
+                if rule_id is None:
+                    continue
+                out.write(f"{product_smi}\t{rule_id}\n")
                 n_mapped += 1
-            except Exception:
-                n_parse_errors += 1
-                continue
-    logger.info(
-        "Policy training data: %d examples written to %s", n_mapped, policy_data_path
+    finally:
+        products_tmp_path.unlink(missing_ok=True)
+
+    n_expected = len(reaction_rule_pairs)
+    print(
+        f"Policy training data: {n_mapped}/{n_expected} examples written to "
+        f"{policy_data_path}"
     )
-    if n_small_products:
-        logger.warning(
-            "%d reaction(s) had product fewer than 6 heavy atoms.",
-            n_small_products,
-        )
-    if n_parse_errors:
-        logger.warning(
-            "%d reaction(s) could not be parsed for policy data. "
-            "Consider running 'synplan reaction_standardizing' and "
-            "'synplan reaction_filtering' before rule extraction to ensure "
-            "clean input data.",
-            n_parse_errors,
-        )

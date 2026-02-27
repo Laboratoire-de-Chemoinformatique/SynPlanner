@@ -12,7 +12,8 @@ import json
 from pathlib import Path
 
 import torch
-from safetensors.torch import load_file, save_file
+from safetensors import safe_open
+from safetensors.torch import save_file
 from torch_geometric.data.data import Data
 
 
@@ -91,14 +92,20 @@ def save_pyg_dataset(
 
 def load_pyg_dataset(
     path: str | Path,
-) -> tuple[Data, dict, list[str] | None]:
-    """Load a collated PyG dataset from safetensors.
+) -> tuple[Data, dict, list[str] | None, safe_open | None]:
+    """Load a collated PyG dataset from safetensors with memory mapping.
 
-    Returns ``(data, slices, product_keys_or_None)``.
+    Tensors are memory-mapped: the OS pages in data on demand instead of
+    loading the entire file into RAM.  The returned ``handle`` keeps the
+    mmap alive — the caller **must** hold a reference to it for as long as
+    the tensors are used.
+
+    Returns ``(data, slices, product_keys_or_None, handle)``.
     """
     path = Path(path)
 
-    tensors = load_file(str(path))
+    handle = safe_open(str(path), framework="pt", device="cpu")
+    tensors = {key: handle.get_tensor(key) for key in handle.keys()}
     data, slices = _unflatten(tensors)
 
     meta_path = path.with_suffix(".meta.json")
@@ -107,4 +114,4 @@ def load_pyg_dataset(
         meta = json.loads(meta_path.read_text())
         product_keys = meta.get("product_keys")
 
-    return data, slices, product_keys
+    return data, slices, product_keys, handle

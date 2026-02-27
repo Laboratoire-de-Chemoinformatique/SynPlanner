@@ -1259,10 +1259,11 @@ def standardize_reactions_from_file(
                 _flush(done[0], write_fn)
                 pending.pop(done[0], None)
     finally:
+        if ray.is_initialized():
+            ray.shutdown()
         if error_file is not None:
             error_file.close()
 
     bar.close()
-    ray.shutdown()
 
     _print_error_summary(error_counts, n_processed, n_std, _error_path)

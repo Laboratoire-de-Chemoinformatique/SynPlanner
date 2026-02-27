@@ -61,7 +61,8 @@ def process_pool_map_stream(
     if max_pending < 1:
         max_pending = 1
 
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    executor = ProcessPoolExecutor(max_workers=max_workers)
+    try:
         iterator = iter(items)
         pending = set()
 
@@ -84,3 +85,5 @@ def process_pool_map_stream(
                     pass
 
                 yield future.result()
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)

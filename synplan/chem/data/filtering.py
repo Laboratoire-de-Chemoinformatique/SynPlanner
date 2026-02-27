@@ -1192,8 +1192,9 @@ def filter_reactions_from_file(
                     error_counts=error_counts,
                 )
 
-        ray.shutdown()
         _print_filtering_summary(lines_counter, n_filtered, error_counts, _error_path)
     finally:
+        if ray.is_initialized():
+            ray.shutdown()
         if error_file is not None:
             error_file.close()
