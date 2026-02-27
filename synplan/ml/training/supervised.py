@@ -144,10 +144,11 @@ def create_policy_dataset(
     :return: A ``LightningDataset`` with train and validation splits.
     """
 
-    # Compute cache path: explicit output_path wins, otherwise auto in tmp/
+    # Compute cache path: explicit output_path wins, otherwise auto next
+    # to the input data so the cache is shared across experiments.
     if not output_path and cache:
-        cache_dir = Path(results_dir) / "tmp"
         if dataset_type == "ranking" and policy_data_path:
+            cache_dir = Path(policy_data_path).resolve().parent / ".cache"
             digest = cache_digest(policy_data_path, extra="ranking")
             output_path = str(cache_dir / f"ranking_{digest}.safetensors")
         elif (
@@ -155,6 +156,7 @@ def create_policy_dataset(
             and molecules_or_reactions_path
             and reaction_rules_path
         ):
+            cache_dir = Path(molecules_or_reactions_path).resolve().parent / ".cache"
             digest = cache_digest(
                 molecules_or_reactions_path, reaction_rules_path, extra="filtering"
             )
