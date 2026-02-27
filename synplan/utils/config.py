@@ -247,6 +247,10 @@ class PolicyNetworkConfig(ConfigABC):
     :param num_conv_layers: Number of convolutional layers in the network.
     :param num_epoch: Number of training epochs.
     :param policy_type: Mode of operation, either 'filtering' or 'ranking'.
+    :param logger: Training logger configuration. ``None`` disables logging.
+        A dict with ``"type"`` key (``"csv"``, ``"tensorboard"``, ``"mlflow"``,
+        or ``"wandb"``) and optional logger-specific parameters passed to the
+        PyTorch Lightning logger constructor.
     """
 
     policy_type: str = "ranking"
@@ -258,6 +262,9 @@ class PolicyNetworkConfig(ConfigABC):
     num_conv_layers: int = 5
     num_epoch: int = 100
     weights_path: str | None = None
+
+    # training logger (None disables logging, or dict with "type" + logger kwargs)
+    logger: dict | None = None
 
     # for filtering policy
     priority_rules_fraction: float = 0.5
@@ -324,6 +331,18 @@ class PolicyNetworkConfig(ConfigABC):
 
         if not isinstance(params["top_rules"], int) or params["top_rules"] <= 0:
             raise ValueError("top_rules must be a positive integer.")
+
+        logger = params.get("logger")
+        if logger is not None:
+            if not isinstance(logger, dict):
+                raise ValueError("logger must be a dictionary or null.")
+            if "type" not in logger:
+                raise ValueError("logger dict must contain a 'type' key.")
+            valid_types = ("csv", "tensorboard", "mlflow", "wandb")
+            if logger["type"] not in valid_types:
+                raise ValueError(
+                    f"logger type must be one of {valid_types}, got '{logger['type']}'"
+                )
 
 
 @dataclass

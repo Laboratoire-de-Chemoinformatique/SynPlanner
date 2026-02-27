@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from synplan.ml.training.preprocessing import RankingPolicyDataset
+from synplan.utils.cache import cache_digest
 from synplan.ml.training.supervised import _stratified_ranking_split
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
@@ -15,7 +16,7 @@ POLICY_DATA = str(DATA_DIR / "policy_data_small.tsv")
 @pytest.fixture(scope="module")
 def dataset(tmp_path_factory):
     """Build dataset once for the whole module."""
-    cache = str(tmp_path_factory.mktemp("cache") / "ds.dt")
+    cache = str(tmp_path_factory.mktemp("cache") / "ds.safetensors")
     return RankingPolicyDataset(policy_data_path=POLICY_DATA, output_path=cache)
 
 
@@ -129,3 +130,18 @@ def test_split_has_validation(dataset):
     """With rules >20, the validation set must be non-empty."""
     _, val = _stratified_ranking_split(dataset)
     assert len(val) > 0, "Validation set is empty"
+
+
+# ── Lightweight cache digest test ─────────────────────────────
+
+
+def test_cache_digest_changes_with_content(tmp_path):
+    """Digest must change when file content changes."""
+    f = tmp_path / "data.tsv"
+    f.write_text("col1\tcol2\nA\t1\nB\t2\n")
+    d1 = cache_digest(str(f), extra="test")
+
+    f.write_text("col1\tcol2\nA\t1\nB\t2\nC\t3\n")
+    d2 = cache_digest(str(f), extra="test")
+
+    assert d1 != d2, "Digest should change when file content changes"

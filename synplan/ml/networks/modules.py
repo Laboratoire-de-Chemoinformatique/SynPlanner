@@ -273,9 +273,7 @@ class MCTSNetwork(LightningModule, ABC):
             print_change_log=False,
         )
 
-        lr_scheduler = ReduceLROnPlateau(
-            optimizer, patience=3, factor=0.8, min_lr=5e-5
-        )
+        lr_scheduler = ReduceLROnPlateau(optimizer, patience=3, factor=0.8, min_lr=5e-5)
         scheduler = {
             "scheduler": lr_scheduler,
             "reduce_on_plateau": True,

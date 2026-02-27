@@ -27,6 +27,7 @@ dependencies = [
   "rdkit>=2023.9.1",
   "matplotlib>=3.7",
   "pyyaml>=6.0",
+  "safetensors>=0.4",
 ]
 
 # Extras to select PyTorch variant - required for uv users

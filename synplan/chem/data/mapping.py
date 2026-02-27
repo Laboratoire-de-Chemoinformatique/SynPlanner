@@ -260,7 +260,9 @@ def map_reaction(
     model.to(dev).eval()
 
     with torch.no_grad():
-        attns = _batched_attention(model, [rxn], batch_size=1, device=dev, use_amp=use_amp)
+        attns = _batched_attention(
+            model, [rxn], batch_size=1, device=dev, use_amp=use_amp
+        )
 
     _map_reaction(rxn, attns[0])
     return rxn

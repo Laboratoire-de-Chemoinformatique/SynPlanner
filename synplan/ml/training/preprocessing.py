@@ -20,7 +20,9 @@ from torch_geometric.data.makedirs import makedirs
 from torch_geometric.transforms import ToUndirected
 from tqdm.auto import tqdm
 
+from synplan.utils.cache import load_pyg_dataset, save_pyg_dataset
 from synplan.utils.loading import load_reaction_rules
+from synplan.utils.parallel import default_num_workers, process_pool_map_stream
 
 
 class ValueNetworkDataset(InMemoryDataset, ABC):
@@ -77,6 +79,24 @@ class ValueNetworkDataset(InMemoryDataset, ABC):
         return data, slices
 
 
+def _convert_ranking_item(item: tuple[str, str]) -> tuple[Data, str] | None:
+    """Convert a (product_smiles, rule_id_str) pair into a labelled PyG graph.
+
+    Module-level function so it can be pickled by :class:`ProcessPoolExecutor`.
+    Returns ``(pyg_graph, product_smiles)`` or ``None`` on failure.
+    """
+    product_smi, rule_id_str = item
+    try:
+        molecule = smiles(product_smi)
+        pyg_graph = mol_to_pyg(molecule)
+        if pyg_graph is not None:
+            pyg_graph.y_rules = torch.tensor([int(rule_id_str)], dtype=torch.long)
+            return pyg_graph, product_smi
+    except Exception:
+        return None
+    return None
+
+
 class RankingPolicyDataset(InMemoryDataset):
     """Ranking policy network dataset.
 
@@ -84,25 +104,26 @@ class RankingPolicyDataset(InMemoryDataset):
     ``rule_id`` columns) produced by :func:`extract_rules_from_reactions`.
     """
 
-    def __init__(self, policy_data_path: str, output_path: str):
+    def __init__(self, policy_data_path: str, output_path: str, num_workers: int = 0):
         """Initializes a ranking policy network dataset.
 
         :param policy_data_path: Path to the policy training mapping file
             (``*_policy_data.tsv``) generated during rule extraction.
         :param output_path: Path where the cached PyG dataset will be saved.
+        :param num_workers: CPU workers for parallel graph conversion.
+            ``0`` auto-detects via :func:`default_num_workers`.
         """
         super().__init__(None, None, None)
 
         self.policy_data_path = policy_data_path
         self.output_path = output_path
+        self.num_workers = num_workers
         self._product_keys: list[str] | None = None
 
         if output_path and os.path.exists(output_path):
-            saved = torch.load(self.output_path, weights_only=False)
-            if isinstance(saved, tuple) and len(saved) == 3:
-                self.data, self.slices, self._product_keys = saved
-            else:
-                self.data, self.slices = saved
+            data, slices, product_keys = load_pyg_dataset(output_path)
+            self.data, self.slices = data, slices
+            self._product_keys = product_keys
         else:
             self.data, self.slices = self.prepare_data()
 
@@ -115,36 +136,54 @@ class RankingPolicyDataset(InMemoryDataset):
 
         :return: The collated PyTorch Geometric data and slices.
         """
-        list_of_graphs = []
-        product_keys: list[str] = []
-
+        # 1. Read TSV into a list of (smiles, rule_id) pairs
+        items: list[tuple[str, str]] = []
         with open(self.policy_data_path, encoding="utf-8") as f:
             f.readline()  # skip header
-            for line in tqdm(
-                f,
-                desc="Building policy dataset: ",
-                bar_format="{desc}{n} [{elapsed}]",
-            ):
+            for line in f:
                 parts = line.rstrip("\n").split("\t")
-                product_smi, rule_id_str = parts[0], parts[1]
-                try:
-                    molecule = smiles(product_smi)
-                    pyg_graph = mol_to_pyg(molecule)
-                    if pyg_graph is not None:
-                        pyg_graph.y_rules = torch.tensor(
-                            [int(rule_id_str)], dtype=torch.long
-                        )
-                        list_of_graphs.append(pyg_graph)
-                        product_keys.append(product_smi)
-                except Exception as e:
-                    logging.debug(e)
-                    continue
+                items.append((parts[0], parts[1]))
+
+        # 2. Convert molecules to PyG graphs
+        # Parallel only helps for large datasets; for small ones the process
+        # spawn + PyG Data pickling overhead dominates (especially on macOS).
+        _MIN_ITEMS_FOR_PARALLEL = 5000
+        workers = self.num_workers if self.num_workers > 0 else default_num_workers()
+        if len(items) < _MIN_ITEMS_FOR_PARALLEL:
+            workers = 1
+        list_of_graphs: list[Data] = []
+        product_keys: list[str] = []
+
+        if workers <= 1:
+            results = (
+                _convert_ranking_item(item)
+                for item in tqdm(
+                    items,
+                    desc="Building policy dataset: ",
+                    bar_format="{desc}{n}/{total} [{elapsed}]",
+                )
+            )
+        else:
+            results = tqdm(
+                process_pool_map_stream(
+                    items,
+                    _convert_ranking_item,
+                    max_workers=workers,
+                ),
+                total=len(items),
+                desc=f"Building policy dataset ({workers} workers): ",
+                bar_format="{desc}{n}/{total} [{elapsed}]",
+            )
+
+        for result in results:
+            if result is not None:
+                list_of_graphs.append(result[0])
+                product_keys.append(result[1])
 
         self._product_keys = product_keys
         data, slices = self.collate(list_of_graphs)
         if self.output_path:
-            makedirs(os.path.dirname(self.output_path))
-            torch.save((data, slices, product_keys), self.output_path)
+            save_pyg_dataset(self.output_path, data, slices, product_keys=product_keys)
 
         return data, slices
 
@@ -178,7 +217,8 @@ class FilteringPolicyDataset(InMemoryDataset):
         self.batch_size = 100
 
         if output_path and os.path.exists(output_path):
-            self.data, self.slices = torch.load(self.output_path, weights_only=False)
+            data, slices, _ = load_pyg_dataset(output_path)
+            self.data, self.slices = data, slices
         else:
             self.data, self.slices = self.prepare_data()
 
@@ -224,8 +264,7 @@ class FilteringPolicyDataset(InMemoryDataset):
 
         data, slices = self.collate(processed_data)
         if self.output_path:
-            makedirs(os.path.dirname(self.output_path))
-            torch.save((data, slices), self.output_path)
+            save_pyg_dataset(self.output_path, data, slices)
 
         return data, slices
 
@@ -439,12 +478,14 @@ def mol_to_pyg(molecule: MoleculeContainer, canonicalize: bool = True) -> Data |
     edge_attr = []
     for atom, neighbour, bond in tmp_molecule.bonds():
         edge_index.append([atom - 1, neighbour - 1])
-        edge_attr.append([
-            float(bond.order == 1),
-            float(bond.order == 2),
-            float(bond.order == 3),
-            float(bond.in_ring),
-        ])
+        edge_attr.append(
+            [
+                float(bond.order == 1),
+                float(bond.order == 2),
+                float(bond.order == 3),
+                float(bond.in_ring),
+            ]
+        )
     edge_index = torch.tensor(edge_index, dtype=torch.long)
     edge_attr = torch.tensor(edge_attr, dtype=torch.float)
 

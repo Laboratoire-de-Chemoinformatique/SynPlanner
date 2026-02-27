@@ -16,11 +16,14 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import Subset, random_split
 from torch_geometric.data.lightning import LightningDataset
 
+from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
+
 from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.training.preprocessing import (
     FilteringPolicyDataset,
     RankingPolicyDataset,
 )
+from synplan.utils.cache import cache_digest
 from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.logging import DisableLogger, HiddenPrints
 
@@ -102,11 +105,14 @@ def create_policy_dataset(
     policy_data_path: str | None = None,
     reaction_rules_path: str | None = None,
     molecules_or_reactions_path: str | None = None,
+    results_dir: str = ".",
     output_path: str = "",
     dataset_type: str = "filtering",
     batch_size: int = 100,
     num_cpus: int = 1,
+    num_workers: int = 0,
     training_data_ratio: float = 0.8,
+    cache: bool = True,
 ):
     """
     Create a training dataset for a policy network.
@@ -115,19 +121,46 @@ def create_policy_dataset(
     by rule extraction).  For filtering policy, provide *reaction_rules_path*
     and *molecules_or_reactions_path*.
 
+    Preprocessed datasets are cached as safetensors files in
+    ``{results_dir}/tmp/`` by default.  The cache filename includes a
+    digest of the input data so it auto-invalidates when inputs change.
+    Pass *output_path* to override the cache location directly.
+
     :param policy_data_path: Path to the policy training mapping file
         (ranking policy only).
     :param reaction_rules_path: Path to the reaction rules file
         (filtering policy).
     :param molecules_or_reactions_path: Path to the molecules file
         (filtering policy).
-    :param output_path: Path to store the processed dataset cache.
+    :param results_dir: Directory for results and dataset cache.
+    :param output_path: Explicit cache file path (overrides auto-computed
+        path). Kept for backward compatibility.
     :param dataset_type: ``'ranking'`` or ``'filtering'``.
     :param batch_size: Batch size for the data module.
     :param training_data_ratio: Train ratio for filtering policy (random split).
     :param num_cpus: Number of CPUs (filtering policy only).
+    :param num_workers: CPU workers for ranking preprocessing (0 = auto).
+    :param cache: If True (default), cache the preprocessed dataset to disk.
     :return: A ``LightningDataset`` with train and validation splits.
     """
+
+    # Compute cache path: explicit output_path wins, otherwise auto in tmp/
+    if not output_path and cache:
+        cache_dir = Path(results_dir) / "tmp"
+        if dataset_type == "ranking" and policy_data_path:
+            digest = cache_digest(policy_data_path, extra="ranking")
+            output_path = str(cache_dir / f"ranking_{digest}.safetensors")
+        elif (
+            dataset_type == "filtering"
+            and molecules_or_reactions_path
+            and reaction_rules_path
+        ):
+            digest = cache_digest(
+                molecules_or_reactions_path, reaction_rules_path, extra="filtering"
+            )
+            output_path = str(cache_dir / f"filtering_{digest}.safetensors")
+    if not cache:
+        output_path = ""
 
     with DisableLogger(), HiddenPrints():
         if dataset_type == "filtering":
@@ -141,6 +174,7 @@ def create_policy_dataset(
             full_dataset = RankingPolicyDataset(
                 policy_data_path=policy_data_path,
                 output_path=output_path,
+                num_workers=num_workers,
             )
 
     # Stratified split for ranking policy; random split for filtering.
@@ -171,6 +205,46 @@ def create_policy_dataset(
     )
 
     return datamodule
+
+
+def _create_logger(logger_config: dict | None, results_path: Path):
+    """Create a PyTorch Lightning logger from a config dict.
+
+    :param logger_config: Dict with ``"type"`` and optional logger kwargs, or None.
+    :param results_path: Default ``save_dir`` for the logger.
+    :return: A Lightning logger instance, or ``False`` to disable logging.
+    """
+    if logger_config is None:
+        return False
+
+    kwargs = dict(logger_config)
+    logger_type = kwargs.pop("type")
+    kwargs.setdefault("save_dir", str(results_path))
+
+    if logger_type == "csv":
+        return CSVLogger(**kwargs)
+    elif logger_type == "tensorboard":
+        return TensorBoardLogger(**kwargs)
+    elif logger_type == "mlflow":
+        try:
+            from pytorch_lightning.loggers import MLFlowLogger
+        except ImportError:
+            raise ImportError(
+                "MLflow logger requires the 'mlflow' package. "
+                "Install it with: pip install mlflow"
+            )
+        return MLFlowLogger(**kwargs)
+    elif logger_type == "wandb":
+        try:
+            from pytorch_lightning.loggers import WandbLogger
+        except ImportError:
+            raise ImportError(
+                "Wandb logger requires the 'wandb' package. "
+                "Install it with: pip install wandb"
+            )
+        return WandbLogger(**kwargs)
+    else:
+        raise ValueError(f"Unknown logger type: '{logger_type}'")
 
 
 def run_policy_training(
@@ -223,7 +297,7 @@ def run_policy_training(
         devices=devices,
         max_epochs=config.num_epoch,
         callbacks=[checkpoint],
-        logger=False,
+        logger=_create_logger(config.logger, results_path),
         gradient_clip_val=1.0,
         enable_progress_bar=enable_progress_bar,
     )

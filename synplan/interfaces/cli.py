@@ -416,21 +416,48 @@ def rule_extracting_cli(
     type=click.Path(),
     help="Path to the directory where the trained policy network will be stored.",
 )
+@click.option(
+    "--workers",
+    "num_workers",
+    default=0,
+    type=int,
+    help="CPU workers for dataset preprocessing (0 = auto-detect).",
+)
+@click.option(
+    "--no-cache",
+    "no_cache",
+    is_flag=True,
+    default=False,
+    help="Disable dataset caching (always reprocess from scratch).",
+)
+@click.option(
+    "--logger",
+    "logger_type",
+    default=None,
+    type=click.Choice(["csv", "tensorboard", "mlflow", "wandb"], case_sensitive=False),
+    help="Enable a training logger (overrides config). Uses default settings with save_dir=results_dir.",
+)
 def ranking_policy_training_cli(
     config_path: str,
     policy_data: str,
     results_dir: str,
+    num_workers: int,
+    no_cache: bool,
+    logger_type: str | None,
 ) -> None:
     """Ranking policy network training."""
     policy_config = PolicyNetworkConfig.from_yaml(config_path)
     policy_config.policy_type = "ranking"
-    policy_dataset_file = os.path.join(results_dir, "policy_dataset.dt")
+    if logger_type is not None:
+        policy_config.logger = {"type": logger_type}
 
     datamodule = create_policy_dataset(
         policy_data_path=policy_data,
-        output_path=policy_dataset_file,
+        results_dir=results_dir,
         dataset_type="ranking",
         batch_size=policy_config.batch_size,
+        num_workers=num_workers,
+        cache=not no_cache,
     )
 
     run_policy_training(datamodule, config=policy_config, results_path=results_dir)
@@ -468,26 +495,44 @@ def ranking_policy_training_cli(
     type=int,
     help="The number of CPUs to use for training set preparation.",
 )
+@click.option(
+    "--no-cache",
+    "no_cache",
+    is_flag=True,
+    default=False,
+    help="Disable dataset caching (always reprocess from scratch).",
+)
+@click.option(
+    "--logger",
+    "logger_type",
+    default=None,
+    type=click.Choice(["csv", "tensorboard", "mlflow", "wandb"], case_sensitive=False),
+    help="Enable a training logger (overrides config). Uses default settings with save_dir=results_dir.",
+)
 def filtering_policy_training_cli(
     config_path: str,
     molecule_data: str,
     reaction_rules: str,
     results_dir: str,
     num_cpus: int,
+    no_cache: bool,
+    logger_type: str | None,
 ):
     """Filtering policy network training."""
 
     policy_config = PolicyNetworkConfig.from_yaml(config_path)
     policy_config.policy_type = "filtering"
-    policy_dataset_file = os.path.join(results_dir, "policy_dataset.ckpt")
+    if logger_type is not None:
+        policy_config.logger = {"type": logger_type}
 
     datamodule = create_policy_dataset(
         reaction_rules_path=reaction_rules,
         molecules_or_reactions_path=molecule_data,
-        output_path=policy_dataset_file,
+        results_dir=results_dir,
         dataset_type="filtering",
         batch_size=policy_config.batch_size,
         num_cpus=num_cpus,
+        cache=not no_cache,
     )
 
     run_policy_training(datamodule, config=policy_config, results_path=results_dir)
