@@ -8,7 +8,12 @@ from torch import Tensor
 from torch.nn import Linear
 from torch.nn.functional import binary_cross_entropy_with_logits, cross_entropy, one_hot
 from torch_geometric.data.batch import Batch
-from torchmetrics.functional.classification import f1_score, recall, specificity
+from torchmetrics.functional.classification import (
+    f1_score,
+    multiclass_accuracy,
+    recall,
+    specificity,
+)
 
 from synplan.ml.networks.modules import MCTSNetwork
 
@@ -84,6 +89,12 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
             f1_y = f1_score(pred_y, true_y, task="multiclass", num_classes=self.n_rules)
 
             metrics = {"loss": loss, "balanced_accuracy_y": ba_y, "f1_score_y": f1_y}
+
+            for k in (5, 10):
+                if self.n_rules > k:
+                    metrics[f"top{k}_accuracy_y"] = multiclass_accuracy(
+                        pred_y, true_y, num_classes=self.n_rules, top_k=k
+                    )
 
         elif self.policy_type == "filtering":
             loss_y = binary_cross_entropy_with_logits(pred_y, true_y.float())
