@@ -271,6 +271,9 @@ class PolicyNetworkConfig(ConfigABC):
     # training logger (None disables logging, or dict with "type" + logger kwargs)
     logger: dict | None = None
 
+    # extra Trainer kwargs (None = use defaults, or dict passed to Lightning Trainer)
+    trainer: dict | None = None
+
     # for filtering policy
     priority_rules_fraction: float = 0.5
     rule_prob_threshold: float = 0.0
@@ -363,6 +366,11 @@ class PolicyNetworkConfig(ConfigABC):
                 raise ValueError(
                     f"logger type must be one of {valid_types}, got '{logger['type']}'"
                 )
+
+        trainer = params.get("trainer")
+        if trainer is not None:
+            if not isinstance(trainer, dict):
+                raise ValueError("trainer must be a dictionary or null.")
 
 
 @dataclass

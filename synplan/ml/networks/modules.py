@@ -292,7 +292,7 @@ class MCTSNetwork(LightningModule, ABC):
         optimizer = AdaBelief(
             self.parameters(),
             lr=self.lr,
-            eps=1e-16,
+            eps=1e-8,
             betas=(0.9, 0.999),
             weight_decouple=True,
             rectify=True,

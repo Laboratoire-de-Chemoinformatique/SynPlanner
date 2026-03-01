@@ -297,7 +297,7 @@ def run_policy_training(
     else:
         enable_progress_bar = True
 
-    trainer = Trainer(
+    trainer_kwargs = dict(
         accelerator=accelerator,
         devices=devices,
         max_epochs=config.num_epoch,
@@ -306,6 +306,10 @@ def run_policy_training(
         gradient_clip_val=1.0,
         enable_progress_bar=enable_progress_bar,
     )
+    if config.trainer:
+        trainer_kwargs.update(config.trainer)
+
+    trainer = Trainer(**trainer_kwargs)
 
     if silent:
         with DisableLogger(), HiddenPrints():
