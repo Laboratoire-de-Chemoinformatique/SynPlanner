@@ -6,17 +6,16 @@ strategies during synthesis.
 """
 
 import logging
-from dataclasses import dataclass
 
 import yaml
+from pydantic import BaseModel, ConfigDict
 from chython import smarts
 from chython.containers import MoleculeContainer
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class FunctionalGroupMatch:
+class FunctionalGroupMatch(BaseModel):
     """A single functional group match in a molecule.
 
     :param name: Human-readable name of the functional group (e.g. "hydroxyl").
@@ -24,6 +23,8 @@ class FunctionalGroupMatch:
     :param atom_indices: Tuple of matched atom indices in the molecule,
         sorted for deduplication.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     name: str
     category: str
@@ -161,14 +162,15 @@ class FunctionalGroupDetector:
         self._cache.clear()
 
 
-@dataclass(frozen=True)
-class HalogenMatch:
+class HalogenMatch(BaseModel):
     """A single halogen group match in a molecule.
 
     :param name: Name of the halogen pattern (e.g. "aryl_bromide").
     :param family: Halogen family (e.g. "bromide", "chloride").
     :param atom_indices: Tuple of matched atom indices in the molecule.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     name: str
     family: str

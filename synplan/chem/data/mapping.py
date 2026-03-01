@@ -12,12 +12,11 @@ import threading
 import time
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import nullcontext
-from dataclasses import dataclass
 from itertools import chain, count
 from math import inf
 from pathlib import Path
 from queue import Queue
-from typing import Any
+from typing import Any, Literal
 
 import torch
 from chython import smiles as parse_smiles
@@ -39,7 +38,9 @@ from scipy.linalg import block_diag
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
-from synplan.utils.config import ConfigABC
+from pydantic import Field
+
+from synplan.utils.config import BaseConfigModel
 from synplan.utils.files import count_smiles_records
 from synplan.utils.parallel import default_num_workers, select_device
 
@@ -51,8 +52,7 @@ _RECYCLE_WORKERS = sys.version_info >= (3, 11)  # max_tasks_per_child added in 3
 # -- Configuration -----------------------------------------------------------
 
 
-@dataclass
-class MappingConfig(ConfigABC):
+class MappingConfig(BaseConfigModel):
     """Configuration for the GPU reaction-mapping pipeline.
 
     :param batch_size: Batch size for GPU inference.
@@ -61,32 +61,10 @@ class MappingConfig(ConfigABC):
     :param no_amp: Disable automatic mixed precision.
     """
 
-    batch_size: int = 16
-    chunk_size: int = 5000
-    device: str | None = None
+    batch_size: int = Field(default=16, ge=1)
+    chunk_size: int = Field(default=5000, ge=1)
+    device: Literal["cuda", "mps", "cpu"] | None = None
     no_amp: bool = False
-
-    @staticmethod
-    def from_dict(config_dict: dict[str, Any]) -> MappingConfig:
-        return MappingConfig(**config_dict)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> MappingConfig:
-        import yaml
-
-        with open(file_path, encoding="utf-8") as f:
-            return MappingConfig.from_dict(yaml.safe_load(f) or {})
-
-    def _validate_params(self, params: dict[str, Any]) -> None:
-        if params["batch_size"] < 1:
-            raise ValueError("batch_size must be >= 1")
-        if params["chunk_size"] < 1:
-            raise ValueError("chunk_size must be >= 1")
-        dev = params.get("device")
-        if dev is not None and dev not in ("cuda", "mps", "cpu"):
-            raise ValueError(
-                f"device must be 'cuda', 'mps', 'cpu', or None; got {dev!r}"
-            )
 
 
 # -- Worker functions (module-level for ProcessPool pickling) ----------------

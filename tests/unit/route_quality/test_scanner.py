@@ -2,6 +2,7 @@
 
 import pytest
 from chython import smiles
+from pydantic import ValidationError
 
 from synplan.route_quality.protection.config import ProtectionConfig
 from synplan.route_quality.protection.functional_groups import (
@@ -213,10 +214,10 @@ def test_scan_route_with_halogen_detector(scanner_with_halogens):
 def test_classify_interactions_counts():
     """classify_interactions should count I, C, H correctly."""
     interactions = [
-        CompetingInteraction(0, "hydroxyl", (1, 2), "aldehyde", "incompatible"),
-        CompetingInteraction(0, "primary_amine", (3, 4), "aldehyde", "incompatible"),
-        CompetingInteraction(1, "hydroxyl", (5, 6), "ketone", "competing"),
-        CompetingInteraction(1, "aldehyde", (7,), None, "compatible"),
+        CompetingInteraction(step_id=0, fg_name="hydroxyl", fg_atoms=(1, 2), reacting_fg="aldehyde", severity="incompatible"),
+        CompetingInteraction(step_id=0, fg_name="primary_amine", fg_atoms=(3, 4), reacting_fg="aldehyde", severity="incompatible"),
+        CompetingInteraction(step_id=1, fg_name="hydroxyl", fg_atoms=(5, 6), reacting_fg="ketone", severity="competing"),
+        CompetingInteraction(step_id=1, fg_name="aldehyde", fg_atoms=(7,), reacting_fg=None, severity="compatible"),
     ]
     i_count, c_count, h_count = RouteScanner.classify_interactions(
         interactions, halogen_count=2
@@ -235,8 +236,8 @@ def test_classify_interactions_empty():
 def test_classify_interactions_all_compatible():
     """All compatible interactions should give (0, 0, 0)."""
     interactions = [
-        CompetingInteraction(0, "hydroxyl", (1, 2), None, "compatible"),
-        CompetingInteraction(1, "aldehyde", (3,), None, "compatible"),
+        CompetingInteraction(step_id=0, fg_name="hydroxyl", fg_atoms=(1, 2), reacting_fg=None, severity="compatible"),
+        CompetingInteraction(step_id=1, fg_name="aldehyde", fg_atoms=(3,), reacting_fg=None, severity="compatible"),
     ]
     i, c, h = RouteScanner.classify_interactions(interactions)
     assert (i, c, h) == (0, 0, 0)
@@ -245,7 +246,7 @@ def test_classify_interactions_all_compatible():
 def test_classify_interactions_with_halogen_count():
     """Halogen count should pass through correctly."""
     interactions = [
-        CompetingInteraction(0, "hydroxyl", (1,), "aldehyde", "competing"),
+        CompetingInteraction(step_id=0, fg_name="hydroxyl", fg_atoms=(1,), reacting_fg="aldehyde", severity="competing"),
     ]
     i, c, h = RouteScanner.classify_interactions(interactions, halogen_count=3)
     assert i == 0
@@ -271,13 +272,13 @@ def test_competing_interaction_dataclass():
 
 def test_competing_interaction_is_frozen():
     """CompetingInteraction should be immutable."""
-    ci = CompetingInteraction(0, "hydroxyl", (1,), "aldehyde", "competing")
-    with pytest.raises(AttributeError):
+    ci = CompetingInteraction(step_id=0, fg_name="hydroxyl", fg_atoms=(1,), reacting_fg="aldehyde", severity="competing")
+    with pytest.raises(ValidationError):
         ci.severity = "other"
 
 
 def test_competing_interaction_reacting_fg_none():
     """CompetingInteraction should accept None for reacting_fg."""
-    ci = CompetingInteraction(0, "hydroxyl", (1,), None, "compatible")
+    ci = CompetingInteraction(step_id=0, fg_name="hydroxyl", fg_atoms=(1,), reacting_fg=None, severity="compatible")
     assert ci.reacting_fg is None
     assert ci.severity == "compatible"

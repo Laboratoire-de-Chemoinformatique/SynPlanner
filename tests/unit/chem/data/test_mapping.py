@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 from click.testing import CliRunner
+from pydantic import ValidationError
 
 from synplan.chem.data.mapping import MappingConfig, _parse_one
 from synplan.interfaces.cli import synplan
@@ -27,15 +28,15 @@ class TestMappingConfig:
         assert cfg.device == "cpu"
 
     def test_bad_batch_size(self):
-        with pytest.raises(ValueError, match="batch_size"):
+        with pytest.raises(ValidationError, match="batch_size"):
             MappingConfig(batch_size=0)
 
     def test_bad_chunk_size(self):
-        with pytest.raises(ValueError, match="chunk_size"):
+        with pytest.raises(ValidationError, match="chunk_size"):
             MappingConfig(chunk_size=-1)
 
     def test_bad_device(self):
-        with pytest.raises(ValueError, match="device"):
+        with pytest.raises(ValidationError, match="device"):
             MappingConfig(device="tpu")
 
     def test_round_trip_yaml(self, tmp_path: Path):

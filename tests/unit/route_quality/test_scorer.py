@@ -1,6 +1,7 @@
 """Tests for the competing sites scorer and route re-ranking module."""
 
 import pytest
+from pydantic import ValidationError
 from unittest.mock import MagicMock
 from chython import smiles
 
@@ -108,9 +109,9 @@ def test_score_maximally_conflicting_route():
     mock_scanner = MagicMock(spec=RouteScanner)
     mock_scanner.scan_route.return_value = (
         [
-            CompetingInteraction(0, "hydroxyl", (1,), "aldehyde", "incompatible"),
-            CompetingInteraction(0, "primary_amine", (2,), "aldehyde", "incompatible"),
-            CompetingInteraction(0, "thiol", (3,), "aldehyde", "incompatible"),
+            CompetingInteraction(step_id=0, fg_name="hydroxyl", fg_atoms=(1,), reacting_fg="aldehyde", severity="incompatible"),
+            CompetingInteraction(step_id=0, fg_name="primary_amine", fg_atoms=(2,), reacting_fg="aldehyde", severity="incompatible"),
+            CompetingInteraction(step_id=0, fg_name="thiol", fg_atoms=(3,), reacting_fg="aldehyde", severity="incompatible"),
         ],
         0,  # halogen_count
     )
@@ -127,8 +128,8 @@ def test_score_with_competing_severity():
     mock_scanner = MagicMock(spec=RouteScanner)
     mock_scanner.scan_route.return_value = (
         [
-            CompetingInteraction(0, "hydroxyl", (1,), "aldehyde", "competing"),
-            CompetingInteraction(0, "phenol", (2,), "aldehyde", "competing"),
+            CompetingInteraction(step_id=0, fg_name="hydroxyl", fg_atoms=(1,), reacting_fg="aldehyde", severity="competing"),
+            CompetingInteraction(step_id=0, fg_name="phenol", fg_atoms=(2,), reacting_fg="aldehyde", severity="competing"),
         ],
         0,
     )
@@ -144,8 +145,8 @@ def test_score_mixed_severities():
     mock_scanner = MagicMock(spec=RouteScanner)
     mock_scanner.scan_route.return_value = (
         [
-            CompetingInteraction(0, "hydroxyl", (1,), "aldehyde", "incompatible"),
-            CompetingInteraction(1, "phenol", (2,), "ketone", "competing"),
+            CompetingInteraction(step_id=0, fg_name="hydroxyl", fg_atoms=(1,), reacting_fg="aldehyde", severity="incompatible"),
+            CompetingInteraction(step_id=1, fg_name="phenol", fg_atoms=(2,), reacting_fg="ketone", severity="competing"),
         ],
         0,
     )
@@ -161,7 +162,7 @@ def test_score_with_halogen_count():
     mock_scanner = MagicMock(spec=RouteScanner)
     mock_scanner.scan_route.return_value = (
         [
-            CompetingInteraction(0, "hydroxyl", (1,), "aldehyde", "incompatible"),
+            CompetingInteraction(step_id=0, fg_name="hydroxyl", fg_atoms=(1,), reacting_fg="aldehyde", severity="incompatible"),
         ],
         2,  # halogen_count
     )
@@ -306,13 +307,13 @@ def test_config_from_yaml(tmp_path):
 
 def test_config_invalid_score_weight():
     """ProtectionConfig should reject score_weight outside [0, 1]."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         ProtectionConfig(score_weight=1.5)
 
 
 def test_config_invalid_score_weight_negative():
     """ProtectionConfig should reject negative score_weight."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         ProtectionConfig(score_weight=-0.1)
 
 

@@ -11,7 +11,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import torch
-from pytorch_lightning import Trainer
+from pytorch_lightning import Callback, Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import Subset, random_split
 from torch_geometric.data.lightning import LightningDataset
@@ -28,6 +28,19 @@ from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.logging import DisableLogger, HiddenPrints
 
 warnings.filterwarnings("ignore")
+
+
+class GradNormLogger(Callback):
+    """Logs mean gradient norm per top-level module (e.g. embedder, y_predictor)."""
+
+    def on_before_optimizer_step(self, trainer, pl_module, optimizer):
+        norms = {}
+        for name, p in pl_module.named_parameters():
+            if p.grad is not None:
+                tag = name.split(".")[0]
+                norms.setdefault(tag, []).append(p.grad.norm().item())
+        for tag, vals in norms.items():
+            pl_module.log(f"grad_norm/{tag}", sum(vals) / len(vals))
 
 
 def _stratified_ranking_split(
@@ -292,6 +305,10 @@ def run_policy_training(
         dirpath=results_path, filename=weights_file_name, monitor="val_loss", mode="min"
     )
 
+    callbacks = [checkpoint]
+    if config.log_grad_norm:
+        callbacks.append(GradNormLogger())
+
     if silent:
         enable_progress_bar = False
     else:
@@ -301,7 +318,7 @@ def run_policy_training(
         accelerator=accelerator,
         devices=devices,
         max_epochs=config.num_epoch,
-        callbacks=[checkpoint],
+        callbacks=callbacks,
         logger=_create_logger(config.logger, results_path),
         gradient_clip_val=1.0,
         enable_progress_bar=enable_progress_bar,

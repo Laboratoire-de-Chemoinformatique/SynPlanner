@@ -5,7 +5,7 @@ from abc import ABC
 import torch
 from pytorch_lightning import LightningModule
 from torch import Tensor
-from torch.nn import Linear
+from torch.nn import Dropout, Linear
 from torch.nn.functional import binary_cross_entropy_with_logits, cross_entropy, one_hot
 from torch_geometric.data.batch import Batch
 from torchmetrics.functional.classification import (
@@ -40,6 +40,7 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
         self.save_hyperparameters()
         self.policy_type = policy_type
         self.n_rules = n_rules
+        self.head_dropout = Dropout(kwargs.get("dropout", 0.4))
         self.y_predictor = Linear(vector_dim, n_rules)
 
         if self.policy_type == "filtering":
@@ -54,6 +55,7 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
             application of regular and priority reaction rules.
         """
         x = self.embedder(batch)
+        x = self.head_dropout(x)
         y = self.y_predictor(x)
 
         if self.policy_type == "ranking":
@@ -75,6 +77,7 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
         """
         true_y = batch.y_rules.long()
         x = self.embedder(batch)
+        x = self.head_dropout(x)
         pred_y = self.y_predictor(x)
 
         if self.policy_type == "ranking":

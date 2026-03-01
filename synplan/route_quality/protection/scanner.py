@@ -13,9 +13,9 @@ The competing-sites identification approach is inspired by the methodology of:
 
 import csv
 import logging
-from dataclasses import dataclass
 
 from chython.containers import ReactionContainer
+from pydantic import BaseModel, ConfigDict
 
 from synplan.route_quality.protection.functional_groups import (
     FunctionalGroupDetector,
@@ -31,8 +31,7 @@ logger = logging.getLogger(__name__)
 _SEVERITY_LABELS = {0: "compatible", 1: "competing", 2: "incompatible"}
 
 
-@dataclass(frozen=True)
-class CompetingInteraction:
+class CompetingInteraction(BaseModel):
     """A competing functional group interaction at a synthesis step.
 
     :param step_id: Index of the reaction step in the route.
@@ -41,6 +40,8 @@ class CompetingInteraction:
     :param reacting_fg: Name of the FG at the reaction center (or None).
     :param severity: Interaction severity: "incompatible", "competing", or "compatible".
     """
+
+    model_config = ConfigDict(frozen=True)
 
     step_id: int
     fg_name: str

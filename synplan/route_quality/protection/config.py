@@ -1,18 +1,15 @@
 """Configuration for the protection strategy module."""
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
-import yaml
+from pydantic import Field
 
-from synplan.utils.config import ConfigABC
+from synplan.utils.config import BaseConfigModel
 
 _DATA_DIR = Path(__file__).resolve().parent / "data"
 
 
-@dataclass
-class ProtectionConfig(ConfigABC):
+class ProtectionConfig(BaseConfigModel):
     """Configuration for protection-group analysis.
 
     :param competing_groups_path: Path to YAML file with SMARTS patterns
@@ -30,38 +27,5 @@ class ProtectionConfig(ConfigABC):
     competing_groups_path: str = str(_DATA_DIR / "competing_groups.yaml")
     incompatibility_path: str = str(_DATA_DIR / "incompatibility_matrix.tsv")
     halogen_groups_path: str = str(_DATA_DIR / "halogen_groups.yaml")
-    score_weight: float = 0.5
+    score_weight: float = Field(default=0.5, ge=0.0, le=1.0)
     enable_reranking: bool = True
-
-    @staticmethod
-    def from_dict(config_dict: dict[str, Any]) -> "ProtectionConfig":
-        return ProtectionConfig(**config_dict)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> "ProtectionConfig":
-        with open(file_path, encoding="utf-8") as fh:
-            config_dict = yaml.safe_load(fh)
-        return ProtectionConfig.from_dict(config_dict)
-
-    def _validate_params(self, params: dict[str, Any]) -> None:
-        # competing_groups_path
-        if not isinstance(params["competing_groups_path"], str):
-            raise ValueError("competing_groups_path must be a string.")
-
-        # incompatibility_path
-        if not isinstance(params["incompatibility_path"], str):
-            raise ValueError("incompatibility_path must be a string.")
-
-        # halogen_groups_path
-        if not isinstance(params["halogen_groups_path"], str):
-            raise ValueError("halogen_groups_path must be a string.")
-
-        # score_weight
-        if not isinstance(params["score_weight"], (int, float)):
-            raise ValueError("score_weight must be a float.")
-        if not (0.0 <= float(params["score_weight"]) <= 1.0):
-            raise ValueError("score_weight must be in [0.0, 1.0].")
-
-        # enable_reranking
-        if not isinstance(params["enable_reranking"], bool):
-            raise ValueError("enable_reranking must be a boolean.")

@@ -3,16 +3,16 @@
 import logging
 from collections import Counter
 from collections.abc import Iterable
-from dataclasses import dataclass
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 import ray
 import yaml
 from chython.algorithms.fingerprints.morgan import MorganFingerprint
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
+from pydantic import Field, model_validator
 from tqdm.auto import tqdm
 
 from synplan.chem.data.standardizing import (
@@ -20,44 +20,15 @@ from synplan.chem.data.standardizing import (
     KekuleFormStandardizer,
     StandardizationError,
 )
-from synplan.utils.config import ConfigABC, convert_config_to_dict
+from synplan.utils.config import BaseConfigModel
 from synplan.utils.files import RawReactionReader, ReactionWriter, parse_reaction
 
 logger = logging.getLogger("synplan.chem.data.filtering")
 
 
-@dataclass
-class CompeteProductsConfig(ConfigABC):
-    fingerprint_tanimoto_threshold: float = 0.3
-    mcs_tanimoto_threshold: float = 0.6
-
-    @staticmethod
-    def from_dict(config_dict: dict[str, Any]) -> "CompeteProductsConfig":
-        """Create an instance of CompeteProductsConfig from a dictionary."""
-        return CompeteProductsConfig(**config_dict)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> "CompeteProductsConfig":
-        """Deserialize a YAML file into a CompeteProductsConfig object."""
-        with open(file_path, encoding="utf-8") as file:
-            config_dict = yaml.safe_load(file)
-        return CompeteProductsConfig.from_dict(config_dict)
-
-    def _validate_params(self, params: dict[str, Any]) -> None:
-        """Validate configuration parameters."""
-        if not isinstance(params.get("fingerprint_tanimoto_threshold"), float) or not (
-            0 <= params["fingerprint_tanimoto_threshold"] <= 1
-        ):
-            raise ValueError(
-                "Invalid 'fingerprint_tanimoto_threshold'; expected a float between 0 and 1"
-            )
-
-        if not isinstance(params.get("mcs_tanimoto_threshold"), float) or not (
-            0 <= params["mcs_tanimoto_threshold"] <= 1
-        ):
-            raise ValueError(
-                "Invalid 'mcs_tanimoto_threshold'; expected a float between 0 and 1"
-            )
+class CompeteProductsConfig(BaseConfigModel):
+    fingerprint_tanimoto_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
+    mcs_tanimoto_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
 
 class CompeteProductsFilter:
@@ -118,45 +89,17 @@ class CompeteProductsFilter:
         return is_compete
 
 
-@dataclass
-class DynamicBondsConfig(ConfigABC):
-    min_bonds_number: int = 1
-    max_bonds_number: int = 6
+class DynamicBondsConfig(BaseConfigModel):
+    min_bonds_number: int = Field(default=1, ge=0)
+    max_bonds_number: int = Field(default=6, ge=0)
 
-    @staticmethod
-    def from_dict(config_dict: dict[str, Any]) -> "DynamicBondsConfig":
-        """Create an instance of DynamicBondsConfig from a dictionary."""
-        return DynamicBondsConfig(**config_dict)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> "DynamicBondsConfig":
-        """Deserialize a YAML file into a DynamicBondsConfig object."""
-        with open(file_path) as file:
-            config_dict = yaml.safe_load(file)
-        return DynamicBondsConfig.from_dict(config_dict)
-
-    def _validate_params(self, params: dict[str, Any]) -> None:
-        """Validate configuration parameters."""
-        if (
-            not isinstance(params.get("min_bonds_number"), int)
-            or params["min_bonds_number"] < 0
-        ):
-            raise ValueError(
-                "Invalid 'min_bonds_number'; expected a non-negative integer"
-            )
-
-        if (
-            not isinstance(params.get("max_bonds_number"), int)
-            or params["max_bonds_number"] < 0
-        ):
-            raise ValueError(
-                "Invalid 'max_bonds_number'; expected a non-negative integer"
-            )
-
-        if params["min_bonds_number"] > params["max_bonds_number"]:
+    @model_validator(mode="after")
+    def _check_min_le_max(self):
+        if self.min_bonds_number > self.max_bonds_number:
             raise ValueError(
                 "'min_bonds_number' cannot be greater than 'max_bonds_number'"
             )
+        return self
 
 
 class DynamicBondsFilter:
@@ -178,29 +121,8 @@ class DynamicBondsFilter:
         )
 
 
-@dataclass
-class SmallMoleculesConfig(ConfigABC):
-    mol_max_size: int = 6
-
-    @staticmethod
-    def from_dict(config_dict: dict[str, Any]) -> "SmallMoleculesConfig":
-        """Creates an instance of SmallMoleculesConfig from a dictionary."""
-        return SmallMoleculesConfig(**config_dict)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> "SmallMoleculesConfig":
-        """Deserialize a YAML file into a SmallMoleculesConfig object."""
-        with open(file_path) as file:
-            config_dict = yaml.safe_load(file)
-        return SmallMoleculesConfig.from_dict(config_dict)
-
-    def _validate_params(self, params: dict[str, Any]) -> None:
-        """Validate configuration parameters."""
-        if (
-            not isinstance(params.get("mol_max_size"), int)
-            or params["mol_max_size"] < 1
-        ):
-            raise ValueError("Invalid 'mol_max_size'; expected a positive integer")
+class SmallMoleculesConfig(BaseConfigModel):
+    mol_max_size: int = Field(default=6, ge=1)
 
 
 class SmallMoleculesFilter:
@@ -236,8 +158,7 @@ class SmallMoleculesFilter:
         return all(len(molecule) <= self.limit for molecule in molecules)
 
 
-@dataclass
-class CGRConnectedComponentsConfig:
+class CGRConnectedComponentsConfig(BaseConfigModel):
     pass
 
 
@@ -258,8 +179,7 @@ class CGRConnectedComponentsFilter:
         return cgr.connected_components_count > 1
 
 
-@dataclass
-class RingsChangeConfig:
+class RingsChangeConfig(BaseConfigModel):
     pass
 
 
@@ -302,8 +222,7 @@ class RingsChangeFilter:
         return rings, arom_rings
 
 
-@dataclass
-class StrangeCarbonsConfig:
+class StrangeCarbonsConfig(BaseConfigModel):
     # currently empty, but can be extended in the future if needed
     pass
 
@@ -330,8 +249,7 @@ class StrangeCarbonsFilter:
         return False
 
 
-@dataclass
-class NoReactionConfig:
+class NoReactionConfig(BaseConfigModel):
     # Currently empty, but can be extended in the future if needed
     pass
 
@@ -349,8 +267,7 @@ class NoReactionFilter:
         return not cgr.center_atoms and len(cgr.center_bonds) == 0
 
 
-@dataclass
-class MultiCenterConfig:
+class MultiCenterConfig(BaseConfigModel):
     pass
 
 
@@ -366,8 +283,7 @@ class MultiCenterFilter:
         return len(cgr.centers_list) > 1
 
 
-@dataclass
-class WrongCHBreakingConfig:
+class WrongCHBreakingConfig(BaseConfigModel):
     pass
 
 
@@ -447,8 +363,7 @@ class WrongCHBreakingFilter:
         return False
 
 
-@dataclass
-class CCsp3BreakingConfig:
+class CCsp3BreakingConfig(BaseConfigModel):
     pass
 
 
@@ -485,8 +400,7 @@ class CCsp3BreakingFilter:
         return False
 
 
-@dataclass
-class CCRingBreakingConfig:
+class CCRingBreakingConfig(BaseConfigModel):
     """
     Object to pass to ReactionFilterConfig if you want to enable C-C ring breaking filter
 
@@ -555,8 +469,7 @@ class CCRingBreakingFilter:
         return False
 
 
-@dataclass
-class ReactionFilterConfig(ConfigABC):
+class ReactionFilterConfig(BaseConfigModel):
     """
     Configuration class for reaction filtering. This class manages configuration
     settings for various reaction filters, including paths, file formats, and filter-
@@ -589,123 +502,37 @@ class ReactionFilterConfig(ConfigABC):
     cc_sp3_breaking_config: CCsp3BreakingConfig | None = None
     cc_ring_breaking_config: CCRingBreakingConfig | None = None
 
-    def to_dict(self):
-        """Converts the configuration into a dictionary."""
-        config_dict = {
-            "dynamic_bonds_config": convert_config_to_dict(
-                self.dynamic_bonds_config, DynamicBondsConfig
-            ),
-            "small_molecules_config": convert_config_to_dict(
-                self.small_molecules_config, SmallMoleculesConfig
-            ),
-            "compete_products_config": convert_config_to_dict(
-                self.compete_products_config, CompeteProductsConfig
-            ),
-            "cgr_connected_components_config": (
-                {} if self.cgr_connected_components_config is not None else None
-            ),
-            "rings_change_config": {} if self.rings_change_config is not None else None,
-            "strange_carbons_config": (
-                {} if self.strange_carbons_config is not None else None
-            ),
-            "no_reaction_config": {} if self.no_reaction_config is not None else None,
-            "multi_center_config": {} if self.multi_center_config is not None else None,
-            "wrong_ch_breaking_config": (
-                {} if self.wrong_ch_breaking_config is not None else None
-            ),
-            "cc_sp3_breaking_config": (
-                {} if self.cc_sp3_breaking_config is not None else None
-            ),
-            "cc_ring_breaking_config": (
-                {} if self.cc_ring_breaking_config is not None else None
-            ),
-        }
+    _NESTED_CONFIG_TYPES: ClassVar[dict[str, type]] = {
+        "dynamic_bonds_config": DynamicBondsConfig,
+        "small_molecules_config": SmallMoleculesConfig,
+        "strange_carbons_config": StrangeCarbonsConfig,
+        "compete_products_config": CompeteProductsConfig,
+        "cgr_connected_components_config": CGRConnectedComponentsConfig,
+        "rings_change_config": RingsChangeConfig,
+        "no_reaction_config": NoReactionConfig,
+        "multi_center_config": MultiCenterConfig,
+        "wrong_ch_breaking_config": WrongCHBreakingConfig,
+        "cc_sp3_breaking_config": CCsp3BreakingConfig,
+        "cc_ring_breaking_config": CCRingBreakingConfig,
+    }
 
-        filtered_config_dict = {k: v for k, v in config_dict.items() if v is not None}
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_nested(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for field_name, cfg_cls in cls._NESTED_CONFIG_TYPES.items():
+                if field_name in data and isinstance(data[field_name], dict):
+                    data[field_name] = cfg_cls(**data[field_name])
+        return data
 
-        return filtered_config_dict
-
-    @staticmethod
-    def from_dict(config_dict: dict[str, Any]) -> "ReactionFilterConfig":
-        """Create an instance of ReactionCheckConfig from a dictionary."""
-        # Instantiate configuration objects if their corresponding dictionary is present
-        dynamic_bonds_config = (
-            DynamicBondsConfig(**config_dict["dynamic_bonds_config"])
-            if "dynamic_bonds_config" in config_dict
-            else None
-        )
-
-        small_molecules_config = (
-            SmallMoleculesConfig(**config_dict["small_molecules_config"])
-            if "small_molecules_config" in config_dict
-            else None
-        )
-
-        compete_products_config = (
-            CompeteProductsConfig(**config_dict["compete_products_config"])
-            if "compete_products_config" in config_dict
-            else None
-        )
-
-        cgr_connected_components_config = (
-            CGRConnectedComponentsConfig()
-            if "cgr_connected_components_config" in config_dict
-            else None
-        )
-
-        rings_change_config = (
-            RingsChangeConfig() if "rings_change_config" in config_dict else None
-        )
-
-        strange_carbons_config = (
-            StrangeCarbonsConfig() if "strange_carbons_config" in config_dict else None
-        )
-
-        no_reaction_config = (
-            NoReactionConfig() if "no_reaction_config" in config_dict else None
-        )
-
-        multi_center_config = (
-            MultiCenterConfig() if "multi_center_config" in config_dict else None
-        )
-
-        wrong_ch_breaking_config = (
-            WrongCHBreakingConfig()
-            if "wrong_ch_breaking_config" in config_dict
-            else None
-        )
-
-        cc_sp3_breaking_config = (
-            CCsp3BreakingConfig() if "cc_sp3_breaking_config" in config_dict else None
-        )
-
-        cc_ring_breaking_config = (
-            CCRingBreakingConfig() if "cc_ring_breaking_config" in config_dict else None
-        )
-
-        return ReactionFilterConfig(
-            dynamic_bonds_config=dynamic_bonds_config,
-            small_molecules_config=small_molecules_config,
-            compete_products_config=compete_products_config,
-            cgr_connected_components_config=cgr_connected_components_config,
-            rings_change_config=rings_change_config,
-            strange_carbons_config=strange_carbons_config,
-            no_reaction_config=no_reaction_config,
-            multi_center_config=multi_center_config,
-            wrong_ch_breaking_config=wrong_ch_breaking_config,
-            cc_sp3_breaking_config=cc_sp3_breaking_config,
-            cc_ring_breaking_config=cc_ring_breaking_config,
-        )
-
-    @staticmethod
-    def from_yaml(file_path: str) -> "ReactionFilterConfig":
-        """Deserializes a YAML file into a ReactionCheckConfig object."""
-        with open(file_path, encoding="utf-8") as file:
-            config_dict = yaml.safe_load(file)
-        return ReactionFilterConfig.from_dict(config_dict)
-
-    def _validate_params(self, params: dict[str, Any]):
-        pass
+    def to_dict(self) -> dict[str, Any]:
+        """Converts the configuration into a dictionary, excluding None fields."""
+        result = {}
+        for field_name in self._NESTED_CONFIG_TYPES:
+            config = getattr(self, field_name)
+            if config is not None:
+                result[field_name] = config.to_dict()
+        return result
 
     def create_filters(self):
         filter_instances = []

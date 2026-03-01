@@ -2,6 +2,7 @@
 
 import pytest
 from chython import smiles
+from pydantic import ValidationError
 
 from synplan.route_quality.protection.functional_groups import (
     FunctionalGroupDetector,
@@ -115,11 +116,11 @@ def test_match_dataclass_fields():
 
 
 def test_match_is_frozen():
-    """FunctionalGroupMatch should be immutable (frozen dataclass)."""
+    """FunctionalGroupMatch should be immutable (frozen model)."""
     m = FunctionalGroupMatch(
         name="hydroxyl", category="nucleophile", atom_indices=(1, 2)
     )
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValidationError):
         m.name = "other"
 
 
@@ -206,7 +207,7 @@ def test_halogen_match_dataclass():
 def test_halogen_match_is_frozen():
     """HalogenMatch should be immutable."""
     m = HalogenMatch(name="aryl_bromide", family="bromide", atom_indices=(1, 2))
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValidationError):
         m.name = "other"
 
 

@@ -10,18 +10,18 @@ import logging
 from abc import ABC, abstractmethod
 from collections import Counter
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import ray
 import yaml
 from chython import smiles as smiles_chython
 from chython.containers import MoleculeContainer, ReactionContainer
+from pydantic import Field, model_validator
 from tqdm.auto import tqdm
 
 from synplan.chem.utils import unite_molecules
-from synplan.utils.config import ConfigABC
+from synplan.utils.config import BaseConfigModel
 from synplan.utils.files import (
     RawReactionReader,
     ReactionWriter,
@@ -109,8 +109,7 @@ class BaseStandardizer(ABC):
             raise StandardizationError(self.__class__.__name__, str(rxn), exc) from exc
 
 
-@dataclass
-class FunctionalGroupsConfig:
+class FunctionalGroupsConfig(BaseConfigModel):
     pass
 
 
@@ -133,8 +132,7 @@ class FunctionalGroupsStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class KekuleFormConfig:
+class KekuleFormConfig(BaseConfigModel):
     pass
 
 
@@ -157,8 +155,7 @@ class KekuleFormStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class CheckValenceConfig:
+class CheckValenceConfig(BaseConfigModel):
     pass
 
 
@@ -188,8 +185,7 @@ class CheckValenceStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class ImplicifyHydrogensConfig:
+class ImplicifyHydrogensConfig(BaseConfigModel):
     pass
 
 
@@ -212,8 +208,7 @@ class ImplicifyHydrogensStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class CheckIsotopesConfig:
+class CheckIsotopesConfig(BaseConfigModel):
     pass
 
 
@@ -247,8 +242,7 @@ class CheckIsotopesStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class SplitIonsConfig:
+class SplitIonsConfig(BaseConfigModel):
     pass
 
 
@@ -356,8 +350,7 @@ class SplitIonsStandardizer(BaseStandardizer):
         )
 
 
-@dataclass
-class AromaticFormConfig:
+class AromaticFormConfig(BaseConfigModel):
     pass
 
 
@@ -380,8 +373,7 @@ class AromaticFormStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class MappingFixConfig:
+class MappingFixConfig(BaseConfigModel):
     pass
 
 
@@ -404,8 +396,7 @@ class MappingFixStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class UnchangedPartsConfig:
+class UnchangedPartsConfig(BaseConfigModel):
     pass
 
 
@@ -476,27 +467,8 @@ class UnchangedPartsStandardizer(BaseStandardizer):
         return new_reaction
 
 
-@dataclass
-class SmallMoleculesConfig:
-    mol_max_size: int = 6
-
-    @staticmethod
-    def from_dict(config_dict: dict[str, Any]) -> SmallMoleculesConfig:
-        """Create an instance of SmallMoleculesConfig from a dictionary."""
-        return SmallMoleculesConfig(**config_dict)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> SmallMoleculesConfig:
-        """Deserialize a YAML file into a SmallMoleculesConfig object."""
-        with open(file_path, encoding="utf-8") as file:
-            config_dict = yaml.safe_load(file)
-        return SmallMoleculesConfig.from_dict(config_dict)
-
-    def _validate_params(self, params: dict[str, Any]) -> None:
-        """Validate configuration parameters."""
-        mol_max_size = params.get("mol_max_size", self.mol_max_size)
-        if not isinstance(mol_max_size, int) or not (mol_max_size > 0):
-            raise ValueError("Invalid 'mol_max_size'; expected an integer more than 1")
+class SmallMoleculesConfig(BaseConfigModel):
+    mol_max_size: int = Field(default=6, ge=1)
 
 
 class SmallMoleculesStandardizer(BaseStandardizer):
@@ -569,29 +541,8 @@ class SmallMoleculesStandardizer(BaseStandardizer):
         return new_reaction
 
 
-@dataclass
-class RemoveReagentsConfig:
-    reagent_max_size: int = 7
-
-    @staticmethod
-    def from_dict(config_dict: dict[str, Any]) -> RemoveReagentsConfig:
-        """Create an instance of RemoveReagentsConfig from a dictionary."""
-        return RemoveReagentsConfig(**config_dict)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> RemoveReagentsConfig:
-        """Deserialize a YAML file into a RemoveReagentsConfig object."""
-        with open(file_path, encoding="utf-8") as file:
-            config_dict = yaml.safe_load(file)
-        return RemoveReagentsConfig.from_dict(config_dict)
-
-    def _validate_params(self, params: dict[str, Any]) -> None:
-        """Validate configuration parameters."""
-        reagent_max_size = params.get("reagent_max_size", self.reagent_max_size)
-        if not isinstance(reagent_max_size, int) or not (reagent_max_size > 0):
-            raise ValueError(
-                "Invalid 'reagent_max_size'; expected an integer more than 1"
-            )
+class RemoveReagentsConfig(BaseConfigModel):
+    reagent_max_size: int = Field(default=7, ge=1)
 
 
 class RemoveReagentsStandardizer(BaseStandardizer):
@@ -658,8 +609,7 @@ class RemoveReagentsStandardizer(BaseStandardizer):
         return new_reaction
 
 
-@dataclass
-class RebalanceReactionConfig:
+class RebalanceReactionConfig(BaseConfigModel):
     pass
 
 
@@ -695,8 +645,7 @@ class RebalanceReactionStandardizer(BaseStandardizer):
         return new_rxn
 
 
-@dataclass
-class DuplicateReactionConfig:
+class DuplicateReactionConfig(BaseConfigModel):
     pass
 
 
@@ -787,8 +736,7 @@ STANDARDIZER_REGISTRY = {
 }
 
 
-@dataclass
-class ReactionStandardizationConfig(ConfigABC):
+class ReactionStandardizationConfig(BaseConfigModel):
     """Configuration class for reaction filtering. This class manages configuration
     settings for various reaction filters, including paths, file formats, and filter-
     specific parameters.
@@ -826,42 +774,39 @@ class ReactionStandardizationConfig(ConfigABC):
     rebalance_reaction_config: RebalanceReactionConfig | None = None
     duplicate_reaction_config: DuplicateReactionConfig | None = None
 
-    def _validate_params(self, params: dict[str, Any]) -> None:
-        """Validate configuration parameters."""
-        for field_name, config in self.__dict__.items():
-            if config is not None and hasattr(config, "_validate_params"):
-                config._validate_params(params.get(field_name, {}))
+    _NESTED_CONFIG_TYPES: ClassVar[dict[str, type]] = {
+        "functional_groups_config": FunctionalGroupsConfig,
+        "kekule_form_config": KekuleFormConfig,
+        "check_valence_config": CheckValenceConfig,
+        "implicify_hydrogens_config": ImplicifyHydrogensConfig,
+        "check_isotopes_config": CheckIsotopesConfig,
+        "split_ions_config": SplitIonsConfig,
+        "aromatic_form_config": AromaticFormConfig,
+        "mapping_fix_config": MappingFixConfig,
+        "unchanged_parts_config": UnchangedPartsConfig,
+        "small_molecules_config": SmallMoleculesConfig,
+        "remove_reagents_config": RemoveReagentsConfig,
+        "rebalance_reaction_config": RebalanceReactionConfig,
+        "duplicate_reaction_config": DuplicateReactionConfig,
+    }
 
-    def to_dict(self):
-        """Converts the configuration into a dictionary."""
-        config_dict = {}
-        for field_name in STANDARDIZER_REGISTRY:
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_nested(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for field_name, cfg_cls in cls._NESTED_CONFIG_TYPES.items():
+                if field_name in data and isinstance(data[field_name], dict):
+                    data[field_name] = cfg_cls(**data[field_name])
+        return data
+
+    def to_dict(self) -> dict[str, Any]:
+        """Converts the configuration into a dictionary, excluding None fields."""
+        result = {}
+        for field_name in self._NESTED_CONFIG_TYPES:
             config = getattr(self, field_name)
             if config is not None:
-                config_dict[field_name] = {}
-        return config_dict
-
-    @staticmethod
-    def from_dict(config_dict: dict[str, Any]) -> ReactionStandardizationConfig:
-        """Create an instance of ReactionCheckConfig from a dictionary."""
-        from typing import get_type_hints
-
-        hints = get_type_hints(ReactionStandardizationConfig)
-        config_kwargs = {}
-        for field_name in STANDARDIZER_REGISTRY:
-            if field_name in config_dict:
-                cfg_cls = hints[field_name]
-                if hasattr(cfg_cls, "__args__"):  # Optional[X] → extract X
-                    cfg_cls = cfg_cls.__args__[0]
-                config_kwargs[field_name] = cfg_cls()
-        return ReactionStandardizationConfig(**config_kwargs)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> ReactionStandardizationConfig:
-        """Deserializes a YAML file into a ReactionCheckConfig object."""
-        with open(file_path, encoding="utf-8") as file:
-            config_dict = yaml.safe_load(file)
-        return ReactionStandardizationConfig.from_dict(config_dict)
+                result[field_name] = config.to_dict()
+        return result
 
     def create_standardizers(self):
         """Create standardizer instances based on configuration."""
