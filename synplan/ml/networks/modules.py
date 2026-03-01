@@ -11,6 +11,7 @@ from torch.nn.functional import relu
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch_geometric.data.batch import Batch
 from torch_geometric.nn.conv import GCNConv, GINEConv, GPSConv
+from torch_geometric.nn.aggr import VariancePreservingAggregation
 from torch_geometric.nn.pool import global_add_pool, global_mean_pool
 
 
@@ -137,6 +138,7 @@ class GraphEmbeddingGPS(Module):
         super().__init__()
         self.node_expansion = Linear(11, vector_dim)
         self.edge_expansion = Linear(edge_dim, vector_dim)
+        self.pool = VariancePreservingAggregation()
 
         self.convs = ModuleList()
         for _ in range(num_conv_layers):
@@ -170,7 +172,7 @@ class GraphEmbeddingGPS(Module):
         for conv in self.convs:
             atoms = conv(atoms, graph.edge_index, graph.batch, edge_attr=edge_attr)
 
-        return global_mean_pool(atoms, graph.batch)
+        return self.pool(atoms, index=graph.batch)
 
 
 class MCTSNetwork(LightningModule, ABC):
