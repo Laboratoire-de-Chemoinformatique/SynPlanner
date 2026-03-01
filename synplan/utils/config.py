@@ -263,6 +263,11 @@ class PolicyNetworkConfig(ConfigABC):
     num_epoch: int = 100
     weights_path: str | None = None
 
+    # GPS embedder parameters (only used when embedder_type="gps")
+    heads: int = 4
+    attn_type: str = "performer"
+    attn_dropout: float = 0.5
+
     # training logger (None disables logging, or dict with "type" + logger kwargs)
     logger: dict | None = None
 
@@ -288,6 +293,21 @@ class PolicyNetworkConfig(ConfigABC):
 
         if params.get("embedder_type", "gcn") not in ("gcn", "gcn_concat", "gps"):
             raise ValueError("embedder_type must be 'gcn', 'gcn_concat', or 'gps'.")
+
+        if not isinstance(params.get("heads", 4), int) or params.get("heads", 4) < 1:
+            raise ValueError("heads must be a positive integer.")
+
+        attn_type = params.get("attn_type", "performer")
+        if attn_type not in ("performer", "multihead"):
+            raise ValueError(
+                "attn_type must be 'performer' or 'multihead'."
+            )
+
+        attn_dropout = params.get("attn_dropout", 0.5)
+        if not isinstance(attn_dropout, (int, float)) or not (
+            0.0 <= attn_dropout <= 1.0
+        ):
+            raise ValueError("attn_dropout must be a float between 0.0 and 1.0.")
 
         if not isinstance(params["vector_dim"], int) or params["vector_dim"] <= 0:
             raise ValueError("vector_dim must be a positive integer.")

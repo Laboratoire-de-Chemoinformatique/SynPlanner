@@ -283,6 +283,9 @@ def run_policy_training(
         learning_rate=config.learning_rate,
         policy_type=config.policy_type,
         embedder_type=config.embedder_type,
+        heads=config.heads,
+        attn_type=config.attn_type,
+        attn_dropout=config.attn_dropout,
     )
 
     checkpoint = ModelCheckpoint(

@@ -112,7 +112,17 @@ class GraphEmbeddingConcat(GraphEmbedding, Module):
 
 
 class GraphEmbeddingGPS(Module):
-    """GPS-style graph embedder: GINEConv + Performer attention + LayerNorm + GELU."""
+    """GPS-style graph embedder: GINEConv + optional attention + LayerNorm + GELU.
+
+    :param vector_dim: Hidden dimension for node and edge embeddings.
+    :param edge_dim: Input edge feature dimension (4 bond features from mol_to_pyg).
+    :param dropout: Dropout probability for the GPS layer (applied to MPNN output).
+    :param num_conv_layers: Number of GPS layers.
+    :param heads: Number of attention heads. Only used when attn_type is not None.
+    :param attn_type: Attention mechanism: ``"performer"`` (O(N) linear)
+        or ``"multihead"`` (O(N^2) full).
+    :param attn_dropout: Dropout on attention weights (separate from layer dropout).
+    """
 
     def __init__(
         self,
@@ -121,6 +131,8 @@ class GraphEmbeddingGPS(Module):
         dropout: float = 0.3,
         num_conv_layers: int = 5,
         heads: int = 4,
+        attn_type: str = "performer",
+        attn_dropout: float = 0.5,
     ):
         super().__init__()
         self.node_expansion = Linear(11, vector_dim)
@@ -134,6 +146,7 @@ class GraphEmbeddingGPS(Module):
                 Linear(vector_dim, vector_dim),
             )
             local_conv = GINEConv(nn_layer, edge_dim=vector_dim)
+            attn_kwargs = {"dropout": attn_dropout}
             layer = GPSConv(
                 channels=vector_dim,
                 conv=local_conv,
@@ -142,7 +155,8 @@ class GraphEmbeddingGPS(Module):
                 act="gelu",
                 norm="layer_norm",
                 norm_kwargs={"mode": "node"},
-                attn_type="performer",
+                attn_type=attn_type,
+                attn_kwargs=attn_kwargs,
             )
             self.convs.append(layer)
 
@@ -171,6 +185,9 @@ class MCTSNetwork(LightningModule, ABC):
         learning_rate: float = 0.001,
         gcn_concat: bool = False,
         embedder_type: str = "gcn",
+        heads: int = 4,
+        attn_type: str = "performer",
+        attn_dropout: float = 0.5,
     ):
         """The basic class for MCTS graph convolutional neural networks (policy and
         value network).
@@ -185,11 +202,19 @@ class MCTSNetwork(LightningModule, ABC):
             from the training data.
         :param gcn_concat: Legacy flag for concat embedder. Use embedder_type instead.
         :param embedder_type: Embedder architecture: "gcn", "gcn_concat", or "gps".
+        :param heads: Number of attention heads (GPS only).
+        :param attn_type: Attention type: "performer", "multihead", or None (GPS only).
+        :param attn_dropout: Attention dropout probability (GPS only).
         """
         super().__init__()
         if embedder_type == "gps":
             self.embedder = GraphEmbeddingGPS(
-                vector_dim, dropout=dropout, num_conv_layers=num_conv_layers
+                vector_dim,
+                dropout=dropout,
+                num_conv_layers=num_conv_layers,
+                heads=heads,
+                attn_type=attn_type,
+                attn_dropout=attn_dropout,
             )
         elif gcn_concat or embedder_type == "gcn_concat":
             self.embedder = GraphEmbeddingConcat(vector_dim, dropout, num_conv_layers)
