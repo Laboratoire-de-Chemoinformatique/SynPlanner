@@ -9,7 +9,7 @@ from chython.containers import CGRContainer, ReactionContainer
 
 def pytest_unconfigure(config):
     """Force-exit after test session to prevent hanging from Ray/PyTorch daemon threads."""
-    os._exit(getattr(config, '_exitstatus', 0))
+    os._exit(getattr(config, "_exitstatus", 0))
 
 
 def pytest_sessionfinish(session, exitstatus):
