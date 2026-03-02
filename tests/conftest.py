@@ -7,9 +7,14 @@ from chython import smiles
 from chython.containers import CGRContainer, ReactionContainer
 
 
-def pytest_sessionfinish(session, exitstatus):
+def pytest_unconfigure(config):
     """Force-exit after test session to prevent hanging from Ray/PyTorch daemon threads."""
-    os._exit(exitstatus)
+    os._exit(getattr(config, '_exitstatus', 0))
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Store exit status for pytest_unconfigure."""
+    session.config._exitstatus = exitstatus
 
 
 from synplan.chem.data.filtering import (

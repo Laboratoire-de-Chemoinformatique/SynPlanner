@@ -216,7 +216,7 @@ class PolicyNetworkConfig(BaseConfigModel):
     learning_rate: float = Field(default=0.008, gt=0.0)
     num_conv_layers: int = Field(default=5, gt=0)
     num_epoch: int = Field(default=100, gt=0)
-    weights_path: str | None = None
+    weights_path: str | Path | None = None
 
     # GPS embedder parameters (only used when embedder_type="gps")
     heads: int = Field(default=4, gt=0)
@@ -262,7 +262,7 @@ class ValueNetworkConfig(BaseConfigModel):
     :param num_epoch: Number of training epochs.
     """
 
-    weights_path: str | None = None
+    weights_path: str | Path | None = None
     vector_dim: int = Field(default=256, gt=0)
     batch_size: int = Field(default=500, gt=0)
     dropout: float = Field(default=0.4, ge=0.0, le=1.0)
@@ -393,7 +393,7 @@ class ValueNetworkEvaluationConfig(BaseConfigModel):
     :param normalize: Whether to normalize scores to [0, 1].
     """
 
-    weights_path: str
+    weights_path: str | Path
     normalize: bool = False
 
 
@@ -455,8 +455,8 @@ class CombinedPolicyConfig(BaseConfigModel):
         Values > 1.0 produce softer distributions (more exploration).
     """
 
-    filtering_weights_path: str
-    ranking_weights_path: str
+    filtering_weights_path: str | Path
+    ranking_weights_path: str | Path
     top_rules: int = Field(default=50, gt=0)
     rule_prob_threshold: float = 0.0
     ranking_weight: float = Field(default=1.0, gt=0.0)
