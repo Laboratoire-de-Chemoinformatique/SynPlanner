@@ -42,6 +42,7 @@ def mol_from_smiles(
 
     tmp = molecule.copy()
     try:
+        tmp.remove_coordinate_bonds(keep_to_terminal=False)
         if standardize:
             tmp.canonicalize()
         if clean_stereo:
@@ -119,6 +120,7 @@ def safe_canonicalization(molecule: MoleculeContainer) -> MoleculeContainer:
 
     molecule_copy = molecule.copy()
     try:
+        molecule_copy.remove_coordinate_bonds(keep_to_terminal=False)
         molecule_copy.canonicalize()
         molecule_copy.clean_stereo()
         return molecule_copy

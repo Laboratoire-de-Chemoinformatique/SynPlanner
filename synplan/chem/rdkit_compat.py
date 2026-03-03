@@ -40,6 +40,7 @@ def target_from_rdkit(
     molecule = MoleculeContainer.from_rdkit(rdkit_mol)
     tmp = molecule.copy()
     try:
+        tmp.remove_coordinate_bonds(keep_to_terminal=False)
         if standardize:
             tmp.canonicalize()
         if clean_stereo:
