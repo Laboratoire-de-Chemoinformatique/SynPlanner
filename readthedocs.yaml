@@ -8,9 +8,7 @@ build:
     post_create_environment:
       - pip install uv
     post_install:
-      - uv sync --group docs --extra cpu
-      - uv pip install nbsphinx pydata-sphinx-theme nbsphinx-link
-      - uv pip install .
+      - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH uv sync --group docs --extra cpu
 
 sphinx:
   builder: html
