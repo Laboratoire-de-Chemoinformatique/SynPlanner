@@ -4,12 +4,7 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.11"
-  jobs:
-    post_create_environment:
-      - pip install uv
-    post_install:
-      - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH uv sync --group docs --extra cpu
-
-sphinx:
-  builder: html
-  configuration: docs/conf.py
+  commands:
+    - pip install uv
+    - uv sync --group docs --extra cpu
+    - .venv/bin/python -m sphinx -T -b html -d docs/_build/doctrees -D language=en docs/ $READTHEDOCS_OUTPUT/html
