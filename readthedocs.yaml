@@ -4,14 +4,7 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.11"
-  jobs:
-    post_create_environment:
-      - pip install uv
-    post_install:
-      - uv sync --group docs --extra cpu
-      - uv pip install nbsphinx pydata-sphinx-theme nbsphinx-link
-      - uv pip install .
-
-sphinx:
-  builder: html
-  configuration: docs/conf.py
+  commands:
+    - pip install uv
+    - uv sync --group docs --extra cpu
+    - uv run --group docs python -m sphinx -T -b html -d docs/_build/doctrees -D language=en docs/ $READTHEDOCS_OUTPUT/html

@@ -3044,21 +3044,6 @@ wheels = [
 ]
 
 [[package]]
-name = "nbsphinx-link"
-version = "1.3.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "nbsphinx" },
-    { name = "sphinx", version = "8.1.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
-    { name = "sphinx", version = "9.0.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
-    { name = "sphinx", version = "9.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e6/d3/aabce2e96a7080b15a19342fa0839573463b9c3a8c57ee8e657a7ce9c176/nbsphinx-link-1.3.1.tar.gz", hash = "sha256:8b5a3f5279ba9e9f81c01309ff5436dfcc14c23f188ec8a04658f871a3860420", size = 16624, upload-time = "2024-09-18T12:20:26.501Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6e/8f/cd4bb6849fef05dafc02e38b3c9b9e985d266c3ca7cb485c3160ddeb96f2/nbsphinx_link-1.3.1-py3-none-any.whl", hash = "sha256:2188fc42294a38ba253eedd184dea8750ab035fd94fe63e855ff01f911631769", size = 5230, upload-time = "2024-09-18T12:20:45.982Z" },
-]
-
-[[package]]
 name = "nest-asyncio"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5669,7 +5654,6 @@ docs = [
     { name = "myst-parser", version = "4.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
     { name = "myst-parser", version = "5.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
     { name = "nbsphinx" },
-    { name = "nbsphinx-link" },
     { name = "pandoc" },
     { name = "pydata-sphinx-theme" },
     { name = "pypandoc-binary" },
@@ -5717,7 +5701,6 @@ docs = [
     { name = "ipython", specifier = ">=8.12.1,<9" },
     { name = "myst-parser", specifier = ">=4.0" },
     { name = "nbsphinx", specifier = ">=0.9.4,<0.10" },
-    { name = "nbsphinx-link", specifier = "==1.3.1" },
     { name = "pandoc", specifier = ">=2.3,<3" },
     { name = "pydata-sphinx-theme", specifier = ">=0.15.4,<0.16" },
     { name = "pypandoc-binary", specifier = ">=1.15,<2" },
