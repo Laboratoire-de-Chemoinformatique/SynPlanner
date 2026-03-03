@@ -1,13 +1,13 @@
 [
-  {"name": "dev", "version": "dev", "url": "/"},
-  {"name": "1.4.0 (stable)", "version": "1.4.0", "url": "/"},
-  {"name": "1.3.2", "version": "1.3.2", "url": "/"},
-  {"name": "1.3.1", "version": "1.3.1", "url": "/"},
-  {"name": "1.3.0", "version": "1.3.0", "url": "/"},
-  {"name": "1.2.1", "version": "1.2.1", "url": "/"},
-  {"name": "1.2.0", "version": "1.2.0", "url": "/"},
-  {"name": "1.1.2", "version": "1.1.2", "url": "/"},
-  {"name": "1.1.1", "version": "1.1.1", "url": "/"},
-  {"name": "1.1.0", "version": "1.1.0", "url": "/"},
-  {"name": "1.0.0", "version": "1.0.0", "url": "/"}
+  {"name": "dev", "version": "latest", "url": "/en/latest/"},
+  {"name": "1.4.0 (stable)", "version": "stable", "url": "/en/stable/"},
+  {"name": "1.3.2", "version": "v1.3.2", "url": "/en/v1.3.2/"},
+  {"name": "1.3.1", "version": "v1.3.1", "url": "/en/v1.3.1/"},
+  {"name": "1.3.0", "version": "v1.3.0", "url": "/en/v1.3.0/"},
+  {"name": "1.2.1", "version": "v1.2.1", "url": "/en/v1.2.1/"},
+  {"name": "1.2.0", "version": "v1.2.0", "url": "/en/v1.2.0/"},
+  {"name": "1.1.2", "version": "v1.1.2", "url": "/en/v1.1.2/"},
+  {"name": "1.1.1", "version": "v1.1.1", "url": "/en/v1.1.1/"},
+  {"name": "1.1.0", "version": "v1.1.0", "url": "/en/v1.1.0/"},
+  {"name": "1.0.0", "version": "v1.0.0", "url": "/en/v1.0.0/"}
 ]
