@@ -116,6 +116,18 @@ class Tree:
         self.found_a_route = False
         self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks = {}
 
+        # search statistics
+        self.stats: dict = {
+            "expansion_calls": 0,
+            "expansion_successes": 0,
+            "total_rules_tried": 0,
+            "total_rules_succeeded": 0,
+            "dead_end_nodes": 0,
+            "first_solution_iteration": None,
+            "first_solution_time": None,
+            "routes_found_at": [],
+        }
+
         # choose search algorithm (normalize key)
         algo_key = str(config.algorithm).lower()
         if algo_key not in ALGORITHMS:
@@ -186,6 +198,14 @@ class Tree:
 
         is_solved, last_node_id = self.algorithm.step()
 
+        if is_solved:
+            self.stats["routes_found_at"].append(
+                (self.curr_iteration, round(self.curr_time, 4))
+            )
+            if self.stats["first_solution_iteration"] is None:
+                self.stats["first_solution_iteration"] = self.curr_iteration
+                self.stats["first_solution_time"] = round(self.curr_time, 4)
+
         return is_solved, last_node_id
 
     def _init_target_node(self, target: MoleculeContainer):
@@ -216,12 +236,16 @@ class Tree:
         # Track raw product molecules to avoid repeating equivalent expansions
         tmp_products = set()
         expanded = False
+        rules_tried_here = 0
+        rules_succeeded_here = 0
 
         prediction = self.expansion_function.predict_reaction_rules(
             curr_node.curr_precursor, self.reaction_rules
         )
 
         for prob, rule, rule_id in prediction:
+            rules_tried_here += 1
+            rule_produced = False
             for products in apply_reaction_rule(
                 curr_node.curr_precursor.molecule, rule
             ):
@@ -229,6 +253,7 @@ class Tree:
                 if not products or not (set(products) - tmp_products):
                     continue
                 tmp_products.update(products)
+                rule_produced = True
 
                 for molecule in products:
                     molecule.meta["reactor_id"] = rule_id
@@ -280,6 +305,18 @@ class Tree:
                     self._add_node(node_id, child_node, scaled_prob, rule_id)
                     total_expanded += 1
                     expanded = True
+
+            if rule_produced:
+                rules_succeeded_here += 1
+
+        # update statistics
+        self.stats["expansion_calls"] += 1
+        self.stats["total_rules_tried"] += rules_tried_here
+        self.stats["total_rules_succeeded"] += rules_succeeded_here
+        if expanded:
+            self.stats["expansion_successes"] += 1
+        elif node_id != 1:
+            self.stats["dead_end_nodes"] += 1
 
         if not expanded and node_id == 1:
             raise StopIteration("\nThe target molecule was not expanded.")
@@ -498,3 +535,175 @@ class Tree:
             meta[node_id] = (node_value, node_synthesisability, visit_in_node)
 
         return newick_string, meta
+
+    # ------------------------------------------------------------------
+    # Analysis methods
+    # ------------------------------------------------------------------
+
+    def winning_rule_ranks(self) -> list[dict]:
+        """For each winning route, return the rule rank and probability at each step.
+
+        The "rank" is the position (1-indexed) of the rule in the policy's
+        sorted prediction for that node.  Since we only store the probability
+        assigned to the chosen rule (in ``nodes_prob``), the rank is
+        approximated by counting how many sibling nodes (children of the same
+        parent) have a higher probability.
+
+        :return: List of dicts, one per winning route, each containing
+            ``winning_node_id`` and ``steps`` (list of per-step dicts with
+            node_id, rule_id, prob, rank).
+        """
+        results = []
+        for win_id in self.winning_nodes:
+            steps = []
+            nid = win_id
+            while nid and nid != 1:
+                parent_id = self.parents[nid]
+                rule_id = self.nodes_rules.get(nid)
+                prob = self.nodes_prob.get(nid, 0.0)
+
+                # Rank among siblings: count siblings with higher prob
+                siblings = self.children.get(parent_id, set())
+                rank = 1 + sum(
+                    1
+                    for sib in siblings
+                    if sib != nid and self.nodes_prob.get(sib, 0.0) > prob
+                )
+
+                steps.append(
+                    {
+                        "node_id": nid,
+                        "rule_id": rule_id,
+                        "prob": round(prob, 6),
+                        "rank": rank,
+                    }
+                )
+                nid = parent_id
+
+            results.append(
+                {
+                    "winning_node_id": win_id,
+                    "steps": list(reversed(steps)),
+                }
+            )
+        return results
+
+    def rule_applicability_rate(self) -> float:
+        """Fraction of tried rules that produced valid products.
+
+        :return: Float in [0, 1], or 0.0 if no rules were tried.
+        """
+        tried = self.stats["total_rules_tried"]
+        if tried == 0:
+            return 0.0
+        return self.stats["total_rules_succeeded"] / tried
+
+    def branching_profile(self) -> dict[int, dict]:
+        """Compute mean branching factor per depth level (expanded nodes only).
+
+        :return: Dict mapping depth -> {"mean_children": float, "nodes": int}.
+        """
+        from collections import defaultdict
+
+        depth_children: dict[int, list[int]] = defaultdict(list)
+        for nid in self.expanded_nodes:
+            depth = self.nodes_depth.get(nid, 0)
+            n_children = len(self.children.get(nid, set()))
+            depth_children[depth].append(n_children)
+
+        return {
+            depth: {
+                "mean_children": round(sum(counts) / len(counts), 2),
+                "nodes": len(counts),
+            }
+            for depth, counts in sorted(depth_children.items())
+        }
+
+    def route_details(self, node_id: int) -> dict:
+        """Get full details about a route ending at the given node.
+
+        :param node_id: The id of the terminal (winning) node.
+        :return: Dict with route_score, route_length, and per-step details.
+        """
+        steps = []
+        nid = node_id
+        while nid and nid != 1:
+            parent_id = self.parents[nid]
+            node = self.nodes[nid]
+            steps.append(
+                {
+                    "node_id": nid,
+                    "depth": self.nodes_depth.get(nid, 0),
+                    "rule_id": self.nodes_rules.get(nid),
+                    "prob": round(self.nodes_prob.get(nid, 0.0), 6),
+                    "init_value": round(self.nodes_init_value.get(nid, 0.0), 4),
+                    "total_value": round(self.nodes_total_value.get(nid, 0.0), 4),
+                    "visits": self.nodes_visit.get(nid, 0),
+                    "is_solved": node.is_solved(),
+                    "n_precursors": len(node.new_precursors),
+                }
+            )
+            nid = parent_id
+
+        return {
+            "node_id": node_id,
+            "route_score": round(self.route_score(node_id), 6),
+            "route_length": len(steps),
+            "steps": list(reversed(steps)),
+        }
+
+    def to_stats_dict(self) -> dict:
+        """Return a flat dict with all tree statistics for CSV/JSON export.
+
+        Combines basic tree metrics with policy analytics and search dynamics.
+        """
+        # Branching stats
+        all_children_counts = [
+            len(self.children.get(nid, set())) for nid in self.expanded_nodes
+        ]
+        max_bf = max(all_children_counts) if all_children_counts else 0
+        mean_bf = (
+            round(sum(all_children_counts) / len(all_children_counts), 2)
+            if all_children_counts
+            else 0.0
+        )
+
+        # Best route info
+        best_score = None
+        mean_winning_rank = None
+        if self.winning_nodes:
+            best_score = round(
+                max(self.route_score(nid) for nid in self.winning_nodes), 6
+            )
+            ranks_info = self.winning_rule_ranks()
+            all_ranks = [
+                step["rank"] for route in ranks_info for step in route["steps"]
+            ]
+            if all_ranks:
+                mean_winning_rank = round(sum(all_ranks) / len(all_ranks), 2)
+
+        return {
+            # Existing basics
+            "num_routes": len(self.winning_nodes),
+            "num_nodes": len(self),
+            "num_iter": self.curr_iteration,
+            "tree_depth": max(self.nodes_depth.values()) if self.nodes_depth else 0,
+            "search_time": round(self.curr_time, 1),
+            "solved": len(self.winning_nodes) > 0,
+            # Policy performance
+            "expansion_calls": self.stats["expansion_calls"],
+            "expansion_successes": self.stats["expansion_successes"],
+            "total_rules_tried": self.stats["total_rules_tried"],
+            "total_rules_succeeded": self.stats["total_rules_succeeded"],
+            "rule_applicability_rate": round(self.rule_applicability_rate(), 4),
+            "dead_end_nodes": self.stats["dead_end_nodes"],
+            # Search dynamics
+            "first_solution_iteration": self.stats["first_solution_iteration"],
+            "first_solution_time": self.stats["first_solution_time"],
+            # Tree shape
+            "max_branching_factor": max_bf,
+            "mean_branching_factor": mean_bf,
+            # Route quality
+            "best_route_score": best_score,
+            "mean_winning_rule_rank": mean_winning_rank,
+        }

@@ -76,3 +76,56 @@ Other Algorithms
 - **Breadth-First Search (breadth_first):** Explores nodes level by level in FIFO order
 - **Best-First Search (best_first):** Prioritizes nodes with highest evaluation scores
 - **Beam Search (beam):** Like best-first but expands only the top-k nodes at each level (controlled by ``beam_width``)
+
+Tree Analytics
+--------------
+
+After a search completes, the ``Tree`` object provides statistics about policy performance, search dynamics,
+and tree structure. These are useful for debugging failed searches, evaluating policy quality, and comparing
+different configurations.
+
+**Search counters** (``tree.stats``). Lightweight counters collected during search with zero overhead:
+
+.. table::
+    :widths: 40 60
+
+    ============================================= ===========================================================
+    Counter                                       Description
+    ============================================= ===========================================================
+    ``expansion_calls``                           Number of nodes the search attempted to expand
+    ``expansion_successes``                       Expansions that produced at least one child
+    ``total_rules_tried``                         Total reaction rules applied across all expansions
+    ``total_rules_succeeded``                     Rules that produced valid products
+    ``dead_end_nodes``                            Non-root nodes where no rule produced children
+    ``first_solution_iteration``                  Iteration when first solved route was found
+    ``first_solution_time``                       Wall-clock seconds to first solution
+    ``routes_found_at``                           List of (iteration, time) pairs for each route discovery
+    ============================================= ===========================================================
+
+**Analysis methods**. Computed lazily on demand after search:
+
+.. table::
+    :widths: 40 60
+
+    ============================================= ===========================================================
+    Method                                        Description
+    ============================================= ===========================================================
+    ``rule_applicability_rate()``                  Fraction of tried rules that produced valid products (0–1)
+    ``winning_rule_ranks()``                       Rank of the winning rule among siblings at each step of each solved route
+    ``branching_profile()``                        Mean branching factor per depth level (expanded nodes only)
+    ``route_details(node_id)``                     Per-step breakdown of a specific route (rule, prob, value, visits)
+    ``to_stats_dict()``                            Flat dict with all metrics for CSV/JSON export
+    ============================================= ===========================================================
+
+**Interpreting results**:
+
+- **Rule applicability rate** > 0.5 indicates the policy predicts mostly applicable rules.
+  Below 0.2 suggests the policy may need retraining or the rule set is too specific.
+- **Winning rule rank** close to 1 means the policy's top predictions lead to solutions.
+  Higher ranks indicate the search had to explore further down the prediction list.
+- **First solution iteration** relative to total iterations shows search efficiency.
+  Late first solutions suggest increasing ``max_iterations`` or tuning ``c_ucb``.
+- **Dead-end nodes** indicate nodes where no predicted rules produced children.
+  High dead-end rates may point to limited building blocks or overly specific rules.
+
+For a hands-on tutorial, see the `Tree Analysis notebook <10_Tree_Analysis.ipynb>`_.

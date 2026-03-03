@@ -57,6 +57,7 @@ also for creating flexible pipelines.
 
 - `Combined Ranking and Filtering Policy`_ - demonstrates how to combine ranking and filtering policy networks.
 - `NMCS Algorithms`_ - demonstrates Nested Monte Carlo Search algorithms for retrosynthetic planning.
+- `Tree Analysis`_ - demonstrates how to analyze tree search results: policy performance, winning rule ranks, branching profile, and route details.
 
 .. _Welcome to Chython: 00_Welcome_to_Chython.ipynb
 .. _Coming from RDKit: 01_Coming_from_RDKit.ipynb
@@ -69,6 +70,7 @@ also for creating flexible pipelines.
 .. _Protection Scoring: 07_Protection_Scoring.ipynb
 .. _Combined Ranking and Filtering Policy: 08_Combined_Ranking_Filtering_Policy.ipynb
 .. _NMCS Algorithms: 09_NMCS_Algorithms.ipynb
+.. _Tree Analysis: 10_Tree_Analysis.ipynb
 
 .. toctree::
     :hidden:
@@ -87,5 +89,6 @@ also for creating flexible pipelines.
     07_Protection_Scoring
     08_Combined_Ranking_Filtering_Policy
     09_NMCS_Algorithms
+    10_Tree_Analysis
     ../configuration/configuration
     ../methods/methods
