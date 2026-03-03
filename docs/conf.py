@@ -7,12 +7,12 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # General configuration
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints']
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon', 'sphinx.ext.intersphinx', 'nbsphinx', 'nbsphinx_link', 'myst_parser']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon', 'sphinx.ext.intersphinx', 'nbsphinx', 'myst_parser']
 source_suffix = '.rst'
 master_doc = 'index'
 
 # nbsphinx configuration: do not execute notebooks during the build
-# This avoids long build times from heavy notebooks referenced via .nblink
+# This avoids long build times from heavy notebooks
 nbsphinx_execute = 'never'
 
 # Override nbsphinx's default which contains a lambda (unpickleable),
