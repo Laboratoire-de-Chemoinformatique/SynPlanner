@@ -1,13 +1,14 @@
 """Module containing commands line scripts for training and planning steps."""
 
 import os
-from pathlib import Path
 import warnings
+from pathlib import Path
 
 import click
 import yaml
 
 from synplan.chem.data.filtering import ReactionFilterConfig, filter_reactions_from_file
+from synplan.chem.data.mapping import MappingConfig, map_reactions_from_file
 from synplan.chem.data.standardizing import (
     ReactionStandardizationConfig,
     standardize_reactions_from_file,
@@ -21,8 +22,8 @@ from synplan.ml.training.supervised import create_policy_dataset, run_policy_tra
 from synplan.utils.config import (
     PolicyEvaluationConfig,
     PolicyNetworkConfig,
-    RDKitEvaluationConfig,
     RandomEvaluationConfig,
+    RDKitEvaluationConfig,
     RolloutEvaluationConfig,
     RuleExtractionConfig,
     TreeConfig,
@@ -32,13 +33,15 @@ from synplan.utils.config import (
 )
 from synplan.utils.loading import (
     download_all_data,
+    download_preset,
     load_building_blocks,
     load_policy_function,
     load_reaction_rules,
 )
 
 try:
-    from importlib.metadata import PackageNotFoundError, version as _dist_version
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _dist_version
 except Exception:  # pragma: no cover
     _dist_version = None  # type: ignore[assignment]
     PackageNotFoundError = Exception  # type: ignore[assignment]
@@ -69,6 +72,24 @@ def synplan():
     """SynPlanner command line interface."""
 
 
+@synplan.command(name="download_preset")
+@click.option(
+    "--preset",
+    default="synplanner-article",
+    help="Preset name (e.g. 'synplanner-article').",
+)
+@click.option(
+    "--save_to", "save_to", default=".", help="Directory to save downloaded data."
+)
+def download_preset_cli(preset: str, save_to: str) -> None:
+    """Download a ready-to-use data preset from HuggingFace."""
+    paths = download_preset(preset_name=preset, save_to=save_to)
+    click.echo(f"Preset '{preset}' downloaded:")
+    for key, path in paths.items():
+        if path is not None:
+            click.echo(f"  {key}: {path}")
+
+
 @synplan.command(name="download_all_data")
 @click.option(
     "--save_to",
@@ -76,7 +97,7 @@ def synplan():
     help="Path to the folder where downloaded data will be stored.",
 )
 def download_all_data_cli(save_to: str = ".") -> None:
-    """Downloads all data for training, planning and benchmarking SynPlanner."""
+    """Downloads all data from the legacy repo. Deprecated: use download_preset instead."""
     download_all_data(save_to=save_to)
 
 
@@ -124,8 +145,32 @@ def building_blocks_standardizing_cli(input_file: str, output_file: str) -> None
 @click.option(
     "--num_cpus", default=4, type=int, help="The number of CPUs to use for processing."
 )
+@click.option(
+    "--ignore-errors/--no-ignore-errors",
+    default=True,
+    help="Skip bad reactions instead of crashing (default: skip).",
+)
+@click.option(
+    "--error-file",
+    "error_file",
+    default=None,
+    type=click.Path(),
+    help="Write failed reactions here. Default: <output>.errors.tsv",
+)
+@click.option(
+    "--batch_size",
+    default=100,
+    type=int,
+    help="Number of reactions per batch sent to each worker.",
+)
 def reaction_standardizing_cli(
-    config_path: str, input_file: str, output_file: str, num_cpus: int
+    config_path: str,
+    input_file: str,
+    output_file: str,
+    num_cpus: int,
+    ignore_errors: bool,
+    error_file: str | None,
+    batch_size: int,
 ) -> None:
     """Standardizes reactions and remove duplicates."""
     stand_config = ReactionStandardizationConfig.from_yaml(config_path)
@@ -134,7 +179,9 @@ def reaction_standardizing_cli(
         input_reaction_data_path=input_file,
         standardized_reaction_data_path=output_file,
         num_cpus=num_cpus,
-        batch_size=100,
+        batch_size=batch_size,
+        ignore_errors=ignore_errors,
+        error_file_path=error_file,
     )
 
 
@@ -163,8 +210,32 @@ def reaction_standardizing_cli(
 @click.option(
     "--num_cpus", default=4, type=int, help="The number of CPUs to use for processing."
 )
+@click.option(
+    "--ignore-errors/--no-ignore-errors",
+    default=True,
+    help="Skip bad reactions instead of crashing (default: skip).",
+)
+@click.option(
+    "--error-file",
+    "error_file",
+    default=None,
+    type=click.Path(),
+    help="Write failed/filtered reactions here. Default: <output>.errors.tsv",
+)
+@click.option(
+    "--batch_size",
+    default=100,
+    type=int,
+    help="Number of reactions per batch sent to each worker.",
+)
 def reaction_filtering_cli(
-    config_path: str, input_file: str, output_file: str, num_cpus: int
+    config_path: str,
+    input_file: str,
+    output_file: str,
+    num_cpus: int,
+    ignore_errors: bool,
+    error_file: str | None,
+    batch_size: int,
 ):
     """Filters erroneous reactions."""
     reaction_check_config = ReactionFilterConfig().from_yaml(config_path)
@@ -173,7 +244,89 @@ def reaction_filtering_cli(
         input_reaction_data_path=input_file,
         filtered_reaction_data_path=output_file,
         num_cpus=num_cpus,
-        batch_size=100,
+        batch_size=batch_size,
+        ignore_errors=ignore_errors,
+        error_file_path=error_file,
+    )
+
+
+@synplan.command(name="reaction_mapping")
+@click.option(
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(exists=True),
+    help="YAML configuration file (optional; defaults used if omitted).",
+)
+@click.option(
+    "--input",
+    "input_file",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the file with reactions to be mapped.",
+)
+@click.option(
+    "--output",
+    "output_file",
+    required=True,
+    type=click.Path(),
+    help="Path to the file where mapped reactions will be stored.",
+)
+@click.option(
+    "--workers", "num_workers", default=0, type=int, help="CPU workers (0 = auto)."
+)
+@click.option(
+    "--device",
+    default=None,
+    type=click.Choice(["cuda", "mps", "cpu"], case_sensitive=False),
+    help="Torch device (default: auto-detect).",
+)
+@click.option(
+    "--no-amp", "no_amp", is_flag=True, help="Disable automatic mixed precision."
+)
+@click.option(
+    "--batch-size", "batch_size", default=None, type=int, help="GPU batch size."
+)
+@click.option(
+    "--ignore-errors/--no-ignore-errors",
+    default=True,
+    help="Skip bad reactions instead of crashing (default: skip).",
+)
+@click.option(
+    "--error-file",
+    "error_file",
+    default=None,
+    type=click.Path(),
+    help="Write failed reactions here. Default: <output>.errors.tsv",
+)
+def reaction_mapping_cli(
+    config_path,
+    input_file,
+    output_file,
+    num_workers,
+    device,
+    no_amp,
+    batch_size,
+    ignore_errors,
+    error_file,
+):
+    """Map reaction atoms using a neural attention model."""
+    config = MappingConfig.from_yaml(config_path) if config_path else MappingConfig()
+    if device is not None:
+        config.device = device
+    if no_amp:
+        config.no_amp = True
+    if batch_size is not None:
+        config.batch_size = batch_size
+
+    map_reactions_from_file(
+        config=config,
+        input_reaction_data_path=input_file,
+        mapped_reaction_data_path=output_file,
+        num_workers=num_workers,
+        silent=False,
+        ignore_errors=ignore_errors,
+        error_file_path=error_file,
     )
 
 
@@ -202,8 +355,32 @@ def reaction_filtering_cli(
 @click.option(
     "--num_cpus", default=4, type=int, help="The number of CPUs to use for processing."
 )
+@click.option(
+    "--ignore-errors/--no-ignore-errors",
+    default=True,
+    help="Skip bad reactions instead of crashing (default: skip).",
+)
+@click.option(
+    "--error-file",
+    "error_file",
+    default=None,
+    type=click.Path(),
+    help="Write failed reactions here. Default: <output>.errors.tsv",
+)
+@click.option(
+    "--batch_size",
+    default=100,
+    type=int,
+    help="Number of reactions per batch sent to each worker.",
+)
 def rule_extracting_cli(
-    config_path: str, input_file: str, output_file: str, num_cpus: int
+    config_path: str,
+    input_file: str,
+    output_file: str,
+    num_cpus: int,
+    ignore_errors: bool,
+    error_file: str | None,
+    batch_size: int,
 ):
     """Reaction rules extraction."""
     reaction_rule_config = RuleExtractionConfig.from_yaml(config_path)
@@ -212,7 +389,9 @@ def rule_extracting_cli(
         reaction_data_path=input_file,
         reaction_rules_path=output_file,
         num_cpus=num_cpus,
-        batch_size=100,
+        batch_size=batch_size,
+        ignore_errors=ignore_errors,
+        error_file_path=error_file,
     )
 
 
@@ -225,16 +404,11 @@ def rule_extracting_cli(
     help="Path to the configuration file for ranking policy training.",
 )
 @click.option(
-    "--reaction_data",
+    "--policy_data",
     required=True,
     type=click.Path(exists=True),
-    help="Path to the file with reactions for ranking policy training.",
-)
-@click.option(
-    "--reaction_rules",
-    required=True,
-    type=click.Path(exists=True),
-    help="Path to the file with extracted reaction rules.",
+    help="Path to the policy training mapping file (*_policy_data.tsv) "
+    "generated during rule extraction.",
 )
 @click.option(
     "--results_dir",
@@ -243,30 +417,47 @@ def rule_extracting_cli(
     help="Path to the directory where the trained policy network will be stored.",
 )
 @click.option(
-    "--num_cpus",
-    default=4,
+    "--workers",
+    "num_workers",
+    default=0,
     type=int,
-    help="The number of CPUs to use for training set preparation.",
+    help="CPU workers for dataset preprocessing (0 = auto-detect).",
+)
+@click.option(
+    "--no-cache",
+    "no_cache",
+    is_flag=True,
+    default=False,
+    help="Disable dataset caching (always reprocess from scratch).",
+)
+@click.option(
+    "--logger",
+    "logger_type",
+    default=None,
+    type=click.Choice(["csv", "tensorboard", "mlflow", "wandb"], case_sensitive=False),
+    help="Enable a training logger (overrides config). Uses default settings with save_dir=results_dir.",
 )
 def ranking_policy_training_cli(
     config_path: str,
-    reaction_data: str,
-    reaction_rules: str,
+    policy_data: str,
     results_dir: str,
-    num_cpus: int,
+    num_workers: int,
+    no_cache: bool,
+    logger_type: str | None,
 ) -> None:
     """Ranking policy network training."""
     policy_config = PolicyNetworkConfig.from_yaml(config_path)
     policy_config.policy_type = "ranking"
-    policy_dataset_file = os.path.join(results_dir, "policy_dataset.dt")
+    if logger_type is not None:
+        policy_config.logger = {"type": logger_type}
 
     datamodule = create_policy_dataset(
-        reaction_rules_path=reaction_rules,
-        molecules_or_reactions_path=reaction_data,
-        output_path=policy_dataset_file,
+        policy_data_path=policy_data,
+        results_dir=results_dir,
         dataset_type="ranking",
         batch_size=policy_config.batch_size,
-        num_cpus=num_cpus,
+        num_workers=num_workers,
+        cache=not no_cache,
     )
 
     run_policy_training(datamodule, config=policy_config, results_path=results_dir)
@@ -304,26 +495,44 @@ def ranking_policy_training_cli(
     type=int,
     help="The number of CPUs to use for training set preparation.",
 )
+@click.option(
+    "--no-cache",
+    "no_cache",
+    is_flag=True,
+    default=False,
+    help="Disable dataset caching (always reprocess from scratch).",
+)
+@click.option(
+    "--logger",
+    "logger_type",
+    default=None,
+    type=click.Choice(["csv", "tensorboard", "mlflow", "wandb"], case_sensitive=False),
+    help="Enable a training logger (overrides config). Uses default settings with save_dir=results_dir.",
+)
 def filtering_policy_training_cli(
     config_path: str,
     molecule_data: str,
     reaction_rules: str,
     results_dir: str,
     num_cpus: int,
+    no_cache: bool,
+    logger_type: str | None,
 ):
     """Filtering policy network training."""
 
     policy_config = PolicyNetworkConfig.from_yaml(config_path)
     policy_config.policy_type = "filtering"
-    policy_dataset_file = os.path.join(results_dir, "policy_dataset.ckpt")
+    if logger_type is not None:
+        policy_config.logger = {"type": logger_type}
 
     datamodule = create_policy_dataset(
         reaction_rules_path=reaction_rules,
         molecules_or_reactions_path=molecule_data,
-        output_path=policy_dataset_file,
+        results_dir=results_dir,
         dataset_type="filtering",
         batch_size=policy_config.batch_size,
         num_cpus=num_cpus,
+        cache=not no_cache,
     )
 
     run_policy_training(datamodule, config=policy_config, results_path=results_dir)
@@ -384,17 +593,15 @@ def value_network_tuning_cli(
 ):
     """Value network tuning."""
 
-    with open(config_path, "r", encoding="utf-8") as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     policy_config = PolicyNetworkConfig.from_dict(config["node_expansion"])
     policy_config.weights_path = policy_network
 
     value_config = ValueNetworkConfig.from_dict(config["value_network"])
-    if value_network is None:
-        value_config.weights_path = os.path.join(
-            results_dir, "weights", "value_network.ckpt"
-        )
+    if value_network is not None:
+        value_config.weights_path = value_network
 
     tree_config = TreeConfig.from_dict(config["tree"])
     tuning_config = TuningConfig.from_dict(config["tuning"])
@@ -466,10 +673,10 @@ def planning_cli(
 ):
     """Retrosynthetic planning."""
 
-    with open(config_path, "r", encoding="utf-8") as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
-    search_config = {**config["tree"], **config["node_evaluation"]}
+    search_config = {**config["tree"], **config.get("node_evaluation", {})}
     policy_config = PolicyNetworkConfig.from_dict(
         {**config["node_expansion"], **{"weights_path": policy_network}}
     )
@@ -550,8 +757,8 @@ def planning_cli(
 )
 @click.option(
     "--perform_subcluster",
-    default=None,
-    type=click.Path(exists=False),
+    is_flag=True,
+    default=False,
     help="Perform subclustering.",
 )
 @click.option(

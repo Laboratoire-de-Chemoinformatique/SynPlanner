@@ -1,34 +1,67 @@
 """Module containing functions for protocol of reaction rules extraction."""
 
 import logging
-import pickle
-from collections import defaultdict
+import tempfile
+from collections import Counter, defaultdict
+from io import TextIOWrapper
 from itertools import islice
 from os.path import splitext
-from typing import Dict, List, Set, Tuple
+from pathlib import Path
 
 import ray
-from chython import QueryContainer as QueryContainerChython
-from CGRtools.containers.cgr import CGRContainer
-from CGRtools.containers.molecule import MoleculeContainer
-from CGRtools.containers.query import QueryContainer
-from CGRtools.containers.reaction import ReactionContainer
-from CGRtools.exceptions import InvalidAromaticRing
-from CGRtools.reactor import Reactor
+from chython.containers.bonds import Bond, QueryBond
+from chython.containers.cgr import CGRContainer
+from chython.containers.molecule import MoleculeContainer
+from chython.containers.query import QueryContainer
+from chython.containers.reaction import ReactionContainer
+from chython.exceptions import InvalidAromaticRing
+from chython.periodictable import QueryElement
+from chython.reactor import Reactor
 from tqdm.auto import tqdm
 
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
-from synplan.chem.utils import (
-    reverse_reaction,
-    cgrtools_to_chython_molecule,
-)
+from synplan.chem.utils import reverse_reaction, unite_molecules
 from synplan.utils.config import RuleExtractionConfig
-from synplan.utils.files import ReactionReader
+from synplan.utils.files import (
+    RawReactionReader,
+    load_rule_index_mapping_tsv,
+    parse_reaction,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
+    atoms = set(atoms)
+    q = QueryContainer(smarts="")
+    for n in atoms:
+        atom = mol.atom(n)
+        xy = atom.xy if hasattr(atom, "xy") else None
+        if isinstance(atom, QueryElement):
+            q.add_atom(atom.copy(full=True), n, xy=xy)
+        else:
+            q.add_atom(
+                QueryElement.from_atom(
+                    atom,
+                    neighbors=True,
+                    hydrogens=True,
+                    ring_sizes=True,
+                ),
+                n,
+                xy=xy,
+            )
+    for n, m, bond in mol.bonds():
+        if n in atoms and m in atoms:
+            if isinstance(bond, QueryBond):
+                q.add_bond(n, m, bond.copy(full=True))
+            elif isinstance(bond, Bond):
+                q.add_bond(n, m, QueryBond.from_bond(bond))
+    return q
 
 
 def add_environment_atoms(
-    cgr: CGRContainer, center_atoms: Set[int], environment_atom_count: int
-) -> Set[int]:
+    cgr: CGRContainer, center_atoms: set[int], environment_atom_count: int
+) -> set[int]:
     """
     Adds environment atoms to the set of center atoms based on the specified depth.
 
@@ -48,18 +81,15 @@ def add_environment_atoms(
     """
     if environment_atom_count:
         env_cgr = cgr.augmented_substructure(center_atoms, deep=environment_atom_count)
-        # combine the original center atoms with the new environment atoms
         return center_atoms | set(env_cgr)
-
-    # if no environment is to be included, return the original center atoms
     return center_atoms
 
 
 def add_functional_groups(
     reaction: ReactionContainer,
-    center_atoms: Set[int],
-    func_groups_list: List[QueryContainerChython],
-) -> Set[int]:
+    center_atoms: set[int],
+    func_groups_list: list[QueryContainer],
+) -> set[int]:
     """
     Augments the set of reaction rule atoms with functional groups if specified.
 
@@ -78,24 +108,17 @@ def add_functional_groups(
     """
 
     rule_atoms = center_atoms.copy()
-    # iterate over each molecule in the reaction
     for molecule in reaction.molecules():
-        molecule_chython = cgrtools_to_chython_molecule(molecule)
-        # for each functional group specified in the list
         for func_group in func_groups_list:
-            # find mappings of the functional group in the molecule
-            for mapping in func_group.get_mapping(molecule_chython):
-                # remap the functional group based on the found mapping
+            for mapping in func_group.get_mapping(molecule):
                 func_group.remap(mapping)
-                # if the functional group intersects with center atoms, include it
                 if set(func_group.atoms_numbers) & center_atoms:
                     rule_atoms |= set(func_group.atoms_numbers)
-                # reset the mapping to its original state for the next iteration
                 func_group.remap({v: k for k, v in mapping.items()})
     return rule_atoms
 
 
-def add_ring_structures(cgr: CGRContainer, rule_atoms: Set[int]) -> Set[int]:
+def add_ring_structures(cgr: CGRContainer, rule_atoms: set[int]) -> set[int]:
     """
     Adds ring structures to the set of rule atoms if they intersect with the reaction
     center atoms.
@@ -118,10 +141,10 @@ def add_ring_structures(cgr: CGRContainer, rule_atoms: Set[int]) -> Set[int]:
 
 def add_leaving_incoming_groups(
     reaction: ReactionContainer,
-    rule_atoms: Set[int],
+    rule_atoms: set[int],
     keep_leaving_groups: bool,
     keep_incoming_groups: bool,
-) -> Tuple[Set[int], Dict[str, Set]]:
+) -> tuple[set[int], dict[str, set]]:
     """
     Identifies and includes leaving and incoming groups to the rule atoms based on
     specified flags.
@@ -168,11 +191,11 @@ def add_leaving_incoming_groups(
 
 
 def clean_molecules(
-    rule_molecules: List[MoleculeContainer],
-    reaction_molecules: Tuple[MoleculeContainer],
-    reaction_center_atoms: Set[int],
-    atom_retention_details: Dict[str, Dict[str, bool]],
-) -> List[QueryContainer]:
+    rule_molecules: list[MoleculeContainer],
+    reaction_molecules: tuple[MoleculeContainer],
+    reaction_center_atoms: set[int],
+    atom_retention_details: dict[str, dict[str, bool]],
+) -> list[QueryContainer]:
     """
     Cleans rule molecules by removing specified information about atoms based on
     retention details provided.
@@ -191,55 +214,35 @@ def clean_molecules(
     :return: A list of QueryContainer objects representing the cleaned rule molecules.
 
     """
-    cleaned_rule_molecules = []
+    cleaned = []
+    for rule_mol in rule_molecules:
+        rule_atoms = set(rule_mol.atoms_numbers)
+        for rxn_mol in reaction_molecules:
+            rxn_atoms = set(rxn_mol.atoms_numbers)
+            if rule_atoms <= rxn_atoms:
+                q_rxn = molecule_substructure_as_query(rxn_mol, rxn_atoms)
+                q_rule = molecule_substructure_as_query(q_rxn, rule_atoms)
 
-    for rule_molecule in rule_molecules:
-        for reaction_molecule in reaction_molecules:
-            if set(rule_molecule.atoms_numbers) <= set(reaction_molecule.atoms_numbers):
-                query_reaction_molecule = reaction_molecule.substructure(
-                    reaction_molecule, as_query=True
-                )
-                query_rule_molecule = query_reaction_molecule.substructure(
-                    rule_molecule
-                )
-
-                # clean reaction center atoms
-                if not all(
-                    atom_retention_details["reaction_center"].values()
-                ):  # if everything True, we keep all marks
-                    local_reaction_center_atoms = (
-                        set(rule_molecule.atoms_numbers) & reaction_center_atoms
-                    )
-                    for atom_number in local_reaction_center_atoms:
-                        query_rule_molecule = clean_atom(
-                            query_rule_molecule,
-                            atom_retention_details["reaction_center"],
-                            atom_number,
+                if not all(atom_retention_details["reaction_center"].values()):
+                    for n in rule_atoms & reaction_center_atoms:
+                        q_rule = clean_atom(
+                            q_rule, atom_retention_details["reaction_center"], n
                         )
 
-                # clean environment atoms
-                if not all(
-                    atom_retention_details["environment"].values()
-                ):  # if everything True, we keep all marks
-                    local_environment_atoms = (
-                        set(rule_molecule.atoms_numbers) - reaction_center_atoms
-                    )
-                    for atom_number in local_environment_atoms:
-                        query_rule_molecule = clean_atom(
-                            query_rule_molecule,
-                            atom_retention_details["environment"],
-                            atom_number,
+                if not all(atom_retention_details["environment"].values()):
+                    for n in rule_atoms - reaction_center_atoms:
+                        q_rule = clean_atom(
+                            q_rule, atom_retention_details["environment"], n
                         )
 
-                cleaned_rule_molecules.append(query_rule_molecule)
+                cleaned.append(q_rule)
                 break
-
-    return cleaned_rule_molecules
+    return cleaned
 
 
 def clean_atom(
     query_molecule: QueryContainer,
-    attributes_to_keep: Dict[str, bool],
+    attributes_to_keep: dict[str, bool],
     atom_number: int,
 ) -> QueryContainer:
     """
@@ -250,7 +253,6 @@ def clean_atom(
                                representing the attribute names, and the values should be booleans indicating whether
                                to retain (True) or remove(False) that attribute. Expected keys are:
                                - "neighbors": Indicates if neighbors of the atom should be removed.
-                               - "hybridization": Indicates if hybridization information of the atom should be removed.
                                - "implicit_hydrogens": Indicates if implicit hydrogen information of the atom should be removed.
                                - "ring_sizes": Indicates if ring size information of the atom should be removed.
 
@@ -262,8 +264,6 @@ def clean_atom(
 
     if not attributes_to_keep["neighbors"]:
         target_atom.neighbors = None
-    if not attributes_to_keep["hybridization"]:
-        target_atom.hybridization = None
     if not attributes_to_keep["implicit_hydrogens"]:
         target_atom.implicit_hydrogens = None
     if not attributes_to_keep["ring_sizes"]:
@@ -274,10 +274,10 @@ def clean_atom(
 
 def create_substructures_and_reagents(
     reaction: ReactionContainer,
-    rule_atoms: Set[int],
+    rule_atoms: set[int],
     as_query_container: bool,
     keep_reagents: bool,
-) -> Tuple[List[MoleculeContainer], List[MoleculeContainer], List]:
+) -> tuple[list[MoleculeContainer], list[MoleculeContainer], list]:
     """
     Creates substructures for reactants and products, and optionally includes
     reagents, based on specified parameters. The function processes the reaction to
@@ -300,36 +300,28 @@ def create_substructures_and_reagents(
              - A list of reagents, included as is or as substructures, depending on the as_query_container flag.
 
     """
-    reactant_substructures = [
-        reactant.substructure(rule_atoms.intersection(reactant.atoms_numbers))
-        for reactant in reaction.reactants
-        if rule_atoms.intersection(reactant.atoms_numbers)
-    ]
+    reactant_substructures = []
+    for reactant in reaction.reactants:
+        atoms = rule_atoms & set(reactant.atoms_numbers)
+        if atoms:
+            reactant_substructures.append(reactant.substructure(atoms))
 
-    product_substructures = [
-        product.substructure(rule_atoms.intersection(product.atoms_numbers))
-        for product in reaction.products
-        if rule_atoms.intersection(product.atoms_numbers)
-    ]
+    product_substructures = []
+    for product in reaction.products:
+        atoms = rule_atoms & set(product.atoms_numbers)
+        if atoms:
+            product_substructures.append(product.substructure(atoms))
 
-    reagents = []
-    if keep_reagents:
-        if as_query_container:
-            reagents = [
-                reagent.substructure(reagent, as_query=True)
-                for reagent in reaction.reagents
-            ]
-        else:
-            reagents = reaction.reagents
+    reagents = list(reaction.reagents) if keep_reagents else []
 
     return reactant_substructures, product_substructures, reagents
 
 
 def assemble_final_rule(
-    reactant_substructures: List[QueryContainer],
-    product_substructures: List[QueryContainer],
-    reagents: List,
-    meta_debug: Dict[str, Set],
+    reactant_substructures: list[QueryContainer],
+    product_substructures: list[QueryContainer],
+    reagents: list,
+    meta_debug: dict[str, set],
     keep_metadata: bool,
     reaction: ReactionContainer,
 ) -> ReactionContainer:
@@ -398,30 +390,37 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
 
     """
 
-    # create a reactor with the given rule
-    reactor = Reactor(rule)
+    # build the query patterns and products as before
+    patterns = tuple(
+        molecule_substructure_as_query(m, m.atoms_numbers) for m in rule.reactants
+    )
+    products = tuple(rule.products)
+    reactor = Reactor(patterns=patterns, products=products, delete_atoms=False)
     try:
-        for result_reaction in reactor(reaction.reactants):
-            result_products = []
-            for result_product in result_reaction.products:
-                tmp = result_product.copy()
-                try:
-                    tmp.kekule()
-                    if tmp.check_valence():
+        for result_reaction in reactor(*reaction.reactants):  # unpack here
+            try:
+                result_products = []
+                for result_product in result_reaction.products:
+                    tmp = result_product.copy()
+                    try:
+                        tmp.kekule()
+                        if tmp.check_valence():
+                            continue
+                    except InvalidAromaticRing:
                         continue
-                except InvalidAromaticRing:
-                    continue
-                result_products.append(result_product)
-            if set(reaction.products) == set(result_products) and len(
-                reaction.products
-            ) == len(result_products):
-                return True
-
-    except (KeyError, IndexError):
+                    result_products.append(result_product)
+                if set(reaction.products) == set(result_products) and len(
+                    reaction.products
+                ) == len(result_products):
+                    return True
+            except (KeyError, IndexError, InvalidAromaticRing):
+                # KeyError - iteration over reactor is finished and products are different from the original reaction
+                # IndexError - mistake in __contract_ions, possibly problems with charges in reaction rule
+                # InvalidAromaticRing - aromatic ring is invalid
+                continue
+    except KeyError:
         # KeyError - iteration over reactor is finished and products are different from the original reaction
-        # IndexError - mistake in __contract_ions, possibly problems with charges in reaction rule
         return False
-
     return False
 
 
@@ -442,10 +441,7 @@ def create_rule(
     :param reaction: The reaction object (ReactionContainer) from which to create the
                      rule. This object represents a chemical reaction with specified reactants,
                      products, and possibly reagents.
-    :return: A ReactionContainer object representing the extracted reaction rule. This
-             rule includes various elements of the reaction as specified by the
-             configuration, such as reaction centers, environmental atoms, functional groups,
-             and others.
+    :return: A ReactionContainer object representing the extracted reaction rule.
 
     """
 
@@ -489,7 +485,6 @@ def create_rule(
             center_atoms,
             config.atom_info_retention,
         )
-
         product_substructures = clean_molecules(
             product_substructures,
             reaction.products,
@@ -524,7 +519,7 @@ def create_rule(
 
 def extract_rules(
     config: RuleExtractionConfig, reaction: ReactionContainer
-) -> List[ReactionContainer]:
+) -> tuple[list[ReactionContainer], bool]:
     """
     Extracts reaction rules from a given reaction based on the specified
     configuration.
@@ -536,70 +531,94 @@ def extract_rules(
     :param reaction: The reaction object (ReactionContainer) from which to extract
         rules. The reaction object represents a chemical reaction with specified
         reactants, products, and possibly reagents.
-    :return: A list of ReactionContainer objects, each representing a distinct reaction
-        rule. If config.multicenter_rules is True, a single rule encompassing all
-        reaction centers is returned. Otherwise, separate rules for each reaction center
-        are extracted, up to a maximum of 15 distinct centers.
+    :return: A tuple of (rules, skipped_multi_product) where *rules* is a list of
+        ReactionContainer objects and *skipped_multi_product* is True if the reaction
+        was skipped because it has multiple products.
 
     """
 
-    standardizer = (
-        RemoveReagentsStandardizer()
-    )  # reagents are needed if they are the part of reaction rule specification
+    standardizer = RemoveReagentsStandardizer()
     reaction = standardizer(reaction)
 
+    # skip reactions with multiple products (checked after reagent removal)
+    if config.single_product_only and len(reaction.products) != 1:
+        return [], True
+
     if config.multicenter_rules:
-        # extract a single rule encompassing all reaction centers
-        return [create_rule(config, reaction)]
+        return [create_rule(config, reaction)], False
 
     # extract separate rules for each distinct reaction center
     distinct_rules = set()
     for center_reaction in islice(reaction.enumerate_centers(), 15):
-        single_rule = create_rule(config, center_reaction)
-        distinct_rules.add(single_rule)
+        distinct_rules.add(create_rule(config, center_reaction))
 
-    return list(distinct_rules)
+    return list(distinct_rules), False
 
 
 @ray.remote
 def process_reaction_batch(
-    batch: List[Tuple[int, ReactionContainer]], config: RuleExtractionConfig
-) -> List[Tuple[int, List[ReactionContainer]]]:
+    batch: list[tuple[int, str]],
+    config: RuleExtractionConfig,
+    ignore_errors: bool = False,
+    fmt: str = "smi",
+) -> tuple[
+    list[tuple[int, list[ReactionContainer]]], list[tuple[str, str, str, str]], int
+]:
+    """Process a batch of reactions for rule extraction.
+
+    Raw strings are parsed inside the worker so that SMILES parsing is
+    distributed across Ray workers instead of being a main-thread bottleneck.
+
+    :param batch: List of ``(index, raw_string)`` pairs.
+    :param config: Rule extraction configuration.
+    :param ignore_errors: If True, log failures and continue.
+    :param fmt: Format hint — ``"smi"`` or ``"rdf"``.
+    :return: ``(results, errors, n_multi_product)`` where *results* is a list of
+        ``(index, extracted_rules, product_smiles)`` tuples, *errors* is a list of
+        ``(original_smiles, stage, error_type, error_message)`` tuples and
+        *n_multi_product* is the number of reactions skipped due to multiple products.
     """
-    Processes a batch of reactions to extract reaction rules based on the given
-    configuration. This function operates as a remote task in a distributed system using
-    Ray. It takes a batch of reactions, where each reaction is paired with an index. For
-    each reaction in the batch, it extracts reaction rules as specified by the
-    configuration object. The extracted rules for each reaction are then returned along
-    with the corresponding index. This function is intended to be used in a distributed
-    manner with Ray to parallelize the rule extraction process across multiple
-    reactions.
-
-    :param batch: A list where each element is a tuple containing an index (int) and a
-        ReactionContainer object. The index is typically used to keep track of the
-        reaction's position in a larger dataset.
-    :param config: An instance of ExtractRuleConfig that provides settings and
-        parameters for the rule extraction process.
-    :return: A list where each element is a tuple. The first element of the tuple is an
-        index (int), and the second is a list of ReactionContainer objects representing
-        the extracted rules for the corresponding reaction.
-
-    """
-
     extracted_rules_list = []
-    for index, reaction in batch:
+    errors: list[tuple[str, str, str, str]] = []
+    n_multi_product = 0
+    for index, raw_item in batch:
         try:
-            extracted_rules = extract_rules(config, reaction)
-            extracted_rules_list.append((index, extracted_rules))
+            reaction = parse_reaction(raw_item, fmt=fmt)
+            product_smi = str(unite_molecules(reaction.products))
+            extracted_rules, skipped = extract_rules(config, reaction)
+            if skipped:
+                n_multi_product += 1
+            extracted_rules_list.append((index, extracted_rules, product_smi))
         except Exception as e:
-            logging.debug(e)
-            continue
-    return extracted_rules_list
+            if not ignore_errors:
+                raise
+            orig = raw_item if isinstance(raw_item, str) else str(raw_item)
+            etype = type(e).__qualname__
+            stage = e.stage if hasattr(e, "stage") else "extract_rules"
+            errors.append((orig, stage, etype, str(e)))
+    return extracted_rules_list, errors, n_multi_product
+
+
+def _update_rules_statistics(
+    rules_statistics: dict[ReactionContainer, list[int]],
+    index: int,
+    extracted_rules: list[ReactionContainer],
+) -> None:
+    """Update rules statistics with the indices of reactions they came from."""
+    for rule in extracted_rules:
+        prev_stats_len = len(rules_statistics)
+        rules_statistics[rule].append(index)
+        if len(rules_statistics) != prev_stats_len:
+            rule.meta["first_reaction_index"] = index
 
 
 def process_completed_batch(
-    futures: Dict,
-    rules_statistics: Dict,
+    futures: dict,
+    rules_statistics: dict,
+    error_file: TextIOWrapper | None = None,
+    error_counts: Counter | None = None,
+    multi_product_count: list[int] | None = None,
+    products_file: TextIOWrapper | None = None,
 ) -> None:
     """
     Processes completed batches of reactions, updating the rules statistics and
@@ -610,25 +629,44 @@ def process_completed_batch(
 
     :param futures: A dictionary of futures representing ongoing batch processing tasks.
     :param rules_statistics: A dictionary to keep track of statistics for each rule.
+    :param error_file: Optional file handle to write failed reactions.
+    :param error_counts: Optional counter to accumulate error categories.
+    :param multi_product_count: Single-element list used as mutable accumulator for
+        multi-product reaction count.
+    :param products_file: Optional file handle to write ``reaction_id\\tproduct_smiles``
+        pairs for later policy data generation.
     :return: None
 
     """
 
-    ready_id, running_id = ray.wait(list(futures.keys()), num_returns=1)
-    completed_batch = ray.get(ready_id[0])
-    for index, extracted_rules in completed_batch:
-        for rule in extracted_rules:
-            prev_stats_len = len(rules_statistics)
-            rules_statistics[rule].append(index)
-            if len(rules_statistics) != prev_stats_len:
-                rule.meta["first_reaction_index"] = index
+    ready_id, _running_id = ray.wait(list(futures.keys()), num_returns=1)
+    try:
+        results, errors, n_multi_product = ray.get(ready_id[0])
+    except Exception as exc:
+        logger.error("Batch failed entirely: %s", exc)
+        del futures[ready_id[0]]
+        return
+
+    for index, extracted_rules, product_smi in results:
+        _update_rules_statistics(rules_statistics, index, extracted_rules)
+        if products_file is not None:
+            products_file.write(f"{index}\t{product_smi}\n")
+
+    for orig, stage, etype, emsg in errors:
+        if error_file is not None:
+            error_file.write(f"{orig}\t{stage}\t{etype}\t{emsg}\n")
+        if error_counts is not None:
+            error_counts[(stage, etype)] += 1
+
+    if multi_product_count is not None:
+        multi_product_count[0] += n_multi_product
 
     del futures[ready_id[0]]
 
 
 def sort_rules(
-    rules_stats: Dict, min_popularity: int, single_product_only: bool
-) -> List[Tuple[ReactionContainer, List[int]]]:
+    rules_stats: dict, min_popularity: int
+) -> tuple[list[tuple[ReactionContainer, list[int]]], dict[str, int]]:
     """
     Sorts reaction rules based on their popularity and validation status. This
     function sorts the given rules according to their popularity (i.e., the number of
@@ -642,25 +680,135 @@ def sort_rules(
         considered. Default is 3.
     :type min_popularity: The minimum number of occurrence of the reaction rule to be
         selected.
-    :param single_product_only: Whether to keep only reaction rules with a single
-        molecule on the right side of reaction arrow. Default is True.
 
-    :return: A list of tuples, where each tuple contains a reaction rule and a list of
-        indices representing the rule's applications. The list is sorted in descending
-        order of the rule's popularity.
+    :return: A tuple of (sorted_rules, filter_stats) where *sorted_rules* is a list of
+        tuples with a reaction rule and its application indices, sorted by descending
+        popularity, and *filter_stats* is a dict with counts of rules rejected at each
+        filtering stage.
 
     """
+    passed = []
+    filter_stats = {
+        "total_unique_rules": 0,
+        "rejected_reactor_validation": 0,
+        "rejected_popularity": 0,
+        "passed": 0,
+    }
 
-    return sorted(
-        (
-            (rule, indices)
-            for rule, indices in rules_stats.items()
-            if len(indices) >= min_popularity
-            and rule.meta["reactor_validation"] == "passed"
-            and (not single_product_only or len(rule.products) == 1)
-        ),
-        key=lambda x: -len(x[1]),
-    )
+    for rule, indices in rules_stats.items():
+        filter_stats["total_unique_rules"] += 1
+        validation = rule.meta.get("reactor_validation", "not_set")
+        if validation != "passed":
+            filter_stats["rejected_reactor_validation"] += 1
+            continue
+        if len(indices) < min_popularity:
+            filter_stats["rejected_popularity"] += 1
+            continue
+        filter_stats["passed"] += 1
+        passed.append((rule, indices))
+
+    passed.sort(key=lambda x: -len(x[1]))
+    return passed, filter_stats
+
+
+def _extract_rules_serial(
+    config: RuleExtractionConfig,
+    reaction_data_path: str,
+    rules_statistics: dict[ReactionContainer, list[int]],
+    *,
+    ignore_errors: bool = False,
+    error_file: TextIOWrapper | None = None,
+    error_counts: Counter | None = None,
+    products_file: TextIOWrapper | None = None,
+    fmt: str = "smi",
+) -> tuple[int, int]:
+    """Serial rules extraction path used when a single CPU is requested.
+
+    Returns ``(n_processed, n_multi_product)``.
+    """
+    n_processed = 0
+    n_multi_product = 0
+    raw_reader = RawReactionReader(reaction_data_path)
+    for index, raw_item in tqdm(
+        enumerate(raw_reader),
+        desc="Number of reactions processed: ",
+        bar_format="{desc}{n} [{elapsed}]",
+    ):
+        n_processed += 1
+        try:
+            reaction = parse_reaction(raw_item, fmt=fmt)
+            product_smi = str(unite_molecules(reaction.products))
+            extracted_rules, skipped = extract_rules(config, reaction)
+            if skipped:
+                n_multi_product += 1
+            _update_rules_statistics(rules_statistics, index, extracted_rules)
+            if products_file is not None:
+                products_file.write(f"{index}\t{product_smi}\n")
+        except Exception as e:
+            if not ignore_errors:
+                raise
+            orig = raw_item if isinstance(raw_item, str) else str(raw_item)
+            etype = type(e).__qualname__
+            stage = e.stage if hasattr(e, "stage") else "extract_rules"
+            if error_file is not None:
+                error_file.write(f"{orig}\t{stage}\t{etype}\t{e}\n")
+            if error_counts is not None:
+                error_counts[(stage, etype)] += 1
+    return n_processed, n_multi_product
+
+
+def _print_extraction_summary(
+    n_processed: int,
+    sorted_rules: list[tuple[ReactionContainer, list[int]]],
+    filter_stats: dict[str, int],
+    error_counts: Counter,
+    error_file_path: Path | None,
+) -> None:
+    """Print a categorized summary of rule extraction results."""
+    n_rules = len(sorted_rules)
+    n_errors = sum(error_counts.values())
+    covered_reactions = set()
+    for _rule, indices in sorted_rules:
+        covered_reactions.update(indices)
+    n_covered = len(covered_reactions)
+    summary_lines = [
+        f"Finished: processed {n_processed}, extracted {n_rules} rules "
+        f"from {n_covered} reactions ({n_covered*100/n_processed:.1f}%), "
+        f"failed {n_errors}"
+    ]
+    # Reaction-level filtering
+    n_multi_product = filter_stats.get("skipped_multi_product", 0)
+    if n_multi_product:
+        summary_lines.append(
+            f"Reactions skipped (multi-product): {n_multi_product} "
+            f"({n_multi_product*100/n_processed:.1f}%)"
+        )
+    # Rule filtering breakdown
+    total_unique = filter_stats.get("total_unique_rules", 0)
+    if total_unique:
+        summary_lines.append(f"Rule filtering ({total_unique} unique rules extracted):")
+        for key, label in [
+            ("rejected_reactor_validation", "reactor validation failed"),
+            ("rejected_popularity", "below min popularity"),
+        ]:
+            count = filter_stats.get(key, 0)
+            if count:
+                summary_lines.append(
+                    f"  {label}: {count} ({count*100/total_unique:.1f}%)"
+                )
+        n_passed = filter_stats.get("passed", 0)
+        summary_lines.append(
+            f"  passed all filters: {n_passed} ({n_passed*100/total_unique:.1f}%)"
+        )
+    if error_counts:
+        summary_lines.append("Extraction errors:")
+        for (stage, etype), count in error_counts.most_common():
+            summary_lines.append(f"  {stage}/{etype}={count}")
+    if error_file_path is not None:
+        summary_lines.append(f"Errors written to: {error_file_path}")
+    summary = "\n".join(summary_lines)
+    print(summary)
+    logger.info(summary)
 
 
 def extract_rules_from_reactions(
@@ -669,14 +817,16 @@ def extract_rules_from_reactions(
     reaction_rules_path: str,
     num_cpus: int,
     batch_size: int,
+    *,
+    ignore_errors: bool = False,
+    error_file_path: str | Path | None = None,
 ) -> None:
     """
     Extracts reaction rules from a set of reactions based on the given configuration.
     This function initializes a Ray environment for distributed computing and processes
     each reaction in the provided reaction database to extract reaction rules. It
     handles the reactions in batches, parallelize the rule extraction process. Extracted
-    rules are written to RDF files and their statistics are recorded. The function also
-    sorts the rules based on their popularity and saves the sorted rules.
+    rules and their statistics are collected, then saved as a TSV file.
 
     :param config: Configuration settings for rule extraction, including file paths,
         batch size, and other parameters.
@@ -684,59 +834,163 @@ def extract_rules_from_reactions(
     :param reaction_rules_path: Name of the file to store the extracted rules.
     :param num_cpus: Number of CPU cores to use for processing. Defaults to 1.
     :param batch_size: Number of reactions to process in each batch. Defaults to 10.
+    :param ignore_errors: If True, log extraction failures and keep processing.
+    :param error_file_path: Path to write failed reactions (TSV). If None and
+        ``ignore_errors`` is True, defaults to ``<output>.errors.tsv``.
     :return: None
 
     """
 
-    ray.init(num_cpus=num_cpus, ignore_reinit_error=True, logging_level=logging.ERROR)
+    reaction_rules_path_base, _ = splitext(reaction_rules_path)
+    extracted_rules_and_statistics = defaultdict(list)
 
-    reaction_rules_path, _ = splitext(reaction_rules_path)
-    with ReactionReader(reaction_data_path) as reactions:
+    # Resolve error file path
+    _error_path: Path | None = None
+    if error_file_path is not None:
+        _error_path = Path(error_file_path)
+    elif ignore_errors:
+        _error_path = Path(f"{reaction_rules_path_base}.errors.tsv")
 
-        futures = {}
-        batch = []
-        max_concurrent_batches = num_cpus
-        extracted_rules_and_statistics = defaultdict(list)
+    error_counts: Counter = Counter()
+    error_file = None
+    if _error_path is not None:
+        error_file = open(_error_path, "w", encoding="utf-8")
+        error_file.write("# original_smiles\tstage\terror_type\terror_message\n")
 
-        for index, reaction in tqdm(
-            enumerate(reactions),
-            desc="Number of reactions processed: ",
-            bar_format="{desc}{n} [{elapsed}]",
-        ):
+    n_processed = 0
+    n_multi_product = 0
 
-            # reaction ready to use
-            batch.append((index, reaction))
-            if len(batch) == batch_size:
-                future = process_reaction_batch.remote(batch, config)
+    raw_reader = RawReactionReader(reaction_data_path)
+    fmt = raw_reader.format
 
-                futures[future] = None
-                batch = []
+    # Temp file to store reaction_id → product_smiles during extraction,
+    # so we don't need to re-parse the entire input file for policy data.
+    products_tmp = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".tsv", delete=False, encoding="utf-8"
+    )
 
-                while len(futures) >= max_concurrent_batches:
-                    process_completed_batch(
-                        futures,
-                        extracted_rules_and_statistics,
-                    )
-
-        if batch:
-            future = process_reaction_batch.remote(batch, config)
-            futures[future] = None
-
-        while futures:
-            process_completed_batch(
-                futures,
+    try:
+        # Simple serial path for a single CPU.
+        if num_cpus <= 1:
+            n_processed, n_multi_product = _extract_rules_serial(
+                config,
+                reaction_data_path,
                 extracted_rules_and_statistics,
+                ignore_errors=ignore_errors,
+                error_file=error_file,
+                error_counts=error_counts,
+                products_file=products_tmp,
+                fmt=fmt,
+            )
+        else:
+            ray.init(
+                num_cpus=num_cpus, ignore_reinit_error=True, logging_level=logging.ERROR
             )
 
-        sorted_rules = sort_rules(
-            extracted_rules_and_statistics,
-            min_popularity=config.min_popularity,
-            single_product_only=config.single_product_only,
-        )
+            futures = {}
+            batch = []
+            max_concurrent_batches = num_cpus
+            multi_product_count = [0]  # mutable accumulator
 
-        ray.shutdown()
+            for index, raw_item in tqdm(
+                enumerate(raw_reader),
+                desc="Number of reactions processed: ",
+                bar_format="{desc}{n} [{elapsed}]",
+            ):
+                n_processed += 1
+                batch.append((index, raw_item))
+                if len(batch) == batch_size:
+                    future = process_reaction_batch.remote(
+                        batch, config, ignore_errors, fmt
+                    )
+                    futures[future] = None
+                    batch = []
 
-        with open(f"{reaction_rules_path}.pickle", "wb") as statistics_file:
-            pickle.dump(sorted_rules, statistics_file)
+                    while len(futures) >= max_concurrent_batches:
+                        process_completed_batch(
+                            futures,
+                            extracted_rules_and_statistics,
+                            error_file=error_file,
+                            error_counts=error_counts,
+                            multi_product_count=multi_product_count,
+                            products_file=products_tmp,
+                        )
 
-        print(f"Number of extracted reaction rules: {len(sorted_rules)}")
+            if batch:
+                future = process_reaction_batch.remote(
+                    batch, config, ignore_errors, fmt
+                )
+                futures[future] = None
+
+            while futures:
+                process_completed_batch(
+                    futures,
+                    extracted_rules_and_statistics,
+                    error_file=error_file,
+                    error_counts=error_counts,
+                    multi_product_count=multi_product_count,
+                    products_file=products_tmp,
+                )
+
+            n_multi_product = multi_product_count[0]
+    finally:
+        if ray.is_initialized():
+            ray.shutdown()
+        if error_file is not None:
+            error_file.close()
+        products_tmp.close()
+
+    sorted_rules, filter_stats = sort_rules(
+        extracted_rules_and_statistics,
+        min_popularity=config.min_popularity,
+    )
+    filter_stats["skipped_multi_product"] = n_multi_product
+
+    # Always save rules as TSV (primary format: human-readable, safe, reproducible).
+    rules_tsv_path = f"{reaction_rules_path_base}.tsv"
+    with open(rules_tsv_path, "w", encoding="utf-8") as tsv_file:
+        tsv_file.write("rule_smarts\tpopularity\treaction_indices\n")
+        for rule, indices in sorted_rules:
+            patterns = tuple(
+                molecule_substructure_as_query(m, m.atoms_numbers)
+                for m in rule.reactants
+            )
+            products = tuple(rule.products)
+            reactor = Reactor(patterns=patterns, products=products, delete_atoms=False)
+            smarts_str = str(reactor)
+            tsv_file.write(
+                f"{smarts_str}\t{len(indices)}\t{','.join(map(str, indices))}\n"
+            )
+
+    _print_extraction_summary(
+        n_processed, sorted_rules, filter_stats, error_counts, _error_path
+    )
+
+    # Generate policy training mapping file from the temp products file.
+    # No re-parsing needed — product SMILES were captured during extraction.
+    policy_data_path = f"{reaction_rules_path_base}_policy_data.tsv"
+    reaction_rule_pairs = load_rule_index_mapping_tsv(rules_tsv_path)
+    n_mapped = 0
+    n_small_products = 0
+    products_tmp_path = Path(products_tmp.name)
+    try:
+        with (
+            open(products_tmp_path, encoding="utf-8") as products_in,
+            open(policy_data_path, "w", encoding="utf-8") as out,
+        ):
+            out.write("product_smiles\trule_id\n")
+            for line in products_in:
+                reaction_id_str, product_smi = line.rstrip("\n").split("\t", 1)
+                rule_id = reaction_rule_pairs.get(int(reaction_id_str))
+                if rule_id is None:
+                    continue
+                out.write(f"{product_smi}\t{rule_id}\n")
+                n_mapped += 1
+    finally:
+        products_tmp_path.unlink(missing_ok=True)
+
+    n_expected = len(reaction_rule_pairs)
+    print(
+        f"Policy training data: {n_mapped}/{n_expected} examples written to "
+        f"{policy_data_path}"
+    )

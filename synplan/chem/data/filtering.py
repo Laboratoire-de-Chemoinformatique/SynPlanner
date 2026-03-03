@@ -1,59 +1,34 @@
 """Module containing classes abd functions for reactions filtering."""
 
 import logging
-from dataclasses import dataclass
+from collections import Counter
+from collections.abc import Iterable
 from io import TextIOWrapper
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, ClassVar
 
 import numpy as np
 import ray
 import yaml
-from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from chython.algorithms.fingerprints.morgan import MorganFingerprint
+from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
+from pydantic import Field, model_validator
 from tqdm.auto import tqdm
 
 from synplan.chem.data.standardizing import (
     AromaticFormStandardizer,
     KekuleFormStandardizer,
-    RemoveReagentsStandardizer,
+    StandardizationError,
 )
-from synplan.chem.utils import cgrtools_to_chython_molecule
-from synplan.utils.config import ConfigABC, convert_config_to_dict
-from synplan.utils.files import ReactionReader, ReactionWriter
+from synplan.utils.config import BaseConfigModel
+from synplan.utils.files import RawReactionReader, ReactionWriter, parse_reaction
+
+logger = logging.getLogger("synplan.chem.data.filtering")
 
 
-@dataclass
-class CompeteProductsConfig(ConfigABC):
-    fingerprint_tanimoto_threshold: float = 0.3
-    mcs_tanimoto_threshold: float = 0.6
-
-    @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "CompeteProductsConfig":
-        """Create an instance of CompeteProductsConfig from a dictionary."""
-        return CompeteProductsConfig(**config_dict)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> "CompeteProductsConfig":
-        """Deserialize a YAML file into a CompeteProductsConfig object."""
-        with open(file_path, "r", encoding="utf-8") as file:
-            config_dict = yaml.safe_load(file)
-        return CompeteProductsConfig.from_dict(config_dict)
-
-    def _validate_params(self, params: Dict[str, Any]) -> None:
-        """Validate configuration parameters."""
-        if not isinstance(params.get("fingerprint_tanimoto_threshold"), float) or not (
-            0 <= params["fingerprint_tanimoto_threshold"] <= 1
-        ):
-            raise ValueError(
-                "Invalid 'fingerprint_tanimoto_threshold'; expected a float between 0 and 1"
-            )
-
-        if not isinstance(params.get("mcs_tanimoto_threshold"), float) or not (
-            0 <= params["mcs_tanimoto_threshold"] <= 1
-        ):
-            raise ValueError(
-                "Invalid 'mcs_tanimoto_threshold'; expected a float between 0 and 1"
-            )
+class CompeteProductsConfig(BaseConfigModel):
+    fingerprint_tanimoto_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
+    mcs_tanimoto_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
 
 class CompeteProductsFilter:
@@ -80,7 +55,6 @@ class CompeteProductsFilter:
         :param reaction: Input reaction.
         :return: Returns True if the reaction has competing products, else False.
         """
-        mf = MorganFingerprint()
         is_compete = False
 
         # check for compete products using both fingerprint similarity and maximum common substructure (MCS) similarity
@@ -88,8 +62,8 @@ class CompeteProductsFilter:
             for other_mol in reaction.products:
                 if len(mol) > 6 and len(other_mol) > 6:
                     # compute fingerprint similarity
-                    molf = mf.transform([cgrtools_to_chython_molecule(mol)])
-                    other_molf = mf.transform([cgrtools_to_chython_molecule(other_mol)])
+                    molf = mol.morgan_fingerprint()
+                    other_molf = other_mol.morgan_fingerprint()
                     fingerprint_tanimoto = tanimoto_kernel(molf, other_molf)[0][0]
 
                     # if fingerprint similarity is high enough, check for MCS similarity
@@ -115,45 +89,17 @@ class CompeteProductsFilter:
         return is_compete
 
 
-@dataclass
-class DynamicBondsConfig(ConfigABC):
-    min_bonds_number: int = 1
-    max_bonds_number: int = 6
+class DynamicBondsConfig(BaseConfigModel):
+    min_bonds_number: int = Field(default=1, ge=0)
+    max_bonds_number: int = Field(default=6, ge=0)
 
-    @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "DynamicBondsConfig":
-        """Create an instance of DynamicBondsConfig from a dictionary."""
-        return DynamicBondsConfig(**config_dict)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> "DynamicBondsConfig":
-        """Deserialize a YAML file into a DynamicBondsConfig object."""
-        with open(file_path, "r") as file:
-            config_dict = yaml.safe_load(file)
-        return DynamicBondsConfig.from_dict(config_dict)
-
-    def _validate_params(self, params: Dict[str, Any]) -> None:
-        """Validate configuration parameters."""
-        if (
-            not isinstance(params.get("min_bonds_number"), int)
-            or params["min_bonds_number"] < 0
-        ):
-            raise ValueError(
-                "Invalid 'min_bonds_number'; expected a non-negative integer"
-            )
-
-        if (
-            not isinstance(params.get("max_bonds_number"), int)
-            or params["max_bonds_number"] < 0
-        ):
-            raise ValueError(
-                "Invalid 'max_bonds_number'; expected a non-negative integer"
-            )
-
-        if params["min_bonds_number"] > params["max_bonds_number"]:
+    @model_validator(mode="after")
+    def _check_min_le_max(self):
+        if self.min_bonds_number > self.max_bonds_number:
             raise ValueError(
                 "'min_bonds_number' cannot be greater than 'max_bonds_number'"
             )
+        return self
 
 
 class DynamicBondsFilter:
@@ -175,29 +121,8 @@ class DynamicBondsFilter:
         )
 
 
-@dataclass
-class SmallMoleculesConfig(ConfigABC):
-    mol_max_size: int = 6
-
-    @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "SmallMoleculesConfig":
-        """Creates an instance of SmallMoleculesConfig from a dictionary."""
-        return SmallMoleculesConfig(**config_dict)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> "SmallMoleculesConfig":
-        """Deserialize a YAML file into a SmallMoleculesConfig object."""
-        with open(file_path, "r") as file:
-            config_dict = yaml.safe_load(file)
-        return SmallMoleculesConfig.from_dict(config_dict)
-
-    def _validate_params(self, params: Dict[str, Any]) -> None:
-        """Validate configuration parameters."""
-        if (
-            not isinstance(params.get("mol_max_size"), int)
-            or params["mol_max_size"] < 1
-        ):
-            raise ValueError("Invalid 'mol_max_size'; expected a positive integer")
+class SmallMoleculesConfig(BaseConfigModel):
+    mol_max_size: int = Field(default=6, ge=1)
 
 
 class SmallMoleculesFilter:
@@ -213,7 +138,7 @@ class SmallMoleculesFilter:
         return SmallMoleculesFilter(config.mol_max_size)
 
     def __call__(self, reaction: ReactionContainer) -> bool:
-        if (
+        return bool(
             (
                 len(reaction.reactants) == 1
                 and self.are_only_small_molecules(reaction.reactants)
@@ -226,17 +151,14 @@ class SmallMoleculesFilter:
                 self.are_only_small_molecules(reaction.reactants)
                 and self.are_only_small_molecules(reaction.products)
             )
-        ):
-            return True
-        return False
+        )
 
     def are_only_small_molecules(self, molecules: Iterable[MoleculeContainer]) -> bool:
         """Checks if all molecules in the given iterable are small molecules."""
         return all(len(molecule) <= self.limit for molecule in molecules)
 
 
-@dataclass
-class CGRConnectedComponentsConfig:
+class CGRConnectedComponentsConfig(BaseConfigModel):
     pass
 
 
@@ -257,8 +179,7 @@ class CGRConnectedComponentsFilter:
         return cgr.connected_components_count > 1
 
 
-@dataclass
-class RingsChangeConfig:
+class RingsChangeConfig(BaseConfigModel):
     pass
 
 
@@ -287,7 +208,7 @@ class RingsChangeFilter:
         return (r_arom_rings != p_arom_rings) or (r_rings != p_rings)
 
     @staticmethod
-    def _calc_rings(molecules: Iterable) -> Tuple[int, int]:
+    def _calc_rings(molecules: Iterable) -> tuple[int, int]:
         """
         Calculates number of all rings and number of aromatic rings in molecules.
 
@@ -301,8 +222,7 @@ class RingsChangeFilter:
         return rings, arom_rings
 
 
-@dataclass
-class StrangeCarbonsConfig:
+class StrangeCarbonsConfig(BaseConfigModel):
     # currently empty, but can be extended in the future if needed
     pass
 
@@ -329,8 +249,7 @@ class StrangeCarbonsFilter:
         return False
 
 
-@dataclass
-class NoReactionConfig:
+class NoReactionConfig(BaseConfigModel):
     # Currently empty, but can be extended in the future if needed
     pass
 
@@ -345,11 +264,10 @@ class NoReactionFilter:
 
     def __call__(self, reaction: ReactionContainer) -> bool:
         cgr = ~reaction
-        return not cgr.center_atoms and not cgr.center_bonds
+        return not cgr.center_atoms and len(cgr.center_bonds) == 0
 
 
-@dataclass
-class MultiCenterConfig:
+class MultiCenterConfig(BaseConfigModel):
     pass
 
 
@@ -365,8 +283,7 @@ class MultiCenterFilter:
         return len(cgr.centers_list) > 1
 
 
-@dataclass
-class WrongCHBreakingConfig:
+class WrongCHBreakingConfig(BaseConfigModel):
     pass
 
 
@@ -432,21 +349,21 @@ class WrongCHBreakingFilter:
 
                 if is_c_h_breaking and is_c_c_formation:
                     # check for presence of heteroatoms in the first environment of 2 bonding carbons
-                    if any(
-                        cgr.atom(neighbour_id).atomic_symbol not in ("C", "H")
-                        for neighbour_id in cgr._bonds[c_with_h_id]
-                    ) or any(
-                        cgr.atom(neighbour_id).atomic_symbol not in ("C", "H")
-                        for neighbour_id in cgr._bonds[another_c_id]
-                    ):
-                        return False
-                    return True
+                    return not (
+                        any(
+                            cgr.atom(nid).atomic_symbol not in ("C", "H")
+                            for nid in cgr._bonds[c_with_h_id]
+                        )
+                        or any(
+                            cgr.atom(nid).atomic_symbol not in ("C", "H")
+                            for nid in cgr._bonds[another_c_id]
+                        )
+                    )
 
         return False
 
 
-@dataclass
-class CCsp3BreakingConfig:
+class CCsp3BreakingConfig(BaseConfigModel):
     pass
 
 
@@ -466,24 +383,24 @@ class CCsp3BreakingFilter:
 
         """
         cgr = ~reaction
-        reaction_center = cgr.augmented_substructure(cgr.center_atoms, deep=1)
-        for atom_id, neighbour_id, bond in reaction_center.bonds():
-            atom = reaction_center.atom(atom_id)
-            neighbour = reaction_center.atom(neighbour_id)
+        rc = cgr.augmented_substructure(cgr.center_atoms, deep=1)
+
+        for n, m, bond in rc.bonds():
+            atom = rc.atom(n)
+            neigh = rc.atom(m)
 
             is_bond_broken = bond.order is not None and bond.p_order is None
-            are_atoms_carbons = (
-                atom.atomic_symbol == "C" and neighbour.atomic_symbol == "C"
+            are_atoms_carbons = atom.atomic_number == 6 and neigh.atomic_number == 6
+            is_atom_sp3 = (
+                rc._hybridizations.get(n, 0) == 1 or rc._hybridizations.get(m, 0) == 1
             )
-            is_atom_sp3 = atom.hybridization == 1 or neighbour.hybridization == 1
 
             if is_bond_broken and are_atoms_carbons and is_atom_sp3:
                 return True
         return False
 
 
-@dataclass
-class CCRingBreakingConfig:
+class CCRingBreakingConfig(BaseConfigModel):
     """
     Object to pass to ReactionFilterConfig if you want to enable C-C ring breaking filter
 
@@ -552,8 +469,7 @@ class CCRingBreakingFilter:
         return False
 
 
-@dataclass
-class ReactionFilterConfig(ConfigABC):
+class ReactionFilterConfig(BaseConfigModel):
     """
     Configuration class for reaction filtering. This class manages configuration
     settings for various reaction filters, including paths, file formats, and filter-
@@ -574,135 +490,49 @@ class ReactionFilterConfig(ConfigABC):
     """
 
     # configuration for reaction filters
-    dynamic_bonds_config: Optional[DynamicBondsConfig] = None
-    small_molecules_config: Optional[SmallMoleculesConfig] = None
-    strange_carbons_config: Optional[StrangeCarbonsConfig] = None
-    compete_products_config: Optional[CompeteProductsConfig] = None
-    cgr_connected_components_config: Optional[CGRConnectedComponentsConfig] = None
-    rings_change_config: Optional[RingsChangeConfig] = None
-    no_reaction_config: Optional[NoReactionConfig] = None
-    multi_center_config: Optional[MultiCenterConfig] = None
-    wrong_ch_breaking_config: Optional[WrongCHBreakingConfig] = None
-    cc_sp3_breaking_config: Optional[CCsp3BreakingConfig] = None
-    cc_ring_breaking_config: Optional[CCRingBreakingConfig] = None
+    dynamic_bonds_config: DynamicBondsConfig | None = None
+    small_molecules_config: SmallMoleculesConfig | None = None
+    strange_carbons_config: StrangeCarbonsConfig | None = None
+    compete_products_config: CompeteProductsConfig | None = None
+    cgr_connected_components_config: CGRConnectedComponentsConfig | None = None
+    rings_change_config: RingsChangeConfig | None = None
+    no_reaction_config: NoReactionConfig | None = None
+    multi_center_config: MultiCenterConfig | None = None
+    wrong_ch_breaking_config: WrongCHBreakingConfig | None = None
+    cc_sp3_breaking_config: CCsp3BreakingConfig | None = None
+    cc_ring_breaking_config: CCRingBreakingConfig | None = None
 
-    def to_dict(self):
-        """Converts the configuration into a dictionary."""
-        config_dict = {
-            "dynamic_bonds_config": convert_config_to_dict(
-                self.dynamic_bonds_config, DynamicBondsConfig
-            ),
-            "small_molecules_config": convert_config_to_dict(
-                self.small_molecules_config, SmallMoleculesConfig
-            ),
-            "compete_products_config": convert_config_to_dict(
-                self.compete_products_config, CompeteProductsConfig
-            ),
-            "cgr_connected_components_config": (
-                {} if self.cgr_connected_components_config is not None else None
-            ),
-            "rings_change_config": {} if self.rings_change_config is not None else None,
-            "strange_carbons_config": (
-                {} if self.strange_carbons_config is not None else None
-            ),
-            "no_reaction_config": {} if self.no_reaction_config is not None else None,
-            "multi_center_config": {} if self.multi_center_config is not None else None,
-            "wrong_ch_breaking_config": (
-                {} if self.wrong_ch_breaking_config is not None else None
-            ),
-            "cc_sp3_breaking_config": (
-                {} if self.cc_sp3_breaking_config is not None else None
-            ),
-            "cc_ring_breaking_config": (
-                {} if self.cc_ring_breaking_config is not None else None
-            ),
-        }
+    _NESTED_CONFIG_TYPES: ClassVar[dict[str, type]] = {
+        "dynamic_bonds_config": DynamicBondsConfig,
+        "small_molecules_config": SmallMoleculesConfig,
+        "strange_carbons_config": StrangeCarbonsConfig,
+        "compete_products_config": CompeteProductsConfig,
+        "cgr_connected_components_config": CGRConnectedComponentsConfig,
+        "rings_change_config": RingsChangeConfig,
+        "no_reaction_config": NoReactionConfig,
+        "multi_center_config": MultiCenterConfig,
+        "wrong_ch_breaking_config": WrongCHBreakingConfig,
+        "cc_sp3_breaking_config": CCsp3BreakingConfig,
+        "cc_ring_breaking_config": CCRingBreakingConfig,
+    }
 
-        filtered_config_dict = {k: v for k, v in config_dict.items() if v is not None}
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_nested(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for field_name, cfg_cls in cls._NESTED_CONFIG_TYPES.items():
+                if field_name in data and isinstance(data[field_name], dict):
+                    data[field_name] = cfg_cls(**data[field_name])
+        return data
 
-        return filtered_config_dict
-
-    @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "ReactionFilterConfig":
-        """Create an instance of ReactionCheckConfig from a dictionary."""
-        # Instantiate configuration objects if their corresponding dictionary is present
-        dynamic_bonds_config = (
-            DynamicBondsConfig(**config_dict["dynamic_bonds_config"])
-            if "dynamic_bonds_config" in config_dict
-            else None
-        )
-
-        small_molecules_config = (
-            SmallMoleculesConfig(**config_dict["small_molecules_config"])
-            if "small_molecules_config" in config_dict
-            else None
-        )
-
-        compete_products_config = (
-            CompeteProductsConfig(**config_dict["compete_products_config"])
-            if "compete_products_config" in config_dict
-            else None
-        )
-
-        cgr_connected_components_config = (
-            CGRConnectedComponentsConfig()
-            if "cgr_connected_components_config" in config_dict
-            else None
-        )
-
-        rings_change_config = (
-            RingsChangeConfig() if "rings_change_config" in config_dict else None
-        )
-
-        strange_carbons_config = (
-            StrangeCarbonsConfig() if "strange_carbons_config" in config_dict else None
-        )
-
-        no_reaction_config = (
-            NoReactionConfig() if "no_reaction_config" in config_dict else None
-        )
-
-        multi_center_config = (
-            MultiCenterConfig() if "multi_center_config" in config_dict else None
-        )
-
-        wrong_ch_breaking_config = (
-            WrongCHBreakingConfig()
-            if "wrong_ch_breaking_config" in config_dict
-            else None
-        )
-
-        cc_sp3_breaking_config = (
-            CCsp3BreakingConfig() if "cc_sp3_breaking_config" in config_dict else None
-        )
-
-        cc_ring_breaking_config = (
-            CCRingBreakingConfig() if "cc_ring_breaking_config" in config_dict else None
-        )
-
-        return ReactionFilterConfig(
-            dynamic_bonds_config=dynamic_bonds_config,
-            small_molecules_config=small_molecules_config,
-            compete_products_config=compete_products_config,
-            cgr_connected_components_config=cgr_connected_components_config,
-            rings_change_config=rings_change_config,
-            strange_carbons_config=strange_carbons_config,
-            no_reaction_config=no_reaction_config,
-            multi_center_config=multi_center_config,
-            wrong_ch_breaking_config=wrong_ch_breaking_config,
-            cc_sp3_breaking_config=cc_sp3_breaking_config,
-            cc_ring_breaking_config=cc_ring_breaking_config,
-        )
-
-    @staticmethod
-    def from_yaml(file_path: str) -> "ReactionFilterConfig":
-        """Deserializes a YAML file into a ReactionCheckConfig object."""
-        with open(file_path, "r", encoding="utf-8") as file:
-            config_dict = yaml.safe_load(file)
-        return ReactionFilterConfig.from_dict(config_dict)
-
-    def _validate_params(self, params: Dict[str, Any]):
-        pass
+    def to_dict(self) -> dict[str, Any]:
+        """Converts the configuration into a dictionary, excluding None fields."""
+        result = {}
+        for field_name in self._NESTED_CONFIG_TYPES:
+            config = getattr(self, field_name)
+            if config is not None:
+                result[field_name] = config.to_dict()
+        return result
 
     def create_filters(self):
         filter_instances = []
@@ -784,86 +614,133 @@ def tanimoto_kernel(x: MorganFingerprint, y: MorganFingerprint) -> float:
 
 
 def filter_reaction(
-    reaction: ReactionContainer, config: ReactionFilterConfig, filters: list
-) -> Tuple[bool, ReactionContainer]:
+    item: str | ReactionContainer,
+    config: ReactionFilterConfig,
+    filters: list,
+    *,
+    ignore_errors: bool = False,
+    fmt: str = "smi",
+) -> tuple[bool, ReactionContainer | None, str | None]:
     """Checks the input reaction. Returns True if reaction is detected as erroneous and
     returns reaction itself, which sometimes is modified and does not necessarily
     correspond to the initial reaction.
 
-    :param reaction: Reaction to be filtered.
+    :param item: Reaction to be filtered (raw string or already-parsed).
     :param config: Reaction filtration configuration.
     :param filters: The list of reaction filters.
-    :return: False and reaction if reaction is correct and True and reaction if reaction
-        is filtered (erroneous).
+    :param ignore_errors: If True, keep processing when a standardization step fails;
+        otherwise re-raise to expose unexpected issues.
+    :param fmt: Format hint — ``"smi"`` for SMILES strings, ``"rdf"`` for RDF blocks.
+    :return: 3-tuple ``(is_filtered, reaction, reason)`` where *reason* is
+        ``None`` on success, a filter class name when filtered, or
+        ``"stage/ErrorType: message"`` on standardization error.
+        *reaction* may be ``None`` when parsing fails completely.
     """
 
+    # --- Parse raw string into ReactionContainer ---
+    try:
+        reaction = parse_reaction(item, fmt) if isinstance(item, str) else item
+    except Exception as exc:
+        if not ignore_errors:
+            raise
+        exc_type = type(exc).__qualname__
+        return True, None, f"parse/{exc_type}: {exc}"
+
     is_filtered = False
+    reason: str | None = None
 
     # run reaction standardization
 
     standardizers = [
-        RemoveReagentsStandardizer(),
+        # RemoveReagentsStandardizer(),
         KekuleFormStandardizer(),
         AromaticFormStandardizer(),
     ]
 
-    for reaction_standardizer in standardizers:
-        reaction = reaction_standardizer(reaction)
-        if not reaction:
-            is_filtered = True
-            break
+    try:
+        for reaction_standardizer in standardizers:
+            reaction = reaction_standardizer(reaction)
+            if not reaction:
+                is_filtered = True
+                reason = reaction_standardizer.__class__.__name__
+                break
+    except StandardizationError as error:
+        if not ignore_errors:
+            raise
+        reaction.meta["standardization_log"] = error.stage
+        is_filtered = True
+        reason = f"{error.stage}/{error.original_type}: {error.original_msg}"
 
     # run reaction filtration
     if not is_filtered:
         for reaction_filter in filters:
-            try:  # CGRTools ValueError: mapping of graphs is not disjoint
+            try:
                 if reaction_filter(reaction):
-                    # if filter returns True it means the reaction doesn't pass the filter
                     reaction.meta["filtration_log"] = reaction_filter.__class__.__name__
                     is_filtered = True
-            except Exception as e:
-                logging.debug(e)
+                    reason = reaction_filter.__class__.__name__
+                    break
+            except StandardizationError as error:
+                if not ignore_errors:
+                    raise
+                reaction.meta["standardization_log"] = error.stage
                 is_filtered = True
+                reason = f"{error.stage}/{error.original_type}: {error.original_msg}"
+                break
+            except Exception as exc:
+                if not ignore_errors:
+                    raise
+                filter_name = reaction_filter.__class__.__name__
+                exc_type = type(exc).__qualname__
+                reaction.meta["filtration_log"] = filter_name
+                is_filtered = True
+                reason = f"{filter_name}/{exc_type}: {exc}"
+                break
 
-    return is_filtered, reaction
+    return is_filtered, reaction, reason
 
 
 @ray.remote
 def process_batch(
-    batch: List[Tuple[int, ReactionContainer]],
+    batch: list[str | ReactionContainer],
     config: ReactionFilterConfig,
     filters: list,
-) -> List[Tuple[bool, ReactionContainer]]:
+    ignore_errors: bool = False,
+    fmt: str = "smi",
+) -> list[tuple[bool, ReactionContainer | None, str | None]]:
     """
     Processes a batch of reactions to extract reaction rules based on the given
     configuration. This function operates as a remote task in a distributed system using
     Ray.
 
-    :param batch: A list where each element is a tuple containing an index (int) and a
-        ReactionContainer object. The index is typically used to keep track of the
-        reaction's position in a larger dataset.
+    :param batch: List of raw strings or ReactionContainer objects.
     :param config: Reaction filtration configuration.
     :param filters: The list of reaction filters.
-    :return: The list of tuples where each tuple include the reaction index, is ir
-        filtered or not (True/False) and reaction itself.
+    :param ignore_errors: If True, keep processing when a standardization step fails.
+    :param fmt: Format hint — ``"smi"`` or ``"rdf"``.
+    :return: List of 3-tuples ``(is_filtered, reaction, reason)``.
 
     """
 
     processed_reaction_list = []
-    for reaction in batch:
-        try:  # CGRtools.exceptions.MappingError: atoms with number {52} not equal
-            is_filtered, processed_reaction = filter_reaction(reaction, config, filters)
-            processed_reaction_list.append((is_filtered, processed_reaction))
-        except Exception as e:
-            logging.debug(e)
-            processed_reaction_list.append((True, reaction))
+    for item in batch:
+        is_filtered, processed_reaction, reason = filter_reaction(
+            item,
+            config,
+            filters,
+            ignore_errors=ignore_errors,
+            fmt=fmt,
+        )
+        processed_reaction_list.append((is_filtered, processed_reaction, reason))
     return processed_reaction_list
 
 
 def process_completed_batch(
-    futures: Dict,
+    futures: dict,
     result_file: TextIOWrapper,
     n_filtered: int = 0,
+    error_file: TextIOWrapper | None = None,
+    error_counts: Counter | None = None,
 ) -> int:
     """
     Processes completed batches of reactions.
@@ -871,23 +748,154 @@ def process_completed_batch(
     :param futures: A dictionary of futures representing ongoing batch processing tasks.
     :param result_file: The path to the file where filtered reactions will be stored.
     :param n_filtered: The number of processed reactions.
+    :param error_file: Optional file handle to write failed reactions.
+    :param error_counts: Optional counter to accumulate error categories.
     :return: The numbers of filtered and correct reactions.
 
     """
 
-    ready_id, running_id = ray.wait(list(futures.keys()), num_returns=1)
-    completed_batch = ray.get(ready_id[0])
+    ready_id, _running_id = ray.wait(list(futures.keys()), num_returns=1)
+
+    try:
+        completed_batch = ray.get(ready_id[0])
+    except Exception as exc:
+        logger.error("Batch failed entirely: %s", exc)
+        del futures[ready_id[0]]
+        return n_filtered
 
     # write results of the completed batch to file
-    for is_filtered, reaction in completed_batch:
-        if not is_filtered:
+    batch_filtered = 0
+    batch_kept = 0
+    for is_filtered, reaction, reason in completed_batch:
+        if is_filtered is False and reaction is not None:
             result_file.write(reaction)
             n_filtered += 1
+            batch_kept += 1
+        else:
+            batch_filtered += 1
+            if reason is not None and error_file is not None:
+                orig_smi = (
+                    reaction.meta.get("init_smiles", str(reaction))
+                    if reaction is not None and hasattr(reaction, "meta")
+                    else str(reaction) if reaction is not None else "(parse failed)"
+                )
+                error_file.write(f"{orig_smi}\t{reason}\n")
+            if reason is not None and error_counts is not None:
+                error_counts[reason] += 1
+
+    # Log batch completion statistics
+    logger.debug(
+        "Batch completed: %d total, %d kept, %d filtered out. Total kept so far: %d",
+        len(completed_batch),
+        batch_kept,
+        batch_filtered,
+        n_filtered,
+    )
 
     # remove completed future and update progress bar
     del futures[ready_id[0]]
 
     return n_filtered
+
+
+def _filter_reactions_serial(
+    config: ReactionFilterConfig,
+    filters: list,
+    input_reaction_data_path: str,
+    filtered_reaction_data_path: str,
+    *,
+    ignore_errors: bool,
+    fmt: str = "smi",
+    error_file: TextIOWrapper | None = None,
+    error_counts: Counter | None = None,
+) -> tuple[int, int]:
+    """Serial filtering loop used when ``num_cpus <= 1``."""
+    lines_counter = 0
+    n_filtered = 0
+    with (
+        RawReactionReader(input_reaction_data_path) as reactions,
+        ReactionWriter(filtered_reaction_data_path) as result_file,
+    ):
+        for item in tqdm(
+            reactions,
+            desc="Number of reactions processed: ",
+            bar_format="{desc}{n} [{elapsed}]",
+        ):
+            lines_counter += 1
+            is_filtered, processed_reaction, reason = filter_reaction(
+                item,
+                config,
+                filters,
+                ignore_errors=ignore_errors,
+                fmt=fmt,
+            )
+            if not is_filtered and processed_reaction is not None:
+                result_file.write(processed_reaction)
+                n_filtered += 1
+            elif reason is not None:
+                if error_file is not None:
+                    orig_smi = (
+                        processed_reaction.meta.get(
+                            "init_smiles", str(processed_reaction)
+                        )
+                        if processed_reaction is not None
+                        and hasattr(processed_reaction, "meta")
+                        else str(item)
+                    )
+                    error_file.write(f"{orig_smi}\t{reason}\n")
+                if error_counts is not None:
+                    error_counts[reason] += 1
+
+    return lines_counter, n_filtered
+
+
+def _print_filtering_summary(
+    lines_counter: int,
+    n_filtered: int,
+    error_counts: Counter,
+    error_file_path: Path | None,
+) -> None:
+    """Print a categorized summary of filtering results."""
+    from synplan.chem.data.standardizing import _DATA_ERROR_STAGES, _DATA_ERROR_TYPES
+
+    n_rejected = lines_counter - n_filtered
+    summary_lines = [
+        f"Finished: processed {lines_counter}, kept {n_filtered}, rejected {n_rejected}"
+    ]
+
+    if error_counts:
+        data_reasons: list[str] = []
+        pipeline_reasons: list[str] = []
+        filter_reasons: list[str] = []
+        for reason, count in error_counts.most_common():
+            label = f"{reason}={count}"
+            if "/" in reason:
+                # "stage/ErrorType: msg" pattern — extract stage and type
+                stage_type = reason.split(":")[0]  # "stage/ErrorType"
+                stage, etype = (
+                    stage_type.split("/", 1) if "/" in stage_type else (stage_type, "")
+                )
+                if stage in _DATA_ERROR_STAGES or etype in _DATA_ERROR_TYPES:
+                    data_reasons.append(label)
+                else:
+                    pipeline_reasons.append(label)
+            else:
+                filter_reasons.append(label)
+        if filter_reasons:
+            summary_lines.append(f"  Filter rejections: {', '.join(filter_reasons)}")
+        if data_reasons:
+            summary_lines.append(f"  Data errors:       {', '.join(data_reasons)}")
+        if pipeline_reasons:
+            summary_lines.append(
+                f"  Pipeline errors:   {', '.join(pipeline_reasons)}  <-- INVESTIGATE"
+            )
+
+    if error_file_path is not None:
+        summary_lines.append(f"Errors written to: {error_file_path}")
+
+    summary = "\n".join(summary_lines)
+    print(summary)
+    logger.info(summary)
 
 
 def filter_reactions_from_file(
@@ -896,6 +904,9 @@ def filter_reactions_from_file(
     filtered_reaction_data_path: str = "reaction_data_filtered.smi",
     num_cpus: int = 1,
     batch_size: int = 100,
+    *,
+    ignore_errors: bool = False,
+    error_file_path: str | Path | None = None,
 ) -> None:
     """
     Processes reaction data, applying reaction filters based on the provided
@@ -908,6 +919,11 @@ def filter_reactions_from_file(
         reactions.
     :param num_cpus: Number of CPUs to use for processing.
     :param batch_size: Size of the batch for processing reactions.
+    :param ignore_errors: If True, suppress standardization failures and continue
+        processing (logging them instead). If False, standardization errors will stop
+        the pipeline so new issues are visible.
+    :param error_file_path: Path to write failed/filtered reactions (TSV).  If None
+        and ``ignore_errors`` is True, defaults to ``<output>.errors.tsv``.
     :return: None. The function writes the processed reactions to specified RDF/smi
         files.
 
@@ -915,49 +931,97 @@ def filter_reactions_from_file(
 
     filters = config.create_filters()
 
-    ray.init(num_cpus=num_cpus, ignore_reinit_error=True, logging_level=logging.ERROR)
-    max_concurrent_batches = num_cpus  # limit the number of concurrent batches
-    lines_counter = 0
-    with (
-        ReactionReader(input_reaction_data_path) as reactions,
-        ReactionWriter(filtered_reaction_data_path) as result_file,
-    ):
+    # Resolve error file path
+    _error_path: Path | None = None
+    if error_file_path is not None:
+        _error_path = Path(error_file_path)
+    elif ignore_errors:
+        _error_path = Path(filtered_reaction_data_path).with_suffix(".errors.tsv")
 
-        batches_to_process, batch = {}, []
-        n_filtered = 0
-        for index, reaction in tqdm(
-            enumerate(reactions),
-            desc="Number of reactions processed: ",
-            bar_format="{desc}{n} [{elapsed}]",
-        ):
-            lines_counter += 1
-            batch.append(reaction)
-            if len(batch) == batch_size:
-                batch_results = process_batch.remote(batch, config, filters)
-                batches_to_process[batch_results] = None
-                batch = []
+    error_counts: Counter = Counter()
+    error_file = None
+    if _error_path is not None:
+        error_file = open(_error_path, "w", encoding="utf-8")
+        error_file.write("# original_smiles\treason\n")
 
-                # check and process completed tasks if we've reached the concurrency limit
-                while len(batches_to_process) >= max_concurrent_batches:
-                    n_filtered = process_completed_batch(
-                        batches_to_process,
-                        result_file,
-                        n_filtered,
-                    )
+    try:
+        raw_reader = RawReactionReader(input_reaction_data_path)
+        fmt = raw_reader.format
 
-        # process the last batch if it's not empty
-        if batch:
-            batch_results = process_batch.remote(batch, config, filters)
-            batches_to_process[batch_results] = None
-
-        # process remaining batches
-        while batches_to_process:
-            n_filtered = process_completed_batch(
-                batches_to_process,
-                result_file,
-                n_filtered,
+        # Simple serial path (works well with `init_logger` and is easy to debug).
+        if num_cpus <= 1:
+            lines_counter, n_filtered = _filter_reactions_serial(
+                config,
+                filters,
+                input_reaction_data_path,
+                filtered_reaction_data_path,
+                ignore_errors=ignore_errors,
+                fmt=fmt,
+                error_file=error_file,
+                error_counts=error_counts,
             )
+            _print_filtering_summary(
+                lines_counter, n_filtered, error_counts, _error_path
+            )
+            return
 
-    ray.shutdown()
-    print(f"Initial number of reactions: {lines_counter}")
-    print(f"Filtered number of reactions: {n_filtered}")
+        # Parallel path with Ray for `num_cpus > 1`
+        ray.init(
+            num_cpus=num_cpus, ignore_reinit_error=True, logging_level=logging.ERROR
+        )
+        max_concurrent_batches = num_cpus  # limit the number of concurrent batches
+        lines_counter = 0
+        with (
+            raw_reader,
+            ReactionWriter(filtered_reaction_data_path) as result_file,
+        ):
+
+            batches_to_process, batch = {}, []
+            n_filtered = 0
+            for item in tqdm(
+                raw_reader,
+                desc="Number of reactions processed: ",
+                bar_format="{desc}{n} [{elapsed}]",
+            ):
+                lines_counter += 1
+                batch.append(item)
+                if len(batch) == batch_size:
+                    batch_results = process_batch.remote(
+                        batch, config, filters, ignore_errors, fmt
+                    )
+                    batches_to_process[batch_results] = None
+                    batch = []
+
+                    # check and process completed tasks if we've reached the concurrency limit
+                    while len(batches_to_process) >= max_concurrent_batches:
+                        n_filtered = process_completed_batch(
+                            batches_to_process,
+                            result_file,
+                            n_filtered,
+                            error_file=error_file,
+                            error_counts=error_counts,
+                        )
+
+            # process the last batch if it's not empty
+            if batch:
+                batch_results = process_batch.remote(
+                    batch, config, filters, ignore_errors=ignore_errors, fmt=fmt
+                )
+                batches_to_process[batch_results] = None
+
+            # process remaining batches
+            while batches_to_process:
+                n_filtered = process_completed_batch(
+                    batches_to_process,
+                    result_file,
+                    n_filtered,
+                    error_file=error_file,
+                    error_counts=error_counts,
+                )
+
+        _print_filtering_summary(lines_counter, n_filtered, error_counts, _error_path)
+    finally:
+        if ray.is_initialized():
+            ray.shutdown()
+        if error_file is not None:
+            error_file.close()

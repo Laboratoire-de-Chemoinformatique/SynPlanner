@@ -1,22 +1,21 @@
 """Module containing additional functions needed in different reaction data processing
 protocols."""
 
-from io import StringIO
 import logging
-from typing import Iterable
+from collections.abc import Iterable
+from io import StringIO
 
-from CGRtools.containers import (
+from chython import smiles as smiles_parser
+from chython.containers import (
     CGRContainer,
     MoleculeContainer,
     QueryContainer,
     ReactionContainer,
 )
-from CGRtools.exceptions import InvalidAromaticRing
-from CGRtools.files.SDFrw import SDFRead
-from chython import MoleculeContainer as MoleculeContainerChython
+from chython.exceptions import InvalidAromaticRing
+from chython.files.SDFrw import SDFRead
 from tqdm.auto import tqdm
 
-from synplan.chem import smiles_parser
 from synplan.utils.files import MoleculeReader, MoleculeWriter
 
 
@@ -34,12 +33,12 @@ def mol_from_smiles(
     :param clean_stereo: Whether to remove the stereo marks on atoms of the molecule (default is True).
     :param clean2d: Whether to clean the 2D coordinates of the molecule (default is True).
     :return: The processed molecule object.
-    :raises ValueError: If the SMILES string could not be processed by CGRtools.
+    :raises ValueError: If the SMILES string could not be processed by chython.
     """
-    molecule = smiles_parser(smiles)
+    molecule = smiles_parser(smiles, ignore=True)
 
     if not isinstance(molecule, MoleculeContainer):
-        raise ValueError("SMILES string was not processed by CGRtools")
+        raise ValueError("SMILES string was not processed by chython")
 
     tmp = molecule.copy()
     try:
@@ -52,7 +51,7 @@ def mol_from_smiles(
         molecule = tmp
     except InvalidAromaticRing:
         logging.warning(
-            "CGRtools was not able to standardize molecule due to invalid aromatic ring"
+            "chython was not able to standardize molecule due to invalid aromatic ring"
         )
     return molecule
 
@@ -159,7 +158,7 @@ def standardize_building_blocks(input_file: str, output_file: str) -> str:
 
 def _standardize_one_smiles(smiles_str: str) -> str | None:
     try:
-        mol = smiles_parser(smiles_str)
+        mol = smiles_parser(smiles_str, ignore=True)
         mol = safe_canonicalization(mol)
         return str(mol)
     except Exception:
@@ -188,15 +187,14 @@ def _standardize_sdf_text(block: str) -> list[str]:
     The block may contain one or multiple SDF records, separated by $$$$ lines.
     """
     out: list[str] = []
-    with StringIO(block) as fh:
-        with SDFRead(fh) as sdf:
-            for mol in sdf:
-                try:
-                    mol = safe_canonicalization(mol)
-                    out.append(str(mol))
-                except Exception:
-                    # ignore malformed entries
-                    pass
+    with StringIO(block) as fh, SDFRead(fh) as sdf:
+        for mol in sdf:
+            try:
+                mol = safe_canonicalization(mol)
+                out.append(str(mol))
+            except Exception:
+                # ignore malformed entries
+                pass
     return out
 
 
@@ -223,7 +221,7 @@ def cgr_from_reaction_rule(reaction_rule: ReactionContainer) -> CGRContainer:
     return cgr_rule
 
 
-def hash_from_reaction_rule(reaction_rule: ReactionContainer) -> hash:
+def hash_from_reaction_rule(reaction_rule: ReactionContainer) -> int:
     """Generates hash for the given reaction rule.
 
     :param reaction_rule: The reaction rule to be converted.
@@ -251,30 +249,3 @@ def reverse_reaction(
     reversed_reaction.name = reaction.name
 
     return reversed_reaction
-
-
-def cgrtools_to_chython_molecule(molecule):
-    molecule_chython = MoleculeContainerChython()
-    for n, atom in molecule.atoms():
-        molecule_chython.add_atom(atom.atomic_symbol, n)
-
-    for n, m, bond in molecule.bonds():
-        molecule_chython.add_bond(n, m, int(bond))
-
-    return molecule_chython
-
-
-def chython_query_to_cgrtools(query):
-    cgrtools_query = QueryContainer()
-    for n, atom in query.atoms():
-        cgrtools_query.add_atom(
-            atom=atom.atomic_symbol,
-            charge=atom.charge,
-            neighbors=atom.neighbors,
-            hybridization=atom.hybridization,
-            _map=n,
-        )
-    for n, m, bond in query.bonds():
-        cgrtools_query.add_bond(n, m, int(bond))
-
-    return cgrtools_query

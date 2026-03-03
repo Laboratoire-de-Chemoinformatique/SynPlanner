@@ -6,7 +6,7 @@ This page explains the supported environments and shows three ways to install Sy
 Supported environments
 ~~~~~~~~~~~~~~~~~~~~~~
 
-- Python: ``>=3.10,<3.13`` (CPython). The publishing workflow builds with Python ``3.12``.
+- Python: ``>=3.10,<3.15`` (CPython). The publishing workflow builds with Python ``3.12``.
 - OS/arch: developed and CI-tested on Linux x86_64 and MacOS arm64. Other platforms may work, but Docker is
   recommended for maximum portability.
 
@@ -16,7 +16,7 @@ What you get after install
 - CLI entrypoint: ``synplan``
 - Python API: ``import synplan``
 - Data and weights are not bundled. Fetch them with
-  ``synplan download_all_data --save_to tutorials/synplan_data`` or follow :doc:`data_download`.
+  ``synplan download_preset --preset synplanner-article --save_to synplan_data`` or follow :doc:`data_download`.
 
 Install with pip (recommended)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

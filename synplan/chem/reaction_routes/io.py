@@ -1,11 +1,12 @@
 import csv
 import json
-import pickle
 import os
+import pickle
 
-from CGRtools import smiles as read_smiles
-from synplan.mcts.tree import Tree
+from chython import smiles as read_smiles
+from chython.exceptions import InvalidAromaticRing
 from synplan.chem.reaction_routes.route_cgr import extract_reactions
+from synplan.mcts.tree import Tree
 
 
 def _collect_reactions(tree):
@@ -53,7 +54,7 @@ def make_dict(routes_json):
 
 
 def read_routes_json(file_path="routes.csv", to_dict=False):
-    with open(file_path, "r") as file:
+    with open(file_path) as file:
         routes_json = json.load(file)
     if to_dict:
         return make_dict(routes_json)
@@ -107,9 +108,12 @@ def make_json(routes_dict, keep_ids=True):
             prod_map = {}  # smiles -> list of step_ids
             for sid, rxn in steps.items():
                 for prod in rxn.products:
-                    prod.kekule()
-                    prod.implicify_hydrogens()
-                    prod.thiele()
+                    try:
+                        prod.kekule()
+                        prod.implicify_hydrogens()
+                        prod.thiele()
+                    except InvalidAromaticRing:
+                        pass
                     s = str(prod)
                     prod_map.setdefault(s, []).append(sid)
         except Exception as e:
@@ -117,9 +121,12 @@ def make_json(routes_dict, keep_ids=True):
             continue
 
         def transform(mol):
-            mol.kekule()
-            mol.implicify_hydrogens()
-            mol.thiele()
+            try:
+                mol.kekule()
+                mol.implicify_hydrogens()
+                mol.thiele()
+            except InvalidAromaticRing:
+                pass
             return str(mol)
 
         def build_mol_node(sid):

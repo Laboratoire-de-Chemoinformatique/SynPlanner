@@ -35,6 +35,7 @@ jobs:
         shell: bash
 
       - name: Publish to TestPyPI
+        continue-on-error: true
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
         run: |

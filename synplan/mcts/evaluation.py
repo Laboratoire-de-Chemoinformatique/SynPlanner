@@ -12,7 +12,6 @@ import random
 from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from random import uniform
-from typing import Dict, List, Set, Tuple
 
 import torch
 
@@ -39,7 +38,7 @@ class ValueNetworkFunction:
         )
         self.value_network = value_net.eval()
 
-    def predict_value(self, precursors: List[Precursor,]) -> float:
+    def predict_value(self, precursors: list[Precursor,]) -> float:
         """Predicts a value based on the given precursors from the node. For prediction,
         precursors must be composed into a single molecule (product).
 
@@ -73,7 +72,7 @@ class RolloutSimulator:
         self,
         policy_network: PolicyNetworkFunction,
         reaction_rules,
-        building_blocks: Set[str],
+        building_blocks: set[str],
         min_mol_size: int,
         max_depth: int,
         stochastic: bool = False,
@@ -95,7 +94,7 @@ class RolloutSimulator:
         self.max_depth = max_depth
         self.stochastic = stochastic
 
-    def _select_reaction(self, current_precursor: Precursor) -> Tuple[bool, any, int]:
+    def _select_reaction(self, current_precursor: Precursor) -> tuple[bool, any, int]:
         """Select a reaction rule to apply.
 
         :param current_precursor: The precursor to expand.
@@ -108,7 +107,7 @@ class RolloutSimulator:
 
     def _select_reaction_greedy(
         self, current_precursor: Precursor
-    ) -> Tuple[bool, any, int]:
+    ) -> tuple[bool, any, int]:
         """Greedy selection: take first successful rule.
 
         :param current_precursor: The precursor to expand.
@@ -124,7 +123,7 @@ class RolloutSimulator:
 
     def _select_reaction_stochastic(
         self, current_precursor: Precursor
-    ) -> Tuple[bool, any, int]:
+    ) -> tuple[bool, any, int]:
         """Stochastic selection: sample from rules until a valid one is found.
 
         Instead of applying all rules upfront, samples from the policy
@@ -150,7 +149,7 @@ class RolloutSimulator:
             # Sample one rule proportionally to probabilities
             probs = [c[0] for c in candidates]
             idx = random.choices(range(len(candidates)), weights=probs, k=1)[0]
-            prob, rule, rule_id = candidates[idx]
+            _prob, rule, rule_id = candidates[idx]
 
             # Try to apply the sampled rule
             for prods in self._apply_rule(current_precursor, rule):
@@ -244,8 +243,8 @@ class EvaluationStrategy(ABC):
         self,
         node,
         node_id: int,
-        nodes_depth: Dict[int, int],
-        nodes_prob: Dict[int, float],
+        nodes_depth: dict[int, int],
+        nodes_prob: dict[int, float],
     ) -> float:
         """Evaluate a node and return its score.
 
@@ -258,7 +257,7 @@ class EvaluationStrategy(ABC):
         pass
 
     @staticmethod
-    def _to_01(value: float, *, src_range: Tuple[float, float] = (0.0, 1.0)) -> float:
+    def _to_01(value: float, *, src_range: tuple[float, float] = (0.0, 1.0)) -> float:
         """Normalize value to [0, 1] range.
 
         :param value: Value to normalize.
@@ -287,7 +286,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         self,
         policy_network: PolicyNetworkFunction,
         reaction_rules,
-        building_blocks: Set[str],
+        building_blocks: set[str],
         min_mol_size: int,
         max_depth: int,
         normalize: bool = False,
@@ -318,8 +317,8 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         self,
         node,
         node_id: int,
-        nodes_depth: Dict[int, int],
-        nodes_prob: Dict[int, float],
+        nodes_depth: dict[int, int],
+        nodes_prob: dict[int, float],
     ) -> float:
         """Evaluate node using rollout simulation."""
         current_depth = nodes_depth[node_id]
@@ -360,8 +359,8 @@ class ValueNetworkEvaluationStrategy(EvaluationStrategy):
         self,
         node,
         node_id: int,
-        nodes_depth: Dict[int, int],
-        nodes_prob: Dict[int, float],
+        nodes_depth: dict[int, int],
+        nodes_prob: dict[int, float],
     ) -> float:
         """Evaluate node using value network."""
         score = float(self.value_network.predict_value(node.new_precursors))
@@ -391,8 +390,8 @@ class RDKitEvaluationStrategy(EvaluationStrategy):
         self,
         node,
         node_id: int,
-        nodes_depth: Dict[int, int],
-        nodes_prob: Dict[int, float],
+        nodes_depth: dict[int, int],
+        nodes_prob: dict[int, float],
     ) -> float:
         """Evaluate node using RDKit scorer."""
         score = float(self.scorer(node))
@@ -416,8 +415,8 @@ class PolicyEvaluationStrategy(EvaluationStrategy):
         self,
         node,
         node_id: int,
-        nodes_depth: Dict[int, int],
-        nodes_prob: Dict[int, float],
+        nodes_depth: dict[int, int],
+        nodes_prob: dict[int, float],
     ) -> float:
         """Evaluate node using policy probability."""
         score = nodes_prob.get(node_id, 0.0)
@@ -441,8 +440,8 @@ class RandomEvaluationStrategy(EvaluationStrategy):
         self,
         node,
         node_id: int,
-        nodes_depth: Dict[int, int],
-        nodes_prob: Dict[int, float],
+        nodes_depth: dict[int, int],
+        nodes_prob: dict[int, float],
     ) -> float:
         """Evaluate node using random score."""
         score = uniform(0.0, 1.0)

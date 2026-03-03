@@ -3,20 +3,22 @@ reading/writing."""
 
 import csv
 import gzip
+from collections.abc import Iterable, Iterator
+from io import StringIO
 from os.path import splitext
 from pathlib import Path
-from typing import Iterable, Iterator, TextIO, Union
+from typing import TextIO
 
-from CGRtools import smiles
-from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
-from CGRtools.files.RDFrw import RDFRead, RDFWrite
-from CGRtools.files.SDFrw import SDFRead, SDFWrite
+from chython import smiles
+from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
+from chython.files.RDFrw import RDFRead, RDFWrite
+from chython.files.SDFrw import SDFRead, SDFWrite
 
 
 class FileHandler:
     """General class to handle chemical files."""
 
-    def __init__(self, filename: Union[str, Path], **kwargs):
+    def __init__(self, filename: str | Path, **kwargs):
         """General class to handle chemical files.
 
         :param filename: The path and name of the file.
@@ -38,7 +40,7 @@ class FileHandler:
 
 
 class Reader(FileHandler):
-    def __init__(self, filename: Union[str, Path], **kwargs):
+    def __init__(self, filename: str | Path, **kwargs):
         """General class to read reactions/molecules data files.
 
         :param filename: The path and name of the file.
@@ -60,7 +62,7 @@ class Reader(FileHandler):
 
 
 class SMILESRead:
-    def __init__(self, filename: Union[str, Path], **kwargs):
+    def __init__(self, filename: str | Path, **kwargs):
         """Simplified class to read files containing a SMILES (Molecules or Reaction)
         string per line.
 
@@ -68,12 +70,12 @@ class SMILESRead:
         :return: None.
         """
         filename = str(Path(filename).resolve(strict=True))
-        self._file = open(filename, "r", encoding="utf-8")
+        self._file = open(filename, encoding="utf-8")
         self._data = self.__data()
 
     def __data(
         self,
-    ) -> Iterable[Union[ReactionContainer, CGRContainer, MoleculeContainer]]:
+    ) -> Iterable[ReactionContainer | CGRContainer | MoleculeContainer]:
         for line in iter(self._file.readline, ""):
             line = line.strip()
             x = smiles(line)
@@ -105,7 +107,7 @@ class SMILESRead:
 
 
 class Writer(FileHandler):
-    def __init__(self, filename: Union[str, Path], mapping: bool = True, **kwargs):
+    def __init__(self, filename: str | Path, mapping: bool = True, **kwargs):
         """General class to write chemical files.
 
         :param filename: The path and name of the file.
@@ -120,7 +122,7 @@ class Writer(FileHandler):
 
 
 class ReactionReader(Reader):
-    def __init__(self, filename: Union[str, Path], **kwargs):
+    def __init__(self, filename: str | Path, **kwargs):
         """Class to read reaction files.
 
         :param filename: The path and name of the file.
@@ -136,7 +138,7 @@ class ReactionReader(Reader):
 
 
 class ReactionWriter(Writer):
-    def __init__(self, filename: Union[str, Path], mapping: bool = True, **kwargs):
+    def __init__(self, filename: str | Path, mapping: bool = True, **kwargs):
         """Class to write reaction files.
 
         :param filename: The path and name of the file.
@@ -165,7 +167,7 @@ class ReactionWriter(Writer):
 
 
 class MoleculeReader(Reader):
-    def __init__(self, filename: Union[str, Path], **kwargs):
+    def __init__(self, filename: str | Path, **kwargs):
         """Class to read molecule files.
 
         :param filename: The path and name of the file.
@@ -181,7 +183,7 @@ class MoleculeReader(Reader):
 
 
 class MoleculeWriter(Writer):
-    def __init__(self, filename: Union[str, Path], mapping: bool = True, **kwargs):
+    def __init__(self, filename: str | Path, mapping: bool = True, **kwargs):
         """Class to write molecule files.
 
         :param filename: The path and name of the file.
@@ -209,16 +211,14 @@ class MoleculeWriter(Writer):
             self._file.write(molecule)
 
 
-def count_sdf_records(path: Union[str, Path]) -> int:
+def count_sdf_records(path: str | Path) -> int:
     """Count number of SDF records (by '$$$$' separators)."""
     p = Path(path)
-    with open(p, "r", encoding="utf-8") as f:
+    with open(p, encoding="utf-8") as f:
         return sum(1 for line in f if line.strip() == "$$$$")
 
 
-def iter_sdf_text_blocks(
-    path: Union[str, Path], records_per_block: int
-) -> Iterator[str]:
+def iter_sdf_text_blocks(path: str | Path, records_per_block: int) -> Iterator[str]:
     """Yield SDF text blocks containing up to `records_per_block` molecules.
 
     Records are delimited by lines equal to '$$$$'. The block is a concatenated
@@ -228,7 +228,7 @@ def iter_sdf_text_blocks(
     buf: list[str] = []
     count = 0
     step = max(1, records_per_block)
-    with open(p, "r", encoding="utf-8") as f:
+    with open(p, encoding="utf-8") as f:
         for line in f:
             buf.append(line)
             if line.strip() == "$$$$":
@@ -240,7 +240,7 @@ def iter_sdf_text_blocks(
         yield "".join(buf)
 
 
-def open_text(path: Union[str, Path]) -> TextIO:
+def open_text(path: str | Path) -> TextIO:
     """Open a text file that may be gzip-compressed.
 
     If the path ends with ".gz", the file is opened via gzip in text mode.
@@ -248,7 +248,7 @@ def open_text(path: Union[str, Path]) -> TextIO:
     p = Path(path)
     if p.suffix.lower() == ".gz":
         return gzip.open(p, "rt", encoding="utf-8", newline="")
-    return open(p, "r", encoding="utf-8", newline="")
+    return open(p, encoding="utf-8", newline="")
 
 
 def _resolve_csv_column(fieldnames: list[str] | None, column: str) -> str:
@@ -268,17 +268,17 @@ def _resolve_csv_column(fieldnames: list[str] | None, column: str) -> str:
     raise ValueError(f"Expected '{column}' column in CSV header, got {fieldnames}")
 
 
-def count_smiles_records(path: Union[str, Path]) -> int:
+def count_smiles_records(path: str | Path) -> int:
     """Count number of non-empty SMILES records (lines)."""
     p = Path(path)
-    with open(p, "r", encoding="utf-8") as f:
+    with open(p, encoding="utf-8") as f:
         return sum(1 for line in f if line.strip())
 
 
-def iter_smiles(path: Union[str, Path]) -> Iterator[str]:
+def iter_smiles(path: str | Path) -> Iterator[str]:
     """Yield first whitespace-delimited token (SMILES) per non-empty line."""
     p = Path(path)
-    with open(p, "r", encoding="utf-8") as f:
+    with open(p, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -286,9 +286,7 @@ def iter_smiles(path: Union[str, Path]) -> Iterator[str]:
             yield line.split()[0]
 
 
-def iter_smiles_blocks(
-    path: Union[str, Path], records_per_block: int
-) -> Iterator[list[str]]:
+def iter_smiles_blocks(path: str | Path, records_per_block: int) -> Iterator[list[str]]:
     """Yield SMILES lists of up to `records_per_block` items from file."""
     step = max(1, records_per_block)
     block: list[str] = []
@@ -302,7 +300,7 @@ def iter_smiles_blocks(
 
 
 def iter_csv_smiles(
-    path: Union[str, Path],
+    path: str | Path,
     *,
     header: bool = True,
     delimiter: str = ",",
@@ -341,7 +339,7 @@ def iter_csv_smiles(
 
 
 def iter_csv_smiles_blocks(
-    path: Union[str, Path],
+    path: str | Path,
     records_per_block: int,
     *,
     header: bool = True,
@@ -362,6 +360,117 @@ def iter_csv_smiles_blocks(
         yield block
 
 
+def count_rdf_records(path: str | Path) -> int:
+    """Count number of RDF records (by $RFMT/$MFMT markers)."""
+    p = Path(path)
+    with open(p, encoding="utf-8") as f:
+        return sum(1 for line in f if line.startswith(("$RFMT", "$MFMT")))
+
+
+def iter_rdf_text_blocks(path: str | Path, records_per_block: int) -> Iterator[str]:
+    """Yield RDF text blocks of up to `records_per_block` records.
+
+    Each block is a string containing one or more $RFMT/$MFMT records,
+    parseable via ``RDFRead(StringIO(block))``.
+    """
+    p = Path(path)
+    buf: list[str] = []
+    count = 0
+    step = max(1, records_per_block)
+    in_header = True
+    with open(p, encoding="utf-8") as f:
+        for line in f:
+            if in_header:
+                if line.startswith(("$RFMT", "$MFMT", "$RXN")):
+                    in_header = False
+                    buf.append(line)
+                continue
+            if line.startswith(("$RFMT", "$MFMT")):
+                count += 1
+                if count % step == 0:
+                    yield "".join(buf)
+                    buf = [line]
+                    continue
+            buf.append(line)
+    if buf:
+        yield "".join(buf)
+
+
+def parse_reaction(
+    item: str | ReactionContainer, fmt: str = "smi"
+) -> ReactionContainer:
+    """Parse a raw string into a ReactionContainer.
+
+    If *item* is already a ReactionContainer it is returned as-is.
+
+    :param item: A SMILES string, an RDF text block, or a ReactionContainer.
+    :param fmt: ``"smi"`` for SMILES strings, ``"rdf"`` for RDF text blocks.
+    :return: The parsed ReactionContainer.
+    """
+    if isinstance(item, ReactionContainer):
+        return item
+    if fmt == "smi":
+        rxn = smiles(item)
+        rxn.meta["init_smiles"] = item
+        return rxn
+    else:  # rdf block
+        with RDFRead(StringIO(item), ignore=True) as r:
+            rxn = next(iter(r))
+        return rxn
+
+
+class RawReactionReader:
+    """Yields raw unparsed items: str lines for SMILES, str blocks for RDF."""
+
+    def __init__(self, filename: str | Path, batch_size: int = 1):
+        p = Path(filename)
+        ext = p.suffix.lower()
+        if ext in (".smi", ".smiles"):
+            self.format = "smi"
+        elif ext == ".rdf":
+            self.format = "rdf"
+        else:
+            raise ValueError(f"Unsupported extension for raw reading: {ext}")
+        self._path = p
+        self._batch_size = batch_size
+
+    def __iter__(self) -> Iterator[str]:
+        if self.format == "smi":
+            yield from iter_smiles(self._path)
+        else:
+            yield from iter_rdf_text_blocks(self._path, 1)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        pass
+
+
+def load_rule_index_mapping_tsv(tsv_path: str | Path) -> dict:
+    """Load reaction-to-rule index mapping from a rules TSV file.
+
+    The TSV is already sorted by descending popularity (same order as the
+    pickle), so the rule index is simply the row number (0-based).
+
+    :param tsv_path: Path to the TSV file with columns
+        ``rule_smarts``, ``popularity``, ``reaction_indices``.
+    :return: Dict mapping ``reaction_index → rule_index``.
+    """
+    reaction_rule_pairs = {}
+    with open(tsv_path, encoding="utf-8") as f:
+        f.readline()  # skip header
+        for rule_i, line in enumerate(f):
+            line = line.rstrip("\n")
+            if not line:
+                continue
+            parts = line.split("\t")
+            indices_str = parts[2]
+            for reaction_id_str in indices_str.split(","):
+                reaction_rule_pairs[int(reaction_id_str)] = rule_i
+    return dict(sorted(reaction_rule_pairs.items()))
+
+
 def to_reaction_smiles_record(reaction: ReactionContainer) -> str:
     """Converts the reaction to the SMILES record. Needed for reaction/molecule writers.
 
@@ -375,7 +484,6 @@ def to_reaction_smiles_record(reaction: ReactionContainer) -> str:
     reaction_record = [format(reaction, "m")]
     sorted_meta = sorted(reaction.meta.items(), key=lambda x: x[0])
     for _, meta_info in sorted_meta:
-        meta_info = ""
-        meta_info = ";".join(meta_info.split("\n"))
+        meta_info = ";".join(str(meta_info).split("\n"))
         reaction_record.append(str(meta_info))
     return "\t".join(reaction_record)

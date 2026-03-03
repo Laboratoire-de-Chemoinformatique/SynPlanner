@@ -6,19 +6,19 @@ import json
 import logging
 import os.path
 from pathlib import Path
-from typing import Union
 
-from CGRtools.containers import MoleculeContainer
+from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
 from synplan.chem.reaction_routes.io import write_routes_csv, write_routes_json
 from synplan.chem.reaction_routes.route_cgr import extract_reactions
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.tree import Tree, TreeConfig
+from synplan.route_quality.scorer import RouteScorer
 from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.loading import (
-    load_evaluation_function,
     load_building_blocks,
+    load_evaluation_function,
     load_policy_function,
     load_reaction_rules,
 )
@@ -26,7 +26,7 @@ from synplan.utils.visualisation import extract_routes, generate_results_html
 
 
 def extract_tree_stats(
-    tree: Tree, target: Union[str, MoleculeContainer], init_smiles: str = None
+    tree: Tree, target: str | MoleculeContainer, init_smiles: str = None
 ):
     """Collects various statistics from a tree and returns them in a dictionary format.
 
@@ -41,17 +41,11 @@ def extract_tree_stats(
         [f"{nid},{v[0]},{v[1]},{v[2]}" for nid, v in newick_meta.items()]
     )
 
-    return {
-        "target_smiles": init_smiles if init_smiles is not None else str(target),
-        "num_routes": len(tree.winning_nodes),
-        "num_nodes": len(tree),
-        "num_iter": tree.curr_iteration,
-        "tree_depth": max(tree.nodes_depth.values()),
-        "search_time": round(tree.curr_time, 1),
-        "newick_tree": newick_tree,
-        "newick_meta": newick_meta_line,
-        "solved": True if len(tree.winning_nodes) > 0 else False,
-    }
+    stats = tree.to_stats_dict()
+    stats["target_smiles"] = init_smiles if init_smiles is not None else str(target)
+    stats["newick_tree"] = newick_tree
+    stats["newick_meta"] = newick_meta_line
+    return stats
 
 
 def run_search(
@@ -62,6 +56,7 @@ def run_search(
     reaction_rules_path: str,
     building_blocks_path: str,
     results_root: str = "search_results",
+    route_scorer: RouteScorer | None = None,
 ) -> None:
     """Performs a tree search on a set of target molecules using specified configuration
     and reaction rules, logging the results and statistics.
@@ -76,6 +71,8 @@ def run_search(
     :param building_blocks_path: The path to the file containing building blocks.
     :param results_root: The name of the folder where the results of the tree search
         will be saved.
+    :param route_scorer: Optional post-search route scorer for re-ranking
+        winning routes (e.g. ProtectionRouteScorer).
     :return: None.
     """
 
@@ -98,9 +95,26 @@ def run_search(
         "num_iter",
         "tree_depth",
         "search_time",
+        "solved",
+        # Policy performance
+        "expansion_calls",
+        "expansion_successes",
+        "total_rules_tried",
+        "total_rules_succeeded",
+        "rule_applicability_rate",
+        "dead_end_nodes",
+        # Search dynamics
+        "first_solution_iteration",
+        "first_solution_time",
+        # Tree shape
+        "max_branching_factor",
+        "mean_branching_factor",
+        # Route quality
+        "best_route_score",
+        "mean_winning_rule_rank",
+        # Tree structure
         "newick_tree",
         "newick_meta",
-        "solved",
         "error",
     ]
 
@@ -119,7 +133,7 @@ def run_search(
     tree_config = TreeConfig.from_dict(search_config)
     tree_config.silent = True
     with (
-        open(targets_path, "r", encoding="utf-8") as targets,
+        open(targets_path, encoding="utf-8") as targets,
         open(stats_file, "w", encoding="utf-8", newline="\n") as csvfile,
     ):
 
@@ -143,6 +157,7 @@ def run_search(
                     building_blocks=building_blocks,
                     expansion_function=policy_function,
                     evaluation_function=evaluation_function,
+                    route_scorer=route_scorer,
                 )
 
                 _ = list(tree)

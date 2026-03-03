@@ -19,7 +19,7 @@ each reaction rule to a given input molecular graph, which can be used for the r
 **Filtering policy network**. The training dataset for the filtering policy is formed by the application of all
 reaction rules to the training molecules. The labels vector is filled with positive labels in positions corresponding
 to the successfully applied reaction rules. The prediction part of the filtering policy is formed from two linear layers
-with a sigmoid function that assigns the probabilities for the “regular”, as well as “priority” reac-tion rules
+with a sigmoid function that assigns the probabilities for the "regular", as well as "priority" reaction rules
 (cyclization reaction rules). These two vectors are then combined with a coefficient α ranging from 0 to 1.
 This approach ensures that the priority reaction rules receive the highest score, followed by other regular reaction rules.
 

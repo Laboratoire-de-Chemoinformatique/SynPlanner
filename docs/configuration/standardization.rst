@@ -10,17 +10,17 @@ The list and order of application of standardizers can be specified in the confi
 Download example configuration
 ------------------------------
 
-- GitHub: `configs/standardization.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/standardization.yaml>`_
+- GitHub: `configs/reactions_standardization.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/reactions_standardization.yaml>`_
 
 Quickstart (CLI)
 ----------------
 
-Run reaction standardization using the repository configuration in ``configs/standardization.yaml``:
+Run reaction standardization using the repository configuration in ``configs/reactions_standardization.yaml``:
 
 .. code-block:: bash
 
    synplan reaction_standardizing \
-     --config configs/standardization.yaml \
+     --config configs/reactions_standardization.yaml \
      --input reaction_data_original.smi \
      --output reaction_data_standardized.smi
 
@@ -28,7 +28,6 @@ Run reaction standardization using the repository configuration in ``configs/sta
 
 .. code-block:: yaml
 
-    reaction_mapping_config:
     functional_groups_config:
     kekule_form_config:
     check_valence_config:
@@ -47,7 +46,6 @@ Run reaction standardization using the repository configuration in ``configs/sta
     ================================== =================================================================================
     Reaction standardizer              Description
     ================================== =================================================================================
-    reaction_mapping_config            Maps atoms of the reaction using chython (chytorch)
     functional_groups_config           Standardization of functional groups
     kekule_form_config                 Transform molecules to Kekule form when possible
     check_valence_config               Check atom valences

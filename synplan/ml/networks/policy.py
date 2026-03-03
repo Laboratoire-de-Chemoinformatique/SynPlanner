@@ -1,15 +1,19 @@
 """Module containing main class for policy network."""
 
 from abc import ABC
-from typing import Dict
 
 import torch
 from pytorch_lightning import LightningModule
 from torch import Tensor
-from torch.nn import Linear
+from torch.nn import Dropout, Linear
 from torch.nn.functional import binary_cross_entropy_with_logits, cross_entropy, one_hot
 from torch_geometric.data.batch import Batch
-from torchmetrics.functional.classification import f1_score, recall, specificity
+from torchmetrics.functional.classification import (
+    f1_score,
+    multiclass_accuracy,
+    recall,
+    specificity,
+)
 
 from synplan.ml.networks.modules import MCTSNetwork
 
@@ -36,6 +40,7 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
         self.save_hyperparameters()
         self.policy_type = policy_type
         self.n_rules = n_rules
+        self.head_dropout = Dropout(kwargs.get("dropout", 0.4))
         self.y_predictor = Linear(vector_dim, n_rules)
 
         if self.policy_type == "filtering":
@@ -49,7 +54,8 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
         :return: Returns the vector of probabilities (given by sigmoid) of successful
             application of regular and priority reaction rules.
         """
-        x = self.embedder(batch, self.batch_size)
+        x = self.embedder(batch)
+        x = self.head_dropout(x)
         y = self.y_predictor(x)
 
         if self.policy_type == "ranking":
@@ -61,7 +67,7 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
             priority = torch.sigmoid(self.priority_predictor(x))
             return y, priority
 
-    def _get_loss(self, batch: Batch) -> Dict[str, Tensor]:
+    def _get_loss(self, batch: Batch) -> dict[str, Tensor]:
         """Calculates the loss and various classification metrics for a given batch for
         reaction rules prediction.
 
@@ -70,7 +76,8 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
             prediction.
         """
         true_y = batch.y_rules.long()
-        x = self.embedder(batch, self.batch_size)
+        x = self.embedder(batch)
+        x = self.head_dropout(x)
         pred_y = self.y_predictor(x)
 
         if self.policy_type == "ranking":
@@ -85,6 +92,12 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
             f1_y = f1_score(pred_y, true_y, task="multiclass", num_classes=self.n_rules)
 
             metrics = {"loss": loss, "balanced_accuracy_y": ba_y, "f1_score_y": f1_y}
+
+            for k in (5, 10):
+                if self.n_rules > k:
+                    metrics[f"top{k}_accuracy_y"] = multiclass_accuracy(
+                        pred_y, true_y, num_classes=self.n_rules, top_k=k
+                    )
 
         elif self.policy_type == "filtering":
             loss_y = binary_cross_entropy_with_logits(pred_y, true_y.float())

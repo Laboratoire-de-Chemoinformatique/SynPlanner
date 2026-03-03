@@ -38,30 +38,43 @@ Tutorials
 some advanced explanations and configurations, that can be used not only for demonstrative and educational purposes but
 also for creating flexible pipelines.
 
-Currently, there are two groups of tutorials available – general and advanced. General tutorials aimed to provide a quick review
-of the ``SynPlanner`` pipeline and its application to the custom data. The advanced tutorial provides more explanations about
-each ``SynPlanner`` pipeline step and allows for more sophisticated functionalities and configurations for each pipeline step.
+**Introductory tutorials:**
 
-**General tutorials:**
-
+- `Welcome to Chython`_ - an introduction to the chython library and its core concepts.
+- `Coming from RDKit`_ - a side-by-side comparison for users familiar with RDKit.
 - `10 minutes to SynPlanner`_ - a quickstart guide to run planning via Python or CLI.
-- `SynPlanner Pipeline`_ - demonstrates the whole ``SynPlanner`` pipeline of reaction data curation, reaction rules extraction, retrosynthetic models training, retrosynthetic planning, and predicted retrosynthetic routes visualization. This tutorial can be used for routine creating ready-to-use planners for custom data and creating custom pipeline configurations.
+
+**Pipeline tutorials:**
+
+- `Data Curation`_ - demonstrates how to prepare data (reaction standardization and filtration) before reaction rules extraction and retrosynthetic model training.
+- `Rules Extraction`_ - demonstrates how to extract reaction rules from reaction data.
+- `Policy Training`_ - demonstrates how to train ranking and filtering policy networks.
+- `Retrosynthetic Planning`_ - demonstrates how retrosynthetic planning can be performed for target molecules.
+- `Clustering`_ - demonstrates how to cluster predicted retrosynthetic routes.
+- `Protection Scoring`_ - demonstrates how to detect competing functional groups and score routes for selectivity issues, inspired by `Westerlund et al. (2025) <https://doi.org/10.26434/chemrxiv-2025-gdrr8>`_.
 
 **Advanced tutorials:**
 
-- `Step-1. Data curation`_ - demonstrates how to prepare data (reaction standardization and filtration) before reaction rules extraction and retrosynthetic model training in ``SynPlanner``
-- `Step-2. Reaction rules extraction`_ - demonstrates how to extract reaction rules from reaction data in ``SynPlanner``.
-- `Step-3. Policy network training`_ - demonstrates how to train ranking and filtering policy network in ``SynPlanner``.
-- `Step-4. Retrosynthetic planning`_ - demonstrates how retrosynthetic planning can be performed for target molecules in ``SynPlanner``.
-- `Step-5. Clustering`_ - demonstrates how to cluster predicted retrosynthetic routes in ``SynPlanner``.
+- `Combined Ranking and Filtering Policy`_ - demonstrates how to combine ranking and filtering policy networks.
+- `NMCS Algorithms`_ - demonstrates Nested Monte Carlo Search algorithms for retrosynthetic planning.
+- `Tree Analysis`_ - demonstrates how to analyze tree search results: policy performance, winning rule ranks, branching profile, and route details.
+- `Planning with RDKit`_ - demonstrates how to use SynPlanner with RDKit Mol objects for input and output.
+- `Rule Analysis`_ - demonstrates how to analyze and visualize reaction rules.
 
-.. _SynPlanner Pipeline: SynPlanner_Pipeline.ipynb
+.. _Welcome to Chython: 00_Welcome_to_Chython.ipynb
+.. _Coming from RDKit: 01_Coming_from_RDKit.ipynb
 .. _10 minutes to SynPlanner: ten_minutes.rst
-.. _Step-1. Data curation: Step-1_Data_Curation.ipynb
-.. _Step-2. Reaction rules extraction: Step-2_Rules_Extraction.ipynb
-.. _Step-3. Policy network training: Step-3_Policy_Training.ipynb
-.. _Step-4. Retrosynthetic planning: Step-4_Retrosynthetic_Planning.ipynb
-.. _Step-5. Clustering: Step-5_Clustering.ipynb
+.. _Data Curation: 02_Data_Curation.ipynb
+.. _Rules Extraction: 03_Rules_Extraction.ipynb
+.. _Policy Training: 04_Policy_Training.ipynb
+.. _Retrosynthetic Planning: 05_Retrosynthetic_Planning.ipynb
+.. _Clustering: 06_Clustering.ipynb
+.. _Protection Scoring: 07_Protection_Scoring.ipynb
+.. _Combined Ranking and Filtering Policy: 08_Combined_Ranking_Filtering_Policy.ipynb
+.. _NMCS Algorithms: 09_NMCS_Algorithms.ipynb
+.. _Tree Analysis: 10_Tree_Analysis.ipynb
+.. _Planning with RDKit: 11_Planning_with_RDKit.ipynb
+.. _Rule Analysis: 12_Rule_Analysis.ipynb
 
 .. toctree::
     :hidden:
@@ -70,11 +83,18 @@ each ``SynPlanner`` pipeline step and allows for more sophisticated functionalit
     ten_minutes
     cli_interface
     data
-    SynPlanner_Pipeline
-    Step-1_Data_Curation
-    Step-2_Rules_Extraction
-    Step-3_Policy_Training
-    Step-4_Retrosynthetic_Planning
-    Step-5_Clustering
+    00_Welcome_to_Chython
+    01_Coming_from_RDKit
+    02_Data_Curation
+    03_Rules_Extraction
+    04_Policy_Training
+    05_Retrosynthetic_Planning
+    06_Clustering
+    07_Protection_Scoring
+    08_Combined_Ranking_Filtering_Policy
+    09_NMCS_Algorithms
+    10_Tree_Analysis
+    11_Planning_with_RDKit
+    12_Rule_Analysis
     ../configuration/configuration
     ../methods/methods

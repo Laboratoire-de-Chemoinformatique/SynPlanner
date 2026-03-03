@@ -1,11 +1,12 @@
 """Module containing classes and functions for manipulating reactions and reaction
 rules."""
 
-from typing import Any, Iterator, List, Optional
+from collections.abc import Iterator
+from typing import Any
 
-from CGRtools.containers import MoleculeContainer, ReactionContainer
-from CGRtools.exceptions import InvalidAromaticRing
-from CGRtools.reactor import Reactor
+from chython.containers import MoleculeContainer, ReactionContainer
+from chython.exceptions import InvalidAromaticRing
+from chython.reactor import Reactor
 
 
 class Reaction(ReactionContainer):
@@ -16,8 +17,8 @@ class Reaction(ReactionContainer):
 
 
 def add_small_mols(
-    big_mol: MoleculeContainer, small_molecules: Optional[Any] = None
-) -> List[MoleculeContainer]:
+    big_mol: MoleculeContainer, small_molecules: Any | None = None
+) -> list[MoleculeContainer]:
     """Takes a molecule and returns a list of modified molecules where each small
     molecule has been added to the big molecule.
 
@@ -32,7 +33,7 @@ def add_small_mols(
         for small_mol in small_molecules:
 
             for n, atom in small_mol.atoms():
-                new_number = tmp_mol.add_atom(atom.atomic_symbol)
+                new_number = tmp_mol.add_atom(atom.copy())
                 transition_mapping[n] = new_number
 
             for atom, neighbor, bond in small_mol.bonds():
@@ -53,7 +54,7 @@ def apply_reaction_rule(
     top_reactions_num: int = 3,
     validate_products: bool = True,
     rebuild_with_cgr: bool = False,
-) -> Iterator[List[MoleculeContainer,]]:
+) -> Iterator[list[MoleculeContainer,]]:
     """Applies a reaction rule to a given molecule.
 
     :param molecule: A molecule to which reaction rule will be applied.
@@ -70,7 +71,7 @@ def apply_reaction_rule(
 
     try:
         if sort_reactions:
-            unsorted_reactions = list(reaction_rule(reactants))
+            unsorted_reactions = list(reaction_rule(*reactants))
             sorted_reactions = sorted(
                 unsorted_reactions,
                 key=lambda react: len(
@@ -83,11 +84,11 @@ def apply_reaction_rule(
             reactions = sorted_reactions[:top_reactions_num]
         else:
             reactions = []
-            for reaction in reaction_rule(reactants):
+            for reaction in reaction_rule(*reactants):
                 reactions.append(reaction)
                 if len(reactions) == top_reactions_num:
                     break
-    except IndexError:
+    except (IndexError, InvalidAromaticRing):
         reactions = []
 
     for reaction in reactions:
@@ -113,13 +114,18 @@ def apply_reaction_rule(
 
         # validate products
         if validate_products:
+            is_valid = True
             for mol in reactants:
                 try:
-                    mol.kekule()
-                    if mol.check_valence():
-                        yield None
-                    mol.thiele()
+                    tmp_mol = mol.copy()
+                    tmp_mol.kekule()
+                    if tmp_mol.check_valence():
+                        is_valid = False
+                        break
                 except InvalidAromaticRing:
-                    yield None
+                    is_valid = False
+                    break
+            if not is_valid:
+                continue
 
         yield reactants

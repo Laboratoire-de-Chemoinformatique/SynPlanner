@@ -1,19 +1,19 @@
 """Module containing functions for preparation of the training sets for policy and value
 network."""
 
-from abc import ABC
 import logging
 import os
-import pickle
-from typing import Any, Dict, List, Optional, Tuple
+from abc import ABC
+from concurrent.futures.process import BrokenProcessPool
+from typing import Any
 
-from CGRtools import smiles
-from CGRtools.containers import MoleculeContainer
-from CGRtools.exceptions import InvalidAromaticRing
-from CGRtools.reactor import Reactor
 import ray
-from ray.util.queue import Empty, Queue
 import torch
+from chython import smiles
+from chython.containers import MoleculeContainer
+from chython.exceptions import InvalidAromaticRing
+from chython.reactor import Reactor
+from ray.util.queue import Empty, Queue
 from torch import Tensor
 from torch_geometric.data import InMemoryDataset
 from torch_geometric.data.data import Data
@@ -21,15 +21,15 @@ from torch_geometric.data.makedirs import makedirs
 from torch_geometric.transforms import ToUndirected
 from tqdm.auto import tqdm
 
-from synplan.chem.utils import unite_molecules
-from synplan.utils.files import ReactionReader
+from synplan.utils.cache import load_pyg_dataset, save_pyg_dataset
 from synplan.utils.loading import load_reaction_rules
+from synplan.utils.parallel import default_num_workers, process_pool_map_stream
 
 
 class ValueNetworkDataset(InMemoryDataset, ABC):
     """Value network dataset."""
 
-    def __init__(self, extracted_precursor: Dict[str, float]) -> None:
+    def __init__(self, extracted_precursor: dict[str, float]) -> None:
         """Initializes a value network dataset object.
 
         :param extracted_precursor: The dictionary with the extracted from the built
@@ -43,7 +43,7 @@ class ValueNetworkDataset(InMemoryDataset, ABC):
             )
 
     @staticmethod
-    def mol_to_graph(molecule: MoleculeContainer, label: float) -> Optional[Data]:
+    def mol_to_graph(molecule: MoleculeContainer, label: float) -> Data | None:
         """Takes a molecule as input, and converts the molecule to a PyTorch geometric
         graph, assigns the reward value (label) to the graph, and returns the graph.
 
@@ -61,8 +61,8 @@ class ValueNetworkDataset(InMemoryDataset, ABC):
         return None
 
     def graphs_from_extracted_precursor(
-        self, extracted_precursor: Dict[str, float]
-    ) -> Tuple[Data, Dict]:
+        self, extracted_precursor: dict[str, float]
+    ) -> tuple[Data, dict]:
         """Converts the extracted from the search trees precursor to the PyTorch geometric
         graphs.
 
@@ -80,26 +80,51 @@ class ValueNetworkDataset(InMemoryDataset, ABC):
         return data, slices
 
 
+def _convert_ranking_item(item: tuple[str, str]) -> tuple[Data, str] | None:
+    """Convert a (product_smiles, rule_id_str) pair into a labelled PyG graph.
+
+    Module-level function so it can be pickled by :class:`ProcessPoolExecutor`.
+    Returns ``(pyg_graph, product_smiles)`` or ``None`` on failure.
+    """
+    product_smi, rule_id_str = item
+    try:
+        molecule = smiles(product_smi)
+        pyg_graph = mol_to_pyg(molecule)
+        if pyg_graph is not None:
+            pyg_graph.y_rules = torch.tensor([int(rule_id_str)], dtype=torch.long)
+            return pyg_graph, product_smi
+    except Exception:
+        return None
+    return None
+
+
 class RankingPolicyDataset(InMemoryDataset):
-    """Ranking policy network dataset."""
+    """Ranking policy network dataset.
 
-    def __init__(self, reactions_path: str, reaction_rules_path: str, output_path: str):
-        """Initializes a policy network dataset.
+    Reads a policy training mapping file (TSV with ``product_smiles`` and
+    ``rule_id`` columns) produced by :func:`extract_rules_from_reactions`.
+    """
 
-        :param reactions_path: The path to the file containing the reaction data used
-            for extraction of reaction rules.
-        :param reaction_rules_path: The path to the file containing the reaction rules.
-        :param output_path: The output path to the file where policy network dataset
-            will be saved.
+    def __init__(self, policy_data_path: str, output_path: str, num_workers: int = 0):
+        """Initializes a ranking policy network dataset.
+
+        :param policy_data_path: Path to the policy training mapping file
+            (``*_policy_data.tsv``) generated during rule extraction.
+        :param output_path: Path where the cached PyG dataset will be saved.
+        :param num_workers: CPU workers for parallel graph conversion.
+            ``0`` auto-detects via :func:`default_num_workers`.
         """
         super().__init__(None, None, None)
 
-        self.reactions_path = reactions_path
-        self.reaction_rules_path = reaction_rules_path
+        self.policy_data_path = policy_data_path
         self.output_path = output_path
+        self.num_workers = num_workers
+        self._product_keys: list[str] | None = None
 
         if output_path and os.path.exists(output_path):
-            self.data, self.slices = torch.load(self.output_path)
+            data, slices, product_keys, self._sf_handle = load_pyg_dataset(output_path)
+            self.data, self.slices = data, slices
+            self._product_keys = product_keys
         else:
             self.data, self.slices = self.prepare_data()
 
@@ -107,54 +132,71 @@ class RankingPolicyDataset(InMemoryDataset):
     def num_classes(self) -> int:
         return self._infer_num_classes(self._data.y_rules)
 
-    def prepare_data(self) -> Tuple[Data, Dict[str, Tensor]]:
-        """Prepares data by loading reaction rules, preprocessing the molecules,
-        collating the data, and returning the data and slices.
+    def prepare_data(self) -> tuple[Data, dict[str, Tensor]]:
+        """Reads the policy mapping file and converts product SMILES to PyG graphs.
 
-        :return: The PyTorch geometric graphs and slices.
+        :return: The collated PyTorch Geometric data and slices.
         """
+        # 1. Read TSV into a list of (smiles, rule_id) pairs
+        items: list[tuple[str, str]] = []
+        with open(self.policy_data_path, encoding="utf-8") as f:
+            f.readline()  # skip header
+            for line in f:
+                parts = line.rstrip("\n").split("\t")
+                items.append((parts[0], parts[1]))
 
-        with open(self.reaction_rules_path, "rb") as inp:
-            reaction_rules = pickle.load(inp)
-        reaction_rules = sorted(reaction_rules, key=lambda x: len(x[1]), reverse=True)
+        # 2. Convert molecules to PyG graphs
+        # Parallel only helps for large datasets; for small ones the process
+        # spawn + PyG Data pickling overhead dominates (especially on macOS).
+        _MIN_ITEMS_FOR_PARALLEL = 5000
+        workers = self.num_workers if self.num_workers > 0 else default_num_workers()
+        if len(items) < _MIN_ITEMS_FOR_PARALLEL:
+            workers = 1
+        list_of_graphs: list[Data] = []
+        product_keys: list[str] = []
 
-        reaction_rule_pairs = {}
-        for rule_i, (_, reactions_ids) in enumerate(reaction_rules):
-            for reaction_id in reactions_ids:
-                reaction_rule_pairs[reaction_id] = rule_i
-        reaction_rule_pairs = dict(sorted(reaction_rule_pairs.items()))
-
-        list_of_graphs = []
-        with ReactionReader(self.reactions_path) as reactions:
-
-            for reaction_id, reaction in tqdm(
-                enumerate(reactions),
-                desc="Number of reactions processed: ",
-                bar_format="{desc}{n} [{elapsed}]",
+        def _collect_serial():
+            for item in tqdm(
+                items,
+                desc="Building policy dataset: ",
+                bar_format="{desc}{n}/{total} [{elapsed}]",
             ):
+                result = _convert_ranking_item(item)
+                if result is not None:
+                    list_of_graphs.append(result[0])
+                    product_keys.append(result[1])
 
-                rule_id = reaction_rule_pairs.get(reaction_id)
+        if workers <= 1:
+            _collect_serial()
+        else:
+            try:
+                for result in tqdm(
+                    process_pool_map_stream(
+                        items,
+                        _convert_ranking_item,
+                        max_workers=workers,
+                    ),
+                    total=len(items),
+                    desc=f"Building policy dataset ({workers} workers): ",
+                    bar_format="{desc}{n}/{total} [{elapsed}]",
+                ):
+                    if result is not None:
+                        list_of_graphs.append(result[0])
+                        product_keys.append(result[1])
+            except BrokenProcessPool:
+                logging.warning(
+                    "A worker process crashed — falling back to serial. "
+                    "This is usually caused by a malformed SMILES triggering "
+                    "a C-level error in chython."
+                )
+                list_of_graphs.clear()
+                product_keys.clear()
+                _collect_serial()
 
-                if rule_id is None:
-                    continue
-
-                try:  #  MENDEL_INFO does not contain cadmium (Cd) properties
-                    molecule = unite_molecules(reaction.products)
-                    pyg_graph = mol_to_pyg(molecule)
-
-                    if pyg_graph is not None:
-                        pyg_graph.y_rules = torch.tensor([rule_id], dtype=torch.long)
-                        list_of_graphs.append(pyg_graph)
-                except (
-                    Exception
-                ) as e:  # TypeError: can't assign a NoneType to a torch.ByteTensor
-                    logging.debug(e)
-                    continue
-
+        self._product_keys = product_keys
         data, slices = self.collate(list_of_graphs)
         if self.output_path:
-            makedirs(os.path.dirname(self.output_path))
-            torch.save((data, slices), self.output_path)
+            save_pyg_dataset(self.output_path, data, slices, product_keys=product_keys)
 
         return data, slices
 
@@ -188,7 +230,8 @@ class FilteringPolicyDataset(InMemoryDataset):
         self.batch_size = 100
 
         if output_path and os.path.exists(output_path):
-            self.data, self.slices = torch.load(self.output_path)
+            data, slices, _, self._sf_handle = load_pyg_dataset(output_path)
+            self.data, self.slices = data, slices
         else:
             self.data, self.slices = self.prepare_data()
 
@@ -196,7 +239,7 @@ class FilteringPolicyDataset(InMemoryDataset):
     def num_classes(self) -> int:
         return self._data.y_rules.shape[1]
 
-    def prepare_data(self) -> Tuple[Data, Dict]:
+    def prepare_data(self) -> tuple[Data, dict]:
         """Prepares data by loading reaction rules, initializing Ray, preprocessing the
         molecules, collating the data, and returning the data and slices.
 
@@ -204,29 +247,32 @@ class FilteringPolicyDataset(InMemoryDataset):
         """
 
         ray.init(num_cpus=self.num_cpus, ignore_reinit_error=True)
-        reaction_rules = load_reaction_rules(self.reaction_rules_path)
-        reaction_rules_ids = ray.put(reaction_rules)
+        try:
+            reaction_rules = load_reaction_rules(self.reaction_rules_path)
+            reaction_rules_ids = ray.put(reaction_rules)
 
-        to_process = Queue(maxsize=self.batch_size * self.num_cpus)
-        processed_data = []
-        results_ids = [
-            preprocess_filtering_policy_molecules.remote(to_process, reaction_rules_ids)
-            for _ in range(self.num_cpus)
-        ]
+            to_process = Queue(maxsize=self.batch_size * self.num_cpus)
+            processed_data = []
+            results_ids = [
+                preprocess_filtering_policy_molecules.remote(
+                    to_process, reaction_rules_ids
+                )
+                for _ in range(self.num_cpus)
+            ]
 
-        with open(self.molecules_path, "r", encoding="utf-8") as inp_data:
-            for molecule in tqdm(
-                inp_data.read().splitlines(),
-                desc="Number of molecules processed: ",
-                bar_format="{desc}{n} [{elapsed}]",
-            ):
+            with open(self.molecules_path, encoding="utf-8") as inp_data:
+                for molecule in tqdm(
+                    inp_data.read().splitlines(),
+                    desc="Number of molecules processed: ",
+                    bar_format="{desc}{n} [{elapsed}]",
+                ):
 
-                to_process.put(molecule)
+                    to_process.put(molecule)
 
-        results = [graph for res in ray.get(results_ids) if res for graph in res]
-        processed_data.extend(results)
-
-        ray.shutdown()
+            results = [graph for res in ray.get(results_ids) if res for graph in res]
+            processed_data.extend(results)
+        finally:
+            ray.shutdown()
 
         for pyg in processed_data:
             pyg.y_rules = pyg.y_rules.to_dense()
@@ -234,15 +280,14 @@ class FilteringPolicyDataset(InMemoryDataset):
 
         data, slices = self.collate(processed_data)
         if self.output_path:
-            makedirs(os.path.dirname(self.output_path))
-            torch.save((data, slices), self.output_path)
+            save_pyg_dataset(self.output_path, data, slices)
 
         return data, slices
 
 
 def reaction_rules_appliance(
-    molecule: MoleculeContainer, reaction_rules: List[Reactor]
-) -> Tuple[List[int], List[int]]:
+    molecule: MoleculeContainer, reaction_rules: list[Reactor]
+) -> tuple[list[int], list[int]]:
     """Applies each reaction rule from the list of reaction rules to a given molecule
     and returns the indexes of the successfully applied regular and prioritized reaction
     rules.
@@ -262,8 +307,9 @@ def reaction_rules_appliance(
         try:
             for reaction in rule([molecule]):
                 for prod in reaction.products:
-                    prod.kekule()
-                    if prod.check_valence():
+                    tmp_prod = prod.copy()
+                    tmp_prod.kekule()
+                    if tmp_prod.check_valence():
                         break
                     rule_applied = True
 
@@ -298,8 +344,8 @@ def reaction_rules_appliance(
 
 @ray.remote
 def preprocess_filtering_policy_molecules(
-    to_process: Queue, reaction_rules: List[Reactor]
-) -> List[Optional[Data]]:
+    to_process: Queue, reaction_rules: list[Reactor]
+) -> list[Data | None]:
     """Preprocesses a list of molecules by applying reaction rules and converting
     molecules into PyTorch geometric graphs. Successfully applied reaction rules are
     converted to binary vectors for policy network training.
@@ -415,9 +461,7 @@ def mol_to_matrix(molecule: MoleculeContainer) -> Tensor:
     return atoms_vectors
 
 
-def mol_to_pyg(
-    molecule: MoleculeContainer, canonicalize: bool = True
-) -> Optional[Data]:
+def mol_to_pyg(molecule: MoleculeContainer, canonicalize: bool = True) -> Data | None:
     """Takes a list of molecules and returns a list of PyTorch Geometric graphs, a one-
     hot encoded vectors of the atoms, and a matrices of the bonds.
 
@@ -445,15 +489,29 @@ def mol_to_pyg(
     new_mappings = {n: i for i, (n, _) in enumerate(tmp_molecule.atoms(), 1)}
     tmp_molecule.remap(new_mappings)
 
-    # get edge indexes from target mapping
+    # get edge indexes and edge features from target mapping
     edge_index = []
-    for atom, neighbour, _ in tmp_molecule.bonds():
+    edge_attr = []
+    for atom, neighbour, bond in tmp_molecule.bonds():
         edge_index.append([atom - 1, neighbour - 1])
+        edge_attr.append(
+            [
+                float(bond.order == 1),
+                float(bond.order == 2),
+                float(bond.order == 3),
+                float(bond.in_ring),
+            ]
+        )
     edge_index = torch.tensor(edge_index, dtype=torch.long)
+    edge_attr = torch.tensor(edge_attr, dtype=torch.float)
 
     x = mol_to_matrix(tmp_molecule)
 
-    mol_pyg_graph = Data(x=x, edge_index=edge_index.t().contiguous())
+    mol_pyg_graph = Data(
+        x=x,
+        edge_index=edge_index.t().contiguous(),
+        edge_attr=edge_attr,
+    )
     mol_pyg_graph = ToUndirected()(mol_pyg_graph)
 
     assert mol_pyg_graph.is_undirected()

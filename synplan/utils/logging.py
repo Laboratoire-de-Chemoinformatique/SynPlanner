@@ -3,16 +3,16 @@ Generic logging helpers for scripts, notebooks and Ray clusters.
 """
 
 from __future__ import annotations
-from datetime import datetime
+
 import logging
 import os
-from pathlib import Path
 import sys
-from typing import Iterable
 import warnings
+from collections.abc import Iterable
+from datetime import datetime
+from pathlib import Path
 
 from IPython import get_ipython
-
 
 # --------------------------------------------------------------------------- #
 #                               Helper classes                                #
@@ -75,7 +75,7 @@ def init_logger(
     file_level: str | int = "INFO",
     log_dir: str | os.PathLike = ".",
     redirect_tqdm: bool = True,
-) -> logging.Logger:
+) -> tuple[logging.Logger, str]:
     """
     Initialise (or fetch) a namespaced logger that works in scripts &
     notebooks.  Idempotent ‑ safe to call multiple times.
@@ -135,7 +135,7 @@ def init_ray_logging(
     backend_level: str = "error",
     log_to_driver: bool = False,
     filter_userwarnings: bool = True,
-) -> "ray.LoggingConfig":
+) -> ray.LoggingConfig:
     """
     Prepare environment + Ray LoggingConfig **before** `ray.init()`.
 

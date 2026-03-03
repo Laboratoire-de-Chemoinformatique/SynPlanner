@@ -46,10 +46,10 @@ Quick planning example (mount config and data):
      planning \
        --config configs/planning.yaml \
        --targets tutorials/synplan_data/benchmarks/sascore/targets_with_sascore_1.5_2.5.smi \
-       --reaction_rules tutorials/synplan_data/uspto/uspto_reaction_rules.pickle \
-       --building_blocks tutorials/synplan_data/building_blocks/building_blocks_em_sa_ln.smi \
-       --policy_network tutorials/synplan_data/uspto/weights/ranking_policy_network.ckpt \
-       --results_dir tutorials/planning_results
+       --reaction_rules synplan_data/policy/supervised_gcn/v1/reaction_rules.tsv \
+       --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \
+       --policy_network synplan_data/policy/supervised_gcn/v1/v1/ranking_policy.ckpt \
+       --results_dir planning_results
 
 Run the GUI
 ~~~~~~~~~~~

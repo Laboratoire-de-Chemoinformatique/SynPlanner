@@ -5,48 +5,76 @@ https://github.com/Laboratoire-de-Chemoinformatique/Reaction_Data_Cleaning/blob/
 """
 
 from __future__ import annotations
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-import logging
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from CGRtools import smiles as smiles_cgrtools
-from CGRtools.containers import MoleculeContainer
-from CGRtools.containers import ReactionContainer
-from CGRtools.containers import ReactionContainer as ReactionContainerCGRTools
-from chython import ReactionContainer as ReactionContainerChython
-from chython import smiles as smiles_chython
+import logging
+from abc import ABC, abstractmethod
+from collections import Counter
+from collections.abc import Iterable, Sequence
+from pathlib import Path
+from typing import Any, ClassVar
+
 import ray
-from tqdm.auto import tqdm
 import yaml
+from chython import smiles as smiles_chython
+from chython.containers import MoleculeContainer, ReactionContainer
+from pydantic import Field, model_validator
+from tqdm.auto import tqdm
 
 from synplan.chem.utils import unite_molecules
-from synplan.utils.config import ConfigABC
-from synplan.utils.files import ReactionReader, ReactionWriter
+from synplan.utils.config import BaseConfigModel
+from synplan.utils.files import (
+    RawReactionReader,
+    ReactionWriter,
+    parse_reaction,
+)
 
 logger = logging.getLogger("synplan.chem.data.standardizing")
 
 
 class StandardizationError(RuntimeError):
-    """Wraps the original exception and the reaction string that failed."""
+    """Wraps the original exception and the reaction string that failed.
+
+    Stores the original exception type name and message as strings so the
+    error is safely picklable by Ray (no reference to the live exception
+    object which may not be importable on the worker).
+    """
 
     def __init__(self, stage: str, reaction: str, original: Exception):
-        super().__init__(f"{stage} failed on {reaction}: {original}")
         self.stage = stage
         self.reaction = reaction
-        self.original = original
+        self.original_type = type(original).__qualname__
+        self.original_msg = str(original)
+        super().__init__(f"{stage} failed on {reaction}: {original}")
+
+    def __reduce__(self):
+        """Make picklable for Ray (no reference to original exception object)."""
+        return (
+            self.__class__._from_pickle,
+            (self.stage, self.reaction, self.original_type, self.original_msg),
+        )
+
+    @classmethod
+    def _from_pickle(cls, stage, reaction, orig_type, orig_msg):
+        err = cls.__new__(cls)
+        err.stage = stage
+        err.reaction = reaction
+        err.original_type = orig_type
+        err.original_msg = orig_msg
+        RuntimeError.__init__(
+            err, f"{stage} failed on {reaction}: {orig_type}: {orig_msg}"
+        )
+        return err
 
 
 class BaseStandardizer(ABC):
     """Template: subclasses override `_run` only."""
 
     @classmethod
-    def from_config(cls, _cfg: object) -> "BaseStandardizer":
+    def from_config(cls, _cfg: object) -> BaseStandardizer:
         return cls()
 
     @abstractmethod
-    def _run(self, rxn: ReactionContainer) -> ReactionContainer:
+    def _run(self, rxn: ReactionContainer | str) -> ReactionContainer:
         """Run the standardization step on the reaction.
 
         Args:
@@ -74,78 +102,14 @@ class BaseStandardizer(ABC):
         """
         try:
             return self._run(rxn)
+        except StandardizationError:
+            raise
         except Exception as exc:
             logging.debug("%s: %s", self.__class__.__name__, exc, exc_info=True)
-            raise StandardizationError(self.__class__.__name__, str(rxn), exc)
+            raise StandardizationError(self.__class__.__name__, str(rxn), exc) from exc
 
 
-# Configuration classes
-@dataclass
-class ReactionMappingConfig:
-    pass
-
-
-class ReactionMappingStandardizer(BaseStandardizer):
-    """Maps atoms of the reaction using chython (chytorch)."""
-
-    def _map_and_remove_reagents(
-        self, reaction: ReactionContainerChython
-    ) -> ReactionContainerChython:
-        """Map and remove reagents from the reaction.
-
-        Args:
-            reaction: Input reaction
-
-        Returns:
-            The mapped reaction with reagents removed
-        """
-        reaction.reset_mapping()
-        reaction.remove_reagents()
-        return reaction
-
-    def _run(self, rxn: ReactionContainerCGRTools) -> ReactionContainerCGRTools:
-        """Map atoms of the reaction using chython.
-
-        Args:
-            rxn: Input reaction
-
-        Returns:
-            The mapped reaction
-
-        Raises:
-            StandardizationError: If mapping fails
-        """
-        try:
-            # Convert to chython format
-            if isinstance(rxn, str):
-                chython_reaction = smiles_chython(rxn)
-            else:
-                # Convert CGRtools reaction to SMILES string, preserving reagents
-                reactants = ".".join(str(m) for m in rxn.reactants)
-                reagents = ".".join(str(m) for m in rxn.reagents)
-                products = ".".join(str(m) for m in rxn.products)
-                smiles = f"{reactants}>{reagents}>{products}"
-                # Parse SMILES string with chython
-                chython_reaction = smiles_chython(smiles)
-
-            # Map and remove reagents
-            reaction_mapped = self._map_and_remove_reagents(chython_reaction)
-            if not reaction_mapped:
-                raise StandardizationError(
-                    "ReactionMapping", str(rxn), ValueError("Mapping failed")
-                )
-
-            # Convert back to CGRtools format
-            mapped_smiles = format(chython_reaction, "m")
-            result = smiles_cgrtools(mapped_smiles)
-            result.meta.update(rxn.meta)  # Preserve metadata
-            return result
-        except Exception as e:
-            raise StandardizationError("ReactionMapping", str(rxn), e)
-
-
-@dataclass
-class FunctionalGroupsConfig:
+class FunctionalGroupsConfig(BaseConfigModel):
     pass
 
 
@@ -168,8 +132,7 @@ class FunctionalGroupsStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class KekuleFormConfig:
+class KekuleFormConfig(BaseConfigModel):
     pass
 
 
@@ -192,8 +155,7 @@ class KekuleFormStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class CheckValenceConfig:
+class CheckValenceConfig(BaseConfigModel):
     pass
 
 
@@ -223,8 +185,7 @@ class CheckValenceStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class ImplicifyHydrogensConfig:
+class ImplicifyHydrogensConfig(BaseConfigModel):
     pass
 
 
@@ -247,8 +208,7 @@ class ImplicifyHydrogensStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class CheckIsotopesConfig:
+class CheckIsotopesConfig(BaseConfigModel):
     pass
 
 
@@ -282,8 +242,7 @@ class CheckIsotopesStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class SplitIonsConfig:
+class SplitIonsConfig(BaseConfigModel):
     pass
 
 
@@ -322,7 +281,7 @@ class SplitIonsStandardizer(BaseStandardizer):
         """
         return sum(molecule._charges.values())
 
-    def _split_ions(self, reaction: ReactionContainer) -> Tuple[ReactionContainer, int]:
+    def _split_ions(self, reaction: ReactionContainer) -> tuple[ReactionContainer, int]:
         """Split ions in a reaction.
 
         Args:
@@ -344,16 +303,16 @@ class SplitIonsStandardizer(BaseStandardizer):
                 if isinstance(molecule, str):
                     # If it's a string, try to parse it as a molecule
                     try:
-                        molecule: MoleculeContainer = smiles_cgrtools(molecule)
-                    except Exception as e:
+                        molecule: MoleculeContainer = smiles_chython(molecule)
+                    except (ValueError, TypeError) as e:
                         logging.warning("Failed to parse molecule %s: %s", molecule, e)
                         continue
 
-                # Use the split method from CGRtools
+                # Use the split method from chython
                 try:
                     components = molecule.split()
                     divided_molecules.extend(components)
-                except Exception as e:
+                except (ValueError, RuntimeError) as e:
                     logging.warning("Failed to split molecule %s: %s", molecule, e)
                     divided_molecules.append(molecule)
 
@@ -365,7 +324,7 @@ class SplitIonsStandardizer(BaseStandardizer):
                     total_charge += mol_charge
                     if mol_charge != 0:
                         ions_present = True
-                except Exception as e:
+                except (ValueError, RuntimeError) as e:
                     logging.warning(
                         "Failed to calculate charge for molecule %s: %s", molecule, e
                     )
@@ -391,8 +350,7 @@ class SplitIonsStandardizer(BaseStandardizer):
         )
 
 
-@dataclass
-class AromaticFormConfig:
+class AromaticFormConfig(BaseConfigModel):
     pass
 
 
@@ -415,8 +373,7 @@ class AromaticFormStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class MappingFixConfig:
+class MappingFixConfig(BaseConfigModel):
     pass
 
 
@@ -439,8 +396,7 @@ class MappingFixStandardizer(BaseStandardizer):
         return rxn
 
 
-@dataclass
-class UnchangedPartsConfig:
+class UnchangedPartsConfig(BaseConfigModel):
     pass
 
 
@@ -456,7 +412,7 @@ class UnchangedPartsStandardizer(BaseStandardizer):
         self.keep_reagents = keep_reagents
 
     @classmethod
-    def from_config(cls, config: UnchangedPartsConfig) -> "UnchangedPartsStandardizer":
+    def from_config(cls, config: UnchangedPartsConfig) -> UnchangedPartsStandardizer:
         return cls()
 
     def _run(self, rxn: ReactionContainer) -> ReactionContainer:
@@ -511,27 +467,8 @@ class UnchangedPartsStandardizer(BaseStandardizer):
         return new_reaction
 
 
-@dataclass
-class SmallMoleculesConfig:
-    mol_max_size: int = 6
-
-    @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "SmallMoleculesConfig":
-        """Create an instance of SmallMoleculesConfig from a dictionary."""
-        return SmallMoleculesConfig(**config_dict)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> "SmallMoleculesConfig":
-        """Deserialize a YAML file into a SmallMoleculesConfig object."""
-        with open(file_path, "r", encoding="utf-8") as file:
-            config_dict = yaml.safe_load(file)
-        return SmallMoleculesConfig.from_dict(config_dict)
-
-    def _validate_params(self, params: Dict[str, Any]) -> None:
-        """Validate configuration parameters."""
-        mol_max_size = params.get("mol_max_size", self.mol_max_size)
-        if not isinstance(mol_max_size, int) or not (0 < mol_max_size):
-            raise ValueError("Invalid 'mol_max_size'; expected an integer more than 1")
+class SmallMoleculesConfig(BaseConfigModel):
+    mol_max_size: int = Field(default=6, ge=1)
 
 
 class SmallMoleculesStandardizer(BaseStandardizer):
@@ -541,12 +478,12 @@ class SmallMoleculesStandardizer(BaseStandardizer):
         self.mol_max_size = mol_max_size
 
     @classmethod
-    def from_config(cls, config: SmallMoleculesConfig) -> "SmallMoleculesStandardizer":
+    def from_config(cls, config: SmallMoleculesConfig) -> SmallMoleculesStandardizer:
         return cls(config.mol_max_size)
 
     def _split_molecules(
         self, molecules: Iterable, number_of_atoms: int
-    ) -> Tuple[List[MoleculeContainer], List[MoleculeContainer]]:
+    ) -> tuple[list[MoleculeContainer], list[MoleculeContainer]]:
         """Split molecules according to the number of heavy atoms.
 
         Args:
@@ -604,29 +541,8 @@ class SmallMoleculesStandardizer(BaseStandardizer):
         return new_reaction
 
 
-@dataclass
-class RemoveReagentsConfig:
-    reagent_max_size: int = 7
-
-    @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "RemoveReagentsConfig":
-        """Create an instance of RemoveReagentsConfig from a dictionary."""
-        return RemoveReagentsConfig(**config_dict)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> "RemoveReagentsConfig":
-        """Deserialize a YAML file into a RemoveReagentsConfig object."""
-        with open(file_path, "r", encoding="utf-8") as file:
-            config_dict = yaml.safe_load(file)
-        return RemoveReagentsConfig.from_dict(config_dict)
-
-    def _validate_params(self, params: Dict[str, Any]) -> None:
-        """Validate configuration parameters."""
-        reagent_max_size = params.get("reagent_max_size", self.reagent_max_size)
-        if not isinstance(reagent_max_size, int) or not (0 < reagent_max_size):
-            raise ValueError(
-                "Invalid 'reagent_max_size'; expected an integer more than 1"
-            )
+class RemoveReagentsConfig(BaseConfigModel):
+    reagent_max_size: int = Field(default=7, ge=1)
 
 
 class RemoveReagentsStandardizer(BaseStandardizer):
@@ -636,7 +552,7 @@ class RemoveReagentsStandardizer(BaseStandardizer):
         self.reagent_max_size = reagent_max_size
 
     @classmethod
-    def from_config(cls, config: RemoveReagentsConfig) -> "RemoveReagentsStandardizer":
+    def from_config(cls, config: RemoveReagentsConfig) -> RemoveReagentsStandardizer:
         return cls(config.reagent_max_size)
 
     def _run(self, rxn: ReactionContainer) -> ReactionContainer:
@@ -693,8 +609,7 @@ class RemoveReagentsStandardizer(BaseStandardizer):
         return new_reaction
 
 
-@dataclass
-class RebalanceReactionConfig:
+class RebalanceReactionConfig(BaseConfigModel):
     pass
 
 
@@ -704,7 +619,7 @@ class RebalanceReactionStandardizer(BaseStandardizer):
     @classmethod
     def from_config(
         cls, config: RebalanceReactionConfig
-    ) -> "RebalanceReactionStandardizer":
+    ) -> RebalanceReactionStandardizer:
         return cls()
 
     def _run(self, rxn: ReactionContainer) -> ReactionContainer:
@@ -720,33 +635,24 @@ class RebalanceReactionStandardizer(BaseStandardizer):
         Raises:
             StandardizationError: If rebalancing fails
         """
-        try:
-            tmp_rxn = ReactionContainer(rxn.reactants, rxn.products)
-            cgr = ~tmp_rxn
-            reactants, products = ~cgr
-            new_rxn = ReactionContainer(
-                reactants.split(), products.split(), rxn.reagents, rxn.meta
-            )
-            new_rxn.name = rxn.name
-            return new_rxn
-        except Exception as e:
-            logging.debug(f"Rebalancing attempt failed: {e}")
-            raise StandardizationError(
-                "RebalanceReaction",
-                str(rxn),
-                ValueError("Failed to rebalance reaction"),
-            )
+        tmp_rxn = ReactionContainer(rxn.reactants, rxn.products)
+        cgr = ~tmp_rxn
+        reactants, products = ~cgr
+        new_rxn = ReactionContainer(
+            reactants.split(), products.split(), rxn.reagents, rxn.meta
+        )
+        new_rxn.name = rxn.name
+        return new_rxn
 
 
-@dataclass
-class DuplicateReactionConfig:
+class DuplicateReactionConfig(BaseConfigModel):
     pass
 
 
 class DuplicateReactionStandardizer(BaseStandardizer):
     """Cluster‑wide duplicate removal via a Ray actor."""
 
-    def __init__(self, dedup_actor: "ray.actor.ActorHandle"):
+    def __init__(self, dedup_actor: ray.actor.ActorHandle):
         self._actor = dedup_actor  # global singleton handle
         # local fast‑path cache to avoid actor call on obvious repeats *in
         # the same worker*; purely an optimisation, not required.
@@ -814,7 +720,6 @@ class DedupActor:
 
 # Registry mapping config field names to standardizer classes
 STANDARDIZER_REGISTRY = {
-    "reaction_mapping_config": ReactionMappingStandardizer,
     "functional_groups_config": FunctionalGroupsStandardizer,
     "kekule_form_config": KekuleFormStandardizer,
     "check_valence_config": CheckValenceStandardizer,
@@ -831,13 +736,11 @@ STANDARDIZER_REGISTRY = {
 }
 
 
-@dataclass
-class ReactionStandardizationConfig(ConfigABC):
+class ReactionStandardizationConfig(BaseConfigModel):
     """Configuration class for reaction filtering. This class manages configuration
     settings for various reaction filters, including paths, file formats, and filter-
     specific parameters.
 
-    :param reaction_mapping_config: Configuration for reaction mapping.
     :param functional_groups_config: Configuration for functional groups
         standardization.
     :param kekule_form_config: Configuration for reactants/reagents/products
@@ -857,53 +760,53 @@ class ReactionStandardizationConfig(ConfigABC):
     """
 
     # configuration for reaction standardizers
-    reaction_mapping_config: Optional[ReactionMappingConfig] = None
-    functional_groups_config: Optional[FunctionalGroupsConfig] = None
-    kekule_form_config: Optional[KekuleFormConfig] = None
-    check_valence_config: Optional[CheckValenceConfig] = None
-    implicify_hydrogens_config: Optional[ImplicifyHydrogensConfig] = None
-    check_isotopes_config: Optional[CheckIsotopesConfig] = None
-    split_ions_config: Optional[SplitIonsConfig] = None
-    aromatic_form_config: Optional[AromaticFormConfig] = None
-    mapping_fix_config: Optional[MappingFixConfig] = None
-    unchanged_parts_config: Optional[UnchangedPartsConfig] = None
-    small_molecules_config: Optional[SmallMoleculesConfig] = None
-    remove_reagents_config: Optional[RemoveReagentsConfig] = None
-    rebalance_reaction_config: Optional[RebalanceReactionConfig] = None
-    duplicate_reaction_config: Optional[DuplicateReactionConfig] = None
+    functional_groups_config: FunctionalGroupsConfig | None = None
+    kekule_form_config: KekuleFormConfig | None = None
+    check_valence_config: CheckValenceConfig | None = None
+    implicify_hydrogens_config: ImplicifyHydrogensConfig | None = None
+    check_isotopes_config: CheckIsotopesConfig | None = None
+    split_ions_config: SplitIonsConfig | None = None
+    aromatic_form_config: AromaticFormConfig | None = None
+    mapping_fix_config: MappingFixConfig | None = None
+    unchanged_parts_config: UnchangedPartsConfig | None = None
+    small_molecules_config: SmallMoleculesConfig | None = None
+    remove_reagents_config: RemoveReagentsConfig | None = None
+    rebalance_reaction_config: RebalanceReactionConfig | None = None
+    duplicate_reaction_config: DuplicateReactionConfig | None = None
 
-    def _validate_params(self, params: Dict[str, Any]) -> None:
-        """Validate configuration parameters."""
-        for field_name, config in self.__dict__.items():
-            if config is not None and hasattr(config, "_validate_params"):
-                config._validate_params(params.get(field_name, {}))
+    _NESTED_CONFIG_TYPES: ClassVar[dict[str, type]] = {
+        "functional_groups_config": FunctionalGroupsConfig,
+        "kekule_form_config": KekuleFormConfig,
+        "check_valence_config": CheckValenceConfig,
+        "implicify_hydrogens_config": ImplicifyHydrogensConfig,
+        "check_isotopes_config": CheckIsotopesConfig,
+        "split_ions_config": SplitIonsConfig,
+        "aromatic_form_config": AromaticFormConfig,
+        "mapping_fix_config": MappingFixConfig,
+        "unchanged_parts_config": UnchangedPartsConfig,
+        "small_molecules_config": SmallMoleculesConfig,
+        "remove_reagents_config": RemoveReagentsConfig,
+        "rebalance_reaction_config": RebalanceReactionConfig,
+        "duplicate_reaction_config": DuplicateReactionConfig,
+    }
 
-    def to_dict(self):
-        """Converts the configuration into a dictionary."""
-        config_dict = {}
-        for field_name in STANDARDIZER_REGISTRY:
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_nested(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for field_name, cfg_cls in cls._NESTED_CONFIG_TYPES.items():
+                if field_name in data and isinstance(data[field_name], dict):
+                    data[field_name] = cfg_cls(**data[field_name])
+        return data
+
+    def to_dict(self) -> dict[str, Any]:
+        """Converts the configuration into a dictionary, excluding None fields."""
+        result = {}
+        for field_name in self._NESTED_CONFIG_TYPES:
             config = getattr(self, field_name)
             if config is not None:
-                config_dict[field_name] = {}
-        return config_dict
-
-    @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "ReactionStandardizationConfig":
-        """Create an instance of ReactionCheckConfig from a dictionary."""
-        config_kwargs = {}
-        for field_name, std_cls in STANDARDIZER_REGISTRY.items():
-            if field_name in config_dict:
-                config_kwargs[field_name] = std_cls.__name__.replace(
-                    "Standardizer", "Config"
-                )()
-        return ReactionStandardizationConfig(**config_kwargs)
-
-    @staticmethod
-    def from_yaml(file_path: str) -> "ReactionStandardizationConfig":
-        """Deserializes a YAML file into a ReactionCheckConfig object."""
-        with open(file_path, "r", encoding="utf-8") as file:
-            config_dict = yaml.safe_load(file)
-        return ReactionStandardizationConfig.from_dict(config_dict)
+                result[field_name] = config.to_dict()
+        return result
 
     def create_standardizers(self):
         """Create standardizer instances based on configuration."""
@@ -935,58 +838,85 @@ def standardize_reaction(
     """
     std_rxn = reaction
     for std in standardizers:
-        logger.debug("  › %s(%s)", std.__class__.__name__, std_rxn)
-        try:
-            std_rxn = std(std_rxn)  # may return None
-            if std_rxn is None:  # soft filter
-                logger.info("%s filtered out reaction", std.__class__.__name__)
-                return None
-        except StandardizationError as exc:
-            # Log *once*, then re‑raise with full traceback intact
-            logger.warning(
-                "%s failed on reaction %s : %s",
-                std.__class__.__name__,
-                std_rxn,
-                exc,
-            )
-            raise  # re‑raise same object
+        std_rxn = std(std_rxn)  # may return None or raise
+        if std_rxn is None:
+            return None
     return std_rxn
 
 
 def safe_standardize(
     item: str | ReactionContainer,
     standardizers: Sequence,
-) -> Tuple[ReactionContainer, bool]:
+    *,
+    ignore_errors: bool = False,
+    fmt: str = "smi",
+) -> tuple[ReactionContainer | None, bool, StandardizationError | None]:
     """
-    Always returns a ReactionContainer. The boolean flags real success.
+    Returns ``(reaction, success, error)``.
+
+    *reaction* is a :class:`ReactionContainer` on success or when the original
+    could be recovered, or ``None`` when parsing failed completely.
+    The boolean flags real success.
+    The third element is the :class:`StandardizationError` when the reaction
+    failed, or ``None`` on success.
+
+    If ``ignore_errors`` is False (default), any :class:`StandardizationError`
+    or unexpected exception is propagated so callers can see new failure modes.
+    When set to True, failures are logged and the original reaction is returned
+    with the success flag set to False.
     """
+    reaction: ReactionContainer | None = None
     try:
-        # Parse only if needed
-        reaction = (
-            item if isinstance(item, ReactionContainer) else smiles_cgrtools(item)
-        )
+        reaction = parse_reaction(item, fmt)
         std = standardize_reaction(reaction, standardizers)
         if std is None:
-            return reaction, False  # filtered → keep original
-        return std, True
-    except Exception:  # noqa: BLE001
-        # keep the original container (parse if it was a string)
-        if isinstance(item, ReactionContainer):
-            return item, False
-        return smiles_cgrtools(item), False
+            return reaction, False, None  # filtered → keep original
+        return std, True, None
+    except StandardizationError as exc:
+        if ignore_errors:
+            if reaction is not None:
+                return reaction, False, exc
+            return None, False, exc
+        raise
+    except Exception as exc:
+        if ignore_errors:
+            orig = item if isinstance(item, str) else str(item)
+            wrapped = StandardizationError("parse", orig, exc)
+            if reaction is not None:
+                return reaction, False, wrapped
+            return None, False, wrapped
+        raise
 
 
 def _process_batch(
     batch: Sequence[str | ReactionContainer],
     standardizers: Sequence,
-) -> Tuple[List[ReactionContainer], int]:
-    results: List[ReactionContainer] = []
+    *,
+    ignore_errors: bool = False,
+    fmt: str = "smi",
+) -> tuple[list[ReactionContainer], int, list[tuple[str, str, str, str]]]:
+    """Process a batch and return (results, n_ok, errors).
+
+    Each error entry is ``(original_smiles, stage, error_type, error_message)``.
+    """
+    results: list[ReactionContainer] = []
+    errors: list[tuple[str, str, str, str]] = []
     n_std = 0
     for item in batch:
-        rxn, ok = safe_standardize(item, standardizers)
-        results.append(rxn)
+        rxn, ok, exc = safe_standardize(
+            item, standardizers, ignore_errors=ignore_errors, fmt=fmt
+        )
+        if rxn is not None:
+            results.append(rxn)
         n_std += ok
-    return results, n_std
+        if exc is not None:
+            orig = (
+                rxn.meta.get("init_smiles", str(rxn))
+                if rxn is not None and hasattr(rxn, "meta")
+                else str(item)
+            )
+            errors.append((orig, exc.stage, exc.original_type, exc.original_msg))
+    return results, n_std, errors
 
 
 @ray.remote
@@ -994,7 +924,9 @@ def process_batch_remote(
     batch: Sequence[str | ReactionContainer],
     std_param: ray.ObjectRef,  # <-- receives a ref
     log_file_path: str | Path | None = None,
-) -> Tuple[List[ReactionContainer], int]:
+    ignore_errors: bool = False,
+    fmt: str = "smi",
+) -> tuple[list[ReactionContainer], int, list[tuple[str, str, str, str]]]:
     # Ray keeps a local cache of fetched objects, so the list is
     # deserialised only once per worker process, not once per task.
     if isinstance(std_param, ray.ObjectRef):  # handle?   get it
@@ -1028,15 +960,12 @@ def process_batch_remote(
                 worker_logger.propagate = (
                     False  # Avoid double logging if driver also logs
                 )
-                # Optional: Log that the handler was added
-                # worker_logger.info(f"Worker process attached file handler: {log_file_path}")
-            except Exception as e:
-                # Log error if handler creation fails (e.g., permissions)
+            except (OSError, ValueError) as e:
                 logging.error(
-                    f"Worker failed to create file handler {log_file_path}: {e}"
+                    "Worker failed to create file handler %s: %s", log_file_path, e
                 )
 
-    return _process_batch(batch, standardizers)
+    return _process_batch(batch, standardizers, ignore_errors=ignore_errors, fmt=fmt)
 
 
 def chunked(iterable: Iterable, size: int):
@@ -1050,8 +979,71 @@ def chunked(iterable: Iterable, size: int):
         yield chunk
 
 
+# -- Error taxonomy for categorized summaries --
+# Stages / chython exceptions that represent noisy *data*, not pipeline bugs.
+_DATA_ERROR_STAGES = frozenset(
+    {
+        "CheckValence",
+        "ReactionMapping",
+        "SplitIons",
+        "UnchangedParts",
+        "SmallMolecules",
+        "RemoveReagents",
+        "DuplicateReaction",
+        "parse",
+    }
+)
+_DATA_ERROR_TYPES = frozenset(
+    {
+        "InvalidAromaticRing",
+        "MappingError",
+        "EmptyMolecule",
+        "EmptyReaction",
+        "IncorrectSmiles",
+        "ValenceError",
+        "ValueError",
+    }
+)
+
+
+def _print_error_summary(
+    error_counts: Counter,
+    n_processed: int,
+    n_ok: int,
+    error_file_path: Path | None,
+) -> None:
+    """Print a categorized summary of errors to stdout and logger."""
+    n_failed = n_processed - n_ok
+    summary_lines = [
+        f"Finished: processed {n_processed}, succeeded {n_ok}, failed {n_failed}"
+    ]
+
+    if error_counts:
+        data_errors: list[str] = []
+        pipeline_errors: list[str] = []
+        for (stage, etype), count in error_counts.most_common():
+            label = f"{stage}/{etype}={count}"
+            if stage in _DATA_ERROR_STAGES or etype in _DATA_ERROR_TYPES:
+                data_errors.append(label)
+            else:
+                pipeline_errors.append(label)
+        if data_errors:
+            summary_lines.append(f"  Data errors:     {', '.join(data_errors)}")
+        if pipeline_errors:
+            summary_lines.append(
+                f"  Pipeline errors: {', '.join(pipeline_errors)}  <-- INVESTIGATE"
+            )
+
+    if error_file_path is not None:
+        summary_lines.append(f"Errors written to: {error_file_path}")
+
+    summary = "\n".join(summary_lines)
+    print(summary)
+    logger.info(summary)
+
+
 def standardize_reactions_from_file(
-    config: "ReactionStandardizationConfig",
+    config: ReactionStandardizationConfig,
     input_reaction_data_path: str | Path,
     standardized_reaction_data_path: str | Path = "reaction_data_standardized.smi",
     *,
@@ -1061,6 +1053,8 @@ def standardize_reactions_from_file(
     max_pending_factor: int = 4,  # tasks in flight = factor × CPUs
     worker_log_level: int | str = logging.WARNING,
     log_file_path: str | Path | None = None,
+    ignore_errors: bool = False,
+    error_file_path: str | Path | None = None,
 ) -> None:
     """
     Reads reactions, standardises them in parallel with Ray, writes results.
@@ -1080,9 +1074,20 @@ def standardize_reactions_from_file(
         max_pending_factor: Controls the number of pending Ray tasks.
         worker_log_level: Logging level for Ray workers (e.g., logging.INFO, logging.WARNING).
         log_file_path: Path to the log file for workers to write to.
+        ignore_errors: If True, log standardization failures and keep processing;
+            otherwise propagate exceptions to surface new issues.
+        error_file_path: Path to write failed reactions (TSV).  If None and
+            ``ignore_errors`` is True, defaults to ``<output>.errors.tsv``.
     """
     output_path = Path(standardized_reaction_data_path)
     standardizers = config.create_standardizers()
+
+    # Resolve error file path
+    _error_path: Path | None = None
+    if error_file_path is not None:
+        _error_path = Path(error_file_path)
+    elif ignore_errors:
+        _error_path = output_path.with_suffix(".errors.tsv")
 
     logger.info(
         "Standardizers: %s",
@@ -1102,9 +1107,9 @@ def standardize_reactions_from_file(
         DEDUP_NAME = "duplicate_rxn_actor"
 
         try:
-            dedup_actor = ray.get_actor(DEDUP_NAME)  # already running?
+            ray.get_actor(DEDUP_NAME)  # already running?
         except ValueError:
-            dedup_actor = DedupActor.options(
+            DedupActor.options(
                 name=DEDUP_NAME, lifetime="detached"  # survives driver exit
             ).remote()
 
@@ -1113,9 +1118,11 @@ def standardize_reactions_from_file(
             std_ref = ray.put(standardizers)
 
     max_pending = max_pending_factor * num_cpus
-    pending: Dict[ray.ObjectRef, None] = {}
+    pending: dict[ray.ObjectRef, None] = {}
 
     n_processed = n_std = 0
+    error_counts: Counter = Counter()
+
     bar = tqdm(
         total=0,
         unit="rxn",
@@ -1124,59 +1131,84 @@ def standardize_reactions_from_file(
         dynamic_ncols=True,
     )
 
+    # Open error file (or use a no-op context)
+    error_file = open(_error_path, "w", encoding="utf-8") if _error_path else None
+    if error_file is not None:
+        error_file.write("# original_smiles\tstage\terror_type\terror_message\n")
+
+    def _write_errors(batch_errors: list[tuple[str, str, str, str]]) -> None:
+        for smi, stage, etype, emsg in batch_errors:
+            error_counts[(stage, etype)] += 1
+            if error_file is not None:
+                error_file.write(f"{smi}\t{stage}\t{etype}\t{emsg}\n")
+
     # ------------------------  Helper function  ------------------------
     def _flush(ref: ray.ObjectRef, write_fn) -> None:
         """Fetch finished task, write its results, update counters & bar."""
         nonlocal n_processed, n_std
-        res, ok = ray.get(ref)
+        try:
+            res, ok, errs = ray.get(ref)
+        except Exception as exc:
+            logger.error("Batch failed entirely: %s", exc)
+            return
         write_fn(res)
+        _write_errors(errs)
         bar.update(len(res))
         n_processed += len(res)
         n_std += ok
 
-    # -----------------------------  I/O  -------------------------------
-    with (
-        ReactionReader(input_reaction_data_path) as reader,
-        ReactionWriter(output_path) as writer,
-    ):
+    try:
+        # -----------------------------  I/O  -------------------------------
+        raw_reader = RawReactionReader(input_reaction_data_path)
+        fmt = raw_reader.format
 
-        write_fn = lambda reactions: [writer.write(r) for r in reactions]
+        with (
+            raw_reader,
+            ReactionWriter(output_path) as writer,
+        ):
 
-        # ---------------------  Main read/compute loop  -----------------
-        for chunk in chunked(reader, batch_size):
-            bar.total += len(chunk)
-            bar.refresh()
+            def write_fn(reactions):
+                return [writer.write(r) for r in reactions]
 
-            if num_cpus > 1:
-                # ---------- back‑pressure: keep ≤ max_pending ----------
-                while len(pending) >= max_pending:
-                    done, _ = ray.wait(list(pending), num_returns=1)
-                    _flush(done[0], write_fn)
-                    pending.pop(done[0], None)
+            # ---------------------  Main read/compute loop  -----------------
+            for chunk in chunked(raw_reader, batch_size):
+                bar.total += len(chunk)
+                bar.refresh()
 
-                # ----------- schedule new task -------------------------
-                ref = process_batch_remote.remote(chunk, std_ref, log_file_path)
-                pending[ref] = None
-            else:
-                # --------------- serial fall‑back ----------------------
-                res, ok = _process_batch(chunk, standardizers)
-                write_fn(res)
-                bar.update(len(res))
-                n_processed += len(res)
-                n_std += ok
+                if num_cpus > 1:
+                    # ---------- back‑pressure: keep ≤ max_pending ----------
+                    while len(pending) >= max_pending:
+                        done, _ = ray.wait(list(pending), num_returns=1)
+                        _flush(done[0], write_fn)
+                        pending.pop(done[0], None)
 
-        # ------------------  Drain remaining Ray tasks  -----------------
-        while pending:
-            done, _ = ray.wait(list(pending), num_returns=1)
-            _flush(done[0], write_fn)
-            pending.pop(done[0], None)
+                    # ----------- schedule new task -------------------------
+                    ref = process_batch_remote.remote(
+                        chunk, std_ref, log_file_path, ignore_errors, fmt
+                    )
+                    pending[ref] = None
+                else:
+                    # --------------- serial fall‑back ----------------------
+                    res, ok, errs = _process_batch(
+                        chunk, standardizers, ignore_errors=ignore_errors, fmt=fmt
+                    )
+                    write_fn(res)
+                    _write_errors(errs)
+                    bar.update(len(res))
+                    n_processed += len(res)
+                    n_std += ok
+
+            # ------------------  Drain remaining Ray tasks  -----------------
+            while pending:
+                done, _ = ray.wait(list(pending), num_returns=1)
+                _flush(done[0], write_fn)
+                pending.pop(done[0], None)
+    finally:
+        if ray.is_initialized():
+            ray.shutdown()
+        if error_file is not None:
+            error_file.close()
 
     bar.close()
-    ray.shutdown()
 
-    logger.info(
-        "Finished: processed %d, standardised %d, filtered %d",
-        n_processed,
-        n_std,
-        n_processed - n_std,
-    )
+    _print_error_summary(error_counts, n_processed, n_std, _error_path)

@@ -6,11 +6,9 @@ import re
 import uuid
 import zipfile
 
-from CGRtools.files import SMILESRead
-from huggingface_hub import hf_hub_download
-from huggingface_hub.utils import disable_progress_bars
 import pandas as pd
 import streamlit as st
+from huggingface_hub.utils import disable_progress_bars
 from streamlit_ketcher import st_ketcher
 
 from synplan.chem.reaction_routes.clustering import *
@@ -18,8 +16,10 @@ from synplan.chem.reaction_routes.route_cgr import *
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.search import extract_tree_stats
 from synplan.mcts.tree import Tree
+from synplan.route_quality.scorer import ProtectionRouteScorer
 from synplan.utils.config import TreeConfig
 from synplan.utils.loading import (
+    download_preset,
     load_building_blocks,
     load_policy_function,
     load_reaction_rules,
@@ -34,7 +34,6 @@ from synplan.utils.visualisation import (
 
 disable_progress_bars("huggingface_hub")
 
-smiles_parser = SMILESRead.create_parser(ignore=True)
 DEFAULT_MOL = "c1cc(ccc1Cl)C(CCO)NC(C2(CCN(CC2)c3c4cc[nH]c4ncn3)N)=O"
 
 
@@ -98,25 +97,12 @@ def download_button(
 
 @st.cache_resource
 def load_planning_resources_cached():
-    building_blocks_path = hf_hub_download(
-        repo_id="Laboratoire-De-Chemoinformatique/SynPlanner",
-        filename="building_blocks_em_sa_ln.smi",
-        subfolder="building_blocks",
-        local_dir=".",
+    paths = download_preset(preset_name="synplanner-article", save_to=".")
+    return (
+        str(paths["building_blocks"]),
+        str(paths["ranking_policy"]),
+        str(paths["reaction_rules"]),
     )
-    ranking_policy_weights_path = hf_hub_download(
-        repo_id="Laboratoire-De-Chemoinformatique/SynPlanner",
-        filename="ranking_policy_network.ckpt",
-        subfolder="uspto/weights",
-        local_dir=".",
-    )
-    reaction_rules_path = hf_hub_download(
-        repo_id="Laboratoire-De-Chemoinformatique/SynPlanner",
-        filename="uspto_reaction_rules.pickle",
-        subfolder="uspto",
-        local_dir=".",
-    )
-    return building_blocks_path, ranking_policy_weights_path, reaction_rules_path
 
 
 # --- GUI Sections ---
@@ -418,6 +404,8 @@ def setup_planning_options():
                     )
                     evaluator = load_evaluation_function(eval_config)
 
+                    route_scorer = ProtectionRouteScorer.from_config()
+
                     tree = Tree(
                         target=target_molecule,
                         config=tree_config,
@@ -425,11 +413,12 @@ def setup_planning_options():
                         building_blocks=building_blocks,
                         expansion_function=policy_function,
                         evaluation_function=evaluator,
+                        route_scorer=route_scorer,
                     )
 
                     mcts_progress_text = "Running MCTS iterations..."
                     mcts_bar = st.progress(0, text=mcts_progress_text)
-                    for step, (solved, route_id) in enumerate(tree):
+                    for step, (_solved, _route_id) in enumerate(tree):
                         progress_value = min(
                             1.0, (step + 1) / planning_params["max_iterations"]
                         )
@@ -644,7 +633,7 @@ def download_clustering_results():
         num_clusters_total = len(clusters_for_html)
         clusters_items = list(clusters_for_html.items())
 
-        for i, (cluster_idx, group_data) in enumerate(clusters_items):
+        for i, (cluster_idx, _group_data) in enumerate(clusters_items):
             if i >= MAX_DOWNLOAD_LINKS_DISPLAYED:
                 break
             try:

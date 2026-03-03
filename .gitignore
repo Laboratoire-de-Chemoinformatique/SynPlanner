@@ -107,6 +107,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.venv-*
 env/
 venv/
 ENV/
@@ -146,5 +147,12 @@ coverage/
 
 tutorials/tutorial_results/
 tutorials/synplan_data/
+tutorials/clustering_with_downloaded_data/
+tutorials/planning_with_downloaded_data/
+tutorials/protection_scoring_results/
 uspto/
+presets/
 *.smi
+*.ckpt
+*.tsv
+local/

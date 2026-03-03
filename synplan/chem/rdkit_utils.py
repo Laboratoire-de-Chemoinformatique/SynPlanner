@@ -1,5 +1,4 @@
-from rdkit import Chem
-from rdkit import RDLogger
+from rdkit import Chem, RDLogger
 from rdkit.Chem.Descriptors import ExactMolWt
 from rdkit.Chem.rdMolDescriptors import CalcNumHeavyAtoms
 from rdkit.Contrib.SA_Score import sascorer

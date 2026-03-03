@@ -4,3 +4,9 @@ learning_rate: 0.0005
 dropout: 0.4
 num_epoch: 100
 batch_size: 1000
+
+# Training logger — logs metrics to CSV files in the results directory.
+# Set to null (or remove) to disable logging.
+# Supported types: csv, tensorboard, mlflow, wandb.
+logger:
+  type: csv

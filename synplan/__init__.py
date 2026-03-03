@@ -1,6 +1,7 @@
 try:
     # Python 3.10+: standard library source of installed distribution version
-    from importlib.metadata import PackageNotFoundError, version as _dist_version
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _dist_version
 except Exception:  # pragma: no cover - extremely unlikely on supported Pythons
     _dist_version = None  # type: ignore[assignment]
     PackageNotFoundError = Exception  # type: ignore[assignment]
@@ -14,8 +15,8 @@ def _read_version_from_pyproject():
     find the installed package metadata.
     """
     try:
-        from pathlib import Path
         import re
+        from pathlib import Path
 
         pyproject_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
         if not pyproject_path.exists():
@@ -64,4 +65,4 @@ def __getattr__(name):
 
 
 def __dir__():
-    return sorted(list(globals().keys()) + ["Tree", "__version__"])
+    return sorted([*list(globals().keys()), "Tree", "__version__"])

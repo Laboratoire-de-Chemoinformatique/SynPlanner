@@ -2,10 +2,10 @@ from collections import defaultdict
 from pathlib import Path
 import pickle
 import re
-from typing import Any, Dict
+from typing import Any
 
-from CGRtools.containers import CGRContainer, ReactionContainer
-from CGRtools.containers.bonds import DynamicBond
+from chython.containers import CGRContainer, ReactionContainer
+from chython.containers.bonds import DynamicBond
 
 from synplan.chem.reaction_routes.io import (
     make_dict,
@@ -284,7 +284,7 @@ def lg_process_reset(lg_cgr: CGRContainer, atom_num: int):
                 order = int(bond.order)
                 lg_cgr.delete_bond(atom1, atom2)
                 lg_cgr.add_bond(atom1, atom2, DynamicBond(order, order))
-    lg_cgr._atoms[atom_num].is_radical = True
+    lg_cgr._radicals[atom_num] = True
     return lg_cgr
 
 
@@ -347,7 +347,10 @@ def lg_replacer(route_cgr: CGRContainer):
                     if len(lg_cgrs) == 2:
                         lg_cgr = lg_cgrs[1]
                         lg_cgr = lg_process_reset(lg_cgr, atom2)
-                        lg_cgr.clean2d()
+                        try:
+                            lg_cgr.clean2d()
+                        except (ImportError, AttributeError, Exception):
+                            pass
                     else:
                         continue
                     lg_groups[k] = (lg_cgr, atom2)
@@ -518,7 +521,7 @@ def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
     return result
 
 
-def group_routes_by_synthon_detail(data_dict: Dict[Any, list]) -> Dict[str, dict]:
+def group_routes_by_synthon_detail(data_dict: dict[Any, list]) -> dict[str, dict]:
     """
     Groups routes based on synthon CGR (result_list[0]), reaction data, and lg_sizes.
     The final group index is formatted as "{lg_sizes}_{temp_index}".
@@ -713,7 +716,11 @@ def replace_leaving_groups_in_synthon(subgroup, to_remove):  # Under development
                 lg_fragment = lg_table[current_mark][0]
                 updated_cgr = updated_cgr.union(lg_fragment)
                 # Reset radical flag on the new atom and restore the bond
-                updated_cgr._atoms[atom_idx].is_radical = False
+                # DynamicElement.is_radical is read-only in chython;
+                # modify container dicts directly.
+                updated_cgr._radicals[atom_idx] = False
+                updated_cgr._p_radicals[atom_idx] = False
+                updated_cgr.flush_cache()
                 updated_cgr.add_bond(atom_idx, neighbor_idx, bond)
 
             removed_count += 1

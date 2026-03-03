@@ -1,5 +1,5 @@
 import pytest
-from CGRtools import smiles
+from chython import smiles
 from synplan.chem.precursor import Precursor
 
 

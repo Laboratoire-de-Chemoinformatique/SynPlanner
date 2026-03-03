@@ -1,17 +1,20 @@
 """Module containing functions for loading reaction rules, building blocks and
 retrosynthetic models."""
 
+import contextlib
 import functools
 import logging
 import os
-from pathlib import Path
 import pickle
 import shutil
-from typing import TYPE_CHECKING, FrozenSet, List, Union
+import warnings
 import zipfile
+from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING, Union
 
-from CGRtools.files.SDFrw import SDFRead
-from CGRtools.reactor.reactor import Reactor
+import yaml
+from chython.files.SDFrw import SDFRead
+from chython.reactor.reactor import Reactor
 from huggingface_hub import hf_hub_download, snapshot_download
 from torch import device
 from tqdm.auto import tqdm
@@ -31,18 +34,19 @@ from synplan.utils.files import (
 from synplan.utils.parallel import process_pool_map_stream
 
 if TYPE_CHECKING:
-    from synplan.utils.config import (
-        ValueNetworkConfig,
-        PolicyNetworkConfig,
-        CombinedPolicyConfig,
-    )
+    from synplan.mcts.evaluation import EvaluationStrategy, ValueNetworkFunction
     from synplan.mcts.expansion import (
-        PolicyNetworkFunction,
         CombinedPolicyNetworkFunction,
+        PolicyNetworkFunction,
     )
-    from synplan.mcts.evaluation import ValueNetworkFunction, EvaluationStrategy
+    from synplan.utils.config import (
+        CombinedPolicyConfig,
+        PolicyNetworkConfig,
+        ValueNetworkConfig,
+    )
 
-REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
+REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner-data"
+LEGACY_REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
 logger = logging.getLogger(__name__)
 
 
@@ -91,6 +95,7 @@ def download_selected_files(
     save_to: str | Path = "./tutorials/synplan_data",
     extract_zips: bool = True,
     relocate_map: dict[str, str] | None = None,
+    repo_id: str | None = None,
 ) -> Path:
     """
     Download specific files from the Hugging Face repo.
@@ -108,14 +113,17 @@ def download_selected_files(
     relocate_map : dict[str, str]
         Optional map { "weights/ranking_policy_network.ckpt": "uspto/weights/ranking_policy_network.ckpt" }
         to copy/move files after download to match test paths.
+    repo_id : str or None
+        Override the HuggingFace repo ID. Defaults to ``REPO_ID``.
     """
+    repo = repo_id or REPO_ID
     root = Path(save_to).resolve()
     root.mkdir(parents=True, exist_ok=True)
 
     for subfolder, filename in files_to_get:
         local_path = Path(
             hf_hub_download(
-                repo_id=REPO_ID,
+                repo_id=repo,
                 subfolder=subfolder,
                 filename=filename,
                 local_dir=str(root),
@@ -131,19 +139,20 @@ def download_selected_files(
             dst = root / dst_rel
             dst.parent.mkdir(parents=True, exist_ok=True)
             if src.exists() and not dst.exists():
-                shutil.copy2(src, dst)  # or shutil.move(src, dst)
+                shutil.copy2(src, dst)
 
     return root
 
 
-def download_unpack_data(filename, subfolder, save_to="."):
+def download_unpack_data(filename, subfolder, save_to=".", repo_id=None):
+    repo = repo_id or REPO_ID
     if isinstance(save_to, str):
         save_to = Path(save_to).resolve()
         save_to.mkdir(exist_ok=True)
 
-    # Download the zip file from the repository
+    # Download the file from the repository
     file_path = hf_hub_download(
-        repo_id=REPO_ID,
+        repo_id=repo,
         filename=filename,
         subfolder=subfolder,
         local_dir=save_to,
@@ -163,8 +172,67 @@ def download_unpack_data(filename, subfolder, save_to="."):
         return file_path
 
 
+def download_preset(
+    preset_name: str = "synplanner-article",
+    save_to: str | Path = ".",
+    repo_id: str | None = None,
+) -> dict[str, Path]:
+    """Download a ready-to-use data preset from HuggingFace.
+
+    The preset YAML lists explicit file paths under a ``files:`` key.
+    Each file is downloaded into the ``save_to`` directory, preserving
+    the repository folder structure.
+
+    :param preset_name: Name of the preset (e.g. ``"synplanner-article"``).
+    :param save_to: Local directory to save downloaded files.
+    :param repo_id: Override the HuggingFace repo ID.
+    :return: Dict mapping component keys to local file paths.
+    """
+    repo = repo_id or REPO_ID
+    root = Path(save_to).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+
+    # 1. Download and parse preset YAML
+    preset_path = Path(
+        hf_hub_download(
+            repo_id=repo,
+            filename=f"{preset_name}.yaml",
+            subfolder="presets",
+            local_dir=str(root),
+        )
+    )
+    with open(preset_path, encoding="utf-8") as f:
+        preset = yaml.safe_load(f)
+
+    # 2. Download each file listed in the preset
+    result: dict[str, Path] = {}
+    for key, repo_path in preset.get("files", {}).items():
+        parts = PurePosixPath(repo_path)
+        local_path = Path(
+            hf_hub_download(
+                repo_id=repo,
+                filename=parts.name,
+                subfolder=str(parts.parent),
+                local_dir=str(root),
+            )
+        )
+        result[key] = local_path
+
+    return result
+
+
 def download_all_data(save_to="."):
-    dir_path = snapshot_download(repo_id=REPO_ID, local_dir=save_to)
+    """Download all data from the legacy HuggingFace repo.
+
+    .. deprecated::
+        Use :func:`download_preset` instead.
+    """
+    warnings.warn(
+        "download_all_data() is deprecated. Use download_preset() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    dir_path = snapshot_download(repo_id=LEGACY_REPO_ID, local_dir=save_to)
     dir_path = Path(dir_path).resolve()
     for zip_file in dir_path.rglob("*.zip"):
         with zipfile.ZipFile(zip_file, "r") as zip_ref:
@@ -179,27 +247,74 @@ def download_all_data(save_to="."):
                     print(f"Extracted {file_name} to {zip_file.parent}")
 
 
-@functools.lru_cache(maxsize=None)
-def load_reaction_rules(file: str) -> List[Reactor]:
-    """Loads the reaction rules from a pickle file and converts them into a list of
-    Reactor objects if necessary.
+@functools.cache
+def load_reaction_rules(file: str) -> list[Reactor]:
+    """Loads the reaction rules from a TSV or pickle file and converts them into a
+    list of Reactor objects.
 
-    :param file: The path to the pickle file that stores the reaction rules.
+    Supported formats
+
+    - ``.tsv`` -- tab-separated text with ``rule_smarts``, ``popularity``,
+      ``reaction_indices`` columns (preferred).
+    - ``.pickle`` -- legacy pickle format (deprecated).
+
+    :param file: The path to the file that stores the reaction rules.
     :return: A list of reaction rules as Reactor objects.
     """
+    ext = Path(file).suffix.lower()
 
+    if ext == ".tsv":
+        return _load_rules_tsv(file)
+
+    # Legacy pickle path
+    return _load_rules_pickle(file)
+
+
+def _load_rules_tsv(file: str) -> tuple:
+    """Load reaction rules from a TSV file."""
+    reactors = []
+    with open(file, encoding="utf-8") as f:
+        f.readline()  # skip header
+        for line in f:
+            line = line.rstrip("\n")
+            if not line:
+                continue
+            parts = line.split("\t")
+            smarts_str = parts[0]
+            reactors.append(Reactor.from_smarts(smarts_str, delete_atoms=False))
+    return tuple(reactors)
+
+
+def _load_rules_pickle(file: str) -> tuple:
+    """Load reaction rules from a legacy pickle file."""
     with open(file, "rb") as f:
         reaction_rules = pickle.load(f)
 
+    # Already a list of chython Reactors (converted pickle)
+    if isinstance(reaction_rules[0], Reactor):
+        return tuple(reaction_rules)
+
+    # Legacy format: list of (rule, priority) tuples with CGRtools objects
     if not isinstance(reaction_rules[0][0], Reactor):
-        reaction_rules = [Reactor(x) for x, _ in reaction_rules]
+        converted = []
+        for rule, _ in reaction_rules:
+            patterns = tuple(
+                _convert_cgrtools_query_container(m) for m in rule.reactants
+            )
+            products = tuple(
+                _convert_cgrtools_query_container(m) for m in rule.products
+            )
+            converted.append(
+                Reactor(patterns=patterns, products=products, delete_atoms=False)
+            )
+        reaction_rules = converted
 
     return tuple(reaction_rules)
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def load_building_blocks(
-    building_blocks_path: Union[str, Path],
+    building_blocks_path: str | Path,
     standardize: bool = True,
     silent: bool = True,
     num_workers: int | None = None,
@@ -208,7 +323,7 @@ def load_building_blocks(
     header: bool = True,
     delimiter: str = ",",
     smiles_column: str = "SMILES",
-) -> FrozenSet[str]:
+) -> frozenset[str]:
     """Loads building blocks data from a file and returns a frozen set of building
     blocks.
 
@@ -224,11 +339,15 @@ def load_building_blocks(
     building_blocks_path = Path(building_blocks_path).resolve()
     suffixes = "".join(building_blocks_path.suffixes).lower()
     is_csv = suffixes.endswith(".csv") or suffixes.endswith(".csv.gz")
+    is_tsv = suffixes.endswith(".tsv") or suffixes.endswith(".tsv.gz")
+    if is_tsv:
+        is_csv = True
+        delimiter = "\t"
     suffix = building_blocks_path.suffix.lower()
     if not is_csv and suffix not in {".smi", ".smiles", ".sdf"}:
         raise ValueError(
             f"Unsupported building blocks file extension: '{building_blocks_path.name}'. "
-            "Supported: .smi, .smiles, .sdf, .csv, .csv.gz"
+            "Supported: .smi, .smiles, .sdf, .csv, .csv.gz, .tsv, .tsv.gz"
         )
 
     building_blocks_smiles = set()
@@ -306,16 +425,14 @@ def load_building_blocks(
         elif suffix == ".sdf":
             with SDFRead(str(building_blocks_path)) as sdf:
                 for mol in sdf:
-                    try:
+                    with contextlib.suppress(Exception):
                         building_blocks_smiles.add(str(mol))
-                    except Exception:
-                        pass
 
     return frozenset(building_blocks_smiles)
 
 
 def load_value_net(
-    model_class: ValueNetwork, value_network_path: Union[str, Path]
+    model_class: ValueNetwork, value_network_path: str | Path
 ) -> ValueNetwork:
     """Loads the value network.
 
@@ -329,7 +446,7 @@ def load_value_net(
 
 
 def load_policy_net(
-    model_class: PolicyNetwork, policy_network_path: Union[str, Path]
+    model_class: PolicyNetwork, policy_network_path: str | Path
 ) -> PolicyNetwork:
     """Loads the policy network.
 
@@ -440,7 +557,7 @@ def load_combined_policy_function(
         ... )
     """
     from synplan.mcts.expansion import CombinedPolicyNetworkFunction
-    from synplan.utils.config import PolicyNetworkConfig, CombinedPolicyConfig
+    from synplan.utils.config import CombinedPolicyConfig, PolicyNetworkConfig
 
     # Priority 1: Use CombinedPolicyConfig
     if combined_config is not None:
@@ -580,18 +697,18 @@ def load_evaluation_function(eval_config) -> "EvaluationStrategy":
         >>> evaluator = load_evaluation_function(config)
     """
     from synplan.mcts.evaluation import (
-        RolloutEvaluationStrategy,
-        ValueNetworkEvaluationStrategy,
-        RDKitEvaluationStrategy,
         PolicyEvaluationStrategy,
         RandomEvaluationStrategy,
+        RDKitEvaluationStrategy,
+        RolloutEvaluationStrategy,
+        ValueNetworkEvaluationStrategy,
     )
     from synplan.utils.config import (
-        RolloutEvaluationConfig,
-        ValueNetworkEvaluationConfig,
-        RDKitEvaluationConfig,
         PolicyEvaluationConfig,
         RandomEvaluationConfig,
+        RDKitEvaluationConfig,
+        RolloutEvaluationConfig,
+        ValueNetworkEvaluationConfig,
     )
 
     logger.debug(f"create_evaluator config_type={type(eval_config).__name__}")

@@ -29,6 +29,14 @@ synplan.chem.reaction module
    :undoc-members:
    :show-inheritance:
 
+synplan.chem.rdkit\_compat module
+----------------------------------
+
+.. automodule:: synplan.chem.rdkit_compat
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 synplan.chem.utils module
 -------------------------
 

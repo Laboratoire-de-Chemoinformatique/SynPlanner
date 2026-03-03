@@ -1,0 +1,971 @@
+{
+    "schema": {
+        "fields": [
+            {
+                "name": "index",
+                "type": "integer"
+            },
+            {
+                "name": "reactive_function",
+                "type": "string"
+            },
+            {
+                "name": "labels",
+                "type": "string"
+            }
+        ],
+        "primaryKey": [
+            "index"
+        ],
+        "pandas_version": "1.4.0"
+    },
+    "data": [
+        {
+            "index": 0,
+            "reactive_function": "NonProlineAlphaAminoAcid_unprotected",
+            "labels": []
+        },
+        {
+            "index": 1,
+            "reactive_function": "NonProlineAlphaAminoAcid_protected",
+            "labels": []
+        },
+        {
+            "index": 2,
+            "reactive_function": "NonProlineAlphaAminoEster",
+            "labels": []
+        },
+        {
+            "index": 3,
+            "reactive_function": "Acid_SaturatedAliphatic",
+            "labels": [
+                0,
+                1,
+                2,
+                3,
+                8,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 4,
+            "reactive_function": "Acid_UnsaturatedAliphatic",
+            "labels": [
+                0,
+                1,
+                2,
+                3,
+                8,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 5,
+            "reactive_function": "Acid_Aromatic",
+            "labels": [
+                0,
+                2,
+                3,
+                8,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 6,
+            "reactive_function": "Acid_Heteroaromatic",
+            "labels": [
+                2,
+                3,
+                8,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 7,
+            "reactive_function": "XKetoneAromaticFluoride",
+            "labels": [
+                12,
+                13,
+                14
+            ]
+        },
+        {
+            "index": 8,
+            "reactive_function": "XKetoneAromaticChloride",
+            "labels": [
+                11,
+                12
+            ]
+        },
+        {
+            "index": 9,
+            "reactive_function": "XKetoneAromaticBromide",
+            "labels": [
+                11,
+                12,
+                14
+            ]
+        },
+        {
+            "index": 10,
+            "reactive_function": "XKetoneAromaticIodide",
+            "labels": []
+        },
+        {
+            "index": 11,
+            "reactive_function": "XKetoneAromaticTriflate",
+            "labels": []
+        },
+        {
+            "index": 12,
+            "reactive_function": "XKetoneAliphaticFluoride",
+            "labels": [
+                11,
+                12,
+                14
+            ]
+        },
+        {
+            "index": 13,
+            "reactive_function": "XKetoneAliphaticChloride",
+            "labels": [
+                11,
+                12,
+                13,
+                14
+            ]
+        },
+        {
+            "index": 14,
+            "reactive_function": "XKetoneAliphaticBromide",
+            "labels": [
+                11,
+                12,
+                14
+            ]
+        },
+        {
+            "index": 15,
+            "reactive_function": "XKetoneAliphaticIodide",
+            "labels": [
+                12
+            ]
+        },
+        {
+            "index": 16,
+            "reactive_function": "XKetoneAliphaticTriflate",
+            "labels": [
+                12
+            ]
+        },
+        {
+            "index": 17,
+            "reactive_function": "Aldehyde_SaturatedAliphatic",
+            "labels": [
+                11,
+                12,
+                13,
+                14
+            ]
+        },
+        {
+            "index": 18,
+            "reactive_function": "Aldehyde_UnsaturatedAliphatic",
+            "labels": [
+                11,
+                12,
+                13,
+                14
+            ]
+        },
+        {
+            "index": 19,
+            "reactive_function": "Aldehyde_Aromatic",
+            "labels": [
+                11,
+                12,
+                13,
+                14
+            ]
+        },
+        {
+            "index": 20,
+            "reactive_function": "Aldehyde_Heteroaromatic",
+            "labels": [
+                11,
+                12,
+                13,
+                14
+            ]
+        },
+        {
+            "index": 21,
+            "reactive_function": "KetoneAromaticCyclic",
+            "labels": [
+                11,
+                12,
+                13,
+                14
+            ]
+        },
+        {
+            "index": 22,
+            "reactive_function": "KetoneAromaticAcyclic",
+            "labels": [
+                11,
+                12,
+                13,
+                14
+            ]
+        },
+        {
+            "index": 23,
+            "reactive_function": "KetoneAliphaticCyclic",
+            "labels": [
+                11,
+                12,
+                13,
+                14
+            ]
+        },
+        {
+            "index": 24,
+            "reactive_function": "KetoneAliphaticAcyclic",
+            "labels": [
+                11,
+                12,
+                13,
+                14
+            ]
+        },
+        {
+            "index": 25,
+            "reactive_function": "KetoneMixCyclic",
+            "labels": [
+                11,
+                12,
+                13,
+                14
+            ]
+        },
+        {
+            "index": 26,
+            "reactive_function": "KetoneMixAcyclic",
+            "labels": [
+                11,
+                12,
+                13,
+                14
+            ]
+        },
+        {
+            "index": 27,
+            "reactive_function": "Thioketone",
+            "labels": []
+        },
+        {
+            "index": 28,
+            "reactive_function": "Sulfonic_Aliphatic",
+            "labels": []
+        },
+        {
+            "index": 29,
+            "reactive_function": "Sulfonic_Aromatic",
+            "labels": []
+        },
+        {
+            "index": 30,
+            "reactive_function": "Sulphonamide",
+            "labels": []
+        },
+        {
+            "index": 31,
+            "reactive_function": "Thiocarbamate",
+            "labels": []
+        },
+        {
+            "index": 32,
+            "reactive_function": "PhosphoricAcid_SaturatedAliphatic",
+            "labels": []
+        },
+        {
+            "index": 33,
+            "reactive_function": "PhosphoricAcid_UnsaturatedAliphatic",
+            "labels": []
+        },
+        {
+            "index": 34,
+            "reactive_function": "PhosphoricAcid_Aromatic",
+            "labels": []
+        },
+        {
+            "index": 35,
+            "reactive_function": "PhosphoricAcid_Heteroaromatic",
+            "labels": []
+        },
+        {
+            "index": 36,
+            "reactive_function": "Amide",
+            "labels": []
+        },
+        {
+            "index": 37,
+            "reactive_function": "Amide_Aromatic",
+            "labels": []
+        },
+        {
+            "index": 38,
+            "reactive_function": "PhenolHeteroaromatic6membered",
+            "labels": [
+                1,
+                2,
+                3,
+                9,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 39,
+            "reactive_function": "PhenolHeteroaromatic5membered",
+            "labels": [
+                1,
+                3,
+                9,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 40,
+            "reactive_function": "Phenol",
+            "labels": [
+                1,
+                2,
+                3,
+                9,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 41,
+            "reactive_function": "PrimaryAlcoholAromatic",
+            "labels": [
+                1,
+                2,
+                3,
+                9,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 42,
+            "reactive_function": "PrimaryAlcoholAliphatic",
+            "labels": [
+                1,
+                2,
+                3,
+                4,
+                9,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 43,
+            "reactive_function": "SecondaryAlcoholAromaticCyclic",
+            "labels": [
+                1,
+                15,
+                17
+            ]
+        },
+        {
+            "index": 44,
+            "reactive_function": "SecondaryAlcoholAliphaticCyclic",
+            "labels": [
+                1,
+                2,
+                3,
+                4,
+                9,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 45,
+            "reactive_function": "SecondaryAlcoholMixCyclic",
+            "labels": [
+                1,
+                2,
+                3,
+                4,
+                9,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 46,
+            "reactive_function": "SecondaryAlcoholAromaticAcyclic",
+            "labels": [
+                1,
+                2,
+                3,
+                9,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 47,
+            "reactive_function": "SecondaryAlcoholAliphaticAcyclic",
+            "labels": [
+                1,
+                2,
+                3,
+                4,
+                9,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 48,
+            "reactive_function": "SecondaryAlcoholMixAcyclic",
+            "labels": [
+                1,
+                2,
+                3,
+                4,
+                9,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 49,
+            "reactive_function": "TertiaryAlcoholCyclic",
+            "labels": [
+                1,
+                2,
+                3,
+                4,
+                9,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 50,
+            "reactive_function": "TertiaryAlcoholAcyclic",
+            "labels": [
+                1,
+                2,
+                3,
+                4,
+                9,
+                15,
+                16,
+                17
+            ]
+        },
+        {
+            "index": 51,
+            "reactive_function": "SulfinylamineAromatic",
+            "labels": [
+                0,
+                9
+            ]
+        },
+        {
+            "index": 52,
+            "reactive_function": "SulfinylamineAliphatic",
+            "labels": [
+                0,
+                9
+            ]
+        },
+        {
+            "index": 53,
+            "reactive_function": "HeterocycleNH",
+            "labels": [
+                0,
+                5,
+                6,
+                7,
+                9
+            ]
+        },
+        {
+            "index": 54,
+            "reactive_function": "Benzylamine_primary",
+            "labels": [
+                0,
+                5,
+                6,
+                7,
+                18
+            ]
+        },
+        {
+            "index": 55,
+            "reactive_function": "HeteroBenzylamine_primary",
+            "labels": [
+                0,
+                5,
+                6,
+                7,
+                18
+            ]
+        },
+        {
+            "index": 56,
+            "reactive_function": "Amine_Primary_SaturatedAliphatic",
+            "labels": [
+                0,
+                5,
+                6,
+                7,
+                18
+            ]
+        },
+        {
+            "index": 57,
+            "reactive_function": "Amine_Primary_UnsaturatedAliphatic",
+            "labels": [
+                0,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 58,
+            "reactive_function": "Amine_Primary_Phe",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 59,
+            "reactive_function": "Amine_Primary_Het6",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 60,
+            "reactive_function": "Amine_Primary_Het5",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 61,
+            "reactive_function": "Amine_Primary_Het6Het5",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 62,
+            "reactive_function": "Amine_Primary_PheHet5",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 63,
+            "reactive_function": "Amine_Primary_Het5Het6",
+            "labels": [
+                0,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 64,
+            "reactive_function": "Amine_Primary_Het5Phe",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 65,
+            "reactive_function": "Amine_Primary_Het5Het5",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 66,
+            "reactive_function": "Amine_Primary_PhePhe",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 67,
+            "reactive_function": "Amine_Primary_Het6Phe",
+            "labels": [
+                0,
+                6,
+                7,
+                9
+            ]
+        },
+        {
+            "index": 68,
+            "reactive_function": "Amine_Primary_PheHet6",
+            "labels": [
+                0,
+                5,
+                6,
+                7,
+                9
+            ]
+        },
+        {
+            "index": 69,
+            "reactive_function": "Amine_Primary_Het6Het6",
+            "labels": [
+                0,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 70,
+            "reactive_function": "Amine_AcyclicSecondary_SaturatedAliphatic-SaturatedAliphatic",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 71,
+            "reactive_function": "Amine_AcyclicSecondary_SaturatedAliphatic-UnsaturatedAliphatic",
+            "labels": [
+                0,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 72,
+            "reactive_function": "Amine_AcyclicSecondary_SaturatedAliphatic-Aromatic",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 73,
+            "reactive_function": "Amine_AcyclicSecondary_SaturatedAliphatic-Heteroaromatic",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 74,
+            "reactive_function": "Amine_AcyclicSecondary_UnsaturatedAliphatic-UnsaturatedAliphatic",
+            "labels": [
+                0,
+                6,
+                18
+            ]
+        },
+        {
+            "index": 75,
+            "reactive_function": "Amine_AcyclicSecondary_UnsaturatedAliphatic-Aromatic",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 76,
+            "reactive_function": "Amine_AcyclicSecondary_UnsaturatedAliphatic-Heteroaromatic",
+            "labels": [
+                0,
+                6,
+                18
+            ]
+        },
+        {
+            "index": 77,
+            "reactive_function": "Amine_AcyclicSecondary_Aromatic-Aromatic",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 78,
+            "reactive_function": "Amine_AcyclicSecondary_Aromatic-Heteroaromatic",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 79,
+            "reactive_function": "Amine_AcyclicSecondary_Heteroaromatic-Heteroaromatic",
+            "labels": [
+                0,
+                5,
+                6,
+                7,
+                9
+            ]
+        },
+        {
+            "index": 80,
+            "reactive_function": "Amine_CyclicSecondary_SaturatedAliphatic-SaturatedAliphatic",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 81,
+            "reactive_function": "Amine_CyclicSecondary_SaturatedAliphatic-UnsaturatedAliphatic",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 82,
+            "reactive_function": "Amine_CyclicSecondary_SaturatedAliphatic-Aromatic",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 83,
+            "reactive_function": "Amine_CyclicSecondary_SaturatedAliphatic-Heteroaromatic",
+            "labels": [
+                0,
+                6,
+                7,
+                9
+            ]
+        },
+        {
+            "index": 84,
+            "reactive_function": "Amine_CyclicSecondary_UnsaturatedAliphatic-UnsaturatedAliphatic",
+            "labels": [
+                0,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 85,
+            "reactive_function": "Amine_CyclicSecondary_UnsaturatedAliphatic-Aromatic",
+            "labels": [
+                0,
+                7,
+                9
+            ]
+        },
+        {
+            "index": 86,
+            "reactive_function": "Amine_CyclicSecondary_UnsaturatedAliphatic-Heteroaromatic",
+            "labels": [
+                0,
+                6
+            ]
+        },
+        {
+            "index": 87,
+            "reactive_function": "Amine_CyclicSecondary_Aromatic-Aromatic",
+            "labels": [
+                0,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 88,
+            "reactive_function": "Amine_CyclicSecondary_Aromatic-Heteroaromatic",
+            "labels": [
+                0,
+                5,
+                6,
+                9
+            ]
+        },
+        {
+            "index": 89,
+            "reactive_function": "Amine_CyclicSecondary_Heteroaromatic-Heteroaromatic",
+            "labels": [
+                0
+            ]
+        },
+        {
+            "index": 90,
+            "reactive_function": "HydrazineTerminalAromatic",
+            "labels": [
+                0,
+                7
+            ]
+        },
+        {
+            "index": 91,
+            "reactive_function": "HydrazineTerminalAliphatic",
+            "labels": [
+                0,
+                7
+            ]
+        },
+        {
+            "index": 92,
+            "reactive_function": "HydrazineTerminalCarbamoyl",
+            "labels": [
+                0,
+                6
+            ]
+        },
+        {
+            "index": 93,
+            "reactive_function": "HydrazineNonTerminalAromatic",
+            "labels": [
+                0,
+                6
+            ]
+        },
+        {
+            "index": 94,
+            "reactive_function": "HydrazineNonTerminalAliphatic",
+            "labels": [
+                0,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 95,
+            "reactive_function": "HydrazineNonTerminalMix",
+            "labels": [
+                6
+            ]
+        },
+        {
+            "index": 96,
+            "reactive_function": "HydroxyAmidine",
+            "labels": [
+                6
+            ]
+        },
+        {
+            "index": 97,
+            "reactive_function": "HydroxylamineAromatic",
+            "labels": [
+                0,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 98,
+            "reactive_function": "HydroxylamineAliphatic",
+            "labels": [
+                0,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 99,
+            "reactive_function": "SubstitutedHydroxylamineAromatic",
+            "labels": [
+                0
+            ]
+        },
+        {
+            "index": 100,
+            "reactive_function": "SubstitutedHydroxylamineAliphatic",
+            "labels": [
+                0,
+                6,
+                7
+            ]
+        },
+        {
+            "index": 101,
+            "reactive_function": "Hydroxylamine",
+            "labels": [
+                6
+            ]
+        }
+    ]
+}

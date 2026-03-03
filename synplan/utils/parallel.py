@@ -7,8 +7,39 @@ parallel mapping with backpressure. Keep format-specific I/O utilities in
 
 from __future__ import annotations
 
+import os
+from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Any, Callable, Iterable, Iterator
+from typing import Any
+
+import torch
+
+
+def select_device(device: str | None = None) -> torch.device:
+    """Auto-detect best available device: cuda > mps > cpu.
+
+    Parameters
+    ----------
+    device
+        Explicit device string (e.g. ``"cuda"``, ``"mps"``, ``"cpu"``).
+        When *None* the best available accelerator is chosen automatically.
+
+    Returns
+    -------
+    torch.device
+    """
+    if device is not None:
+        return torch.device(device)
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
+def default_num_workers(cap: int = 8) -> int:
+    """Return a sensible default worker count, capped at *cap*."""
+    return min(os.cpu_count() or 4, cap)
 
 
 def process_pool_map_stream(
@@ -30,7 +61,8 @@ def process_pool_map_stream(
     if max_pending < 1:
         max_pending = 1
 
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    executor = ProcessPoolExecutor(max_workers=max_workers)
+    try:
         iterator = iter(items)
         pending = set()
 
@@ -53,3 +85,5 @@ def process_pool_map_stream(
                     pass
 
                 yield future.result()
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)

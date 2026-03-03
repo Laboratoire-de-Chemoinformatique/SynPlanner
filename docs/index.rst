@@ -46,7 +46,7 @@ SynPlanner Pipeline
 Monte-Carlo Tree Search (MCTS) algorithm with neural networks for node expansion and evaluation.
 The main steps of this pipeline are listed below.
 
-1. **Reaction data curation** is a necessary step, including reaction strandardization and filtration.
+1. **Reaction data curation** is a necessary step, including reaction standardization and filtration.
    See the details in `data curation`_ tutorial.
 
 2. **Reaction rules extraction** should be done from the high-quality reaction data
@@ -63,10 +63,10 @@ The main steps of this pipeline are listed below.
     If you want to run retrosynthetic planning, you can download the data we used in our paper.
     See more in section :ref:`data`.
 
-.. _retrosynthetic planning: tutorials/retrosynthetic_planning.ipynb
-.. _data curation: tutorials/data_curation.ipynb
-.. _reaction rules extraction: tutorials/rules_extraction.ipynb
-.. _ranking policy training: tutorials/policy_training.ipynb
+.. _retrosynthetic planning: user_guide/05_Retrosynthetic_Planning.ipynb
+.. _data curation: user_guide/02_Data_Curation.ipynb
+.. _reaction rules extraction: user_guide/03_Rules_Extraction.ipynb
+.. _ranking policy training: user_guide/04_Policy_Training.ipynb
 
 .. toctree::
     :hidden:

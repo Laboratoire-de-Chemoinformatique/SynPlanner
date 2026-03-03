@@ -3,14 +3,15 @@ from functools import partial
 from math import hypot
 from uuid import uuid4
 
-from CGRtools.algorithms.depict import (
+from chython.algorithms.depict import (
     Depict,
     DepictCGR,
     DepictMolecule,
     _render_charge,
+    _render_config,
     rotate_vector,
 )
-from CGRtools.containers import CGRContainer, MoleculeContainer, ReactionContainer
+from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 
 
 class WideBondDepictCGR(DepictCGR):
@@ -38,7 +39,7 @@ class WideBondDepictCGR(DepictCGR):
                   representing a bond.
         """
         plane = self._plane
-        config = self._render_config
+        config = _render_config
 
         # get the normal width (default 1.0) and compute a 4× wide stroke
         normal_width = config.get("bond_width", 0.02)
@@ -445,7 +446,7 @@ class WideBondDepictCGR(DepictCGR):
         return svg
 
     def __render_aromatic_bond(self, n_x, n_y, m_x, m_y, c_x, c_y, color):
-        config = self._render_config
+        config = _render_config
 
         dash1, dash2 = config["dashes"]
         dash3, dash4 = config["aromatic_dashes"]
@@ -529,7 +530,7 @@ class CustomDepictMolecule(DepictMolecule):
         charges = self._charges
         radicals = self._radicals
         hydrogens = self._hydrogens
-        config = self._render_config
+        config = _render_config
 
         carbon = config["carbon"]
         mapping = config["mapping"]
@@ -813,7 +814,9 @@ def depict_custom_reaction(reaction: ReactionContainer):
                 mol.__class__ = type(custom_class_name, new_bases, {})
 
             # Depict using the (potentially) modified class
-            atoms, bonds, masks, min_x, min_y, max_x, max_y = mol.depict(embedding=True)
+            atoms, bonds, _, masks, _, min_x, min_y, max_x, max_y = mol.depict(
+                _embedding=True
+            )
             r_atoms.append(atoms)
             r_bonds.append(bonds)
             r_masks.append(masks)
@@ -829,7 +832,7 @@ def depict_custom_reaction(reaction: ReactionContainer):
         for mol, original_class in original_classes.items():
             mol.__class__ = original_class
 
-    config = DepictMolecule._render_config  # Access via the imported class
+    config = _render_config
 
     font_size = config["font_size"]
     font125 = 1.25 * font_size

@@ -1,0 +1,26 @@
+reaction_class	template	label	example_reagent	substructure	deprotection_class
+5.1.1 N-Boc protection	CC(C)(C)O[C:512]=O	0	CC(C)(C)OC(=O)OC(=O)OC(C)(C)C	CC(C)(C)OC=O	6.1.1 N-Boc deprotection
+5.1.2 N-Cbz protection	[C:512](=O)OCc1ccccc1	6	O=C(Cl)OCc1ccccc1	NC(=O)OCc1ccccc1	6.1.3 N-Cbz deprotection
+5.1.3 N-Fmoc protection	[C:512](=O)OCC1c2ccccc2c2ccccc21	5	O=C(Cl)OCC1c2ccccc2-c2ccccc21	NC(=O)OCC1c2ccccc2c2ccccc21	6.1.6 N-Fmoc deprotection
+5.1.4 N-Phth protection	[Xe]1[C:512](=O)c2ccccc2[C:512]1=O	18	CCOC(=O)N1C(=O)c2ccccc2C1=O	N1C(=O)c2ccccc2C1=O	6.1.7 N-Phth deprotection
+5.1.5 N-TFA protection	[C:512](C(F)(F)F)=O	7	O=C(OC(=O)C(F)(F)F)C(F)(F)F	NC(C(F)(F)F)=O	6.1.8 N-TFA deprotection
+5.1.8 N-SEM protection	[CH2:512]OCC[Si](C)(C)C	9	C[Si](C)(C)CCOCCl	COCC[Si](C)(C)C	6.1.18 N-SEM deprotection
+5.2.1 CO2H-tBu protection	[C:512](C)(C)C	8	CC(C)(C)O	OC(C)(C)C	6.2.3 CO2H-tBu deprotection
+5.3.1 O-Bn protection	[CH2:512]c1ccccc1	10	BrCc1ccccc1	OCc1ccccc1	6.3.1 O-Bn deprotection
+5.3.10 O-SEM protection	[CH2:512]OCC[Si](C)(C)C	9	C[Si](C)(C)CCOCCl	COCC[Si](C)(C)C	6.3.13 O-SEM deprotection
+5.3.11 O-Boc protection	CC(C)(C)O[C:512]=O	0	CC(C)(C)OC(=O)OC(=O)OC(C)(C)C	CC(C)(C)OC=O	6.3.20 O-carbonate deprotection
+5.3.12 O-Piv protection	CC(C)(C)[C:512]=O	1	CC(C)(C)C(=O)OC(=O)C(C)(C)C	CC(C)(C)C=O	6.3.24 O-Piv deprotection
+5.3.2 O-TBS protection	[Si:512](C(C)(C)C)(C)C	15	CC(C)(C)[Si](C)(C)Cl	O[Si](C(C)(C)C)(C)C	6.3.2 O-TBS deprotection
+5.3.3 O-TIPS protection	[Si:512](C(C)C)(C(C)C)C(C)C	16	CC(C)[Si](Cl)(C(C)C)C(C)C	O[Si](C(C)C)(C(C)C)C(C)C	6.3.3 O-TIPS deprotection
+5.3.4 O-TMS protection	[Si:512](C)(C)C	17	C[Si](C)(C)N[Si](C)(C)C	O[Si](C)(C)C	6.3.4 O-TMS deprotection
+5.3.6 O-MOM protection	CO[CH2:512]	3	COCBr	OCOC	6.3.8 O-MOM deprotection
+5.3.7 O-acetonide protection	C[C:512]C	4	CC(=C)OC	O1CCOC1(C)C	6.3.16 O-acetonide deprotection
+5.3.9 O-TES protection	CC[Si:512](CC)CC	2	CC[Si](Cl)(CC)CC	CC[Si](O)(CC)CC	6.3.19 O-TES deprotection
+5.5.1 Aldehyde dioxolane protection	[O:512]CC[O:512]	12	OCCO	C1OCCO1	6.5.2 Aldehyde dioxolane deprotection
+5.5.2 Ketone dioxolane protection	[O:512]CC[O:512]	12	OCCO	C1OCCO1	6.5.3 Ketone dioxolane deprotection
+5.5.3 Aldehyde dioxane protection	[O:512]CCC[O:512]	11	OCCCO	C1OCCCO1	6.5.11 Aldehyde dioxane deprotection
+5.5.4 Ketone dioxane protection	[O:512]CCC[O:512]	11	OCCCO	C1OCCCO1	6.5.4 Ketone dioxane deprotection
+5.5.5 Aldehyde dithiolane protection	[S:512]CC[S:512]	14	SCCS	C1SCCS1	6.5.5 Aldehyde dithiolane deprotection
+5.5.6 Ketone dithiolane protection	[S:512]CC[S:512]	14	SCCS	C1SCCS1	6.5.6 Ketone dithiolane deprotection
+5.5.7 Aldehyde dithiane protection	[S:512]CCC[S:512]	13	SCCCS	C1SCCCS1	6.5.7 Aldehyde dithiane deprotection
+5.5.8 Ketone dithiane protection	[S:512]CCC[S:512]	13	SCCCS	C1SCCCS1	6.5.8 Ketone dithiane deprotection

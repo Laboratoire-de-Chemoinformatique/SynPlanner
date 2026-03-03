@@ -1,26 +1,35 @@
 Data download
 --------------
 
-Use the built-in downloader to fetch all example data (rules, weights, building blocks, benchmarks) from Hugging Face.
+Use the built-in downloader to fetch pre-trained models, reaction rules, and building blocks from HuggingFace.
 
-Everything
-~~~~~~~~~~~
+Preset download (recommended)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Download a ready-to-use preset with all components needed for retrosynthetic planning:
 
 .. code-block:: bash
 
-   synplan download_all_data --save_to tutorials/synplan_data
+   synplan download_preset --preset synplanner-article --save_to synplan_data
 
-This creates subfolders like ``uspto/``, ``weights/``, and ``building_blocks/`` under ``tutorials/synplan_data``.
+This downloads the ``synplanner-article`` preset, which includes:
 
-Minimal set for planning
-~~~~~~~~~~~~~~~~~~~~~~~~
+- Reaction rules (TSV): ``policy/supervised_gcn/v1/reaction_rules.tsv``
+- Ranking policy weights: ``policy/supervised_gcn/v1/v1/ranking_policy.ckpt``
+- Filtering policy weights: ``policy/supervised_gcn/v1/v1/filtering_policy.ckpt``
+- Value network weights: ``value/supervised_gcn/v1/value_network.ckpt``
+- Building blocks: ``building_blocks/emolecules-salt-ln/building_blocks.tsv``
 
-You typically need:
+Python API:
 
-- Reaction rules: ``uspto/uspto_reaction_rules.pickle``
-- Policy weights: ``uspto/weights/ranking_policy_network.ckpt``
-- Building blocks: ``building_blocks/building_blocks_em_sa_ln.smi`` (unzipped)
-- Targets file: a text file with SMILES, e.g. ``tutorials/synplan_data/benchmarks/sascore/targets_with_sascore_1.5_2.5.smi``
+.. code-block:: python
+
+   from synplan.utils.loading import download_preset
+
+   paths = download_preset("synplanner-article", save_to="synplan_data")
+   rules_path = paths["reaction_rules"]
+   policy_path = paths["ranking_policy"]
+   bb_path = paths["building_blocks"]
 
 Details
 ~~~~~~~

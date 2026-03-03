@@ -42,11 +42,11 @@ the synthesizability of intermediate products (value network).
 
 ``SynPlanner`` offers comprehensive capabilities for chemical synthesis planning:
 
-- ✅ **Ensure Data Quality:** Effortlessly standardize and filter raw chemical reaction data.
-- 🧪 **Customize Reaction Templates:** Extract versatile reaction rules (templates) with a wide array of options.
-- 🧠 **Advanced Model Training:** Train robust policy and value networks using both supervised and reinforcement learning techniques.
-- 🗺️ **Flexible Retrosynthesis:** Perform in-depth retrosynthetic planning with diverse MCTS-based search strategies.
-- 📊 **Intuitive Visualization:** Clearly visualize discovered synthetic paths and interact with an easy-to-use graphical user interface.
+- ✅ **Data Quality:** Standardize and filter raw chemical reaction data.
+- 🧪 **Reaction Templates:** Extract reaction rules (templates) with configurable specificity options.
+- 🧠 **Model Training:** Train policy and value networks using supervised and reinforcement learning techniques.
+- 🗺️ **Retrosynthesis:** Perform retrosynthetic planning with multiple MCTS-based search strategies.
+- 📊 **Visualization:** Visualize discovered synthetic paths and interact with a graphical user interface.
 
 📦 Installation
 =============================
@@ -75,7 +75,7 @@ Prebuilt images are published to GHCR for Linux/AMD64.
 
 .. code-block:: bash
 
-    VERSION=1.3.2
+    VERSION=1.4.0
 
     # CLI: pull and show help
     docker pull ghcr.io/laboratoire-de-chemoinformatique/synplanner:${VERSION}-cli-amd64
@@ -95,20 +95,30 @@ For a mounted-data planning example and more details, see the Get started docs: 
 Get started with ``SynPlanner`` in a few steps:
 
 1.  **Download Essential Data:**
-    Fetch the necessary pre-trained models and example data to begin your journey.
+    Fetch pre-trained models, reaction rules, and building blocks from HuggingFace.
 
     .. code-block:: bash
 
-        synplan download_all_data --save_to synplan_data
+        synplan download_preset --preset synplanner-article --save_to synplan_data
 
-2.  **Explore Planning:**
-    Once the data is downloaded, you can try running a planning example. For more detailed instructions, see the `Tutorials`_ sections.
+2.  **Prepare a targets file:**
+    Create a plain-text file with one SMILES per line, e.g.:
 
     .. code-block:: bash
 
-        synplan planning --config configs/planning.yaml --targets synplan_data/benchmarks/sascore/targets_with_sascore_1.5_2.5.smi --reaction_rules synplan_data/uspto/uspto_reaction_rules.pickle --building_blocks synplan_data/building_blocks/building_blocks_em_sa_ln.smi --policy_network synplan_data/uspto/weights/ranking_policy_network.ckpt --results_dir planning_results_quickstart
+        echo "NC1(C(=O)N[C@@H](CCO)c2ccc(Cl)cc2)CCN(c2nc[nH]c3nccc2-3)CC1" > targets.smi
 
-    (Note: Ensure ``configs/planning.yaml`` exists or adjust the path accordingly. You might need to create a basic one or use one from the cloned repository if you haven't installed all package data globally.)
+3.  **Run planning:**
+
+    .. code-block:: bash
+
+        synplan planning \
+          --config configs/planning_standard.yaml \
+          --targets targets.smi \
+          --reaction_rules synplan_data/policy/supervised_gcn/v1/reaction_rules.tsv \
+          --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \
+          --policy_network synplan_data/policy/supervised_gcn/v1/v1/ranking_policy.ckpt \
+          --results_dir planning_results_quickstart
 
 📓 Colab tutorials
 -----------------------------
@@ -130,16 +140,16 @@ If you have a question or want to report a bug, please submit an issue.
 =============================
 
 * `Tagir Akhmetshin <https://github.com/tagirshin>`_ - main developer and maintainer.
+* `Almaz Gilmullin <https://github.com/Protolaw>`_ - maintainer, implementation of the clustering module.
 
 👥 Contributors
 =============================
 
 * `Timur Madzhidov <tmadzhidov@gmail.com>`_ - key contributor, main initiator and inspirator of the project.
 * `Alexandre Varnek <varnek@unistra.fr>`_ - supervisor of the project.
-* `Dmitry Zankov <https://github.com/dzankov>`_ - data curation adoption, tutorials, documentation and reproducibility of the results.
-* `Almaz Gilmullin <https://github.com/Protolaw>`_  - implementation of the clustreing module.
-* `Philippe Gantzer <https://github.com/PGantzer>`_ - implementation of inital graphical user interface and unified writing module.
-* `Dmitry Babadeev <https://github.com/prog420>`_ - implementation of the inital retrosynthetic planning module and routes visualization.
+* `Dmitry Zankov <https://github.com/dzankov>`_ - data curation adoption, initial tutorials and documentation, SynPlanner article initial draft preparation, and reproducibility of the results.
+* `Philippe Gantzer <https://github.com/PGantzer>`_ - implementation of initial graphical user interface and unified writing module.
+* `Dmitry Babadeev <https://github.com/prog420>`_ - implementation of the initial retrosynthetic planning module and routes visualization.
 * `Anna Pinigina <anna.10081048@gmail.com>`_ - implementation of the rule extraction module.
 * `Milo Roucairol <https://github.com/RoucairolMilo>`_ - implementation of the various search strategies.
 * `Mikhail Volkov <https://github.com/mbvolkoff>`_ - help in testing and debugging the code.

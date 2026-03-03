@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Iterable, Set
 
 import pytest
-from CGRtools import smiles
-from CGRtools.containers import (
+from chython import smiles
+from chython.containers import (
     CGRContainer,
     MoleculeContainer,
     QueryContainer,
@@ -19,8 +19,8 @@ from synplan.chem.reaction_rules.extraction import (
     add_functional_groups,
     add_ring_structures,
     clean_molecules,
+    molecule_substructure_as_query,
 )
-from synplan.chem.utils import cgrtools_to_chython_molecule
 from synplan.utils.config import RuleExtractionConfig
 
 # ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ def default_config() -> RuleExtractionConfig:  # noqa: D401 – simple factory
 def _neighbours(mol: MoleculeContainer | CGRContainer, idx: int) -> Set[int]:
     """Return immediate neighbour atom numbers for *idx*.
 
-    Implementation relies on CGRtools' private `_bonds` mapping because the
+    Implementation relies on chython's private `_bonds` mapping because the
     public `Atom.neighbors` returns only a **count**.  Falls back to scanning
     `mol.bonds` if the mapping is unavailable.
     """
@@ -83,7 +83,7 @@ def test_add_functional_groups(
 ) -> None:
     centre = {3, 4, 5, 6}
     carbonyl = sq_chy("[C]=[O]")
-    r0_ch = cgrtools_to_chython_molecule(simple_esterification_reaction.reactants[0])
+    r0_ch = simple_esterification_reaction.reactants[0]
 
     expected = centre.copy()
     for mp in carbonyl.get_mapping(r0_ch):
@@ -115,7 +115,8 @@ def test_add_ring_structures_ring_formed(diels_alder_cgr: CGRContainer) -> None:
 
 @pytest.fixture(scope="session")
 def query_ethanol() -> QueryContainer:
-    return smiles("CCO").substructure(smiles("CCO"), as_query=True)
+    mol = smiles("CCO")
+    return molecule_substructure_as_query(mol, mol.atoms_numbers)
 
 
 def test_clean_molecules(simple_esterification_reaction: ReactionContainer) -> None:
@@ -128,7 +129,7 @@ def test_clean_molecules(simple_esterification_reaction: ReactionContainer) -> N
         for m in mols:
             sel = rule_atoms & set(m.atoms_numbers)
             if sel:
-                out.append(m.substructure(atoms=sel, as_query=True))
+                out.append(molecule_substructure_as_query(m, sel))
         return out
 
     r_queries = _extract(rxn.reactants)
@@ -136,12 +137,10 @@ def test_clean_molecules(simple_esterification_reaction: ReactionContainer) -> N
 
     retention = {
         "reaction_center": {
-            k: True
-            for k in ("neighbors", "hybridization", "implicit_hydrogens", "ring_sizes")
+            k: True for k in ("neighbors", "implicit_hydrogens", "ring_sizes")
         },
         "environment": {
-            k: False
-            for k in ("neighbors", "hybridization", "implicit_hydrogens", "ring_sizes")
+            k: False for k in ("neighbors", "implicit_hydrogens", "ring_sizes")
         },
     }
 
@@ -153,10 +152,8 @@ def test_clean_molecules(simple_esterification_reaction: ReactionContainer) -> N
             for idx in o.atoms_numbers:
                 o_atom, c_atom = o.atom(idx), c.atom(idx)
                 if idx in centre:
-                    assert c_atom.hybridization not in ((), None)
                     assert c_atom.implicit_hydrogens not in ((), None)
                 else:
-                    assert c_atom.hybridization in ((), set())
                     assert c_atom.implicit_hydrogens in ((), set())
 
     _check(r_queries, cleaned_r)

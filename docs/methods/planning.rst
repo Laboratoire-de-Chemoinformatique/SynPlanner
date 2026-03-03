@@ -23,7 +23,7 @@ interacting with the given set of building blocks.
 **Advanced planning**. This planning configuration includes the ranking policy network for node expansion,
 value neural network for instant node evaluation, and evaluation-first strategy. This configuration requires reaction data
 for training the policy network and molecule data for planning simulations in value network tuning.
-Because the building block set is used in planning simulations, the value network should be returned
+Because the building block set is used in planning simulations, the value network should be retrained
 if the building block set is changed. The evaluation-first strategy supposes more computations,
 but the total time of search is partially reduced by instant predictions of node values by value neural network
 instead of expansive rollout simulations.
@@ -36,5 +36,5 @@ instead of expansive rollout simulations.
       evaluation_type: gcn
 
 **Conclusion**. In general, the advanced planning algorithm is slower than the default (around 2x slow down),
-but can be considered more powerful (because of more exhaustive search tree exploration) and may help
-if the default planning algorithm fails to find a solution for the given molecule.
+but explores the search tree more exhaustively and may help if the default planning algorithm fails to find
+a solution for the given molecule.

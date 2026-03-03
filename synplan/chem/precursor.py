@@ -1,9 +1,7 @@
 """Module containing a class Precursor that represents a precursor (extend molecule object) in
 the search tree."""
 
-from typing import Set
-
-from CGRtools.containers import MoleculeContainer
+from chython.containers import MoleculeContainer
 
 from synplan.chem.utils import safe_canonicalization
 
@@ -24,7 +22,7 @@ class Precursor:
         """Return the number of atoms in Precursor."""
         return len(self.molecule)
 
-    def __hash__(self) -> hash:
+    def __hash__(self) -> int:
         """Returns the hash value of Precursor."""
         return hash(self.molecule)
 
@@ -40,7 +38,7 @@ class Precursor:
         """Returns a SMILES of the Precursor."""
         return str(self.molecule)
 
-    def is_building_block(self, bb_stock: Set[str], min_mol_size: int = 6) -> bool:
+    def is_building_block(self, bb_stock: set[str], min_mol_size: int = 6) -> bool:
         """Checks if a Precursor is a building block.
 
         :param bb_stock: The list of building blocks. Each building block is represented
@@ -89,7 +87,7 @@ def compose_precursors(
         transition_mapping = {}
         for mol in precursors[1:]:
             for n, atom in mol.molecule.atoms():
-                new_number = tmp_mol.add_atom(atom.atomic_symbol)
+                new_number = tmp_mol.add_atom(atom.copy())
                 transition_mapping[n] = new_number
             for atom, neighbor, bond in mol.molecule.bonds():
                 tmp_mol.add_bond(

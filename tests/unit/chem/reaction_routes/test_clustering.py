@@ -1,13 +1,13 @@
-import pytest
 import pickle
+
+import pytest
+from chython.containers import CGRContainer, ReactionContainer
 import synplan.chem.reaction_routes.clustering as clustering
 from synplan.chem.reaction_routes.clustering import (
     cluster_routes,
     subcluster_all_clusters,
     subcluster_one_cluster,
 )
-
-from CGRtools.containers import CGRContainer, ReactionContainer
 
 
 @pytest.fixture(scope="module")

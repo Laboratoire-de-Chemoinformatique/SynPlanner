@@ -1,10 +1,9 @@
 """Integration tests for the main SynPlanner pipeline components."""
 
-import pickle
 from pathlib import Path
-from CGRtools import smiles as smiles_cgrtools
 
 import pytest
+from chython import smiles as smiles_chython
 
 from synplan.chem.data.standardizing import (
     standardize_reactions_from_file,
@@ -23,7 +22,7 @@ def debug_standardization(reaction_smiles: str, standardizers: list) -> None:
     print(f"\nDebugging reaction: {reaction_smiles}")
     try:
         # Parse the reaction
-        reaction = smiles_cgrtools(reaction_smiles)
+        reaction = smiles_chython(reaction_smiles)
         print(f"Successfully parsed reaction: {reaction}")
 
         # Apply each standardizer one by one
@@ -105,8 +104,43 @@ def test_filtering_keeps_some(
     assert 0 < len(kept) < len(open(sample_reactions_file).read().splitlines())
 
 
+@pytest.mark.skip(
+    reason="Ray parallel test is slow and has env resolution issues with local chython path"
+)
+def test_filtering_parallel_matches_serial(
+    tmp_path: Path,
+    sample_reactions_file: Path,
+    filt_config,
+):
+    serial_out = tmp_path / "filt_serial.smi"
+    parallel_out = tmp_path / "filt_parallel.smi"
+
+    filter_reactions_from_file(
+        config=filt_config,
+        input_reaction_data_path=str(sample_reactions_file),
+        filtered_reaction_data_path=str(serial_out),
+        num_cpus=1,
+        batch_size=2,
+    )
+
+    filter_reactions_from_file(
+        config=filt_config,
+        input_reaction_data_path=str(sample_reactions_file),
+        filtered_reaction_data_path=str(parallel_out),
+        num_cpus=2,
+        batch_size=2,
+    )
+
+    serial_lines = serial_out.read_text().splitlines()
+    parallel_lines = parallel_out.read_text().splitlines()
+
+    assert serial_lines, "serial filtering removed every reaction"
+    assert parallel_lines, "parallel filtering removed every reaction"
+    assert serial_lines == parallel_lines
+
+
 # --------------------------------------------------------------------------- #
-# 3. Basic rule extraction returns rules and pickles non‑empty                #
+# 3. Basic rule extraction returns rules as TSV                               #
 # --------------------------------------------------------------------------- #
 
 
@@ -116,7 +150,7 @@ def test_rule_extraction_basic(
     rule_cfg_factory,
 ):
     cfg = rule_cfg_factory()
-    out = tmp_path / "rules.pickle"
+    out = tmp_path / "rules.tsv"
 
     extract_rules_from_reactions(
         config=cfg,
@@ -126,9 +160,38 @@ def test_rule_extraction_basic(
         batch_size=2,
     )
 
-    with out.open("rb") as fh:
-        rules = pickle.load(fh)
-    assert rules, "no rules extracted"
+    assert out.exists(), "TSV file not created"
+    tsv_lines = out.read_text().splitlines()
+    assert tsv_lines[0] == "rule_smarts\tpopularity\treaction_indices"
+    assert len(tsv_lines) > 1, "no rules extracted"
+
+
+def test_rule_extraction_tsv_roundtrip(
+    tmp_path: Path,
+    sample_reactions_file: Path,
+    rule_cfg_factory,
+):
+    """Extract rules → save TSV → load back via load_reaction_rules."""
+    from synplan.utils.loading import load_reaction_rules
+
+    cfg = rule_cfg_factory()
+    out = tmp_path / "rules.tsv"
+
+    extract_rules_from_reactions(
+        config=cfg,
+        reaction_data_path=str(sample_reactions_file),
+        reaction_rules_path=str(out),
+        num_cpus=1,
+        batch_size=2,
+    )
+
+    reactors = load_reaction_rules(str(out))
+    assert reactors, "no reactors loaded from TSV"
+
+    # Every loaded reactor should have a valid SMARTS representation
+    for reactor in reactors:
+        smarts_str = str(reactor)
+        assert ">>" in smarts_str, f"invalid SMARTS: {smarts_str}"
 
 
 # --------------------------------------------------------------------------- #
@@ -146,7 +209,7 @@ def test_rule_extraction_variants(
     popularity,
 ):
     cfg = rule_cfg_factory(environment_atom_count=env_cnt, min_popularity=popularity)
-    out = tmp_path / f"rules_env{env_cnt}_pop{popularity}.pickle"
+    out = tmp_path / f"rules_env{env_cnt}_pop{popularity}.tsv"
 
     extract_rules_from_reactions(
         config=cfg,
@@ -156,14 +219,16 @@ def test_rule_extraction_variants(
         batch_size=2,
     )
 
-    with out.open("rb") as fh:
-        rules = pickle.load(fh)
+    assert out.exists(), "TSV file not created"
+    tsv_lines = out.read_text().splitlines()
+    n_rules = len(tsv_lines) - 1  # subtract header
 
     # For higher popularity thresholds, we might get no rules
     if popularity == 1:
-        assert rules  # at least one rule for min_popularity=1
+        assert n_rules > 0  # at least one rule for min_popularity=1
     # stricter popularity => never *more* rules
     if popularity > 1:
-        prev_file = tmp_path / f"rules_env{env_cnt}_pop1.pickle"
+        prev_file = tmp_path / f"rules_env{env_cnt}_pop1.tsv"
         if prev_file.exists():
-            assert len(rules) <= len(pickle.load(prev_file.open("rb")))
+            prev_n = len(prev_file.read_text().splitlines()) - 1
+            assert n_rules <= prev_n

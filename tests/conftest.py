@@ -1,9 +1,21 @@
 from __future__ import annotations
+import os
 from pathlib import Path
 
 import pytest
-from CGRtools import smiles
-from CGRtools.containers import ReactionContainer, CGRContainer
+from chython import smiles
+from chython.containers import CGRContainer, ReactionContainer
+
+
+def pytest_unconfigure(config):
+    """Force-exit after test session to prevent hanging from Ray/PyTorch daemon threads."""
+    os._exit(getattr(config, "_exitstatus", 0))
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Store exit status for pytest_unconfigure."""
+    session.config._exitstatus = exitstatus
+
 
 from synplan.chem.data.filtering import (
     ReactionFilterConfig,
@@ -12,7 +24,6 @@ from synplan.chem.data.filtering import (
 )
 from synplan.chem.data.standardizing import (
     ReactionStandardizationConfig,
-    ReactionMappingConfig,
     FunctionalGroupsConfig,
     KekuleFormConfig,
     CheckValenceConfig,
@@ -64,7 +75,7 @@ REACTIONS = [
         "Grignard addition",
     ),
     (
-        "[CH2:1]1[CH2:2][CH2:3][CH2:4][CH2:5][CH:6]1[OH:7]>[O:11]=[Cr:10](=[O:12])([OH:9])[OH:13]>[CH2:2]1[CH2:1][CH:6]([CH2:5][CH2:4][CH2:3]1)[CH:7]=[O:8]",
+        "[CH2:1]1[CH2:2][CH2:3][CH2:4][CH2:5][CH:6]1[OH:7]>[O:11]=[Cr:10](=[O:12])([OH:9])[OH:13]>[CH2:2]1[CH2:1][C:6](=[O:7])[CH2:5][CH2:4][CH2:3]1",
         "Jones oxidation",
     ),
     (
@@ -117,7 +128,6 @@ def sample_reactions_file(tmp_path: Path, sample_reactions) -> Path:
 def std_config() -> ReactionStandardizationConfig:
     """One fully‑loaded standardisation config reused across tests."""
     return ReactionStandardizationConfig(
-        reaction_mapping_config=ReactionMappingConfig(),
         functional_groups_config=FunctionalGroupsConfig(),
         kekule_form_config=KekuleFormConfig(),
         check_valence_config=CheckValenceConfig(),

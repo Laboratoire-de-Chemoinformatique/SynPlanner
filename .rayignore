@@ -1,0 +1,11 @@
+.git
+.venv
+local
+synplan_data
+tutorial_results
+.cache
+__pycache__
+*.pt
+*.dt
+*.smi
+*.safetensors
