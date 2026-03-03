@@ -87,7 +87,7 @@ def compose_precursors(
         transition_mapping = {}
         for mol in precursors[1:]:
             for n, atom in mol.molecule.atoms():
-                new_number = tmp_mol.add_atom(atom.atomic_symbol)
+                new_number = tmp_mol.add_atom(atom.copy())
                 transition_mapping[n] = new_number
             for atom, neighbor, bond in mol.molecule.bonds():
                 tmp_mol.add_bond(

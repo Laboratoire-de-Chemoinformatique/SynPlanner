@@ -33,7 +33,7 @@ def add_small_mols(
         for small_mol in small_molecules:
 
             for n, atom in small_mol.atoms():
-                new_number = tmp_mol.add_atom(atom.atomic_symbol)
+                new_number = tmp_mol.add_atom(atom.copy())
                 transition_mapping[n] = new_number
 
             for atom, neighbor, bond in small_mol.bonds():
@@ -114,13 +114,18 @@ def apply_reaction_rule(
 
         # validate products
         if validate_products:
+            is_valid = True
             for mol in reactants:
                 try:
                     tmp_mol = mol.copy()
                     tmp_mol.kekule()
                     if tmp_mol.check_valence():
-                        yield None
+                        is_valid = False
+                        break
                 except InvalidAromaticRing:
-                    yield None
+                    is_valid = False
+                    break
+            if not is_valid:
+                continue
 
         yield reactants
