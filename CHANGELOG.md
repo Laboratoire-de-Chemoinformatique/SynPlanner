@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [1.4.0] - 2025
+## [1.4.0] - 2026-03-03
 
 > **This is a major breaking release.** SynPlanner now uses `chython-synplan` as its
 > sole cheminformatics backend, replacing CGRtools and minimizing RDKit to an optional
@@ -191,7 +191,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 | Pretrained models | Retrain — feature vectors differ |
 | HuggingFace repo | Data moved to `SynPlanner-data` repo |
 
-## [1.3.2] - 2024
+## [1.3.2] - 2025-12-14
 
 ### Added
 - NMCS and LazyNMCS tutorials (`09_NMCS_Algorithms`)
@@ -206,12 +206,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PyPI publishing pipeline (`--skip-existing` flag)
 - Black formatting
 
-## [1.3.1] - 2024
+## [1.3.1] - 2025-11-13
 
 ### Fixed
 - Streamlit GUI rerun error
 
-## [1.3.0] - 2024
+## [1.3.0] - 2025-11-13
 
 ### Added
 - NMCS (Nested Monte Carlo Search) and LazyNMCS search algorithms
@@ -236,13 +236,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - SAScore division-by-zero edge case with UCT
 - Tree config backward compatibility
 
-## [1.2.1] - 2024
+## [1.2.1] - 2025-09-15
 
 ### Changed
 - Updated dependencies
 - Improved README and documentation
 
-## [1.2.0] - 2024
+## [1.2.0] - 2025-08-13
 
 ### Added
 - Route clustering by strategic bonds (contributed by Almaz Gilmullin)
@@ -256,12 +256,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Refactored visualisation module
 - Enhanced GUI session state management
 
-## [1.1.2] - 2024
+## [1.1.2] - 2025-05-11
 
 ### Changed
 - Updated dependency versions
 
-## [1.1.1] - 2024
+## [1.1.1] - 2025-05-11
 
 ### Added
 - RxnMapper integration for atom-to-atom mapping
@@ -269,7 +269,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - PyPI publishing configuration and dependencies
 
-## [1.1.0] - 2024
+## [1.1.0] - 2025-05-04
 
 ### Added
 - Initial CI pipeline and tests
@@ -279,7 +279,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Refactored standardization pipeline
 - Updated NumPy compatibility
 
-## [1.0.0] - 2024
+## [1.0.0] - 2024-12-20
 
 ### Added
 - Initial public release
