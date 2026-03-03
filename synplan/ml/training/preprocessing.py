@@ -308,6 +308,7 @@ def reaction_rules_appliance(
             for reaction in rule([molecule]):
                 for prod in reaction.products:
                     tmp_prod = prod.copy()
+                    tmp_prod.remove_coordinate_bonds(keep_to_terminal=False)
                     tmp_prod.kekule()
                     if tmp_prod.check_valence():
                         break
@@ -478,6 +479,7 @@ def mol_to_pyg(molecule: MoleculeContainer, canonicalize: bool = True) -> Data |
     try:
         if canonicalize:
             tmp_molecule.canonicalize()
+        tmp_molecule.remove_coordinate_bonds(keep_to_terminal=False)
         tmp_molecule.kekule()
         if tmp_molecule.check_valence():
             return None

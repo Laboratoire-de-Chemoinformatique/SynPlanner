@@ -50,10 +50,8 @@ html_theme_options = {
     "show_nav_level": 4,
     "show_prev_next": False,
     "navbar_end": ["version-switcher", "theme-switcher", "navbar-icon-links"],
-    # Version switcher configuration (works locally with _static/switcher.json
-    # and on hosting when json_url points to a hosted file)
     "switcher": {
-        "json_url": "_static/switcher.json",
+        "json_url": os.environ.get("READTHEDOCS_CANONICAL_URL", "") + "_static/switcher.json",
         "version_match": os.environ.get("READTHEDOCS_VERSION", release),
     },
     "icon_links": [

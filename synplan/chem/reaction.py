@@ -118,6 +118,7 @@ def apply_reaction_rule(
             for mol in reactants:
                 try:
                     tmp_mol = mol.copy()
+                    tmp_mol.remove_coordinate_bonds(keep_to_terminal=False)
                     tmp_mol.kekule()
                     if tmp_mol.check_valence():
                         is_valid = False

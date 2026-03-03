@@ -403,6 +403,7 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
                 for result_product in result_reaction.products:
                     tmp = result_product.copy()
                     try:
+                        tmp.remove_coordinate_bonds(keep_to_terminal=False)
                         tmp.kekule()
                         if tmp.check_valence():
                             continue
