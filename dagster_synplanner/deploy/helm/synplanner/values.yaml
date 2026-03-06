@@ -1,0 +1,97 @@
+# SynPlanner Helm values
+# Override these for your AWS/Kubernetes deployment
+
+image:
+  repository: synplanner
+  tag: latest
+  pullPolicy: IfNotPresent
+
+synplanner:
+  outputDir: /data/synplanner
+  numCpus: "4"
+  batchSize: "100"
+  device: cpu  # Set to "cuda" for GPU nodes
+
+  # Persistent volume for data/models/results
+  persistence:
+    enabled: true
+    storageClass: ""  # Use default or set to "gp3" for AWS EBS
+    size: 50Gi
+    accessMode: ReadWriteMany  # Use EFS on AWS for shared access
+
+api:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+frontend:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# GPU worker pool for training/planning ops
+gpuWorkers:
+  enabled: false
+  nodeSelector:
+    nvidia.com/gpu: "true"
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  resources:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+      nvidia.com/gpu: "1"
+    limits:
+      cpu: "4"
+      memory: 16Gi
+      nvidia.com/gpu: "1"
+
+# Dagster sub-chart configuration
+dagster:
+  enabled: true
+  dagsterWebserver:
+    replicas: 1
+  dagsterDaemon:
+    enabled: true
+  postgresql:
+    enabled: false  # Use our own postgresql sub-chart
+
+# PostgreSQL sub-chart configuration
+postgresql:
+  enabled: true
+  auth:
+    username: dagster
+    password: dagster
+    database: dagster
+  primary:
+    persistence:
+      size: 10Gi
+
+ingress:
+  enabled: false
+  className: alb  # AWS ALB Ingress Controller
+  annotations: {}
+  hosts:
+    - host: synplanner.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: api
+        - path: /dagster
+          pathType: Prefix
+          service: dagster-webserver

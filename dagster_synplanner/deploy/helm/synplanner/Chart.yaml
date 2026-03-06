@@ -1,0 +1,14 @@
+apiVersion: v2
+name: synplanner
+description: SynPlanner retrosynthetic planning platform with Dagster orchestration
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: dagster
+    version: "1.9.x"
+    repository: https://dagster-io.github.io/helm
+    condition: dagster.enabled
+  - name: postgresql
+    version: "16.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled

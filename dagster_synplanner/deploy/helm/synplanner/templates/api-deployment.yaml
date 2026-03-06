@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api
+  labels:
+    app: synplanner-api
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app: synplanner-api
+  template:
+    metadata:
+      labels:
+        app: synplanner-api
+    spec:
+      containers:
+        - name: api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["uvicorn", "dagster_synplanner.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DAGSTER_GRAPHQL_URL
+              value: "http://{{ .Release.Name }}-dagster-webserver:3000/graphql"
+            - name: SYNPLANNER_OUTPUT_DIR
+              value: {{ .Values.synplanner.outputDir }}
+            - name: SYNPLANNER_UPLOAD_DIR
+              value: "{{ .Values.synplanner.outputDir }}/uploads"
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.synplanner.outputDir }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+      volumes:
+        - name: data
+          {{- if .Values.synplanner.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-api
+spec:
+  selector:
+    app: synplanner-api
+  ports:
+    - port: 8000
+      targetPort: 8000

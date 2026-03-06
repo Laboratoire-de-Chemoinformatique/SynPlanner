@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-user-code
+  labels:
+    app: synplanner-user-code
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: synplanner-user-code
+  template:
+    metadata:
+      labels:
+        app: synplanner-user-code
+    spec:
+      {{- if .Values.gpuWorkers.enabled }}
+      nodeSelector:
+        {{- toYaml .Values.gpuWorkers.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.gpuWorkers.tolerations | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: user-code
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "-m", "dagster_synplanner.repository"]
+          ports:
+            - containerPort: 4000
+          env:
+            - name: SYNPLANNER_OUTPUT_DIR
+              value: {{ .Values.synplanner.outputDir }}
+            - name: SYNPLANNER_NUM_CPUS
+              value: {{ .Values.synplanner.numCpus | quote }}
+            - name: SYNPLANNER_BATCH_SIZE
+              value: {{ .Values.synplanner.batchSize | quote }}
+            - name: SYNPLANNER_DEVICE
+              value: {{ .Values.synplanner.device }}
+            - name: DAGSTER_PG_HOST
+              value: "{{ .Release.Name }}-postgresql"
+            - name: DAGSTER_PG_PORT
+              value: "5432"
+            - name: DAGSTER_PG_USER
+              value: {{ .Values.postgresql.auth.username }}
+            - name: DAGSTER_PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-postgresql
+                  key: password
+            - name: DAGSTER_PG_DB
+              value: {{ .Values.postgresql.auth.database }}
+          {{- if .Values.gpuWorkers.enabled }}
+          resources:
+            {{- toYaml .Values.gpuWorkers.resources | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.synplanner.outputDir }}
+      volumes:
+        - name: data
+          {{- if .Values.synplanner.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-user-code
+spec:
+  selector:
+    app: synplanner-user-code
+  ports:
+    - port: 4000
+      targetPort: 4000

@@ -1,0 +1,7 @@
+# Dagster workspace configuration
+# Points to the user code gRPC server
+load_from:
+  - grpc_server:
+      host: user-code
+      port: 4000
+      location_name: synplanner
