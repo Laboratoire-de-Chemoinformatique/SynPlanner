@@ -5,6 +5,75 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-03-15
+
+### Added
+
+#### ORD (Open Reaction Database) Support
+- New `synplan/utils/ord/` package for reading ORD `.pb` Dataset files via protobuf
+  (`dataset_pb2.py`, `reaction_pb2.py`) without depending on `ord-schema`
+- `iter_ord_reactions()` iterator for lazy ORD `.pb` file parsing
+- `convert_ord_to_smiles()` utility for batch ORD-to-SMILES conversion
+- `synplan ord_convert` CLI command for converting ORD `.pb` files to `.smi`
+- `ReactionReader` and `RawReactionReader` now accept `.pb` files natively
+- `_ORDReadAdapter` for transparent ORD reading through the existing `Reader` protocol
+- 367-line test suite (`test_ord_reader.py`) covering ORD parsing
+
+#### Configuration
+- `ReactorConfig` pydantic model for typed Reactor construction parameters
+  (`automorphism_filter`, `delete_atoms`, `one_shot`, `fix_aromatic_rings`,
+  `fix_tautomers`) with `to_reactor_kwargs()` serialization
+- `load_reaction_rules()` now accepts optional `reactor_config` parameter
+
+### Changed
+
+#### Rule Extraction
+- Rule deduplication now uses CGR (condensed graph of reaction) instead of
+  `ReactionContainer` hashing — correctly preserves query-level atom annotations
+  (neighbors, hybridization) when rules contain `QueryContainer` molecules
+- `_update_rules_statistics()` and `sort_rules()` updated to use `cgr_to_rule`
+  mapping for CGR-based dedup
+- `process_completed_batch()` receives `cgr_to_rule` dict
+
+#### Docker
+- Added `.dockerignore` to exclude `.git`, `.venv`, `docs`, `tests`, `tutorials`,
+  build caches, and data directories from Docker build context
+
+#### Dependencies
+- Added `protobuf>=4.21` to core dependencies (ORD `.pb` support)
+- Added `grpcio-tools>=1.78.0` to dev dependencies (protobuf code generation)
+
+#### Fixes & Cleanup
+- `depict_settings()` calls updated to module-level function (was
+  `MoleculeContainer.depict_settings()`)
+- `routes_clustering_report` / `routes_subclustering_report`: safer target SMILES
+  lookup with `.get()` fallback instead of direct key access
+- Removed unused `yaml` imports from `filtering.py` and `standardizing.py`
+- Removed unused `os` import from `cli.py`
+- Removed unused `Any` import from `mapping.py`
+- Import order cleanup (ruff/black formatting)
+
+## [1.4.1] - 2026-03-03
+
+### Fixed
+- Coordinate bonds that break `mol_to_pyg` graph conversion are now removed via
+  `remove_coordinate_bonds(keep_to_terminal=False)` before kekulization across
+  6 call sites (`rdkit_compat.py`, `reaction.py`, `extraction.py`, `utils.py` ×2,
+  `preprocessing.py` ×2)
+
+### Changed
+
+#### Documentation
+- Replaced `.nblink` files with direct symlinks to tutorial notebooks (removed
+  `nbsphinx_link` dependency)
+- Version switcher now uses `READTHEDOCS_CANONICAL_URL` for correct multi-version
+  docs hosting
+- ReadTheDocs build switched from `jobs` to `commands` with explicit `uv run sphinx`
+- Cleaned up `conf.py` comments and removed `nbsphinx_link` from extensions
+
+### Infrastructure
+- Bumped version to 1.4.1 in `pyproject.toml` and `uv.lock`
+
 ## [1.4.0] - 2026-03-03
 
 > **This is a major breaking release.** SynPlanner now uses `chython-synplan` as its
@@ -291,7 +360,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CLI interface (`synplan` command)
 - Docker images for CLI and GUI
 
-[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.1...v1.4.2
+[1.4.1]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.3.0...v1.3.1
