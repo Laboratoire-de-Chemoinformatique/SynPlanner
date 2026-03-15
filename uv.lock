@@ -5798,7 +5798,7 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.7" },
     { name = "numpy", specifier = ">=2" },
     { name = "pandas", specifier = ">=1.4" },
-    { name = "protobuf", specifier = ">=4.21" },
+    { name = "protobuf", specifier = ">=6.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytorch-lightning", specifier = ">=2" },
     { name = "pyyaml", specifier = ">=6.0" },

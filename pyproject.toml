@@ -29,7 +29,7 @@ dependencies = [
   "pydantic>=2.0",
   "pyyaml>=6.0",
   "safetensors>=0.4",
-  "protobuf>=4.21",
+  "protobuf>=6.0",
 ]
 
 # Extras to select PyTorch variant - required for uv users
