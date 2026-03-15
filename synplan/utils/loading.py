@@ -248,7 +248,7 @@ def download_all_data(save_to="."):
 
 
 @functools.cache
-def load_reaction_rules(file: str) -> list[Reactor]:
+def load_reaction_rules(file: str, reactor_config: "ReactorConfig | None" = None) -> list[Reactor]:
     """Loads the reaction rules from a TSV or pickle file and converts them into a
     list of Reactor objects.
 
@@ -259,19 +259,27 @@ def load_reaction_rules(file: str) -> list[Reactor]:
     - ``.pickle`` -- legacy pickle format (deprecated).
 
     :param file: The path to the file that stores the reaction rules.
+    :param reactor_config: Optional ReactorConfig to control Reactor construction
+        (e.g. automorphism_filter, delete_atoms). If None, uses defaults.
     :return: A list of reaction rules as Reactor objects.
     """
     ext = Path(file).suffix.lower()
 
+    reactor_kwargs = reactor_config.to_reactor_kwargs() if reactor_config else {}
+
     if ext == ".tsv":
-        return _load_rules_tsv(file)
+        return _load_rules_tsv(file, reactor_kwargs)
 
     # Legacy pickle path
     return _load_rules_pickle(file)
 
 
-def _load_rules_tsv(file: str) -> tuple:
+def _load_rules_tsv(file: str, reactor_kwargs: dict | None = None) -> tuple:
     """Load reaction rules from a TSV file."""
+    if reactor_kwargs is None:
+        reactor_kwargs = {}
+    # delete_atoms default for SynPlanner rules is False
+    reactor_kwargs.setdefault("delete_atoms", False)
     reactors = []
     with open(file, encoding="utf-8") as f:
         f.readline()  # skip header
@@ -281,7 +289,7 @@ def _load_rules_tsv(file: str) -> tuple:
                 continue
             parts = line.split("\t")
             smarts_str = parts[0]
-            reactors.append(Reactor.from_smarts(smarts_str, delete_atoms=False))
+            reactors.append(Reactor.from_smarts(smarts_str, **reactor_kwargs))
     return tuple(reactors)
 
 

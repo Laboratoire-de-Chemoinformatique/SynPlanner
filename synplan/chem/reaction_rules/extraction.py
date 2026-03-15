@@ -548,12 +548,15 @@ def extract_rules(
     if config.multicenter_rules:
         return [create_rule(config, reaction)], False
 
-    # extract separate rules for each distinct reaction center
-    distinct_rules = set()
+    # extract separate rules for each distinct reaction center (deduplicate by CGR)
+    seen_cgrs = {}
     for center_reaction in islice(reaction.enumerate_centers(), 15):
-        distinct_rules.add(create_rule(config, center_reaction))
+        rule = create_rule(config, center_reaction)
+        cgr = ~rule
+        if cgr not in seen_cgrs:
+            seen_cgrs[cgr] = rule
 
-    return list(distinct_rules), False
+    return list(seen_cgrs.values()), False
 
 
 @ray.remote
@@ -601,21 +604,30 @@ def process_reaction_batch(
 
 
 def _update_rules_statistics(
-    rules_statistics: dict[ReactionContainer, list[int]],
+    rules_statistics: dict,
+    cgr_to_rule: dict,
     index: int,
     extracted_rules: list[ReactionContainer],
 ) -> None:
-    """Update rules statistics with the indices of reactions they came from."""
+    """Update rules statistics with the indices of reactions they came from.
+
+    Deduplication is performed by the CGR (condensed graph of reaction) of
+    each rule, which preserves query-level atom annotations (neighbors,
+    hybridization, etc.) when rules contain QueryContainer molecules.
+    """
     for rule in extracted_rules:
+        cgr = ~rule
         prev_stats_len = len(rules_statistics)
-        rules_statistics[rule].append(index)
+        rules_statistics[cgr].append(index)
         if len(rules_statistics) != prev_stats_len:
             rule.meta["first_reaction_index"] = index
+            cgr_to_rule[cgr] = rule
 
 
 def process_completed_batch(
     futures: dict,
     rules_statistics: dict,
+    cgr_to_rule: dict,
     error_file: TextIOWrapper | None = None,
     error_counts: Counter | None = None,
     multi_product_count: list[int] | None = None,
@@ -629,7 +641,8 @@ def process_completed_batch(
     updates the progress bar with the size of the processed batch.
 
     :param futures: A dictionary of futures representing ongoing batch processing tasks.
-    :param rules_statistics: A dictionary to keep track of statistics for each rule.
+    :param rules_statistics: A dictionary mapping rule CGRs to lists of reaction indices.
+    :param cgr_to_rule: A dictionary mapping rule CGRs to the first rule seen.
     :param error_file: Optional file handle to write failed reactions.
     :param error_counts: Optional counter to accumulate error categories.
     :param multi_product_count: Single-element list used as mutable accumulator for
@@ -649,7 +662,7 @@ def process_completed_batch(
         return
 
     for index, extracted_rules, product_smi in results:
-        _update_rules_statistics(rules_statistics, index, extracted_rules)
+        _update_rules_statistics(rules_statistics, cgr_to_rule, index, extracted_rules)
         if products_file is not None:
             products_file.write(f"{index}\t{product_smi}\n")
 
@@ -666,7 +679,9 @@ def process_completed_batch(
 
 
 def sort_rules(
-    rules_stats: dict, min_popularity: int
+    rules_stats: dict,
+    cgr_to_rule: dict,
+    min_popularity: int,
 ) -> tuple[list[tuple[ReactionContainer, list[int]]], dict[str, int]]:
     """
     Sorts reaction rules based on their popularity and validation status. This
@@ -674,13 +689,12 @@ def sort_rules(
     times they have been applied) and filters out rules that haven't passed reactor
     validation or are less popular than the specified minimum popularity threshold.
 
-    :param rules_stats: A dictionary where each key is a reaction rule and the value is
+    :param rules_stats: A dictionary where each key is a rule CGR and the value is
         a list of integers. Each integer represents an index where the rule was applied.
-    :type rules_stats: The number of occurrence of the reaction rules.
+    :param cgr_to_rule: A dictionary mapping rule CGRs to the first
+        ReactionContainer rule seen for that CGR.
     :param min_popularity: The minimum number of times a rule must be applied to be
         considered. Default is 3.
-    :type min_popularity: The minimum number of occurrence of the reaction rule to be
-        selected.
 
     :return: A tuple of (sorted_rules, filter_stats) where *sorted_rules* is a list of
         tuples with a reaction rule and its application indices, sorted by descending
@@ -696,7 +710,8 @@ def sort_rules(
         "passed": 0,
     }
 
-    for rule, indices in rules_stats.items():
+    for cgr, indices in rules_stats.items():
+        rule = cgr_to_rule[cgr]
         filter_stats["total_unique_rules"] += 1
         validation = rule.meta.get("reactor_validation", "not_set")
         if validation != "passed":
@@ -715,7 +730,8 @@ def sort_rules(
 def _extract_rules_serial(
     config: RuleExtractionConfig,
     reaction_data_path: str,
-    rules_statistics: dict[ReactionContainer, list[int]],
+    rules_statistics: dict,
+    cgr_to_rule: dict,
     *,
     ignore_errors: bool = False,
     error_file: TextIOWrapper | None = None,
@@ -742,7 +758,7 @@ def _extract_rules_serial(
             extracted_rules, skipped = extract_rules(config, reaction)
             if skipped:
                 n_multi_product += 1
-            _update_rules_statistics(rules_statistics, index, extracted_rules)
+            _update_rules_statistics(rules_statistics, cgr_to_rule, index, extracted_rules)
             if products_file is not None:
                 products_file.write(f"{index}\t{product_smi}\n")
         except Exception as e:
@@ -843,7 +859,8 @@ def extract_rules_from_reactions(
     """
 
     reaction_rules_path_base, _ = splitext(reaction_rules_path)
-    extracted_rules_and_statistics = defaultdict(list)
+    extracted_rules_and_statistics = defaultdict(list)  # CGR -> list[int]
+    cgr_to_rule: dict = {}  # CGR -> first ReactionContainer seen
 
     # Resolve error file path
     _error_path: Path | None = None
@@ -877,6 +894,7 @@ def extract_rules_from_reactions(
                 config,
                 reaction_data_path,
                 extracted_rules_and_statistics,
+                cgr_to_rule,
                 ignore_errors=ignore_errors,
                 error_file=error_file,
                 error_counts=error_counts,
@@ -911,6 +929,7 @@ def extract_rules_from_reactions(
                         process_completed_batch(
                             futures,
                             extracted_rules_and_statistics,
+                            cgr_to_rule,
                             error_file=error_file,
                             error_counts=error_counts,
                             multi_product_count=multi_product_count,
@@ -927,6 +946,7 @@ def extract_rules_from_reactions(
                 process_completed_batch(
                     futures,
                     extracted_rules_and_statistics,
+                    cgr_to_rule,
                     error_file=error_file,
                     error_counts=error_counts,
                     multi_product_count=multi_product_count,
@@ -943,6 +963,7 @@ def extract_rules_from_reactions(
 
     sorted_rules, filter_stats = sort_rules(
         extracted_rules_and_statistics,
+        cgr_to_rule,
         min_popularity=config.min_popularity,
     )
     filter_stats["skipped_multi_product"] = n_multi_product

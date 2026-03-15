@@ -154,5 +154,14 @@ uspto/
 presets/
 *.smi
 *.ckpt
-*.tsv
+# Ignore large TSV data files, but not package data (synplan/route_quality/protection/data/)
+/*.tsv
+building_blocks/**/*.tsv
+policy/**/*.tsv
+synplan_data/**/*.tsv
 local/
+
+# SynPlanner App
+synplanner_app/frontend/node_modules/
+synplanner_app/frontend/dist/
+.tmp*
