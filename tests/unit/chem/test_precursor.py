@@ -1,5 +1,6 @@
 import pytest
 from chython import smiles
+
 from synplan.chem.precursor import Precursor
 
 

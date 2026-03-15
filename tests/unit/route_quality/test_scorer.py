@@ -1,9 +1,10 @@
 """Tests for the competing sites scorer and route re-ranking module."""
 
-import pytest
-from pydantic import ValidationError
 from unittest.mock import MagicMock
+
+import pytest
 from chython import smiles
+from pydantic import ValidationError
 
 from synplan.route_quality.protection.config import ProtectionConfig
 from synplan.route_quality.protection.functional_groups import (

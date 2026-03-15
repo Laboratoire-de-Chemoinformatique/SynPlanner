@@ -248,7 +248,9 @@ def download_all_data(save_to="."):
 
 
 @functools.cache
-def load_reaction_rules(file: str, reactor_config: "ReactorConfig | None" = None) -> list[Reactor]:
+def load_reaction_rules(
+    file: str, reactor_config: "ReactorConfig | None" = None
+) -> list[Reactor]:
     """Loads the reaction rules from a TSV or pickle file and converts them into a
     list of Reactor objects.
 

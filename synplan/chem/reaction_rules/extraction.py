@@ -758,7 +758,9 @@ def _extract_rules_serial(
             extracted_rules, skipped = extract_rules(config, reaction)
             if skipped:
                 n_multi_product += 1
-            _update_rules_statistics(rules_statistics, cgr_to_rule, index, extracted_rules)
+            _update_rules_statistics(
+                rules_statistics, cgr_to_rule, index, extracted_rules
+            )
             if products_file is not None:
                 products_file.write(f"{index}\t{product_smi}\n")
         except Exception as e:

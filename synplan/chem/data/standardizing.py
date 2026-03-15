@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import ray
-import yaml
 from chython import smiles as smiles_chython
 from chython.containers import MoleculeContainer, ReactionContainer
 from pydantic import Field, model_validator

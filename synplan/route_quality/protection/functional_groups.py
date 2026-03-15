@@ -8,9 +8,9 @@ strategies during synthesis.
 import logging
 
 import yaml
-from pydantic import BaseModel, ConfigDict
 from chython import smarts
 from chython.containers import MoleculeContainer
+from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
 

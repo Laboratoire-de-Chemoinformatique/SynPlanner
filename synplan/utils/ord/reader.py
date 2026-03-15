@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 # CompoundIdentifier.IdentifierType enum values (from reaction.proto)
 _ID_SMILES = 2
 _ID_INCHI = 4
-_ID_NAME = 6       # IUPAC_NAME
-_ID_NAME2 = 7      # NAME
+_ID_NAME = 6  # IUPAC_NAME
+_ID_NAME2 = 7  # NAME
 
 # Compound.ReactionRole enum values
 _ROLE_REACTANT = 1
@@ -82,8 +82,11 @@ def _reaction_to_smiles(reaction) -> tuple[str | None, dict]:
             elif role in (_ROLE_REAGENT, _ROLE_SOLVENT, _ROLE_CATALYST):
                 if smi:
                     reagent_smiles.append(smi)
-                label = {_ROLE_REAGENT: "reagents", _ROLE_SOLVENT: "solvents",
-                         _ROLE_CATALYST: "catalysts"}[role]
+                label = {
+                    _ROLE_REAGENT: "reagents",
+                    _ROLE_SOLVENT: "solvents",
+                    _ROLE_CATALYST: "catalysts",
+                }[role]
                 if name:
                     names[label].append(name)
             else:
@@ -153,9 +156,7 @@ def iter_ord_reactions(path: str | Path) -> Iterator[ReactionContainer]:
         try:
             rxn = parse_smiles(rxn_smi)
         except Exception as exc:
-            logger.warning(
-                "chython parse failed for %s: %s", reaction.reaction_id, exc
-            )
+            logger.warning("chython parse failed for %s: %s", reaction.reaction_id, exc)
             continue
 
         if not isinstance(rxn, ReactionContainer):

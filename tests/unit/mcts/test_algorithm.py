@@ -1,14 +1,13 @@
 import random
 import time
-from typing import Callable, List, Tuple
+from collections.abc import Callable
 
 from chython.containers import MoleculeContainer
 
-from synplan.mcts.tree import Tree
-from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
-from synplan.utils.loading import load_evaluation_function
 from synplan.mcts.algorithm import NestedMonteCarlo
-
+from synplan.mcts.tree import Tree
+from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
+from synplan.utils.loading import load_evaluation_function
 
 # ----------------------
 # Helper constructors
@@ -28,14 +27,14 @@ def make_mol(n: int) -> MoleculeContainer:
 
 class FakeReaction:
     def __init__(
-        self, reactants: List[MoleculeContainer], products: List[MoleculeContainer]
+        self, reactants: list[MoleculeContainer], products: list[MoleculeContainer]
     ):
         self.reactants = reactants
         self.products = products
 
 
 class FakeReactor:
-    def __init__(self, products_fn: Callable[[], List[MoleculeContainer]]):
+    def __init__(self, products_fn: Callable[[], list[MoleculeContainer]]):
         self.products_fn = products_fn
 
     def __call__(self, *reactants: MoleculeContainer):
@@ -44,7 +43,7 @@ class FakeReactor:
 
 class FakePolicy:
     def __init__(
-        self, rules: List[Tuple[float, FakeReactor, int]], expand_deeper: bool = False
+        self, rules: list[tuple[float, FakeReactor, int]], expand_deeper: bool = False
     ):
         # rules: list of (prob, reactor, rule_id)
         self.rules = rules
@@ -60,7 +59,7 @@ class FakePolicy:
 
 def build_tree(
     algorithm: str,
-    rules: List[Tuple[float, FakeReactor, int]],
+    rules: list[tuple[float, FakeReactor, int]],
     *,
     min_mol_size: int = 6,
     beam_width: int = 1,

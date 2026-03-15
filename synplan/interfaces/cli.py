@@ -1,6 +1,5 @@
 """Module containing commands line scripts for training and planning steps."""
 
-import os
 import warnings
 from pathlib import Path
 

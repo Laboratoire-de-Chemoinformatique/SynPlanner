@@ -7,7 +7,8 @@ from datetime import datetime
 from itertools import count, islice, pairwise
 from typing import Any
 
-from chython import depict_settings, smiles as read_smiles
+from chython import depict_settings
+from chython import smiles as read_smiles
 from chython.algorithms.depict import _graph_svg, _render_config
 from chython.containers.molecule import MoleculeContainer
 from IPython.display import HTML, display
@@ -730,7 +731,9 @@ def routes_clustering_report(
         # JSON mode: take the root smiles of the first route
         try:
             key = valid_routes[0]
-            target_smiles = routes_json.get(key, routes_json.get(str(key), {})).get("smiles", "N/A")
+            target_smiles = routes_json.get(key, routes_json.get(str(key), {})).get(
+                "smiles", "N/A"
+            )
         except Exception:
             target_smiles = "N/A"
 
@@ -1156,7 +1159,9 @@ def routes_subclustering_report(
         # JSON mode: take the root smiles of the first route
         try:
             key = valid_routes[0]
-            target_smiles = routes_json.get(key, routes_json.get(str(key), {})).get("smiles", "N/A")
+            target_smiles = routes_json.get(key, routes_json.get(str(key), {})).get(
+                "smiles", "N/A"
+            )
         except Exception:
             target_smiles = "N/A"
 

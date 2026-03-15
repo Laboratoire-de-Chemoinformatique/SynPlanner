@@ -1,9 +1,8 @@
 from chython import smiles
-import pytest
 
 from synplan.chem.data.filtering import (
-    CCsp3BreakingFilter,
     CCRingBreakingFilter,
+    CCsp3BreakingFilter,
     DynamicBondsFilter,
     NoReactionFilter,
     WrongCHBreakingFilter,

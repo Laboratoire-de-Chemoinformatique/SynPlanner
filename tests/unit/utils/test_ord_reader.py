@@ -1,7 +1,6 @@
 """Tests for ORD .pb file reading (synplan/utils/ord/reader.py)."""
 
 import pytest
-
 from chython.containers import ReactionContainer
 
 from synplan.utils.ord import dataset_pb2, reaction_pb2
@@ -14,7 +13,6 @@ from synplan.utils.ord.reader import (
     count_ord_reactions,
     iter_ord_reactions,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers to build minimal protobuf messages
@@ -144,11 +142,15 @@ class TestGetYield:
 
 class TestReactionToSmiles:
     def test_basic_reaction(self):
-        ds = _make_dataset([{
-            "reactants": ["CC(=O)O", "CCO"],
-            "products": ["CC(=O)OCC"],
-            "reaction_id": "rxn-001",
-        }])
+        ds = _make_dataset(
+            [
+                {
+                    "reactants": ["CC(=O)O", "CCO"],
+                    "products": ["CC(=O)OCC"],
+                    "reaction_id": "rxn-001",
+                }
+            ]
+        )
         rxn = ds.reactions[0]
         smi, meta = _reaction_to_smiles(rxn)
         assert smi is not None
@@ -159,38 +161,54 @@ class TestReactionToSmiles:
         assert meta["ord_reaction_id"] == "rxn-001"
 
     def test_with_reagents(self):
-        ds = _make_dataset([{
-            "reactants": ["CC(=O)O"],
-            "reagents": [("CCN(CC)CC", 2)],  # role=2 REAGENT
-            "products": ["CC(=O)OCC"],
-        }])
+        ds = _make_dataset(
+            [
+                {
+                    "reactants": ["CC(=O)O"],
+                    "reagents": [("CCN(CC)CC", 2)],  # role=2 REAGENT
+                    "products": ["CC(=O)OCC"],
+                }
+            ]
+        )
         smi, meta = _reaction_to_smiles(ds.reactions[0])
         parts = smi.split(">")
         assert len(parts) == 3
         assert "CCN(CC)CC" in parts[1]  # middle = reagents
 
     def test_returns_none_when_no_products(self):
-        ds = _make_dataset([{
-            "reactants": ["CCO"],
-            "products": [],
-        }])
+        ds = _make_dataset(
+            [
+                {
+                    "reactants": ["CCO"],
+                    "products": [],
+                }
+            ]
+        )
         smi, meta = _reaction_to_smiles(ds.reactions[0])
         assert smi is None
 
     def test_returns_none_when_no_reactants(self):
-        ds = _make_dataset([{
-            "reactants": [],
-            "products": ["CCO"],
-        }])
+        ds = _make_dataset(
+            [
+                {
+                    "reactants": [],
+                    "products": ["CCO"],
+                }
+            ]
+        )
         smi, meta = _reaction_to_smiles(ds.reactions[0])
         assert smi is None
 
     def test_yields_in_meta(self):
-        ds = _make_dataset([{
-            "reactants": ["CCO"],
-            "products": ["CC"],
-            "yields": [92.5],
-        }])
+        ds = _make_dataset(
+            [
+                {
+                    "reactants": ["CCO"],
+                    "products": ["CC"],
+                    "yields": [92.5],
+                }
+            ]
+        )
         smi, meta = _reaction_to_smiles(ds.reactions[0])
         assert "ord_yields" in meta
         assert "92.5" in meta["ord_yields"]
@@ -203,11 +221,16 @@ class TestReactionToSmiles:
 
 class TestIterOrdReactions:
     def test_yields_reaction_containers(self, tmp_path):
-        pb_file = _write_dataset(tmp_path, [{
-            "reactants": ["CC(=O)O", "CCO"],
-            "products": ["CC(=O)OCC"],
-            "reaction_id": "rxn-001",
-        }])
+        pb_file = _write_dataset(
+            tmp_path,
+            [
+                {
+                    "reactants": ["CC(=O)O", "CCO"],
+                    "products": ["CC(=O)OCC"],
+                    "reaction_id": "rxn-001",
+                }
+            ],
+        )
         results = list(iter_ord_reactions(pb_file))
         assert len(results) == 1
         assert isinstance(results[0], ReactionContainer)
@@ -251,10 +274,15 @@ class TestIterOrdReactions:
 
 class TestCountOrdReactions:
     def test_counts_reactions(self, tmp_path):
-        pb_file = _write_dataset(tmp_path, [{
-            "reactants": ["CCO"],
-            "products": ["CC"],
-        }])
+        pb_file = _write_dataset(
+            tmp_path,
+            [
+                {
+                    "reactants": ["CCO"],
+                    "products": ["CC"],
+                }
+            ],
+        )
         assert count_ord_reactions(pb_file) == 1
 
 
@@ -265,10 +293,15 @@ class TestCountOrdReactions:
 
 class TestConvertOrdToSmiles:
     def test_writes_smi_file(self, tmp_path):
-        pb_file = _write_dataset(tmp_path, [{
-            "reactants": ["CC(=O)O", "CCO"],
-            "products": ["CC(=O)OCC"],
-        }])
+        pb_file = _write_dataset(
+            tmp_path,
+            [
+                {
+                    "reactants": ["CC(=O)O", "CCO"],
+                    "products": ["CC(=O)OCC"],
+                }
+            ],
+        )
         out_file = tmp_path / "out.smi"
         n = convert_ord_to_smiles(pb_file, out_file)
         assert n == 1
@@ -286,10 +319,16 @@ class TestRawReactionReaderPb:
     def test_accepts_pb_extension(self, tmp_path):
         from synplan.utils.files import RawReactionReader
 
-        pb_file = _write_dataset(tmp_path, [{
-            "reactants": ["CCO"],
-            "products": ["CC"],
-        }], filename="reactions.pb")
+        pb_file = _write_dataset(
+            tmp_path,
+            [
+                {
+                    "reactants": ["CCO"],
+                    "products": ["CC"],
+                }
+            ],
+            filename="reactions.pb",
+        )
         reader = RawReactionReader(pb_file)
         assert reader.format == "pb"
         items = list(reader)
@@ -312,10 +351,16 @@ class TestReactionReaderPb:
     def test_reads_pb_file(self, tmp_path):
         from synplan.utils.files import ReactionReader
 
-        pb_file = _write_dataset(tmp_path, [{
-            "reactants": ["CC(=O)O", "CCO"],
-            "products": ["CC(=O)OCC"],
-        }], filename="reactions.pb")
+        pb_file = _write_dataset(
+            tmp_path,
+            [
+                {
+                    "reactants": ["CC(=O)O", "CCO"],
+                    "products": ["CC(=O)OCC"],
+                }
+            ],
+            filename="reactions.pb",
+        )
         with ReactionReader(pb_file) as r:
             rxns = list(r)
         assert len(rxns) == 1

@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from synplan.ml.training.preprocessing import RankingPolicyDataset
-from synplan.utils.cache import cache_digest
 from synplan.ml.training.supervised import _stratified_ranking_split
+from synplan.utils.cache import cache_digest
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 POLICY_DATA = str(DATA_DIR / "policy_data_small.tsv")

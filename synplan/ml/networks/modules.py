@@ -10,9 +10,9 @@ from torch.nn import GELU, Dropout, Linear, Module, ModuleDict, ModuleList, Sequ
 from torch.nn.functional import relu
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch_geometric.data.batch import Batch
-from torch_geometric.nn.conv import GCNConv, GINEConv, GPSConv
 from torch_geometric.nn.aggr import VariancePreservingAggregation
-from torch_geometric.nn.pool import global_add_pool, global_mean_pool
+from torch_geometric.nn.conv import GCNConv, GINEConv, GPSConv
+from torch_geometric.nn.pool import global_add_pool
 
 
 class GraphEmbedding(Module):

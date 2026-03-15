@@ -17,7 +17,6 @@ from ray.util.queue import Empty, Queue
 from torch import Tensor
 from torch_geometric.data import InMemoryDataset
 from torch_geometric.data.data import Data
-from torch_geometric.data.makedirs import makedirs
 from torch_geometric.transforms import ToUndirected
 from tqdm.auto import tqdm
 

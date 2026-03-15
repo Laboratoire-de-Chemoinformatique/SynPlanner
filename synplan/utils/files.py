@@ -26,7 +26,13 @@ class FileHandler:
         """
         self._file = None
         _, ext = splitext(filename)
-        file_types = {".smi": "SMI", ".smiles": "SMI", ".rdf": "RDF", ".sdf": "SDF", ".pb": "PB"}
+        file_types = {
+            ".smi": "SMI",
+            ".smiles": "SMI",
+            ".rdf": "RDF",
+            ".sdf": "SDF",
+            ".pb": "PB",
+        }
         try:
             self._file_type = file_types[ext]
         except KeyError:
@@ -155,7 +161,6 @@ class ReactionReader(Reader):
         elif self._file_type == "RDF":
             self._file = RDFRead(filename, indexable=True, **kwargs)
         elif self._file_type == "PB":
-            from synplan.utils.ord.reader import iter_ord_reactions
 
             self._file = _ORDReadAdapter(filename)
         else:
