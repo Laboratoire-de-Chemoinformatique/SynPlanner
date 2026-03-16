@@ -16,6 +16,7 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 
 _sym_db = _symbol_database.Default()
 
+from synplan.utils.ord import reaction_pb2 as _reaction_pb2  # noqa: F401, E402
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n\rdataset.proto\x12\x03ord\x1a\x0ereaction.proto"x\n\x07\x44\x61taset\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12 \n\treactions\x18\x03 \x03(\x0b\x32\r.ord.Reaction\x12\x14\n\x0creaction_ids\x18\x04 \x03(\t\x12\x12\n\ndataset_id\x18\x05 \x01(\t"i\n\x0e\x44\x61tasetExample\x12\x12\n\ndataset_id\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x0b\n\x03url\x18\x03 \x01(\t\x12!\n\x07\x63reated\x18\x04 \x01(\x0b\x32\x10.ord.RecordEventb\x06proto3'
