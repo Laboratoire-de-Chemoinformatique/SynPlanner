@@ -1,9 +1,6 @@
 import pytest
-
 from chython.containers import CGRContainer, ReactionContainer
 
-# === Tests for route_cgr.py functions ===
-from synplan.chem.reaction_routes.route_cgr import compose_route_cgr, compose_sb_cgr
 from synplan.chem.reaction_routes.io import (
     TreeWrapper,
     make_dict,
@@ -11,6 +8,8 @@ from synplan.chem.reaction_routes.io import (
     read_routes_json,
 )
 
+# === Tests for route_cgr.py functions ===
+from synplan.chem.reaction_routes.route_cgr import compose_route_cgr, compose_sb_cgr
 
 # --- Test Data ---
 CSV_DATA = """route_id,step_id,smiles,meta

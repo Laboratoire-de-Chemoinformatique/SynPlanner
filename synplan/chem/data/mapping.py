@@ -16,7 +16,7 @@ from itertools import chain, count
 from math import inf
 from pathlib import Path
 from queue import Queue
-from typing import Any, Literal
+from typing import Literal
 
 import torch
 from chython import smiles as parse_smiles
@@ -34,11 +34,10 @@ from numpy import (
     unravel_index,
     zeros,
 )
+from pydantic import Field
 from scipy.linalg import block_diag
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
-
-from pydantic import Field
 
 from synplan.utils.config import BaseConfigModel
 from synplan.utils.files import count_smiles_records

@@ -26,7 +26,13 @@ class FileHandler:
         """
         self._file = None
         _, ext = splitext(filename)
-        file_types = {".smi": "SMI", ".smiles": "SMI", ".rdf": "RDF", ".sdf": "SDF"}
+        file_types = {
+            ".smi": "SMI",
+            ".smiles": "SMI",
+            ".rdf": "RDF",
+            ".sdf": "SDF",
+            ".pb": "PB",
+        }
         try:
             self._file_type = file_types[ext]
         except KeyError:
@@ -121,6 +127,27 @@ class Writer(FileHandler):
         return self
 
 
+class _ORDReadAdapter:
+    """Adapts iter_ord_reactions to the Reader protocol used by ReactionReader."""
+
+    def __init__(self, filename: str | Path):
+        self._path = Path(filename)
+
+    def __iter__(self):
+        from synplan.utils.ord.reader import iter_ord_reactions
+
+        return iter_ord_reactions(self._path)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        pass
+
+    def close(self):
+        pass
+
+
 class ReactionReader(Reader):
     def __init__(self, filename: str | Path, **kwargs):
         """Class to read reaction files.
@@ -133,6 +160,9 @@ class ReactionReader(Reader):
             self._file = SMILESRead(filename, **kwargs)
         elif self._file_type == "RDF":
             self._file = RDFRead(filename, indexable=True, **kwargs)
+        elif self._file_type == "PB":
+
+            self._file = _ORDReadAdapter(filename)
         else:
             raise ValueError("File type incompatible -", filename)
 
@@ -429,16 +459,24 @@ class RawReactionReader:
             self.format = "smi"
         elif ext == ".rdf":
             self.format = "rdf"
+        elif ext == ".pb":
+            self.format = "pb"
         else:
             raise ValueError(f"Unsupported extension for raw reading: {ext}")
         self._path = p
         self._batch_size = batch_size
 
-    def __iter__(self) -> Iterator[str]:
+    def __iter__(self) -> Iterator[str | ReactionContainer]:
         if self.format == "smi":
             yield from iter_smiles(self._path)
-        else:
+        elif self.format == "rdf":
             yield from iter_rdf_text_blocks(self._path, 1)
+        elif self.format == "pb":
+            from synplan.utils.ord.reader import iter_ord_reactions
+
+            yield from iter_ord_reactions(self._path)
+        else:
+            raise ValueError(f"Unsupported format: {self.format}")
 
     def __enter__(self):
         return self

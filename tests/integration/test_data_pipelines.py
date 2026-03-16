@@ -5,10 +5,10 @@ from pathlib import Path
 import pytest
 from chython import smiles as smiles_chython
 
+from synplan.chem.data.filtering import filter_reactions_from_file
 from synplan.chem.data.standardizing import (
     standardize_reactions_from_file,
 )
-from synplan.chem.data.filtering import filter_reactions_from_file
 from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions
 
 
@@ -34,12 +34,12 @@ def debug_standardization(reaction_smiles: str, standardizers: list) -> None:
                 current_reaction = standardizer(current_reaction)
                 print(f"Output reaction: {current_reaction}")
             except Exception as e:
-                print(f"Error in {standardizer.__class__.__name__}: {str(e)}")
+                print(f"Error in {standardizer.__class__.__name__}: {e!s}")
                 print(f"Error type: {type(e)}")
                 raise
         print("\nStandardization completed successfully")
     except Exception as e:
-        print(f"Failed to process reaction: {str(e)}")
+        print(f"Failed to process reaction: {e!s}")
         print(f"Error type: {type(e)}")
         raise
 

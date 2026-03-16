@@ -75,7 +75,7 @@ Prebuilt images are published to GHCR for Linux/AMD64.
 
 .. code-block:: bash
 
-    VERSION=1.4.0
+    VERSION=1.4.2
 
     # CLI: pull and show help
     docker pull ghcr.io/laboratoire-de-chemoinformatique/synplanner:${VERSION}-cli-amd64

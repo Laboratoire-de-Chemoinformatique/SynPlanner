@@ -9,7 +9,6 @@ from typing import Any, ClassVar
 
 import numpy as np
 import ray
-import yaml
 from chython.algorithms.fingerprints.morgan import MorganFingerprint
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from pydantic import Field, model_validator

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Set
+from collections.abc import Iterable
 
 import pytest
+from chython import smarts as sq_chy
 from chython import smiles
 from chython.containers import (
     CGRContainer,
@@ -12,7 +13,6 @@ from chython.containers import (
     QueryContainer,
     ReactionContainer,
 )
-from chython import smarts as sq_chy
 
 from synplan.chem.reaction_rules.extraction import (
     add_environment_atoms,
@@ -29,12 +29,12 @@ from synplan.utils.config import RuleExtractionConfig
 
 
 @pytest.fixture(scope="session")
-def default_config() -> RuleExtractionConfig:  # noqa: D401 – simple factory
+def default_config() -> RuleExtractionConfig:
     """Return the default rule‑extraction configuration."""
     return RuleExtractionConfig()
 
 
-def _neighbours(mol: MoleculeContainer | CGRContainer, idx: int) -> Set[int]:
+def _neighbours(mol: MoleculeContainer | CGRContainer, idx: int) -> set[int]:
     """Return immediate neighbour atom numbers for *idx*.
 
     Implementation relies on chython's private `_bonds` mapping because the

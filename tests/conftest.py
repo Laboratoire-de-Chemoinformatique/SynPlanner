@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import os
 from pathlib import Path
 
@@ -18,26 +19,25 @@ def pytest_sessionfinish(session, exitstatus):
 
 
 from synplan.chem.data.filtering import (
-    ReactionFilterConfig,
     CCsp3BreakingConfig,
     DynamicBondsConfig,
+    ReactionFilterConfig,
 )
 from synplan.chem.data.standardizing import (
-    ReactionStandardizationConfig,
-    FunctionalGroupsConfig,
-    KekuleFormConfig,
-    CheckValenceConfig,
-    ImplicifyHydrogensConfig,
-    CheckIsotopesConfig,
     AromaticFormConfig,
-    MappingFixConfig,
-    UnchangedPartsConfig,
-    RemoveReagentsConfig,
-    RebalanceReactionConfig,
+    CheckIsotopesConfig,
+    CheckValenceConfig,
     DuplicateReactionConfig,
+    FunctionalGroupsConfig,
+    ImplicifyHydrogensConfig,
+    KekuleFormConfig,
+    MappingFixConfig,
+    ReactionStandardizationConfig,
+    RebalanceReactionConfig,
+    RemoveReagentsConfig,
+    UnchangedPartsConfig,
 )
 from synplan.chem.reaction_rules.extraction import RuleExtractionConfig
-
 
 # ---------- test data ------------------------------------------------------ #
 

@@ -7,6 +7,7 @@ from datetime import datetime
 from itertools import count, islice, pairwise
 from typing import Any
 
+from chython import depict_settings
 from chython import smiles as read_smiles
 from chython.algorithms.depict import _graph_svg, _render_config
 from chython.containers.molecule import MoleculeContainer
@@ -422,9 +423,9 @@ def generate_results_html(
     :return: None.
     """
     if aam:
-        MoleculeContainer.depict_settings(aam=True)
+        depict_settings(aam=True)
     else:
-        MoleculeContainer.depict_settings(aam=False)
+        depict_settings(aam=False)
 
     routes = []
     if extended:
@@ -665,7 +666,7 @@ def routes_clustering_report(
     """
     # --- Depict Settings ---
     with contextlib.suppress(Exception):
-        MoleculeContainer.depict_settings(aam=bool(aam))
+        depict_settings(aam=bool(aam))
 
     # --- Figure out what `source` is ---
     using_tree = False
@@ -729,9 +730,12 @@ def routes_clustering_report(
     else:
         # JSON mode: take the root smiles of the first route
         try:
-            target_smiles = routes_json[valid_routes[0]]["smiles"]
-        except:
-            target_smiles = routes_json[valid_routes[0]]["smiles"]
+            key = valid_routes[0]
+            target_smiles = routes_json.get(key, routes_json.get(str(key), {})).get(
+                "smiles", "N/A"
+            )
+        except Exception:
+            target_smiles = "N/A"
 
     # --- HTML Templates & Tags ---
     td = '<td style="text-align: left; border: 1px solid black; border-spacing: 0">'
@@ -1092,7 +1096,7 @@ def routes_subclustering_report(
     """
     # --- Depict Settings ---
     with contextlib.suppress(Exception):
-        MoleculeContainer.depict_settings(aam=bool(aam))
+        depict_settings(aam=bool(aam))
 
     # --- Figure out what `source` is ---
     using_tree = False
@@ -1153,7 +1157,13 @@ def routes_subclustering_report(
             target_smiles = "N/A"
     else:
         # JSON mode: take the root smiles of the first route
-        target_smiles = routes_json[valid_routes[0]]["smiles"]
+        try:
+            key = valid_routes[0]
+            target_smiles = routes_json.get(key, routes_json.get(str(key), {})).get(
+                "smiles", "N/A"
+            )
+        except Exception:
+            target_smiles = "N/A"
 
     # legend row omitted…
 

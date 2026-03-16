@@ -2,6 +2,7 @@ import pickle
 
 import pytest
 from chython.containers import CGRContainer, ReactionContainer
+
 import synplan.chem.reaction_routes.clustering as clustering
 from synplan.chem.reaction_routes.clustering import (
     cluster_routes,

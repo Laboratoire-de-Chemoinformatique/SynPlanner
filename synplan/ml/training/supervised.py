@@ -13,10 +13,9 @@ from pathlib import Path
 import torch
 from pytorch_lightning import Callback, Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 from torch.utils.data import Subset, random_split
 from torch_geometric.data.lightning import LightningDataset
-
-from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 
 from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.training.preprocessing import (

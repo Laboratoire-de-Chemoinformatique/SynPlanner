@@ -1,23 +1,25 @@
 import logging
+
 import pytest
-from synplan.chem.utils import mol_from_smiles
-from synplan.chem.reaction_routes.route_cgr import (
-    compose_all_route_cgrs,
-    compose_all_sb_cgrs,
-)
+
 from synplan.chem.reaction_routes.clustering import (
     cluster_routes,
     subcluster_all_clusters,
 )
+from synplan.chem.reaction_routes.route_cgr import (
+    compose_all_route_cgrs,
+    compose_all_sb_cgrs,
+)
+from synplan.chem.utils import mol_from_smiles
+from synplan.mcts.tree import Tree
+from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import (
     download_preset,
     load_building_blocks,
-    load_reaction_rules,
-    load_policy_function,
     load_evaluation_function,
+    load_policy_function,
+    load_reaction_rules,
 )
-from synplan.mcts.tree import Tree
-from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
 
 # Test molecules with different complexity levels
 TEST_MOLECULES = {

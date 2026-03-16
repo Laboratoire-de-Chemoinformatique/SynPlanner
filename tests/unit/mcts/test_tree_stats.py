@@ -1,13 +1,12 @@
 """Tests for tree statistics collection."""
 
-from typing import Callable, List
+from collections.abc import Callable
 
 from chython.containers import MoleculeContainer
 
 from synplan.mcts.tree import Tree
-from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
+from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import load_evaluation_function
-
 
 # -- Helpers (same pattern as test_algorithm.py) --
 
@@ -30,7 +29,7 @@ class FakeReaction:
 
 
 class FakeReactor:
-    def __init__(self, products_fn: Callable[[], List[MoleculeContainer]]):
+    def __init__(self, products_fn: Callable[[], list[MoleculeContainer]]):
         self.products_fn = products_fn
 
     def __call__(self, *reactants: MoleculeContainer):

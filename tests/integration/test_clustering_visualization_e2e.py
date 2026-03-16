@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 
 import pytest
-from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
+from chython.containers import CGRContainer, ReactionContainer
 
 from synplan.chem.reaction_routes.clustering import (
     cluster_routes,
