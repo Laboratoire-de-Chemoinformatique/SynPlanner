@@ -14,7 +14,6 @@ dependencies = [
   "numpy>=2",
   "pandas>=1.4",
   "toytree>=2.0",
-  "ray>=2.0",
   "click>=8.0.0",
   "huggingface-hub>=0.24.0",
   "adabelief-pytorch>=0.2.1",
@@ -129,12 +128,10 @@ ignore = [
     "SIM115", # open-file-with-context-handler — needs refactoring
     "RUF002", # ambiguous unicode in docstrings — non-breaking hyphens
     "RUF003", # ambiguous unicode in comments — non-breaking hyphens
-    "RUF013", # implicit Optional — to be addressed later
     "F405",   # names from star imports — to be addressed later
     "F403",   # star imports — suppressed globally, per-file for __init__
     "F821",   # undefined names — to be investigated
     "B006",   # mutable argument default — to be addressed later
-    "B904",   # raise-without-from — to be addressed later
     "RUF012", # mutable class default without ClassVar — to be addressed later
     "SIM102", # collapsible-if — sometimes nested ifs are clearer
 ]

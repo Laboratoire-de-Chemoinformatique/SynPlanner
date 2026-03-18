@@ -44,8 +44,7 @@ class FakePolicy:
     def predict_reaction_rules(self, precursor, reaction_rules):
         if not self.expand_deeper and len(precursor.prev_precursors) > 1:
             return
-        for prob, reactor, rid in self.rules:
-            yield prob, reactor, rid
+        yield from self.rules
 
 
 def build_tree(algorithm="breadth_first", rules=None, **kwargs):
@@ -144,7 +143,7 @@ def test_route_discovery_timing():
         (0.9, FakeReactor(lambda: [make_mol(5)]), 0),  # building block -> solved
     ]
     tree = build_tree("breadth_first", rules)
-    for solved, node_ids in tree:
+    for _solved, _node_ids in tree:
         pass
 
     assert tree.stats["first_solution_iteration"] is not None

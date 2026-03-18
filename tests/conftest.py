@@ -18,12 +18,12 @@ def pytest_sessionfinish(session, exitstatus):
     session.config._exitstatus = exitstatus
 
 
-from synplan.chem.data.filtering import (
+from synplan.chem.data.filtering import (  # noqa: E402
     CCsp3BreakingConfig,
     DynamicBondsConfig,
     ReactionFilterConfig,
 )
-from synplan.chem.data.standardizing import (
+from synplan.chem.data.standardizing import (  # noqa: E402
     AromaticFormConfig,
     CheckIsotopesConfig,
     CheckValenceConfig,
@@ -37,7 +37,7 @@ from synplan.chem.data.standardizing import (
     RemoveReagentsConfig,
     UnchangedPartsConfig,
 )
-from synplan.chem.reaction_rules.extraction import RuleExtractionConfig
+from synplan.chem.reaction_rules.extraction import RuleExtractionConfig  # noqa: E402
 
 # ---------- test data ------------------------------------------------------ #
 
@@ -48,7 +48,7 @@ REACTIONS = [
     ),
     (
         "[CH2:5]=[CH2:6].[CH:2]([CH:3]=[CH2:4])=[CH2:1]>>[CH:3]1=[CH:4][CH2:6][CH2:5][CH2:2][CH2:1]1",
-        "Diels–Alder cycloaddition",
+        "Diels-Alder cycloaddition",
     ),
     (
         "[CH:2](=[O:3])[CH3:1].[CH:5](=[O:6])[CH3:4]>[Na+:7].[OH-:8]>[OH:3][CH:2]([CH2:4][CH:5]=[O:6])[CH3:1]",
@@ -64,11 +64,11 @@ REACTIONS = [
     ),
     (
         "[Cl:8][CH3:7].[cH:1]1[cH:2][cH:3][cH:4][cH:5][cH:6]1>[Cl:9][Al:10]([Cl:11])[Cl:12]>[ClH:8].[cH:2]1[cH:1][c:6]([cH:5][cH:4][cH:3]1)[CH3:7]",
-        "Friedel–Crafts alkylation",
+        "Friedel-Crafts alkylation",
     ),
     (
         "[O:9]=[C:8]([CH3:7])[Cl:10].[cH:1]1[cH:2][cH:3][cH:4][cH:5][cH:6]1>[Cl:11][Al:12]([Cl:13])[Cl:14]>[ClH:10].[cH:2]1[cH:1][c:6]([cH:5][cH:4][cH:3]1)[C:8](=[O:9])[CH3:7]",
-        "Friedel–Crafts acylation",
+        "Friedel-Crafts acylation",
     ),
     (
         "[CH3:9][C:10]([CH3:12])=[O:11].[Mg:8].[cH:2]1[cH:1][c:6]([cH:5][cH:4][cH:3]1)[Br:7]>[CH3:18][CH2:17][O:16][CH2:15][CH3:14]>[Br-:7].[Mg+2:13].[cH:1]1[cH:2][cH:3][cH:4][cH:5][c:6]1[C:10](=[O:11])[CH2:9][CH3:12]",
@@ -94,7 +94,7 @@ REACTIONS = [
     ),
     (
         "[cH:2]1[cH:1][c:6]([cH:5][cH:4][cH:3]1)[Br:7].[cH:9]1[cH:8][c:13]([cH:12][cH:11][cH:10]1)[B:14]([OH:16])[OH:15]>[K+:18].[K+:23].[O-:19][C:20]([O-:22])=[O:21].[Pd:17]>[Br-:7].[OH:15][B:14]=[O:16].[cH:1]1[cH:2][cH:3][cH:4][cH:5][c:6]1-[c:8]1[cH:9][cH:10][cH:11][cH:12][cH:13]1",
-        "Suzuki–Miyaura coupling",
+        "Suzuki-Miyaura coupling",
     ),
     (
         "[cH:12]1[cH:11][c:10]([cH:15][cH:14][cH:13]1)[CH:9]=[CH2:8].[cH:2]1[cH:1][c:6]([cH:5][cH:4][cH:3]1)[I:7]>[CH2:18]([CH3:17])[N:19]([CH2:20][CH3:21])[CH2:22][CH3:23].[Pd:16]>[I-:7].[cH:2]1[cH:1][c:6]([cH:5][cH:4][cH:3]1)/[CH:8]=[CH:9]/[c:10]1[cH:11][cH:12][cH:13][cH:14][cH:15]1",

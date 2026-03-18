@@ -35,8 +35,8 @@ class FileHandler:
         }
         try:
             self._file_type = file_types[ext]
-        except KeyError:
-            raise ValueError("I don't know the file extension,", ext)
+        except KeyError as e:
+            raise ValueError("I don't know the file extension,", ext) from e
 
     def close(self):
         self._file.close()

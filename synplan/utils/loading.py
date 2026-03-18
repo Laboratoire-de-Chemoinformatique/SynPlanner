@@ -473,7 +473,7 @@ def load_policy_net(
 
 def load_policy_function(
     policy_config: Union["PolicyNetworkConfig", dict, None] = None,
-    weights_path: str = None,
+    weights_path: str | None = None,
     **config_kwargs,
 ) -> "PolicyNetworkFunction":
     """Factory function to create PolicyNetworkFunction with flexible configuration.
@@ -517,8 +517,8 @@ def load_combined_policy_function(
     combined_config: Union["CombinedPolicyConfig", dict] = None,
     filtering_config: Union["PolicyNetworkConfig", dict, str] = None,
     ranking_config: Union["PolicyNetworkConfig", dict, str] = None,
-    filtering_weights_path: str = None,
-    ranking_weights_path: str = None,
+    filtering_weights_path: str | None = None,
+    ranking_weights_path: str | None = None,
     top_rules: int = 50,
     rule_prob_threshold: float = 0.0,
     ranking_weight: float = 1.0,
@@ -640,7 +640,7 @@ def load_combined_policy_function(
 
 def load_value_network(
     value_config: Union["ValueNetworkConfig", dict, None] = None,
-    weights_path: str = None,
+    weights_path: str | None = None,
     **config_kwargs,
 ) -> "ValueNetworkFunction":
     """Factory function to create ValueNetworkFunction with flexible configuration.

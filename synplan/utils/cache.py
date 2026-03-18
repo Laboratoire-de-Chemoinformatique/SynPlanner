@@ -5,8 +5,6 @@ Replaces pickle-based torch.save/torch.load with safetensors for:
 - Speed: memory-mapped loading (zero-copy on CPU)
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
 from pathlib import Path
@@ -105,7 +103,7 @@ def load_pyg_dataset(
     path = Path(path)
 
     handle = safe_open(str(path), framework="pt", device="cpu")
-    tensors = {key: handle.get_tensor(key) for key in handle.keys()}
+    tensors = {key: handle.get_tensor(key) for key in handle}
     data, slices = _unflatten(tensors)
 
     meta_path = path.with_suffix(".meta.json")

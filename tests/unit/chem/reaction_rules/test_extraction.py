@@ -30,7 +30,7 @@ from synplan.utils.config import RuleExtractionConfig
 
 @pytest.fixture(scope="session")
 def default_config() -> RuleExtractionConfig:
-    """Return the default rule‑extraction configuration."""
+    """Return the default rule-extraction configuration."""
     return RuleExtractionConfig()
 
 
@@ -43,7 +43,7 @@ def _neighbours(mol: MoleculeContainer | CGRContainer, idx: int) -> set[int]:
     """
     neigh: set[int] = set()
 
-    # Preferred: constant‑time lookup from the internal adjacency table.
+    # Preferred: constant-time lookup from the internal adjacency table.
     if hasattr(mol, "_bonds") and isinstance(mol._bonds, dict):  # type: ignore[attr-defined]
         neigh.update(mol._bonds.get(idx, {}).keys())  # type: ignore[attr-defined]
         if neigh:
@@ -69,7 +69,7 @@ def test_add_environment_atoms(simple_cgr: CGRContainer, depth: int) -> None:
     centre = set(simple_cgr.center_atoms)
     expanded = add_environment_atoms(simple_cgr, centre, depth)
     if depth == 0:
-        assert expanded == centre, "Depth 0 must echo centre atoms only"
+        assert expanded == centre, "Depth 0 must echo centre atoms only"
     else:
         assert centre.issubset(expanded), "Centre atoms must be kept"
         expected = centre | {n for idx in centre for n in _neighbours(simple_cgr, idx)}
@@ -150,7 +150,7 @@ def test_clean_molecules(simple_esterification_reaction: ReactionContainer) -> N
     def _check(orig: Iterable[QueryContainer], clean: Iterable[QueryContainer]):
         for o, c in zip(orig, clean, strict=True):
             for idx in o.atoms_numbers:
-                o_atom, c_atom = o.atom(idx), c.atom(idx)
+                _o_atom, c_atom = o.atom(idx), c.atom(idx)
                 if idx in centre:
                     assert c_atom.implicit_hydrogens not in ((), None)
                 else:

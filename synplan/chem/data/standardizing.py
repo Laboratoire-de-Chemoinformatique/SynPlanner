@@ -4,21 +4,20 @@ This module contains the open-source code from
 https://github.com/Laboratoire-de-Chemoinformatique/Reaction_Data_Cleaning/blob/master/scripts/standardizer.py
 """
 
-from __future__ import annotations
-
 import logging
+import time
 from abc import ABC, abstractmethod
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any, ClassVar
 
-import ray
 from chython import smiles as smiles_chython
 from chython.containers import MoleculeContainer, ReactionContainer
 from pydantic import Field, model_validator
 from tqdm.auto import tqdm
 
+from synplan.chem.data.reaction_result import ErrorEntry, PipelineSummary, ProcessResult
 from synplan.chem.utils import unite_molecules
 from synplan.utils.config import BaseConfigModel
 from synplan.utils.files import (
@@ -26,6 +25,7 @@ from synplan.utils.files import (
     ReactionWriter,
     parse_reaction,
 )
+from synplan.utils.parallel import graceful_shutdown, process_pool_map_stream
 
 logger = logging.getLogger("synplan.chem.data.standardizing")
 
@@ -34,8 +34,8 @@ class StandardizationError(RuntimeError):
     """Wraps the original exception and the reaction string that failed.
 
     Stores the original exception type name and message as strings so the
-    error is safely picklable by Ray (no reference to the live exception
-    object which may not be importable on the worker).
+    error is safely picklable across process boundaries (no reference to the
+    live exception object which may not be importable on the worker).
     """
 
     def __init__(self, stage: str, reaction: str, original: Exception):
@@ -46,7 +46,7 @@ class StandardizationError(RuntimeError):
         super().__init__(f"{stage} failed on {reaction}: {original}")
 
     def __reduce__(self):
-        """Make picklable for Ray (no reference to original exception object)."""
+        """Make picklable (no reference to original exception object)."""
         return (
             self.__class__._from_pickle,
             (self.stage, self.reaction, self.original_type, self.original_msg),
@@ -69,7 +69,7 @@ class BaseStandardizer(ABC):
     """Template: subclasses override `_run` only."""
 
     @classmethod
-    def from_config(cls, _cfg: object) -> BaseStandardizer:
+    def from_config(cls, _cfg: object) -> "BaseStandardizer":
         return cls()
 
     @abstractmethod
@@ -411,7 +411,7 @@ class UnchangedPartsStandardizer(BaseStandardizer):
         self.keep_reagents = keep_reagents
 
     @classmethod
-    def from_config(cls, config: UnchangedPartsConfig) -> UnchangedPartsStandardizer:
+    def from_config(cls, config: UnchangedPartsConfig) -> "UnchangedPartsStandardizer":
         return cls()
 
     def _run(self, rxn: ReactionContainer) -> ReactionContainer:
@@ -477,7 +477,7 @@ class SmallMoleculesStandardizer(BaseStandardizer):
         self.mol_max_size = mol_max_size
 
     @classmethod
-    def from_config(cls, config: SmallMoleculesConfig) -> SmallMoleculesStandardizer:
+    def from_config(cls, config: SmallMoleculesConfig) -> "SmallMoleculesStandardizer":
         return cls(config.mol_max_size)
 
     def _split_molecules(
@@ -551,7 +551,7 @@ class RemoveReagentsStandardizer(BaseStandardizer):
         self.reagent_max_size = reagent_max_size
 
     @classmethod
-    def from_config(cls, config: RemoveReagentsConfig) -> RemoveReagentsStandardizer:
+    def from_config(cls, config: RemoveReagentsConfig) -> "RemoveReagentsStandardizer":
         return cls(config.reagent_max_size)
 
     def _run(self, rxn: ReactionContainer) -> ReactionContainer:
@@ -618,7 +618,7 @@ class RebalanceReactionStandardizer(BaseStandardizer):
     @classmethod
     def from_config(
         cls, config: RebalanceReactionConfig
-    ) -> RebalanceReactionStandardizer:
+    ) -> "RebalanceReactionStandardizer":
         return cls()
 
     def _run(self, rxn: ReactionContainer) -> ReactionContainer:
@@ -649,22 +649,18 @@ class DuplicateReactionConfig(BaseConfigModel):
 
 
 class DuplicateReactionStandardizer(BaseStandardizer):
-    """Cluster‑wide duplicate removal via a Ray actor."""
+    """Per-worker duplicate removal (local cache only).
 
-    def __init__(self, dedup_actor: ray.actor.ActorHandle):
-        self._actor = dedup_actor  # global singleton handle
-        # local fast‑path cache to avoid actor call on obvious repeats *in
-        # the same worker*; purely an optimisation, not required.
+    Cross-worker dedup is handled writer-side in
+    ``standardize_reactions_from_file`` using CGR hashes.
+    """
+
+    def __init__(self):
         self._local_seen: set[int] = set()
 
     @classmethod
     def from_config(cls, config: DuplicateReactionConfig):
-        # fallback for single‑process mode: create a dummy in‑proc actor
-        if ray.is_initialized():
-            dedup_actor = ray.get_actor("duplicate_rxn_actor")
-        else:
-            dedup_actor = None
-        return cls(dedup_actor)
+        return cls()
 
     # ------------------------------------------------------------------
     def safe_reaction_smiles(self, reaction: ReactionContainer) -> str:
@@ -675,46 +671,13 @@ class DuplicateReactionStandardizer(BaseStandardizer):
     def _run(self, rxn: ReactionContainer) -> ReactionContainer:
         h = hash(self.safe_reaction_smiles(rxn))
 
-        # local cache fast‑path (helps in large batches processed by same
-        # worker; no correctness impact).
         if h in self._local_seen:
             raise StandardizationError(
                 "DuplicateReaction", str(rxn), ValueError("Duplicate reaction found")
             )
 
-        # ------------------- cluster‑wide check ------------------------
-        if self._actor is None:  # single‑CPU fall‑back
-            is_new = h not in self._local_seen
-        else:
-            # synchronous, returns True/False
-            is_new = ray.get(self._actor.check_and_add.remote(h))
-
-        if is_new:
-            self._local_seen.add(h)
-            return rxn
-
-        raise StandardizationError(
-            "DuplicateReaction", str(rxn), ValueError("Duplicate reaction found")
-        )
-
-
-@ray.remote
-class DedupActor:
-    """Cluster‑wide set of reaction hashes."""
-
-    def __init__(self):
-        self._seen: set[int] = set()
-
-    def check_and_add(self, h: int) -> bool:
-        """
-        Returns True **iff** the hash was not present yet and is now stored.
-        Cluster‑wide uniqueness is guaranteed because this method executes
-        serially inside the actor process.
-        """
-        if h in self._seen:
-            return False
-        self._seen.add(h)
-        return True
+        self._local_seen.add(h)
+        return rxn
 
 
 # Registry mapping config field names to standardizer classes
@@ -918,53 +881,56 @@ def _process_batch(
     return results, n_std, errors
 
 
-@ray.remote
-def process_batch_remote(
-    batch: Sequence[str | ReactionContainer],
-    std_param: ray.ObjectRef,  # <-- receives a ref
-    log_file_path: str | Path | None = None,
-    ignore_errors: bool = False,
-    fmt: str = "smi",
-) -> tuple[list[ReactionContainer], int, list[tuple[str, str, str, str]]]:
-    # Ray keeps a local cache of fetched objects, so the list is
-    # deserialised only once per worker process, not once per task.
-    if isinstance(std_param, ray.ObjectRef):  # handle?   get it
-        standardizers = ray.get(std_param)  # • O(once)
-    else:  # plain list? use as is
-        standardizers = std_param
+_worker_state: dict | None = None
 
-    # --- Worker-specific logging setup ---
-    worker_logger = logging.getLogger("synplan.chem.data.standardizing")
-    if log_file_path:
-        log_file_path = Path(log_file_path)  # Ensure it's a Path object
-        # Check if a handler for this file already exists for this logger
-        handler_exists = any(
-            isinstance(h, logging.FileHandler) and Path(h.baseFilename) == log_file_path
-            for h in worker_logger.handlers
+
+def _init_standardize_worker(config_dict: dict, ignore_errors: bool, fmt: str) -> None:
+    """Process initializer: build standardizers once per worker process."""
+    global _worker_state
+    config = ReactionStandardizationConfig(**config_dict)
+    _worker_state = {
+        "standardizers": config.create_standardizers(),
+        "ignore_errors": ignore_errors,
+        "fmt": fmt,
+    }
+
+
+def _standardize_batch_worker(
+    items: list[str],
+) -> ProcessResult:
+    """Top-level module function called by each worker — must be picklable."""
+    if _worker_state is None:
+        raise RuntimeError(
+            "_standardize_batch_worker called outside a worker process. "
+            "This function requires _init_standardize_worker to run first."
         )
-        if not handler_exists:
-            try:
-                fh = logging.FileHandler(log_file_path, encoding="utf-8")
-                # Use a simple format for worker logs, or match driver's format
-                formatter = logging.Formatter(
-                    "%(asctime)s | %(name)s (worker) | %(levelname)-8s | %(message)s",
-                    datefmt="%Y-%m-%d %H:%M:%S",
-                )
-                fh.setFormatter(formatter)
-                fh.setLevel(logging.INFO)  # Or DEBUG, or use worker_log_level if passed
-                worker_logger.addHandler(fh)
-                worker_logger.setLevel(
-                    logging.INFO
-                )  # Ensure logger passes messages to handler
-                worker_logger.propagate = (
-                    False  # Avoid double logging if driver also logs
-                )
-            except (OSError, ValueError) as e:
-                logging.error(
-                    "Worker failed to create file handler %s: %s", log_file_path, e
-                )
+    reactions, _n_ok, raw_errors = _process_batch(
+        items,
+        _worker_state["standardizers"],
+        ignore_errors=_worker_state["ignore_errors"],
+        fmt=_worker_state["fmt"],
+    )
+    errors = [
+        ErrorEntry(original=smi, stage=stage, error_type=etype, message=emsg)
+        for smi, stage, etype, emsg in raw_errors
+    ]
+    return ProcessResult(reactions=reactions, errors=errors)
 
-    return _process_batch(batch, standardizers, ignore_errors=ignore_errors, fmt=fmt)
+
+def _make_timeout_result(exc: Exception, items: list[str]) -> ProcessResult:
+    """Fallback for timed-out batches."""
+    return ProcessResult(
+        reactions=[],
+        errors=[
+            ErrorEntry(
+                original=item,
+                stage="timeout",
+                error_type="TimeoutError",
+                message=str(exc),
+            )
+            for item in items
+        ],
+    )
 
 
 def chunked(iterable: Iterable, size: int):
@@ -1047,21 +1013,19 @@ def standardize_reactions_from_file(
     standardized_reaction_data_path: str | Path = "reaction_data_standardized.smi",
     *,
     num_cpus: int = 1,
-    batch_size: int = 1_000,  # larger batches amortise overhead
+    batch_size: int = 1_000,
     silent: bool = True,
-    max_pending_factor: int = 4,  # tasks in flight = factor × CPUs
-    worker_log_level: int | str = logging.WARNING,
-    log_file_path: str | Path | None = None,
+    max_pending_factor: int = 4,
     ignore_errors: bool = False,
     error_file_path: str | Path | None = None,
-) -> None:
+) -> PipelineSummary:
     """
-    Reads reactions, standardises them in parallel with Ray, writes results.
+    Reads reactions, standardises them in parallel with ProcessPoolExecutor,
+    writes results.
 
-    The function keeps at most `max_pending_factor * num_cpus` Ray tasks in
-    flight to avoid flooding the scheduler and blowing up the object store.
-    Standardisers are broadcast once with `ray.put`, removing per‑task
-    pickling cost.  All other logic is unchanged.
+    Backpressure is handled by ``process_pool_map_stream``.  Standardisers
+    are constructed once per worker via ``_init_standardize_worker``.
+    Cross-worker deduplication is performed writer-side using CGR hashes.
 
     Args:
         config: Configuration object for standardizers.
@@ -1070,16 +1034,16 @@ def standardize_reactions_from_file(
         num_cpus: Number of CPU cores to use for parallel processing.
         batch_size: Number of reactions to process in each batch.
         silent: If True, suppress the progress bar.
-        max_pending_factor: Controls the number of pending Ray tasks.
-        worker_log_level: Logging level for Ray workers (e.g., logging.INFO, logging.WARNING).
-        log_file_path: Path to the log file for workers to write to.
+        max_pending_factor: Controls the number of pending tasks in flight.
         ignore_errors: If True, log standardization failures and keep processing;
             otherwise propagate exceptions to surface new issues.
         error_file_path: Path to write failed reactions (TSV).  If None and
             ``ignore_errors`` is True, defaults to ``<output>.errors.tsv``.
+
+    Returns:
+        A ``PipelineSummary`` with counts and error breakdown.
     """
     output_path = Path(standardized_reaction_data_path)
-    standardizers = config.create_standardizers()
 
     # Resolve error file path
     _error_path: Path | None = None
@@ -1088,39 +1052,21 @@ def standardize_reactions_from_file(
     elif ignore_errors:
         _error_path = output_path.with_suffix(".errors.tsv")
 
+    # Log which standardizers will be used (construct temporarily for logging)
+    standardizers = config.create_standardizers()
     logger.info(
         "Standardizers: %s",
         ", ".join(s.__class__.__name__ for s in standardizers),
     )
+    del standardizers  # workers will build their own copies
 
-    # -----------------------  Ray initialisation  -----------------------
-    if num_cpus > 1:
-        if not ray.is_initialized():
-            ray.init(
-                num_cpus=num_cpus,
-                ignore_reinit_error=True,
-                logging_level=worker_log_level,
-                log_to_driver=False,
-            )
-
-        DEDUP_NAME = "duplicate_rxn_actor"
-
-        try:
-            ray.get_actor(DEDUP_NAME)  # already running?
-        except ValueError:
-            DedupActor.options(
-                name=DEDUP_NAME, lifetime="detached"  # survives driver exit
-            ).remote()
-
-        std_ref: ray.ObjectRef | None = None
-        if num_cpus > 1 and std_ref is None:  # broadcast once
-            std_ref = ray.put(standardizers)
-
-    max_pending = max_pending_factor * num_cpus
-    pending: dict[ray.ObjectRef, None] = {}
-
-    n_processed = n_std = 0
+    summary = PipelineSummary()
     error_counts: Counter = Counter()
+    seen: set[int] = set()  # CGR hash dedup (writer-side)
+    t0 = time.monotonic()
+
+    raw_reader = RawReactionReader(input_reaction_data_path)
+    fmt = raw_reader.format
 
     bar = tqdm(
         total=0,
@@ -1130,84 +1076,88 @@ def standardize_reactions_from_file(
         dynamic_ncols=True,
     )
 
-    # Open error file (or use a no-op context)
     error_file = open(_error_path, "w", encoding="utf-8") if _error_path else None
     if error_file is not None:
         error_file.write("# original_smiles\tstage\terror_type\terror_message\n")
 
-    def _write_errors(batch_errors: list[tuple[str, str, str, str]]) -> None:
-        for smi, stage, etype, emsg in batch_errors:
-            error_counts[(stage, etype)] += 1
-            if error_file is not None:
-                error_file.write(f"{smi}\t{stage}\t{etype}\t{emsg}\n")
-
-    # ------------------------  Helper function  ------------------------
-    def _flush(ref: ray.ObjectRef, write_fn) -> None:
-        """Fetch finished task, write its results, update counters & bar."""
-        nonlocal n_processed, n_std
-        try:
-            res, ok, errs = ray.get(ref)
-        except Exception as exc:
-            logger.error("Batch failed entirely: %s", exc)
-            return
-        write_fn(res)
-        _write_errors(errs)
-        bar.update(len(res))
-        n_processed += len(res)
-        n_std += ok
-
     try:
-        # -----------------------------  I/O  -------------------------------
-        raw_reader = RawReactionReader(input_reaction_data_path)
-        fmt = raw_reader.format
-
         with (
             raw_reader,
             ReactionWriter(output_path) as writer,
         ):
+            chunks = chunked(raw_reader, batch_size)
 
-            def write_fn(reactions):
-                return [writer.write(r) for r in reactions]
+            with graceful_shutdown() as stop:
+                for result in process_pool_map_stream(
+                    chunks,
+                    _standardize_batch_worker,
+                    max_workers=max(num_cpus, 1),
+                    max_pending=max_pending_factor * max(num_cpus, 1),
+                    ordered=True,
+                    initializer=_init_standardize_worker,
+                    initargs=(config.to_dict(), ignore_errors, fmt),
+                    timeout=300,
+                    max_tasks_per_child=200,
+                    on_timeout=_make_timeout_result,
+                ):
+                    if stop.is_set():
+                        break
 
-            # ---------------------  Main read/compute loop  -----------------
-            for chunk in chunked(raw_reader, batch_size):
-                bar.total += len(chunk)
-                bar.refresh()
+                    # --- Write successfully standardized reactions ---
+                    for rxn in result.reactions:
+                        try:
+                            h = hash(~rxn)  # CGR hash for dedup
+                        except Exception:
+                            h = id(rxn)  # fallback if CGR fails
+                        if h not in seen:
+                            seen.add(h)
+                            writer.write(rxn)
+                            summary.succeeded += 1
+                        else:
+                            summary.duplicates += 1
 
-                if num_cpus > 1:
-                    # ---------- back‑pressure: keep ≤ max_pending ----------
-                    while len(pending) >= max_pending:
-                        done, _ = ray.wait(list(pending), num_returns=1)
-                        _flush(done[0], write_fn)
-                        pending.pop(done[0], None)
+                    # --- Write errors ---
+                    for err in result.errors:
+                        error_counts[(err.stage, err.error_type)] += 1
+                        summary.error_breakdown[f"{err.stage}/{err.error_type}"] = (
+                            summary.error_breakdown.get(
+                                f"{err.stage}/{err.error_type}", 0
+                            )
+                            + 1
+                        )
+                        if error_file is not None:
+                            error_file.write(
+                                f"{err.original}\t{err.stage}\t{err.error_type}\t{err.message}\n"
+                            )
+                    summary.errored += len(result.errors)
 
-                    # ----------- schedule new task -------------------------
-                    ref = process_batch_remote.remote(
-                        chunk, std_ref, log_file_path, ignore_errors, fmt
+                    # --- Track filtered ---
+                    for flt in result.filtered:
+                        summary.filter_breakdown[flt.reason] = (
+                            summary.filter_breakdown.get(flt.reason, 0) + 1
+                        )
+                    summary.filtered += len(result.filtered)
+
+                    # --- Update progress ---
+                    batch_total = (
+                        len(result.reactions)
+                        + len(result.errors)
+                        + len(result.filtered)
                     )
-                    pending[ref] = None
-                else:
-                    # --------------- serial fall‑back ----------------------
-                    res, ok, errs = _process_batch(
-                        chunk, standardizers, ignore_errors=ignore_errors, fmt=fmt
-                    )
-                    write_fn(res)
-                    _write_errors(errs)
-                    bar.update(len(res))
-                    n_processed += len(res)
-                    n_std += ok
-
-            # ------------------  Drain remaining Ray tasks  -----------------
-            while pending:
-                done, _ = ray.wait(list(pending), num_returns=1)
-                _flush(done[0], write_fn)
-                pending.pop(done[0], None)
+                    summary.total_input += batch_total
+                    bar.total = (bar.total or 0) + batch_total
+                    bar.update(batch_total)
     finally:
-        if ray.is_initialized():
-            ray.shutdown()
         if error_file is not None:
             error_file.close()
 
     bar.close()
 
-    _print_error_summary(error_counts, n_processed, n_std, _error_path)
+    summary.elapsed_seconds = time.monotonic() - t0
+    summary.error_file = str(_error_path) if _error_path else None
+
+    _print_error_summary(
+        error_counts, summary.total_input, summary.succeeded, _error_path
+    )
+
+    return summary

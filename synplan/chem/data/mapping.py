@@ -4,13 +4,13 @@ Three-stage concurrent pipeline:
   parse (ProcessPool) → GPU inference (main thread) → map + write (ProcessPool)
 """
 
-from __future__ import annotations
-
 import logging
+import signal
 import sys
 import threading
 import time
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from contextlib import nullcontext
 from itertools import chain, count
 from math import inf
@@ -46,6 +46,7 @@ from synplan.utils.parallel import default_num_workers, select_device
 logger = logging.getLogger(__name__)
 
 _RECYCLE_WORKERS = sys.version_info >= (3, 11)  # max_tasks_per_child added in 3.11
+_CANCEL_FUTURES = sys.version_info >= (3, 9)  # cancel_futures added in 3.9
 
 
 # -- Configuration -----------------------------------------------------------
@@ -58,12 +59,16 @@ class MappingConfig(BaseConfigModel):
     :param chunk_size: Lines per streaming chunk.
     :param device: ``"cuda"``, ``"mps"``, ``"cpu"`` or *None* (auto-detect).
     :param no_amp: Disable automatic mixed precision.
+    :param worker_timeout: Timeout in seconds per worker task (parse/map chunk).
+        If a chunk takes longer, it is skipped and reactions are logged as failed.
+        Set to 0 to disable.
     """
 
     batch_size: int = Field(default=16, ge=1)
     chunk_size: int = Field(default=5000, ge=1)
     device: Literal["cuda", "mps", "cpu"] | None = None
     no_amp: bool = False
+    worker_timeout: int = Field(default=120, ge=0)
 
 
 # -- Worker functions (module-level for ProcessPool pickling) ----------------
@@ -359,6 +364,7 @@ def map_reactions_from_file(
     dev = select_device(config.device)
     use_amp = not config.no_amp and dev.type in ("cuda", "mps")
     workers = num_workers if num_workers > 0 else default_num_workers()
+    worker_timeout = config.worker_timeout or None  # 0 means no timeout
 
     _error_path: Path | None = None
     if error_file_path is not None:
@@ -402,14 +408,22 @@ def map_reactions_from_file(
             for offset, lines in _read_chunks(input_path, config.chunk_size):
                 if stop.is_set():
                     break
-                results = list(pool.map(_parse_one, lines, chunksize=64))
+                # Use submit + result(timeout) instead of pool.map for timeout support
+                futures = [pool.submit(_parse_one, line) for line in lines]
                 rxns, idx, fails = [], [], []
-                for i, (rxn, err) in enumerate(results):
-                    if rxn is not None:
-                        rxns.append(rxn)
-                        idx.append(i)
-                    else:
-                        fails.append((i, lines[i], err))
+                for i, fut in enumerate(futures):
+                    try:
+                        rxn, err = fut.result(timeout=worker_timeout)
+                        if rxn is not None:
+                            rxns.append(rxn)
+                            idx.append(i)
+                        else:
+                            fails.append((i, lines[i], err))
+                    except FuturesTimeoutError:
+                        fut.cancel()
+                        fails.append((i, lines[i], "parse timeout"))
+                    except Exception as e:
+                        fails.append((i, lines[i], f"parse worker: {e}"))
                 _put(parsed_q, (offset, lines, rxns, idx, fails))
         except Exception as e:
             errors["parser"] = e
@@ -423,11 +437,28 @@ def map_reactions_from_file(
             while (item := mapped_q.get()) is not None:
                 offset, lines, rxns, attns, idx, fails = item
 
-                results = (
-                    list(pool.map(_map_and_format, zip(rxns, attns), chunksize=16))
-                    if rxns
-                    else []
-                )
+                if rxns:
+                    # Use submit + result(timeout) instead of pool.map
+                    futures = [
+                        pool.submit(_map_and_format, (rxn, attn))
+                        for rxn, attn in zip(rxns, attns)
+                    ]
+                    results = []
+                    for fi, fut in enumerate(futures):
+                        try:
+                            results.append(fut.result(timeout=worker_timeout))
+                        except FuturesTimeoutError:
+                            fut.cancel()
+                            results.append((None, "mapping timeout"))
+                            logger.warning(
+                                "Mapping timeout for reaction at offset %d+%d",
+                                offset,
+                                idx[fi],
+                            )
+                        except Exception as e:
+                            results.append((None, f"mapping worker: {e}"))
+                else:
+                    results = []
 
                 out_lines = list(lines)
                 for ri, (smi, err) in enumerate(results):
@@ -455,6 +486,15 @@ def map_reactions_from_file(
         except Exception as e:
             errors["writer"] = e
             stop.set()
+
+    # -- Signal handling for graceful shutdown --------------------------------
+    _original_sigterm = signal.getsignal(signal.SIGTERM)
+
+    def _handle_sigterm(signum, frame):
+        logger.warning("SIGTERM received — stopping mapping pipeline")
+        stop.set()
+
+    signal.signal(signal.SIGTERM, _handle_sigterm)
 
     # -- Run pipeline --------------------------------------------------------
     out = fail_out = None
@@ -515,16 +555,26 @@ def map_reactions_from_file(
                 mapped_q.put(None)
                 thr_p.join(timeout=10)
                 thr_w.join(timeout=10)
+
+        # If stop was set (SIGTERM or error), force-shutdown the pool
+        if stop.is_set() and _CANCEL_FUTURES:
+            pool.shutdown(wait=False, cancel_futures=True)
+
     finally:
         if out:
             out.close()
         if fail_out:
             fail_out.close()
+        # Restore original signal handler
+        signal.signal(signal.SIGTERM, _original_sigterm)
 
     elapsed = time.perf_counter() - t0
-    for exc in errors.values():
-        if exc is not None:
-            raise exc
+
+    # Only raise if NOT a graceful stop (SIGTERM)
+    if not stop.is_set():
+        for exc in errors.values():
+            if exc is not None:
+                raise exc
 
     throughput = total / elapsed if elapsed > 0 else 0
     summary = (

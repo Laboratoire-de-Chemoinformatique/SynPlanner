@@ -1,14 +1,10 @@
 """
-Generic logging helpers for scripts, notebooks and Ray clusters.
+Generic logging helpers for scripts and notebooks.
 """
-
-from __future__ import annotations
 
 import logging
 import os
 import sys
-import warnings
-from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 
@@ -129,55 +125,12 @@ def init_logger(
 # --------------------------------------------------------------------------- #
 
 
-def init_ray_logging(
-    *,
-    python_level: str | int = "ERROR",
-    backend_level: str = "error",
-    log_to_driver: bool = False,
-    filter_userwarnings: bool = True,
-) -> ray.LoggingConfig:
-    """
-    Prepare environment + Ray LoggingConfig **before** `ray.init()`.
-
-    Returns
-    -------
-    ray.LoggingConfig
-        Pass as `logging_config=` argument to `ray.init()`.
-    """
-    # 1) silence C++ backend (raylet / plasma) BEFORE importing ray
-    os.environ.setdefault("RAY_BACKEND_LOG_LEVEL", backend_level)
-
-    # 2) optional warnings filter
-    if filter_userwarnings:
-        warnings.filterwarnings("ignore", category=UserWarning)
-
-    import ray  # local import to avoid hard dep
-
-    # 3) global Python logger levels for every worker
-    ray_logger_names: Iterable[str] = (
-        "ray",
-        "ray.worker",
-        "ray.runtime",
-        "ray.dashboard",
-        "ray.tune",
-        "ray.serve",
-    )
-    for n in ray_logger_names:
-        logging.getLogger(n).setLevel(python_level)
-
-    # 4) build LoggingConfig that propagates to workers
-    return ray.LoggingConfig(
-        log_to_driver=log_to_driver,
-        log_level=python_level,
-    )
-
-
 def silence_logger(
     logger_name: str,
     level: int | str = logging.ERROR,
 ):
     """
-    Call at the *top* of every `@ray.remote` function or actor `__init__`
-    to raise the threshold of a chatty library **inside the worker**.
+    Raise the threshold of a chatty library logger.
+    Useful inside worker process initializers.
     """
     logging.getLogger(logger_name).setLevel(level)

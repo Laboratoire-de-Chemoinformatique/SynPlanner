@@ -7,13 +7,11 @@ from abc import ABC
 from concurrent.futures.process import BrokenProcessPool
 from typing import Any
 
-import ray
 import torch
 from chython import smiles
 from chython.containers import MoleculeContainer
 from chython.exceptions import InvalidAromaticRing
 from chython.reactor import Reactor
-from ray.util.queue import Empty, Queue
 from torch import Tensor
 from torch_geometric.data import InMemoryDataset
 from torch_geometric.data.data import Data
@@ -239,39 +237,61 @@ class FilteringPolicyDataset(InMemoryDataset):
         return self._data.y_rules.shape[1]
 
     def prepare_data(self) -> tuple[Data, dict]:
-        """Prepares data by loading reaction rules, initializing Ray, preprocessing the
-        molecules, collating the data, and returning the data and slices.
+        """Preprocesses molecules by applying reaction rules and converting them to
+        PyTorch geometric graphs using a process pool.
 
         :return: The PyTorch geometric graphs and slices.
         """
 
-        ray.init(num_cpus=self.num_cpus, ignore_reinit_error=True)
-        try:
-            reaction_rules = load_reaction_rules(self.reaction_rules_path)
-            reaction_rules_ids = ray.put(reaction_rules)
+        with open(self.molecules_path, encoding="utf-8") as inp_data:
+            molecules = inp_data.read().splitlines()
 
-            to_process = Queue(maxsize=self.batch_size * self.num_cpus)
-            processed_data = []
-            results_ids = [
-                preprocess_filtering_policy_molecules.remote(
-                    to_process, reaction_rules_ids
-                )
-                for _ in range(self.num_cpus)
-            ]
+        workers = self.num_cpus if self.num_cpus > 0 else default_num_workers()
 
-            with open(self.molecules_path, encoding="utf-8") as inp_data:
-                for molecule in tqdm(
-                    inp_data.read().splitlines(),
+        def _collect_serial():
+            # Ensure module-level worker state is set for the serial path.
+            global _worker_state
+            _worker_state = load_reaction_rules(self.reaction_rules_path)
+            try:
+                results = []
+                for mol_smi in tqdm(
+                    molecules,
                     desc="Number of molecules processed: ",
                     bar_format="{desc}{n} [{elapsed}]",
                 ):
+                    result = _preprocess_filtering_policy_molecule(mol_smi)
+                    if result is not None:
+                        results.append(result)
+                return results
+            finally:
+                _worker_state = None
 
-                    to_process.put(molecule)
-
-            results = [graph for res in ray.get(results_ids) if res for graph in res]
-            processed_data.extend(results)
-        finally:
-            ray.shutdown()
+        if workers <= 1:
+            processed_data = _collect_serial()
+        else:
+            try:
+                processed_data = []
+                for result in tqdm(
+                    process_pool_map_stream(
+                        molecules,
+                        _preprocess_filtering_policy_molecule,
+                        max_workers=workers,
+                        initializer=_init_filtering_worker,
+                        initargs=(self.reaction_rules_path,),
+                    ),
+                    total=len(molecules),
+                    desc=f"Number of molecules processed ({workers} workers): ",
+                    bar_format="{desc}{n} [{elapsed}]",
+                ):
+                    if result is not None:
+                        processed_data.append(result)
+            except BrokenProcessPool:
+                logging.warning(
+                    "A worker process crashed — falling back to serial. "
+                    "This is usually caused by a malformed SMILES triggering "
+                    "a C-level error in chython."
+                )
+                processed_data = _collect_serial()
 
         for pyg in processed_data:
             pyg.y_rules = pyg.y_rules.to_dense()
@@ -342,59 +362,77 @@ def reaction_rules_appliance(
     return applied_rules, priority_rules
 
 
-@ray.remote
-def preprocess_filtering_policy_molecules(
-    to_process: Queue, reaction_rules: list[Reactor]
-) -> list[Data | None]:
-    """Preprocesses a list of molecules by applying reaction rules and converting
-    molecules into PyTorch geometric graphs. Successfully applied reaction rules are
-    converted to binary vectors for policy network training.
+# ---------------------------------------------------------------------------
+# Worker state and functions for FilteringPolicyDataset parallel processing
+# ---------------------------------------------------------------------------
 
-    :param to_process: The queue containing SMILES of molecules to be converted to the
-        training data.
-    :param reaction_rules: The list of reaction rules.
-    :return: The list of PyGraph objects.
+_worker_state = None
+
+
+def _init_filtering_worker(reaction_rules_path: str) -> None:
+    """Initializer for each worker process in the filtering policy pool.
+
+    Loads reaction rules once per worker and stores them in module-level
+    ``_worker_state`` so that :func:`_preprocess_filtering_policy_molecule`
+    can access them without re-loading on every call.
     """
+    global _worker_state
+    _worker_state = load_reaction_rules(reaction_rules_path)
 
-    pyg_graphs = []
-    while True:
-        try:
-            molecule = smiles(to_process.get(timeout=30))
-            if not isinstance(molecule, MoleculeContainer):
-                continue
 
-            # reaction reaction_rules application
-            applied_rules, priority_rules = reaction_rules_appliance(
-                molecule, reaction_rules
-            )
+def _preprocess_filtering_policy_molecule(molecule_smi: str) -> Data | None:
+    """Preprocess a single molecule SMILES for filtering policy training.
 
-            y_rules = torch.sparse_coo_tensor(
-                [applied_rules],
-                torch.ones(len(applied_rules)),
-                (len(reaction_rules),),
-                dtype=torch.uint8,
-            )
-            y_priority = torch.sparse_coo_tensor(
-                [priority_rules],
-                torch.ones(len(priority_rules)),
-                (len(reaction_rules),),
-                dtype=torch.uint8,
-            )
+    Applies all reaction rules loaded into ``_worker_state`` (set by
+    :func:`_init_filtering_worker`) to the molecule, builds the sparse
+    label tensors, and converts the molecule to a PyG graph.
 
-            y_rules = torch.unsqueeze(y_rules, 0)
-            y_priority = torch.unsqueeze(y_priority, 0)
+    When running serially (no initializer), the function falls back to using
+    the ``_worker_state`` that must have been set before calling.
 
-            pyg_graph = mol_to_pyg(molecule)
-            if not pyg_graph:
-                continue
-            pyg_graph.y_rules = y_rules
-            pyg_graph.y_priority = y_priority
-            pyg_graphs.append(pyg_graph)
+    :param molecule_smi: SMILES string for the molecule.
+    :return: A PyG :class:`Data` object with ``y_rules`` and ``y_priority``
+        attributes, or ``None`` if parsing / conversion fails.
+    """
+    reaction_rules = _worker_state
+    if reaction_rules is None:
+        return None
 
-        except Empty:
-            break
+    try:
+        molecule = smiles(molecule_smi)
+        if not isinstance(molecule, MoleculeContainer):
+            return None
 
-    return pyg_graphs
+        # reaction rules application
+        applied_rules, priority_rules = reaction_rules_appliance(
+            molecule, reaction_rules
+        )
+
+        y_rules = torch.sparse_coo_tensor(
+            [applied_rules],
+            torch.ones(len(applied_rules)),
+            (len(reaction_rules),),
+            dtype=torch.uint8,
+        )
+        y_priority = torch.sparse_coo_tensor(
+            [priority_rules],
+            torch.ones(len(priority_rules)),
+            (len(reaction_rules),),
+            dtype=torch.uint8,
+        )
+
+        y_rules = torch.unsqueeze(y_rules, 0)
+        y_priority = torch.unsqueeze(y_priority, 0)
+
+        pyg_graph = mol_to_pyg(molecule)
+        if not pyg_graph:
+            return None
+        pyg_graph.y_rules = y_rules
+        pyg_graph.y_priority = y_priority
+        return pyg_graph
+
+    except Exception:
+        return None
 
 
 def atom_to_vector(atom: Any) -> Tensor:
