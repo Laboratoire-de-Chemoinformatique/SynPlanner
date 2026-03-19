@@ -1,11 +1,22 @@
 [project]
 name = "SynPlanner"
-version = "1.4.2"
+version = "1.4.3"
 description = "Toolbox for chemical synthesis planning"
-readme = { file = "README.rst", content-type = "text/x-rst" }
+readme = "README.md"
 requires-python = ">=3.10,<3.15"
 license = { text = "MIT" }
 authors = [{ name = "Laboratoire de Chemoinformatique", email = "tagirshin@gmail.com" }]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
 
 dependencies = [
   "chython-synplan[racer-default]>=1.93",
@@ -103,6 +114,25 @@ explicit = true
 name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
+
+# -- bump-my-version: `uvx bump-my-version bump patch` (or minor / major) -----
+[tool.bumpversion]
+current_version = "1.4.3"
+commit = false
+tag = false
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "README.md"
+search = "VERSION={current_version}"
+replace = "VERSION={new_version}"
+
+# NOTE: docs/_static/switcher.json and CHANGELOG.md need manual updates
+# (switcher requires inserting a new JSON entry, changelog needs release notes)
 
 [tool.ruff]
 line-length = 88

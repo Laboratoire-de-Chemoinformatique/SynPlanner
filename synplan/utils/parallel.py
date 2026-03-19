@@ -291,3 +291,20 @@ def graceful_shutdown() -> Iterator[threading.Event]:
         for sig, original in originals.items():
             with contextlib.suppress(ValueError):
                 signal.signal(sig, original)
+
+
+# ---------------------------------------------------------------------------
+# Iteration helpers
+# ---------------------------------------------------------------------------
+
+
+def chunked(iterable: Iterable, size: int) -> Iterator[list]:
+    """Yield successive chunks of *size* items from *iterable*."""
+    chunk: list = []
+    for item in iterable:
+        chunk.append(item)
+        if len(chunk) == size:
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk

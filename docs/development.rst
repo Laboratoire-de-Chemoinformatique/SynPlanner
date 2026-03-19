@@ -35,6 +35,33 @@ Build GUI Docker image
    docker build --platform linux/amd64 -t synplan:dev-gui-amd64 -f gui.Dockerfile .
    docker run --rm --platform linux/amd64 -p 8501:8501 synplan:dev-gui-amd64
 
+Bump version
+------------
+
+Version is managed by `bump-my-version <https://github.com/callowayproject/bump-my-version>`_.
+Config lives in ``pyproject.toml`` under ``[tool.bumpversion]``.
+
+.. code-block:: bash
+
+   # patch: 1.4.2 → 1.4.3
+   uvx bump-my-version bump patch --allow-dirty
+
+   # minor: 1.4.3 → 1.5.0
+   uvx bump-my-version bump minor --allow-dirty
+
+   # major: 1.5.0 → 2.0.0
+   uvx bump-my-version bump major --allow-dirty
+
+This updates ``pyproject.toml`` (version + current_version) and ``README.md``
+(Docker VERSION) automatically.
+
+**Manual steps after bumping:**
+
+1. Update ``docs/_static/switcher.json`` — add the old version to the list and
+   rename ``(stable)`` to the new version.
+2. Update ``CHANGELOG.md`` — move items from ``[Unreleased]`` into a new
+   section and add footer links.
+
 Publish to GHCR (maintainers)
 -----------------------------
 

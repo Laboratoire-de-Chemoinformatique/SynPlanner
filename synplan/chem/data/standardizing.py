@@ -25,7 +25,7 @@ from synplan.utils.files import (
     ReactionWriter,
     parse_reaction,
 )
-from synplan.utils.parallel import graceful_shutdown, process_pool_map_stream
+from synplan.utils.parallel import chunked, graceful_shutdown, process_pool_map_stream
 
 logger = logging.getLogger("synplan.chem.data.standardizing")
 
@@ -644,42 +644,6 @@ class RebalanceReactionStandardizer(BaseStandardizer):
         return new_rxn
 
 
-class DuplicateReactionConfig(BaseConfigModel):
-    pass
-
-
-class DuplicateReactionStandardizer(BaseStandardizer):
-    """Per-worker duplicate removal (local cache only).
-
-    Cross-worker dedup is handled writer-side in
-    ``standardize_reactions_from_file`` using CGR hashes.
-    """
-
-    def __init__(self):
-        self._local_seen: set[int] = set()
-
-    @classmethod
-    def from_config(cls, config: DuplicateReactionConfig):
-        return cls()
-
-    # ------------------------------------------------------------------
-    def safe_reaction_smiles(self, reaction: ReactionContainer) -> str:
-        reactants_smi = ".".join(str(i) for i in reaction.reactants)
-        products_smi = ".".join(str(i) for i in reaction.products)
-        return f"{reactants_smi}>>{products_smi}"
-
-    def _run(self, rxn: ReactionContainer) -> ReactionContainer:
-        h = hash(self.safe_reaction_smiles(rxn))
-
-        if h in self._local_seen:
-            raise StandardizationError(
-                "DuplicateReaction", str(rxn), ValueError("Duplicate reaction found")
-            )
-
-        self._local_seen.add(h)
-        return rxn
-
-
 # Registry mapping config field names to standardizer classes
 STANDARDIZER_REGISTRY = {
     "functional_groups_config": FunctionalGroupsStandardizer,
@@ -694,7 +658,6 @@ STANDARDIZER_REGISTRY = {
     "small_molecules_config": SmallMoleculesStandardizer,
     "remove_reagents_config": RemoveReagentsStandardizer,
     "rebalance_reaction_config": RebalanceReactionStandardizer,
-    "duplicate_reaction_config": DuplicateReactionStandardizer,
 }
 
 
@@ -718,7 +681,6 @@ class ReactionStandardizationConfig(BaseConfigModel):
         reaction.
     :param remove_reagents_config: Configuration for removal of reagents from reaction.
     :param rebalance_reaction_config: Configuration for reaction rebalancing.
-    :param duplicate_reaction_config: Configuration for removal of duplicate reactions.
     """
 
     # configuration for reaction standardizers
@@ -734,8 +696,7 @@ class ReactionStandardizationConfig(BaseConfigModel):
     small_molecules_config: SmallMoleculesConfig | None = None
     remove_reagents_config: RemoveReagentsConfig | None = None
     rebalance_reaction_config: RebalanceReactionConfig | None = None
-    duplicate_reaction_config: DuplicateReactionConfig | None = None
-
+    deduplicate: bool = True
     _NESTED_CONFIG_TYPES: ClassVar[dict[str, type]] = {
         "functional_groups_config": FunctionalGroupsConfig,
         "kekule_form_config": KekuleFormConfig,
@@ -749,7 +710,6 @@ class ReactionStandardizationConfig(BaseConfigModel):
         "small_molecules_config": SmallMoleculesConfig,
         "remove_reagents_config": RemoveReagentsConfig,
         "rebalance_reaction_config": RebalanceReactionConfig,
-        "duplicate_reaction_config": DuplicateReactionConfig,
     }
 
     @model_validator(mode="before")
@@ -933,17 +893,6 @@ def _make_timeout_result(exc: Exception, items: list[str]) -> ProcessResult:
     )
 
 
-def chunked(iterable: Iterable, size: int):
-    chunk = []
-    for it in iterable:
-        chunk.append(it)
-        if len(chunk) == size:
-            yield chunk
-            chunk = []
-    if chunk:
-        yield chunk
-
-
 # -- Error taxonomy for categorized summaries --
 # Stages / chython exceptions that represent noisy *data*, not pipeline bugs.
 _DATA_ERROR_STAGES = frozenset(
@@ -954,7 +903,6 @@ _DATA_ERROR_STAGES = frozenset(
         "UnchangedParts",
         "SmallMolecules",
         "RemoveReagents",
-        "DuplicateReaction",
         "parse",
     }
 )
@@ -1062,7 +1010,8 @@ def standardize_reactions_from_file(
 
     summary = PipelineSummary()
     error_counts: Counter = Counter()
-    seen: set[int] = set()  # CGR hash dedup (writer-side)
+    dedup = config.deduplicate
+    seen: set[int] = set()  # CGR hash dedup (writer-side, if enabled)
     t0 = time.monotonic()
 
     raw_reader = RawReactionReader(input_reaction_data_path)
@@ -1105,16 +1054,17 @@ def standardize_reactions_from_file(
 
                     # --- Write successfully standardized reactions ---
                     for rxn in result.reactions:
-                        try:
-                            h = hash(~rxn)  # CGR hash for dedup
-                        except Exception:
-                            h = id(rxn)  # fallback if CGR fails
-                        if h not in seen:
+                        if dedup:
+                            try:
+                                h = hash(~rxn)  # CGR hash for dedup
+                            except Exception:
+                                h = id(rxn)  # fallback if CGR fails
+                            if h in seen:
+                                summary.duplicates += 1
+                                continue
                             seen.add(h)
-                            writer.write(rxn)
-                            summary.succeeded += 1
-                        else:
-                            summary.duplicates += 1
+                        writer.write(rxn)
+                        summary.succeeded += 1
 
                     # --- Write errors ---
                     for err in result.errors:

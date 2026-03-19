@@ -23,11 +23,10 @@ from synplan.chem.data.standardizing import (
     AromaticFormStandardizer,
     KekuleFormStandardizer,
     StandardizationError,
-    chunked,
 )
 from synplan.utils.config import BaseConfigModel
 from synplan.utils.files import RawReactionReader, ReactionWriter, parse_reaction
-from synplan.utils.parallel import graceful_shutdown, process_pool_map_stream
+from synplan.utils.parallel import chunked, graceful_shutdown, process_pool_map_stream
 
 logger = logging.getLogger("synplan.chem.data.filtering")
 

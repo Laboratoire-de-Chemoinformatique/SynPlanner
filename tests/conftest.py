@@ -9,7 +9,7 @@ from chython.containers import CGRContainer, ReactionContainer
 
 
 def pytest_unconfigure(config):
-    """Force-exit after test session to prevent hanging from Ray/PyTorch daemon threads."""
+    """Force-exit after test session to prevent hanging from PyTorch daemon threads."""
     os._exit(getattr(config, "_exitstatus", 0))
 
 
@@ -27,7 +27,6 @@ from synplan.chem.data.standardizing import (  # noqa: E402
     AromaticFormConfig,
     CheckIsotopesConfig,
     CheckValenceConfig,
-    DuplicateReactionConfig,
     FunctionalGroupsConfig,
     ImplicifyHydrogensConfig,
     KekuleFormConfig,
@@ -138,7 +137,6 @@ def std_config() -> ReactionStandardizationConfig:
         unchanged_parts_config=UnchangedPartsConfig(),
         remove_reagents_config=RemoveReagentsConfig(),
         rebalance_reaction_config=RebalanceReactionConfig(),
-        duplicate_reaction_config=DuplicateReactionConfig(),
     )
 
 

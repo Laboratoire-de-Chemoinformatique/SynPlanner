@@ -36,7 +36,7 @@ Run reaction standardization using the repository configuration in ``configs/rea
     aromatic_form_config:
     mapping_fix_config:
     unchanged_parts_config:
-    duplicate_reaction_config:
+    deduplicate: true
 
 **Configuration parameters**
 
@@ -58,7 +58,7 @@ Run reaction standardization using the repository configuration in ``configs/rea
     small_molecules_config             Remove small molecule from reaction
     remove_reagents_config             Remove reagents from reaction
     rebalance_reaction_config          Rebalance reaction
-    duplicate_reaction_config          Remove duplicate reactions
+    deduplicate                        Deduplicate reactions by CGR hash (default: true)
     ================================== =================================================================================
 
 .. note::

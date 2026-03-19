@@ -798,13 +798,16 @@ def _print_extraction_summary(
         covered_reactions.update(indices)
     n_covered = len(covered_reactions)
     summary_lines = [
-        f"Finished: processed {n_processed}, extracted {n_rules} rules "
-        f"from {n_covered} reactions ({n_covered*100/n_processed:.1f}%), "
-        f"failed {n_errors}"
+        (
+            f"Finished: processed {n_processed}, extracted {n_rules} rules "
+            f"from {n_covered} reactions ({n_covered*100/n_processed:.1f}%), "
+            if n_processed
+            else "from 0 reactions, " f"failed {n_errors}"
+        )
     ]
     # Reaction-level filtering
     n_multi_product = filter_stats.get("skipped_multi_product", 0)
-    if n_multi_product:
+    if n_multi_product and n_processed:
         summary_lines.append(
             f"Reactions skipped (multi-product): {n_multi_product} "
             f"({n_multi_product*100/n_processed:.1f}%)"

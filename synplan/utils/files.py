@@ -449,6 +449,35 @@ def parse_reaction(
         return rxn
 
 
+# -- Process-pool parse worker ------------------------------------------------
+# Module-level state + functions for ProcessPoolExecutor pickling.
+
+_parse_fmt = "smi"
+
+
+def init_parse_worker(fmt: str):
+    """Initializer: store the input format so ``parse_one`` knows how to parse."""
+    global _parse_fmt
+    _parse_fmt = fmt
+
+
+def parse_one(item: str):
+    """Parse a single raw item → ``(ReactionContainer | None, error | None)``.
+
+    *item* is a SMILES string (for .smi) or an RDF text block (for .rdf).
+    The format is set once per worker via :func:`init_parse_worker`.
+    """
+    try:
+        rxn = parse_reaction(item, fmt=_parse_fmt)
+        if rxn is None:
+            return None, "parse returned None"
+        if not isinstance(rxn, ReactionContainer):
+            return None, "not a reaction"
+        return rxn, None
+    except Exception as e:
+        return None, f"parse: {e}"
+
+
 class RawReactionReader:
     """Yields raw unparsed items: str lines for SMILES, str blocks for RDF."""
 
@@ -477,6 +506,31 @@ class RawReactionReader:
             yield from iter_ord_reactions(self._path)
         else:
             raise ValueError(f"Unsupported format: {self.format}")
+
+    def count(self) -> int:
+        """Count the number of records without parsing them."""
+        if self.format == "smi":
+            return count_smiles_records(self._path)
+        elif self.format == "rdf":
+            return count_rdf_records(self._path)
+        elif self.format == "pb":
+            from synplan.utils.ord.reader import iter_ord_reactions
+
+            return sum(1 for _ in iter_ord_reactions(self._path))
+        raise ValueError(f"Unsupported format: {self.format}")
+
+    def iter_chunks(self, chunk_size: int) -> Iterator[tuple[int, list]]:
+        """Yield ``(offset, items)`` chunks of up to *chunk_size* records."""
+        chunk: list = []
+        offset = 0
+        for item in self:
+            chunk.append(item)
+            if len(chunk) == chunk_size:
+                yield offset, chunk
+                offset += len(chunk)
+                chunk = []
+        if chunk:
+            yield offset, chunk
 
     def __enter__(self):
         return self

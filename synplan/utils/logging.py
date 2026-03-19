@@ -121,7 +121,7 @@ def init_logger(
 
 
 # --------------------------------------------------------------------------- #
-#                 Optional Ray‑specific configuration helpers                 #
+#                 Optional worker configuration helpers                       #
 # --------------------------------------------------------------------------- #
 
 

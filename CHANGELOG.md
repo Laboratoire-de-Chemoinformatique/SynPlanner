@@ -5,6 +5,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-03-19
+
+### Changed
+
+#### Parallelization
+- **Removed Ray dependency entirely** — all parallel pipelines now use
+  `ProcessPoolExecutor` via the new `process_pool_map_stream` utility
+- `process_pool_map_stream` enhanced with `ordered` mode (submission-order
+  yield), per-future `timeout`, `initializer`/`initargs` for non-picklable
+  worker state, `max_tasks_per_child` (Python 3.11+), and `on_timeout` callback
+- New `graceful_shutdown()` context manager for SIGTERM/SIGINT handling with
+  automatic signal handler restoration
+
+#### Data Pipeline
+- Standardization, filtering, rule extraction, and ML preprocessing pipelines
+  migrated from Ray to `process_pool_map_stream` with initializer pattern
+- Writer-side CGR dedup: `hash(~rxn)` (condensed graph of reaction hash) for
+  mechanism-level reaction deduplication — 8 bytes per entry in memory
+- New shared result types: `ProcessResult`, `ErrorEntry`, `FilteredEntry`,
+  `PipelineSummary` in `synplan.chem.data.reaction_result`
+
+#### Compatibility
+- Removed `from __future__ import annotations` from all modules (Dagster
+  compatibility)
+- Forward references quoted for self-referencing return types
+
+### Removed
+- `ray` dependency removed from `pyproject.toml`
+- `init_ray_logging()` removed from `synplan.utils.logging`
+- `DedupActor` Ray actor removed
+
+### Added
+- 10 unit tests for `process_pool_map_stream` and `graceful_shutdown`
+  (`tests/unit/utils/test_parallel.py`)
+- 8 unit tests for `ProcessResult`, `PipelineSummary`, and CGR dedup
+  (`tests/unit/chem/data/test_pipeline.py`)
+
 ## [1.4.2] - 2026-03-15
 
 ### Added
@@ -360,7 +397,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CLI interface (`synplan` command)
 - Docker images for CLI and GUI
 
-[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.3...HEAD
+[1.4.3]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.3.2...v1.4.0
