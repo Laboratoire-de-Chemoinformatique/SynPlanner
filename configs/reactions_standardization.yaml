@@ -6,4 +6,4 @@ check_isotopes_config:
 aromatic_form_config:
 mapping_fix_config:
 unchanged_parts_config:
-duplicate_reaction_config:
+deduplicate: true

@@ -26,7 +26,7 @@ from synplan.utils.visualisation import extract_routes, generate_results_html
 
 
 def extract_tree_stats(
-    tree: Tree, target: str | MoleculeContainer, init_smiles: str = None
+    tree: Tree, target: str | MoleculeContainer, init_smiles: str | None = None
 ):
     """Collects various statistics from a tree and returns them in a dictionary format.
 

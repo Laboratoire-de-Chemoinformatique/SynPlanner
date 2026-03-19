@@ -189,9 +189,11 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
                 if id(m) not in mol_cache:
                     mol_cache[id(m)] = m.to_rdkit(keep_mapping=keep_mapping)
 
-        def _build_node(molecule: MoleculeContainer) -> dict:
+        def _build_node(
+            molecule: MoleculeContainer, _graph=graph, _mol_cache=mol_cache
+        ) -> dict:
             smi = str(molecule)
-            rdkit_mol = mol_cache.get(
+            rdkit_mol = _mol_cache.get(
                 id(molecule),
                 molecule.to_rdkit(keep_mapping=keep_mapping),
             )
@@ -202,8 +204,8 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
                 "in_stock": smi in tree.building_blocks
                 or len(molecule) <= tree.config.min_mol_size,
             }
-            if molecule in graph:
-                children = [_build_node(p) for p in graph[molecule]]
+            if molecule in _graph:
+                children = [_build_node(p) for p in _graph[molecule]]
                 node["children"] = [{"type": "reaction", "children": children}]
             return node
 

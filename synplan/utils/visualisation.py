@@ -526,7 +526,7 @@ def generate_results_html(
 
 
 def html_top_routes_cluster(
-    clusters: dict, tree: Tree, target_smiles: str, html_path: str = None
+    clusters: dict, tree: Tree, target_smiles: str, html_path: str | None = None
 ) -> str:
     """Clustering Results Download: Providing functionality to download the clustering results with styled HTML report."""
 
@@ -623,7 +623,7 @@ def routes_clustering_report(
     group_index: str,
     sb_cgrs_dict: dict,
     aam: bool = False,
-    html_path: str = None,
+    html_path: str | None = None,
 ) -> str:
     """
     Generates an HTML report visualizing a cluster of retrosynthetic routes.
@@ -1042,7 +1042,7 @@ def routes_subclustering_report(
     sb_cgrs_dict: dict,
     if_lg_group: bool = False,
     aam: bool = False,
-    html_path: str = None,
+    html_path: str | None = None,
 ) -> str:
     """
     Generates an HTML report visualizing a specific subcluster of retrosynthetic routes.

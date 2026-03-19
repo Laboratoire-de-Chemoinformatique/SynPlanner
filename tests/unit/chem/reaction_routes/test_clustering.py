@@ -7,7 +7,6 @@ import synplan.chem.reaction_routes.clustering as clustering
 from synplan.chem.reaction_routes.clustering import (
     cluster_routes,
     subcluster_all_clusters,
-    subcluster_one_cluster,
 )
 
 
@@ -46,12 +45,12 @@ def test_cluster_routes_valid(sb_cgrs_dict, use_strat):
     for route_id, value in clusters.items():
         assert isinstance(route_id, str)
         assert isinstance(value, dict)
-        assert "route_ids" in value.keys()
+        assert "route_ids" in value
         assert isinstance(value["route_ids"], list)
         assert len(value["route_ids"]) > 0
-        assert "sb_cgr" in value.keys()
-        assert "strat_bonds" in value.keys()
-        assert "group_size" in value.keys()
+        assert "sb_cgr" in value
+        assert "strat_bonds" in value
+        assert "group_size" in value
 
 
 def test_subcluster_one_cluster_valid(sb_cgrs_dict, routes_cgrs_dict):

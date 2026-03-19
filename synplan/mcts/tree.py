@@ -325,8 +325,8 @@ class Tree:
         self,
         node_id: int,
         new_node: Node,
-        policy_prob: float = None,
-        rule_id: int = None,
+        policy_prob: float | None = None,
+        rule_id: int | None = None,
     ) -> None:
         """Adds a new node to the tree with probability of reaction rules predicted by
         policy function and applied to the parent node of the new node.

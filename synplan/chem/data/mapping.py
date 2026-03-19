@@ -4,13 +4,13 @@ Three-stage concurrent pipeline:
   parse (ProcessPool) → GPU inference (main thread) → map + write (ProcessPool)
 """
 
-from __future__ import annotations
-
 import logging
-import sys
+import os
+import signal
 import threading
 import time
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from contextlib import nullcontext
 from itertools import chain, count
 from math import inf
@@ -19,7 +19,6 @@ from queue import Queue
 from typing import Literal
 
 import torch
-from chython import smiles as parse_smiles
 from chython.containers import ReactionContainer
 from chytorch.utils.data import ReactionEncoderDataset, collate_encoded_reactions
 from chytorch.zoo.rxnmap import Model
@@ -40,12 +39,10 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
 from synplan.utils.config import BaseConfigModel
-from synplan.utils.files import count_smiles_records
+from synplan.utils.files import RawReactionReader, init_parse_worker, parse_one
 from synplan.utils.parallel import default_num_workers, select_device
 
 logger = logging.getLogger(__name__)
-
-_RECYCLE_WORKERS = sys.version_info >= (3, 11)  # max_tasks_per_child added in 3.11
 
 
 # -- Configuration -----------------------------------------------------------
@@ -58,29 +55,19 @@ class MappingConfig(BaseConfigModel):
     :param chunk_size: Lines per streaming chunk.
     :param device: ``"cuda"``, ``"mps"``, ``"cpu"`` or *None* (auto-detect).
     :param no_amp: Disable automatic mixed precision.
+    :param worker_timeout: Timeout in seconds per worker task (parse/map chunk).
+        If a chunk takes longer, it is skipped and reactions are logged as failed.
+        Set to 0 to disable.
     """
 
     batch_size: int = Field(default=16, ge=1)
     chunk_size: int = Field(default=5000, ge=1)
     device: Literal["cuda", "mps", "cpu"] | None = None
     no_amp: bool = False
+    worker_timeout: int = Field(default=120, ge=0)
 
 
 # -- Worker functions (module-level for ProcessPool pickling) ----------------
-
-
-def _parse_one(line: str):
-    """Parse a single SMILES line → ``(ReactionContainer | None, error | None)``."""
-    try:
-        smi = line.split("\t")[0]
-        rxn = parse_smiles(smi)
-        if rxn is None:
-            return None, "parse returned None"
-        if not isinstance(rxn, ReactionContainer):
-            return None, "not a reaction SMILES"
-        return rxn, None
-    except Exception as e:
-        return None, f"parse: {e}"
 
 
 def _map_and_format(args):
@@ -311,25 +298,6 @@ def _batched_attention(model, reactions, batch_size, device, use_amp=False):
     return [attns[inv[i]] for i in range(len(reactions))]
 
 
-# -- I/O helpers -------------------------------------------------------------
-
-
-def _read_chunks(path, chunk_size):
-    """Yield ``(offset, lines)`` chunks without loading the whole file."""
-    chunk, offset = [], 0
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            stripped = line.strip()
-            if stripped:
-                chunk.append(stripped)
-                if len(chunk) == chunk_size:
-                    yield offset, chunk
-                    offset += len(chunk)
-                    chunk = []
-    if chunk:
-        yield offset, chunk
-
-
 # -- Main pipeline -----------------------------------------------------------
 
 
@@ -359,6 +327,7 @@ def map_reactions_from_file(
     dev = select_device(config.device)
     use_amp = not config.no_amp and dev.type in ("cuda", "mps")
     workers = num_workers if num_workers > 0 else default_num_workers()
+    worker_timeout = config.worker_timeout or None  # 0 means no timeout
 
     _error_path: Path | None = None
     if error_file_path is not None:
@@ -368,7 +337,10 @@ def map_reactions_from_file(
 
     logger.info("Device: %s  AMP: %s  Workers: %d", dev, use_amp, workers)
 
-    total = count_smiles_records(input_path)
+    raw_reader = RawReactionReader(input_path)
+    fmt = raw_reader.format
+
+    total = raw_reader.count()
     logger.info("Total: %d reactions", total)
 
     model = Model()
@@ -399,18 +371,25 @@ def map_reactions_from_file(
     # -- Stage 1: read + parse -----------------------------------------------
     def _parser(pool):
         try:
-            for offset, lines in _read_chunks(input_path, config.chunk_size):
+            for offset, items in raw_reader.iter_chunks(config.chunk_size):
                 if stop.is_set():
                     break
-                results = list(pool.map(_parse_one, lines, chunksize=64))
+                futures = [pool.submit(parse_one, item) for item in items]
                 rxns, idx, fails = [], [], []
-                for i, (rxn, err) in enumerate(results):
-                    if rxn is not None:
-                        rxns.append(rxn)
-                        idx.append(i)
-                    else:
-                        fails.append((i, lines[i], err))
-                _put(parsed_q, (offset, lines, rxns, idx, fails))
+                for i, fut in enumerate(futures):
+                    try:
+                        rxn, err = fut.result(timeout=worker_timeout)
+                        if rxn is not None:
+                            rxns.append(rxn)
+                            idx.append(i)
+                        else:
+                            fails.append((i, items[i], err))
+                    except FuturesTimeoutError:
+                        fut.cancel()
+                        fails.append((i, items[i], "parse timeout"))
+                    except Exception as e:
+                        fails.append((i, items[i], f"parse worker: {e}"))
+                _put(parsed_q, (offset, items, rxns, idx, fails))
         except Exception as e:
             errors["parser"] = e
             stop.set()
@@ -421,40 +400,61 @@ def map_reactions_from_file(
     def _writer(pool, out, fail_out, pbar):
         try:
             while (item := mapped_q.get()) is not None:
-                offset, lines, rxns, attns, idx, fails = item
+                offset, raw_items, rxns, attns, idx, fails = item
 
-                results = (
-                    list(pool.map(_map_and_format, zip(rxns, attns), chunksize=16))
-                    if rxns
-                    else []
-                )
+                if rxns:
+                    futures = [
+                        pool.submit(_map_and_format, (rxn, attn))
+                        for rxn, attn in zip(rxns, attns)
+                    ]
+                    results = []
+                    for fi, fut in enumerate(futures):
+                        try:
+                            results.append(fut.result(timeout=worker_timeout))
+                        except FuturesTimeoutError:
+                            fut.cancel()
+                            results.append((None, "mapping timeout"))
+                            logger.warning(
+                                "Mapping timeout for reaction at offset %d+%d",
+                                offset,
+                                idx[fi],
+                            )
+                        except Exception as e:
+                            results.append((None, f"mapping worker: {e}"))
+                else:
+                    results = []
 
-                out_lines = list(lines)
+                n_ok = 0
                 for ri, (smi, err) in enumerate(results):
                     ci = idx[ri]
                     if smi is not None:
-                        parts = lines[ci].split("\t", 1)
-                        out_lines[ci] = smi + (
-                            "\t" + parts[1] if len(parts) > 1 else ""
-                        )
+                        out.write(smi + "\n")
+                        n_ok += 1
                     else:
-                        fails.append((ci, lines[ci], err))
+                        fails.append((ci, raw_items[ci], err))
 
-                for ln in out_lines:
-                    out.write(ln + "\n")
-
-                fail_set = {i for i, _, _ in fails}
-                stats["failed"] += len(fail_set)
-                stats["mapped"] += len(lines) - len(fail_set)
+                stats["failed"] += len(fails)
+                stats["mapped"] += n_ok
 
                 if fail_out:
                     for fi, fl, fe in fails:
-                        fail_out.write(f"{offset + fi}\t{fl}\t{fe}\n")
+                        # Truncate RDF blocks to first line for error log
+                        fl_short = fl.split("\n")[0] if "\n" in fl else fl
+                        fail_out.write(f"{offset + fi}\t{fl_short}\t{fe}\n")
 
-                pbar.update(len(lines))
+                pbar.update(len(raw_items))
         except Exception as e:
             errors["writer"] = e
             stop.set()
+
+    # -- Signal handling for graceful shutdown --------------------------------
+    _original_sigterm = signal.getsignal(signal.SIGTERM)
+
+    def _handle_sigterm(signum, frame):
+        logger.warning("SIGTERM received — stopping mapping pipeline")
+        stop.set()
+
+    signal.signal(signal.SIGTERM, _handle_sigterm)
 
     # -- Run pipeline --------------------------------------------------------
     out = fail_out = None
@@ -464,13 +464,14 @@ def map_reactions_from_file(
         if _error_path:
             fail_out = open(_error_path, "w", encoding="utf-8")
 
-        # Recycle workers periodically to free accumulated memory.
-        pool_kw = {"max_tasks_per_child": 1000} if _RECYCLE_WORKERS else {}
+        pool = ProcessPoolExecutor(
+            max_workers=workers,
+            initializer=init_parse_worker,
+            initargs=(fmt,),
+        )
+        pbar = tqdm(total=total, desc="Mapping", unit="rxn", disable=silent)
 
-        with (
-            ProcessPoolExecutor(max_workers=workers, **pool_kw) as pool,
-            tqdm(total=total, desc="Mapping", unit="rxn", disable=silent) as pbar,
-        ):
+        try:
             thr_p = threading.Thread(target=_parser, args=(pool,), daemon=True)
             thr_w = threading.Thread(
                 target=_writer,
@@ -486,7 +487,7 @@ def map_reactions_from_file(
                     item = parsed_q.get()
                     if item is None:
                         break
-                    offset, lines, rxns, idx, fails = item
+                    offset, raw_items, rxns, idx, fails = item
 
                     if rxns:
                         try:
@@ -502,12 +503,12 @@ def map_reactions_from_file(
                             torch.cuda.empty_cache()
                             logger.warning("GPU OOM (%d rxns)", len(rxns))
                             for i in idx:
-                                fails.append((i, lines[i], "GPU out of memory"))
+                                fails.append((i, raw_items[i], "GPU out of memory"))
                             rxns, idx, attns = [], [], []
                     else:
                         attns = []
 
-                    _put(mapped_q, (offset, lines, rxns, attns, idx, fails))
+                    _put(mapped_q, (offset, raw_items, rxns, attns, idx, fails))
             except Exception as e:
                 errors["gpu"] = e
                 stop.set()
@@ -515,16 +516,33 @@ def map_reactions_from_file(
                 mapped_q.put(None)
                 thr_p.join(timeout=10)
                 thr_w.join(timeout=10)
+        finally:
+            pbar.close()
+            # Collect worker PIDs before shutdown so we can force-kill if needed
+            worker_pids = [p.pid for p in pool._processes.values() if p.pid is not None]
+            pool.shutdown(wait=False, cancel_futures=True)
+            # Force-kill lingering workers to avoid atexit deadlock (gh-115634)
+            import contextlib
+
+            for pid in worker_pids:
+                with contextlib.suppress(ProcessLookupError, OSError):
+                    os.kill(pid, signal.SIGKILL)
+
     finally:
         if out:
             out.close()
         if fail_out:
             fail_out.close()
+        # Restore original signal handler
+        signal.signal(signal.SIGTERM, _original_sigterm)
 
     elapsed = time.perf_counter() - t0
-    for exc in errors.values():
-        if exc is not None:
-            raise exc
+
+    # Only raise if NOT a graceful stop (SIGTERM)
+    if not stop.is_set():
+        for exc in errors.values():
+            if exc is not None:
+                raise exc
 
     throughput = total / elapsed if elapsed > 0 else 0
     summary = (

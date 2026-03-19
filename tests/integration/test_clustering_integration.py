@@ -127,11 +127,11 @@ def run_clustering_workflow(
 
 def calc_num_routes_subclusters(subclusters):
     """Calculate the total number of routes in subclusters."""
-    l = 0
+    count = 0
     for cluster in subclusters.values():
         for subcluster in cluster.values():
-            l += len(subcluster["routes_data"])
-    return l
+            count += len(subcluster["routes_data"])
+    return count
 
 
 @pytest.mark.integration
@@ -141,7 +141,7 @@ def test_simple_molecule_clustering(
     """Test clustering workflow with a simple molecule (Aspirin)."""
     caplog.set_level(logging.DEBUG)
     target_smiles = TEST_MOLECULES["simple"]
-    tree, clusters, subclusters = run_clustering_workflow(
+    _tree, clusters, subclusters = run_clustering_workflow(
         target_smiles, building_blocks, reaction_rules, policy_network, tree_config
     )
     # Verify clustering results
@@ -167,7 +167,7 @@ def test_medium_molecule_clustering(
     """Test clustering workflow with a medium complexity molecule (Capivasertib)."""
     caplog.set_level(logging.DEBUG)
     target_smiles = TEST_MOLECULES["medium"]
-    tree, clusters, subclusters = run_clustering_workflow(
+    _tree, clusters, subclusters = run_clustering_workflow(
         target_smiles, building_blocks, reaction_rules, policy_network, tree_config
     )
 
@@ -194,7 +194,7 @@ def test_complex_molecule_clustering(
     """Test clustering workflow with a complex molecule (Ibuprofen)."""
     caplog.set_level(logging.DEBUG)
     target_smiles = TEST_MOLECULES["complex"]
-    tree, clusters, subclusters = run_clustering_workflow(
+    _tree, clusters, subclusters = run_clustering_workflow(
         target_smiles, building_blocks, reaction_rules, policy_network, tree_config
     )
 

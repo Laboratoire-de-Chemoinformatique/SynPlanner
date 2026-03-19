@@ -273,7 +273,7 @@ def test_rank_routes_no_existing_scores(scorer):
     routes = {0: {0: rxn}}
     ranked = scorer.rank_routes(routes)
     assert len(ranked) == 1
-    route_id, combined, protection, original = ranked[0]
+    _route_id, combined, protection, original = ranked[0]
     assert original == 0.0
     assert combined == pytest.approx(0.5 * protection)
 

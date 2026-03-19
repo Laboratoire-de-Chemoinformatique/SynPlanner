@@ -79,7 +79,7 @@ def _stratified_ranking_split(
     rule_candidates: dict[int, list[int]] = defaultdict(list)
     n_leaked = 0
 
-    for pkey, indices in product_groups.items():
+    for _pkey, indices in product_groups.items():
         if len(indices) > 1:
             train_indices.extend(indices)
             n_leaked += len(indices)
@@ -91,7 +91,7 @@ def _stratified_ranking_split(
     val_indices: list[int] = []
     rng = random.Random(seed)
 
-    for rule_id, candidates in rule_candidates.items():
+    for _rule_id, candidates in rule_candidates.items():
         if len(candidates) <= min_rule_count:
             train_indices.extend(candidates)
             continue
@@ -242,20 +242,20 @@ def _create_logger(logger_config: dict | None, results_path: Path):
     elif logger_type == "mlflow":
         try:
             from pytorch_lightning.loggers import MLFlowLogger
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "MLflow logger requires the 'mlflow' package. "
                 "Install it with: pip install mlflow"
-            )
+            ) from e
         return MLFlowLogger(**kwargs)
     elif logger_type == "wandb":
         try:
             from pytorch_lightning.loggers import WandbLogger
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "Wandb logger requires the 'wandb' package. "
                 "Install it with: pip install wandb"
-            )
+            ) from e
         return WandbLogger(**kwargs)
     else:
         raise ValueError(f"Unknown logger type: '{logger_type}'")

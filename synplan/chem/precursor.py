@@ -54,7 +54,7 @@ class Precursor:
 
 
 def compose_precursors(
-    precursors: list = None, exclude_small: bool = True, min_mol_size: int = 6
+    precursors: list | None = None, exclude_small: bool = True, min_mol_size: int = 6
 ) -> MoleculeContainer:
     """
     Takes a list of precursors, excludes small precursors if specified, and composes them

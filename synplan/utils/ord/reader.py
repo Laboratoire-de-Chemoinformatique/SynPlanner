@@ -3,8 +3,6 @@
 Uses pre-generated _pb2 stubs from the ORD proto schema — no ord-schema dependency.
 """
 
-from __future__ import annotations
-
 import logging
 from collections.abc import Iterator
 from pathlib import Path

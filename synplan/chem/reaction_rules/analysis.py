@@ -1,7 +1,5 @@
 """Utilities for loading and inspecting extracted reaction rules."""
 
-from __future__ import annotations
-
 import logging
 from collections.abc import Sequence
 from pathlib import Path
@@ -45,7 +43,7 @@ class RuleSet:
         self.reaction_indices = tuple(reaction_indices)
 
     @classmethod
-    def from_tsv(cls, tsv_path: str | Path) -> RuleSet:
+    def from_tsv(cls, tsv_path: str | Path) -> "RuleSet":
         """Load rules from a SynPlanner extraction TSV file.
 
         TSV columns (tab-separated, with header):

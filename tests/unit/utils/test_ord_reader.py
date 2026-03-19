@@ -170,7 +170,7 @@ class TestReactionToSmiles:
                 }
             ]
         )
-        smi, meta = _reaction_to_smiles(ds.reactions[0])
+        smi, _meta = _reaction_to_smiles(ds.reactions[0])
         parts = smi.split(">")
         assert len(parts) == 3
         assert "CCN(CC)CC" in parts[1]  # middle = reagents
@@ -184,7 +184,7 @@ class TestReactionToSmiles:
                 }
             ]
         )
-        smi, meta = _reaction_to_smiles(ds.reactions[0])
+        smi, _meta = _reaction_to_smiles(ds.reactions[0])
         assert smi is None
 
     def test_returns_none_when_no_reactants(self):
@@ -196,7 +196,7 @@ class TestReactionToSmiles:
                 }
             ]
         )
-        smi, meta = _reaction_to_smiles(ds.reactions[0])
+        smi, _meta = _reaction_to_smiles(ds.reactions[0])
         assert smi is None
 
     def test_yields_in_meta(self):
@@ -209,7 +209,7 @@ class TestReactionToSmiles:
                 }
             ]
         )
-        smi, meta = _reaction_to_smiles(ds.reactions[0])
+        _smi, meta = _reaction_to_smiles(ds.reactions[0])
         assert "ord_yields" in meta
         assert "92.5" in meta["ord_yields"]
 
@@ -305,7 +305,9 @@ class TestConvertOrdToSmiles:
         out_file = tmp_path / "out.smi"
         n = convert_ord_to_smiles(pb_file, out_file)
         assert n == 1
-        lines = [l.strip() for l in out_file.read_text().splitlines() if l.strip()]
+        lines = [
+            line.strip() for line in out_file.read_text().splitlines() if line.strip()
+        ]
         assert len(lines) == 1
         assert ">" in lines[0]  # reaction SMILES format
 

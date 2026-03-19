@@ -5,7 +5,9 @@ class Node:
     """Node class represents a node in the tree search."""
 
     def __init__(
-        self, precursors_to_expand: tuple = None, new_precursors: tuple = None
+        self,
+        precursors_to_expand: tuple | None = None,
+        new_precursors: tuple | None = None,
     ) -> None:
         """The function initializes the new Node object.
 

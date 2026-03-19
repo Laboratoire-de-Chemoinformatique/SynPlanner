@@ -8,7 +8,6 @@ from itertools import islice
 from os.path import splitext
 from pathlib import Path
 
-import ray
 from chython.containers.bonds import Bond, QueryBond
 from chython.containers.cgr import CGRContainer
 from chython.containers.molecule import MoleculeContainer
@@ -27,6 +26,7 @@ from synplan.utils.files import (
     load_rule_index_mapping_tsv,
     parse_reaction,
 )
+from synplan.utils.parallel import graceful_shutdown, process_pool_map_stream
 
 logger = logging.getLogger(__name__)
 
@@ -559,29 +559,46 @@ def extract_rules(
     return list(seen_cgrs.values()), False
 
 
-@ray.remote
-def process_reaction_batch(
-    batch: list[tuple[int, str]],
-    config: RuleExtractionConfig,
-    ignore_errors: bool = False,
-    fmt: str = "smi",
-) -> tuple[
-    list[tuple[int, list[ReactionContainer]]], list[tuple[str, str, str, str]], int
-]:
-    """Process a batch of reactions for rule extraction.
+_worker_state: dict | None = None
 
-    Raw strings are parsed inside the worker so that SMILES parsing is
-    distributed across Ray workers instead of being a main-thread bottleneck.
+
+def _init_extraction_worker(config_dict: dict, ignore_errors: bool, fmt: str) -> None:
+    """Process initializer: build config once per worker process."""
+    global _worker_state
+    _worker_state = {
+        "config": RuleExtractionConfig(**config_dict),
+        "ignore_errors": ignore_errors,
+        "fmt": fmt,
+    }
+
+
+def _extract_rules_batch_worker(
+    batch: list[tuple[int, str]],
+) -> tuple[
+    list[tuple[int, list[ReactionContainer], str]],
+    list[tuple[str, str, str, str]],
+    int,
+]:
+    """Top-level picklable worker function for rule extraction.
+
+    Called by each worker process via ``process_pool_map_stream``.
+    Requires ``_init_extraction_worker`` to have been called first.
 
     :param batch: List of ``(index, raw_string)`` pairs.
-    :param config: Rule extraction configuration.
-    :param ignore_errors: If True, log failures and continue.
-    :param fmt: Format hint — ``"smi"`` or ``"rdf"``.
     :return: ``(results, errors, n_multi_product)`` where *results* is a list of
         ``(index, extracted_rules, product_smiles)`` tuples, *errors* is a list of
         ``(original_smiles, stage, error_type, error_message)`` tuples and
         *n_multi_product* is the number of reactions skipped due to multiple products.
     """
+    if _worker_state is None:
+        raise RuntimeError(
+            "_extract_rules_batch_worker called outside a worker process. "
+            "This function requires _init_extraction_worker to run first."
+        )
+    config = _worker_state["config"]
+    ignore_errors = _worker_state["ignore_errors"]
+    fmt = _worker_state["fmt"]
+
     extracted_rules_list = []
     errors: list[tuple[str, str, str, str]] = []
     n_multi_product = 0
@@ -624,23 +641,21 @@ def _update_rules_statistics(
             cgr_to_rule[cgr] = rule
 
 
-def process_completed_batch(
-    futures: dict,
+def _process_extraction_result(
+    result: tuple,
     rules_statistics: dict,
     cgr_to_rule: dict,
     error_file: TextIOWrapper | None = None,
     error_counts: Counter | None = None,
     multi_product_count: list[int] | None = None,
     products_file: TextIOWrapper | None = None,
-) -> None:
+) -> int:
     """
-    Processes completed batches of reactions, updating the rules statistics and
-    writing rules to a file. This function waits for the completion of a batch of
-    reactions processed in parallel (using Ray), updates the statistics for each
-    extracted rule, and writes the rules to a result file if they are new. It also
-    updates the progress bar with the size of the processed batch.
+    Processes a single batch result from the extraction worker, updating rules
+    statistics and writing errors/products.
 
-    :param futures: A dictionary of futures representing ongoing batch processing tasks.
+    :param result: Tuple of ``(extracted_rules_list, errors, n_multi_product)``
+        returned by a worker.
     :param rules_statistics: A dictionary mapping rule CGRs to lists of reaction indices.
     :param cgr_to_rule: A dictionary mapping rule CGRs to the first rule seen.
     :param error_file: Optional file handle to write failed reactions.
@@ -649,19 +664,11 @@ def process_completed_batch(
         multi-product reaction count.
     :param products_file: Optional file handle to write ``reaction_id\\tproduct_smiles``
         pairs for later policy data generation.
-    :return: None
-
+    :return: Number of reactions in this batch (for progress bar updates).
     """
+    extracted_rules_list, errors, n_multi_product = result
 
-    ready_id, _running_id = ray.wait(list(futures.keys()), num_returns=1)
-    try:
-        results, errors, n_multi_product = ray.get(ready_id[0])
-    except Exception as exc:
-        logger.error("Batch failed entirely: %s", exc)
-        del futures[ready_id[0]]
-        return
-
-    for index, extracted_rules, product_smi in results:
+    for index, extracted_rules, product_smi in extracted_rules_list:
         _update_rules_statistics(rules_statistics, cgr_to_rule, index, extracted_rules)
         if products_file is not None:
             products_file.write(f"{index}\t{product_smi}\n")
@@ -675,7 +682,7 @@ def process_completed_batch(
     if multi_product_count is not None:
         multi_product_count[0] += n_multi_product
 
-    del futures[ready_id[0]]
+    return len(extracted_rules_list) + len(errors)
 
 
 def sort_rules(
@@ -791,13 +798,16 @@ def _print_extraction_summary(
         covered_reactions.update(indices)
     n_covered = len(covered_reactions)
     summary_lines = [
-        f"Finished: processed {n_processed}, extracted {n_rules} rules "
-        f"from {n_covered} reactions ({n_covered*100/n_processed:.1f}%), "
-        f"failed {n_errors}"
+        (
+            f"Finished: processed {n_processed}, extracted {n_rules} rules "
+            f"from {n_covered} reactions ({n_covered*100/n_processed:.1f}%), "
+            if n_processed
+            else "from 0 reactions, " f"failed {n_errors}"
+        )
     ]
     # Reaction-level filtering
     n_multi_product = filter_stats.get("skipped_multi_product", 0)
-    if n_multi_product:
+    if n_multi_product and n_processed:
         summary_lines.append(
             f"Reactions skipped (multi-product): {n_multi_product} "
             f"({n_multi_product*100/n_processed:.1f}%)"
@@ -842,10 +852,9 @@ def extract_rules_from_reactions(
 ) -> None:
     """
     Extracts reaction rules from a set of reactions based on the given configuration.
-    This function initializes a Ray environment for distributed computing and processes
-    each reaction in the provided reaction database to extract reaction rules. It
-    handles the reactions in batches, parallelize the rule extraction process. Extracted
-    rules and their statistics are collected, then saved as a TSV file.
+    This function uses ProcessPoolExecutor for parallel processing of reactions in
+    batches to extract reaction rules. Extracted rules and their statistics are
+    collected, then saved as a TSV file.
 
     :param config: Configuration settings for rule extraction, including file paths,
         batch size, and other parameters.
@@ -904,61 +913,53 @@ def extract_rules_from_reactions(
                 fmt=fmt,
             )
         else:
-            ray.init(
-                num_cpus=num_cpus, ignore_reinit_error=True, logging_level=logging.ERROR
-            )
-
-            futures = {}
-            batch = []
-            max_concurrent_batches = num_cpus
             multi_product_count = [0]  # mutable accumulator
 
-            for index, raw_item in tqdm(
-                enumerate(raw_reader),
+            def _make_batches():
+                batch = []
+                for index, raw_item in enumerate(raw_reader):
+                    batch.append((index, raw_item))
+                    if len(batch) == batch_size:
+                        yield batch
+                        batch = []
+                if batch:
+                    yield batch
+
+            bar = tqdm(
                 desc="Number of reactions processed: ",
                 bar_format="{desc}{n} [{elapsed}]",
-            ):
-                n_processed += 1
-                batch.append((index, raw_item))
-                if len(batch) == batch_size:
-                    future = process_reaction_batch.remote(
-                        batch, config, ignore_errors, fmt
+            )
+
+            with graceful_shutdown() as stop:
+                for result in process_pool_map_stream(
+                    _make_batches(),
+                    _extract_rules_batch_worker,
+                    max_workers=num_cpus,
+                    max_pending=4 * num_cpus,
+                    ordered=True,
+                    initializer=_init_extraction_worker,
+                    initargs=(config.to_dict(), ignore_errors, fmt),
+                    timeout=300,
+                    max_tasks_per_child=200,
+                ):
+                    if stop.is_set():
+                        break
+
+                    batch_count = _process_extraction_result(
+                        result,
+                        extracted_rules_and_statistics,
+                        cgr_to_rule,
+                        error_file=error_file,
+                        error_counts=error_counts,
+                        multi_product_count=multi_product_count,
+                        products_file=products_tmp,
                     )
-                    futures[future] = None
-                    batch = []
+                    n_processed += batch_count
+                    bar.update(batch_count)
 
-                    while len(futures) >= max_concurrent_batches:
-                        process_completed_batch(
-                            futures,
-                            extracted_rules_and_statistics,
-                            cgr_to_rule,
-                            error_file=error_file,
-                            error_counts=error_counts,
-                            multi_product_count=multi_product_count,
-                            products_file=products_tmp,
-                        )
-
-            if batch:
-                future = process_reaction_batch.remote(
-                    batch, config, ignore_errors, fmt
-                )
-                futures[future] = None
-
-            while futures:
-                process_completed_batch(
-                    futures,
-                    extracted_rules_and_statistics,
-                    cgr_to_rule,
-                    error_file=error_file,
-                    error_counts=error_counts,
-                    multi_product_count=multi_product_count,
-                    products_file=products_tmp,
-                )
-
+            bar.close()
             n_multi_product = multi_product_count[0]
     finally:
-        if ray.is_initialized():
-            ray.shutdown()
         if error_file is not None:
             error_file.close()
         products_tmp.close()
@@ -995,7 +996,7 @@ def extract_rules_from_reactions(
     policy_data_path = f"{reaction_rules_path_base}_policy_data.tsv"
     reaction_rule_pairs = load_rule_index_mapping_tsv(rules_tsv_path)
     n_mapped = 0
-    n_small_products = 0
+    _n_small_products = 0
     products_tmp_path = Path(products_tmp.name)
     try:
         with (

@@ -9,8 +9,9 @@ import yaml
 from click.testing import CliRunner
 from pydantic import ValidationError
 
-from synplan.chem.data.mapping import MappingConfig, _parse_one
+from synplan.chem.data.mapping import MappingConfig
 from synplan.interfaces.cli import synplan
+from synplan.utils.files import init_parse_worker, parse_one
 
 
 class TestMappingConfig:
@@ -59,28 +60,27 @@ class TestMappingConfig:
 
 class TestParseOne:
 
-    def test_valid_reaction(self):
-        rxn, err = _parse_one("[CH3:1][OH:2]>>[CH2:1]=[O:2]")
-        assert rxn is not None
-        assert err is None
+    @pytest.fixture(autouse=True)
+    def _init_worker(self):
+        init_parse_worker("smi")
 
-    def test_tab_suffix_preserved(self):
-        rxn, err = _parse_one("[CH3:1][OH:2]>>[CH2:1]=[O:2]\tUS1234567")
+    def test_valid_reaction(self):
+        rxn, err = parse_one("[CH3:1][OH:2]>>[CH2:1]=[O:2]")
         assert rxn is not None
         assert err is None
 
     def test_molecule_smiles_rejected(self):
-        rxn, err = _parse_one("CCO")
+        rxn, err = parse_one("CCO")
         assert rxn is None
         assert "not a reaction" in err
 
     def test_invalid_smiles(self):
-        rxn, err = _parse_one("NOT_A_SMILES")
+        rxn, err = parse_one("NOT_A_SMILES")
         assert rxn is None
         assert err is not None
 
     def test_empty_string(self):
-        rxn, err = _parse_one("")
+        rxn, err = parse_one("")
         assert rxn is None
         assert err is not None
 
