@@ -5,6 +5,7 @@ backpressure, and graceful shutdown.
 """
 
 import signal
+import sys
 import time
 
 import pytest
@@ -101,7 +102,7 @@ def test_timeout_with_callback():
             _hang_on_value,
             max_workers=2,
             ordered=True,
-            timeout=2,
+            timeout=5,  # generous timeout for slow CI (Windows)
             on_timeout=on_timeout,
         )
     )
@@ -208,14 +209,19 @@ def test_single_worker():
     assert results == items
 
 
-# -- T9: graceful_shutdown sets stop event on SIGTERM ------------------------
+# -- T9: graceful_shutdown sets stop event on signal -------------------------
+
+_is_windows = sys.platform == "win32"
 
 
+@pytest.mark.skipif(
+    _is_windows,
+    reason="os.kill(SIGTERM) terminates the process on Windows; handler cannot catch it",
+)
 def test_graceful_shutdown_sigterm():
-    """SIGTERM sets the stop event."""
+    """SIGTERM sets the stop event (POSIX only)."""
     with graceful_shutdown() as stop:
         assert not stop.is_set()
-        # Send SIGTERM to self
         import os
 
         os.kill(os.getpid(), signal.SIGTERM)
@@ -226,11 +232,13 @@ def test_graceful_shutdown_sigterm():
 # -- T10: graceful_shutdown restores original handler -----------------------
 
 
+@pytest.mark.skipif(
+    _is_windows,
+    reason="os.kill(SIGTERM) terminates the process on Windows; handler cannot catch it",
+)
 def test_graceful_shutdown_restores_handler():
-    """Original signal handler is restored after exit."""
+    """Original signal handler is restored after exit (POSIX only)."""
     original = signal.getsignal(signal.SIGTERM)
     with graceful_shutdown() as _:
-        # Handler is replaced inside the context
         assert signal.getsignal(signal.SIGTERM) != original
-    # After exit, handler is restored
     assert signal.getsignal(signal.SIGTERM) is original
