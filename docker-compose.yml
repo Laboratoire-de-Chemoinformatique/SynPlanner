@@ -1,0 +1,13 @@
+services:
+  synplan-app:
+    build:
+      context: .
+      dockerfile: app.Dockerfile
+    image: synplan-app:latest
+    platform: linux/amd64
+    ports:
+      - "8501:8501"
+    environment:
+      MPLCONFIGDIR: /tmp/matplotlib
+      XDG_CACHE_HOME: /tmp/cache
+    restart: unless-stopped
