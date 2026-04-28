@@ -64,6 +64,34 @@ class BaseConfigModel(BaseModel):
             )
 
 
+class ReactorConfig(BaseConfigModel):
+    """Configuration for chython Reactor instances.
+
+    Controls how Reactor objects are created when loading reaction rules.
+    Intended for programmatic use, not config files.
+
+    :param automorphism_filter: If True, skip substructure matches to the same
+        set of atoms. Should be False for asymmetric product templates (e.g.
+        Suzuki) where different match orientations produce different products.
+    :param delete_atoms: If True, atoms in reactants but not in products are removed.
+    :param one_shot: If True, do only single reaction center per application.
+    :param fix_aromatic_rings: Proceed kekule and thiele on products.
+    :param fix_tautomers: Fix tautomers in products.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    automorphism_filter: bool = True
+    delete_atoms: bool = False
+    one_shot: bool = True
+    fix_aromatic_rings: bool = True
+    fix_tautomers: bool = True
+
+    def to_reactor_kwargs(self) -> dict:
+        """Convert to kwargs dict for Reactor constructor."""
+        return self.model_dump()
+
+
 class RuleExtractionConfig(BaseConfigModel):
     """Configuration class for extracting reaction rules.
 

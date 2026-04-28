@@ -26,11 +26,17 @@ class FileHandler:
         """
         self._file = None
         _, ext = splitext(filename)
-        file_types = {".smi": "SMI", ".smiles": "SMI", ".rdf": "RDF", ".sdf": "SDF"}
+        file_types = {
+            ".smi": "SMI",
+            ".smiles": "SMI",
+            ".rdf": "RDF",
+            ".sdf": "SDF",
+            ".pb": "PB",
+        }
         try:
             self._file_type = file_types[ext]
-        except KeyError:
-            raise ValueError("I don't know the file extension,", ext)
+        except KeyError as e:
+            raise ValueError("I don't know the file extension,", ext) from e
 
     def close(self):
         self._file.close()
@@ -121,6 +127,27 @@ class Writer(FileHandler):
         return self
 
 
+class _ORDReadAdapter:
+    """Adapts iter_ord_reactions to the Reader protocol used by ReactionReader."""
+
+    def __init__(self, filename: str | Path):
+        self._path = Path(filename)
+
+    def __iter__(self):
+        from synplan.utils.ord.reader import iter_ord_reactions
+
+        return iter_ord_reactions(self._path)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        pass
+
+    def close(self):
+        pass
+
+
 class ReactionReader(Reader):
     def __init__(self, filename: str | Path, **kwargs):
         """Class to read reaction files.
@@ -133,6 +160,9 @@ class ReactionReader(Reader):
             self._file = SMILESRead(filename, **kwargs)
         elif self._file_type == "RDF":
             self._file = RDFRead(filename, indexable=True, **kwargs)
+        elif self._file_type == "PB":
+
+            self._file = _ORDReadAdapter(filename)
         else:
             raise ValueError("File type incompatible -", filename)
 
@@ -419,6 +449,35 @@ def parse_reaction(
         return rxn
 
 
+# -- Process-pool parse worker ------------------------------------------------
+# Module-level state + functions for ProcessPoolExecutor pickling.
+
+_parse_fmt = "smi"
+
+
+def init_parse_worker(fmt: str):
+    """Initializer: store the input format so ``parse_one`` knows how to parse."""
+    global _parse_fmt
+    _parse_fmt = fmt
+
+
+def parse_one(item: str):
+    """Parse a single raw item → ``(ReactionContainer | None, error | None)``.
+
+    *item* is a SMILES string (for .smi) or an RDF text block (for .rdf).
+    The format is set once per worker via :func:`init_parse_worker`.
+    """
+    try:
+        rxn = parse_reaction(item, fmt=_parse_fmt)
+        if rxn is None:
+            return None, "parse returned None"
+        if not isinstance(rxn, ReactionContainer):
+            return None, "not a reaction"
+        return rxn, None
+    except Exception as e:
+        return None, f"parse: {e}"
+
+
 class RawReactionReader:
     """Yields raw unparsed items: str lines for SMILES, str blocks for RDF."""
 
@@ -429,16 +488,49 @@ class RawReactionReader:
             self.format = "smi"
         elif ext == ".rdf":
             self.format = "rdf"
+        elif ext == ".pb":
+            self.format = "pb"
         else:
             raise ValueError(f"Unsupported extension for raw reading: {ext}")
         self._path = p
         self._batch_size = batch_size
 
-    def __iter__(self) -> Iterator[str]:
+    def __iter__(self) -> Iterator[str | ReactionContainer]:
         if self.format == "smi":
             yield from iter_smiles(self._path)
-        else:
+        elif self.format == "rdf":
             yield from iter_rdf_text_blocks(self._path, 1)
+        elif self.format == "pb":
+            from synplan.utils.ord.reader import iter_ord_reactions
+
+            yield from iter_ord_reactions(self._path)
+        else:
+            raise ValueError(f"Unsupported format: {self.format}")
+
+    def count(self) -> int:
+        """Count the number of records without parsing them."""
+        if self.format == "smi":
+            return count_smiles_records(self._path)
+        elif self.format == "rdf":
+            return count_rdf_records(self._path)
+        elif self.format == "pb":
+            from synplan.utils.ord.reader import iter_ord_reactions
+
+            return sum(1 for _ in iter_ord_reactions(self._path))
+        raise ValueError(f"Unsupported format: {self.format}")
+
+    def iter_chunks(self, chunk_size: int) -> Iterator[tuple[int, list]]:
+        """Yield ``(offset, items)`` chunks of up to *chunk_size* records."""
+        chunk: list = []
+        offset = 0
+        for item in self:
+            chunk.append(item)
+            if len(chunk) == chunk_size:
+                yield offset, chunk
+                offset += len(chunk)
+                chunk = []
+        if chunk:
+            yield offset, chunk
 
     def __enter__(self):
         return self

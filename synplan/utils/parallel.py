@@ -2,17 +2,40 @@
 
 This module provides small, reusable helpers for ProcessPool-based
 parallel mapping with backpressure. Keep format-specific I/O utilities in
-`synplan.utils.files`.
+``synplan.utils.files``.
+
+Key components:
+- ``process_pool_map_stream``: lazy parallel map with backpressure, timeout,
+  ordered mode, and worker initializer support.
+- ``graceful_shutdown``: context manager for SIGTERM/SIGINT handling.
+- ``select_device``, ``default_num_workers``: hardware helpers.
 """
 
-from __future__ import annotations
-
+import contextlib
+import logging
 import os
+import signal
+import sys
+import threading
+from collections import deque
 from collections.abc import Callable, Iterable, Iterator
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import (
+    Future,
+    ProcessPoolExecutor,
+    as_completed,
+)
+from concurrent.futures import (
+    TimeoutError as FuturesTimeoutError,
+)
+from contextlib import contextmanager
 from typing import Any
 
 import torch
+
+logger = logging.getLogger(__name__)
+
+_CANCEL_FUTURES = sys.version_info >= (3, 9)
+_RECYCLE_WORKERS = sys.version_info >= (3, 11)
 
 
 def select_device(device: str | None = None) -> torch.device:
@@ -48,11 +71,49 @@ def process_pool_map_stream(
     *,
     max_workers: int,
     max_pending: int | None = None,
+    timeout: float = 300.0,
+    ordered: bool = False,
+    initializer: Callable[..., None] | None = None,
+    initargs: tuple = (),
+    max_tasks_per_child: int | None = None,
+    on_timeout: Callable[[FuturesTimeoutError, Any], Any] | None = None,
 ) -> Iterator[Any]:
-    """Submit tasks lazily and yield results as they finish.
+    """Submit tasks lazily and yield results with backpressure.
 
-    Limits the number of in‑flight futures to avoid memory spikes when `items`
-    is a large or infinite iterator. Results are yielded in completion order.
+    Parameters
+    ----------
+    items
+        Iterable of inputs. Each item is passed to ``worker_fn``.
+    worker_fn
+        Top-level module function (must be picklable). Receives one item,
+        returns one result.
+    max_workers
+        Number of worker processes.
+    max_pending
+        Maximum in-flight futures. Defaults to ``4 * max_workers``.
+    timeout
+        Per-future timeout in seconds. When a future exceeds this, a
+        ``TimeoutError`` is raised (or handled by ``on_timeout``).
+        Default 300s. Set to 0 to disable.
+    ordered
+        If True, yield results in submission order (preserves input order).
+        If False (default), yield in completion order (faster throughput).
+    initializer
+        Callable run once per worker process at startup. Used to set up
+        non-picklable state (e.g. standardizer objects) in a module global.
+    initargs
+        Arguments for ``initializer``.
+    max_tasks_per_child
+        Recycle worker processes after this many tasks (Python 3.11+).
+        Prevents memory leaks in long-running pipelines.
+    on_timeout
+        Callback ``(timeout_error, original_item) -> fallback_result``.
+        If provided, timeout does not raise — the callback's return value
+        is yielded instead. If None, TimeoutError propagates.
+
+    Yields
+    ------
+    Results from ``worker_fn`` in the order determined by ``ordered``.
     """
     if max_workers < 1:
         raise ValueError("max_workers must be >= 1")
@@ -61,29 +122,189 @@ def process_pool_map_stream(
     if max_pending < 1:
         max_pending = 1
 
-    executor = ProcessPoolExecutor(max_workers=max_workers)
+    effective_timeout = timeout if timeout > 0 else None
+
+    if _RECYCLE_WORKERS and max_tasks_per_child is not None:
+        executor = ProcessPoolExecutor(
+            max_workers=max_workers,
+            initializer=initializer,
+            initargs=initargs,
+            max_tasks_per_child=max_tasks_per_child,
+        )
+    else:
+        executor = ProcessPoolExecutor(
+            max_workers=max_workers,
+            initializer=initializer,
+            initargs=initargs,
+        )
     try:
-        iterator = iter(items)
-        pending = set()
-
-        # Prime the queue up to max_pending
-        try:
-            while len(pending) < max_pending:
-                pending.add(executor.submit(worker_fn, next(iterator)))
-        except StopIteration:
-            pass
-
-        while pending:
-            for future in as_completed(pending):
-                pending.remove(future)
-
-                # Refill the queue immediately to keep workers busy
-                try:
-                    while len(pending) < max_pending:
-                        pending.add(executor.submit(worker_fn, next(iterator)))
-                except StopIteration:
-                    pass
-
-                yield future.result()
+        if ordered:
+            yield from _ordered_stream(
+                executor,
+                items,
+                worker_fn,
+                max_pending,
+                effective_timeout,
+                on_timeout,
+            )
+        else:
+            yield from _unordered_stream(
+                executor,
+                items,
+                worker_fn,
+                max_pending,
+                effective_timeout,
+                on_timeout,
+            )
     finally:
-        executor.shutdown(wait=False, cancel_futures=True)
+        if _CANCEL_FUTURES:
+            executor.shutdown(wait=False, cancel_futures=True)
+        else:
+            executor.shutdown(wait=False)
+
+
+def _ordered_stream(
+    executor: ProcessPoolExecutor,
+    items: Iterable[Any],
+    worker_fn: Callable,
+    max_pending: int,
+    timeout: float | None,
+    on_timeout: Callable | None,
+) -> Iterator[Any]:
+    """Yield results in submission order using a deque."""
+    futures_deque: deque[tuple[Future, Any]] = deque()
+    iterator = iter(items)
+    exhausted = False
+
+    def _fill():
+        nonlocal exhausted
+        while len(futures_deque) < max_pending and not exhausted:
+            try:
+                item = next(iterator)
+                fut = executor.submit(worker_fn, item)
+                futures_deque.append((fut, item))
+            except StopIteration:
+                exhausted = True
+                break
+
+    _fill()
+
+    while futures_deque:
+        fut, original_item = futures_deque[0]
+        try:
+            result = fut.result(timeout=timeout)
+            futures_deque.popleft()
+            _fill()
+            yield result
+        except FuturesTimeoutError as e:
+            futures_deque.popleft()
+            _fill()
+            if on_timeout is not None:
+                yield on_timeout(e, original_item)
+            else:
+                raise
+
+
+def _unordered_stream(
+    executor: ProcessPoolExecutor,
+    items: Iterable[Any],
+    worker_fn: Callable,
+    max_pending: int,
+    timeout: float | None,
+    on_timeout: Callable | None,
+) -> Iterator[Any]:
+    """Yield results in completion order (existing behavior)."""
+    iterator = iter(items)
+    pending: dict[Future, Any] = {}
+
+    # Prime
+    try:
+        while len(pending) < max_pending:
+            item = next(iterator)
+            fut = executor.submit(worker_fn, item)
+            pending[fut] = item
+    except StopIteration:
+        pass
+
+    while pending:
+        done_futures = as_completed(pending, timeout=timeout)
+        for future in done_futures:
+            original_item = pending.pop(future)
+
+            # Refill
+            try:
+                while len(pending) < max_pending:
+                    item = next(iterator)
+                    fut = executor.submit(worker_fn, item)
+                    pending[fut] = item
+            except StopIteration:
+                pass
+
+            try:
+                yield future.result()
+            except FuturesTimeoutError as e:
+                if on_timeout is not None:
+                    yield on_timeout(e, original_item)
+                else:
+                    raise
+
+
+# ---------------------------------------------------------------------------
+# Graceful shutdown
+# ---------------------------------------------------------------------------
+
+
+@contextmanager
+def graceful_shutdown() -> Iterator[threading.Event]:
+    """Context manager that catches SIGTERM/SIGINT and sets a stop event.
+
+    Restores the original signal handlers on exit. If called from a non-main
+    thread, signal handling is silently skipped (the stop event is still
+    usable for manual signaling).
+
+    Usage::
+
+        with graceful_shutdown() as stop:
+            for chunk in process_pool_map_stream(...):
+                if stop.is_set():
+                    break
+                process(chunk)
+    """
+    stop = threading.Event()
+    originals: dict[int, Any] = {}
+
+    def _handler(*_: Any) -> None:
+        logger.warning("Received termination signal — stopping gracefully")
+        stop.set()
+
+    try:
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            originals[sig] = signal.getsignal(sig)
+            signal.signal(sig, _handler)
+    except ValueError:
+        # Not on main thread — signal handling unavailable.
+        pass
+
+    try:
+        yield stop
+    finally:
+        for sig, original in originals.items():
+            with contextlib.suppress(ValueError):
+                signal.signal(sig, original)
+
+
+# ---------------------------------------------------------------------------
+# Iteration helpers
+# ---------------------------------------------------------------------------
+
+
+def chunked(iterable: Iterable, size: int) -> Iterator[list]:
+    """Yield successive chunks of *size* items from *iterable*."""
+    chunk: list = []
+    for item in iterable:
+        chunk.append(item)
+        if len(chunk) == size:
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk

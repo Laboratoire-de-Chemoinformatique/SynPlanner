@@ -1,6 +1,5 @@
 """Module containing commands line scripts for training and planning steps."""
 
-import os
 import warnings
 from pathlib import Path
 
@@ -119,6 +118,29 @@ def download_all_data_cli(save_to: str = ".") -> None:
 def building_blocks_standardizing_cli(input_file: str, output_file: str) -> None:
     """Standardizes building blocks."""
     standardize_building_blocks(input_file=input_file, output_file=output_file)
+
+
+@synplan.command(name="ord_convert")
+@click.option(
+    "--input",
+    "input_file",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the ORD .pb Dataset file.",
+)
+@click.option(
+    "--output",
+    "output_file",
+    required=True,
+    type=click.Path(),
+    help="Path to the output .smi file.",
+)
+def ord_convert_cli(input_file: str, output_file: str) -> None:
+    """Convert an ORD .pb Dataset file to a SynPlanner-compatible SMILES file."""
+    from synplan.utils.ord.reader import convert_ord_to_smiles
+
+    n = convert_ord_to_smiles(input_path=input_file, output_path=output_file)
+    click.echo(f"Converted {n} reactions → {output_file}")
 
 
 @synplan.command(name="reaction_standardizing")

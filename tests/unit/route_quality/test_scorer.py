@@ -1,9 +1,10 @@
 """Tests for the competing sites scorer and route re-ranking module."""
 
-import pytest
-from pydantic import ValidationError
 from unittest.mock import MagicMock
+
+import pytest
 from chython import smiles
+from pydantic import ValidationError
 
 from synplan.route_quality.protection.config import ProtectionConfig
 from synplan.route_quality.protection.functional_groups import (
@@ -272,7 +273,7 @@ def test_rank_routes_no_existing_scores(scorer):
     routes = {0: {0: rxn}}
     ranked = scorer.rank_routes(routes)
     assert len(ranked) == 1
-    route_id, combined, protection, original = ranked[0]
+    _route_id, combined, protection, original = ranked[0]
     assert original == 0.0
     assert combined == pytest.approx(0.5 * protection)
 

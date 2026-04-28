@@ -51,7 +51,7 @@ jobs:
           # If process was killed (e.g. by os._exit or timeout) but coverage.xml
           # exists, tests completed successfully — treat as green.
           if [ $rc -ne 0 ] && [ -f coverage.xml ]; then
-            echo "::warning::Tests passed but process exited with code $rc (likely Ray/PyTorch daemon threads). Treating as success."
+            echo "::warning::Tests passed but process exited with code $rc (likely PyTorch daemon threads). Treating as success."
             exit 0
           fi
           exit $rc

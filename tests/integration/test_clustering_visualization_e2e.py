@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 
 import pytest
-from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
+from chython.containers import CGRContainer, ReactionContainer
 
 from synplan.chem.reaction_routes.clustering import (
     cluster_routes,
@@ -132,9 +132,9 @@ class TestRouteLoading:
         rd = routes_dict_from_csv
         assert isinstance(rd, dict)
         assert len(rd) > 0
-        for route_id, steps in rd.items():
+        for _route_id, steps in rd.items():
             assert isinstance(steps, dict)
-            for step_id, rxn in steps.items():
+            for _step_id, rxn in steps.items():
                 assert isinstance(rxn, ReactionContainer)
 
     def test_json_csv_produce_same_routes(
@@ -237,9 +237,9 @@ class TestClustering:
         assert len(cl) > 0
 
     def test_subcluster_structure(self, all_subclusters):
-        for cluster_key, subcl in all_subclusters.items():
+        for _cluster_key, subcl in all_subclusters.items():
             assert isinstance(subcl, dict)
-            for sc_num, sc_data in subcl.items():
+            for _sc_num, sc_data in subcl.items():
                 assert "routes_data" in sc_data
                 assert "synthon_reaction" in sc_data
 
@@ -290,7 +290,7 @@ class TestVisualizationSVG:
     def test_sb_cgr_display_produces_svg(self, all_sb_cgrs):
         """cgr_display should work on SB-CGRs too."""
         tested = 0
-        for route_id, sb_cgr in all_sb_cgrs.items():
+        for _route_id, sb_cgr in all_sb_cgrs.items():
             components = list(sb_cgr.connected_components)
             if not components:
                 continue
@@ -434,7 +434,7 @@ class TestHTMLReports:
     ):
         group_index = next(iter(clusters))
         html_path = str(tmp_path / "cluster_report.html")
-        result = routes_clustering_report(
+        routes_clustering_report(
             routes_json, clusters, group_index, all_sb_cgrs, html_path=html_path
         )
         assert Path(html_path).exists(), "HTML report file should be created"
@@ -463,8 +463,8 @@ class TestHTMLReports:
     def test_post_process_subgroup(self, all_subclusters):
         """post_process_subgroup should work on subclusters with >1 route."""
         tested = 0
-        for cluster_key, subcl in all_subclusters.items():
-            for sc_num, sc_data in subcl.items():
+        for _cluster_key, subcl in all_subclusters.items():
+            for _sc_num, sc_data in subcl.items():
                 if len(sc_data["routes_data"]) > 1:
                     processed = post_process_subgroup(sc_data)
                     assert isinstance(processed, dict)
@@ -558,7 +558,7 @@ class TestFullPipelineSmokeTest:
 
         # Cell: Display CGRs as SVG
         tested_cgr_svg = 0
-        for route_id, route_cgr in all_route_cgrs.items():
+        for _route_id, route_cgr in all_route_cgrs.items():
             components = list(route_cgr.connected_components)
             if not components:
                 continue

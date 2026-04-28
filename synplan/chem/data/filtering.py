@@ -1,20 +1,24 @@
 """Module containing classes abd functions for reactions filtering."""
 
 import logging
+import time
 from collections import Counter
 from collections.abc import Iterable
-from io import TextIOWrapper
 from pathlib import Path
 from typing import Any, ClassVar
 
 import numpy as np
-import ray
-import yaml
 from chython.algorithms.fingerprints.morgan import MorganFingerprint
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from pydantic import Field, model_validator
 from tqdm.auto import tqdm
 
+from synplan.chem.data.reaction_result import (
+    ErrorEntry,
+    FilteredEntry,
+    PipelineSummary,
+    ProcessResult,
+)
 from synplan.chem.data.standardizing import (
     AromaticFormStandardizer,
     KekuleFormStandardizer,
@@ -22,6 +26,7 @@ from synplan.chem.data.standardizing import (
 )
 from synplan.utils.config import BaseConfigModel
 from synplan.utils.files import RawReactionReader, ReactionWriter, parse_reaction
+from synplan.utils.parallel import chunked, graceful_shutdown, process_pool_map_stream
 
 logger = logging.getLogger("synplan.chem.data.filtering")
 
@@ -700,153 +705,84 @@ def filter_reaction(
     return is_filtered, reaction, reason
 
 
-@ray.remote
-def process_batch(
-    batch: list[str | ReactionContainer],
-    config: ReactionFilterConfig,
-    filters: list,
-    ignore_errors: bool = False,
-    fmt: str = "smi",
-) -> list[tuple[bool, ReactionContainer | None, str | None]]:
+# ---------------------------------------------------------------------------
+# Worker initializer + batch worker for ProcessPoolExecutor
+# ---------------------------------------------------------------------------
+
+_filter_state: dict | None = None
+
+
+def _init_filter_worker(config_dict: dict) -> None:
+    """Initialise per-worker state (filter instances, config).
+
+    Called once per worker process by ``ProcessPoolExecutor``.
     """
-    Processes a batch of reactions to extract reaction rules based on the given
-    configuration. This function operates as a remote task in a distributed system using
-    Ray.
+    global _filter_state
+    cfg = ReactionFilterConfig(**config_dict)
+    _filter_state = {
+        "config": cfg,
+        "filters": cfg.create_filters(),
+    }
 
-    :param batch: List of raw strings or ReactionContainer objects.
-    :param config: Reaction filtration configuration.
-    :param filters: The list of reaction filters.
-    :param ignore_errors: If True, keep processing when a standardization step fails.
-    :param fmt: Format hint — ``"smi"`` or ``"rdf"``.
-    :return: List of 3-tuples ``(is_filtered, reaction, reason)``.
 
+def _filter_batch_worker(
+    items: list[tuple[str, str, bool]],
+) -> ProcessResult:
+    """Process a batch of raw reaction strings.
+
+    Each element of *items* is ``(raw_string, fmt, ignore_errors)``.
+
+    Returns a :class:`ProcessResult` with kept reactions, filtered entries,
+    and error entries.
     """
+    if _filter_state is None:
+        raise RuntimeError("_filter_batch_worker called before _init_filter_worker")
 
-    processed_reaction_list = []
-    for item in batch:
-        is_filtered, processed_reaction, reason = filter_reaction(
-            item,
+    config: ReactionFilterConfig = _filter_state["config"]
+    filters: list = _filter_state["filters"]
+
+    reactions: list[ReactionContainer] = []
+    filtered: list[FilteredEntry] = []
+    errors: list[ErrorEntry] = []
+
+    for raw, fmt, ignore_errors in items:
+        is_filtered, reaction, reason = filter_reaction(
+            raw,
             config,
             filters,
             ignore_errors=ignore_errors,
             fmt=fmt,
         )
-        processed_reaction_list.append((is_filtered, processed_reaction, reason))
-    return processed_reaction_list
-
-
-def process_completed_batch(
-    futures: dict,
-    result_file: TextIOWrapper,
-    n_filtered: int = 0,
-    error_file: TextIOWrapper | None = None,
-    error_counts: Counter | None = None,
-) -> int:
-    """
-    Processes completed batches of reactions.
-
-    :param futures: A dictionary of futures representing ongoing batch processing tasks.
-    :param result_file: The path to the file where filtered reactions will be stored.
-    :param n_filtered: The number of processed reactions.
-    :param error_file: Optional file handle to write failed reactions.
-    :param error_counts: Optional counter to accumulate error categories.
-    :return: The numbers of filtered and correct reactions.
-
-    """
-
-    ready_id, _running_id = ray.wait(list(futures.keys()), num_returns=1)
-
-    try:
-        completed_batch = ray.get(ready_id[0])
-    except Exception as exc:
-        logger.error("Batch failed entirely: %s", exc)
-        del futures[ready_id[0]]
-        return n_filtered
-
-    # write results of the completed batch to file
-    batch_filtered = 0
-    batch_kept = 0
-    for is_filtered, reaction, reason in completed_batch:
-        if is_filtered is False and reaction is not None:
-            result_file.write(reaction)
-            n_filtered += 1
-            batch_kept += 1
-        else:
-            batch_filtered += 1
-            if reason is not None and error_file is not None:
-                orig_smi = (
-                    reaction.meta.get("init_smiles", str(reaction))
-                    if reaction is not None and hasattr(reaction, "meta")
-                    else str(reaction) if reaction is not None else "(parse failed)"
-                )
-                error_file.write(f"{orig_smi}\t{reason}\n")
-            if reason is not None and error_counts is not None:
-                error_counts[reason] += 1
-
-    # Log batch completion statistics
-    logger.debug(
-        "Batch completed: %d total, %d kept, %d filtered out. Total kept so far: %d",
-        len(completed_batch),
-        batch_kept,
-        batch_filtered,
-        n_filtered,
-    )
-
-    # remove completed future and update progress bar
-    del futures[ready_id[0]]
-
-    return n_filtered
-
-
-def _filter_reactions_serial(
-    config: ReactionFilterConfig,
-    filters: list,
-    input_reaction_data_path: str,
-    filtered_reaction_data_path: str,
-    *,
-    ignore_errors: bool,
-    fmt: str = "smi",
-    error_file: TextIOWrapper | None = None,
-    error_counts: Counter | None = None,
-) -> tuple[int, int]:
-    """Serial filtering loop used when ``num_cpus <= 1``."""
-    lines_counter = 0
-    n_filtered = 0
-    with (
-        RawReactionReader(input_reaction_data_path) as reactions,
-        ReactionWriter(filtered_reaction_data_path) as result_file,
-    ):
-        for item in tqdm(
-            reactions,
-            desc="Number of reactions processed: ",
-            bar_format="{desc}{n} [{elapsed}]",
-        ):
-            lines_counter += 1
-            is_filtered, processed_reaction, reason = filter_reaction(
-                item,
-                config,
-                filters,
-                ignore_errors=ignore_errors,
-                fmt=fmt,
+        if not is_filtered and reaction is not None:
+            reactions.append(reaction)
+        elif reason is not None:
+            orig_smi = (
+                reaction.meta.get("init_smiles", str(reaction))
+                if reaction is not None and hasattr(reaction, "meta")
+                else raw
             )
-            if not is_filtered and processed_reaction is not None:
-                result_file.write(processed_reaction)
-                n_filtered += 1
-            elif reason is not None:
-                if error_file is not None:
-                    orig_smi = (
-                        processed_reaction.meta.get(
-                            "init_smiles", str(processed_reaction)
-                        )
-                        if processed_reaction is not None
-                        and hasattr(processed_reaction, "meta")
-                        else str(item)
+            if "/" in reason:
+                # Error: "stage/ErrorType: message"
+                stage_type = reason.split(":")[0]
+                parts = (
+                    stage_type.split("/", 1)
+                    if "/" in stage_type
+                    else (stage_type, "Unknown")
+                )
+                msg = reason.split(":", 1)[1].strip() if ":" in reason else reason
+                errors.append(
+                    ErrorEntry(
+                        original=orig_smi,
+                        stage=parts[0],
+                        error_type=parts[1],
+                        message=msg,
                     )
-                    error_file.write(f"{orig_smi}\t{reason}\n")
-                if error_counts is not None:
-                    error_counts[reason] += 1
+                )
+            else:
+                # Filter rejection (class name only)
+                filtered.append(FilteredEntry(original=orig_smi, reason=reason))
 
-    return lines_counter, n_filtered
+    return ProcessResult(reactions=reactions, filtered=filtered, errors=errors)
 
 
 def _print_filtering_summary(
@@ -907,7 +843,7 @@ def filter_reactions_from_file(
     *,
     ignore_errors: bool = False,
     error_file_path: str | Path | None = None,
-) -> None:
+) -> PipelineSummary:
     """
     Processes reaction data, applying reaction filters based on the provided
     configuration, and writes the results to specified files.
@@ -924,12 +860,9 @@ def filter_reactions_from_file(
         the pipeline so new issues are visible.
     :param error_file_path: Path to write failed/filtered reactions (TSV).  If None
         and ``ignore_errors`` is True, defaults to ``<output>.errors.tsv``.
-    :return: None. The function writes the processed reactions to specified RDF/smi
-        files.
+    :return: A :class:`PipelineSummary` with counts and breakdowns.
 
     """
-
-    filters = config.create_filters()
 
     # Resolve error file path
     _error_path: Path | None = None
@@ -938,90 +871,97 @@ def filter_reactions_from_file(
     elif ignore_errors:
         _error_path = Path(filtered_reaction_data_path).with_suffix(".errors.tsv")
 
-    error_counts: Counter = Counter()
-    error_file = None
+    config_dict = config.to_dict()
+
+    raw_reader = RawReactionReader(input_reaction_data_path)
+    fmt = raw_reader.format
+
+    summary = PipelineSummary(
+        error_file=str(_error_path) if _error_path else None,
+    )
+    t0 = time.monotonic()
+
+    error_fh = None
     if _error_path is not None:
-        error_file = open(_error_path, "w", encoding="utf-8")
-        error_file.write("# original_smiles\treason\n")
+        error_fh = open(_error_path, "w", encoding="utf-8")
+        error_fh.write("# original_smiles\treason\n")
 
     try:
-        raw_reader = RawReactionReader(input_reaction_data_path)
-        fmt = raw_reader.format
+        # Build batches: each item is a list of (raw_string, fmt, ignore_errors)
+        def _batched_items():
+            with raw_reader:
+                for chunk in chunked(raw_reader, batch_size):
+                    yield [(raw, fmt, ignore_errors) for raw in chunk]
 
-        # Simple serial path (works well with `init_logger` and is easy to debug).
-        if num_cpus <= 1:
-            lines_counter, n_filtered = _filter_reactions_serial(
-                config,
-                filters,
-                input_reaction_data_path,
-                filtered_reaction_data_path,
-                ignore_errors=ignore_errors,
-                fmt=fmt,
-                error_file=error_file,
-                error_counts=error_counts,
-            )
-            _print_filtering_summary(
-                lines_counter, n_filtered, error_counts, _error_path
-            )
-            return
+        max_workers = max(num_cpus, 1)
 
-        # Parallel path with Ray for `num_cpus > 1`
-        ray.init(
-            num_cpus=num_cpus, ignore_reinit_error=True, logging_level=logging.ERROR
-        )
-        max_concurrent_batches = num_cpus  # limit the number of concurrent batches
-        lines_counter = 0
         with (
-            raw_reader,
+            graceful_shutdown() as stop,
             ReactionWriter(filtered_reaction_data_path) as result_file,
         ):
-
-            batches_to_process, batch = {}, []
-            n_filtered = 0
-            for item in tqdm(
-                raw_reader,
+            bar = tqdm(
                 desc="Number of reactions processed: ",
                 bar_format="{desc}{n} [{elapsed}]",
-            ):
-                lines_counter += 1
-                batch.append(item)
-                if len(batch) == batch_size:
-                    batch_results = process_batch.remote(
-                        batch, config, filters, ignore_errors, fmt
+            )
+
+            stream = process_pool_map_stream(
+                _batched_items(),
+                _filter_batch_worker,
+                max_workers=max_workers,
+                ordered=True,
+                initializer=_init_filter_worker,
+                initargs=(config_dict,),
+                max_tasks_per_child=200,
+            )
+
+            for result in stream:
+                if stop.is_set():
+                    logger.warning("Shutdown requested — stopping filtering")
+                    break
+
+                # Write kept reactions
+                for reaction in result.reactions:
+                    result_file.write(reaction)
+                summary.succeeded += len(result.reactions)
+
+                # Write filtered entries
+                for flt in result.filtered:
+                    summary.filter_breakdown[flt.reason] = (
+                        summary.filter_breakdown.get(flt.reason, 0) + 1
                     )
-                    batches_to_process[batch_results] = None
-                    batch = []
+                    if error_fh is not None:
+                        error_fh.write(f"{flt.original}\t{flt.reason}\n")
+                summary.filtered += len(result.filtered)
 
-                    # check and process completed tasks if we've reached the concurrency limit
-                    while len(batches_to_process) >= max_concurrent_batches:
-                        n_filtered = process_completed_batch(
-                            batches_to_process,
-                            result_file,
-                            n_filtered,
-                            error_file=error_file,
-                            error_counts=error_counts,
-                        )
+                # Write error entries
+                for err in result.errors:
+                    key = f"{err.stage}/{err.error_type}: {err.message}"
+                    summary.error_breakdown[key] = (
+                        summary.error_breakdown.get(key, 0) + 1
+                    )
+                    if error_fh is not None:
+                        error_fh.write(f"{err.original}\t{key}\n")
+                summary.errored += len(result.errors)
 
-            # process the last batch if it's not empty
-            if batch:
-                batch_results = process_batch.remote(
-                    batch, config, filters, ignore_errors=ignore_errors, fmt=fmt
+                batch_total = (
+                    len(result.reactions) + len(result.filtered) + len(result.errors)
                 )
-                batches_to_process[batch_results] = None
+                summary.total_input += batch_total
+                bar.update(batch_total)
 
-            # process remaining batches
-            while batches_to_process:
-                n_filtered = process_completed_batch(
-                    batches_to_process,
-                    result_file,
-                    n_filtered,
-                    error_file=error_file,
-                    error_counts=error_counts,
-                )
-
-        _print_filtering_summary(lines_counter, n_filtered, error_counts, _error_path)
+            bar.close()
     finally:
-        if ray.is_initialized():
-            ray.shutdown()
-        if error_file is not None:
-            error_file.close()
+        if error_fh is not None:
+            error_fh.close()
+
+    summary.elapsed_seconds = time.monotonic() - t0
+
+    # Print legacy-style summary
+    error_counts = Counter()
+    error_counts.update(summary.filter_breakdown)
+    error_counts.update(summary.error_breakdown)
+    _print_filtering_summary(
+        summary.total_input, summary.succeeded, error_counts, _error_path
+    )
+
+    return summary

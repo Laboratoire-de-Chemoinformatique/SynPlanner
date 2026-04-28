@@ -255,7 +255,7 @@ def tune_value_network(
 
 
 def run_training(
-    extracted_precursor: dict[str, float] = None,
+    extracted_precursor: dict[str, float] | None = None,
     value_config: ValueNetworkConfig = None,
 ) -> None:
     """Runs the training stage in value network tuning.
@@ -330,7 +330,7 @@ def run_updating(
     reinforce_config: TuningConfig,
     reaction_rules_path: str,
     building_blocks_path: str,
-    results_root: str = None,
+    results_root: str | None = None,
 ) -> None:
     """Performs updating of value network.
 

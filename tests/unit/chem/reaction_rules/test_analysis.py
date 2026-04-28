@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 from chython.containers.reaction import ReactionContainer
 
-
 # -- Fixture: minimal TSV file with 3 rules --------------------------------
 
 SAMPLE_TSV = """\

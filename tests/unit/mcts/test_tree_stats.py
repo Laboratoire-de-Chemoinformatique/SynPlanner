@@ -1,13 +1,12 @@
 """Tests for tree statistics collection."""
 
-from typing import Callable, List
+from collections.abc import Callable
 
 from chython.containers import MoleculeContainer
 
 from synplan.mcts.tree import Tree
-from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
+from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import load_evaluation_function
-
 
 # -- Helpers (same pattern as test_algorithm.py) --
 
@@ -30,7 +29,7 @@ class FakeReaction:
 
 
 class FakeReactor:
-    def __init__(self, products_fn: Callable[[], List[MoleculeContainer]]):
+    def __init__(self, products_fn: Callable[[], list[MoleculeContainer]]):
         self.products_fn = products_fn
 
     def __call__(self, *reactants: MoleculeContainer):
@@ -45,8 +44,7 @@ class FakePolicy:
     def predict_reaction_rules(self, precursor, reaction_rules):
         if not self.expand_deeper and len(precursor.prev_precursors) > 1:
             return
-        for prob, reactor, rid in self.rules:
-            yield prob, reactor, rid
+        yield from self.rules
 
 
 def build_tree(algorithm="breadth_first", rules=None, **kwargs):
@@ -145,7 +143,7 @@ def test_route_discovery_timing():
         (0.9, FakeReactor(lambda: [make_mol(5)]), 0),  # building block -> solved
     ]
     tree = build_tree("breadth_first", rules)
-    for solved, node_ids in tree:
+    for _solved, _node_ids in tree:
         pass
 
     assert tree.stats["first_solution_iteration"] is not None

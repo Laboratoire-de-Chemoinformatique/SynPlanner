@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from synplan.ml.training.preprocessing import RankingPolicyDataset
-from synplan.utils.cache import cache_digest
 from synplan.ml.training.supervised import _stratified_ranking_split
+from synplan.utils.cache import cache_digest
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 POLICY_DATA = str(DATA_DIR / "policy_data_small.tsv")
@@ -75,8 +75,8 @@ def test_no_data_leakage(dataset):
 
 def test_val_fraction_per_rule(dataset):
     """No rule contributes more than ~10% of its examples to validation."""
-    train, val = _stratified_ranking_split(dataset)
-    val_set = set(val)
+    _train, val = _stratified_ranking_split(dataset)
+    set(val)
     y = dataset._data.y_rules.view(-1).tolist()
 
     rule_total = Counter(y)
@@ -94,8 +94,8 @@ def test_val_fraction_per_rule(dataset):
 
 def test_small_rules_stay_in_train(dataset):
     """Rules with ≤20 single-occurrence examples must have 0 val entries."""
-    train, val = _stratified_ranking_split(dataset)
-    val_set = set(val)
+    _train, val = _stratified_ranking_split(dataset)
+    set(val)
     y = dataset._data.y_rules.view(-1).tolist()
     keys = dataset._product_keys
 
@@ -105,7 +105,7 @@ def test_small_rules_stay_in_train(dataset):
         product_groups.setdefault(key, []).append(idx)
 
     rule_candidates = Counter()
-    for key, indices in product_groups.items():
+    for _key, indices in product_groups.items():
         if len(indices) == 1:
             rule_candidates[y[indices[0]]] += 1
 

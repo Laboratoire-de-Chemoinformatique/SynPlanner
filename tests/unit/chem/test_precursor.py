@@ -1,5 +1,6 @@
 import pytest
 from chython import smiles
+
 from synplan.chem.precursor import Precursor
 
 
@@ -52,7 +53,7 @@ def test_precursor_from_reaction_components(sample_reactions):
     # Test creating precursors from reaction components
     for rxn_smiles in sample_reactions:
         # Split reaction into components
-        reactants, _, products = rxn_smiles.split(">")
+        reactants, _, _products = rxn_smiles.split(">")
         # Create precursor from first reactant
         reactant_mol = smiles(reactants.split(".")[0])
         p = Precursor(reactant_mol)
@@ -68,5 +69,5 @@ def test_precursor_inequality(simple_molecule, complex_molecule):
 
 
 def test_precursor_with_invalid_input():
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         Precursor(None)

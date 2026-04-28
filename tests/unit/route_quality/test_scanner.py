@@ -203,7 +203,7 @@ def test_scan_route_with_halogen_detector(scanner_with_halogens):
         "[Br:1]c1ccc([Br:2])cc1.[CH3:3][Li:4]>>" "[CH3:3]c1ccc([Br:2])cc1.[Li:4][Br:1]"
     )
     route = {0: rxn}
-    interactions, halogen_count = scanner_with_halogens.scan_route(route)
+    _interactions, halogen_count = scanner_with_halogens.scan_route(route)
     # There should be a competing halogen site (the other Br)
     assert halogen_count >= 0  # at least verified it runs
 

@@ -1,14 +1,13 @@
 import random
 import time
-from typing import Callable, List, Tuple
+from collections.abc import Callable
 
 from chython.containers import MoleculeContainer
 
-from synplan.mcts.tree import Tree
-from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
-from synplan.utils.loading import load_evaluation_function
 from synplan.mcts.algorithm import NestedMonteCarlo
-
+from synplan.mcts.tree import Tree
+from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
+from synplan.utils.loading import load_evaluation_function
 
 # ----------------------
 # Helper constructors
@@ -28,14 +27,14 @@ def make_mol(n: int) -> MoleculeContainer:
 
 class FakeReaction:
     def __init__(
-        self, reactants: List[MoleculeContainer], products: List[MoleculeContainer]
+        self, reactants: list[MoleculeContainer], products: list[MoleculeContainer]
     ):
         self.reactants = reactants
         self.products = products
 
 
 class FakeReactor:
-    def __init__(self, products_fn: Callable[[], List[MoleculeContainer]]):
+    def __init__(self, products_fn: Callable[[], list[MoleculeContainer]]):
         self.products_fn = products_fn
 
     def __call__(self, *reactants: MoleculeContainer):
@@ -44,7 +43,7 @@ class FakeReactor:
 
 class FakePolicy:
     def __init__(
-        self, rules: List[Tuple[float, FakeReactor, int]], expand_deeper: bool = False
+        self, rules: list[tuple[float, FakeReactor, int]], expand_deeper: bool = False
     ):
         # rules: list of (prob, reactor, rule_id)
         self.rules = rules
@@ -54,13 +53,12 @@ class FakePolicy:
         # only generate at the root by default (len(prev_precursors) == 1 at root)
         if not self.expand_deeper and len(precursor.prev_precursors) > 1:
             return
-        for prob, reactor, rid in self.rules:
-            yield prob, reactor, rid
+        yield from self.rules
 
 
 def build_tree(
     algorithm: str,
-    rules: List[Tuple[float, FakeReactor, int]],
+    rules: list[tuple[float, FakeReactor, int]],
     *,
     min_mol_size: int = 6,
     beam_width: int = 1,
@@ -133,7 +131,7 @@ def test_best_first_orders_by_policy_value():
     ]
     tree = build_tree("best_first", rules)
 
-    found, node_ids = tree.algorithm.step()
+    found, _node_ids = tree.algorithm.step()
     assert found is False
     # frontier should be sorted by nodes_prob (policy value)
     assert len(tree.algorithm.frontier) == 2
@@ -167,7 +165,7 @@ def test_beam_top1_is_highest():
     ]
     tree = build_tree("beam", rules, beam_width=1)
 
-    found, node_ids = tree.algorithm.step()
+    found, _node_ids = tree.algorithm.step()
     assert found is False
     assert len(tree.algorithm.frontier) == 2
     best_score = max(tree._get_node_value(cid) for cid in tree.children[1])
@@ -234,7 +232,7 @@ def test_nmcs_marks_solved_when_present():
     tree._expand_node(1)
     tree.expanded_nodes.add(1)
     tree.start_time = time.time()
-    found, _ = tree.algorithm.step()
+    _found, _ = tree.algorithm.step()
     # NMCS should mark solved children
     assert any(tree.nodes[cid].is_solved() for cid in tree.children[1])
     assert tree.found_a_route is True
