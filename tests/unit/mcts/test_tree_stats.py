@@ -36,6 +36,23 @@ class FakeReactor:
         return [FakeReaction(list(reactants), self.products_fn())]
 
 
+class _AlwaysMatches:
+    def __lt__(self, other):
+        return True
+
+
+class FakePriorityReactor(FakeReactor):
+    def __init__(self, products_fn: Callable[[], List[MoleculeContainer]]):
+        super().__init__(products_fn)
+        self.reactants = [_AlwaysMatches()]
+
+
+class FakePatternPriorityReactor(FakeReactor):
+    def __init__(self, products_fn: Callable[[], List[MoleculeContainer]]):
+        super().__init__(products_fn)
+        self._patterns = (_AlwaysMatches(),)
+
+
 class FakePolicy:
     def __init__(self, rules, expand_deeper=False):
         self.rules = rules
@@ -52,6 +69,7 @@ def build_tree(algorithm="breadth_first", rules=None, **kwargs):
         rules = [(0.5, FakeReactor(lambda: [make_mol(5)]), 0)]
     expand_deeper = kwargs.pop("expand_deeper", False)
     max_iterations = kwargs.pop("max_iterations", 20)
+    priority_rules = kwargs.pop("priority_rules", None)
     cfg = TreeConfig(
         algorithm=algorithm,
         max_iterations=max_iterations,
@@ -78,6 +96,7 @@ def build_tree(algorithm="breadth_first", rules=None, **kwargs):
         building_blocks=set(),
         expansion_function=fake_policy,
         evaluation_function=evaluator,
+        priority_rules=priority_rules,
     )
 
 
@@ -92,6 +111,10 @@ def test_stats_dict_exists_on_new_tree():
     assert tree.stats["expansion_successes"] == 0
     assert tree.stats["total_rules_tried"] == 0
     assert tree.stats["total_rules_succeeded"] == 0
+    assert tree.stats["policy_rules_tried"] == 0
+    assert tree.stats["policy_rules_succeeded"] == 0
+    assert tree.stats["priority_rules_tried"] == 0
+    assert tree.stats["priority_rules_succeeded"] == 0
     assert tree.stats["dead_end_nodes"] == 0
     assert tree.stats["first_solution_iteration"] is None
     assert tree.stats["first_solution_time"] is None
@@ -197,9 +220,61 @@ def test_winning_rule_ranks():
         for step in route_info["steps"]:
             assert "node_id" in step
             assert "rule_id" in step
+            assert "rule_source" in step
+            assert "rule_key" in step
             assert "prob" in step
             assert "rank" in step
             assert step["rank"] >= 1
+            assert step["rule_source"] == "policy"
+            assert step["rule_key"] == f"policy:{step['rule_id']}"
+
+
+def test_priority_rule_metadata_and_counters():
+    priority_rule = FakePriorityReactor(lambda: [make_mol(5)])
+    tree = build_tree(
+        "breadth_first",
+        rules=[],
+        priority_rules=[priority_rule],
+        use_priority=True,
+    )
+    for _ in tree:
+        pass
+
+    assert tree.stats["priority_rules_tried"] >= 1
+    assert tree.stats["priority_rules_succeeded"] >= 1
+    assert tree.stats["policy_rules_tried"] == 0
+    assert tree.stats["policy_rules_succeeded"] == 0
+    assert tree.stats["total_rules_tried"] == tree.stats["priority_rules_tried"]
+    assert tree.stats["total_rules_succeeded"] == tree.stats["priority_rules_succeeded"]
+
+    ranks = tree.winning_rule_ranks()
+    assert len(ranks) >= 1
+    step = ranks[0]["steps"][0]
+    assert step["rule_source"] == "priority"
+    assert step["rule_key"] == "priority:0"
+
+    details = tree.route_details(tree.winning_nodes[0])
+    assert details["steps"][0]["rule_source"] == "priority"
+    assert details["steps"][0]["rule_key"] == "priority:0"
+
+    stats = tree.to_stats_dict()
+    assert stats["n_routes_with_priority"] == len(tree.winning_nodes)
+    assert stats["fraction_routes_with_priority"] == 1.0
+
+
+def test_priority_reactor_patterns_are_supported():
+    priority_rule = FakePatternPriorityReactor(lambda: [make_mol(5)])
+    tree = build_tree(
+        "breadth_first",
+        rules=[],
+        priority_rules=[priority_rule],
+        use_priority=True,
+    )
+    for _ in tree:
+        pass
+
+    assert tree.stats["priority_rules_tried"] >= 1
+    assert tree.stats["priority_rules_succeeded"] >= 1
 
 
 # -- Task 5: Applicability rate and branching --
@@ -280,6 +355,8 @@ def test_to_stats_dict():
 
     expected_keys = {
         "num_routes",
+        "n_routes_with_priority",
+        "fraction_routes_with_priority",
         "num_nodes",
         "num_iter",
         "tree_depth",
@@ -297,3 +374,5 @@ def test_to_stats_dict():
         "mean_branching_factor",
     }
     assert expected_keys.issubset(d.keys()), f"Missing keys: {expected_keys - d.keys()}"
+    assert d["n_routes_with_priority"] == 0
+    assert d["fraction_routes_with_priority"] == 0.0

@@ -24,22 +24,23 @@ from synplan.mcts.tree import Tree
 def get_child_nodes(
     tree: Tree,
     molecule: MoleculeContainer,
-    graph: dict[MoleculeContainer, list[MoleculeContainer]],
+    graph: dict[MoleculeContainer, dict[str, Any]],
 ) -> dict[str, Any]:
     """Extracts the child nodes of the given molecule.
 
     :param tree: The built tree.
     :param molecule: The molecule in the tree from which to extract child nodes.
-    :param graph: The relationship between the given molecule and child nodes.
+    :param graph: The relationship between the given molecule and the reaction
+        metadata for its child nodes.
     :return: The dict with extracted child nodes.
     """
 
-    nodes = []
-    try:
-        graph[molecule]
-    except KeyError:
+    reaction = graph.get(molecule)
+    if reaction is None:
         return []
-    for precursor in graph[molecule]:
+
+    nodes = []
+    for precursor in reaction["children"]:
         temp_obj = {
             "smiles": str(precursor),
             "type": "mol",
@@ -49,7 +50,13 @@ def get_child_nodes(
         if node:
             temp_obj["children"] = [node]
         nodes.append(temp_obj)
-    return {"type": "reaction", "children": nodes}
+
+    reaction_node = {"type": "reaction", "children": nodes}
+    if reaction.get("rule_key"):
+        reaction_node["rule_key"] = reaction["rule_key"]
+    if reaction.get("policy_rank") is not None:
+        reaction_node["policy_rank"] = reaction["policy_rank"]
+    return reaction_node
 
 
 def extract_routes(
@@ -83,13 +90,24 @@ def extract_routes(
     if winning_nodes:
         for winning_node in winning_nodes:
             # Create graph for route
-            nodes = tree.route_to_node(winning_node)
-            graph, pred = {}, {}
-            for before, after in pairwise(nodes):
-                before = before.curr_precursor.molecule
-                graph[before] = after = [x.molecule for x in after.new_precursors]
-                for x in after:
-                    pred[x] = before
+            graph = {}
+            path_ids = []
+            nid = winning_node
+            while nid:
+                path_ids.append(nid)
+                nid = tree.parents[nid]
+            path_ids.reverse()
+
+            for before_id, after_id in pairwise(path_ids):
+                before = tree.nodes[before_id].curr_precursor.molecule
+                graph[before] = {
+                    "children": [
+                        precursor.molecule
+                        for precursor in tree.nodes[after_id].new_precursors
+                    ],
+                    "rule_key": tree.nodes_rule_key.get(after_id),
+                    "policy_rank": tree.nodes_policy_rank.get(after_id),
+                }
 
             routes_block.append(
                 {
@@ -132,8 +150,8 @@ def render_svg(pred, columns, box_colors, labeled: bool = False):
         box_colors (dict): A dictionary mapping molecule status strings (e.g.,
                           'target', 'mulecule', 'instock') to SVG color strings
                           for the boxes around the molecules.
-        labeled (bool): If True, render ``m.meta["label"]`` above each molecule box
-                        when present.
+        labeled (bool): If True, upstream preparation may include the full
+                        ``rule_key`` in the rendered arrow labels.
 
     Returns:
         str: A string containing the complete SVG code for the retrosynthetic
@@ -247,7 +265,7 @@ def render_svg(pred, columns, box_colors, labeled: bool = False):
             arrow += f'  <circle cx="{mid_x}" cy="{p_y}" r="0.1"/>'
         svg.append(arrow)
 
-        if labeled and s not in rendered_arrow_labels:
+        if s not in rendered_arrow_labels:
             label_text = flat_molecules[s].meta.get("label")
             if label_text:
                 # Keep the rule label clear of the arrow head and bend.
@@ -326,6 +344,24 @@ def _render_route_svg(columns, pred, labeled: bool = False) -> str:
     return render_svg(pred, columns, _route_box_colors(), labeled=labeled)
 
 
+def _format_arrow_label(
+    rule_key: str | None,
+    policy_rank: int | None,
+    *,
+    include_rule_key: bool,
+) -> str | None:
+    """Build the per-arrow label text for route SVGs."""
+
+    parts = []
+    if include_rule_key and rule_key:
+        parts.append(rule_key)
+    if policy_rank is not None:
+        parts.append(f"Top-{policy_rank}")
+    if parts:
+        return " | ".join(parts)
+    return None
+
+
 def _prepare_tree_route_svg_inputs(
     tree: Tree,
     node_id: int,
@@ -358,17 +394,20 @@ def _prepare_tree_route_svg_inputs(
                 precursor.molecule.meta.pop("label", None)
                 precursor.molecule.meta.pop("status", None)
 
-    if labeled:
-        for parent_idx in range(len(path_ids) - 1):
-            child_id = path_ids[parent_idx + 1]
-            rule_key = tree.nodes_rule_key.get(child_id)
-            if not rule_key:
-                continue
+    for parent_idx in range(len(path_ids) - 1):
+        child_id = path_ids[parent_idx + 1]
+        label_text = _format_arrow_label(
+            tree.nodes_rule_key.get(child_id),
+            tree.nodes_policy_rank.get(child_id),
+            include_rule_key=labeled,
+        )
+        if not label_text:
+            continue
 
-            parent_node = nodes[parent_idx]
-            curr_precursor = getattr(parent_node, "curr_precursor", None)
-            if curr_precursor is not None and hasattr(curr_precursor, "molecule"):
-                curr_precursor.molecule.meta["label"] = rule_key
+        parent_node = nodes[parent_idx]
+        curr_precursor = getattr(parent_node, "curr_precursor", None)
+        if curr_precursor is not None and hasattr(curr_precursor, "molecule"):
+            curr_precursor.molecule.meta["label"] = label_text
 
     for node in nodes:
         for precursor in getattr(node, "new_precursors", ()):
@@ -434,8 +473,9 @@ def get_route_svg(
 
     :param tree: The built tree.
     :param node_id: The id of the node from which to visualize the route.
-    :param labeled: If True, annotate each disconnection with the child node's
-        ``nodes_rule_key`` (for example ``"policy:42"`` or ``"priority:3"``).
+    :param labeled: If True, include each disconnection's ``nodes_rule_key`` in
+        the arrow label. Stored policy ranks are shown as ``Top-N`` whenever
+        available, even when ``labeled`` is False.
     :param allow_unsolved: If True, also render partial routes ending at non-winning
         nodes. Default keeps the historical solved-only behavior.
     :return: The SVG string.
@@ -518,11 +558,14 @@ def _prepare_json_route_svg_inputs(routes_json: dict, route_id: int, labeled: bo
                     "instock" if mol.get("in_stock") else "mulecule"
                 )
 
-            if labeled:
-                reaction = outgoing_reaction_of.get(id(mol))
-                rule_key = reaction.get("rule_key") if reaction else None
-                if rule_key:
-                    container.meta["label"] = rule_key
+            reaction = outgoing_reaction_of.get(id(mol))
+            label_text = _format_arrow_label(
+                reaction.get("rule_key") if reaction else None,
+                reaction.get("policy_rank") if reaction else None,
+                include_rule_key=labeled,
+            )
+            if label_text:
+                container.meta["label"] = label_text
 
             mol_container[id(mol)] = container
 

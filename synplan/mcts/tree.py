@@ -105,6 +105,7 @@ class Tree:
         self.nodes_rule_label: dict[int, str | None] = {}
         self.nodes_rule_source: dict[int, str | None] = {}
         self.nodes_rule_key: dict[int, str | None] = {}
+        self.nodes_policy_rank: dict[int, int | None] = {}
 
         # default search parameters
         self.init_node_value: float = self.config.init_node_value
@@ -249,7 +250,9 @@ class Tree:
         # Track raw product molecules to avoid repeating equivalent expansions
         tmp_products = set()
         expanded = False
-        for prob, rule, rule_id, rule_source in self._iter_rules(curr_node):
+        for prob, rule, rule_id, rule_source, policy_rank in self._iter_rules(
+            curr_node
+        ):
             self._increment_rule_stats(rule_source, tried=1)
             rule_produced = False
             enable_multirule = bool(
@@ -269,6 +272,7 @@ class Tree:
                     products=products,
                     prob=prob,
                     rule_id=rule_id,
+                    policy_rank=policy_rank,
                     tmp_products=tmp_products,
                     rule_source=rule_source,
                 ):
@@ -300,14 +304,37 @@ class Tree:
                     continue
                 try:
                     if pattern < molecule:
-                        yield 1.0, rule, rule_id, self.config.priority_rule_source_name
+                        yield (
+                            1.0,
+                            rule,
+                            rule_id,
+                            self.config.priority_rule_source_name,
+                            None,
+                        )
                 except TypeError:
                     continue
 
-        for prob, rule, rule_id in self.expansion_function.predict_reaction_rules(
-            curr_node.curr_precursor, self.reaction_rules
+        policy_top_rules = self._get_policy_top_rules_limit()
+        for policy_rank, (prob, rule, rule_id) in enumerate(
+            self.expansion_function.predict_reaction_rules(
+                curr_node.curr_precursor, self.reaction_rules
+            ),
+            start=1,
         ):
-            yield prob, rule, rule_id, self.config.policy_rule_source_name
+            if policy_top_rules is not None and policy_rank > policy_top_rules:
+                break
+            yield prob, rule, rule_id, self.config.policy_rule_source_name, policy_rank
+
+    def _get_policy_top_rules_limit(self) -> int | None:
+        """Return the configured policy Top-N limit when exposed by the expansion fn."""
+
+        config = getattr(self.expansion_function, "config", None)
+        top_rules = getattr(config, "top_rules", None)
+        if top_rules is None:
+            top_rules = getattr(self.expansion_function, "top_rules", None)
+        if top_rules is None:
+            return None
+        return int(top_rules)
 
     def _add_child_if_new(
         self,
@@ -317,6 +344,7 @@ class Tree:
         products,
         prob: float,
         rule_id: int,
+        policy_rank: int | None,
         tmp_products: set,
         rule_source: str,
     ) -> bool:
@@ -331,6 +359,7 @@ class Tree:
             molecule.meta["reactor_id"] = rule_id
             molecule.meta["rule_source"] = rule_source
             molecule.meta["rule_key"] = rule_key
+            molecule.meta["policy_rank"] = policy_rank
 
         new_precursor = tuple(Precursor(mol) for mol in products)
         scaled_prob = prob * len(
@@ -380,6 +409,7 @@ class Tree:
             new_node=child_node,
             policy_prob=scaled_prob,
             rule_id=rule_id,
+            policy_rank=policy_rank,
             rule_source=rule_source,
         )
         return True
@@ -413,6 +443,7 @@ class Tree:
         new_node: Node,
         policy_prob: float = None,
         rule_id: int = None,
+        policy_rank: int | None = None,
         rule_source: str | None = None,
     ) -> None:
         """Adds a new node to the tree with probability of reaction rules predicted by
@@ -438,6 +469,7 @@ class Tree:
         self.nodes_rule_label[new_node_id] = rule_source
         self.nodes_rule_source[new_node_id] = rule_source
         self.nodes_rule_key[new_node_id] = self._make_rule_key(rule_source, rule_id)
+        self.nodes_policy_rank[new_node_id] = policy_rank
         self.nodes_depth[new_node_id] = self.nodes_depth[node_id] + 1
         self.curr_tree_size += 1
 
@@ -633,11 +665,10 @@ class Tree:
     def winning_rule_ranks(self) -> list[dict]:
         """For each winning route, return the rule rank and probability at each step.
 
-        The "rank" is the position (1-indexed) of the rule in the policy's
-        sorted prediction for that node.  Since we only store the probability
-        assigned to the chosen rule (in ``nodes_prob``), the rank is
-        approximated by counting how many sibling nodes (children of the same
-        parent) have a higher probability.
+        When available, the rank is the exact 1-indexed position of the chosen
+        policy rule in the model's Top-N prediction list. If that value is not
+        stored for a node, the rank falls back to a sibling-probability
+        approximation.
 
         :return: List of dicts, one per winning route, each containing
             ``winning_node_id`` and ``steps`` (list of per-step dicts with
@@ -652,13 +683,14 @@ class Tree:
                 rule_id = self.nodes_rules.get(nid)
                 prob = self.nodes_prob.get(nid, 0.0)
 
-                # Rank among siblings: count siblings with higher prob
-                siblings = self.children.get(parent_id, set())
-                rank = 1 + sum(
-                    1
-                    for sib in siblings
-                    if sib != nid and self.nodes_prob.get(sib, 0.0) > prob
-                )
+                rank = self.nodes_policy_rank.get(nid)
+                if rank is None:
+                    siblings = self.children.get(parent_id, set())
+                    rank = 1 + sum(
+                        1
+                        for sib in siblings
+                        if sib != nid and self.nodes_prob.get(sib, 0.0) > prob
+                    )
 
                 steps.append(
                     {
@@ -666,6 +698,7 @@ class Tree:
                         "rule_id": rule_id,
                         "rule_source": self.nodes_rule_source.get(nid),
                         "rule_key": self.nodes_rule_key.get(nid),
+                        "policy_rank": self.nodes_policy_rank.get(nid),
                         "prob": round(prob, 6),
                         "rank": rank,
                     }
@@ -729,6 +762,7 @@ class Tree:
                     "rule_id": self.nodes_rules.get(nid),
                     "rule_source": self.nodes_rule_source.get(nid),
                     "rule_key": self.nodes_rule_key.get(nid),
+                    "policy_rank": self.nodes_policy_rank.get(nid),
                     "prob": round(self.nodes_prob.get(nid, 0.0), 6),
                     "init_value": round(self.nodes_init_value.get(nid, 0.0), 4),
                     "total_value": round(self.nodes_total_value.get(nid, 0.0), 4),
@@ -776,6 +810,21 @@ class Tree:
             if all_ranks:
                 mean_winning_rank = round(sum(all_ranks) / len(all_ranks), 2)
 
+        priority_name = self.config.priority_rule_source_name
+        n_routes_with_priority = 0
+        for route_id in self.winning_nodes:
+            nid = route_id
+            while nid and nid != 1:
+                if self.nodes_rule_source.get(nid) == priority_name:
+                    n_routes_with_priority += 1
+                    break
+                nid = self.parents[nid]
+        fraction_routes_with_priority = (
+            n_routes_with_priority / len(self.winning_nodes)
+            if self.winning_nodes
+            else 0.0
+        )
+
         return {
             # Existing basics
             "num_routes": len(self.winning_nodes),
@@ -791,10 +840,12 @@ class Tree:
             "total_rules_succeeded": self.stats["total_rules_succeeded"],
             "policy_rules_tried": self.stats["policy_rules_tried"],
             "policy_rules_succeeded": self.stats["policy_rules_succeeded"],
-            "priority_rules_tried": self.stats["priority_rules_tried"],
-            "priority_rules_succeeded": self.stats["priority_rules_succeeded"],
             "rule_applicability_rate": round(self.rule_applicability_rate(), 4),
             "dead_end_nodes": self.stats["dead_end_nodes"],
+            #Priority rules usage
+            "priority_rules_tried": self.stats["priority_rules_tried"],
+            "n_routes_with_priority": n_routes_with_priority,
+            "fraction_routes_with_priority": fraction_routes_with_priority,
             # Search dynamics
             "first_solution_iteration": self.stats["first_solution_iteration"],
             "first_solution_time": self.stats["first_solution_time"],
