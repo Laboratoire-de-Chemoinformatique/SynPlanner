@@ -176,12 +176,12 @@ def test_no_data_leakage(dataset):
 
     for key, indices in product_groups.items():
         if len(indices) > 1:
-            assert all(i in train_set for i in indices), (
-                f"Duplicate product {key!r} leaked into validation"
-            )
-            assert all(i not in val_set for i in indices), (
-                f"Duplicate product {key!r} found in validation"
-            )
+            assert all(
+                i in train_set for i in indices
+            ), f"Duplicate product {key!r} leaked into validation"
+            assert all(
+                i not in val_set for i in indices
+            ), f"Duplicate product {key!r} found in validation"
 
 
 def test_val_fraction_per_rule(dataset):
