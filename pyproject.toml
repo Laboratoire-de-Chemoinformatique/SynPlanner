@@ -1,6 +1,6 @@
 [project]
 name = "SynPlanner"
-version = "1.4.3"
+version = "1.4.4"
 description = "Toolbox for chemical synthesis planning"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
@@ -29,7 +29,7 @@ dependencies = [
   "huggingface-hub>=0.24.0",
   "adabelief-pytorch>=0.2.1",
   "torch-geometric>=2.4.0",
-  "pytorch-lightning>=2",
+  "pytorch-lightning>=2.3.3,!=2.6.2,!=2.6.3",
   "ipykernel>6.29.0",
   "ipywidgets>8.1.0",
   "streamlit>1.35.1",
@@ -47,6 +47,14 @@ dependencies = [
 cpu = ["torch>=2.0"]
 cu126 = ["torch>=2.0"]
 cu128 = ["torch>=2.0"]
+litlogger = ["litlogger>=2026.4.16"]
+wandb = ["wandb>=0.17"]
+mlflow = ["mlflow>=2"]
+loggers = [
+  "litlogger>=2026.4.16",
+  "wandb>=0.17",
+  "mlflow>=2",
+]
 
 [dependency-groups]
 dev = [
@@ -115,9 +123,9 @@ name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
-# -- bump-my-version: `uvx bump-my-version bump patch` (or minor / major) -----
+# -- optional bump-my-version compatibility ----------------------------------
 [tool.bumpversion]
-current_version = "1.4.3"
+current_version = "1.4.4"
 commit = false
 tag = false
 
@@ -126,13 +134,8 @@ filename = "pyproject.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
-[[tool.bumpversion.files]]
-filename = "README.md"
-search = "VERSION={current_version}"
-replace = "VERSION={new_version}"
-
-# NOTE: docs/_static/switcher.json and CHANGELOG.md need manual updates
-# (switcher requires inserting a new JSON entry, changelog needs release notes)
+# NOTE: docs/_static/switcher.json, docs/get_started/docker_images.rst, and
+# CHANGELOG.md need manual updates for release notes and published image tags.
 
 [tool.ruff]
 line-length = 88
@@ -168,3 +171,26 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
+
+# -- ty type checker ---------------------------------------------------------
+# Most chython types are dynamic unions (MoleculeContainer | QueryContainer | ...)
+# which cause false positives. Only enforce rules that catch real bugs.
+[tool.ty.rules]
+# False positives from chython/rdkit/torch/numpy dynamic types
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
+unsupported-operator = "ignore"
+not-subscriptable = "ignore"
+invalid-method-override = "ignore"
+not-iterable = "ignore"
+call-non-callable = "ignore"
+no-matching-overload = "ignore"
+index-out-of-bounds = "ignore"
+missing-argument = "ignore"      # chython Reactor has multiple constructors
+invalid-type-form = "ignore"     # chython stubs use `any` instead of `Any`
+unresolved-import = "ignore"     # rdkit uses dynamic imports (SA_Score, Descriptors)
+invalid-return-type = "ignore"   # chython union narrowing false positives
+invalid-assignment = "ignore"    # chython union narrowing false positives
+invalid-parameter-default = "ignore" # chython defaults
+# Keep enabled (catches real bugs like undefined names)
+# unresolved-reference = "error"   (default)
