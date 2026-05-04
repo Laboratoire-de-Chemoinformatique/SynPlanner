@@ -20,6 +20,18 @@ Download a ready-to-use data preset from HuggingFace with all components needed 
     - ``preset`` - preset name (default: ``synplanner-article``).
     - ``save_to`` - the directory where downloaded data will be stored.
 
+ORD conversion
+---------------------------
+ORD ``.pb`` datasets can be converted to SynPlanner-compatible reaction SMILES:
+
+.. code-block:: bash
+
+    synplan ord_convert --input reactions.pb --output reactions.smi
+
+**Parameters**:
+    - ``input`` - the path to the ORD ``.pb`` dataset.
+    - ``output`` - the path to the output ``.smi`` file.
+
 Building blocks standardization
 -------------------------------
 It is crucial to standardize custom building blocks for compatibility with ``SynPlanner``.
@@ -48,6 +60,11 @@ also works as a general reaction data cleaner.
     - ``config`` - the path to the configuration file.
     - ``input`` - the path to the file (.smi or .rdf) with reactions to be standardized.
     - ``output`` - the path to the file (.smi or .rdf) where standardized reactions to be stored.
+    - ``--num_cpus`` - number of worker processes.
+    - ``--batch_size`` - number of reactions per worker batch.
+    - ``--ignore-errors`` / ``--no-ignore-errors`` - skip bad reactions or fail fast.
+    - ``--error-file`` - path for failed reaction rows.
+    - ``--silent`` - suppress the progress bar. By default, the CLI shows progress.
 
 Reaction filtration
 ---------------------------
@@ -64,6 +81,29 @@ filters will be stored in the output file.
     - ``config`` - the path to the configuration file.
     - ``input`` - the path to the file (.smi or .rdf) with reactions to be filtered.
     - ``output`` - the path to the file (.smi or .rdf) where filtered reactions to be stored.
+    - ``--num_cpus`` - number of worker processes.
+    - ``--batch_size`` - number of reactions per worker batch.
+    - ``--ignore-errors`` / ``--no-ignore-errors`` - skip bad reactions or fail fast.
+    - ``--error-file`` - path for failed or filtered reaction rows.
+
+Reaction mapping
+---------------------------
+Reaction atoms can be mapped with the neural mapper:
+
+.. code-block:: bash
+
+    synplan reaction_mapping --input reaction_data_original.smi --output reaction_data_mapped.smi
+
+**Parameters**:
+    - ``config`` - optional mapping configuration file.
+    - ``input`` - the path to the file with reactions to be mapped.
+    - ``output`` - the path where mapped reactions will be stored.
+    - ``--workers`` - CPU worker count (0 = auto).
+    - ``--device`` - torch device: ``cuda``, ``mps``, or ``cpu``.
+    - ``--no-amp`` - disable automatic mixed precision.
+    - ``--batch-size`` - GPU batch size.
+    - ``--ignore-errors`` / ``--no-ignore-errors`` - skip bad reactions or fail fast.
+    - ``--error-file`` - path for failed reaction rows.
 
 Reaction rule extraction
 ---------------------------
@@ -82,6 +122,10 @@ containing product SMILES and rule IDs ready for ranking policy training.
     - ``input`` - the path to the file (.smi or .rdf) with reactions for reaction rule extraction.
     - ``output`` - the path to the file (.tsv) where extracted reaction rules will be stored.
       A ``*_policy_data.tsv`` file for ranking policy training is generated alongside.
+    - ``--num_cpus`` - number of worker processes.
+    - ``--batch_size`` - number of reactions per worker batch.
+    - ``--ignore-errors`` / ``--no-ignore-errors`` - skip bad reactions or fail fast.
+    - ``--error-file`` - path for failed reaction rows.
 
 Policy networks training
 ---------------------------
@@ -98,6 +142,11 @@ types of policy networks is configured by the same configuration file (see the d
     - ``config`` - the path to the policy configuration file.
     - ``policy_data`` - the path to the policy training mapping file (``*_policy_data.tsv``) generated during rule extraction.
     - ``results_dir`` - the path to the directory where the trained policy network will be stored.
+    - ``--workers`` - CPU workers for ranking dataset preprocessing (0 = auto).
+    - ``--no-cache`` - disable dataset cache reuse.
+    - ``--logger`` - logger backend: ``csv``, ``tensorboard``, ``mlflow``, ``wandb``, or ``litlogger``.
+      Optional remote backends require the matching extra, e.g. ``SynPlanner[litlogger]``,
+      ``SynPlanner[wandb]``, ``SynPlanner[mlflow]``, or ``SynPlanner[loggers]``.
 
 **Filtering policy network**
 
@@ -110,6 +159,11 @@ types of policy networks is configured by the same configuration file (see the d
     - ``molecule_data`` - the path to the file with molecules for filtering policy training.
     - ``reaction_rules`` - the path to the file with extracted reaction rules.
     - ``results_dir`` - the path to the directory where the trained policy network will be stored.
+    - ``--num_cpus`` - CPUs for filtering dataset preparation.
+    - ``--no-cache`` - disable dataset cache reuse.
+    - ``--logger`` - logger backend: ``csv``, ``tensorboard``, ``mlflow``, ``wandb``, or ``litlogger``.
+      Optional remote backends require the matching extra, e.g. ``SynPlanner[litlogger]``,
+      ``SynPlanner[wandb]``, ``SynPlanner[mlflow]``, or ``SynPlanner[loggers]``.
 
 Value network training
 ---------------------------
@@ -146,4 +200,3 @@ Retrosynthetic planning can be performed in ``SynPlanner``.
     - ``policy_network`` - the path to the file with trained policy network (ranking or filtering).
     - ``value_network`` - the path to the file with trained value network if available (default is None).
     - ``results_dir`` - the path to the directory where the trained value network will be to be stored.
-

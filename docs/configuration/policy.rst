@@ -20,8 +20,7 @@ Train a policy network using the repository configuration in ``configs/policy_tr
 
    synplan ranking_policy_training \
      --config configs/policy_training.yaml \
-     --reaction_data reaction_data_filtered.smi \
-     --reaction_rules reaction_rules.tsv \
+     --policy_data reaction_rules_policy_data.tsv \
      --results_dir ranking_policy_network
 
 **Configuration file**
@@ -52,6 +51,11 @@ Train a policy network using the repository configuration in ``configs/policy_tr
     dropout                            The dropout value
     num_epoch                          The number of training epochs
     batch_size                         The size of the training batch of input molecular graphs
+    embedder_type                      Graph embedder: ``gcn``, ``gcn_concat``, or ``gps``
+    heads                              Number of attention heads for ``embedder_type: gps``
+    attn_type                          GPS attention type: ``multihead``, ``performer``, or ``null``
+    attn_dropout                       Attention dropout for GPS layers
+    log_grad_norm                      If true, log module-level gradient norms during training
     logger                             Training logger configuration (see below). Set to ``null`` to disable.
     ================================== =========================================================================
 
@@ -62,7 +66,13 @@ The ``logger`` key enables `PyTorch Lightning experiment logging <https://lightn
 When set to ``null`` or omitted, no logger is created (the default prior behavior).
 The ``type`` sub-key is required; all other sub-keys are passed directly as keyword
 arguments to the corresponding Lightning logger constructor.
-The ``save_dir`` parameter defaults to ``results_dir`` automatically.
+The ``save_dir`` parameter defaults to ``results_dir`` automatically. For
+``litlogger``, ``save_dir`` is treated as an alias for LitLogger's ``root_dir``.
+Remote logger integrations are optional dependencies. Install only the backend
+you need, for example ``SynPlanner[litlogger]``, ``SynPlanner[wandb]``,
+``SynPlanner[mlflow]``, or ``SynPlanner[loggers]`` for all optional logger
+backends. With ``uv`` in this repository, use ``uv sync --extra litlogger``,
+``uv sync --extra wandb``, or ``uv sync --extra loggers``.
 
 You can also enable a logger from the command line without editing the YAML file:
 
@@ -80,7 +90,7 @@ You can also enable a logger from the command line without editing the YAML file
     ========================= ========== =========================================================================
     Sub-key                   Required   Description
     ========================= ========== =========================================================================
-    type                      yes        Logger backend: ``csv``, ``tensorboard``, ``mlflow``, or ``wandb``
+    type                      yes        Logger backend: ``csv``, ``tensorboard``, ``litlogger``, ``mlflow``, or ``wandb``
     save_dir                  no         Log output directory (defaults to ``results_dir``)
     *(other keys)*            no         Passed directly to the Lightning logger constructor
     ========================= ========== =========================================================================
@@ -120,7 +130,26 @@ CSV logger parameters:
     flush_logs_every_n_steps       How often to write to disk. Default ``100``.
     ============================== =========================================================================
 
-**MLflow logger** (requires ``pip install mlflow``)
+**LitLogger** (requires ``SynPlanner[litlogger]`` or ``SynPlanner[loggers]``)
+
+Logs metrics, metadata, terminal output, and optionally model checkpoints to
+Lightning AI. See the
+`LitLogger docs <https://lightning.ai/docs/pytorch/stable/extensions/generated/lightning.pytorch.loggers.LitLogger.html>`_
+for all available parameters.
+
+.. code-block:: yaml
+
+    logger:
+      type: litlogger
+      name: ranking_gps_g
+      root_dir: /path/to/results
+      log_model: true
+      save_logs: true
+      metadata:
+        dataset: uspto_full
+        policy: gps_g
+
+**MLflow logger** (requires ``SynPlanner[mlflow]`` or ``SynPlanner[loggers]``)
 
 Logs to an `MLflow <https://mlflow.org>`_ tracking server. See the
 `MLFlowLogger docs <https://lightning.ai/docs/pytorch/stable/extensions/generated/lightning.pytorch.loggers.MLFlowLogger.html>`_
@@ -142,3 +171,16 @@ for all available parameters.
       experiment_name: synplanner_ranking
       tracking_uri: http://localhost:5000
       run_name: gps-embedder-v1
+
+**Weights & Biases logger** (requires ``SynPlanner[wandb]`` or ``SynPlanner[loggers]``)
+
+Logs to `Weights & Biases <https://wandb.ai/>`_. See the
+`WandbLogger docs <https://lightning.ai/docs/pytorch/stable/extensions/generated/lightning.pytorch.loggers.WandbLogger.html>`_
+for all available parameters.
+
+.. code-block:: yaml
+
+    logger:
+      type: wandb
+      project: synplanner-ranking
+      name: gps-embedder-v1

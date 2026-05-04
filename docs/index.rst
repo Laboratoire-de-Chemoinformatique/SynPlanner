@@ -85,6 +85,5 @@ How to navigate this documentation
 - Getting started: quick install and first runs → :doc:`get_started/index`
 - User Guide: tutorials and core topics (concepts, configuration, interfaces) → :doc:`user_guide/index`
 - API reference: Python package API → :doc:`api`
-- Development: contributing, local dev, building → :doc:`development`
+- Development: contributing, PR review, local dev, building → :doc:`development`
 - Release notes: version changes → :doc:`release_notes`
-

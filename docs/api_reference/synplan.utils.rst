@@ -12,6 +12,14 @@ synplan.utils.config module
    :undoc-members:
    :show-inheritance:
 
+synplan.utils.cache module
+--------------------------
+
+.. automodule:: synplan.utils.cache
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 synplan.utils.files module
 --------------------------
 
