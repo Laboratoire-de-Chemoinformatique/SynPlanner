@@ -90,7 +90,7 @@ def save_pyg_dataset(
 
 def load_pyg_dataset(
     path: str | Path,
-) -> tuple[Data, dict, list[str] | None, safe_open | None]:
+) -> tuple[Data, dict, list[str] | None, safe_open]:
     """Load a collated PyG dataset from safetensors with memory mapping.
 
     Tensors are memory-mapped: the OS pages in data on demand instead of
@@ -103,7 +103,8 @@ def load_pyg_dataset(
     path = Path(path)
 
     handle = safe_open(str(path), framework="pt", device="cpu")
-    tensors = {key: handle.get_tensor(key) for key in handle}
+    tensor_names = handle.keys()
+    tensors = {key: handle.get_tensor(key) for key in tensor_names}
     data, slices = _unflatten(tensors)
 
     meta_path = path.with_suffix(".meta.json")

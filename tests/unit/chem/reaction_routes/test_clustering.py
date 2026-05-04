@@ -125,7 +125,7 @@ def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
         # 2) Build ReactionContainer
         try:
             synthon_rxn = ReactionContainer.from_cgr(synthon_cgr)
-        except:  # replace with the actual exception class
+        except Exception as e:
             raise SubclusterError(
                 f"Failed to parse synthon CGR for route {route_id}"
             ) from e

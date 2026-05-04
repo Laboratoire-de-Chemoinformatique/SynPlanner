@@ -300,7 +300,6 @@ def run_planning(
     tree_list = []
     tree_config.silent = False
     for target in tqdm(targets_batch):
-
         try:
             tree = run_tree_search(
                 target=target,
@@ -366,7 +365,6 @@ def run_updating(
 
     # run value network tuning
     for batch_id, targets_batch in enumerate(targets_batch_list, start=1):
-
         # start tree planning simulation for batch of targets
         tree_list = run_planning(
             targets_batch=targets_batch,

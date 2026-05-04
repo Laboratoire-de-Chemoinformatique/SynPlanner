@@ -124,9 +124,9 @@ class TestRouteLoading:
         for route_id, steps in rd.items():
             assert isinstance(steps, dict)
             for step_id, rxn in steps.items():
-                assert isinstance(
-                    rxn, ReactionContainer
-                ), f"Route {route_id} step {step_id}: expected ReactionContainer"
+                assert isinstance(rxn, ReactionContainer), (
+                    f"Route {route_id} step {step_id}: expected ReactionContainer"
+                )
 
     def test_load_routes_from_csv(self, routes_dict_from_csv):
         rd = routes_dict_from_csv
@@ -154,9 +154,9 @@ class TestRouteLoading:
         assert len(routes_json) > 0
         for route_id, tree in routes_json.items():
             assert isinstance(tree, dict), f"Route {route_id}: expected dict tree node"
-            assert (
-                tree.get("type") == "mol"
-            ), f"Route {route_id}: root node should be 'mol'"
+            assert tree.get("type") == "mol", (
+                f"Route {route_id}: root node should be 'mol'"
+            )
             assert "smiles" in tree
             assert "children" in tree
 
@@ -172,9 +172,9 @@ class TestRouteLoading:
         rd_roundtrip = make_dict(rj)
         assert set(rd_roundtrip.keys()) == set(routes_dict_from_json.keys())
         for route_id in rd_roundtrip:
-            assert (
-                len(rd_roundtrip[route_id]) > 0
-            ), f"Route {route_id}: should have at least one step after roundtrip"
+            assert len(rd_roundtrip[route_id]) > 0, (
+                f"Route {route_id}: should have at least one step after roundtrip"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -187,9 +187,9 @@ class TestRouteCGRComposition:
 
     def test_compose_all_route_cgrs_types(self, all_route_cgrs):
         for route_id, cgr in all_route_cgrs.items():
-            assert isinstance(
-                cgr, CGRContainer
-            ), f"Route {route_id}: expected CGRContainer, got {type(cgr)}"
+            assert isinstance(cgr, CGRContainer), (
+                f"Route {route_id}: expected CGRContainer, got {type(cgr)}"
+            )
 
     def test_compose_all_route_cgrs_nonempty(self, all_route_cgrs):
         for route_id, cgr in all_route_cgrs.items():
@@ -197,9 +197,9 @@ class TestRouteCGRComposition:
 
     def test_compose_all_sb_cgrs_types(self, all_sb_cgrs):
         for route_id, sb_cgr in all_sb_cgrs.items():
-            assert isinstance(
-                sb_cgr, CGRContainer
-            ), f"Route {route_id}: expected CGRContainer, got {type(sb_cgr)}"
+            assert isinstance(sb_cgr, CGRContainer), (
+                f"Route {route_id}: expected CGRContainer, got {type(sb_cgr)}"
+            )
 
     def test_sb_cgrs_subset_of_route_cgrs(self, all_route_cgrs, all_sb_cgrs):
         """SB-CGR route IDs should be a subset of route CGR route IDs."""
@@ -278,9 +278,9 @@ class TestVisualizationSVG:
             target_cgr = route_cgr.substructure(components[0])
             svg = cgr_display(target_cgr)
             assert isinstance(svg, str), f"Route {route_id}: expected str SVG"
-            assert svg.strip().startswith(
-                "<svg"
-            ), f"Route {route_id}: SVG should start with <svg"
+            assert svg.strip().startswith("<svg"), (
+                f"Route {route_id}: SVG should start with <svg"
+            )
             assert "</svg>" in svg, f"Route {route_id}: SVG should end with </svg>"
             tested += 1
             if tested >= 5:

@@ -13,7 +13,7 @@ Set your version once (replace with an existing tag if needed):
 
 .. code-block:: bash
 
-   VERSION=1.3.2
+   VERSION=1.4.4
 
 Pull images
 ~~~~~~~~~~~
@@ -67,5 +67,4 @@ Notes
 - The repository path is lowercased for Docker compatibility.
 - Images are built for ``linux/amd64``; running on arm64 hosts may require emulation (e.g. Docker Desktop with Rosetta/qemu).
 - For data download instructions, see :doc:`data_download`.
-
 

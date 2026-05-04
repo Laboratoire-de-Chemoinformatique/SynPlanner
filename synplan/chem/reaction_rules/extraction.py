@@ -18,6 +18,11 @@ from chython.periodictable import QueryElement
 from chython.reactor import Reactor
 from tqdm.auto import tqdm
 
+from synplan.chem.data.reaction_result import (
+    ErrorEntry,
+    ExtractedRuleRecord,
+    ExtractionBatchResult,
+)
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
 from synplan.chem.utils import reverse_reaction, unite_molecules
 from synplan.utils.config import RuleExtractionConfig
@@ -559,6 +564,32 @@ def extract_rules(
     return list(seen_cgrs.values()), False
 
 
+def _rule_to_reactor_smarts(rule: ReactionContainer) -> str:
+    """Serialize an extracted rule to the final TSV SMARTS representation."""
+    patterns = tuple(
+        molecule_substructure_as_query(m, m.atoms_numbers) for m in rule.reactants
+    )
+    products = tuple(rule.products)
+    reactor = Reactor(patterns=patterns, products=products, delete_atoms=False)
+    return str(reactor)
+
+
+def _make_extracted_rule_record(rule: ReactionContainer) -> ExtractedRuleRecord:
+    """Build the lightweight rule payload sent from worker to parent.
+
+    The parent must not parse rule SMARTS back into ReactionContainer objects.
+    Chython can emit query SMARTS that are valid enough for final Reactor TSV
+    loading but fail a parser round-trip during aggregation. Computing the CGR
+    key and final TSV SMARTS in the worker avoids that serial bottleneck and
+    avoids parser crashes in the parent.
+    """
+    return ExtractedRuleRecord(
+        cgr_key=str(~rule),
+        rule_smarts=_rule_to_reactor_smarts(rule),
+        reactor_validation=rule.meta.get("reactor_validation"),
+    )
+
+
 _worker_state: dict | None = None
 
 
@@ -574,21 +605,19 @@ def _init_extraction_worker(config_dict: dict, ignore_errors: bool, fmt: str) ->
 
 def _extract_rules_batch_worker(
     batch: list[tuple[int, str]],
-) -> tuple[
-    list[tuple[int, list[ReactionContainer], str]],
-    list[tuple[str, str, str, str]],
-    int,
-]:
+) -> ExtractionBatchResult:
     """Top-level picklable worker function for rule extraction.
 
     Called by each worker process via ``process_pool_map_stream``.
     Requires ``_init_extraction_worker`` to have been called first.
 
+    Rules are serialized to SMARTS strings (~200 B each) rather than
+    sending ReactionContainer objects (~19 KB each) over IPC.
+
     :param batch: List of ``(index, raw_string)`` pairs.
-    :return: ``(results, errors, n_multi_product)`` where *results* is a list of
-        ``(index, extracted_rules, product_smiles)`` tuples, *errors* is a list of
-        ``(original_smiles, stage, error_type, error_message)`` tuples and
-        *n_multi_product* is the number of reactions skipped due to multiple products.
+    :return: ExtractionBatchResult with rule SMARTS strings plus lightweight
+        validation metadata, errors, and the count of skipped multi-product
+        reactions.
     """
     if _worker_state is None:
         raise RuntimeError(
@@ -599,8 +628,8 @@ def _extract_rules_batch_worker(
     ignore_errors = _worker_state["ignore_errors"]
     fmt = _worker_state["fmt"]
 
-    extracted_rules_list = []
-    errors: list[tuple[str, str, str, str]] = []
+    rule_records: list[tuple[int, list[ExtractedRuleRecord], str]] = []
+    errors: list[ErrorEntry] = []
     n_multi_product = 0
     for index, raw_item in batch:
         try:
@@ -609,40 +638,47 @@ def _extract_rules_batch_worker(
             extracted_rules, skipped = extract_rules(config, reaction)
             if skipped:
                 n_multi_product += 1
-            extracted_rules_list.append((index, extracted_rules, product_smi))
+            rules_payload = [
+                _make_extracted_rule_record(rule) for rule in extracted_rules
+            ]
+            rule_records.append((index, rules_payload, product_smi))
         except Exception as e:
             if not ignore_errors:
                 raise
             orig = raw_item if isinstance(raw_item, str) else str(raw_item)
             etype = type(e).__qualname__
             stage = e.stage if hasattr(e, "stage") else "extract_rules"
-            errors.append((orig, stage, etype, str(e)))
-    return extracted_rules_list, errors, n_multi_product
+            errors.append(
+                ErrorEntry(original=orig, stage=stage, error_type=etype, message=str(e))
+            )
+    return ExtractionBatchResult(
+        rule_records=rule_records,
+        errors=errors,
+        n_multi_product=n_multi_product,
+    )
 
 
 def _update_rules_statistics(
     rules_statistics: dict,
     cgr_to_rule: dict,
     index: int,
-    extracted_rules: list[ReactionContainer],
+    rule_records: list[ExtractedRuleRecord],
 ) -> None:
     """Update rules statistics with the indices of reactions they came from.
 
-    Deduplication is performed by the CGR (condensed graph of reaction) of
-    each rule, which preserves query-level atom annotations (neighbors,
-    hybridization, etc.) when rules contain QueryContainer molecules.
+    Deduplication is performed by the worker-computed CGR string of each rule.
+    The parent never parses rule SMARTS back into ReactionContainers; that keeps
+    aggregation cheap and avoids parser round-trip failures for query SMARTS.
     """
-    for rule in extracted_rules:
-        cgr = ~rule
+    for rule_record in rule_records:
         prev_stats_len = len(rules_statistics)
-        rules_statistics[cgr].append(index)
+        rules_statistics[rule_record.cgr_key].append(index)
         if len(rules_statistics) != prev_stats_len:
-            rule.meta["first_reaction_index"] = index
-            cgr_to_rule[cgr] = rule
+            cgr_to_rule[rule_record.cgr_key] = rule_record
 
 
 def _process_extraction_result(
-    result: tuple,
+    result: ExtractionBatchResult,
     rules_statistics: dict,
     cgr_to_rule: dict,
     error_file: TextIOWrapper | None = None,
@@ -650,46 +686,41 @@ def _process_extraction_result(
     multi_product_count: list[int] | None = None,
     products_file: TextIOWrapper | None = None,
 ) -> int:
-    """
-    Processes a single batch result from the extraction worker, updating rules
-    statistics and writing errors/products.
+    """Process a single ExtractionBatchResult, updating rules statistics.
 
-    :param result: Tuple of ``(extracted_rules_list, errors, n_multi_product)``
-        returned by a worker.
-    :param rules_statistics: A dictionary mapping rule CGRs to lists of reaction indices.
-    :param cgr_to_rule: A dictionary mapping rule CGRs to the first rule seen.
+    :param result: ExtractionBatchResult returned by a worker.
+    :param rules_statistics: Dict mapping CGR key strings to lists of reaction indices.
+    :param cgr_to_rule: Dict mapping CGR key strings to the first rule seen.
     :param error_file: Optional file handle to write failed reactions.
     :param error_counts: Optional counter to accumulate error categories.
-    :param multi_product_count: Single-element list used as mutable accumulator for
-        multi-product reaction count.
-    :param products_file: Optional file handle to write ``reaction_id\\tproduct_smiles``
-        pairs for later policy data generation.
-    :return: Number of reactions in this batch (for progress bar updates).
+    :param multi_product_count: Single-element list used as mutable accumulator.
+    :param products_file: Optional file handle to write ``reaction_id\\tproduct_smiles``.
+    :return: Number of reactions processed in this batch (for progress bar).
     """
-    extracted_rules_list, errors, n_multi_product = result
-
-    for index, extracted_rules, product_smi in extracted_rules_list:
-        _update_rules_statistics(rules_statistics, cgr_to_rule, index, extracted_rules)
+    for index, rule_records, product_smi in result.rule_records:
+        _update_rules_statistics(rules_statistics, cgr_to_rule, index, rule_records)
         if products_file is not None:
             products_file.write(f"{index}\t{product_smi}\n")
 
-    for orig, stage, etype, emsg in errors:
+    for err in result.errors:
         if error_file is not None:
-            error_file.write(f"{orig}\t{stage}\t{etype}\t{emsg}\n")
+            error_file.write(
+                f"{err.original}\t{err.stage}\t{err.error_type}\t{err.message}\n"
+            )
         if error_counts is not None:
-            error_counts[(stage, etype)] += 1
+            error_counts[(err.stage, err.error_type)] += 1
 
     if multi_product_count is not None:
-        multi_product_count[0] += n_multi_product
+        multi_product_count[0] += result.n_multi_product
 
-    return len(extracted_rules_list) + len(errors)
+    return len(result.rule_records) + len(result.errors)
 
 
 def sort_rules(
     rules_stats: dict,
     cgr_to_rule: dict,
     min_popularity: int,
-) -> tuple[list[tuple[ReactionContainer, list[int]]], dict[str, int]]:
+) -> tuple[list[tuple[ExtractedRuleRecord, list[int]]], dict[str, int]]:
     """
     Sorts reaction rules based on their popularity and validation status. This
     function sorts the given rules according to their popularity (i.e., the number of
@@ -698,15 +729,15 @@ def sort_rules(
 
     :param rules_stats: A dictionary where each key is a rule CGR and the value is
         a list of integers. Each integer represents an index where the rule was applied.
-    :param cgr_to_rule: A dictionary mapping rule CGRs to the first
-        ReactionContainer rule seen for that CGR.
+    :param cgr_to_rule: A dictionary mapping rule CGRs to the first serialized
+        rule record seen for that CGR.
     :param min_popularity: The minimum number of times a rule must be applied to be
         considered. Default is 3.
 
     :return: A tuple of (sorted_rules, filter_stats) where *sorted_rules* is a list of
-        tuples with a reaction rule and its application indices, sorted by descending
-        popularity, and *filter_stats* is a dict with counts of rules rejected at each
-        filtering stage.
+        tuples with a serialized rule record and its application indices, sorted by
+        descending popularity, and *filter_stats* is a dict with counts of rules
+        rejected at each filtering stage.
 
     """
     passed = []
@@ -720,7 +751,7 @@ def sort_rules(
     for cgr, indices in rules_stats.items():
         rule = cgr_to_rule[cgr]
         filter_stats["total_unique_rules"] += 1
-        validation = rule.meta.get("reactor_validation", "not_set")
+        validation = rule.reactor_validation or "not_set"
         if validation != "passed":
             filter_stats["rejected_reactor_validation"] += 1
             continue
@@ -765,9 +796,10 @@ def _extract_rules_serial(
             extracted_rules, skipped = extract_rules(config, reaction)
             if skipped:
                 n_multi_product += 1
-            _update_rules_statistics(
-                rules_statistics, cgr_to_rule, index, extracted_rules
-            )
+            rule_smarts = [
+                _make_extracted_rule_record(rule) for rule in extracted_rules
+            ]
+            _update_rules_statistics(rules_statistics, cgr_to_rule, index, rule_smarts)
             if products_file is not None:
                 products_file.write(f"{index}\t{product_smi}\n")
         except Exception as e:
@@ -785,7 +817,7 @@ def _extract_rules_serial(
 
 def _print_extraction_summary(
     n_processed: int,
-    sorted_rules: list[tuple[ReactionContainer, list[int]]],
+    sorted_rules: list[tuple[ExtractedRuleRecord, list[int]]],
     filter_stats: dict[str, int],
     error_counts: Counter,
     error_file_path: Path | None,
@@ -797,20 +829,20 @@ def _print_extraction_summary(
     for _rule, indices in sorted_rules:
         covered_reactions.update(indices)
     n_covered = len(covered_reactions)
-    summary_lines = [
-        (
+    if n_processed:
+        summary_lines = [
             f"Finished: processed {n_processed}, extracted {n_rules} rules "
-            f"from {n_covered} reactions ({n_covered*100/n_processed:.1f}%), "
-            if n_processed
-            else "from 0 reactions, " f"failed {n_errors}"
-        )
-    ]
+            f"from {n_covered} reactions ({n_covered * 100 / n_processed:.1f}%), "
+            f"failed {n_errors}"
+        ]
+    else:
+        summary_lines = [f"Finished: processed 0 reactions, failed {n_errors}"]
     # Reaction-level filtering
     n_multi_product = filter_stats.get("skipped_multi_product", 0)
     if n_multi_product and n_processed:
         summary_lines.append(
             f"Reactions skipped (multi-product): {n_multi_product} "
-            f"({n_multi_product*100/n_processed:.1f}%)"
+            f"({n_multi_product * 100 / n_processed:.1f}%)"
         )
     # Rule filtering breakdown
     total_unique = filter_stats.get("total_unique_rules", 0)
@@ -823,11 +855,11 @@ def _print_extraction_summary(
             count = filter_stats.get(key, 0)
             if count:
                 summary_lines.append(
-                    f"  {label}: {count} ({count*100/total_unique:.1f}%)"
+                    f"  {label}: {count} ({count * 100 / total_unique:.1f}%)"
                 )
         n_passed = filter_stats.get("passed", 0)
         summary_lines.append(
-            f"  passed all filters: {n_passed} ({n_passed*100/total_unique:.1f}%)"
+            f"  passed all filters: {n_passed} ({n_passed * 100 / total_unique:.1f}%)"
         )
     if error_counts:
         summary_lines.append("Extraction errors:")
@@ -940,7 +972,10 @@ def extract_rules_from_reactions(
                     initializer=_init_extraction_worker,
                     initargs=(config.to_dict(), ignore_errors, fmt),
                     timeout=300,
-                    max_tasks_per_child=200,
+                    # Avoid ProcessPoolExecutor worker recycling here: CPython
+                    # documents open hangs with max_tasks_per_child in 3.13/3.14.
+                    # The shared pool helper now performs bounded cleanup of
+                    # stale chemistry workers at the end of the run instead.
                 ):
                     if stop.is_set():
                         break
@@ -976,15 +1011,8 @@ def extract_rules_from_reactions(
     with open(rules_tsv_path, "w", encoding="utf-8") as tsv_file:
         tsv_file.write("rule_smarts\tpopularity\treaction_indices\n")
         for rule, indices in sorted_rules:
-            patterns = tuple(
-                molecule_substructure_as_query(m, m.atoms_numbers)
-                for m in rule.reactants
-            )
-            products = tuple(rule.products)
-            reactor = Reactor(patterns=patterns, products=products, delete_atoms=False)
-            smarts_str = str(reactor)
             tsv_file.write(
-                f"{smarts_str}\t{len(indices)}\t{','.join(map(str, indices))}\n"
+                f"{rule.rule_smarts}\t{len(indices)}\t{','.join(map(str, indices))}\n"
             )
 
     _print_extraction_summary(

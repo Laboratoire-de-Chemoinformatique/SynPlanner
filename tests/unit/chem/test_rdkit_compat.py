@@ -257,9 +257,9 @@ class TestExtractRoutesRdkit:
 
         def check_node(node):
             if node["type"] == "mol":
-                assert isinstance(
-                    node["mol"], Chem.rdchem.Mol
-                ), f"Missing RDKit Mol for {node['smiles']}"
+                assert isinstance(node["mol"], Chem.rdchem.Mol), (
+                    f"Missing RDKit Mol for {node['smiles']}"
+                )
             for child in node.get("children", []):
                 check_node(child)
 

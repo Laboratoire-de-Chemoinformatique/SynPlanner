@@ -2,6 +2,13 @@ Development
 ================
 
 This page covers local development setup, uv usage, and building Docker images.
+For pull request acceptance criteria, see :doc:`pr_review`.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   pr_review
 
 uv setup
 --------
@@ -38,22 +45,21 @@ Build GUI Docker image
 Bump version
 ------------
 
-Version is managed by `bump-my-version <https://github.com/callowayproject/bump-my-version>`_.
-Config lives in ``pyproject.toml`` under ``[tool.bumpversion]``.
+Version is managed from ``pyproject.toml`` with ``uv version``.
 
 .. code-block:: bash
 
-   # patch: 1.4.2 → 1.4.3
-   uvx bump-my-version bump patch --allow-dirty
+   # patch: 1.4.3 → 1.4.4
+   uv version --bump patch --no-sync
 
-   # minor: 1.4.3 → 1.5.0
-   uvx bump-my-version bump minor --allow-dirty
+   # minor: 1.4.4 → 1.5.0
+   uv version --bump minor --no-sync
 
    # major: 1.5.0 → 2.0.0
-   uvx bump-my-version bump major --allow-dirty
+   uv version --bump major --no-sync
 
-This updates ``pyproject.toml`` (version + current_version) and ``README.md``
-(Docker VERSION) automatically.
+This updates ``pyproject.toml`` and relocks the project without syncing the
+local environment.
 
 **Manual steps after bumping:**
 
@@ -61,6 +67,8 @@ This updates ``pyproject.toml`` (version + current_version) and ``README.md``
    rename ``(stable)`` to the new version.
 2. Update ``CHANGELOG.md`` — move items from ``[Unreleased]`` into a new
    section and add footer links.
+3. Update ``docs/get_started/docker_images.rst`` so the documented GHCR
+   ``VERSION`` matches the new release.
 
 Publish to GHCR (maintainers)
 -----------------------------
@@ -77,5 +85,3 @@ To push locally (requires write permissions to the repo's packages):
    docker tag synplan:dev-gui-amd64 ${REPO}:${VERSION}-gui-amd64
    docker push ${REPO}:${VERSION}-cli-amd64
    docker push ${REPO}:${VERSION}-gui-amd64
-
-

@@ -200,7 +200,7 @@ def test_scan_route_with_halogen_detector(scanner_with_halogens):
     # Reaction on a molecule with two Br atoms (same family)
     # Using mapped SMILES for a substitution on Br where another Br is competing
     rxn = smiles(
-        "[Br:1]c1ccc([Br:2])cc1.[CH3:3][Li:4]>>" "[CH3:3]c1ccc([Br:2])cc1.[Li:4][Br:1]"
+        "[Br:1]c1ccc([Br:2])cc1.[CH3:3][Li:4]>>[CH3:3]c1ccc([Br:2])cc1.[Li:4][Br:1]"
     )
     route = {0: rxn}
     _interactions, halogen_count = scanner_with_halogens.scan_route(route)
