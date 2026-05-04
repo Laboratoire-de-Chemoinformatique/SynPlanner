@@ -52,6 +52,12 @@ the standardized reactions as reaction smiles in the output file. If the reactio
 (e.g. incorrect reaction or corrupt smiles), the corresponding reactions will be discarded, which means that ``SynPlanner``
 also works as a general reaction data cleaner.
 
+For SMI inputs with source/provenance columns, such as mapped USPTO rows in the
+form ``reaction_smiles<TAB>row_id<TAB>patent_ids``, standardization preserves
+those source columns in successful output rows. When ``--ignore-errors`` is
+used, failed rows are removed from the standardized output and written to the
+error TSV with a ``source_info`` column.
+
 .. code-block:: bash
 
     synplan reaction_standardizing --config configs/reactions_standardization.yaml --input reaction_data_original.smi --output reaction_data_standardized.smi

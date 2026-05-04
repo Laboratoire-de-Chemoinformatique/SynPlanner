@@ -1,9 +1,9 @@
-functional_groups_config:
 kekule_form_config:
+functional_groups_config:
 remove_reagents_config:
+check_valence_config:
 implicify_hydrogens_config:
 check_isotopes_config:
-check_valence_config:
 aromatic_form_config:
 unchanged_parts_config:
 deduplicate: true

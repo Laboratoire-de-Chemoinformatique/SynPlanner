@@ -127,7 +127,8 @@ def write_batch_results(
             summary.errored += 1
             if error_file is not None:
                 error_file.write(
-                    f"{err.original}\t{err.stage}\t{err.error_type}\t{err.message}\n"
+                    f"{err.original}\t{err.source_info}\t{err.stage}\t"
+                    f"{err.error_type}\t{err.message}\n"
                 )
         for flt in batch.filtered:
             summary.filter_breakdown[flt.reason] = (

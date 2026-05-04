@@ -127,15 +127,15 @@ def sample_reactions_file(tmp_path: Path, sample_reactions) -> Path:
 def std_config() -> ReactionStandardizationConfig:
     """One fully‑loaded standardisation config reused across tests."""
     return ReactionStandardizationConfig(
-        functional_groups_config=FunctionalGroupsConfig(),
         kekule_form_config=KekuleFormConfig(),
+        functional_groups_config=FunctionalGroupsConfig(),
+        remove_reagents_config=RemoveReagentsConfig(),
         check_valence_config=CheckValenceConfig(),
         implicify_hydrogens_config=ImplicifyHydrogensConfig(),
         check_isotopes_config=CheckIsotopesConfig(),
         aromatic_form_config=AromaticFormConfig(),
         mapping_fix_config=MappingFixConfig(),
         unchanged_parts_config=UnchangedPartsConfig(),
-        remove_reagents_config=RemoveReagentsConfig(),
         rebalance_reaction_config=RebalanceReactionConfig(),
     )
 

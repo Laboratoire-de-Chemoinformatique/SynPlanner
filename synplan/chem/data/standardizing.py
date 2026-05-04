@@ -32,7 +32,10 @@ from synplan.utils.config import BaseConfigModel
 from synplan.utils.files import (
     RawReactionReader,
     ReactionWriter,
+    format_source_fields,
     parse_reaction,
+    reaction_source_info,
+    split_smiles_record,
 )
 from synplan.utils.parallel import chunked, graceful_shutdown, process_pool_map_stream
 
@@ -653,10 +656,16 @@ class RebalanceReactionStandardizer(BaseStandardizer):
         return new_rxn
 
 
-# Registry mapping config field names to standardizer classes
+# Canonical chemistry order for reaction standardization. The configuration
+# only enables/disables steps and sets parameters; it does not define execution
+# order.  In particular, reagents are removed before valence validation so
+# reagent-only species do not create false valence failures, and aromatization
+# happens after valence-sensitive steps so final serialized reactions deduplicate
+# in a consistent aromatic form.
 STANDARDIZER_REGISTRY = {
-    "functional_groups_config": FunctionalGroupsStandardizer,
     "kekule_form_config": KekuleFormStandardizer,
+    "functional_groups_config": FunctionalGroupsStandardizer,
+    "remove_reagents_config": RemoveReagentsStandardizer,
     "check_valence_config": CheckValenceStandardizer,
     "implicify_hydrogens_config": ImplicifyHydrogensStandardizer,
     "check_isotopes_config": CheckIsotopesStandardizer,
@@ -665,7 +674,6 @@ STANDARDIZER_REGISTRY = {
     "mapping_fix_config": MappingFixStandardizer,
     "unchanged_parts_config": UnchangedPartsStandardizer,
     "small_molecules_config": SmallMoleculesStandardizer,
-    "remove_reagents_config": RemoveReagentsStandardizer,
     "rebalance_reaction_config": RebalanceReactionStandardizer,
 }
 
@@ -740,7 +748,7 @@ class ReactionStandardizationConfig(BaseConfigModel):
         return result
 
     def create_standardizers(self):
-        """Create standardizer instances based on configuration."""
+        """Create selected standardizers in SynPlanner's canonical order."""
         standardizers = []
         for field_name, std_cls in STANDARDIZER_REGISTRY.items():
             config = getattr(self, field_name)
@@ -825,28 +833,35 @@ def _process_batch(
     *,
     ignore_errors: bool = False,
     fmt: str = "smi",
-) -> tuple[list[ReactionContainer], int, list[tuple[str, str, str, str]]]:
+) -> tuple[list[ReactionContainer], int, list[tuple[str, str, str, str, str]]]:
     """Process a batch and return (results, n_ok, errors).
 
-    Each error entry is ``(original_smiles, stage, error_type, error_message)``.
+    Each error entry is ``(original_smiles, source_info, stage, error_type,
+    error_message)``.
     """
     results: list[ReactionContainer] = []
-    errors: list[tuple[str, str, str, str]] = []
+    errors: list[tuple[str, str, str, str, str]] = []
     n_std = 0
     for item in batch:
         rxn, ok, exc = safe_standardize(
             item, standardizers, ignore_errors=ignore_errors, fmt=fmt
         )
-        if rxn is not None:
+        if ok and rxn is not None:
             results.append(rxn)
         n_std += ok
         if exc is not None:
-            orig = (
-                rxn.meta.get("init_smiles", str(rxn))
-                if rxn is not None and hasattr(rxn, "meta")
-                else str(item)
+            if rxn is not None and hasattr(rxn, "meta"):
+                orig = rxn.meta.get("init_smiles", str(rxn))
+                source_info = reaction_source_info(rxn)
+            elif isinstance(item, str) and fmt == "smi":
+                orig, source_fields = split_smiles_record(item)
+                source_info = format_source_fields(source_fields)
+            else:
+                orig = str(item)
+                source_info = ""
+            errors.append(
+                (orig, source_info, exc.stage, exc.original_type, exc.original_msg)
             )
-            errors.append((orig, exc.stage, exc.original_type, exc.original_msg))
     return results, n_std, errors
 
 
@@ -885,8 +900,14 @@ def _standardize_batch_worker(
         fmt=_worker_state["fmt"],
     )
     errors = [
-        ErrorEntry(original=smi, stage=stage, error_type=etype, message=emsg)
-        for smi, stage, etype, emsg in raw_errors
+        ErrorEntry(
+            original=smi,
+            source_info=source_info,
+            stage=stage,
+            error_type=etype,
+            message=emsg,
+        )
+        for smi, source_info, stage, etype, emsg in raw_errors
     ]
     return build_batch_result(reactions, errors, [], _worker_state["fmt"])
 
@@ -897,18 +918,27 @@ _reaction_dedup_key = reaction_cgr_key
 
 def _make_timeout_result(exc: Exception, items: list[str]) -> BatchResult:
     """Fallback for timed-out batches."""
-    return BatchResult(
-        records=[],
-        dedup_keys=[],
-        errors=[
+    errors = []
+    for item in items:
+        original = item
+        source_info = ""
+        smiles_part, source_fields = split_smiles_record(item)
+        if smiles_part:
+            original = smiles_part
+            source_info = format_source_fields(source_fields)
+        errors.append(
             ErrorEntry(
-                original=item,
+                original=original,
+                source_info=source_info,
                 stage="timeout",
                 error_type="TimeoutError",
                 message=str(exc),
             )
-            for item in items
-        ],
+        )
+    return BatchResult(
+        records=[],
+        dedup_keys=[],
+        errors=errors,
     )
 
 
@@ -1047,7 +1077,9 @@ def standardize_reactions_from_file(
 
     error_file = open(_error_path, "w", encoding="utf-8") if _error_path else None
     if error_file is not None:
-        error_file.write("# original_smiles\tstage\terror_type\terror_message\n")
+        error_file.write(
+            "# original_smiles\tsource_info\tstage\terror_type\terror_message\n"
+        )
 
     try:
         with (

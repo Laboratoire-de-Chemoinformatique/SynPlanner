@@ -28,6 +28,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Ranking dataset cache loading now iterates safetensors keys correctly.
 - Deduplication now fails fast if worker-computed dedup keys are unavailable.
 - Standardization ion-splitting warnings now use the module logger.
+- Reaction standardization now preserves mapped SMI source columns in
+  successful output rows and error reports, applies a fixed canonical chemistry
+  order for enabled standardizers, and excludes failed reactions from the
+  standardized output when `ignore_errors` is enabled.
 
 ## [1.4.3] - 2026-03-19
 

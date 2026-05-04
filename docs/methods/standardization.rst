@@ -43,3 +43,18 @@ The current available reaction standardizers in ``SynPlanner``:
 - Reaction rebalancing (rebalancing reaction)
 - Duplicate reaction removal (remove duplicate reactions)
 
+Standardization order
+--------------------------------
+
+Reaction standardization uses a fixed internal order. The configuration turns
+individual steps on or off and supplies parameters, but users do not need to
+arrange the steps manually. This keeps the common curation path robust for
+large reaction corpora where a small ordering mistake can create many false
+errors.
+
+The default order applies Kekule conversion and functional-group normalization
+before chemical validation. Reagents are then removed before atom valence
+validation because reagents are omitted downstream and can include species
+whose valence should not reject an otherwise valid transformation. Aromatic
+conversion is applied after valence-sensitive checks so final standardized
+records and duplicate detection use a consistent aromatic representation.

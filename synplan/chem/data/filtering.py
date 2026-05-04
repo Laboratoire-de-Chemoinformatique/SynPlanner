@@ -26,7 +26,14 @@ from synplan.chem.data.standardizing import (
     StandardizationError,
 )
 from synplan.utils.config import BaseConfigModel
-from synplan.utils.files import RawReactionReader, ReactionWriter, parse_reaction
+from synplan.utils.files import (
+    RawReactionReader,
+    ReactionWriter,
+    format_source_fields,
+    parse_reaction,
+    reaction_source_info,
+    split_smiles_record,
+)
 from synplan.utils.parallel import chunked, graceful_shutdown, process_pool_map_stream
 
 logger = logging.getLogger("synplan.chem.data.filtering")
@@ -759,11 +766,13 @@ def _filter_batch_worker(
         if not is_filtered and reaction is not None:
             reactions.append(reaction)
         elif reason is not None:
-            orig_smi = (
-                reaction.meta.get("init_smiles", str(reaction))
-                if reaction is not None and hasattr(reaction, "meta")
-                else raw
-            )
+            source_info = ""
+            if reaction is not None and hasattr(reaction, "meta"):
+                orig_smi = reaction.meta.get("init_smiles", str(reaction))
+                source_info = reaction_source_info(reaction)
+            else:
+                orig_smi, source_fields = split_smiles_record(raw)
+                source_info = format_source_fields(source_fields)
             if "/" in reason:
                 # Error: "stage/ErrorType: message"
                 stage_type = reason.split(":")[0]
@@ -776,6 +785,7 @@ def _filter_batch_worker(
                 errors.append(
                     ErrorEntry(
                         original=orig_smi,
+                        source_info=source_info,
                         stage=parts[0],
                         error_type=parts[1],
                         message=msg,
@@ -886,7 +896,9 @@ def filter_reactions_from_file(
     error_fh = None
     if _error_path is not None:
         error_fh = open(_error_path, "w", encoding="utf-8")
-        error_fh.write("# original_smiles\tstage\terror_type\terror_message\n")
+        error_fh.write(
+            "# original_smiles\tsource_info\tstage\terror_type\terror_message\n"
+        )
 
     try:
         # Build batches: each item is a list of (raw_string, fmt, ignore_errors)

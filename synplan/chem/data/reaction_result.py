@@ -19,6 +19,7 @@ class ErrorEntry:
     stage: str
     error_type: str
     message: str
+    source_info: str = ""
     line_number: int | None = None
 
 

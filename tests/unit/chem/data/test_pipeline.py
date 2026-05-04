@@ -19,8 +19,18 @@ from synplan.chem.data.reaction_result import (
     PipelineSummary,
     ProcessResult,
 )
-from synplan.chem.data.standardizing import ReactionStandardizationConfig
-from synplan.utils.files import ReactionReader, ReactionWriter
+from synplan.chem.data.standardizing import (
+    AromaticFormConfig,
+    CheckValenceConfig,
+    CheckValenceStandardizer,
+    FunctionalGroupsConfig,
+    KekuleFormConfig,
+    ReactionStandardizationConfig,
+    RemoveReagentsConfig,
+    RemoveReagentsStandardizer,
+    StandardizationError,
+)
+from synplan.utils.files import ReactionReader, ReactionWriter, parse_reaction
 
 # -- BatchResult / ExtractionBatchResult dataclasses -------------------------
 
@@ -130,6 +140,68 @@ def test_reaction_cgr_key_alias():
     rxn = parse_smiles("[CH3:1][OH:2]>>[CH3:1][Cl:3]")
     if rxn is not None:
         assert standardizing._reaction_dedup_key(rxn) == reaction_cgr_key(rxn)
+
+
+def test_standardization_config_uses_canonical_order():
+    """Config selects standardizers; code owns the chemistry execution order."""
+    config = ReactionStandardizationConfig(
+        functional_groups_config=FunctionalGroupsConfig(),
+        check_valence_config=CheckValenceConfig(),
+        aromatic_form_config=AromaticFormConfig(),
+        remove_reagents_config=RemoveReagentsConfig(),
+        kekule_form_config=KekuleFormConfig(),
+    )
+
+    names = [
+        standardizer.__class__.__name__
+        for standardizer in config.create_standardizers()
+    ]
+
+    assert names == [
+        "KekuleFormStandardizer",
+        "FunctionalGroupsStandardizer",
+        "RemoveReagentsStandardizer",
+        "CheckValenceStandardizer",
+        "AromaticFormStandardizer",
+    ]
+
+
+def test_parse_reaction_preserves_mapped_source_fields():
+    """Mapped USPTO SMI records keep source columns as reaction metadata."""
+    record = "[CH3:1][OH:2]>>[CH3:1][Cl:3]\t42\tUS123,US456"
+
+    rxn = parse_reaction(record)
+
+    assert rxn.meta["init_smiles"] == "[CH3:1][OH:2]>>[CH3:1][Cl:3]"
+    assert rxn.meta["source_0001"] == "42"
+    assert rxn.meta["source_0002"] == "US123,US456"
+    assert serialize_reaction(rxn, "smi").endswith("\t42\tUS123,US456")
+
+
+def test_standardization_errors_are_not_written_to_output():
+    """ignore_errors logs bad reactions but does not mix them into output records."""
+
+    class AlwaysFailStandardizer:
+        def __call__(self, rxn):
+            raise StandardizationError("CheckValence", str(rxn), ValueError("bad"))
+
+    results, n_ok, errors = standardizing._process_batch(
+        ["[CH3:1][OH:2]>>[CH3:1][Cl:3]\t42\tUS123"],
+        [AlwaysFailStandardizer()],
+        ignore_errors=True,
+    )
+
+    assert results == []
+    assert n_ok == 0
+    assert errors == [
+        (
+            "[CH3:1][OH:2]>>[CH3:1][Cl:3]",
+            "42;US123",
+            "CheckValence",
+            "ValueError",
+            "bad",
+        )
+    ]
 
 
 # -- CGR dedup consistency ---------------------------------------------------
@@ -270,13 +342,13 @@ def test_write_batch_results_errors(tmp_path):
     written = []
     summary = PipelineSummary()
     err_path = tmp_path / "errors.tsv"
-    errors = [ErrorEntry("bad", "parse", "ValueError", "msg")]
+    errors = [ErrorEntry("bad", "parse", "ValueError", "msg", source_info="US123")]
     batches = [BatchResult(records=[], dedup_keys=[], errors=errors)]
     with open(err_path, "w") as ef:
         write_batch_results(batches, written.append, summary, error_file=ef)
     assert summary.errored == 1
     assert "parse/ValueError" in summary.error_breakdown
-    assert "bad\tparse\tValueError\tmsg" in err_path.read_text()
+    assert "bad\tUS123\tparse\tValueError\tmsg" in err_path.read_text()
 
 
 def test_write_batch_results_filtered():
@@ -357,3 +429,121 @@ def test_standardization_dedup_uses_worker_computed_keys(monkeypatch, tmp_path):
 
     assert written == ["CC>>CC"]
     assert summary.succeeded == 1
+
+
+# -- canonical order: reagent metal species must not reach CheckValence --------
+
+# Real USPTO mapped records where the reagent section contains a transition
+# metal with an unusual formal charge that chython flags as a valence error.
+# RemoveReagents strips these before CheckValence runs in the canonical order,
+# so the reaction passes standardization.  Running CheckValence first (the old
+# behaviour) would reject both records.
+
+_V4_REAGENT_SMILES = (
+    "[F:23][C:22]([F:24])([F:25])[CH2:21][O:20][C:19]1=[C:3]([CH3:2])"
+    "[C:4](=[N:16][CH:17]=[CH:18]1)[CH2:5][S:6][C:7]1=[N:15][C:14]=2"
+    "[CH:13]=[CH:12][CH:11]=[CH:10][C:9]=2[NH:8]1.[H-:1].[Na+:33].[Na+:34]"
+    ".[O-:29][S:28]([O-:30])(=[O:31])=[S:32].[OH:26][OH:27]"
+    ">[CH3:40][C:38](=[O:39])[CH2:37][C:36]([CH3:42])=[O:41].[CH3:45][CH2:43][OH:44].[V+4:35]"
+    ">[F:23][C:22]([F:24])([F:25])[CH2:21][O:20][C:19]1=[C:3]([CH3:2])"
+    "[C:4]([CH2:5][S:6]([C:7]=2[NH:8][C:9]3=[C:14]([CH:13]=[CH:12][CH:11]=[CH:10]3)"
+    "[N:15]=2)=[O:26])=[N:16][CH:17]=[CH:18]1.[OH2:29]"
+)
+
+_PT4_REAGENT_SMILES = (
+    "[CH2:10]1[CH2:11][CH2:12][CH2:13][CH2:14][C:8]1=[O:9]"
+    ".[K+:6].[K+:7].[O-:2][S:1]([O-:3])(=[O:4])=[O:5]"
+    ">[Cl-:27].[Cl-:28].[Cl-:29].[Cl-:30]"
+    ".[OH2:21].[OH2:22].[OH2:23].[OH2:24].[OH2:25].[OH2:26]"
+    ".[Pd:33][Cl:32].[Pt+4:31]"
+    ">[CH:17]1=[CH:16][C:15](=[CH:20][CH:19]=[CH:18]1)"
+    "[C:10]=1[CH:11]=[CH:12][CH:13]=[CH:14][C:8]=1[OH:9]"
+)
+
+
+def test_remove_reagents_before_check_valence_v4(monkeypatch):
+    """V+4 reagent (USPTO US06002011) fails CheckValence if run first.
+
+    With the canonical order (RemoveReagents before CheckValence) the reaction
+    is accepted because [V+4] is stripped as a spectator before valence
+    validation.
+    """
+    from chython import smiles as parse_smiles
+
+    rxn = parse_smiles(_V4_REAGENT_SMILES)
+    assert rxn is not None
+
+    check_val = CheckValenceStandardizer()
+    remove_reag = RemoveReagentsStandardizer()
+
+    with pytest.raises(StandardizationError, match="Valence errors"):
+        check_val(rxn)
+
+    rxn2 = parse_smiles(_V4_REAGENT_SMILES)
+    rxn2 = remove_reag(rxn2)
+    check_val(rxn2)  # must not raise
+
+
+def test_remove_reagents_before_check_valence_pt4(monkeypatch):
+    """Pt+4 reagent (USPTO US04060559) fails CheckValence if run first.
+
+    With the canonical order (RemoveReagents before CheckValence) the reaction
+    is accepted because [Pt+4] is stripped as a spectator before valence
+    validation.
+    """
+    from chython import smiles as parse_smiles
+
+    rxn = parse_smiles(_PT4_REAGENT_SMILES)
+    assert rxn is not None
+
+    check_val = CheckValenceStandardizer()
+    remove_reag = RemoveReagentsStandardizer()
+
+    with pytest.raises(StandardizationError, match="Valence errors"):
+        check_val(rxn)
+
+    rxn2 = parse_smiles(_PT4_REAGENT_SMILES)
+    rxn2 = remove_reag(rxn2)
+    check_val(rxn2)  # must not raise
+
+
+# Real USPTO record US03931239 has [Cr+6] in the reagent section (Jones
+# oxidation conditions).  chython currently rejects the [Cr+6] atom token at
+# parse time, so the test skips automatically.  Once chython gains support for
+# Cr+6 the test will run and verify that RemoveReagents strips it before
+# CheckValence sees it.
+_CR6_REAGENT_SMILES = (
+    "[CH3:1][C:2]1[C:10]2[O:11][CH:12]([C:14]([OH:16])=[O:15])[CH2:13]"
+    "[C:9]=2[C:8]2[CH2:7][CH:6]([CH2:17][CH2:18][CH3:19])[CH:5]([OH:20])"
+    "[C:4]=2[C:3]=1[CH3:21].S(=O)(=O)(O)O"
+    ">CC(C)=O.O.[O-2].[O-2].[O-2].[Cr+6]"
+    ">[CH3:1][C:2]1[C:10]2[O:11][CH:12]([C:14]([OH:16])=[O:15])[CH2:13]"
+    "[C:9]=2[C:8]2[CH2:7][CH:6]([CH2:17][CH2:18][CH3:19])[C:5](=[O:20])"
+    "[C:4]=2[C:3]=1[CH3:21]"
+)
+
+
+def test_remove_reagents_before_check_valence_cr6():
+    """Cr+6 reagent (USPTO US03931239, Jones oxidation) — skips if chython cannot parse.
+
+    [Cr+6] is a known reagent species that should be removed before CheckValence
+    runs.  chython currently rejects the [Cr+6] atom token, so this test is
+    skipped until the parser gains support for it.  When it starts passing,
+    remove this comment and drop the skip guard.
+    """
+    try:
+        rxn = parse_smiles(_CR6_REAGENT_SMILES)
+    except Exception:
+        pytest.skip("chython cannot parse [Cr+6] — known limitation")
+    if rxn is None:
+        pytest.skip("chython cannot parse [Cr+6] — known limitation")
+
+    check_val = CheckValenceStandardizer()
+    remove_reag = RemoveReagentsStandardizer()
+
+    with pytest.raises(StandardizationError, match="Valence errors"):
+        check_val(rxn)
+
+    rxn2 = parse_smiles(_CR6_REAGENT_SMILES)
+    rxn2 = remove_reag(rxn2)
+    check_val(rxn2)  # must not raise
