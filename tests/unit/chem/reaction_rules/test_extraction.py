@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter, defaultdict
 from collections.abc import Iterable
 
 import pytest
@@ -14,7 +15,10 @@ from chython.containers import (
     ReactionContainer,
 )
 
+import synplan.chem.reaction_rules.extraction as extraction
+from synplan.chem.data.reaction_result import ExtractedRuleRecord, ExtractionBatchResult
 from synplan.chem.reaction_rules.extraction import (
+    _process_extraction_result,
     add_environment_atoms,
     add_functional_groups,
     add_ring_structures,
@@ -158,3 +162,60 @@ def test_clean_molecules(simple_esterification_reaction: ReactionContainer) -> N
 
     _check(r_queries, cleaned_r)
     _check(p_queries, cleaned_p)
+
+
+def test_process_extraction_result_uses_worker_serialized_rule(monkeypatch):
+    """Parent aggregation must not parse rule SMARTS returned by workers."""
+
+    def fail_if_parent_parses(_smarts):
+        raise AssertionError("parent parsed worker rule SMARTS")
+
+    monkeypatch.setattr(
+        extraction, "parse_smarts", fail_if_parent_parses, raising=False
+    )
+    result = ExtractionBatchResult(
+        rule_records=[
+            (
+                7,
+                [
+                    ExtractedRuleRecord(
+                        cgr_key="stable-cgr",
+                        rule_smarts="[C:1]>>[O:1]",
+                        reactor_validation="passed",
+                    )
+                ],
+                "CO",
+            )
+        ],
+        errors=[],
+        n_multi_product=0,
+    )
+    rules_statistics = defaultdict(list)
+    cgr_to_rule = {}
+
+    count = _process_extraction_result(result, rules_statistics, cgr_to_rule)
+
+    assert count == 1
+    assert rules_statistics["stable-cgr"] == [7]
+    assert cgr_to_rule["stable-cgr"].rule_smarts == "[C:1]>>[O:1]"
+
+
+def test_print_extraction_summary_includes_error_count(capsys):
+    """The processed-reaction summary should always report failed reactions."""
+    record = ExtractedRuleRecord(
+        cgr_key="stable-cgr",
+        rule_smarts="[C:1]>>[O:1]",
+        reactor_validation="passed",
+    )
+
+    extraction._print_extraction_summary(
+        n_processed=10,
+        sorted_rules=[(record, [1, 2, 3])],
+        filter_stats={},
+        error_counts=Counter({("extract_rules", "ValueError"): 2}),
+        error_file_path=None,
+    )
+
+    output = capsys.readouterr().out
+    assert "Finished: processed 10, extracted 1 rules" in output
+    assert "failed 2" in output

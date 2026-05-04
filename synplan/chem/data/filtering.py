@@ -13,11 +13,12 @@ from chython.containers import CGRContainer, MoleculeContainer, ReactionContaine
 from pydantic import Field, model_validator
 from tqdm.auto import tqdm
 
+from synplan.chem.data.pipeline import build_batch_result, write_batch_results
 from synplan.chem.data.reaction_result import (
+    BatchResult,
     ErrorEntry,
     FilteredEntry,
     PipelineSummary,
-    ProcessResult,
 )
 from synplan.chem.data.standardizing import (
     AromaticFormStandardizer,
@@ -727,13 +728,14 @@ def _init_filter_worker(config_dict: dict) -> None:
 
 def _filter_batch_worker(
     items: list[tuple[str, str, bool]],
-) -> ProcessResult:
+) -> BatchResult:
     """Process a batch of raw reaction strings.
 
     Each element of *items* is ``(raw_string, fmt, ignore_errors)``.
+    All items share the same fmt; reads fmt from the first element.
 
-    Returns a :class:`ProcessResult` with kept reactions, filtered entries,
-    and error entries.
+    Returns a :class:`BatchResult` with pre-serialized records, filtered
+    entries, and error entries.  No ReactionContainer crosses the IPC boundary.
     """
     if _filter_state is None:
         raise RuntimeError("_filter_batch_worker called before _init_filter_worker")
@@ -744,14 +746,15 @@ def _filter_batch_worker(
     reactions: list[ReactionContainer] = []
     filtered: list[FilteredEntry] = []
     errors: list[ErrorEntry] = []
+    fmt = items[0][1] if items else "smi"
 
-    for raw, fmt, ignore_errors in items:
+    for raw, _fmt, ignore_errors in items:
         is_filtered, reaction, reason = filter_reaction(
             raw,
             config,
             filters,
             ignore_errors=ignore_errors,
-            fmt=fmt,
+            fmt=_fmt,
         )
         if not is_filtered and reaction is not None:
             reactions.append(reaction)
@@ -779,10 +782,9 @@ def _filter_batch_worker(
                     )
                 )
             else:
-                # Filter rejection (class name only)
                 filtered.append(FilteredEntry(original=orig_smi, reason=reason))
 
-    return ProcessResult(reactions=reactions, filtered=filtered, errors=errors)
+    return build_batch_result(reactions, errors, filtered, fmt, compute_dedup=False)
 
 
 def _print_filtering_summary(
@@ -884,7 +886,7 @@ def filter_reactions_from_file(
     error_fh = None
     if _error_path is not None:
         error_fh = open(_error_path, "w", encoding="utf-8")
-        error_fh.write("# original_smiles\treason\n")
+        error_fh.write("# original_smiles\tstage\terror_type\terror_message\n")
 
     try:
         # Build batches: each item is a list of (raw_string, fmt, ignore_errors)
@@ -911,43 +913,27 @@ def filter_reactions_from_file(
                 ordered=True,
                 initializer=_init_filter_worker,
                 initargs=(config_dict,),
-                max_tasks_per_child=200,
+                # Avoid ProcessPoolExecutor worker recycling here: CPython
+                # documents open hangs with max_tasks_per_child in 3.13/3.14.
+                # The shared pool helper now performs bounded cleanup of
+                # stale chemistry workers at the end of the run instead.
             )
 
-            for result in stream:
-                if stop.is_set():
-                    logger.warning("Shutdown requested — stopping filtering")
-                    break
+            def _stoppable(s):
+                for batch in s:
+                    if stop.is_set():
+                        logger.warning("Shutdown requested — stopping filtering")
+                        break
+                    yield batch
 
-                # Write kept reactions
-                for reaction in result.reactions:
-                    result_file.write(reaction)
-                summary.succeeded += len(result.reactions)
-
-                # Write filtered entries
-                for flt in result.filtered:
-                    summary.filter_breakdown[flt.reason] = (
-                        summary.filter_breakdown.get(flt.reason, 0) + 1
-                    )
-                    if error_fh is not None:
-                        error_fh.write(f"{flt.original}\t{flt.reason}\n")
-                summary.filtered += len(result.filtered)
-
-                # Write error entries
-                for err in result.errors:
-                    key = f"{err.stage}/{err.error_type}: {err.message}"
-                    summary.error_breakdown[key] = (
-                        summary.error_breakdown.get(key, 0) + 1
-                    )
-                    if error_fh is not None:
-                        error_fh.write(f"{err.original}\t{key}\n")
-                summary.errored += len(result.errors)
-
-                batch_total = (
-                    len(result.reactions) + len(result.filtered) + len(result.errors)
-                )
-                summary.total_input += batch_total
-                bar.update(batch_total)
+            write_batch_results(
+                _stoppable(stream),
+                result_file.write_string,
+                summary,
+                error_file=error_fh,
+                dedup=False,
+                on_batch=bar.update,
+            )
 
             bar.close()
     finally:

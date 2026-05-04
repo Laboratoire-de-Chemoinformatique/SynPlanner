@@ -17,7 +17,16 @@ from chython.containers import MoleculeContainer, ReactionContainer
 from pydantic import Field, model_validator
 from tqdm.auto import tqdm
 
-from synplan.chem.data.reaction_result import ErrorEntry, PipelineSummary, ProcessResult
+from synplan.chem.data.pipeline import (
+    build_batch_result,
+    reaction_cgr_key,
+    write_batch_results,
+)
+from synplan.chem.data.reaction_result import (
+    BatchResult,
+    ErrorEntry,
+    PipelineSummary,
+)
 from synplan.chem.utils import unite_molecules
 from synplan.utils.config import BaseConfigModel
 from synplan.utils.files import (
@@ -104,7 +113,7 @@ class BaseStandardizer(ABC):
         except StandardizationError:
             raise
         except Exception as exc:
-            logging.debug("%s: %s", self.__class__.__name__, exc, exc_info=True)
+            logger.debug("%s: %s", self.__class__.__name__, exc, exc_info=True)
             raise StandardizationError(self.__class__.__name__, str(rxn), exc) from exc
 
 
@@ -304,7 +313,7 @@ class SplitIonsStandardizer(BaseStandardizer):
                     try:
                         molecule: MoleculeContainer = smiles_chython(molecule)
                     except (ValueError, TypeError) as e:
-                        logging.warning("Failed to parse molecule %s: %s", molecule, e)
+                        logger.warning("Failed to parse molecule %s: %s", molecule, e)
                         continue
 
                 # Use the split method from chython
@@ -312,7 +321,7 @@ class SplitIonsStandardizer(BaseStandardizer):
                     components = molecule.split()
                     divided_molecules.extend(components)
                 except (ValueError, RuntimeError) as e:
-                    logging.warning("Failed to split molecule %s: %s", molecule, e)
+                    logger.warning("Failed to split molecule %s: %s", molecule, e)
                     divided_molecules.append(molecule)
 
             total_charge = 0
@@ -324,7 +333,7 @@ class SplitIonsStandardizer(BaseStandardizer):
                     if mol_charge != 0:
                         ions_present = True
                 except (ValueError, RuntimeError) as e:
-                    logging.warning(
+                    logger.warning(
                         "Failed to calculate charge for molecule %s: %s", molecule, e
                     )
                     continue
@@ -857,8 +866,13 @@ def _init_standardize_worker(config_dict: dict, ignore_errors: bool, fmt: str) -
 
 def _standardize_batch_worker(
     items: list[str],
-) -> ProcessResult:
-    """Top-level module function called by each worker — must be picklable."""
+) -> BatchResult:
+    """Top-level module function called by each worker — must be picklable.
+
+    All serialization (CGR key + output record) is done here in the worker so
+    the parent receives only plain strings and does a set lookup + file write.
+    No ReactionContainer crosses the IPC boundary.
+    """
     if _worker_state is None:
         raise RuntimeError(
             "_standardize_batch_worker called outside a worker process. "
@@ -874,13 +888,18 @@ def _standardize_batch_worker(
         ErrorEntry(original=smi, stage=stage, error_type=etype, message=emsg)
         for smi, stage, etype, emsg in raw_errors
     ]
-    return ProcessResult(reactions=reactions, errors=errors)
+    return build_batch_result(reactions, errors, [], _worker_state["fmt"])
 
 
-def _make_timeout_result(exc: Exception, items: list[str]) -> ProcessResult:
+# Keep public alias so any external code that imported _reaction_dedup_key still works.
+_reaction_dedup_key = reaction_cgr_key
+
+
+def _make_timeout_result(exc: Exception, items: list[str]) -> BatchResult:
     """Fallback for timed-out batches."""
-    return ProcessResult(
-        reactions=[],
+    return BatchResult(
+        records=[],
+        dedup_keys=[],
         errors=[
             ErrorEntry(
                 original=item,
@@ -973,7 +992,8 @@ def standardize_reactions_from_file(
 
     Backpressure is handled by ``process_pool_map_stream``.  Standardisers
     are constructed once per worker via ``_init_standardize_worker``.
-    Cross-worker deduplication is performed writer-side using CGR hashes.
+    Cross-worker deduplication is performed writer-side using worker-computed
+    stable CGR keys.
 
     Args:
         config: Configuration object for standardizers.
@@ -1011,7 +1031,7 @@ def standardize_reactions_from_file(
     summary = PipelineSummary()
     error_counts: Counter = Counter()
     dedup = config.deduplicate
-    seen: set[int] = set()  # CGR hash dedup (writer-side, if enabled)
+    seen: set[str | int] = set()  # CGR key dedup (worker-computed, if enabled)
     t0 = time.monotonic()
 
     raw_reader = RawReactionReader(input_reaction_data_path)
@@ -1037,7 +1057,7 @@ def standardize_reactions_from_file(
             chunks = chunked(raw_reader, batch_size)
 
             with graceful_shutdown() as stop:
-                for result in process_pool_map_stream(
+                stream = process_pool_map_stream(
                     chunks,
                     _standardize_batch_worker,
                     max_workers=max(num_cpus, 1),
@@ -1046,57 +1066,35 @@ def standardize_reactions_from_file(
                     initializer=_init_standardize_worker,
                     initargs=(config.to_dict(), ignore_errors, fmt),
                     timeout=300,
-                    max_tasks_per_child=200,
+                    # Avoid ProcessPoolExecutor worker recycling here: CPython
+                    # documents open hangs with max_tasks_per_child in 3.13/3.14.
+                    # The shared pool helper now performs bounded cleanup of
+                    # stale chemistry workers at the end of the run instead.
                     on_timeout=_make_timeout_result,
-                ):
-                    if stop.is_set():
-                        break
+                )
 
-                    # --- Write successfully standardized reactions ---
-                    for rxn in result.reactions:
-                        if dedup:
-                            try:
-                                h = hash(~rxn)  # CGR hash for dedup
-                            except Exception:
-                                h = id(rxn)  # fallback if CGR fails
-                            if h in seen:
-                                summary.duplicates += 1
-                                continue
-                            seen.add(h)
-                        writer.write(rxn)
-                        summary.succeeded += 1
+                def _stoppable(s):
+                    for batch in s:
+                        if stop.is_set():
+                            break
+                        # Track error counts for the final summary print
+                        for err in batch.errors:
+                            error_counts[(err.stage, err.error_type)] += 1
+                        yield batch
 
-                    # --- Write errors ---
-                    for err in result.errors:
-                        error_counts[(err.stage, err.error_type)] += 1
-                        summary.error_breakdown[f"{err.stage}/{err.error_type}"] = (
-                            summary.error_breakdown.get(
-                                f"{err.stage}/{err.error_type}", 0
-                            )
-                            + 1
-                        )
-                        if error_file is not None:
-                            error_file.write(
-                                f"{err.original}\t{err.stage}\t{err.error_type}\t{err.message}\n"
-                            )
-                    summary.errored += len(result.errors)
-
-                    # --- Track filtered ---
-                    for flt in result.filtered:
-                        summary.filter_breakdown[flt.reason] = (
-                            summary.filter_breakdown.get(flt.reason, 0) + 1
-                        )
-                    summary.filtered += len(result.filtered)
-
-                    # --- Update progress ---
-                    batch_total = (
-                        len(result.reactions)
-                        + len(result.errors)
-                        + len(result.filtered)
-                    )
-                    summary.total_input += batch_total
+                def _on_batch(batch_total: int) -> None:
                     bar.total = (bar.total or 0) + batch_total
                     bar.update(batch_total)
+
+                write_batch_results(
+                    _stoppable(stream),
+                    writer.write_string,
+                    summary,
+                    error_file=error_file,
+                    dedup=dedup,
+                    seen=seen,
+                    on_batch=_on_batch,
+                )
     finally:
         if error_file is not None:
             error_file.close()

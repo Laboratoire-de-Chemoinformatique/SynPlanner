@@ -9,7 +9,9 @@ import sys
 import time
 
 import pytest
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 
+import synplan.utils.parallel as parallel
 from synplan.utils.parallel import (
     graceful_shutdown,
     process_pool_map_stream,
@@ -207,6 +209,216 @@ def test_single_worker():
         )
     )
     assert results == items
+
+
+def test_process_pool_shutdown_joins_on_normal_completion(monkeypatch):
+    """Normal completion joins worker processes instead of leaving cleanup to exit."""
+
+    class ImmediateFuture:
+        def __init__(self, value):
+            self._value = value
+
+        def result(self, timeout=None):
+            return self._value
+
+    class FakeProcess:
+        def __init__(self):
+            self.terminated = False
+            self.join_calls = []
+            self._alive = True
+
+        def is_alive(self):
+            return self._alive
+
+        def terminate(self):
+            self.terminated = True
+            self._alive = False
+
+        def join(self, timeout=None):
+            self.join_calls.append(timeout)
+            self._alive = False
+
+    class FakeExecutor:
+        instances = []
+
+        def __init__(self, *args, **kwargs):
+            self.process = FakeProcess()
+            self._processes = {1: self.process}
+            self.shutdown_calls = []
+            FakeExecutor.instances.append(self)
+
+        def submit(self, fn, item):
+            return ImmediateFuture(fn(item))
+
+        def shutdown(self, **kwargs):
+            self.shutdown_calls.append(kwargs)
+
+    monkeypatch.setattr(parallel, "ProcessPoolExecutor", FakeExecutor)
+
+    assert list(
+        process_pool_map_stream([1], _identity, max_workers=1, ordered=True)
+    ) == [1]
+
+    executor = FakeExecutor.instances[0]
+    assert executor.shutdown_calls == [{"wait": False, "cancel_futures": True}]
+    assert executor.process.join_calls
+    assert executor.process.terminated is False
+
+
+def test_process_pool_terminates_stale_workers_after_completion(monkeypatch):
+    """Finished tasks may leave non-exiting workers; cleanup must kill those."""
+
+    class ImmediateFuture:
+        def __init__(self, value):
+            self._value = value
+
+        def result(self, timeout=None):
+            return self._value
+
+    class StaleProcess:
+        def __init__(self):
+            self.terminated = False
+            self.killed = False
+            self.join_calls = []
+
+        def is_alive(self):
+            return not self.terminated and not self.killed
+
+        def terminate(self):
+            self.terminated = True
+
+        def kill(self):
+            self.killed = True
+
+        def join(self, timeout=None):
+            self.join_calls.append(timeout)
+
+    class FakeExecutor:
+        instances = []
+
+        def __init__(self, *args, **kwargs):
+            self.process = StaleProcess()
+            self._processes = {1: self.process}
+            self.shutdown_calls = []
+            FakeExecutor.instances.append(self)
+
+        def submit(self, fn, item):
+            return ImmediateFuture(fn(item))
+
+        def shutdown(self, **kwargs):
+            self.shutdown_calls.append(kwargs)
+
+    monkeypatch.setattr(parallel, "ProcessPoolExecutor", FakeExecutor)
+
+    assert list(
+        process_pool_map_stream([1], _identity, max_workers=1, ordered=True)
+    ) == [1]
+
+    executor = FakeExecutor.instances[0]
+    assert executor.shutdown_calls == [{"wait": False, "cancel_futures": True}]
+    assert executor.process.terminated is True
+
+
+def test_process_pool_terminates_workers_after_timeout_callback(monkeypatch):
+    """A timed-out future with fallback must still terminate stale workers."""
+
+    class TimeoutFuture:
+        def result(self, timeout=None):
+            raise FuturesTimeoutError()
+
+    class FakeProcess:
+        def __init__(self):
+            self.terminated = False
+            self.killed = False
+            self.join_calls = []
+
+        def is_alive(self):
+            return not self.terminated and not self.killed
+
+        def terminate(self):
+            self.terminated = True
+
+        def kill(self):
+            self.killed = True
+
+        def join(self, timeout=None):
+            self.join_calls.append(timeout)
+
+    class FakeExecutor:
+        instances = []
+
+        def __init__(self, *args, **kwargs):
+            self.process = FakeProcess()
+            self._processes = {1: self.process}
+            self.shutdown_calls = []
+            FakeExecutor.instances.append(self)
+
+        def submit(self, fn, item):
+            return TimeoutFuture()
+
+        def shutdown(self, **kwargs):
+            self.shutdown_calls.append(kwargs)
+
+    monkeypatch.setattr(parallel, "ProcessPoolExecutor", FakeExecutor)
+
+    results = list(
+        process_pool_map_stream(
+            [1],
+            _identity,
+            max_workers=1,
+            ordered=True,
+            timeout=0.01,
+            on_timeout=lambda _exc, item: f"timeout:{item}",
+        )
+    )
+
+    executor = FakeExecutor.instances[0]
+    assert results == ["timeout:1"]
+    assert executor.process.terminated is True
+    assert executor.shutdown_calls == [{"wait": False, "cancel_futures": True}]
+
+
+def test_process_pool_uses_public_terminate_workers_when_available(monkeypatch):
+    """Python 3.14+ exposes public worker termination; prefer it when present."""
+
+    class TimeoutFuture:
+        def result(self, timeout=None):
+            raise FuturesTimeoutError()
+
+    class FakeExecutor:
+        instances = []
+
+        def __init__(self, *args, **kwargs):
+            self.shutdown_calls = []
+            self.terminate_workers_called = False
+            FakeExecutor.instances.append(self)
+
+        def submit(self, fn, item):
+            return TimeoutFuture()
+
+        def shutdown(self, **kwargs):
+            self.shutdown_calls.append(kwargs)
+
+        def terminate_workers(self):
+            self.terminate_workers_called = True
+
+    monkeypatch.setattr(parallel, "ProcessPoolExecutor", FakeExecutor)
+
+    results = list(
+        process_pool_map_stream(
+            [1],
+            _identity,
+            max_workers=1,
+            ordered=True,
+            timeout=0.01,
+            on_timeout=lambda _exc, item: f"timeout:{item}",
+        )
+    )
+
+    executor = FakeExecutor.instances[0]
+    assert results == ["timeout:1"]
+    assert executor.terminate_workers_called is True
+    assert executor.shutdown_calls == []
 
 
 # -- T9: graceful_shutdown sets stop event on signal -------------------------

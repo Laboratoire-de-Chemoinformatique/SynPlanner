@@ -1,6 +1,7 @@
 """Module containing classes and functions needed for reactions/molecules data
 reading/writing."""
 
+import contextlib
 import csv
 import gzip
 from collections.abc import Iterable, Iterator
@@ -161,7 +162,6 @@ class ReactionReader(Reader):
         elif self._file_type == "RDF":
             self._file = RDFRead(filename, indexable=True, **kwargs)
         elif self._file_type == "PB":
-
             self._file = _ORDReadAdapter(filename)
         else:
             raise ValueError("File type incompatible -", filename)
@@ -176,6 +176,7 @@ class ReactionWriter(Writer):
         :return: None.
         """
         super().__init__(filename, mapping, **kwargs)
+        self._rdf_header_written = False
         if self._file_type == "SMI":
             self._file = open(filename, "w", encoding="utf-8", **kwargs)
         elif self._file_type == "RDF":
@@ -194,6 +195,39 @@ class ReactionWriter(Writer):
             self._file.write(rea_str + "\n")
         elif self._file_type == "RDF":
             self._file.write(reaction)
+
+    def write_string(self, record: str):
+        """Write a pre-serialized record directly, bypassing ReactionContainer.
+
+        ``SMI`` records are written as SMILES lines. ``RDF`` records are written
+        to the underlying text file, with the file-level header emitted on the
+        first call.
+
+        Use this when workers have already serialized reactions (via
+        synplan.chem.data.pipeline.serialize_reaction) to avoid redundant work in
+        the parent process.
+        """
+        s = record if record.endswith("\n") else record + "\n"
+        if self._file_type == "SMI":
+            self._file.write(s)
+        elif self._file_type == "RDF":
+            if not self._rdf_header_written:
+                from time import strftime
+
+                # chython exposes RDFWrite's wrapped text stream only via the
+                # private ``_file._file`` path (verified with chython 2.x).
+                # We write the file-level header here because ``write_string``
+                # receives already serialized RDF records from worker processes,
+                # so RDFWrite.write(rxn) is intentionally bypassed.
+                self._file._file.write(strftime("$RDFILE 1\n$DATM    %m/%d/%y %H:%M\n"))
+                # Remove the instance-level __write override so a subsequent
+                # write(rxn) call does not re-emit the header.
+                with contextlib.suppress(AttributeError):
+                    del self._file.write
+                self._rdf_header_written = True
+            self._file._file.write(s)
+        else:
+            raise ValueError(f"write_string not supported for {self._file_type}")
 
 
 class MoleculeReader(Reader):

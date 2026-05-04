@@ -36,6 +36,11 @@ logger = logging.getLogger(__name__)
 
 _CANCEL_FUTURES = sys.version_info >= (3, 9)
 _RECYCLE_WORKERS = sys.version_info >= (3, 11)
+_FORCE_TERMINATE_ATTR = "_synplan_force_terminate_workers"
+_PROCESS_EXIT_TIMEOUT = 2.0
+_TERMINATE_TIMEOUT = 2.0
+_KILL_TIMEOUT = 1.0
+_MANAGER_THREAD_TIMEOUT = 1.0
 
 
 def select_device(device: str | None = None) -> torch.device:
@@ -92,9 +97,11 @@ def process_pool_map_stream(
     max_pending
         Maximum in-flight futures. Defaults to ``4 * max_workers``.
     timeout
-        Per-future timeout in seconds. When a future exceeds this, a
-        ``TimeoutError`` is raised (or handled by ``on_timeout``).
-        Default 300s. Set to 0 to disable.
+        Timeout in seconds. In ordered mode this is applied while waiting for
+        each submitted future. In unordered mode it is the maximum wait for the
+        current pending batch to produce the next completed future, matching
+        ``concurrent.futures.as_completed`` semantics. Default 300s. Set to
+        0 to disable.
     ordered
         If True, yield results in submission order (preserves input order).
         If False (default), yield in completion order (faster throughput).
@@ -137,6 +144,7 @@ def process_pool_map_stream(
             initializer=initializer,
             initargs=initargs,
         )
+    completed = False
     try:
         if ordered:
             yield from _ordered_stream(
@@ -156,11 +164,120 @@ def process_pool_map_stream(
                 effective_timeout,
                 on_timeout,
             )
+        completed = True
     finally:
-        if _CANCEL_FUTURES:
-            executor.shutdown(wait=False, cancel_futures=True)
-        else:
-            executor.shutdown(wait=False)
+        force_terminate = not completed or getattr(
+            executor, _FORCE_TERMINATE_ATTR, False
+        )
+        _shutdown_process_pool_executor(executor, force_terminate=force_terminate)
+
+
+def _request_executor_termination(executor: ProcessPoolExecutor) -> None:
+    setattr(executor, _FORCE_TERMINATE_ATTR, True)
+
+
+def _shutdown_process_pool_executor(
+    executor: ProcessPoolExecutor,
+    *,
+    force_terminate: bool,
+) -> None:
+    processes = _executor_processes(executor)
+    manager_thread = getattr(executor, "_executor_manager_thread", None)
+
+    if force_terminate and _terminate_executor_publicly(executor):
+        _join_manager_thread(manager_thread)
+        return
+
+    # Do not use shutdown(wait=True) directly: some chemistry workers finish
+    # their tasks but keep non-daemon native/runtime threads alive, which makes
+    # the executor join hang and leaves stale processes after CLI completion.
+    _shutdown_executor_without_wait(executor)
+
+    if force_terminate:
+        _terminate_processes(processes)
+    else:
+        _join_processes(processes, timeout=_PROCESS_EXIT_TIMEOUT)
+        _terminate_processes(_live_processes(processes))
+
+    _join_manager_thread(manager_thread)
+
+
+def _terminate_executor_publicly(executor: ProcessPoolExecutor) -> bool:
+    terminate_workers = getattr(executor, "terminate_workers", None)
+    if terminate_workers is None:
+        return False
+    # Python 3.14 added the public API we want here. Calixarene currently runs
+    # Python 3.13, so older interpreters fall back to cached private processes.
+    with contextlib.suppress(Exception):
+        terminate_workers()
+        return True
+    return False
+
+
+def _shutdown_executor_without_wait(executor: ProcessPoolExecutor) -> None:
+    if _CANCEL_FUTURES:
+        executor.shutdown(wait=False, cancel_futures=True)
+    else:
+        executor.shutdown(wait=False)
+
+
+def _executor_processes(executor: ProcessPoolExecutor) -> list[Any]:
+    processes = getattr(executor, "_processes", None)
+    if not processes:
+        return []
+    return [process for process in processes.values() if process is not None]
+
+
+def _terminate_processes(
+    processes: list[Any],
+    *,
+    terminate_timeout: float = _TERMINATE_TIMEOUT,
+    kill_timeout: float = _KILL_TIMEOUT,
+) -> None:
+    if not processes:
+        return
+
+    live_processes = _live_processes(processes)
+    for process in live_processes:
+        with contextlib.suppress(Exception):
+            process.terminate()
+
+    _join_processes(live_processes, timeout=terminate_timeout)
+
+    stubborn_processes = _live_processes(live_processes)
+    for process in stubborn_processes:
+        kill = getattr(process, "kill", None)
+        if kill is not None:
+            with contextlib.suppress(Exception):
+                kill()
+
+    _join_processes(stubborn_processes, timeout=kill_timeout)
+
+
+def _join_processes(processes: list[Any], *, timeout: float) -> None:
+    for process in processes:
+        with contextlib.suppress(Exception):
+            process.join(timeout=timeout)
+
+
+def _live_processes(processes: list[Any]) -> list[Any]:
+    return [process for process in processes if _process_is_alive(process)]
+
+
+def _join_manager_thread(thread: Any) -> None:
+    if thread is None:
+        return
+    with contextlib.suppress(Exception):
+        thread.join(timeout=_MANAGER_THREAD_TIMEOUT)
+
+
+def _process_is_alive(process: Any) -> bool:
+    is_alive = getattr(process, "is_alive", None)
+    if is_alive is None:
+        return False
+    with contextlib.suppress(Exception):
+        return bool(is_alive())
+    return False
 
 
 def _ordered_stream(
@@ -197,6 +314,7 @@ def _ordered_stream(
             _fill()
             yield result
         except FuturesTimeoutError as e:
+            _request_executor_termination(executor)
             futures_deque.popleft()
             _fill()
             if on_timeout is not None:
@@ -213,7 +331,13 @@ def _unordered_stream(
     timeout: float | None,
     on_timeout: Callable | None,
 ) -> Iterator[Any]:
-    """Yield results in completion order (existing behavior)."""
+    """Yield results in completion order.
+
+    ``as_completed(..., timeout=...)`` applies one deadline to the current
+    pending set, not an independent deadline per future. This is intentional
+    here because unordered mode optimizes throughput and only needs to detect
+    a fully stalled pending window.
+    """
     iterator = iter(items)
     pending: dict[Future, Any] = {}
 
@@ -227,26 +351,31 @@ def _unordered_stream(
         pass
 
     while pending:
-        done_futures = as_completed(pending, timeout=timeout)
-        for future in done_futures:
-            original_item = pending.pop(future)
+        try:
+            done_futures = as_completed(pending, timeout=timeout)
+            for future in done_futures:
+                original_item = pending.pop(future)
 
-            # Refill
-            try:
-                while len(pending) < max_pending:
-                    item = next(iterator)
-                    fut = executor.submit(worker_fn, item)
-                    pending[fut] = item
-            except StopIteration:
-                pass
+                # Refill
+                try:
+                    while len(pending) < max_pending:
+                        item = next(iterator)
+                        fut = executor.submit(worker_fn, item)
+                        pending[fut] = item
+                except StopIteration:
+                    pass
 
-            try:
-                yield future.result()
-            except FuturesTimeoutError as e:
-                if on_timeout is not None:
-                    yield on_timeout(e, original_item)
-                else:
-                    raise
+                try:
+                    yield future.result()
+                except FuturesTimeoutError as e:
+                    _request_executor_termination(executor)
+                    if on_timeout is not None:
+                        yield on_timeout(e, original_item)
+                    else:
+                        raise
+        except FuturesTimeoutError:
+            _request_executor_termination(executor)
+            raise
 
 
 # ---------------------------------------------------------------------------

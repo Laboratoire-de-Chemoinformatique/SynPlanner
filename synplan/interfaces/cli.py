@@ -185,6 +185,11 @@ def ord_convert_cli(input_file: str, output_file: str) -> None:
     type=int,
     help="Number of reactions per batch sent to each worker.",
 )
+@click.option(
+    "--silent/--no-silent",
+    default=False,
+    help="Suppress the progress bar (default: show progress).",
+)
 def reaction_standardizing_cli(
     config_path: str,
     input_file: str,
@@ -193,6 +198,7 @@ def reaction_standardizing_cli(
     ignore_errors: bool,
     error_file: str | None,
     batch_size: int,
+    silent: bool,
 ) -> None:
     """Standardizes reactions and remove duplicates."""
     stand_config = ReactionStandardizationConfig.from_yaml(config_path)
@@ -202,6 +208,7 @@ def reaction_standardizing_cli(
         standardized_reaction_data_path=output_file,
         num_cpus=num_cpus,
         batch_size=batch_size,
+        silent=silent,
         ignore_errors=ignore_errors,
         error_file_path=error_file,
     )
@@ -456,8 +463,11 @@ def rule_extracting_cli(
     "--logger",
     "logger_type",
     default=None,
-    type=click.Choice(["csv", "tensorboard", "mlflow", "wandb"], case_sensitive=False),
-    help="Enable a training logger (overrides config). Uses default settings with save_dir=results_dir.",
+    type=click.Choice(
+        ["csv", "tensorboard", "mlflow", "wandb", "litlogger"],
+        case_sensitive=False,
+    ),
+    help="Enable a training logger: csv, tensorboard, mlflow, wandb, or litlogger.",
 )
 def ranking_policy_training_cli(
     config_path: str,
@@ -528,8 +538,11 @@ def ranking_policy_training_cli(
     "--logger",
     "logger_type",
     default=None,
-    type=click.Choice(["csv", "tensorboard", "mlflow", "wandb"], case_sensitive=False),
-    help="Enable a training logger (overrides config). Uses default settings with save_dir=results_dir.",
+    type=click.Choice(
+        ["csv", "tensorboard", "mlflow", "wandb", "litlogger"],
+        case_sensitive=False,
+    ),
+    help="Enable a training logger: csv, tensorboard, mlflow, wandb, or litlogger.",
 )
 def filtering_policy_training_cli(
     config_path: str,
