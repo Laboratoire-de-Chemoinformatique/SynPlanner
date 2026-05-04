@@ -22,6 +22,7 @@ from tqdm.auto import tqdm
 from synplan.chem.utils import _standardize_sdf_text, _standardize_smiles_batch
 from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.networks.value import ValueNetwork
+from synplan.utils.config import ReactorConfig
 from synplan.utils.files import (
     count_sdf_records,
     count_smiles_records,
@@ -249,7 +250,7 @@ def download_all_data(save_to="."):
 
 @functools.cache
 def load_reaction_rules(
-    file: str, reactor_config: "ReactorConfig | None" = None
+    file: str, reactor_config: ReactorConfig | None = None
 ) -> list[Reactor]:
     """Loads the reaction rules from a TSV or pickle file and converts them into a
     list of Reactor objects.
@@ -304,20 +305,9 @@ def _load_rules_pickle(file: str) -> tuple:
     if isinstance(reaction_rules[0], Reactor):
         return tuple(reaction_rules)
 
-    # Legacy format: list of (rule, priority) tuples with CGRtools objects
+    # Legacy format: list of (rule, priority) tuples
     if not isinstance(reaction_rules[0][0], Reactor):
-        converted = []
-        for rule, _ in reaction_rules:
-            patterns = tuple(
-                _convert_cgrtools_query_container(m) for m in rule.reactants
-            )
-            products = tuple(
-                _convert_cgrtools_query_container(m) for m in rule.products
-            )
-            converted.append(
-                Reactor(patterns=patterns, products=products, delete_atoms=False)
-            )
-        reaction_rules = converted
+        reaction_rules = [rule for rule, _ in reaction_rules]
 
     return tuple(reaction_rules)
 
