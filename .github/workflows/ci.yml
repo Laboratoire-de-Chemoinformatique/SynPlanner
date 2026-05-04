@@ -7,6 +7,11 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+  packages: read
+
 jobs:
   tests:
     name: "Unit‑tests (Python ${{ matrix.python-version }})"
