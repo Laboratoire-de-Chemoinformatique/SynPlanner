@@ -7,9 +7,9 @@ backpressure, and graceful shutdown.
 import signal
 import sys
 import time
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 
 import pytest
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 
 import synplan.utils.parallel as parallel
 from synplan.utils.parallel import (
