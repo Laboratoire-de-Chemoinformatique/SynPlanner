@@ -205,9 +205,9 @@ class BestFirst(ScoredFrontierMixin, BaseSearchStrategy):
     def __init__(self, tree):
         """Initialize best-first search with a scored frontier."""
         super().__init__(tree)
-        self.frontier: list[list[int | float]] = (
-            []
-        )  # (node_id, score, depth, is_expanded)
+        self.frontier: list[
+            list[int | float]
+        ] = []  # (node_id, score, depth, is_expanded)
 
     def step(self) -> tuple[bool, list[int]]:
         """Expand the highest-scored node and re-enqueue evaluated children.
@@ -661,9 +661,9 @@ class LazyNestedMonteCarlo(
         """Initialize lazy NMCS with thresholds and nesting level from config."""
         super().__init__(tree)
         cfg = self.tree.config
-        self.frontier: list[list[int | float]] = (
-            []
-        )  # (node_id, score, depth, is_expanded)
+        self.frontier: list[
+            list[int | float]
+        ] = []  # (node_id, score, depth, is_expanded)
         self.reset_depth_thresholds()
         self.nmcs_level = getattr(cfg, "nmcs_level", 2)
         self.playout_mode = getattr(cfg, "nmcs_playout_mode", "greedy")

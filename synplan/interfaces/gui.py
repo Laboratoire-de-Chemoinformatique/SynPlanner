@@ -424,7 +424,7 @@ def setup_planning_options():
                         )
                         mcts_bar.progress(
                             progress_value,
-                            text=f"{mcts_progress_text} ({step+1}/{planning_params['max_iterations']})",
+                            text=f"{mcts_progress_text} ({step + 1}/{planning_params['max_iterations']})",
                         )
 
                     res = extract_tree_stats(tree, target_molecule)
@@ -1184,7 +1184,6 @@ def download_subclustering_results():
         and "subcluster_num_select_key" in st.session_state
         and "subcluster_index_select_key" in st.session_state
     ):
-
         sub = st.session_state.get("subclusters")
         tree = st.session_state.get("tree")
         sb_cgrs_for_report = st.session_state.get("sb_cgrs_dict")
@@ -1202,7 +1201,6 @@ def download_subclustering_results():
             user_input_cluster_num_display in sub
             and selected_subcluster_idx in sub[user_input_cluster_num_display]
         ):
-
             subcluster_data_for_report = sub[user_input_cluster_num_display][
                 selected_subcluster_idx
             ]

@@ -59,7 +59,6 @@ loggers = [
 [dependency-groups]
 dev = [
   "pytest>=7.4.3,<8",
-  "black>=24.4.2,<25",
   "pytest-cov>=4.0,<5",
   "twine>=6.2.0,<7",
   "ruff>=0.14.4,<0.15",
@@ -154,7 +153,7 @@ select = [
     "RUF",    # ruff-specific
 ]
 ignore = [
-    "E501",   # line too long — handled by black
+    "E501",   # line too long — handled by ruff format
     "E722",   # bare except — to be addressed later
     "B905",   # zip() without strict= — too noisy for scientific code
     "SIM108", # ternary operator — sometimes if/else is clearer

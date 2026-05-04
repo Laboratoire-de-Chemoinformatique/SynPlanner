@@ -15,7 +15,6 @@ from synplan.utils.files import init_parse_worker, parse_one
 
 
 class TestMappingConfig:
-
     def test_defaults(self):
         cfg = MappingConfig()
         assert cfg.batch_size == 16
@@ -59,7 +58,6 @@ class TestMappingConfig:
 
 
 class TestParseOne:
-
     @pytest.fixture(autouse=True)
     def _init_worker(self):
         init_parse_worker("smi")
@@ -86,7 +84,6 @@ class TestParseOne:
 
 
 class TestMappingCLI:
-
     def test_help(self):
         result = CliRunner().invoke(synplan, ["reaction_mapping", "--help"])
         assert result.exit_code == 0

@@ -82,8 +82,8 @@ jobs:
           python-version: "3.12"
       - run: |
           uv sync --group dev --extra cpu
-      - name: black
-        run: uv run --no-sync black --check synplan tests
+      - name: ruff format
+        run: uv run --no-sync ruff format --check synplan tests
       - name: ruff
         run: uv run --no-sync ruff check synplan tests
       - name: ty

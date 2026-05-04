@@ -358,7 +358,6 @@ def load_building_blocks(
             raise ValueError("num_workers must be >= 1")
 
         if suffix in {".smi", ".smiles"}:
-
             total = count_smiles_records(building_blocks_path) if not silent else None
             step = max(1, chunksize or 1000)
 
