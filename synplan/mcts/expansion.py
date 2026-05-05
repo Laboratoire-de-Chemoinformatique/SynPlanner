@@ -6,9 +6,8 @@ from collections.abc import Iterator
 import torch
 import torch_geometric
 import torch_geometric.data
-from chython.reactor.reactor import Reactor
 from chython.containers import MoleculeContainer, ReactionContainer
-from typing import List
+from chython.reactor.reactor import Reactor
 
 from synplan.chem.precursor import Precursor
 from synplan.ml.networks.policy import PolicyNetwork
@@ -364,15 +363,15 @@ class CombinedPolicyNetworkFunction:
                 yield prob, rule_id
 
 
-
-def find_rules_fast_isomorphic_search(molecule: MoleculeContainer,  
-        frag_rules_list) -> List[ReactionContainer]:
+def find_rules_fast_isomorphic_search(
+    molecule: MoleculeContainer, frag_rules_list
+) -> list[ReactionContainer]:
     """
     Fast Brute-force search for isomorphic reaction rules by comparing molecule to rule fragments (Reaction rule set was preproceesed).
     """
     molecule.canonicalize()
     possible_rules_dict = {}
-    for frag_id, frag in enumerate(frag_rules_list):
+    for frag in frag_rules_list:
         if frag[0] < molecule:
             possible_rules_dict[frag[0]] = frag[1]
 
@@ -384,7 +383,7 @@ def find_rules_fast_isomorphic_search(molecule: MoleculeContainer,
             possible_rules.append(rule)
     applicable_rules = [x for xs in possible_rules for x in xs]
     return applicable_rules
-    
+
 
 def _rule_query_pattern(rule) -> ReactionContainer | None:
     """Return the query pattern used to test rule applicability."""
@@ -400,23 +399,20 @@ def _rule_query_pattern(rule) -> ReactionContainer | None:
     return None
 
 
-def find_rules_isomorphic_search(molecule: MoleculeContainer, rules_list: List[ReactionContainer]) -> List[ReactionContainer]:
+def find_rules_isomorphic_search(
+    molecule: MoleculeContainer, rules_list: list[ReactionContainer]
+) -> list[ReactionContainer]:
     """
     Brute-force search for isomorphic reaction rules by comparing molecule to rule reactants.
     """
-    flag = 0
     possible_rules = []
-    for rule_id, rule in enumerate(rules_list):
+    for rule in rules_list:
         pattern = _rule_query_pattern(rule)
         if pattern is None:
             continue
         try:
             if pattern < molecule:
-                flag += 1
                 possible_rules.append(rule)
         except TypeError:
             continue
-    if flag == 0:
-        return []
-    else:
-        return possible_rules
+    return possible_rules

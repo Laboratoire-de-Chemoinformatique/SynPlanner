@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Optional
+import itertools
+from collections.abc import Iterable
 
 from synplan.mcts.tree import Tree
 from synplan.utils.tree_visualization.molecules import (
@@ -12,7 +13,7 @@ from synplan.utils.tree_visualization.molecules import (
 
 
 def route_nodes_by_route(
-    tree: Tree, route_ids: Optional[Iterable[int]] = None
+    tree: Tree, route_ids: Iterable[int] | None = None
 ) -> dict[str, list[int]]:
     if route_ids is None:
         route_ids_set = set(tree.winning_nodes)
@@ -85,7 +86,7 @@ def route_extras_by_route(
 
         by_parent: dict[str, list[dict[str, str]]] = {}
         route_seen_smiles: set[str] = set()
-        for before_id, after_id in zip(path_ids, path_ids[1:]):
+        for before_id, after_id in itertools.pairwise(path_ids):
             before = tree.nodes.get(before_id)
             after = tree.nodes.get(after_id)
             if before is None or after is None:

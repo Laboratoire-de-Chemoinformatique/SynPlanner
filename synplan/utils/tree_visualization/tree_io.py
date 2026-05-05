@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pickle
 from pathlib import Path
-from typing import Optional
 
 from synplan.mcts.tree import Tree
 
@@ -52,7 +51,7 @@ def load_tree(tree_pkl: Path) -> Tree:
     return loaded
 
 
-def load_clusters(clusters_pkl: Optional[Path]) -> dict[str, dict]:
+def load_clusters(clusters_pkl: Path | None) -> dict[str, dict]:
     if not clusters_pkl:
         return {}
     clusters_pkl = Path(clusters_pkl)

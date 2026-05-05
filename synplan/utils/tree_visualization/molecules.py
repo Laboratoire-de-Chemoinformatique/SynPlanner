@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import html
 import math
-from typing import Optional
+from contextlib import suppress
 
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.tree import Tree
 
 
-def node_primary_molecule(node) -> Optional[object]:
+def node_primary_molecule(node) -> object | None:
     if getattr(node, "curr_precursor", None) and hasattr(
         node.curr_precursor, "molecule"
     ):
@@ -26,7 +26,7 @@ def node_primary_molecule(node) -> Optional[object]:
     return None
 
 
-def depict_molecule_svg(molecule) -> Optional[str]:
+def depict_molecule_svg(molecule) -> str | None:
     if molecule is None:
         return None
     try:
@@ -36,7 +36,7 @@ def depict_molecule_svg(molecule) -> Optional[str]:
         return None
 
 
-def svg_from_smiles(smiles: str) -> Optional[str]:
+def svg_from_smiles(smiles: str) -> str | None:
     if not smiles:
         return None
     try:
@@ -46,7 +46,7 @@ def svg_from_smiles(smiles: str) -> Optional[str]:
     return depict_molecule_svg(molecule)
 
 
-def molecule_key(molecule: Optional[object]) -> Optional[str]:
+def molecule_key(molecule: object | None) -> str | None:
     if molecule is None:
         return None
     try:
@@ -56,8 +56,8 @@ def molecule_key(molecule: Optional[object]) -> Optional[str]:
 
 
 def molecule_smiles_and_svg(
-    molecule: Optional[object], *, with_svg: bool
-) -> tuple[Optional[str], Optional[str]]:
+    molecule: object | None, *, with_svg: bool
+) -> tuple[str | None, str | None]:
     if molecule is None:
         return None, None
     try:
@@ -83,7 +83,7 @@ def node_product_molecules(node) -> list[object]:
     return [primary] if primary is not None else []
 
 
-def curr_precursor_key(node) -> Optional[str]:
+def curr_precursor_key(node) -> str | None:
     curr = getattr(node, "curr_precursor", None)
     if curr is None:
         return None
@@ -97,7 +97,7 @@ def curr_precursor_key(node) -> Optional[str]:
         return None
 
 
-def target_molecule(tree: Tree) -> Optional[object]:
+def target_molecule(tree: Tree) -> object | None:
     target_node = tree.nodes.get(1)
     if target_node is None:
         return None
@@ -118,10 +118,8 @@ def target_molecule(tree: Tree) -> Optional[object]:
 
 
 def molecule_atom_coordinates(molecule: object) -> dict[int, tuple[float, float]]:
-    try:
+    with suppress(Exception):
         molecule.clean2d()
-    except Exception:
-        pass
 
     plane = getattr(molecule, "_plane", None)
     if plane:
@@ -143,8 +141,8 @@ def molecule_atom_coordinates(molecule: object) -> dict[int, tuple[float, float]
 
     for atom_id, atom in atom_items:
         try:
-            x = getattr(atom, "x")
-            y = getattr(atom, "y")
+            x = atom.x
+            y = atom.y
             if callable(x):
                 x = x()
             if callable(y):

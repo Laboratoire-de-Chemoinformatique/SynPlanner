@@ -13,10 +13,11 @@ from __future__ import annotations
 
 import argparse
 import base64
+import contextlib
 import json
 import math
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from synplan.mcts.tree import Tree
 from synplan.utils.tree_visualization.clusters import (
@@ -24,17 +25,35 @@ from synplan.utils.tree_visualization.clusters import (
 )
 from synplan.utils.tree_visualization.layout import (
     bounds_with_pad as _bounds_with_pad,
+)
+from synplan.utils.tree_visualization.layout import (
     build_children_map as _build_children_map,
+)
+from synplan.utils.tree_visualization.layout import (
     compute_depths as _compute_depths,
+)
+from synplan.utils.tree_visualization.layout import (
     edge_key as _edge_key,
+)
+from synplan.utils.tree_visualization.layout import (
     radial_layout as _radial_layout,
+)
+from synplan.utils.tree_visualization.layout import (
     scale_positions as _scale_positions,
 )
 from synplan.utils.tree_visualization.molecules import (
     build_target_svg as _build_target_svg,
+)
+from synplan.utils.tree_visualization.molecules import (
     curr_precursor_key as _curr_precursor_key,
+)
+from synplan.utils.tree_visualization.molecules import (
     molecule_key as _molecule_key,
+)
+from synplan.utils.tree_visualization.molecules import (
     molecule_smiles_and_svg as _molecule_smiles_and_svg,
+)
+from synplan.utils.tree_visualization.molecules import (
     node_product_molecules as _node_product_molecules,
 )
 from synplan.utils.tree_visualization.routes import (
@@ -42,6 +61,8 @@ from synplan.utils.tree_visualization.routes import (
 )
 from synplan.utils.tree_visualization.tree_io import (
     load_clusters as _load_clusters,
+)
+from synplan.utils.tree_visualization.tree_io import (
     load_tree as _load_tree,
 )
 
@@ -71,8 +92,8 @@ def _spread_product_positions(
     count: int,
     bubble_radius: float,
     *,
-    parent_pos: Optional[Tuple[float, float]] = None,
-) -> List[Tuple[float, float]]:
+    parent_pos: tuple[float, float] | None = None,
+) -> list[tuple[float, float]]:
     """Spread multiple products around the base position to avoid overlap."""
     if count <= 1 or bubble_radius <= 0:
         return [(base_x, base_y)]
@@ -93,7 +114,7 @@ def _spread_product_positions(
     ring_radius = bubble_radius * ring_scale
 
     # Keep the primary (anchor) product at the base position to preserve layout.
-    positions: List[Tuple[float, float]] = [(base_x, base_y)]
+    positions: list[tuple[float, float]] = [(base_x, base_y)]
     remaining = count - 1
     start_angle = base_angle - math.pi / 2.0
     step = (2.0 * math.pi) / float(max(1, remaining))
@@ -109,25 +130,25 @@ def _spread_product_positions(
     return positions
 
 
-def _select_node_ids(tree: Tree, max_nodes: Optional[int]) -> List[int]:
-    node_ids = sorted(int(nid) for nid in tree.nodes.keys())
+def _select_node_ids(tree: Tree, max_nodes: int | None) -> list[int]:
+    node_ids = sorted(int(nid) for nid in tree.nodes)
     if max_nodes and max_nodes > 0:
-        node_ids = node_ids[: max_nodes]
+        node_ids = node_ids[:max_nodes]
     if 1 in tree.nodes and 1 not in node_ids:
         node_ids = [1, *node_ids]
     return node_ids
 
 
-def _creation_steps(node_ids: Iterable[int], sample_step: int) -> Dict[int, int]:
+def _creation_steps(node_ids: Iterable[int], sample_step: int) -> dict[int, int]:
     sample_step = max(1, int(sample_step))
     ordered = sorted(set(int(nid) for nid in node_ids))
-    steps: Dict[int, int] = {}
+    steps: dict[int, int] = {}
     for idx, node_id in enumerate(ordered):
         steps[node_id] = idx // sample_step
     return steps
 
 
-def _has_expandable_nodes(tree: Tree, node_ids: Set[int]) -> bool:
+def _has_expandable_nodes(tree: Tree, node_ids: set[int]) -> bool:
     for node_id in node_ids:
         node = tree.nodes.get(node_id)
         if node is None:
@@ -146,15 +167,15 @@ def _has_expandable_nodes(tree: Tree, node_ids: Set[int]) -> bool:
 def _winning_route_paths(
     tree: Tree,
     *,
-    allowed_tree_nodes: Set[int],
-    tree_steps: Dict[int, int],
-    anchor_by_tree: Dict[int, int],
-    render_edge_keys_by_tree_edge: Dict[str, List[str]],
-) -> Tuple[Set[str], List[Dict[str, object]], Optional[int], Optional[int]]:
+    allowed_tree_nodes: set[int],
+    tree_steps: dict[int, int],
+    anchor_by_tree: dict[int, int],
+    render_edge_keys_by_tree_edge: dict[str, list[str]],
+) -> tuple[set[str], list[dict[str, object]], int | None, int | None]:
     winning_nodes = list(getattr(tree, "winning_nodes", []) or [])
-    winning_edge_keys: Set[str] = set()
-    paths: List[Dict[str, object]] = []
-    win_steps: List[int] = []
+    winning_edge_keys: set[str] = set()
+    paths: list[dict[str, object]] = []
+    win_steps: list[int] = []
 
     parents = getattr(tree, "parents", {}) or {}
     for raw_node_id in winning_nodes:
@@ -168,9 +189,9 @@ def _winning_route_paths(
         node_step = int(tree_steps.get(node_id, 0))
         win_steps.append(node_step)
 
-        edge_keys: List[str] = []
+        edge_keys: list[str] = []
         current = node_id
-        seen: Set[int] = set()
+        seen: set[int] = set()
         while current and current not in seen:
             seen.add(current)
             parent_id = int(parents.get(current, 0) or 0)
@@ -207,18 +228,18 @@ def _winning_route_paths(
 def _build_payload(
     tree: Tree,
     *,
-    max_nodes: Optional[int],
+    max_nodes: int | None,
     sample_step: int,
     with_svg: bool,
     radius_step: float,
     render_scale: float,
-    node_radius: Optional[float],
+    node_radius: float | None,
     bubble_scale: float,
-    clusters_pkl: Optional[Path] = None,
-    clusters_data: Optional[Dict[str, dict]] = None,
-) -> Dict[str, object]:
+    clusters_pkl: Path | None = None,
+    clusters_data: dict[str, dict] | None = None,
+) -> dict[str, object]:
     selected_ids = _select_node_ids(tree, max_nodes=max_nodes)
-    allowed_tree_nodes: Set[int] = set(selected_ids)
+    allowed_tree_nodes: set[int] = set(selected_ids)
     allowed_tree_nodes.add(1)
 
     children_map = _build_children_map(tree, allowed_nodes=allowed_tree_nodes)
@@ -227,7 +248,9 @@ def _build_payload(
         raise ValueError("Tree has no nodes to render.")
 
     num_nodes = len(nodes_depth_tree)
-    base_radius = node_radius if node_radius is not None else _auto_node_radius(num_nodes)
+    base_radius = (
+        node_radius if node_radius is not None else _auto_node_radius(num_nodes)
+    )
     bubble_scale = max(0.1, float(bubble_scale))
     has_expandable_nodes = _has_expandable_nodes(tree, allowed_tree_nodes)
     layout_positions = _radial_layout(
@@ -241,7 +264,9 @@ def _build_payload(
     bubble_radius = base_scaled_radius * bubble_scale
 
     winning_nodes = list(getattr(tree, "winning_nodes", []) or [])
-    route_index_by_tree = {int(node_id): idx for idx, node_id in enumerate(winning_nodes)}
+    route_index_by_tree = {
+        int(node_id): idx for idx, node_id in enumerate(winning_nodes)
+    }
 
     tree_steps = _creation_steps(nodes_depth_tree.keys(), sample_step=sample_step)
     total_steps = max(tree_steps.values()) if tree_steps else 0
@@ -252,13 +277,13 @@ def _build_payload(
     children = getattr(tree, "children", {}) or {}
 
     # Molecule-level render nodes: one bubble per product molecule.
-    tree_to_render_ids: Dict[int, List[int]] = {}
-    anchor_by_tree: Dict[int, int] = {}
-    render_positions: Dict[int, Tuple[float, float]] = {}
-    render_steps: Dict[int, int] = {}
+    tree_to_render_ids: dict[int, list[int]] = {}
+    anchor_by_tree: dict[int, int] = {}
+    render_positions: dict[int, tuple[float, float]] = {}
+    render_steps: dict[int, int] = {}
 
-    nodes_payload: List[Dict[str, object]] = []
-    molecule_svgs: Dict[str, str] = {}
+    nodes_payload: list[dict[str, object]] = []
+    molecule_svgs: dict[str, str] = {}
     next_render_id = (max(allowed_tree_nodes) + 1) if allowed_tree_nodes else 2
 
     for node_id in sorted(nodes_depth_tree.keys()):
@@ -267,8 +292,14 @@ def _build_payload(
             continue
 
         base_x, base_y = positions_tree.get(node_id, (0.0, 0.0))
-        parent_tree_id = int(tree.parents.get(node_id, 0)) if hasattr(tree, "parents") else 0
-        parent_pos = positions_tree.get(parent_tree_id) if parent_tree_id in positions_tree else None
+        parent_tree_id = (
+            int(tree.parents.get(node_id, 0)) if hasattr(tree, "parents") else 0
+        )
+        parent_pos = (
+            positions_tree.get(parent_tree_id)
+            if parent_tree_id in positions_tree
+            else None
+        )
 
         molecules = _node_product_molecules(node)
         if not molecules:
@@ -298,7 +329,7 @@ def _build_payload(
                 product_positions[0],
             )
 
-        render_ids: List[int] = []
+        render_ids: list[int] = []
         anchor_render_id = int(node_id)
         extra_counter = 0
         for product_index, molecule in enumerate(molecules):
@@ -323,7 +354,7 @@ def _build_payload(
             smiles, svg = _molecule_smiles_and_svg(molecule, with_svg=with_svg)
             if svg:
                 molecule_svgs[str(render_id)] = svg
-            num_children = int(len(children.get(node_id, []))) if is_anchor else 0
+            num_children = len(children.get(node_id, [])) if is_anchor else 0
             display_id = str(node_id) if is_anchor else f"{node_id}.{extra_rank}"
 
             nodes_payload.append(
@@ -356,8 +387,8 @@ def _build_payload(
         anchor_by_tree[node_id] = anchor_render_id
 
     # Render edges: connect each parent anchor to every product bubble.
-    edges_payload: List[Dict[str, object]] = []
-    render_edge_keys_by_tree_edge: Dict[str, List[str]] = {}
+    edges_payload: list[dict[str, object]] = []
+    render_edge_keys_by_tree_edge: dict[str, list[str]] = {}
     for child_id, parent_id in getattr(tree, "parents", {}).items():
         if not parent_id or child_id == 1:
             continue
@@ -368,7 +399,7 @@ def _build_payload(
         child_render_ids = tree_to_render_ids.get(int(child_id)) or [int(child_id)]
         tree_edge_key = _edge_key(parent_id, child_id)
 
-        render_keys: List[str] = []
+        render_keys: list[str] = []
         for render_child_id in child_render_ids:
             render_key = _edge_key(parent_anchor, render_child_id)
             render_keys.append(render_key)
@@ -384,12 +415,14 @@ def _build_payload(
             )
         render_edge_keys_by_tree_edge[tree_edge_key] = render_keys
 
-    winning_edge_keys, winning_paths, win_first_step, win_last_step = _winning_route_paths(
-        tree,
-        allowed_tree_nodes=allowed_tree_nodes,
-        tree_steps=tree_steps,
-        anchor_by_tree=anchor_by_tree,
-        render_edge_keys_by_tree_edge=render_edge_keys_by_tree_edge,
+    winning_edge_keys, winning_paths, win_first_step, win_last_step = (
+        _winning_route_paths(
+            tree,
+            allowed_tree_nodes=allowed_tree_nodes,
+            tree_steps=tree_steps,
+            anchor_by_tree=anchor_by_tree,
+            render_edge_keys_by_tree_edge=render_edge_keys_by_tree_edge,
+        )
     )
 
     if winning_edge_keys:
@@ -398,7 +431,7 @@ def _build_payload(
                 edge["winning"] = True
 
     # Recolor extra product bubbles that touch winning edges to green.
-    winning_edge_connected_ids: Set[int] = set()
+    winning_edge_connected_ids: set[int] = set()
     for edge in edges_payload:
         if not edge.get("winning"):
             continue
@@ -430,18 +463,16 @@ def _build_payload(
     step_counts = [0 for _ in range(total_steps + 1)]
     for step in render_steps.values():
         step_counts[step] += 1
-    cumulative_counts: List[int] = []
+    cumulative_counts: list[int] = []
     running = 0
     for count in step_counts:
         running += count
         cumulative_counts.append(running)
 
-    winning_node_ids: Set[int] = set()
+    winning_node_ids: set[int] = set()
     for path in winning_paths:
-        try:
+        with contextlib.suppress(Exception):
             winning_node_ids.add(int(path.get("nodeId")))
-        except Exception:
-            pass
     for edge in edges_payload:
         if edge.get("winning"):
             winning_node_ids.add(int(edge.get("parent", 0)))
@@ -449,13 +480,11 @@ def _build_payload(
 
     target_svg = _build_target_svg(tree)
     target_smiles = str(tree.nodes[1].curr_precursor) if tree.nodes.get(1) else ""
-    clusters_payload: List[Dict[str, object]] = []
-    route_nodes: Dict[str, List[int]] = {}
+    clusters_payload: list[dict[str, object]] = []
+    route_nodes: dict[str, list[int]] = {}
     if clusters_data is not None or clusters_pkl:
         clusters = (
-            clusters_data
-            if clusters_data is not None
-            else _load_clusters(clusters_pkl)
+            clusters_data if clusters_data is not None else _load_clusters(clusters_pkl)
         )
         clusters_payload = _build_cluster_payload(clusters)
         cluster_route_ids = {
@@ -469,20 +498,24 @@ def _build_payload(
         "nodes": nodes_payload,
         "edges": edges_payload,
         "stats": {
-            "totalNodesInTree": int(len(getattr(tree, "nodes", {}) or {})),
-            "renderedNodes": int(len(nodes_payload)),
-            "renderedEdges": int(len(edges_payload)),
+            "totalNodesInTree": len(getattr(tree, "nodes", {}) or {}),
+            "renderedNodes": len(nodes_payload),
+            "renderedEdges": len(edges_payload),
             "maxDepth": int(max_depth),
             "totalSteps": int(total_steps),
             "sampleStep": int(max(1, sample_step)),
             "withSvg": bool(with_svg),
             "bubbleScale": float(bubble_scale),
-            "spacingScale": float(1.0),
+            "spacingScale": 1.0,
             "hasExpandableNodes": bool(has_expandable_nodes),
-            "winningNodesTotal": int(len(winning_node_ids)),
-            "winningEdgesTotal": int(len(winning_edge_keys)),
-            "winningFirstStep": int(win_first_step) if win_first_step is not None else None,
-            "winningLastStep": int(win_last_step) if win_last_step is not None else None,
+            "winningNodesTotal": len(winning_node_ids),
+            "winningEdgesTotal": len(winning_edge_keys),
+            "winningFirstStep": int(win_first_step)
+            if win_first_step is not None
+            else None,
+            "winningLastStep": int(win_last_step)
+            if win_last_step is not None
+            else None,
         },
         "winningPaths": winning_paths,
         "steps": {
@@ -508,15 +541,15 @@ def generate_expansion_html(
     tree: Tree,
     output_path: Path,
     *,
-    max_nodes: Optional[int],
+    max_nodes: int | None,
     sample_step: int,
     with_svg: bool,
     radius_step: float,
     render_scale: float,
-    node_radius: Optional[float],
+    node_radius: float | None,
     bubble_scale: float,
-    clusters_pkl: Optional[Path] = None,
-    clusters_data: Optional[Dict[str, dict]] = None,
+    clusters_pkl: Path | None = None,
+    clusters_data: dict[str, dict] | None = None,
 ) -> None:
     payload = _build_payload(
         tree,
@@ -542,7 +575,8 @@ def generate_expansion_html(
     molecule_svg_records = "\n".join(
         f"{node_id}\t{base64.b64encode(svg.encode('utf-8')).decode('ascii')}"
         for node_id, svg in sorted(
-            (payload.get("moleculeSvgs", {}) or {}).items(), key=lambda item: int(item[0])
+            (payload.get("moleculeSvgs", {}) or {}).items(),
+            key=lambda item: int(item[0]),
         )
     )
     target_smiles = payload.get("targetSmiles", "")

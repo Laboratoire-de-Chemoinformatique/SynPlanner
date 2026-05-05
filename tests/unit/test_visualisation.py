@@ -1,8 +1,8 @@
 from chython import smiles as read_smiles
 from chython.containers import MoleculeContainer
 
-from synplan.chem.reaction_routes.io import make_json
 from synplan.chem.precursor import Precursor
+from synplan.chem.reaction_routes.io import make_json
 from synplan.mcts.node import Node
 from synplan.utils.visualisation import get_route_svg, get_route_svg_from_json
 
@@ -87,7 +87,9 @@ def test_make_json_attaches_rule_metadata_from_tree():
     routes_json = make_json(routes_dict, tree=_MockRouteMetadataTree())
     root = routes_json[7]
     root_reaction = root["children"][0]
-    expanded_child = next(child for child in root_reaction["children"] if child.get("children"))
+    expanded_child = next(
+        child for child in root_reaction["children"] if child.get("children")
+    )
     nested_reaction = expanded_child["children"][0]
 
     assert root_reaction["step_id"] == 1

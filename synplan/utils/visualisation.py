@@ -394,11 +394,12 @@ def _prepare_tree_route_svg_inputs(
                 precursor.molecule.meta.pop("label", None)
                 precursor.molecule.meta.pop("status", None)
 
+    nodes_policy_rank = getattr(tree, "nodes_policy_rank", {})
     for parent_idx in range(len(path_ids) - 1):
         child_id = path_ids[parent_idx + 1]
         label_text = _format_arrow_label(
             tree.nodes_rule_key.get(child_id),
-            tree.nodes_policy_rank.get(child_id),
+            nodes_policy_rank.get(child_id),
             include_rule_key=labeled,
         )
         if not label_text:
@@ -446,7 +447,9 @@ def _prepare_tree_route_svg_inputs(
         frontier = []
         layer_precursors = []
 
-        for child_node, parent_idx in zip(islice(route_iter, len(parent_indices)), parent_indices):
+        for child_node, parent_idx in zip(
+            islice(route_iter, len(parent_indices)), parent_indices
+        ):
             for precursor in child_node.new_precursors:
                 layer_precursors.append(precursor)
                 child_idx = next(next_idx)
@@ -543,7 +546,9 @@ def _extract_levels_and_parents(root: dict):
     return levels, parent_of, outgoing_reaction_of
 
 
-def _prepare_json_route_svg_inputs(routes_json: dict, route_id: int, labeled: bool = False):
+def _prepare_json_route_svg_inputs(
+    routes_json: dict, route_id: int, labeled: bool = False
+):
     root = _get_root(routes_json, route_id)
     levels, parent_of, outgoing_reaction_of = _extract_levels_and_parents(root)
 

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import itertools
 import math
 from collections import deque
-from typing import Optional
 
 from synplan.mcts.tree import Tree
 
@@ -19,7 +19,7 @@ def group_nodes_by_depth(nodes_depth: dict[int, int]) -> dict[int, list[int]]:
 
 
 def build_children_map(
-    tree: Tree, allowed_nodes: Optional[set[int]] = None
+    tree: Tree, allowed_nodes: set[int] | None = None
 ) -> dict[int, list[int]]:
     if allowed_nodes is None:
         allowed_nodes = set(tree.nodes.keys())
@@ -147,9 +147,7 @@ def compute_radius_scale(
             continue
         radius = depth * radius_step
         depth_angles = sorted(angles.get(node_id, 0.0) for node_id in node_ids)
-        deltas = [
-            right - left for left, right in zip(depth_angles, depth_angles[1:])
-        ]
+        deltas = [right - left for left, right in itertools.pairwise(depth_angles)]
         deltas.append(2.0 * math.pi - depth_angles[-1] + depth_angles[0])
         min_delta = max(min(deltas), epsilon)
         required = min_distance / (radius * min_delta)

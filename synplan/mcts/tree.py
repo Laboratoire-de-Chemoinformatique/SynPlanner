@@ -75,7 +75,6 @@ class Tree:
         self.building_blocks = frozenset(building_blocks)
         self.priority_rules = tuple(priority_rules or ())
 
-
         # policy and evaluation services
         assert expansion_function is not None, "Expansion function is required"
         self.expansion_function = expansion_function
@@ -440,8 +439,8 @@ class Tree:
         self,
         node_id: int,
         new_node: Node,
-        policy_prob: float = None,
-        rule_id: int = None,
+        policy_prob: float | None = None,
+        rule_id: int | None = None,
         policy_rank: int | None = None,
         rule_source: str | None = None,
     ) -> None:
@@ -841,7 +840,7 @@ class Tree:
             "policy_rules_succeeded": self.stats["policy_rules_succeeded"],
             "rule_applicability_rate": round(self.rule_applicability_rate(), 4),
             "dead_end_nodes": self.stats["dead_end_nodes"],
-            #Priority rules usage
+            # Priority rules usage
             "priority_rules_tried": self.stats["priority_rules_tried"],
             "n_routes_with_priority": n_routes_with_priority,
             "fraction_routes_with_priority": fraction_routes_with_priority,

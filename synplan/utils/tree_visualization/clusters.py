@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 
 def normalize_strat_bonds(
-    strat_bonds: Optional[Iterable[Iterable[int]]],
+    strat_bonds: Iterable[Iterable[int]] | None,
 ) -> list[list[int]]:
     if not strat_bonds:
         return []

@@ -6,11 +6,14 @@ from typing import Any
 
 from chython import smiles as read_smiles
 from chython.exceptions import InvalidAromaticRing
+
 from synplan.chem.reaction_routes.route_cgr import extract_reactions
 from synplan.mcts.tree import Tree
 
 
-def _route_step_metadata_from_tree(tree: Tree, route_id: int) -> dict[int, dict[str, Any]]:
+def _route_step_metadata_from_tree(
+    tree: Tree, route_id: int
+) -> dict[int, dict[str, Any]]:
     """Map route step ids from ``extract_reactions`` to tree rule metadata."""
     details = tree.route_details(route_id)
     steps = details.get("steps", [])
@@ -165,11 +168,11 @@ def make_json(
                 pass
             return str(mol)
 
-        def build_mol_node(sid):
+        def build_mol_node(sid, _steps=steps, _atom_nums=atom_nums):
             """Find the product with any overlap to target atoms and recurse into its reaction."""
-            rxn = steps[sid]
+            rxn = _steps[sid]
             for p in rxn.products:
-                if atom_nums & set(p._atoms.keys()):
+                if _atom_nums & set(p._atoms.keys()):
                     smiles = str(p)
                     return {
                         "type": "mol",
@@ -180,17 +183,22 @@ def make_json(
             # Shouldn't reach here if tree is consistent
             return None
 
-        def build_reaction_node(sid):
+        def build_reaction_node(
+            sid,
+            _steps=steps,
+            _route_step_metadata=route_step_metadata,
+            _prod_map=prod_map,
+        ):
             """Build reaction node and recurse into reactant molecule nodes."""
-            rxn = steps[sid]
+            rxn = _steps[sid]
             node = {"type": "reaction", "smiles": format(rxn, "m"), "children": []}
-            if route_step_metadata and sid in route_step_metadata:
-                node.update(route_step_metadata[sid])
+            if _route_step_metadata and sid in _route_step_metadata:
+                node.update(_route_step_metadata[sid])
 
             for react in rxn.reactants:
                 r_smi = transform(react)
                 # Look up any prior step producing this reactant
-                prior = [ps for ps in prod_map.get(r_smi, []) if ps < sid]
+                prior = [ps for ps in _prod_map.get(r_smi, []) if ps < sid]
                 if prior:
                     node["children"].append(build_mol_node(max(prior)))
                 else:
@@ -278,7 +286,6 @@ def export_tree_to_csv(tree: Tree, file_path: str = "routes.csv", route_id=None)
 
 
 class TreeWrapper:
-
     def __init__(self, tree, mol_id=1, config=1, path="planning_results/forest"):
         """Initializes the TreeWrapper."""
         self.tree = tree
