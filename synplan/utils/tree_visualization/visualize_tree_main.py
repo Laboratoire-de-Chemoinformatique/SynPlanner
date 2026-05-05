@@ -161,6 +161,16 @@ def _has_expandable_nodes(tree: Tree, node_ids: set[int]) -> bool:
     return False
 
 
+def _search_type_label(tree: Tree) -> str:
+    algorithm = getattr(tree, "algorithm", None)
+    if algorithm is not None:
+        algorithm_name = algorithm.__class__.__name__
+    else:
+        algorithm_name = str(getattr(tree.config, "algorithm", ""))
+
+    return "MCTS" if algorithm_name == "UCT" else algorithm_name
+
+
 def _winning_route_paths(
     tree: Tree,
     *,
@@ -492,6 +502,7 @@ def _build_payload(
             "totalNodesInTree": len(getattr(tree, "nodes", {}) or {}),
             "renderedNodes": len(nodes_payload),
             "renderedEdges": len(edges_payload),
+            "searchType": _search_type_label(tree),
             "maxDepth": int(max_depth),
             "totalSteps": int(total_steps),
             "sampleStep": int(max(1, sample_step)),
@@ -549,6 +560,7 @@ _TREE_PAGE_CSS = """\
         --intermediate: #ff5c5c;
         --node-stroke: #0b0f14;
         --active-stroke: #ffffff;
+        --sibling-stroke: #8a94a6;
         --active-glow: rgba(255, 255, 255, 0.35);
         --map-center: #0f1623;
         --map-edge: #0b0f14;
@@ -574,6 +586,7 @@ _TREE_PAGE_CSS = """\
         --edge-winning-glow: rgba(200, 138, 0, 0.25);
         --node-stroke: #f8fbff;
         --active-stroke: #132034;
+        --sibling-stroke: #8a94a6;
         --active-glow: rgba(19, 32, 52, 0.18);
         --map-center: #ffffff;
         --map-edge: #dbe7f5;
@@ -614,6 +627,28 @@ _TREE_PAGE_CSS = """\
 
       #tree.dragging {
         cursor: grabbing;
+      }
+
+      #start-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+      }
+
+      #start-overlay.hidden {
+        display: none;
+      }
+
+      #start-btn {
+        pointer-events: auto;
+        padding: 12px 28px;
+        font-size: 16px;
+        font-weight: 700;
+        box-shadow: 0 10px 30px var(--panel-shadow);
       }
 
       .edges line {
@@ -722,7 +757,7 @@ _TREE_PAGE_CSS = """\
         right: 14px;
         left: auto;
         padding: 0;
-        width: min(320px, calc(100vw - 28px));
+        width: min(213px, calc(100vw - 28px));
         max-height: min(46vh, 360px);
         overflow: hidden;
         z-index: 2;
@@ -885,7 +920,7 @@ _TREE_PAGE_CSS = """\
 
       .stat-grid {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 6px;
         margin-top: 8px;
       }
@@ -964,7 +999,12 @@ _TREE_PAGE_CSS = """\
       }
 
       .target-bond.bond-aromatic {
-        stroke-dasharray: 0.22 0.14;
+        stroke-dasharray: none;
+      }
+
+      .target-bond.bond-aromatic-inner {
+        stroke-width: 0.055;
+        pointer-events: none;
       }
 
       .target-bond.possible {
@@ -1072,8 +1112,9 @@ _TREE_PAGE_SCRIPT = """\
       const stepLabel = document.getElementById("step-label");
       const playBtn = document.getElementById("play");
       const resetBtn = document.getElementById("reset");
+      const startOverlayEl = document.getElementById("start-overlay");
+      const startBtn = document.getElementById("start-btn");
       const speedSel = document.getElementById("speed");
-      const toStartBtn = document.getElementById("to-start");
       const toEndBtn = document.getElementById("to-end");
       const controlsEl = document.getElementById("controls");
       const controlsToggleBtn = document.getElementById("controls-toggle");
@@ -1250,7 +1291,7 @@ _TREE_PAGE_SCRIPT = """\
       }
 
       statsEl.appendChild(statCard("Tree Nodes", stats.totalNodesInTree));
-      statsEl.appendChild(statCard("Rendered", stats.renderedNodes));
+      statsEl.appendChild(statCard("Search Type", stats.searchType));
       statsEl.appendChild(statCard("Max Depth", stats.maxDepth));
       statsEl.appendChild(statCard("Steps", stats.totalSteps));
 
@@ -1260,16 +1301,26 @@ _TREE_PAGE_SCRIPT = """\
       let activeNodeId = null;
       let infoCollapsed = false;
       let infoOpen = false;
-      let winningCollapsed = false;
+      let winningCollapsed = true;
       let strategicCollapsed = false;
       let controlsCollapsed = false;
       let dragState = null;
       let suppressClickAfterDrag = false;
       let activeWinningEdgeKeys = new Set();
       let activeWinningNodeIds = new Set();
+      let activeSiblingNodeIds = new Set();
 
       const winningPathsData = Array.isArray(winningPaths) ? winningPaths : [];
       const parentById = new Map(nodes.map((n) => [n.id, Number(n.parent || 0)]));
+      const renderNodeIdsByTreeId = new Map();
+      for (const node of nodes) {
+        const treeId = Number(node.tree_id || node.id);
+        if (!Number.isFinite(treeId)) continue;
+        if (!renderNodeIdsByTreeId.has(treeId)) {
+          renderNodeIdsByTreeId.set(treeId, []);
+        }
+        renderNodeIdsByTreeId.get(treeId).push(Number(node.id));
+      }
       const clustersLoaded = Array.isArray(clusters) && clusters.length > 0;
       const selectedBondIds = new Set();
       let clusterFilteredTreeNodes = null;
@@ -1369,6 +1420,7 @@ _TREE_PAGE_SCRIPT = """\
           intermediate: cssVar("--intermediate") || "#ff5c5c",
           nodeStroke: cssVar("--node-stroke") || "#0b0f14",
           activeStroke: cssVar("--active-stroke") || "#ffffff",
+          siblingStroke: cssVar("--sibling-stroke") || "#8a94a6",
         };
       }
 
@@ -1490,20 +1542,25 @@ _TREE_PAGE_SCRIPT = """\
           ) {
             continue;
           }
+          const isSelected = activeNodeId === meta.id;
+          const isSibling = activeSiblingNodeIds.has(meta.id);
+          ctx.globalAlpha = isSibling ? 0.7 : 1;
           ctx.beginPath();
           ctx.arc(point.x, point.y, nodeRadiusPx, 0, Math.PI * 2);
           ctx.fillStyle = nodeFill(meta, colors);
           ctx.fill();
-          ctx.strokeStyle =
-            activeNodeId === meta.id || activeWinningNodeIds.has(meta.id)
-              ? colors.activeStroke
+          ctx.strokeStyle = isSelected
+            ? colors.activeStroke
+            : isSibling
+              ? colors.siblingStroke
               : colors.nodeStroke;
           ctx.lineWidth =
-            activeNodeId === meta.id || activeWinningNodeIds.has(meta.id)
+            isSelected || isSibling
               ? Math.max(1.3, nodeRadiusPx * 0.28)
               : Math.max(0.8, nodeRadiusPx * 0.18);
           ctx.stroke();
         }
+        ctx.globalAlpha = 1;
       }
 
       function requestDraw() {
@@ -1909,6 +1966,7 @@ _TREE_PAGE_SCRIPT = """\
       winningToggleBtn.addEventListener("click", () => {
         setWinningCollapsed(!winningCollapsed);
       });
+      setWinningCollapsed(true);
 
       function clampStep(value) {
         if (!Number.isFinite(value)) return 0;
@@ -1949,6 +2007,7 @@ _TREE_PAGE_SCRIPT = """\
 
       function startPlaying() {
         if (playing) return;
+        hideStartOverlay();
         playing = true;
         playBtn.textContent = "Pause";
         const raw = parseInt(speedSel.value, 10);
@@ -1967,12 +2026,18 @@ _TREE_PAGE_SCRIPT = """\
         else startPlaying();
       });
 
-      resetBtn.addEventListener("click", () => {
-        stopPlaying();
-        setStep(0);
-      });
+      function hideStartOverlay() {
+        if (!startOverlayEl) return;
+        startOverlayEl.classList.add("hidden");
+      }
 
-      toStartBtn.addEventListener("click", () => {
+      if (startBtn) {
+        startBtn.addEventListener("click", () => {
+          startPlaying();
+        });
+      }
+
+      resetBtn.addEventListener("click", () => {
         stopPlaying();
         setStep(0);
       });
@@ -1997,9 +2062,20 @@ _TREE_PAGE_SCRIPT = """\
 
       function setActiveNode(nodeId) {
         activeNodeId = nodeId;
+        activeSiblingNodeIds = siblingNodeIds(nodeId);
         ensureInfoOpen();
         renderNodeDetails(nodeMeta.get(nodeId));
         requestDraw();
+      }
+
+      function siblingNodeIds(nodeId) {
+        const meta = nodeMeta.get(nodeId);
+        if (!meta) return new Set();
+        const treeId = Number(meta.tree_id || meta.id);
+        if (!Number.isFinite(treeId)) return new Set();
+        return new Set(
+          (renderNodeIdsByTreeId.get(treeId) || []).filter((id) => id !== nodeId)
+        );
       }
 
       function safe(value) {
@@ -2023,9 +2099,8 @@ _TREE_PAGE_SCRIPT = """\
         return { activeEdgeKeys, activeWinningNodeIds };
       }
 
-      function updateWinningPanel(step, activeWinningNodes, activeWinningEdges) {
+      function updateWinningPanel(step, activeWinningNodes) {
         const totalWinningNodes = Number(stats.winningNodesTotal || 0);
-        const totalWinningEdges = Number(stats.winningEdgesTotal || 0);
 
         if (!totalWinningNodes) {
           winningSummaryEl.textContent = "No winning nodes recorded in this tree.";
@@ -2037,10 +2112,6 @@ _TREE_PAGE_SCRIPT = """\
           `Active winning nodes: ${activeWinningNodes} / ${totalWinningNodes} · step ${step}`;
 
         const rows = [
-          ["Winning Nodes (total)", totalWinningNodes],
-          ["Winning Nodes (active)", activeWinningNodes],
-          ["Winning Edges (active)", activeWinningEdges],
-          ["Winning Edges (total)", totalWinningEdges],
           ["First Winning Step", safe(stats.winningFirstStep)],
           ["Last Winning Step", safe(stats.winningLastStep)],
         ];
@@ -2053,7 +2124,7 @@ _TREE_PAGE_SCRIPT = """\
         const active = computeActiveWinning(step);
         activeWinningEdgeKeys = active.activeEdgeKeys;
         activeWinningNodeIds = active.activeWinningNodeIds;
-        updateWinningPanel(step, activeWinningNodeIds.size, activeWinningEdgeKeys.size);
+        updateWinningPanel(step, activeWinningNodeIds.size);
         requestDraw();
       }
 
@@ -2270,6 +2341,9 @@ def _render_html(
   <body>
     <div id="app">
       <canvas id="tree" aria-label="Tree expansion timeline"></canvas>
+      <div id="start-overlay">
+        <button id="start-btn" type="button">Start</button>
+      </div>
 
       <div class="panel" id="controls">
         <div class="panel-header">
@@ -2289,14 +2363,13 @@ def _render_html(
             <label>Playback</label>
             <button id="play">Play</button>
             <button id="reset">Reset</button>
+            <button id="to-end" type="button">To end</button>
             <select id="speed" aria-label="Playback speed">
               <option value="40">Very Fast</option>
               <option value="80" selected>Fast</option>
               <option value="140">Medium</option>
               <option value="220">Slow</option>
             </select>
-            <button id="to-start" type="button">To start</button>
-            <button id="to-end" type="button">To end</button>
           </div>
           <div class="stat-grid" id="stats"></div>
           <div id="legend">
@@ -2307,10 +2380,10 @@ def _render_html(
         </div>
       </div>
 
-      <div class="panel" id="winning-panel" role="status" aria-live="polite">
+      <div class="panel collapsed" id="winning-panel" role="status" aria-live="polite">
         <div class="panel-header">
           <h3>Winning Routes</h3>
-          <button id="winning-toggle" type="button" aria-expanded="true">Collapse</button>
+          <button id="winning-toggle" type="button" aria-expanded="false">Expand</button>
         </div>
         <div id="winning-body">
           <div class="muted" id="winning-summary">Winning nodes: —</div>

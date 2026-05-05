@@ -21,7 +21,12 @@ def molecule_smiles_and_svg(
     molecule: object, *, with_svg: bool
 ) -> tuple[str, str | None]:
     smiles = str(molecule)
-    return smiles, molecule.depict() if with_svg else None
+    if not with_svg:
+        return smiles, None
+
+    with suppress(Exception):
+        molecule.clean2d()
+    return smiles, molecule.depict()
 
 
 def node_product_molecules(node) -> list[object]:
@@ -90,6 +95,59 @@ def ordered_bond_id(atom_a: object, atom_b: object) -> str:
         return f"{a_str}-{b_str}" if a_str < b_str else f"{b_str}-{a_str}"
 
 
+def bond_order(bond: object) -> int:
+    try:
+        return int(getattr(bond, "order", 1))
+    except Exception:
+        return 1
+
+
+def aromatic_component_centers(
+    bonds: tuple[tuple[object, object, object], ...],
+    coordinates: dict[int, tuple[float, float]],
+) -> dict[int, tuple[float, float]]:
+    aromatic_neighbors: dict[int, set[int]] = {}
+    for atom_a, atom_b, bond in bonds:
+        try:
+            a_id = int(atom_a)
+            b_id = int(atom_b)
+        except Exception:
+            continue
+        if bond_order(bond) != 4 or a_id not in coordinates or b_id not in coordinates:
+            continue
+        aromatic_neighbors.setdefault(a_id, set()).add(b_id)
+        aromatic_neighbors.setdefault(b_id, set()).add(a_id)
+
+    centers: dict[int, tuple[float, float]] = {}
+    visited: set[int] = set()
+    for start_atom in aromatic_neighbors:
+        if start_atom in visited:
+            continue
+
+        stack = [start_atom]
+        component: list[int] = []
+        while stack:
+            atom_id = stack.pop()
+            if atom_id in visited:
+                continue
+            visited.add(atom_id)
+            component.append(atom_id)
+            stack.extend(aromatic_neighbors.get(atom_id, set()) - visited)
+
+        if not component:
+            continue
+        x_center = sum(coordinates[atom_id][0] for atom_id in component) / len(
+            component
+        )
+        y_center = -sum(coordinates[atom_id][1] for atom_id in component) / len(
+            component
+        )
+        for atom_id in component:
+            centers[atom_id] = (x_center, y_center)
+
+    return centers
+
+
 def target_svg_from_coordinates(molecule: object) -> str:
     coordinates = molecule_atom_coordinates(molecule)
     if not coordinates:
@@ -112,9 +170,11 @@ def target_svg_from_coordinates(molecule: object) -> str:
     bond_lines: list[str] = []
     bond_offset = 0.18
     try:
-        bonds = molecule.bonds()
+        bonds = tuple(molecule.bonds())
     except Exception:
         bonds = ()
+
+    aromatic_centers = aromatic_component_centers(bonds, coordinates)
 
     for atom_a, atom_b, bond in bonds:
         try:
@@ -137,12 +197,28 @@ def target_svg_from_coordinates(molecule: object) -> str:
 
         perp_x = -dy / norm
         perp_y = dx / norm
+        unit_x = dx / norm
+        unit_y = dy / norm
         bond_id = ordered_bond_id(a_id, b_id)
-        order = getattr(bond, "order", 1)
-        try:
-            order = int(order)
-        except Exception:
-            order = 1
+        order = bond_order(bond)
+
+        def append_line(
+            bond_class: str,
+            start_x: float,
+            start_y: float,
+            end_x: float,
+            end_y: float,
+            *,
+            atom_a_id: int = a_id,
+            atom_b_id: int = b_id,
+            current_bond_id: str = bond_id,
+        ) -> None:
+            bond_lines.append(
+                f'<line class="{bond_class}" data-atom1="{atom_a_id}" '
+                f'data-atom2="{atom_b_id}" data-bond="{current_bond_id}" '
+                f'x1="{start_x:.2f}" y1="{start_y:.2f}" '
+                f'x2="{end_x:.2f}" y2="{end_y:.2f}" />'
+            )
 
         if order == 2:
             offsets = (-bond_offset, bond_offset)
@@ -151,8 +227,24 @@ def target_svg_from_coordinates(molecule: object) -> str:
             offsets = (-bond_offset, 0.0, bond_offset)
             bond_class = "target-bond bond-triple"
         elif order == 4:
-            offsets = (0.0,)
-            bond_class = "target-bond bond-aromatic"
+            append_line("target-bond bond-aromatic bond-aromatic-outer", x1, y1, x2, y2)
+            center = aromatic_centers.get(a_id)
+            if center is not None:
+                mid_x = (x1 + x2) / 2.0
+                mid_y = (y1 + y2) / 2.0
+                if (center[0] - mid_x) * perp_x + (center[1] - mid_y) * perp_y < 0:
+                    perp_x = -perp_x
+                    perp_y = -perp_y
+            trim = min(0.22, norm * 0.2)
+            inner_offset = bond_offset * 1.15
+            append_line(
+                "target-bond bond-aromatic bond-aromatic-inner",
+                x1 + unit_x * trim + perp_x * inner_offset,
+                y1 + unit_y * trim + perp_y * inner_offset,
+                x2 - unit_x * trim + perp_x * inner_offset,
+                y2 - unit_y * trim + perp_y * inner_offset,
+            )
+            continue
         else:
             offsets = (0.0,)
             bond_class = "target-bond bond-single"
@@ -160,12 +252,7 @@ def target_svg_from_coordinates(molecule: object) -> str:
         for offset in offsets:
             ox = perp_x * offset
             oy = perp_y * offset
-            bond_lines.append(
-                f'<line class="{bond_class}" data-atom1="{a_id}" '
-                f'data-atom2="{b_id}" data-bond="{bond_id}" '
-                f'x1="{x1 + ox:.2f}" y1="{y1 + oy:.2f}" '
-                f'x2="{x2 + ox:.2f}" y2="{y2 + oy:.2f}" />'
-            )
+            append_line(bond_class, x1 + ox, y1 + oy, x2 + ox, y2 + oy)
 
     atom_marks: list[str] = []
     atom_radius = 0.14
