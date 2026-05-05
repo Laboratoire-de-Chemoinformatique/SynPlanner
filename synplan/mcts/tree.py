@@ -64,7 +64,17 @@ class Tree:
         :param route_scorer: Optional post-search route scorer for
             re-ranking winning routes.  When set, :meth:`route_score`
             delegates to ``route_scorer.rescore(original, route)``.
-        :param priority_rules: A list of priority reaction rules.
+        :param priority_rules: Optional list of curated reaction rules
+            (``Reactor`` objects) that are tried *before* the policy on every
+            node when ``config.use_priority`` is set. Priority rules are
+            matched by simple substructure isomorphism (``pattern < molecule``)
+            and yielded with ``prob=1.0``; combined with the per-product
+            fragment-count multiplier in :meth:`_add_child_if_new`
+            (``scaled_prob = prob × n_qualifying_fragments``), a priority
+            disconnect that produces N qualifying fragments enters UCB with
+            prior N. Multi-fragment priority disconnects (e.g. 4-component
+            Ugi) therefore dominate sibling selection by design — set
+            ``use_priority=False`` to disable.
         """
 
         # tree config parameters
@@ -101,7 +111,6 @@ class Tree:
         self.nodes_rules: dict[int, int | None] = {}
         self.nodes_init_value: dict[int, float] = {1: 0.0}
         self.nodes_total_value: dict[int, float] = {1: 0.0}
-        self.nodes_rule_label: dict[int, str | None] = {}
         self.nodes_rule_source: dict[int, str | None] = {}
         self.nodes_rule_key: dict[int, str | None] = {}
         self.nodes_policy_rank: dict[int, int | None] = {}
@@ -292,7 +301,19 @@ class Tree:
             raise StopIteration("\nThe target molecule was not expanded.")
 
     def _iter_rules(self, curr_node: Node):
-        """Yield reaction rules from each enabled source for the current node."""
+        """Yield reaction rules from each enabled source for the current node.
+
+        When ``config.use_priority`` is set and ``priority_rules`` is non-empty,
+        priority rules are yielded **first** with ``prob=1.0`` and a
+        ``rule_source`` of ``config.priority_rule_source_name``. Combined with
+        the fragment-count multiplier applied in :meth:`_add_child_if_new`,
+        priority disconnects intentionally dominate sibling selection — see the
+        ``priority_rules`` parameter on :meth:`__init__` for details.
+
+        Policy rules follow, paginated by ``policy_top_rules`` and yielded with
+        the policy probability and a 1-indexed ``policy_rank``. Priority and
+        policy rules are *additive*, not gated: both run on every node.
+        """
 
         if self.config.use_priority and self.priority_rules:
             molecule = curr_node.curr_precursor.molecule
@@ -360,6 +381,12 @@ class Tree:
             molecule.meta["policy_rank"] = policy_rank
 
         new_precursor = tuple(Precursor(mol) for mol in products)
+        # Multiply prob by the number of qualifying fragments so that
+        # disconnections producing more usable precursors are preferred. Note:
+        # priority rules enter here with prob=1.0, so a priority disconnect
+        # producing N qualifying fragments is recorded with prior N — this is
+        # the intentional mechanism that lets curated priority rules outrank
+        # policy rules during UCB sibling selection.
         scaled_prob = prob * len(
             [mol for mol in products if len(mol) > self.config.min_mol_size]
         )
@@ -464,7 +491,6 @@ class Tree:
         self.nodes_visit[new_node_id] = 0
         self.nodes_prob[new_node_id] = policy_prob
         self.nodes_rules[new_node_id] = rule_id
-        self.nodes_rule_label[new_node_id] = rule_source
         self.nodes_rule_source[new_node_id] = rule_source
         self.nodes_rule_key[new_node_id] = self._make_rule_key(rule_source, rule_id)
         self.nodes_policy_rank[new_node_id] = policy_rank
@@ -842,6 +868,7 @@ class Tree:
             "dead_end_nodes": self.stats["dead_end_nodes"],
             # Priority rules usage
             "priority_rules_tried": self.stats["priority_rules_tried"],
+            "priority_rules_succeeded": self.stats["priority_rules_succeeded"],
             "n_routes_with_priority": n_routes_with_priority,
             "fraction_routes_with_priority": fraction_routes_with_priority,
             # Search dynamics

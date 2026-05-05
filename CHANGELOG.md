@@ -7,21 +7,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [1.5.0] - 2026-05-05
 
+### ⚠️ Backwards-incompatible
+- **`apply_reaction_rule` default `top_reactions_num` raised from 3 → 5.**
+  This is a global change that affects *every* call site that did not pass the
+  kwarg explicitly — including MCTS rollouts (`synplan/mcts/evaluation.py`)
+  and per-node expansion (`synplan/mcts/tree.py`). Existing planning runs may
+  produce more child nodes per rule application and consequently larger trees,
+  different timings, and different routes. Pin the previous behavior with
+  `apply_reaction_rule(..., top_reactions_num=3)`.
+
 ### Added
-- Priority-rule support for MCTS expansion, including optional priority matching
-  before policy rules, configurable multi-application of priority rules,
-  source-specific rule counters, and route priority usage statistics.
+- Priority-rule support for MCTS expansion (`Tree(priority_rules=...)`,
+  `TreeConfig.use_priority`), tried *before* the policy on every node when
+  enabled. Priority rules match by simple substructure isomorphism and are
+  yielded with `prob=1.0`; combined with the existing per-product
+  fragment-count multiplier (`scaled_prob = prob × n_qualifying_fragments`),
+  a multi-fragment priority disconnect (e.g. 4-component Ugi → prior 4)
+  intentionally dominates UCB sibling selection. See
+  `Tree.__init__` docstring for the full mechanism.
+- Optional iterated rule application via
+  `TreeConfig.priority_rule_multiapplication` and the new
+  `apply_reaction_rule(multirule=True, rm_dup=True)` kwargs — repeatedly
+  applies the same rule to generated reactants until no new set is produced
+  (e.g. strip every protective group of a given kind from a fully-protected
+  substrate).
+- Source-specific rule counters in `tree.stats` and `to_stats_dict()`
+  (`policy_rules_tried/succeeded`, `priority_rules_tried/succeeded`) and
+  per-route priority usage statistics.
 - Rule provenance metadata on tree nodes and route outputs, including
-  `rule_source`, collision-safe `rule_key`, and exact `policy_rank`.
+  `rule_source`, collision-safe `rule_key` (formatted as `<source>:<id>`),
+  and exact 1-indexed `policy_rank`.
 - Route SVG labels for rule keys and policy ranks, opt-in partial-route
   rendering with `allow_unsolved`, and JSON-route SVG rendering that can display
   stored rule metadata.
 - Tutorial 13 for the priority-rule route analysis workflow.
 
 ### Changed
-- `apply_reaction_rule` now supports multi-step application, duplicate
-  reactant-set removal, sorted multi-step outputs, and a default Top-5 reaction
-  cap.
 - Tree expansion now tracks exact policy Top-N rank from the expansion function
   and enforces the configured top-rules limit during rule iteration.
 - Route, RDKit, JSON, SVG, and tree-stat exports now carry source-aware rule

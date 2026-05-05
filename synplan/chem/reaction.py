@@ -55,22 +55,26 @@ def apply_reaction_rule(
     rebuild_with_cgr: bool = False,
     multirule: bool = False,
     rm_dup: bool = False,
-    sorting: bool = False,
 ) -> Iterator[list[MoleculeContainer,]]:
     """Applies a reaction rule to a given molecule.
 
     :param molecule: A molecule to which reaction rule will be applied.
     :param reaction_rule: A reaction rule to be applied.
-    :param sort_reactions:
-    :param top_reactions_num: The maximum amount of reactions after the application of
-        reaction rule.
+    :param sort_reactions: If True, candidate reactions are sorted by the
+        number of large product fragments (length > 6) before truncation.
+    :param top_reactions_num: The maximum amount of reactions after the
+        application of reaction rule. **Default raised from 3 → 5 in 1.5.0**;
+        callers that depended on the previous default must pass
+        ``top_reactions_num=3`` explicitly.
     :param validate_products: If True, validates the final products.
     :param rebuild_with_cgr: If True, the products are extracted from CGR decomposition.
     :param multirule: If True, repeatedly applies the reaction rule to generated
-        reactants.
-    :param rm_dup: If True, removes duplicate reactant sets from yielded outputs.
-    :param sorting: If True, returns results sorted by number of applied rule steps
-        (descending).
+        reactants in a BFS-style loop until no new reactant set is produced.
+        Used for priority rules that should iterate (e.g. strip every protective
+        group of a given kind from a fully-protected substrate).
+    :param rm_dup: If True, removes duplicate reactant sets from yielded outputs
+        using a canonical-SMILES dedup key. Recommended whenever ``multirule``
+        is set.
     :return: An iterator yielding the products of reaction rule application.
     """
 
@@ -137,16 +141,12 @@ def apply_reaction_rule(
         return tuple(sorted(str(reactant) for reactant in reactants))
 
     seen_reactants = set()
-    pending_reactants: list[tuple[list[MoleculeContainer], int]] = [([molecule], 0)]
+    pending_reactants: list[list[MoleculeContainer]] = [[molecule]]
     expanded_keys = {_reactants_key([molecule])}
     pending_index = 0
 
-    sorted_results = []
-    best_sorted_results = {}
-    output_index = 0
-
     while pending_index < len(pending_reactants):
-        current_reactants, applied_rules_count = pending_reactants[pending_index]
+        current_reactants = pending_reactants[pending_index]
         pending_index += 1
 
         for mol_index, current_molecule in enumerate(current_reactants):
@@ -166,46 +166,17 @@ def apply_reaction_rule(
                 ]
 
                 reactants_key = _reactants_key(merged_reactants)
-                current_applied_rules_count = applied_rules_count + 1
 
                 if rm_dup and reactants_key in seen_reactants:
                     continue
 
-                if sorting:
-                    result_item = (
-                        current_applied_rules_count,
-                        output_index,
-                        merged_reactants,
-                    )
-                    output_index += 1
-
-                    if rm_dup:
-                        previous_item = best_sorted_results.get(reactants_key)
-                        if (
-                            previous_item is None
-                            or current_applied_rules_count > previous_item[0]
-                        ):
-                            best_sorted_results[reactants_key] = result_item
-                    else:
-                        sorted_results.append(result_item)
-                else:
-                    if rm_dup:
-                        seen_reactants.add(reactants_key)
-                    yield merged_reactants
+                if rm_dup:
+                    seen_reactants.add(reactants_key)
+                yield merged_reactants
 
                 if multirule and reactants_key not in expanded_keys:
                     expanded_keys.add(reactants_key)
-                    pending_reactants.append(
-                        (merged_reactants, current_applied_rules_count)
-                    )
+                    pending_reactants.append(merged_reactants)
 
         if not multirule:
             break
-
-    if sorting:
-        if rm_dup:
-            sorted_results = list(best_sorted_results.values())
-
-        sorted_results.sort(key=lambda item: (-item[0], item[1]))
-        for _, _, merged_reactants in sorted_results:
-            yield merged_reactants
