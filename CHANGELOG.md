@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-05-05
+
+### Added
+- Priority-rule support for MCTS expansion, including optional priority matching
+  before policy rules, configurable multi-application of priority rules,
+  source-specific rule counters, and route priority usage statistics.
+- Rule provenance metadata on tree nodes and route outputs, including
+  `rule_source`, collision-safe `rule_key`, and exact `policy_rank`.
+- Route SVG labels for rule keys and policy ranks, opt-in partial-route
+  rendering with `allow_unsolved`, and JSON-route SVG rendering that can display
+  stored rule metadata.
+- Tutorial 13 for the priority-rule route analysis workflow.
+
+### Changed
+- `apply_reaction_rule` now supports multi-step application, duplicate
+  reactant-set removal, sorted multi-step outputs, and a default Top-5 reaction
+  cap.
+- Tree expansion now tracks exact policy Top-N rank from the expansion function
+  and enforces the configured top-rules limit during rule iteration.
+- Route, RDKit, JSON, SVG, and tree-stat exports now carry source-aware rule
+  metadata through serialized and rendered route outputs.
+
+### Fixed
+- Winning rule rank reporting now uses stored policy ranks when available instead
+  of approximating ranks from sibling probabilities.
+- Route JSON export now attaches rule metadata to the matching retrosynthetic
+  step order and avoids closure state leakage while building nested route nodes.
+- Route SVG and RDKit route extraction now derive paths from node IDs, preserving
+  priority/policy metadata and respecting `min_mol_size` during building-block
+  checks.
+- Repeated route SVG renders now clear stale molecule labels and statuses before
+  applying route-specific annotations.
+
 ## [1.4.4] - 2026-05-04
 
 ### Changed
