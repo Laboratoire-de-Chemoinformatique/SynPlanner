@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Iterable, Optional
 
 from synplan.mcts.tree import Tree
-from synplan.utils.visualization.molecules import (
+from synplan.utils.tree_visualization.molecules import (
     node_primary_molecule,
     svg_from_smiles,
 )

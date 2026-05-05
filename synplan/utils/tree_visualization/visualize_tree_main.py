@@ -19,10 +19,10 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from synplan.mcts.tree import Tree
-from synplan.utils.visualization.clusters import (
+from synplan.utils.tree_visualization.clusters import (
     build_cluster_payload as _build_cluster_payload,
 )
-from synplan.utils.visualization.layout import (
+from synplan.utils.tree_visualization.layout import (
     bounds_with_pad as _bounds_with_pad,
     build_children_map as _build_children_map,
     compute_depths as _compute_depths,
@@ -30,17 +30,17 @@ from synplan.utils.visualization.layout import (
     radial_layout as _radial_layout,
     scale_positions as _scale_positions,
 )
-from synplan.utils.visualization.molecules import (
+from synplan.utils.tree_visualization.molecules import (
     build_target_svg as _build_target_svg,
     curr_precursor_key as _curr_precursor_key,
     molecule_key as _molecule_key,
     molecule_smiles_and_svg as _molecule_smiles_and_svg,
     node_product_molecules as _node_product_molecules,
 )
-from synplan.utils.visualization.routes import (
+from synplan.utils.tree_visualization.routes import (
     route_nodes_by_route as _route_nodes_by_route,
 )
-from synplan.utils.visualization.tree_io import (
+from synplan.utils.tree_visualization.tree_io import (
     load_clusters as _load_clusters,
     load_tree as _load_tree,
 )
