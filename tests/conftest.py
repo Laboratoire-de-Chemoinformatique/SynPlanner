@@ -1,11 +1,22 @@
 from __future__ import annotations
 
 import os
+import logging
+import tempfile
 from pathlib import Path
 
 import pytest
 from chython import smiles
 from chython.containers import CGRContainer, ReactionContainer
+
+_mpl_config_dir = Path(tempfile.gettempdir()) / "synplan-matplotlib"
+_mpl_config_dir.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("MPLCONFIGDIR", str(_mpl_config_dir))
+
+# Matplotlib scans system fonts during pytest collection via torchmetrics.
+# Some CI images include color emoji fonts that FreeType cannot inspect.
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
+logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 
 
 def pytest_unconfigure(config):

@@ -42,13 +42,13 @@ class _AlwaysMatches:
 
 
 class FakePriorityReactor(FakeReactor):
-    def __init__(self, products_fn: Callable[[], List[MoleculeContainer]]):
+    def __init__(self, products_fn: Callable[[], list[MoleculeContainer]]):
         super().__init__(products_fn)
         self.reactants = [_AlwaysMatches()]
 
 
 class FakePatternPriorityReactor(FakeReactor):
-    def __init__(self, products_fn: Callable[[], List[MoleculeContainer]]):
+    def __init__(self, products_fn: Callable[[], list[MoleculeContainer]]):
         super().__init__(products_fn)
         self._patterns = (_AlwaysMatches(),)
 
