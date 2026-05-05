@@ -11,7 +11,7 @@ from tqdm.auto import tqdm
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import Reaction, apply_reaction_rule
 from synplan.mcts.evaluation import EvaluationStrategy
-from synplan.mcts.expansion import PolicyNetworkFunction
+from synplan.mcts.expansion import PolicyNetworkFunction, _rule_query_pattern
 from synplan.mcts.node import Node
 from synplan.route_quality.scorer import RouteScorer
 from synplan.utils.config import TreeConfig
@@ -49,6 +49,7 @@ class Tree:
         expansion_function: PolicyNetworkFunction,
         evaluation_function: EvaluationStrategy = None,
         route_scorer: RouteScorer | None = None,
+        priority_rules: list[Reactor] | None = None,
     ):
         """Initializes a tree object with optional parameters for tree search for target
         molecule.
@@ -63,6 +64,7 @@ class Tree:
         :param route_scorer: Optional post-search route scorer for
             re-ranking winning routes.  When set, :meth:`route_score`
             delegates to ``route_scorer.rescore(original, route)``.
+        :param priority_rules: A list of priority reaction rules.
         """
 
         # tree config parameters
@@ -71,6 +73,7 @@ class Tree:
         # building blocks and reaction reaction_rules
         self.reaction_rules = tuple(reaction_rules)
         self.building_blocks = frozenset(building_blocks)
+        self.priority_rules = tuple(priority_rules or ())
 
         # policy and evaluation services
         assert expansion_function is not None, "Expansion function is required"
@@ -95,9 +98,13 @@ class Tree:
         self.nodes_visit: dict[int, int] = {1: 0}
         self.nodes_depth: dict[int, int] = {1: 0}
         self.nodes_prob: dict[int, float] = {1: 0.0}
-        self.nodes_rules: dict[int, float] = {}
+        self.nodes_rules: dict[int, int | None] = {}
         self.nodes_init_value: dict[int, float] = {1: 0.0}
         self.nodes_total_value: dict[int, float] = {1: 0.0}
+        self.nodes_rule_label: dict[int, str | None] = {}
+        self.nodes_rule_source: dict[int, str | None] = {}
+        self.nodes_rule_key: dict[int, str | None] = {}
+        self.nodes_policy_rank: dict[int, int | None] = {}
 
         # default search parameters
         self.init_node_value: float = self.config.init_node_value
@@ -122,6 +129,10 @@ class Tree:
             "expansion_successes": 0,
             "total_rules_tried": 0,
             "total_rules_succeeded": 0,
+            "policy_rules_tried": 0,
+            "policy_rules_succeeded": 0,
+            "priority_rules_tried": 0,
+            "priority_rules_succeeded": 0,
             "dead_end_nodes": 0,
             "first_solution_iteration": None,
             "first_solution_time": None,
@@ -140,6 +151,8 @@ class Tree:
             f"Tree init: target={str(target)[:50]}, "
             f"building_blocks={len(self.building_blocks)}, "
             f"reaction_rules={len(self.reaction_rules)}, "
+            f"priority_rules={len(self.priority_rules)}, "
+            f"use_priority={self.config.use_priority}, "
             f"algorithm={algo_key}, "
             f"max_iterations={config.max_iterations}, "
             f"max_tree_size={config.max_tree_size}, "
@@ -235,83 +248,41 @@ class Tree:
         # Track raw product molecules to avoid repeating equivalent expansions
         tmp_products = set()
         expanded = False
-        rules_tried_here = 0
-        rules_succeeded_here = 0
-
-        prediction = self.expansion_function.predict_reaction_rules(
-            curr_node.curr_precursor, self.reaction_rules
-        )
-
-        for prob, rule, rule_id in prediction:
-            rules_tried_here += 1
+        for prob, rule, rule_id, rule_source, policy_rank in self._iter_rules(
+            curr_node
+        ):
+            self._increment_rule_stats(rule_source, tried=1)
             rule_produced = False
+            enable_multirule = bool(
+                rule_source == self.config.priority_rule_source_name
+                and self.config.priority_rule_multiapplication
+            )
             for products in apply_reaction_rule(
-                curr_node.curr_precursor.molecule, rule
+                curr_node.curr_precursor.molecule,
+                rule,
+                multirule=enable_multirule,
+                rm_dup=enable_multirule,
             ):
-                # check repeated products against previously produced molecules
-                if not products or not (set(products) - tmp_products):
-                    continue
-                tmp_products.update(products)
-                rule_produced = True
-
-                for molecule in products:
-                    molecule.meta["reactor_id"] = rule_id
-
-                new_precursor = tuple(Precursor(mol) for mol in products)
-                scaled_prob = prob * len(
-                    list(filter(lambda x: len(x) > self.config.min_mol_size, products))
-                )
-
-                if set(prev_precursor).isdisjoint(new_precursor):
-                    precursors_to_expand = (
-                        *curr_node.next_precursor,
-                        *(
-                            x
-                            for x in new_precursor
-                            if not x.is_building_block(
-                                self.building_blocks, self.config.min_mol_size
-                            )
-                        ),
-                    )
-
-                    # tree pruning start
-                    if self.config.enable_pruning:
-                        if (
-                            precursors_to_expand != ()
-                            and precursors_to_expand
-                            in self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks
-                        ):
-                            existing_id = self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[
-                                precursors_to_expand
-                            ]
-                            self.redundant_children[node_id].add(existing_id)
-                            total_expanded += 1
-                            expanded = True
-                            continue
-                        else:
-                            self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[
-                                precursors_to_expand
-                            ] = self.curr_tree_size
-
-                    child_node = Node(
-                        precursors_to_expand=precursors_to_expand,
-                        new_precursors=new_precursor,
-                    )
-
-                    for np in new_precursor:
-                        np.prev_precursors = [np, *prev_precursor]
-
-                    self._add_node(node_id, child_node, scaled_prob, rule_id)
+                if self._add_child_if_new(
+                    node_id=node_id,
+                    curr_node=curr_node,
+                    prev_precursor=prev_precursor,
+                    products=products,
+                    prob=prob,
+                    rule_id=rule_id,
+                    policy_rank=policy_rank,
+                    tmp_products=tmp_products,
+                    rule_source=rule_source,
+                ):
+                    rule_produced = True
                     total_expanded += 1
                     expanded = True
 
             if rule_produced:
-                rules_succeeded_here += 1
+                self._increment_rule_stats(rule_source, succeeded=1)
 
         # update statistics
         self.stats["expansion_calls"] += 1
-        self.stats["total_rules_tried"] += rules_tried_here
-        self.stats["total_rules_succeeded"] += rules_succeeded_here
         if expanded:
             self.stats["expansion_successes"] += 1
         elif node_id != 1:
@@ -320,12 +291,158 @@ class Tree:
         if not expanded and node_id == 1:
             raise StopIteration("\nThe target molecule was not expanded.")
 
+    def _iter_rules(self, curr_node: Node):
+        """Yield reaction rules from each enabled source for the current node."""
+
+        if self.config.use_priority and self.priority_rules:
+            molecule = curr_node.curr_precursor.molecule
+            for rule_id, rule in enumerate(self.priority_rules):
+                pattern = _rule_query_pattern(rule)
+                if pattern is None:
+                    continue
+                try:
+                    if pattern < molecule:
+                        yield (
+                            1.0,
+                            rule,
+                            rule_id,
+                            self.config.priority_rule_source_name,
+                            None,
+                        )
+                except TypeError:
+                    continue
+
+        policy_top_rules = self._get_policy_top_rules_limit()
+        for policy_rank, (prob, rule, rule_id) in enumerate(
+            self.expansion_function.predict_reaction_rules(
+                curr_node.curr_precursor, self.reaction_rules
+            ),
+            start=1,
+        ):
+            if policy_top_rules is not None and policy_rank > policy_top_rules:
+                break
+            yield prob, rule, rule_id, self.config.policy_rule_source_name, policy_rank
+
+    def _get_policy_top_rules_limit(self) -> int | None:
+        """Return the configured policy Top-N limit when exposed by the expansion fn."""
+
+        config = getattr(self.expansion_function, "config", None)
+        top_rules = getattr(config, "top_rules", None)
+        if top_rules is None:
+            top_rules = getattr(self.expansion_function, "top_rules", None)
+        if top_rules is None:
+            return None
+        return int(top_rules)
+
+    def _add_child_if_new(
+        self,
+        node_id: int,
+        curr_node: Node,
+        prev_precursor,
+        products,
+        prob: float,
+        rule_id: int,
+        policy_rank: int | None,
+        tmp_products: set,
+        rule_source: str,
+    ) -> bool:
+        """Add a child node if the generated products form a new valid state."""
+
+        if not products or not (set(products) - tmp_products):
+            return False
+        tmp_products.update(products)
+
+        rule_key = self._make_rule_key(rule_source, rule_id)
+        for molecule in products:
+            molecule.meta["reactor_id"] = rule_id
+            molecule.meta["rule_source"] = rule_source
+            molecule.meta["rule_key"] = rule_key
+            molecule.meta["policy_rank"] = policy_rank
+
+        new_precursor = tuple(Precursor(mol) for mol in products)
+        scaled_prob = prob * len(
+            [mol for mol in products if len(mol) > self.config.min_mol_size]
+        )
+
+        if not set(prev_precursor).isdisjoint(new_precursor):
+            return False
+
+        precursors_to_expand = (
+            *curr_node.next_precursor,
+            *(
+                x
+                for x in new_precursor
+                if not x.is_building_block(
+                    self.building_blocks, self.config.min_mol_size
+                )
+            ),
+        )
+
+        if self.config.enable_pruning:
+            if (
+                precursors_to_expand != ()
+                and precursors_to_expand
+                in self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks
+            ):
+                existing_id = self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[
+                    precursors_to_expand
+                ]
+                self.redundant_children[node_id].add(existing_id)
+                return True
+
+            self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[
+                precursors_to_expand
+            ] = self.curr_tree_size
+
+        child_node = Node(
+            precursors_to_expand=precursors_to_expand,
+            new_precursors=new_precursor,
+        )
+
+        for np in new_precursor:
+            np.prev_precursors = [np, *prev_precursor]
+
+        self._add_node(
+            node_id=node_id,
+            new_node=child_node,
+            policy_prob=scaled_prob,
+            rule_id=rule_id,
+            policy_rank=policy_rank,
+            rule_source=rule_source,
+        )
+        return True
+
+    def _increment_rule_stats(
+        self, rule_source: str, tried: int = 0, succeeded: int = 0
+    ) -> None:
+        """Track per-source and aggregate rule usage statistics."""
+
+        self.stats["total_rules_tried"] += tried
+        self.stats["total_rules_succeeded"] += succeeded
+
+        if rule_source == self.config.priority_rule_source_name:
+            self.stats["priority_rules_tried"] += tried
+            self.stats["priority_rules_succeeded"] += succeeded
+        elif rule_source == self.config.policy_rule_source_name:
+            self.stats["policy_rules_tried"] += tried
+            self.stats["policy_rules_succeeded"] += succeeded
+
+    @staticmethod
+    def _make_rule_key(rule_source: str | None, rule_id: int | None) -> str | None:
+        """Build a collision-safe rule identifier."""
+
+        if rule_source is None or rule_id is None:
+            return None
+        return f"{rule_source}:{rule_id}"
+
     def _add_node(
         self,
         node_id: int,
         new_node: Node,
         policy_prob: float | None = None,
         rule_id: int | None = None,
+        policy_rank: int | None = None,
+        rule_source: str | None = None,
     ) -> None:
         """Adds a new node to the tree with probability of reaction rules predicted by
         policy function and applied to the parent node of the new node.
@@ -347,6 +464,10 @@ class Tree:
         self.nodes_visit[new_node_id] = 0
         self.nodes_prob[new_node_id] = policy_prob
         self.nodes_rules[new_node_id] = rule_id
+        self.nodes_rule_label[new_node_id] = rule_source
+        self.nodes_rule_source[new_node_id] = rule_source
+        self.nodes_rule_key[new_node_id] = self._make_rule_key(rule_source, rule_id)
+        self.nodes_policy_rank[new_node_id] = policy_rank
         self.nodes_depth[new_node_id] = self.nodes_depth[node_id] + 1
         self.curr_tree_size += 1
 
@@ -542,11 +663,10 @@ class Tree:
     def winning_rule_ranks(self) -> list[dict]:
         """For each winning route, return the rule rank and probability at each step.
 
-        The "rank" is the position (1-indexed) of the rule in the policy's
-        sorted prediction for that node.  Since we only store the probability
-        assigned to the chosen rule (in ``nodes_prob``), the rank is
-        approximated by counting how many sibling nodes (children of the same
-        parent) have a higher probability.
+        When available, the rank is the exact 1-indexed position of the chosen
+        policy rule in the model's Top-N prediction list. If that value is not
+        stored for a node, the rank falls back to a sibling-probability
+        approximation.
 
         :return: List of dicts, one per winning route, each containing
             ``winning_node_id`` and ``steps`` (list of per-step dicts with
@@ -561,18 +681,22 @@ class Tree:
                 rule_id = self.nodes_rules.get(nid)
                 prob = self.nodes_prob.get(nid, 0.0)
 
-                # Rank among siblings: count siblings with higher prob
-                siblings = self.children.get(parent_id, set())
-                rank = 1 + sum(
-                    1
-                    for sib in siblings
-                    if sib != nid and self.nodes_prob.get(sib, 0.0) > prob
-                )
+                rank = self.nodes_policy_rank.get(nid)
+                if rank is None:
+                    siblings = self.children.get(parent_id, set())
+                    rank = 1 + sum(
+                        1
+                        for sib in siblings
+                        if sib != nid and self.nodes_prob.get(sib, 0.0) > prob
+                    )
 
                 steps.append(
                     {
                         "node_id": nid,
                         "rule_id": rule_id,
+                        "rule_source": self.nodes_rule_source.get(nid),
+                        "rule_key": self.nodes_rule_key.get(nid),
+                        "policy_rank": self.nodes_policy_rank.get(nid),
                         "prob": round(prob, 6),
                         "rank": rank,
                     }
@@ -634,6 +758,9 @@ class Tree:
                     "node_id": nid,
                     "depth": self.nodes_depth.get(nid, 0),
                     "rule_id": self.nodes_rules.get(nid),
+                    "rule_source": self.nodes_rule_source.get(nid),
+                    "rule_key": self.nodes_rule_key.get(nid),
+                    "policy_rank": self.nodes_policy_rank.get(nid),
                     "prob": round(self.nodes_prob.get(nid, 0.0), 6),
                     "init_value": round(self.nodes_init_value.get(nid, 0.0), 4),
                     "total_value": round(self.nodes_total_value.get(nid, 0.0), 4),
@@ -681,6 +808,21 @@ class Tree:
             if all_ranks:
                 mean_winning_rank = round(sum(all_ranks) / len(all_ranks), 2)
 
+        priority_name = self.config.priority_rule_source_name
+        n_routes_with_priority = 0
+        for route_id in self.winning_nodes:
+            nid = route_id
+            while nid and nid != 1:
+                if self.nodes_rule_source.get(nid) == priority_name:
+                    n_routes_with_priority += 1
+                    break
+                nid = self.parents[nid]
+        fraction_routes_with_priority = (
+            n_routes_with_priority / len(self.winning_nodes)
+            if self.winning_nodes
+            else 0.0
+        )
+
         return {
             # Existing basics
             "num_routes": len(self.winning_nodes),
@@ -694,8 +836,14 @@ class Tree:
             "expansion_successes": self.stats["expansion_successes"],
             "total_rules_tried": self.stats["total_rules_tried"],
             "total_rules_succeeded": self.stats["total_rules_succeeded"],
+            "policy_rules_tried": self.stats["policy_rules_tried"],
+            "policy_rules_succeeded": self.stats["policy_rules_succeeded"],
             "rule_applicability_rate": round(self.rule_applicability_rate(), 4),
             "dead_end_nodes": self.stats["dead_end_nodes"],
+            # Priority rules usage
+            "priority_rules_tried": self.stats["priority_rules_tried"],
+            "n_routes_with_priority": n_routes_with_priority,
+            "fraction_routes_with_priority": fraction_routes_with_priority,
             # Search dynamics
             "first_solution_iteration": self.stats["first_solution_iteration"],
             "first_solution_time": self.stats["first_solution_time"],

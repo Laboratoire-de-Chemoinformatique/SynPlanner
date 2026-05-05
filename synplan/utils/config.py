@@ -370,6 +370,10 @@ class TreeConfig(BaseConfigModel):
     max_rules_applied: int = 10  # needed only in pruning
     stop_at_first: bool = False
     enable_pruning: bool = False
+    use_priority: bool = False
+    priority_rule_multiapplication: bool = False
+    policy_rule_source_name: str = "policy"
+    priority_rule_source_name: str = "priority"
 
     # UCT configuration
     search_strategy: Literal["expansion_first", "evaluation_first"] = "expansion_first"

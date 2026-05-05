@@ -82,6 +82,9 @@ def route_to_rdkit(tree, node_id: int, keep_mapping: bool = True) -> list[dict]:
             "precursors": [Mol, ...],        # resulting fragments
             "in_stock": [bool, ...],         # building block status per precursor
             "rule_id": int | None,           # reaction rule applied
+            "rule_source": str | None,       # rule source namespace
+            "rule_key": str | None,          # collision-safe "<source>:<id>"
+            "policy_rank": int | None,       # 1-indexed Top-N policy position
             "depth": int,                    # step depth in the tree
         }
 
@@ -100,6 +103,7 @@ def route_to_rdkit(tree, node_id: int, keep_mapping: bool = True) -> list[dict]:
     path_ids.reverse()
 
     steps = []
+    nodes_policy_rank = getattr(tree, "nodes_policy_rank", {})
     for before_id, after_id in itertools.pairwise(path_ids):
         before_node = tree.nodes[before_id]
         after_node = tree.nodes[after_id]
@@ -122,6 +126,9 @@ def route_to_rdkit(tree, node_id: int, keep_mapping: bool = True) -> list[dict]:
                 "precursors": precursor_mols,
                 "in_stock": in_stock,
                 "rule_id": tree.nodes_rules.get(after_id),
+                "rule_source": tree.nodes_rule_source.get(after_id),
+                "rule_key": tree.nodes_rule_key.get(after_id),
+                "policy_rank": nodes_policy_rank.get(after_id),
                 "depth": tree.nodes_depth.get(after_id, 0),
             }
         )
@@ -169,17 +176,27 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
         ]
 
     routes_block = []
+    nodes_policy_rank = getattr(tree, "nodes_policy_rank", {})
     for winning_node in tree.winning_nodes:
-        nodes = tree.route_to_node(winning_node)
-
         # build molecule graph (same logic as extract_routes)
-        graph: dict[MoleculeContainer, list[MoleculeContainer]] = {}
+        graph: dict[MoleculeContainer, dict[str, object]] = {}
         mol_cache: dict[int, object] = {}  # id(MoleculeContainer) → RDKit Mol
 
-        for before, after in itertools.pairwise(nodes):
-            before_mol = before.curr_precursor.molecule
-            after_mols = [x.molecule for x in after.new_precursors]
-            graph[before_mol] = after_mols
+        path_ids: list[int] = []
+        nid = winning_node
+        while nid:
+            path_ids.append(nid)
+            nid = tree.parents[nid]
+        path_ids.reverse()
+
+        for before_id, after_id in itertools.pairwise(path_ids):
+            before_mol = tree.nodes[before_id].curr_precursor.molecule
+            after_mols = [x.molecule for x in tree.nodes[after_id].new_precursors]
+            graph[before_mol] = {
+                "children": after_mols,
+                "rule_key": tree.nodes_rule_key.get(after_id),
+                "policy_rank": nodes_policy_rank.get(after_id),
+            }
 
             if id(before_mol) not in mol_cache:
                 mol_cache[id(before_mol)] = before_mol.to_rdkit(
@@ -204,9 +221,15 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
                 "in_stock": smi in tree.building_blocks
                 or len(molecule) <= tree.config.min_mol_size,
             }
-            if molecule in _graph:
-                children = [_build_node(p) for p in _graph[molecule]]
-                node["children"] = [{"type": "reaction", "children": children}]
+            reaction = _graph.get(molecule)
+            if reaction is not None:
+                children = [_build_node(p) for p in reaction["children"]]
+                reaction_node = {"type": "reaction", "children": children}
+                if reaction.get("rule_key"):
+                    reaction_node["rule_key"] = reaction["rule_key"]
+                if reaction.get("policy_rank") is not None:
+                    reaction_node["policy_rank"] = reaction["policy_rank"]
+                node["children"] = [reaction_node]
             return node
 
         routes_block.append(_build_node(target_mol))

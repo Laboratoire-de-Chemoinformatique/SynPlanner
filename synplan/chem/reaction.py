@@ -50,9 +50,12 @@ def apply_reaction_rule(
     molecule: MoleculeContainer,
     reaction_rule: Reactor,
     sort_reactions: bool = False,
-    top_reactions_num: int = 3,
+    top_reactions_num: int = 5,
     validate_products: bool = True,
     rebuild_with_cgr: bool = False,
+    multirule: bool = False,
+    rm_dup: bool = False,
+    sorting: bool = False,
 ) -> Iterator[list[MoleculeContainer,]]:
     """Applies a reaction rule to a given molecule.
 
@@ -63,46 +66,53 @@ def apply_reaction_rule(
         reaction rule.
     :param validate_products: If True, validates the final products.
     :param rebuild_with_cgr: If True, the products are extracted from CGR decomposition.
+    :param multirule: If True, repeatedly applies the reaction rule to generated
+        reactants.
+    :param rm_dup: If True, removes duplicate reactant sets from yielded outputs.
+    :param sorting: If True, returns results sorted by number of applied rule steps
+        (descending).
     :return: An iterator yielding the products of reaction rule application.
     """
 
-    reactants = add_small_mols(molecule, small_molecules=False)
+    def _collect_reactions(
+        current_molecule: MoleculeContainer,
+    ) -> list[ReactionContainer]:
+        reactants = add_small_mols(current_molecule, small_molecules=False)
+        try:
+            if sort_reactions:
+                unsorted_reactions = list(reaction_rule(*reactants))
+                sorted_reactions = sorted(
+                    unsorted_reactions,
+                    key=lambda react: len(
+                        [mol for mol in react.products if len(mol) > 6]
+                    ),
+                    reverse=True,
+                )
+                return sorted_reactions[:top_reactions_num]
 
-    try:
-        if sort_reactions:
-            unsorted_reactions = list(reaction_rule(*reactants))
-            sorted_reactions = sorted(
-                unsorted_reactions,
-                key=lambda react: len(
-                    list(filter(lambda mol: len(mol) > 6, react.products))
-                ),
-                reverse=True,
-            )
-
-            # take top-N reactions from reactor
-            reactions = sorted_reactions[:top_reactions_num]
-        else:
             reactions = []
             for reaction in reaction_rule(*reactants):
                 reactions.append(reaction)
                 if len(reactions) == top_reactions_num:
                     break
-    except (IndexError, InvalidAromaticRing):
-        reactions = []
+            return reactions
+        except (IndexError, InvalidAromaticRing):
+            return []
 
-    for reaction in reactions:
+    def _prepare_reactants(
+        reaction: ReactionContainer,
+    ) -> list[MoleculeContainer] | None:
         # temporary solution - incorrect leaving groups
         reactant_atom_nums = []
-        for i in reaction.reactants:
-            reactant_atom_nums.extend(i.atoms_numbers)
+        for reactant in reaction.reactants:
+            reactant_atom_nums.extend(reactant.atoms_numbers)
         product_atom_nums = []
-        for i in reaction.products:
-            product_atom_nums.extend(i.atoms_numbers)
+        for product in reaction.products:
+            product_atom_nums.extend(product.atoms_numbers)
         leaving_atom_nums = set(reactant_atom_nums) - set(product_atom_nums)
         if len(leaving_atom_nums) > len(product_atom_nums):
-            continue
+            return None
 
-        # check reaction
         if rebuild_with_cgr:
             cgr = reaction.compose()
             reactants = cgr.decompose()[1].split()
@@ -110,21 +120,92 @@ def apply_reaction_rule(
             reactants = reaction.products  # reactants are products in retro reaction
         reactants = [mol for mol in reactants if len(mol) > 0]
 
-        # validate products
         if validate_products:
-            is_valid = True
             for mol in reactants:
                 try:
                     tmp_mol = mol.copy()
                     tmp_mol.remove_coordinate_bonds(keep_to_terminal=False)
                     tmp_mol.kekule()
                     if tmp_mol.check_valence():
-                        is_valid = False
-                        break
+                        return None
                 except InvalidAromaticRing:
-                    is_valid = False
-                    break
-            if not is_valid:
-                continue
+                    return None
 
-        yield reactants
+        return reactants
+
+    def _reactants_key(reactants: list[MoleculeContainer]) -> tuple[str, ...]:
+        return tuple(sorted(str(reactant) for reactant in reactants))
+
+    seen_reactants = set()
+    pending_reactants: list[tuple[list[MoleculeContainer], int]] = [([molecule], 0)]
+    expanded_keys = {_reactants_key([molecule])}
+    pending_index = 0
+
+    sorted_results = []
+    best_sorted_results = {}
+    output_index = 0
+
+    while pending_index < len(pending_reactants):
+        current_reactants, applied_rules_count = pending_reactants[pending_index]
+        pending_index += 1
+
+        for mol_index, current_molecule in enumerate(current_reactants):
+            for reaction in _collect_reactions(current_molecule):
+                new_reactants = _prepare_reactants(reaction)
+                if new_reactants is None:
+                    continue
+
+                merged_reactants = [
+                    reactant
+                    for idx, reactant in enumerate(current_reactants)
+                    if idx != mol_index
+                ]
+                merged_reactants.extend(new_reactants)
+                merged_reactants = [
+                    reactant for reactant in merged_reactants if len(reactant) > 0
+                ]
+
+                reactants_key = _reactants_key(merged_reactants)
+                current_applied_rules_count = applied_rules_count + 1
+
+                if rm_dup and reactants_key in seen_reactants:
+                    continue
+
+                if sorting:
+                    result_item = (
+                        current_applied_rules_count,
+                        output_index,
+                        merged_reactants,
+                    )
+                    output_index += 1
+
+                    if rm_dup:
+                        previous_item = best_sorted_results.get(reactants_key)
+                        if (
+                            previous_item is None
+                            or current_applied_rules_count > previous_item[0]
+                        ):
+                            best_sorted_results[reactants_key] = result_item
+                    else:
+                        sorted_results.append(result_item)
+                else:
+                    if rm_dup:
+                        seen_reactants.add(reactants_key)
+                    yield merged_reactants
+
+                if multirule and reactants_key not in expanded_keys:
+                    expanded_keys.add(reactants_key)
+                    pending_reactants.append(
+                        (merged_reactants, current_applied_rules_count)
+                    )
+
+        if not multirule:
+            break
+
+    if sorting:
+        if rm_dup:
+            sorted_results = list(best_sorted_results.values())
+
+        sorted_results.sort(key=lambda item: (-item[0], item[1]))
+        for _, _, merged_reactants in sorted_results:
+            yield merged_reactants

@@ -6,6 +6,7 @@ from collections.abc import Iterator
 import torch
 import torch_geometric
 import torch_geometric.data
+from chython.containers import MoleculeContainer, ReactionContainer
 from chython.reactor.reactor import Reactor
 
 from synplan.chem.precursor import Precursor
@@ -360,3 +361,58 @@ class CombinedPolicyNetworkFunction:
         for prob, rule_id in zip(sorted_probs, sorted_rules):
             if prob > self.rule_prob_threshold:
                 yield prob, rule_id
+
+
+def find_rules_fast_isomorphic_search(
+    molecule: MoleculeContainer, frag_rules_list
+) -> list[ReactionContainer]:
+    """
+    Fast Brute-force search for isomorphic reaction rules by comparing molecule to rule fragments (Reaction rule set was preproceesed).
+    """
+    molecule.canonicalize()
+    possible_rules_dict = {}
+    for frag in frag_rules_list:
+        if frag[0] < molecule:
+            possible_rules_dict[frag[0]] = frag[1]
+
+    if not possible_rules_dict:
+        return []
+    possible_rules = []
+    for rules in possible_rules_dict.values():
+        for rule in rules:
+            possible_rules.append(rule)
+    applicable_rules = [x for xs in possible_rules for x in xs]
+    return applicable_rules
+
+
+def _rule_query_pattern(rule) -> ReactionContainer | None:
+    """Return the query pattern used to test rule applicability."""
+
+    reactants = getattr(rule, "reactants", None)
+    if reactants:
+        return reactants[0]
+
+    patterns = getattr(rule, "_patterns", None)
+    if patterns:
+        return patterns[0]
+
+    return None
+
+
+def find_rules_isomorphic_search(
+    molecule: MoleculeContainer, rules_list: list[ReactionContainer]
+) -> list[ReactionContainer]:
+    """
+    Brute-force search for isomorphic reaction rules by comparing molecule to rule reactants.
+    """
+    possible_rules = []
+    for rule in rules_list:
+        pattern = _rule_query_pattern(rule)
+        if pattern is None:
+            continue
+        try:
+            if pattern < molecule:
+                possible_rules.append(rule)
+        except TypeError:
+            continue
+    return possible_rules

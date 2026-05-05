@@ -2,11 +2,35 @@ import csv
 import json
 import os
 import pickle
+from typing import Any
 
 from chython import smiles as read_smiles
 from chython.exceptions import InvalidAromaticRing
+
 from synplan.chem.reaction_routes.route_cgr import extract_reactions
 from synplan.mcts.tree import Tree
+
+
+def _route_step_metadata_from_tree(
+    tree: Tree, route_id: int
+) -> dict[int, dict[str, Any]]:
+    """Map route step ids from ``extract_reactions`` to tree rule metadata."""
+    details = tree.route_details(route_id)
+    steps = details.get("steps", [])
+    total_steps = len(steps)
+    metadata_by_step_id = {}
+
+    for step_index, step in enumerate(steps):
+        step_id = total_steps - 1 - step_index
+        metadata_by_step_id[step_id] = {
+            "step_id": step_id,
+            "tree_node_id": step.get("node_id"),
+            "rule_id": step.get("rule_id"),
+            "rule_source": step.get("rule_source"),
+            "rule_key": step.get("rule_key"),
+        }
+
+    return metadata_by_step_id
 
 
 def _collect_reactions(tree):
@@ -81,13 +105,23 @@ def read_routes_csv(file_path="routes.csv"):
     return routes_dict
 
 
-def make_json(routes_dict, keep_ids=True):
+def make_json(
+    routes_dict,
+    keep_ids=True,
+    tree: Tree | None = None,
+    route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
+):
     """
     Convert routes into a nested JSON tree of reaction and molecule nodes.
 
     Args:
         routes_dict (dict[int, dict[int, Reaction]]): Mapping route IDs to steps (step_id -> Reaction).
         keep_ids (bool): If True, returns a list of route trees; otherwise returns a dict mapping route IDs to trees.
+        tree (Tree | None): Optional source tree used to attach rule metadata to
+            reaction nodes.
+        route_metadata (dict | None): Optional per-route metadata mapping
+            ``route_id -> step_id -> metadata``. This overrides metadata derived
+            from ``tree`` when provided.
 
     Returns:
         list or dict: JSON-like tree(s) of routes.
@@ -98,6 +132,11 @@ def make_json(routes_dict, keep_ids=True):
     for route_id, steps in routes_dict.items():
         if not steps:
             continue
+        route_step_metadata = (
+            route_metadata.get(route_id) if route_metadata is not None else None
+        )
+        if route_step_metadata is None and tree is not None:
+            route_step_metadata = _route_step_metadata_from_tree(tree, route_id)
         try:
             # Determine target molecule atoms from the final step of this route
             final_step = max(steps)
@@ -129,11 +168,11 @@ def make_json(routes_dict, keep_ids=True):
                 pass
             return str(mol)
 
-        def build_mol_node(sid):
+        def build_mol_node(sid, _steps=steps, _atom_nums=atom_nums):
             """Find the product with any overlap to target atoms and recurse into its reaction."""
-            rxn = steps[sid]
+            rxn = _steps[sid]
             for p in rxn.products:
-                if atom_nums & set(p._atoms.keys()):
+                if _atom_nums & set(p._atoms.keys()):
                     smiles = str(p)
                     return {
                         "type": "mol",
@@ -144,15 +183,22 @@ def make_json(routes_dict, keep_ids=True):
             # Shouldn't reach here if tree is consistent
             return None
 
-        def build_reaction_node(sid):
+        def build_reaction_node(
+            sid,
+            _steps=steps,
+            _route_step_metadata=route_step_metadata,
+            _prod_map=prod_map,
+        ):
             """Build reaction node and recurse into reactant molecule nodes."""
-            rxn = steps[sid]
+            rxn = _steps[sid]
             node = {"type": "reaction", "smiles": format(rxn, "m"), "children": []}
+            if _route_step_metadata and sid in _route_step_metadata:
+                node.update(_route_step_metadata[sid])
 
             for react in rxn.reactants:
                 r_smi = transform(react)
                 # Look up any prior step producing this reactant
-                prior = [ps for ps in prod_map.get(r_smi, []) if ps < sid]
+                prior = [ps for ps in _prod_map.get(r_smi, []) if ps < sid]
                 if prior:
                     node["children"].append(build_mol_node(max(prior)))
                 else:
@@ -163,18 +209,27 @@ def make_json(routes_dict, keep_ids=True):
             return node
 
         # Build route tree and store
-        tree = build_mol_node(final_step)
+        route_tree = build_mol_node(final_step)
         if keep_ids:
-            all_routes[int(route_id)] = tree
+            all_routes[int(route_id)] = route_tree
         else:
-            all_routes.append(tree)
+            all_routes.append(route_tree)
 
     return all_routes
 
 
-def write_routes_json(routes_dict, file_path):
+def write_routes_json(
+    routes_dict,
+    file_path,
+    tree: Tree | None = None,
+    route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
+):
     """Serialize reaction routes to a JSON file."""
-    routes_json = make_json(routes_dict)
+    routes_json = make_json(
+        routes_dict,
+        tree=tree,
+        route_metadata=route_metadata,
+    )
     with open(file_path, "w") as f:
         json.dump(routes_json, f, indent=2)
 
@@ -212,7 +267,7 @@ def export_tree_to_json(tree: Tree, file_path: str, route_id=None):
     routes_dict = extract_reactions(tree, route_id)
     if routes_dict is None:
         raise ValueError("Failed to extract reactions for the specified route_id.")
-    write_routes_json(routes_dict, file_path)
+    write_routes_json(routes_dict, file_path, tree=tree)
 
 
 def export_tree_to_csv(tree: Tree, file_path: str = "routes.csv", route_id=None):
@@ -231,7 +286,6 @@ def export_tree_to_csv(tree: Tree, file_path: str = "routes.csv", route_id=None)
 
 
 class TreeWrapper:
-
     def __init__(self, tree, mol_id=1, config=1, path="planning_results/forest"):
         """Initializes the TreeWrapper."""
         self.tree = tree
