@@ -1,6 +1,7 @@
 """Module containing classes and functions needed for reactions/molecules data
 reading/writing."""
 
+import contextlib
 import csv
 import gzip
 from collections.abc import Iterable, Iterator
@@ -67,6 +68,64 @@ class Reader(FileHandler):
         return len(self._file)
 
 
+def split_smiles_record(record: str) -> tuple[str, list[str]]:
+    """Split a SMILES/SMIRKS text record into chemistry and source fields.
+
+    SynPlanner writes SMI records as ``reaction_smiles<TAB>meta...``.  Mapping
+    tools often append source/provenance columns in the same shape.  Parsing
+    only the first token is correct chemically, but the trailing fields must be
+    carried through curation so users can trace standardized outputs and errors
+    back to the source dataset row.
+    """
+    raw = record.strip()
+    if not raw:
+        return "", []
+    if "\t" in raw:
+        smiles_part, *source_fields = raw.split("\t")
+    else:
+        parts = raw.split(maxsplit=1)
+        smiles_part = parts[0]
+        source_fields = parts[1:]
+    return smiles_part.strip(), [field.strip() for field in source_fields]
+
+
+def _store_source_fields(
+    container: ReactionContainer | CGRContainer | MoleculeContainer,
+    source_fields: list[str],
+) -> None:
+    """Store positional source fields under sortable metadata keys."""
+    for index, field in enumerate(source_fields, start=1):
+        if field:
+            container.meta[f"source_{index:04d}"] = field
+
+
+def format_source_fields(source_fields: Iterable[str]) -> str:
+    """Format source/provenance fields for a single TSV cell."""
+    return ";".join(
+        str(field).replace("\t", " ").replace("\n", " ")
+        for field in source_fields
+        if str(field)
+    )
+
+
+def reaction_source_info(reaction: ReactionContainer) -> str:
+    """Return source/provenance metadata as a compact TSV-safe string."""
+    source_fields = [
+        str(value)
+        for key, value in sorted(reaction.meta.items(), key=lambda item: item[0])
+        if key.startswith("source_")
+    ]
+    if source_fields:
+        return format_source_fields(source_fields)
+
+    meta_fields = [
+        f"{key}={value}"
+        for key, value in sorted(reaction.meta.items(), key=lambda item: item[0])
+        if key != "init_smiles"
+    ]
+    return format_source_fields(meta_fields)
+
+
 class SMILESRead:
     def __init__(self, filename: str | Path, **kwargs):
         """Simplified class to read files containing a SMILES (Molecules or Reaction)
@@ -84,9 +143,11 @@ class SMILESRead:
     ) -> Iterable[ReactionContainer | CGRContainer | MoleculeContainer]:
         for line in iter(self._file.readline, ""):
             line = line.strip()
-            x = smiles(line)
+            smiles_part, source_fields = split_smiles_record(line)
+            x = smiles(smiles_part)
             if isinstance(x, (ReactionContainer, CGRContainer, MoleculeContainer)):
-                x.meta["init_smiles"] = line
+                x.meta["init_smiles"] = smiles_part
+                _store_source_fields(x, source_fields)
                 yield x
 
     def __enter__(self):
@@ -161,7 +222,6 @@ class ReactionReader(Reader):
         elif self._file_type == "RDF":
             self._file = RDFRead(filename, indexable=True, **kwargs)
         elif self._file_type == "PB":
-
             self._file = _ORDReadAdapter(filename)
         else:
             raise ValueError("File type incompatible -", filename)
@@ -176,6 +236,7 @@ class ReactionWriter(Writer):
         :return: None.
         """
         super().__init__(filename, mapping, **kwargs)
+        self._rdf_header_written = False
         if self._file_type == "SMI":
             self._file = open(filename, "w", encoding="utf-8", **kwargs)
         elif self._file_type == "RDF":
@@ -194,6 +255,39 @@ class ReactionWriter(Writer):
             self._file.write(rea_str + "\n")
         elif self._file_type == "RDF":
             self._file.write(reaction)
+
+    def write_string(self, record: str):
+        """Write a pre-serialized record directly, bypassing ReactionContainer.
+
+        ``SMI`` records are written as SMILES lines. ``RDF`` records are written
+        to the underlying text file, with the file-level header emitted on the
+        first call.
+
+        Use this when workers have already serialized reactions (via
+        synplan.chem.data.pipeline.serialize_reaction) to avoid redundant work in
+        the parent process.
+        """
+        s = record if record.endswith("\n") else record + "\n"
+        if self._file_type == "SMI":
+            self._file.write(s)
+        elif self._file_type == "RDF":
+            if not self._rdf_header_written:
+                from time import strftime
+
+                # chython exposes RDFWrite's wrapped text stream only via the
+                # private ``_file._file`` path (verified with chython 2.x).
+                # We write the file-level header here because ``write_string``
+                # receives already serialized RDF records from worker processes,
+                # so RDFWrite.write(rxn) is intentionally bypassed.
+                self._file._file.write(strftime("$RDFILE 1\n$DATM    %m/%d/%y %H:%M\n"))
+                # Remove the instance-level __write override so a subsequent
+                # write(rxn) call does not re-emit the header.
+                with contextlib.suppress(AttributeError):
+                    del self._file.write
+                self._rdf_header_written = True
+            self._file._file.write(s)
+        else:
+            raise ValueError(f"write_string not supported for {self._file_type}")
 
 
 class MoleculeReader(Reader):
@@ -313,7 +407,18 @@ def iter_smiles(path: str | Path) -> Iterator[str]:
             line = line.strip()
             if not line:
                 continue
-            yield line.split()[0]
+            smiles_part, _source_fields = split_smiles_record(line)
+            yield smiles_part
+
+
+def iter_smiles_records(path: str | Path) -> Iterator[str]:
+    """Yield complete non-empty SMI records, including metadata columns."""
+    p = Path(path)
+    with open(p, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                yield line
 
 
 def iter_smiles_blocks(path: str | Path, records_per_block: int) -> Iterator[list[str]]:
@@ -440,8 +545,10 @@ def parse_reaction(
     if isinstance(item, ReactionContainer):
         return item
     if fmt == "smi":
-        rxn = smiles(item)
-        rxn.meta["init_smiles"] = item
+        smiles_part, source_fields = split_smiles_record(item)
+        rxn = smiles(smiles_part)
+        rxn.meta["init_smiles"] = smiles_part
+        _store_source_fields(rxn, source_fields)
         return rxn
     else:  # rdf block
         with RDFRead(StringIO(item), ignore=True) as r:
@@ -497,7 +604,7 @@ class RawReactionReader:
 
     def __iter__(self) -> Iterator[str | ReactionContainer]:
         if self.format == "smi":
-            yield from iter_smiles(self._path)
+            yield from iter_smiles_records(self._path)
         elif self.format == "rdf":
             yield from iter_rdf_text_blocks(self._path, 1)
         elif self.format == "pb":
@@ -574,8 +681,21 @@ def to_reaction_smiles_record(reaction: ReactionContainer) -> str:
         return reaction
 
     reaction_record = [format(reaction, "m")]
-    sorted_meta = sorted(reaction.meta.items(), key=lambda x: x[0])
-    for _, meta_info in sorted_meta:
+    has_source_fields = any(key.startswith("source_") for key in reaction.meta)
+    source_meta = [
+        (key, value)
+        for key, value in sorted(reaction.meta.items(), key=lambda item: item[0])
+        if key.startswith("source_")
+    ]
+    other_meta = [
+        (key, value)
+        for key, value in sorted(reaction.meta.items(), key=lambda item: item[0])
+        if not key.startswith("source_")
+    ]
+    ordered_meta = source_meta + other_meta if has_source_fields else other_meta
+    for key, meta_info in ordered_meta:
+        if has_source_fields and key == "init_smiles":
+            continue
         meta_info = ";".join(str(meta_info).split("\n"))
         reaction_record.append(str(meta_info))
     return "\t".join(reaction_record)

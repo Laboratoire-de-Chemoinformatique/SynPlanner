@@ -223,10 +223,9 @@ class Tree:
         return is_solved, last_node_id
 
     def _init_target_node(self, target: MoleculeContainer):
-
-        assert isinstance(
-            target, MoleculeContainer
-        ), "Target should be given as MoleculeContainer"
+        assert isinstance(target, MoleculeContainer), (
+            "Target should be given as MoleculeContainer"
+        )
         assert len(target) > 3, "Target molecule has less than 3 atoms"
 
         target_molecule = Precursor(target)
@@ -623,9 +622,9 @@ class Tree:
             :param current_node_id: The id of the current node.
             :return: A string representation of a node in a Newick format.
             """
-            assert (
-                current_node_id not in visited_nodes
-            ), "Error: The tree may not be circular!"
+            assert current_node_id not in visited_nodes, (
+                "Error: The tree may not be circular!"
+            )
             node_visit = self.nodes_visit[current_node_id]
 
             visited_nodes.add(current_node_id)

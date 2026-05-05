@@ -16,7 +16,6 @@ class RDKitScore:
         self._W_MAX = 1000.0
 
     def __call__(self, node):
-
         if self.score_function == "sascore":
             meanPrecursorSAS = 0
             for p in node.precursors_to_expand:

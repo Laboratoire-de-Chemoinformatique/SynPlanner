@@ -259,7 +259,7 @@ def render_svg(pred, columns, box_colors, labeled: bool = False):
         _p_min_x, p_max, p_y = arrow_points[p][:3]
         p_max += 1
         mid_x = arrow_points[p][-1]  # p_max + (s_min_x - p_max) / 3
-        arrow = f"""  <polyline points="{p_max:.2f} {p_y:.2f}, {mid_x:.2f} {p_y:.2f}, {mid_x:.2f} {s_y:.2f}, {s_min_x - 1.:.2f} {s_y:.2f}"
+        arrow = f"""  <polyline points="{p_max:.2f} {p_y:.2f}, {mid_x:.2f} {p_y:.2f}, {mid_x:.2f} {s_y:.2f}, {s_min_x - 1.0:.2f} {s_y:.2f}"
                 fill="none" stroke="black" stroke-width=".04" marker-end="url(#arrow)"/>"""
         if p_y != s_y:
             arrow += f'  <circle cx="{mid_x}" cy="{p_y}" r="0.1"/>'
@@ -1017,7 +1017,7 @@ def routes_clustering_report(
             score = round(tree.route_score(route_id), 3)
             # build reaction list
             reac_html = "".join(
-                f"<b>Step {i+1}:</b> {r!s}<br>" for i, r in enumerate(steps)
+                f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in enumerate(steps)
             )
             header = f"Route {route_id} — {len(steps)} steps, score={score}"
             table += f"<tr><td><b>{header}</b></td></tr>"
@@ -1028,7 +1028,7 @@ def routes_clustering_report(
             svg = get_route_svg_from_json(routes_json, route_id)
             steps = routes_dict[route_id]
             reac_html = "".join(
-                f"<b>Step {i+1}:</b> {r!s}<br>" for i, r in steps.items()
+                f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in steps.items()
             )
 
             header = f"Route {route_id} — {len(steps)} steps"
@@ -1114,7 +1114,7 @@ def lg_table_2_html(subcluster, routes_to_display=None, if_display=True):
                 html += "</tr>"
             else:
                 # Optionally, you can note that the route_id was not found
-                html += f"<tr><td colspan='{len(all_marks)+1}' style='border: 1px solid black; padding: 4px; color:red;'>Route ID {route_id} not found.</td></tr>"
+                html += f"<tr><td colspan='{len(all_marks) + 1}' style='border: 1px solid black; padding: 4px; color:red;'>Route ID {route_id} not found.</td></tr>"
 
     html += "</table>"
 
@@ -1469,7 +1469,7 @@ def routes_subclustering_report(
             score = round(tree.route_score(route_id), 3)
             # build reaction list
             reac_html = "".join(
-                f"<b>Step {i+1}:</b> {r!s}<br>" for i, r in enumerate(steps)
+                f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in enumerate(steps)
             )
             header = f"Route {route_id} — {len(steps)} steps, score={score}"
             table += f"<tr><td><b>{header}</b></td></tr>"
@@ -1481,7 +1481,7 @@ def routes_subclustering_report(
             svg = get_route_svg_from_json(routes_json, route_id)
             steps = routes_dict[route_id]
             reac_html = "".join(
-                f"<b>Step {i+1}:</b> {r!s}<br>" for i, r in steps.items()
+                f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in steps.items()
             )
 
             header = f"Route {route_id} — {len(steps)} steps"

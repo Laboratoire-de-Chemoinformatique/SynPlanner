@@ -232,8 +232,8 @@ class PolicyNetworkConfig(BaseConfigModel):
     :param policy_type: Mode of operation, either 'filtering' or 'ranking'.
     :param logger: Training logger configuration. ``None`` disables logging.
         A dict with ``"type"`` key (``"csv"``, ``"tensorboard"``, ``"mlflow"``,
-        or ``"wandb"``) and optional logger-specific parameters passed to the
-        PyTorch Lightning logger constructor.
+        ``"litlogger"``, or ``"wandb"``) and optional logger-specific parameters
+        passed to the PyTorch Lightning logger constructor.
     """
 
     policy_type: Literal["filtering", "ranking"] = "ranking"
@@ -271,11 +271,12 @@ class PolicyNetworkConfig(BaseConfigModel):
         if v is not None:
             if "type" not in v:
                 raise ValueError("logger dict must contain a 'type' key.")
-            valid_types = ("csv", "tensorboard", "mlflow", "wandb")
-            if v["type"] not in valid_types:
+            valid_types = ("csv", "tensorboard", "mlflow", "wandb", "litlogger")
+            if v["type"].lower() not in valid_types:
                 raise ValueError(
                     f"logger type must be one of {valid_types}, got '{v['type']}'"
                 )
+            v["type"] = v["type"].lower()
         return v
 
 

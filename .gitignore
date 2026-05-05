@@ -138,6 +138,9 @@ dmypy.json
 #VS Code
 .vscode/
 
+# Local development helpers
+.dev-local/
+
 # Pytest coverage output
 coverage/
 

@@ -7,7 +7,7 @@ from synplan.utils.loading import load_building_blocks
 def test_load_building_blocks_csv_header(tmp_path):
     path = tmp_path / "bbs.csv"
     path.write_text(
-        "SMILES,ID\n" "CCO,1\n" ",2\n" "CCO,3\n" "CCN,4\n",
+        "SMILES,ID\nCCO,1\n,2\nCCO,3\nCCN,4\n",
         encoding="utf-8",
     )
 

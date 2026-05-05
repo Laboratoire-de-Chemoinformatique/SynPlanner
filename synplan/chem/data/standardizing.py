@@ -17,13 +17,25 @@ from chython.containers import MoleculeContainer, ReactionContainer
 from pydantic import Field, model_validator
 from tqdm.auto import tqdm
 
-from synplan.chem.data.reaction_result import ErrorEntry, PipelineSummary, ProcessResult
+from synplan.chem.data.pipeline import (
+    build_batch_result,
+    reaction_cgr_key,
+    write_batch_results,
+)
+from synplan.chem.data.reaction_result import (
+    BatchResult,
+    ErrorEntry,
+    PipelineSummary,
+)
 from synplan.chem.utils import unite_molecules
 from synplan.utils.config import BaseConfigModel
 from synplan.utils.files import (
     RawReactionReader,
     ReactionWriter,
+    format_source_fields,
     parse_reaction,
+    reaction_source_info,
+    split_smiles_record,
 )
 from synplan.utils.parallel import chunked, graceful_shutdown, process_pool_map_stream
 
@@ -104,7 +116,7 @@ class BaseStandardizer(ABC):
         except StandardizationError:
             raise
         except Exception as exc:
-            logging.debug("%s: %s", self.__class__.__name__, exc, exc_info=True)
+            logger.debug("%s: %s", self.__class__.__name__, exc, exc_info=True)
             raise StandardizationError(self.__class__.__name__, str(rxn), exc) from exc
 
 
@@ -304,7 +316,7 @@ class SplitIonsStandardizer(BaseStandardizer):
                     try:
                         molecule: MoleculeContainer = smiles_chython(molecule)
                     except (ValueError, TypeError) as e:
-                        logging.warning("Failed to parse molecule %s: %s", molecule, e)
+                        logger.warning("Failed to parse molecule %s: %s", molecule, e)
                         continue
 
                 # Use the split method from chython
@@ -312,7 +324,7 @@ class SplitIonsStandardizer(BaseStandardizer):
                     components = molecule.split()
                     divided_molecules.extend(components)
                 except (ValueError, RuntimeError) as e:
-                    logging.warning("Failed to split molecule %s: %s", molecule, e)
+                    logger.warning("Failed to split molecule %s: %s", molecule, e)
                     divided_molecules.append(molecule)
 
             total_charge = 0
@@ -324,7 +336,7 @@ class SplitIonsStandardizer(BaseStandardizer):
                     if mol_charge != 0:
                         ions_present = True
                 except (ValueError, RuntimeError) as e:
-                    logging.warning(
+                    logger.warning(
                         "Failed to calculate charge for molecule %s: %s", molecule, e
                     )
                     continue
@@ -644,10 +656,16 @@ class RebalanceReactionStandardizer(BaseStandardizer):
         return new_rxn
 
 
-# Registry mapping config field names to standardizer classes
+# Canonical chemistry order for reaction standardization. The configuration
+# only enables/disables steps and sets parameters; it does not define execution
+# order.  In particular, reagents are removed before valence validation so
+# reagent-only species do not create false valence failures, and aromatization
+# happens after valence-sensitive steps so final serialized reactions deduplicate
+# in a consistent aromatic form.
 STANDARDIZER_REGISTRY = {
-    "functional_groups_config": FunctionalGroupsStandardizer,
     "kekule_form_config": KekuleFormStandardizer,
+    "functional_groups_config": FunctionalGroupsStandardizer,
+    "remove_reagents_config": RemoveReagentsStandardizer,
     "check_valence_config": CheckValenceStandardizer,
     "implicify_hydrogens_config": ImplicifyHydrogensStandardizer,
     "check_isotopes_config": CheckIsotopesStandardizer,
@@ -656,7 +674,6 @@ STANDARDIZER_REGISTRY = {
     "mapping_fix_config": MappingFixStandardizer,
     "unchanged_parts_config": UnchangedPartsStandardizer,
     "small_molecules_config": SmallMoleculesStandardizer,
-    "remove_reagents_config": RemoveReagentsStandardizer,
     "rebalance_reaction_config": RebalanceReactionStandardizer,
 }
 
@@ -731,7 +748,7 @@ class ReactionStandardizationConfig(BaseConfigModel):
         return result
 
     def create_standardizers(self):
-        """Create standardizer instances based on configuration."""
+        """Create selected standardizers in SynPlanner's canonical order."""
         standardizers = []
         for field_name, std_cls in STANDARDIZER_REGISTRY.items():
             config = getattr(self, field_name)
@@ -816,28 +833,35 @@ def _process_batch(
     *,
     ignore_errors: bool = False,
     fmt: str = "smi",
-) -> tuple[list[ReactionContainer], int, list[tuple[str, str, str, str]]]:
+) -> tuple[list[ReactionContainer], int, list[tuple[str, str, str, str, str]]]:
     """Process a batch and return (results, n_ok, errors).
 
-    Each error entry is ``(original_smiles, stage, error_type, error_message)``.
+    Each error entry is ``(original_smiles, source_info, stage, error_type,
+    error_message)``.
     """
     results: list[ReactionContainer] = []
-    errors: list[tuple[str, str, str, str]] = []
+    errors: list[tuple[str, str, str, str, str]] = []
     n_std = 0
     for item in batch:
         rxn, ok, exc = safe_standardize(
             item, standardizers, ignore_errors=ignore_errors, fmt=fmt
         )
-        if rxn is not None:
+        if ok and rxn is not None:
             results.append(rxn)
         n_std += ok
         if exc is not None:
-            orig = (
-                rxn.meta.get("init_smiles", str(rxn))
-                if rxn is not None and hasattr(rxn, "meta")
-                else str(item)
+            if rxn is not None and hasattr(rxn, "meta"):
+                orig = rxn.meta.get("init_smiles", str(rxn))
+                source_info = reaction_source_info(rxn)
+            elif isinstance(item, str) and fmt == "smi":
+                orig, source_fields = split_smiles_record(item)
+                source_info = format_source_fields(source_fields)
+            else:
+                orig = str(item)
+                source_info = ""
+            errors.append(
+                (orig, source_info, exc.stage, exc.original_type, exc.original_msg)
             )
-            errors.append((orig, exc.stage, exc.original_type, exc.original_msg))
     return results, n_std, errors
 
 
@@ -857,8 +881,13 @@ def _init_standardize_worker(config_dict: dict, ignore_errors: bool, fmt: str) -
 
 def _standardize_batch_worker(
     items: list[str],
-) -> ProcessResult:
-    """Top-level module function called by each worker — must be picklable."""
+) -> BatchResult:
+    """Top-level module function called by each worker — must be picklable.
+
+    All serialization (CGR key + output record) is done here in the worker so
+    the parent receives only plain strings and does a set lookup + file write.
+    No ReactionContainer crosses the IPC boundary.
+    """
     if _worker_state is None:
         raise RuntimeError(
             "_standardize_batch_worker called outside a worker process. "
@@ -871,25 +900,45 @@ def _standardize_batch_worker(
         fmt=_worker_state["fmt"],
     )
     errors = [
-        ErrorEntry(original=smi, stage=stage, error_type=etype, message=emsg)
-        for smi, stage, etype, emsg in raw_errors
+        ErrorEntry(
+            original=smi,
+            source_info=source_info,
+            stage=stage,
+            error_type=etype,
+            message=emsg,
+        )
+        for smi, source_info, stage, etype, emsg in raw_errors
     ]
-    return ProcessResult(reactions=reactions, errors=errors)
+    return build_batch_result(reactions, errors, [], _worker_state["fmt"])
 
 
-def _make_timeout_result(exc: Exception, items: list[str]) -> ProcessResult:
+# Keep public alias so any external code that imported _reaction_dedup_key still works.
+_reaction_dedup_key = reaction_cgr_key
+
+
+def _make_timeout_result(exc: Exception, items: list[str]) -> BatchResult:
     """Fallback for timed-out batches."""
-    return ProcessResult(
-        reactions=[],
-        errors=[
+    errors = []
+    for item in items:
+        original = item
+        source_info = ""
+        smiles_part, source_fields = split_smiles_record(item)
+        if smiles_part:
+            original = smiles_part
+            source_info = format_source_fields(source_fields)
+        errors.append(
             ErrorEntry(
-                original=item,
+                original=original,
+                source_info=source_info,
                 stage="timeout",
                 error_type="TimeoutError",
                 message=str(exc),
             )
-            for item in items
-        ],
+        )
+    return BatchResult(
+        records=[],
+        dedup_keys=[],
+        errors=errors,
     )
 
 
@@ -973,7 +1022,8 @@ def standardize_reactions_from_file(
 
     Backpressure is handled by ``process_pool_map_stream``.  Standardisers
     are constructed once per worker via ``_init_standardize_worker``.
-    Cross-worker deduplication is performed writer-side using CGR hashes.
+    Cross-worker deduplication is performed writer-side using worker-computed
+    stable CGR keys.
 
     Args:
         config: Configuration object for standardizers.
@@ -1011,7 +1061,7 @@ def standardize_reactions_from_file(
     summary = PipelineSummary()
     error_counts: Counter = Counter()
     dedup = config.deduplicate
-    seen: set[int] = set()  # CGR hash dedup (writer-side, if enabled)
+    seen: set[str | int] = set()  # CGR key dedup (worker-computed, if enabled)
     t0 = time.monotonic()
 
     raw_reader = RawReactionReader(input_reaction_data_path)
@@ -1027,7 +1077,9 @@ def standardize_reactions_from_file(
 
     error_file = open(_error_path, "w", encoding="utf-8") if _error_path else None
     if error_file is not None:
-        error_file.write("# original_smiles\tstage\terror_type\terror_message\n")
+        error_file.write(
+            "# original_smiles\tsource_info\tstage\terror_type\terror_message\n"
+        )
 
     try:
         with (
@@ -1037,7 +1089,7 @@ def standardize_reactions_from_file(
             chunks = chunked(raw_reader, batch_size)
 
             with graceful_shutdown() as stop:
-                for result in process_pool_map_stream(
+                stream = process_pool_map_stream(
                     chunks,
                     _standardize_batch_worker,
                     max_workers=max(num_cpus, 1),
@@ -1046,57 +1098,35 @@ def standardize_reactions_from_file(
                     initializer=_init_standardize_worker,
                     initargs=(config.to_dict(), ignore_errors, fmt),
                     timeout=300,
-                    max_tasks_per_child=200,
+                    # Avoid ProcessPoolExecutor worker recycling here: CPython
+                    # documents open hangs with max_tasks_per_child in 3.13/3.14.
+                    # The shared pool helper now performs bounded cleanup of
+                    # stale chemistry workers at the end of the run instead.
                     on_timeout=_make_timeout_result,
-                ):
-                    if stop.is_set():
-                        break
+                )
 
-                    # --- Write successfully standardized reactions ---
-                    for rxn in result.reactions:
-                        if dedup:
-                            try:
-                                h = hash(~rxn)  # CGR hash for dedup
-                            except Exception:
-                                h = id(rxn)  # fallback if CGR fails
-                            if h in seen:
-                                summary.duplicates += 1
-                                continue
-                            seen.add(h)
-                        writer.write(rxn)
-                        summary.succeeded += 1
+                def _stoppable(s):
+                    for batch in s:
+                        if stop.is_set():
+                            break
+                        # Track error counts for the final summary print
+                        for err in batch.errors:
+                            error_counts[(err.stage, err.error_type)] += 1
+                        yield batch
 
-                    # --- Write errors ---
-                    for err in result.errors:
-                        error_counts[(err.stage, err.error_type)] += 1
-                        summary.error_breakdown[f"{err.stage}/{err.error_type}"] = (
-                            summary.error_breakdown.get(
-                                f"{err.stage}/{err.error_type}", 0
-                            )
-                            + 1
-                        )
-                        if error_file is not None:
-                            error_file.write(
-                                f"{err.original}\t{err.stage}\t{err.error_type}\t{err.message}\n"
-                            )
-                    summary.errored += len(result.errors)
-
-                    # --- Track filtered ---
-                    for flt in result.filtered:
-                        summary.filter_breakdown[flt.reason] = (
-                            summary.filter_breakdown.get(flt.reason, 0) + 1
-                        )
-                    summary.filtered += len(result.filtered)
-
-                    # --- Update progress ---
-                    batch_total = (
-                        len(result.reactions)
-                        + len(result.errors)
-                        + len(result.filtered)
-                    )
-                    summary.total_input += batch_total
+                def _on_batch(batch_total: int) -> None:
                     bar.total = (bar.total or 0) + batch_total
                     bar.update(batch_total)
+
+                write_batch_results(
+                    _stoppable(stream),
+                    writer.write_string,
+                    summary,
+                    error_file=error_file,
+                    dedup=dedup,
+                    seen=seen,
+                    on_batch=_on_batch,
+                )
     finally:
         if error_file is not None:
             error_file.close()

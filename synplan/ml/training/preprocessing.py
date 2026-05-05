@@ -20,7 +20,18 @@ from tqdm.auto import tqdm
 
 from synplan.utils.cache import load_pyg_dataset, save_pyg_dataset
 from synplan.utils.loading import load_reaction_rules
-from synplan.utils.parallel import default_num_workers, process_pool_map_stream
+from synplan.utils.parallel import chunked, default_num_workers, process_pool_map_stream
+
+logger = logging.getLogger(__name__)
+
+_RANKING_POLICY_PARALLEL_BATCH_SIZE = 1000
+RankingGraphPayload = tuple[
+    list[list[int]],
+    list[list[int]],
+    list[list[float]],
+    int,
+    str,
+]
 
 
 class ValueNetworkDataset(InMemoryDataset, ABC):
@@ -95,6 +106,53 @@ def _convert_ranking_item(item: tuple[str, str]) -> tuple[Data, str] | None:
     return None
 
 
+def _ranking_graph_to_payload(graph: Data, product_smi: str) -> RankingGraphPayload:
+    """Serialize a ranking graph without torch objects for process-pool IPC.
+
+    PyTorch tensors crossing a multiprocessing boundary are transferred via
+    shared-memory file descriptors. Large ranking batches can therefore hit
+    ``Too many open files`` while unpickling results in the parent process.
+    Keep worker payloads as plain Python lists and reconstruct tensors in the
+    parent instead.
+    """
+    return (
+        graph.x.tolist(),
+        graph.edge_index.tolist(),
+        graph.edge_attr.tolist(),
+        int(graph.y_rules.reshape(-1)[0].item()),
+        product_smi,
+    )
+
+
+def _ranking_payload_to_graph(payload: RankingGraphPayload) -> tuple[Data, str]:
+    """Rebuild a PyG graph from the plain-Python worker payload."""
+    x, edge_index, edge_attr, rule_id, product_smi = payload
+    graph = Data(
+        x=torch.tensor(x, dtype=torch.uint8),
+        edge_index=torch.tensor(edge_index, dtype=torch.long).reshape(2, -1),
+        edge_attr=torch.tensor(edge_attr, dtype=torch.float).reshape(-1, 4),
+    )
+    graph.y_rules = torch.tensor([rule_id], dtype=torch.long)
+    return graph, product_smi
+
+
+def _convert_ranking_batch(
+    batch: list[tuple[str, str]],
+) -> tuple[int, list[RankingGraphPayload]]:
+    """Convert a batch of ranking policy rows inside one worker process.
+
+    Returning batches amortizes ProcessPool IPC overhead.
+    The first tuple element is the number of input rows, so the parent can update
+    progress even when some rows fail conversion and produce no graph.
+    """
+    converted: list[RankingGraphPayload] = []
+    for item in batch:
+        result = _convert_ranking_item(item)
+        if result is not None:
+            converted.append(_ranking_graph_to_payload(result[0], result[1]))
+    return len(batch), converted
+
+
 class RankingPolicyDataset(InMemoryDataset):
     """Ranking policy network dataset.
 
@@ -167,28 +225,32 @@ class RankingPolicyDataset(InMemoryDataset):
             _collect_serial()
         else:
             try:
-                for result in tqdm(
-                    process_pool_map_stream(
-                        items,
-                        _convert_ranking_item,
-                        max_workers=workers,
-                    ),
+                batches = chunked(items, _RANKING_POLICY_PARALLEL_BATCH_SIZE)
+                results = process_pool_map_stream(
+                    batches,
+                    _convert_ranking_batch,
+                    max_workers=workers,
+                    max_pending=max(1, workers * 2),
+                )
+                with tqdm(
                     total=len(items),
                     desc=f"Building policy dataset ({workers} workers): ",
                     bar_format="{desc}{n}/{total} [{elapsed}]",
-                ):
-                    if result is not None:
-                        list_of_graphs.append(result[0])
-                        product_keys.append(result[1])
-            except BrokenProcessPool:
-                logging.warning(
-                    "A worker process crashed — falling back to serial. "
-                    "This is usually caused by a malformed SMILES triggering "
-                    "a C-level error in chython."
-                )
-                list_of_graphs.clear()
-                product_keys.clear()
-                _collect_serial()
+                ) as progress:
+                    for processed_count, batch_results in results:
+                        progress.update(processed_count)
+                        for payload in batch_results:
+                            graph, product_smi = _ranking_payload_to_graph(payload)
+                            list_of_graphs.append(graph)
+                            product_keys.append(product_smi)
+            except BrokenProcessPool as exc:
+                raise RuntimeError(
+                    "Parallel ranking policy dataset build failed before "
+                    "completion. Refusing silent serial fallback because it "
+                    "hides worker crashes and can turn this stage into a "
+                    "single-core run; rerun with --workers 1 only for "
+                    "diagnostics."
+                ) from exc
 
         self._product_keys = product_keys
         data, slices = self.collate(list_of_graphs)
@@ -285,13 +347,14 @@ class FilteringPolicyDataset(InMemoryDataset):
                 ):
                     if result is not None:
                         processed_data.append(result)
-            except BrokenProcessPool:
-                logging.warning(
-                    "A worker process crashed — falling back to serial. "
-                    "This is usually caused by a malformed SMILES triggering "
-                    "a C-level error in chython."
-                )
-                processed_data = _collect_serial()
+            except BrokenProcessPool as exc:
+                raise RuntimeError(
+                    "Parallel filtering policy dataset build failed before "
+                    "completion. Refusing silent serial fallback because it "
+                    "hides worker crashes and can turn this stage into a "
+                    "single-core run; rerun with --num_cpus 1 only for "
+                    "diagnostics."
+                ) from exc
 
         for pyg in processed_data:
             pyg.y_rules = pyg.y_rules.to_dense()
@@ -319,7 +382,6 @@ def reaction_rules_appliance(
 
     applied_rules, priority_rules = [], []
     for i, rule in enumerate(reaction_rules):
-
         rule_applied = False
         rule_prioritized = False
 
@@ -356,7 +418,7 @@ def reaction_rules_appliance(
                 if rule_prioritized:
                     priority_rules.append(i)
         except Exception as e:
-            logging.debug(e)
+            logger.debug(e)
             continue
 
     return applied_rules, priority_rules

@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-05-04
+
+### Changed
+- Improved standardization, filtering, and rule extraction pipeline robustness
+  with worker-serialized results, stable CGR deduplication keys, visible progress
+  reporting, and explicit stale-worker cleanup.
+- Improved policy dataset preparation with safetensors-backed cache reuse,
+  parallel preprocessing progress, nested result directory creation, and a
+  stratified split that avoids duplicate-product validation leakage.
+- Made optional remote logger integrations installable through extras instead
+  of core dependencies: `SynPlanner[litlogger]`, `SynPlanner[wandb]`,
+  `SynPlanner[mlflow]`, or `SynPlanner[loggers]`.
+- Configured `ty` rules for the dynamic chython, RDKit, PyTorch, and
+  NumPy typing surface while keeping unresolved-reference checks enabled.
+- Documented updated CLI flags, policy logger settings, GPS embedder
+  configuration, PR review acceptance guidelines, and new shared pipeline/cache
+  helper modules.
+
+### Fixed
+- Rule extraction summary now always reports failed reaction counts.
+- Ranking dataset cache loading now iterates safetensors keys correctly.
+- Deduplication now fails fast if worker-computed dedup keys are unavailable.
+- Standardization ion-splitting warnings now use the module logger.
+- Reaction standardization now preserves mapped SMI source columns in
+  successful output rows and error reports, applies a fixed canonical chemistry
+  order for enabled standardizers, and excludes failed reactions from the
+  standardized output when `ignore_errors` is enabled.
+
 ## [1.4.3] - 2026-03-19
 
 ### Changed
@@ -397,7 +425,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CLI interface (`synplan` command)
 - Docker images for CLI and GUI
 
-[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.3...HEAD
+[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.4...HEAD
+[1.4.4]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.0...v1.4.1

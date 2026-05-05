@@ -7,6 +7,6 @@ batch_size: 1000
 
 # Training logger — logs metrics to CSV files in the results directory.
 # Set to null (or remove) to disable logging.
-# Supported types: csv, tensorboard, mlflow, wandb.
+# Supported types: csv, tensorboard, mlflow, wandb, litlogger.
 logger:
   type: csv

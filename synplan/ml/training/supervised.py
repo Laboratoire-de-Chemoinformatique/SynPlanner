@@ -232,7 +232,20 @@ def _create_logger(logger_config: dict | None, results_path: Path):
         return False
 
     kwargs = dict(logger_config)
-    logger_type = kwargs.pop("type")
+    logger_type = kwargs.pop("type").lower()
+
+    if logger_type in {"lit", "litlogger"}:
+        try:
+            from pytorch_lightning.loggers import LitLogger
+        except ImportError as e:
+            raise ImportError(
+                "LitLogger requires the 'litlogger' package. "
+                "Install SynPlanner with the 'litlogger' or 'loggers' extra."
+            ) from e
+
+        root_dir = kwargs.pop("root_dir", kwargs.pop("save_dir", str(results_path)))
+        return LitLogger(root_dir=root_dir, **kwargs)
+
     kwargs.setdefault("save_dir", str(results_path))
 
     if logger_type == "csv":
@@ -245,7 +258,7 @@ def _create_logger(logger_config: dict | None, results_path: Path):
         except ImportError as e:
             raise ImportError(
                 "MLflow logger requires the 'mlflow' package. "
-                "Install it with: pip install mlflow"
+                "Install SynPlanner with the 'mlflow' or 'loggers' extra."
             ) from e
         return MLFlowLogger(**kwargs)
     elif logger_type == "wandb":
@@ -254,7 +267,7 @@ def _create_logger(logger_config: dict | None, results_path: Path):
         except ImportError as e:
             raise ImportError(
                 "Wandb logger requires the 'wandb' package. "
-                "Install it with: pip install wandb"
+                "Install SynPlanner with the 'wandb' or 'loggers' extra."
             ) from e
         return WandbLogger(**kwargs)
     else:
@@ -284,7 +297,7 @@ def run_policy_training(
     :return: None.
     """
     results_path = Path(results_path)
-    results_path.mkdir(exist_ok=True)
+    results_path.mkdir(parents=True, exist_ok=True)
 
     network = PolicyNetwork(
         vector_dim=config.vector_dim,

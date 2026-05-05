@@ -28,13 +28,13 @@ Run reaction standardization using the repository configuration in ``configs/rea
 
 .. code-block:: yaml
 
-    functional_groups_config:
     kekule_form_config:
+    functional_groups_config:
+    remove_reagents_config:
     check_valence_config:
     implicify_hydrogens_config:
     check_isotopes_config:
     aromatic_form_config:
-    mapping_fix_config:
     unchanged_parts_config:
     deduplicate: true
 
@@ -63,4 +63,5 @@ Run reaction standardization using the repository configuration in ``configs/rea
 
 .. note::
     1. If the reaction standardizer name is listed in the configuration file (see above), it means that this standardizer will be applied.
-    2. The order of standardizers listed in the configuration file defines the order of their application to the input reactions.
+    2. The configuration file enables standardization steps and sets their parameters; it does not define execution order.
+    3. SynPlanner applies enabled standardizers in a canonical chemistry order. In the default pipeline this means Kekule conversion and functional-group normalization run before reagent removal and valence checking. Reagent removal runs before ``check_valence_config`` to avoid false valence errors from discarded reagent species, and aromatic conversion runs after valence-sensitive steps so duplicate detection sees a consistent final representation.

@@ -5,6 +5,7 @@ from collections.abc import Iterator
 
 import torch
 import torch_geometric
+import torch_geometric.data
 from chython.reactor.reactor import Reactor
 from chython.containers import MoleculeContainer, ReactionContainer
 from typing import List
@@ -140,7 +141,7 @@ class PolicyNetworkFunction:
 
     def predict_reaction_rules(
         self, precursor: Precursor, reaction_rules: list[Reactor]
-    ) -> Iterator[Iterator | Iterator[tuple[float, Reactor, int]]]:
+    ) -> Iterator[tuple[float, Reactor, int]]:
         """The policy function predicts the list of reaction rules for a given precursor.
 
         :param precursor: The current precursor for which the reaction rules are predicted.
@@ -162,7 +163,7 @@ class PolicyNetworkFunction:
 
     def predict_reaction_rules_light(
         self, precursor: Precursor, reaction_rules_len: int
-    ) -> Iterator[Iterator | Iterator[tuple[float, int]]]:
+    ) -> Iterator[tuple[float, int]]:
         """The policy function predicts the list of reaction rules for a given precursor.
 
         Light version that doesn't return Reactor objects.

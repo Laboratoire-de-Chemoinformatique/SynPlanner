@@ -31,7 +31,6 @@ def add_small_mols(
         tmp_mol = big_mol.copy()
         transition_mapping = {}
         for small_mol in small_molecules:
-
             for n, atom in small_mol.atoms():
                 new_number = tmp_mol.add_atom(atom.copy())
                 transition_mapping[n] = new_number

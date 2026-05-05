@@ -3,6 +3,7 @@
 # source: reaction.proto
 # Protobuf Python Version: 6.31.1
 """Generated protocol buffer code."""
+
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import runtime_version as _runtime_version
@@ -58,9 +59,9 @@ if not _descriptor._USE_C_DESCRIPTORS:
     _globals["_REACTIONINPUT_ADDITIONSPEED_ADDITIONSPEEDTYPE"]._serialized_end = 1445
     _globals["_REACTIONINPUT_ADDITIONDEVICE"]._serialized_start = 1448
     _globals["_REACTIONINPUT_ADDITIONDEVICE"]._serialized_end = 1763
-    _globals["_REACTIONINPUT_ADDITIONDEVICE_ADDITIONDEVICETYPE"]._serialized_start = (
-        1552
-    )
+    _globals[
+        "_REACTIONINPUT_ADDITIONDEVICE_ADDITIONDEVICETYPE"
+    ]._serialized_start = 1552
     _globals["_REACTIONINPUT_ADDITIONDEVICE_ADDITIONDEVICETYPE"]._serialized_end = 1763
     _globals["_AMOUNT"]._serialized_start = 1766
     _globals["_AMOUNT"]._serialized_end = 1980
@@ -168,9 +169,9 @@ if not _descriptor._USE_C_DESCRIPTORS:
     _globals["_STIRRINGCONDITIONS"]._serialized_end = 8839
     _globals["_STIRRINGCONDITIONS_STIRRINGRATE"]._serialized_start = 8513
     _globals["_STIRRINGCONDITIONS_STIRRINGRATE"]._serialized_end = 8694
-    _globals["_STIRRINGCONDITIONS_STIRRINGRATE_STIRRINGRATETYPE"]._serialized_start = (
-        8628
-    )
+    _globals[
+        "_STIRRINGCONDITIONS_STIRRINGRATE_STIRRINGRATETYPE"
+    ]._serialized_start = 8628
     _globals["_STIRRINGCONDITIONS_STIRRINGRATE_STIRRINGRATETYPE"]._serialized_end = 8694
     _globals["_STIRRINGCONDITIONS_STIRRINGMETHODTYPE"]._serialized_start = 8697
     _globals["_STIRRINGCONDITIONS_STIRRINGMETHODTYPE"]._serialized_end = 8839
@@ -186,9 +187,9 @@ if not _descriptor._USE_C_DESCRIPTORS:
     _globals[
         "_ELECTROCHEMISTRYCONDITIONS_ELECTROCHEMISTRYMEASUREMENT"
     ]._serialized_end = 9742
-    _globals["_ELECTROCHEMISTRYCONDITIONS_ELECTROCHEMISTRYCELL"]._serialized_start = (
-        9745
-    )
+    _globals[
+        "_ELECTROCHEMISTRYCONDITIONS_ELECTROCHEMISTRYCELL"
+    ]._serialized_start = 9745
     _globals["_ELECTROCHEMISTRYCONDITIONS_ELECTROCHEMISTRYCELL"]._serialized_end = 9972
     _globals[
         "_ELECTROCHEMISTRYCONDITIONS_ELECTROCHEMISTRYCELL_ELECTROCHEMISTRYCELLTYPE"
@@ -196,9 +197,9 @@ if not _descriptor._USE_C_DESCRIPTORS:
     _globals[
         "_ELECTROCHEMISTRYCONDITIONS_ELECTROCHEMISTRYCELL_ELECTROCHEMISTRYCELLTYPE"
     ]._serialized_end = 9972
-    _globals["_ELECTROCHEMISTRYCONDITIONS_ELECTROCHEMISTRYTYPE"]._serialized_start = (
-        9974
-    )
+    _globals[
+        "_ELECTROCHEMISTRYCONDITIONS_ELECTROCHEMISTRYTYPE"
+    ]._serialized_start = 9974
     _globals["_ELECTROCHEMISTRYCONDITIONS_ELECTROCHEMISTRYTYPE"]._serialized_end = 10069
     _globals["_FLOWCONDITIONS"]._serialized_start = 10072
     _globals["_FLOWCONDITIONS"]._serialized_end = 10604
@@ -236,9 +237,9 @@ if not _descriptor._USE_C_DESCRIPTORS:
     ]._serialized_end = 13449
     _globals["_PRODUCTMEASUREMENT_SELECTIVITY"]._serialized_start = 13490
     _globals["_PRODUCTMEASUREMENT_SELECTIVITY"]._serialized_end = 13675
-    _globals["_PRODUCTMEASUREMENT_SELECTIVITY_SELECTIVITYTYPE"]._serialized_start = (
-        13589
-    )
+    _globals[
+        "_PRODUCTMEASUREMENT_SELECTIVITY_SELECTIVITYTYPE"
+    ]._serialized_start = 13589
     _globals["_PRODUCTMEASUREMENT_SELECTIVITY_SELECTIVITYTYPE"]._serialized_end = 13675
     _globals["_PRODUCTMEASUREMENT_PRODUCTMEASUREMENTTYPE"]._serialized_start = 13678
     _globals["_PRODUCTMEASUREMENT_PRODUCTMEASUREMENTTYPE"]._serialized_end = 13834

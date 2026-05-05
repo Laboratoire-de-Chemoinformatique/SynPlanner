@@ -136,7 +136,6 @@ def run_search(
         open(targets_path, encoding="utf-8") as targets,
         open(stats_file, "w", encoding="utf-8", newline="\n") as csvfile,
     ):
-
         statswriter = csv.DictWriter(csvfile, delimiter=",", fieldnames=stats_header)
         statswriter.writeheader()
 
@@ -182,7 +181,6 @@ def run_search(
             # is solved
             n_solved += bool(tree.winning_nodes)
             if bool(tree.winning_nodes):
-
                 # extract routes
                 extracted_routes.append(extract_routes(tree))
 

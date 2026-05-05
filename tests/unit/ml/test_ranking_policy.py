@@ -1,11 +1,18 @@
 """Tests for ranking policy dataset and stratified splitting."""
 
 from collections import Counter
+from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
 import pytest
+import torch
+from torch_geometric.data import Data
 
-from synplan.ml.training.preprocessing import RankingPolicyDataset
+import synplan.ml.training.preprocessing as preprocessing
+from synplan.ml.training.preprocessing import (
+    FilteringPolicyDataset,
+    RankingPolicyDataset,
+)
 from synplan.ml.training.supervised import _stratified_ranking_split
 from synplan.utils.cache import cache_digest
 
@@ -44,6 +51,110 @@ def test_dataset_num_classes(dataset):
     assert dataset.num_classes > 0
 
 
+def test_parallel_dataset_build_submits_batches(monkeypatch, tmp_path):
+    """Parallel ranking preprocessing should amortize IPC by submitting batches."""
+    row_count = 5001
+    policy_data = tmp_path / "policy_data.tsv"
+    policy_data.write_text(
+        "product_smiles\trule_id\n"
+        + "".join(f"product-{idx}\t{idx % 7}\n" for idx in range(row_count)),
+        encoding="utf-8",
+    )
+
+    submitted_batches = []
+
+    def fake_convert_item(item):
+        product_smi, rule_id_str = item
+        graph = Data(
+            x=torch.tensor([[1.0]]),
+            edge_index=torch.empty((2, 0), dtype=torch.long),
+            edge_attr=torch.empty((0, 4), dtype=torch.float),
+        )
+        graph.y_rules = torch.tensor([int(rule_id_str)], dtype=torch.long)
+        return graph, product_smi
+
+    def fake_process_pool_map_stream(items, worker_fn, **_kwargs):
+        for batch in items:
+            assert isinstance(batch, list)
+            assert batch
+            submitted_batches.append(batch)
+            yield worker_fn(batch)
+
+    monkeypatch.setattr(preprocessing, "_convert_ranking_item", fake_convert_item)
+    monkeypatch.setattr(
+        preprocessing, "process_pool_map_stream", fake_process_pool_map_stream
+    )
+
+    dataset = RankingPolicyDataset(
+        policy_data_path=str(policy_data),
+        output_path="",
+        num_workers=2,
+    )
+
+    assert len(dataset) == row_count
+    assert sum(len(batch) for batch in submitted_batches) == row_count
+    assert any(len(batch) > 1 for batch in submitted_batches)
+    assert dataset._product_keys == [f"product-{idx}" for idx in range(row_count)]
+
+
+def test_ranking_batch_payload_does_not_return_torch_objects(monkeypatch):
+    """Worker payloads must avoid torch shared-memory file descriptors."""
+
+    def fake_convert_item(item):
+        product_smi, rule_id_str = item
+        graph = Data(
+            x=torch.tensor([[6, 2, 14, 4, 2, 0, 0, 1, 1, 0, 0]], dtype=torch.uint8),
+            edge_index=torch.tensor([[0, 1], [1, 0]], dtype=torch.long),
+            edge_attr=torch.tensor(
+                [
+                    [1.0, 0.0, 0.0, 0.0],
+                    [1.0, 0.0, 0.0, 0.0],
+                ],
+                dtype=torch.float,
+            ),
+        )
+        graph.y_rules = torch.tensor([int(rule_id_str)], dtype=torch.long)
+        return graph, product_smi
+
+    def contains_torch_object(value):
+        if isinstance(value, (torch.Tensor, Data)):
+            return True
+        if isinstance(value, dict):
+            return any(contains_torch_object(v) for v in value.values())
+        if isinstance(value, (list, tuple)):
+            return any(contains_torch_object(v) for v in value)
+        return False
+
+    monkeypatch.setattr(preprocessing, "_convert_ranking_item", fake_convert_item)
+
+    payload = preprocessing._convert_ranking_batch([("CC", "3")])
+
+    assert not contains_torch_object(payload)
+
+
+def test_filtering_dataset_parallel_crash_refuses_serial_fallback(
+    monkeypatch, tmp_path
+):
+    """Filtering preprocessing should fail visibly if the worker pool crashes."""
+    molecules = tmp_path / "molecules.smi"
+    molecules.write_text("CCO\n", encoding="utf-8")
+
+    def fake_process_pool_map_stream(*_args, **_kwargs):
+        raise BrokenProcessPool("worker crashed")
+
+    monkeypatch.setattr(
+        preprocessing, "process_pool_map_stream", fake_process_pool_map_stream
+    )
+
+    with pytest.raises(RuntimeError, match="Refusing silent serial fallback"):
+        FilteringPolicyDataset(
+            molecules_path=str(molecules),
+            reaction_rules_path="rules.tsv",
+            output_path="",
+            num_cpus=2,
+        )
+
+
 # ── Stratified split tests ─────────────────────────────────────
 
 
@@ -65,12 +176,12 @@ def test_no_data_leakage(dataset):
 
     for key, indices in product_groups.items():
         if len(indices) > 1:
-            assert all(
-                i in train_set for i in indices
-            ), f"Duplicate product {key!r} leaked into validation"
-            assert all(
-                i not in val_set for i in indices
-            ), f"Duplicate product {key!r} found in validation"
+            assert all(i in train_set for i in indices), (
+                f"Duplicate product {key!r} leaked into validation"
+            )
+            assert all(i not in val_set for i in indices), (
+                f"Duplicate product {key!r} found in validation"
+            )
 
 
 def test_val_fraction_per_rule(dataset):
