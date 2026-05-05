@@ -6,115 +6,38 @@ import html
 import math
 from contextlib import suppress
 
-from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.tree import Tree
 
 
-def node_primary_molecule(node) -> object | None:
-    if getattr(node, "curr_precursor", None) and hasattr(
-        node.curr_precursor, "molecule"
-    ):
+def node_primary_molecule(node) -> object:
+    if node.curr_precursor:
         return node.curr_precursor.molecule
-    if getattr(node, "new_precursors", None):
-        precursor = node.new_precursors[0]
-        if hasattr(precursor, "molecule"):
-            return precursor.molecule
-    if getattr(node, "precursors_to_expand", None):
-        precursor = node.precursors_to_expand[0]
-        if hasattr(precursor, "molecule"):
-            return precursor.molecule
-    return None
-
-
-def depict_molecule_svg(molecule) -> str | None:
-    if molecule is None:
-        return None
-    try:
-        molecule.clean2d()
-        return molecule.depict()
-    except Exception:
-        return None
-
-
-def svg_from_smiles(smiles: str) -> str | None:
-    if not smiles:
-        return None
-    try:
-        molecule = mol_from_smiles(smiles)
-    except Exception:
-        return None
-    return depict_molecule_svg(molecule)
-
-
-def molecule_key(molecule: object | None) -> str | None:
-    if molecule is None:
-        return None
-    try:
-        return str(molecule)
-    except Exception:
-        return None
+    if node.new_precursors:
+        return node.new_precursors[0].molecule
+    return node.precursors_to_expand[0].molecule
 
 
 def molecule_smiles_and_svg(
-    molecule: object | None, *, with_svg: bool
-) -> tuple[str | None, str | None]:
-    if molecule is None:
-        return None, None
-    try:
-        smiles = str(molecule)
-    except Exception:
-        smiles = None
-    if not with_svg:
-        return smiles, None
-    return smiles, depict_molecule_svg(molecule)
+    molecule: object, *, with_svg: bool
+) -> tuple[str, str | None]:
+    smiles = str(molecule)
+    return smiles, molecule.depict() if with_svg else None
 
 
 def node_product_molecules(node) -> list[object]:
     """Return product molecules for a node, falling back to one primary molecule."""
-    molecules: list[object] = []
-    for precursor in getattr(node, "new_precursors", None) or ():
-        mol = getattr(precursor, "molecule", None)
-        if mol is not None:
-            molecules.append(mol)
-    if molecules:
-        return molecules
+    if node.new_precursors:
+        return [precursor.molecule for precursor in node.new_precursors]
 
-    primary = node_primary_molecule(node)
-    return [primary] if primary is not None else []
+    return [node_primary_molecule(node)]
 
 
 def curr_precursor_key(node) -> str | None:
-    curr = getattr(node, "curr_precursor", None)
-    if curr is None:
-        return None
-    molecule = getattr(curr, "molecule", curr)
-    key = molecule_key(molecule)
-    if key:
-        return key
-    try:
-        return str(curr)
-    except Exception:
-        return None
+    return str(node.curr_precursor.molecule) if node.curr_precursor else None
 
 
-def target_molecule(tree: Tree) -> object | None:
-    target_node = tree.nodes.get(1)
-    if target_node is None:
-        return None
-
-    candidates = []
-    curr_precursor = getattr(target_node, "curr_precursor", None)
-    if curr_precursor:
-        candidates.append(curr_precursor)
-    for attr_name in ("precursors_to_expand", "new_precursors"):
-        for precursor in getattr(target_node, attr_name, None) or ():
-            candidates.append(precursor)
-
-    for candidate in candidates:
-        molecule = getattr(candidate, "molecule", candidate)
-        if molecule is not None:
-            return molecule
-    return None
+def target_molecule(tree: Tree) -> object:
+    return tree.nodes[1].curr_precursor.molecule
 
 
 def molecule_atom_coordinates(molecule: object) -> dict[int, tuple[float, float]]:
@@ -303,11 +226,4 @@ def target_svg_from_coordinates(molecule: object) -> str:
 
 def build_target_svg(tree: Tree) -> str:
     molecule = target_molecule(tree)
-    if molecule is None:
-        return ""
-
-    target_svg = target_svg_from_coordinates(molecule)
-    if target_svg:
-        return target_svg
-
-    return depict_molecule_svg(molecule) or ""
+    return target_svg_from_coordinates(molecule) or molecule.depict()
