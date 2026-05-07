@@ -5,7 +5,7 @@ import time
 from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import ClassVar
 
 import numpy as np
 from chython.algorithms.fingerprints.morgan import MorganFingerprint
@@ -25,7 +25,7 @@ from synplan.chem.data.standardizing import (
     KekuleFormStandardizer,
     StandardizationError,
 )
-from synplan.utils.config import BaseConfigModel
+from synplan.utils.config import BaseConfigModel, NestedConfigContainer
 from synplan.utils.files import (
     RawReactionReader,
     ReactionWriter,
@@ -482,7 +482,7 @@ class CCRingBreakingFilter:
         return False
 
 
-class ReactionFilterConfig(BaseConfigModel):
+class ReactionFilterConfig(NestedConfigContainer):
     """
     Configuration class for reaction filtering. This class manages configuration
     settings for various reaction filters, including paths, file formats, and filter-
@@ -528,24 +528,6 @@ class ReactionFilterConfig(BaseConfigModel):
         "cc_sp3_breaking_config": CCsp3BreakingConfig,
         "cc_ring_breaking_config": CCRingBreakingConfig,
     }
-
-    @model_validator(mode="before")
-    @classmethod
-    def _coerce_nested(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            for field_name, cfg_cls in cls._NESTED_CONFIG_TYPES.items():
-                if field_name in data and isinstance(data[field_name], dict):
-                    data[field_name] = cfg_cls(**data[field_name])
-        return data
-
-    def to_dict(self) -> dict[str, Any]:
-        """Converts the configuration into a dictionary, excluding None fields."""
-        result = {}
-        for field_name in self._NESTED_CONFIG_TYPES:
-            config = getattr(self, field_name)
-            if config is not None:
-                result[field_name] = config.to_dict()
-        return result
 
     def create_filters(self):
         filter_instances = []

@@ -128,4 +128,4 @@ different configurations.
 - **Dead-end nodes** indicate nodes where no predicted rules produced children.
   High dead-end rates may point to limited building blocks or overly specific rules.
 
-For a hands-on tutorial, see the `Tree Analysis notebook <10_Tree_Analysis.ipynb>`_.
+For a hands-on tutorial, see the `Tree Analysis notebook <06_Tree_Analysis.ipynb>`_.

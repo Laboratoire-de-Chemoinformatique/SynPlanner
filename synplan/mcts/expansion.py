@@ -364,11 +364,13 @@ class CombinedPolicyNetworkFunction:
 
 
 def _rule_query_pattern(rule) -> ReactionContainer | None:
-    """Return the query pattern used to test rule applicability."""
+    """Return the first query pattern stored on a chython :class:`Reactor`.
 
-    reactants = getattr(rule, "reactants", None)
-    if reactants:
-        return reactants[0]
+    chython's :class:`Reactor` keeps the LHS query patterns on the private
+    ``_patterns`` tuple — see ``chython/reactor/reactor.py``. We use ``[0]``
+    because the priority-rule applicability check only needs *any* substructure
+    to test ``pattern < molecule`` against the current precursor.
+    """
 
     patterns = getattr(rule, "_patterns", None)
     if patterns:

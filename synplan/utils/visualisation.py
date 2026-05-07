@@ -100,13 +100,13 @@ def extract_routes(
 
             for before_id, after_id in pairwise(path_ids):
                 before = tree.nodes[before_id].curr_precursor.molecule
+                after_node = tree.nodes[after_id]
                 graph[before] = {
                     "children": [
-                        precursor.molecule
-                        for precursor in tree.nodes[after_id].new_precursors
+                        precursor.molecule for precursor in after_node.new_precursors
                     ],
-                    "rule_key": tree.nodes_rule_key.get(after_id),
-                    "policy_rank": tree.nodes_policy_rank.get(after_id),
+                    "rule_key": after_node.rule_key,
+                    "policy_rank": after_node.policy_rank,
                 }
 
             routes_block.append(
@@ -394,12 +394,12 @@ def _prepare_tree_route_svg_inputs(
                 precursor.molecule.meta.pop("label", None)
                 precursor.molecule.meta.pop("status", None)
 
-    nodes_policy_rank = getattr(tree, "nodes_policy_rank", {})
     for parent_idx in range(len(path_ids) - 1):
         child_id = path_ids[parent_idx + 1]
+        child_node = tree.nodes[child_id]
         label_text = _format_arrow_label(
-            tree.nodes_rule_key.get(child_id),
-            nodes_policy_rank.get(child_id),
+            child_node.rule_key,
+            child_node.policy_rank,
             include_rule_key=labeled,
         )
         if not label_text:
@@ -476,7 +476,7 @@ def get_route_svg(
 
     :param tree: The built tree.
     :param node_id: The id of the node from which to visualize the route.
-    :param labeled: If True, include each disconnection's ``nodes_rule_key`` in
+    :param labeled: If True, include each disconnection's ``Node.rule_key`` in
         the arrow label. Stored policy ranks are shown as ``Top-N`` whenever
         available, even when ``labeled`` is False.
     :param allow_unsolved: If True, also render partial routes ending at non-winning

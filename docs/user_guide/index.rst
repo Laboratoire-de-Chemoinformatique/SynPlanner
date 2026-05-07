@@ -60,6 +60,7 @@ also for creating flexible pipelines.
 - `Tree Analysis`_ - demonstrates how to analyze tree search results: policy performance, winning rule ranks, branching profile, and route details.
 - `Planning with RDKit`_ - demonstrates how to use SynPlanner with RDKit Mol objects for input and output.
 - `Rule Analysis`_ - demonstrates how to analyze and visualize reaction rules.
+- `Priority Rules`_ - demonstrates how to create custom retrosynthetic planner with user defined retrosynthetic SMARTS.
 
 .. _Welcome to Chython: 00_Welcome_to_Chython.ipynb
 .. _Coming from RDKit: 01_Coming_from_RDKit.ipynb
@@ -75,6 +76,7 @@ also for creating flexible pipelines.
 .. _Tree Analysis: 10_Tree_Analysis.ipynb
 .. _Planning with RDKit: 11_Planning_with_RDKit.ipynb
 .. _Rule Analysis: 12_Rule_Analysis.ipynb
+.. _Priority Rules: 13_Priority_Rules.ipynb
 
 .. toctree::
     :hidden:
@@ -96,5 +98,7 @@ also for creating flexible pipelines.
     10_Tree_Analysis
     11_Planning_with_RDKit
     12_Rule_Analysis
+    13_Priority_Rules
     ../configuration/configuration
     ../methods/methods
+   migration

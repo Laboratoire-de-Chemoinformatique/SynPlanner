@@ -10,11 +10,11 @@ from abc import ABC, abstractmethod
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from chython import smiles as smiles_chython
 from chython.containers import MoleculeContainer, ReactionContainer
-from pydantic import Field, model_validator
+from pydantic import Field
 from tqdm.auto import tqdm
 
 from synplan.chem.data.pipeline import (
@@ -28,7 +28,7 @@ from synplan.chem.data.reaction_result import (
     PipelineSummary,
 )
 from synplan.chem.utils import unite_molecules
-from synplan.utils.config import BaseConfigModel
+from synplan.utils.config import BaseConfigModel, NestedConfigContainer
 from synplan.utils.files import (
     RawReactionReader,
     ReactionWriter,
@@ -678,7 +678,7 @@ STANDARDIZER_REGISTRY = {
 }
 
 
-class ReactionStandardizationConfig(BaseConfigModel):
+class ReactionStandardizationConfig(NestedConfigContainer):
     """Configuration class for reaction filtering. This class manages configuration
     settings for various reaction filters, including paths, file formats, and filter-
     specific parameters.
@@ -728,24 +728,6 @@ class ReactionStandardizationConfig(BaseConfigModel):
         "remove_reagents_config": RemoveReagentsConfig,
         "rebalance_reaction_config": RebalanceReactionConfig,
     }
-
-    @model_validator(mode="before")
-    @classmethod
-    def _coerce_nested(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            for field_name, cfg_cls in cls._NESTED_CONFIG_TYPES.items():
-                if field_name in data and isinstance(data[field_name], dict):
-                    data[field_name] = cfg_cls(**data[field_name])
-        return data
-
-    def to_dict(self) -> dict[str, Any]:
-        """Converts the configuration into a dictionary, excluding None fields."""
-        result = {}
-        for field_name in self._NESTED_CONFIG_TYPES:
-            config = getattr(self, field_name)
-            if config is not None:
-                result[field_name] = config.to_dict()
-        return result
 
     def create_standardizers(self):
         """Create selected standardizers in SynPlanner's canonical order."""

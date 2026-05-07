@@ -104,8 +104,7 @@ def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
 
     if not config_path.exists():
         raise FileNotFoundError(
-            f"Config file not found: {config_path}\n"
-            f"Expected at: {DEFAULT_CONFIG_PATH}"
+            f"Config file not found: {config_path}\nExpected at: {DEFAULT_CONFIG_PATH}"
         )
 
     logger.info(f"Loading config from: {config_path}")
@@ -261,7 +260,7 @@ def extract_tree_stats(tree: Tree, target_smi: str) -> dict:
         "num_routes": len(tree.winning_nodes),
         "num_nodes": len(tree),
         "num_iter": tree.curr_iteration,
-        "tree_depth": max(tree.nodes_depth.values()),
+        "tree_depth": max(n.depth for n in tree.nodes.values()),
         "search_time": round(tree.curr_time, 1),
         "solved": len(tree.winning_nodes) > 0,
     }
@@ -563,7 +562,7 @@ def main():
 
     print("-" * 60)
     print(
-        f"{'TOTAL':<20} {total_solved:<10} {total_molecules:<10} {total_solved/total_molecules:.1%}"
+        f"{'TOTAL':<20} {total_solved:<10} {total_molecules:<10} {total_solved / total_molecules:.1%}"
     )
     print("=" * 60)
     print(f"\nResults saved to: {results_root}")

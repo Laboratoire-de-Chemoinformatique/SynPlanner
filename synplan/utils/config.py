@@ -1,7 +1,7 @@
 """Module containing configuration classes."""
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 import yaml
 from chython import smarts
@@ -62,6 +62,61 @@ class BaseConfigModel(BaseModel):
                     "__pydantic_fields_set__": obj.__pydantic_fields_set__,
                 }
             )
+
+
+class NestedConfigContainer(BaseConfigModel):
+    """Base for configs that hold optional ``XxxConfig | None = None`` nested fields.
+
+    Subclasses declare a ``_NESTED_CONFIG_TYPES`` ``ClassVar`` mapping the
+    field name to the concrete nested config class — for example::
+
+        class MyConfig(NestedConfigContainer):
+            substep_config: SubstepConfig | None = None
+
+            _NESTED_CONFIG_TYPES: ClassVar[dict[str, type]] = {
+                "substep_config": SubstepConfig,
+            }
+
+    The container then provides:
+
+    * **YAML-friendly coercion.** Both ``substep_config:`` (parsed as
+      ``None``) and ``substep_config: {}`` (empty mapping) produce a
+      default-instantiated ``SubstepConfig``. Explicit dicts are validated
+      against the declared type. To *disable* a nested config, omit the key
+      from the input entirely (the field default of ``None`` is preserved).
+
+      Pre-1.5.0 ``substep_config:`` silently left the field as ``None`` and
+      the substep was skipped — see the 1.5.0 ⚠️ Backwards-incompatible
+      block in the CHANGELOG.
+
+    * ``to_dict()`` that emits each non-``None`` nested config (recursively)
+      and skips top-level fields not listed in ``_NESTED_CONFIG_TYPES``.
+      Subclasses with additional scalar fields override ``to_dict`` if they
+      need them in the output.
+    """
+
+    _NESTED_CONFIG_TYPES: ClassVar[dict[str, type]] = {}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_nested_configs(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for field_name, cfg_cls in cls._NESTED_CONFIG_TYPES.items():
+                if field_name not in data:
+                    continue
+                value = data[field_name]
+                if value is None or isinstance(value, dict):
+                    data[field_name] = cfg_cls(**(value or {}))
+        return data
+
+    def to_dict(self) -> dict[str, Any]:
+        """Dict of nested configs, ``None`` entries excluded."""
+        result: dict[str, Any] = {}
+        for field_name in self._NESTED_CONFIG_TYPES:
+            config = getattr(self, field_name)
+            if config is not None:
+                result[field_name] = config.to_dict()
+        return result
 
 
 class ReactorConfig(BaseConfigModel):
@@ -354,6 +409,18 @@ class TreeConfig(BaseConfigModel):
     :param lnmcs_ratio: Pruning percentile for LazyNMCS algorithm.
         Only candidates scoring above this percentile threshold are
         explored. Value in range [0.0, 1.0]. Defaults to 0.2.
+    :param use_priority: When ``True``, curated priority rules passed to
+        :class:`~synplan.mcts.tree.Tree` (``priority_rules=...``) are tried
+        ahead of the policy on every expansion. Each priority rule that
+        matches the current precursor enters with ``prob=1.0``; combined
+        with the per-fragment multiplier in ``_add_child_if_new``, an
+        N-fragment priority disconnect produces ``Node.prob = N`` and
+        therefore dominates UCB sibling selection. Defaults to ``False``.
+    :param priority_rule_multiapplication: When ``True``, priority rules are
+        applied repeatedly to a single precursor until no further match is
+        possible (BFS to fixpoint), instead of stopping at the first match.
+        Useful for repeated motifs such as multi-site deprotections. Has no
+        effect on policy rules. Defaults to ``False``.
     """
 
     max_iterations: int = Field(default=100, gt=0)
@@ -372,8 +439,6 @@ class TreeConfig(BaseConfigModel):
     enable_pruning: bool = False
     use_priority: bool = False
     priority_rule_multiapplication: bool = False
-    policy_rule_source_name: str = "policy"
-    priority_rule_source_name: str = "priority"
 
     # UCT configuration
     search_strategy: Literal["expansion_first", "evaluation_first"] = "expansion_first"

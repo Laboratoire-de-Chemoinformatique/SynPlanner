@@ -37,11 +37,11 @@ class _MockTree:
             2: Node(
                 precursors_to_expand=(intermediate,),
                 new_precursors=(intermediate,),
+                rule_key="policy:0",
             ),
         }
         self.parents = {1: 0, 2: 1}
         self.winning_nodes = []
-        self.nodes_rule_key = {2: "policy:0"}
 
 
 class _MockRouteMetadataTree:

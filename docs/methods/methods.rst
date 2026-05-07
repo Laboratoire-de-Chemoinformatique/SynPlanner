@@ -26,3 +26,4 @@ Practical usage (how to configure and run) is covered in :doc:`/configuration/co
     value
     mcts
     planning
+    priority_rules

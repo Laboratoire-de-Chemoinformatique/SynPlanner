@@ -193,7 +193,7 @@ def test_uct_puct_selects_highest_prior_on_second_step():
     found2, ids2 = tree.algorithm.step()
     assert found2 in (False, True)
     selected_id = ids2[0]
-    best_id = max(list(tree.children[1]), key=lambda cid: tree.nodes_prob[cid])
+    best_id = max(list(tree.children[1]), key=lambda cid: tree.nodes[cid].prob)
     assert selected_id == best_id
 
 
@@ -292,7 +292,7 @@ def test_select_nmcs_path_greedy_policy_and_random_on_real_tree():
     # policy should follow highest prior as well
     last_pol, seq_p = playout.select_nmcs_path(1, 1, "policy")
     assert len(seq_p) == 1
-    best_prior = max(list(tree.children[1]), key=lambda cid: tree.nodes_prob[cid])
+    best_prior = max(list(tree.children[1]), key=lambda cid: tree.nodes[cid].prob)
     assert seq_p[0] == best_prior
     assert last_pol in list(tree.children[1])
 

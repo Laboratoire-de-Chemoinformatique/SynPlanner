@@ -7,40 +7,51 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [1.5.0] - 2026-05-05
 
+> Migration guide: see [docs/user_guide/migration.rst](docs/user_guide/migration.rst).
+> Priority rules concept page: see [docs/methods/priority_rules.rst](docs/methods/priority_rules.rst).
+
 ### ⚠️ Backwards-incompatible
-- **`apply_reaction_rule` default `top_reactions_num` raised from 3 → 5.**
-  This is a global change that affects *every* call site that did not pass the
-  kwarg explicitly — including MCTS rollouts (`synplan/mcts/evaluation.py`)
-  and per-node expansion (`synplan/mcts/tree.py`). Existing planning runs may
-  produce more child nodes per rule application and consequently larger trees,
-  different timings, and different routes. Pin the previous behavior with
-  `apply_reaction_rule(..., top_reactions_num=3)`.
+
+- `apply_reaction_rule` default `top_reactions_num` raised from 3 → 5;
+  pin the old behaviour with `apply_reaction_rule(..., top_reactions_num=3)`.
+- Per-node state moved from nine `Tree.nodes_*` parallel dicts onto
+  `Node` attributes (e.g. `tree.nodes_depth[nid]` → `tree.nodes[nid].depth`).
+  Old reads raise `AttributeError` with a migration hint.
+- `Tree.stats` is now a `TreeStats` dataclass — use attribute access,
+  not subscript or `.get()`. `Tree.to_stats_dict()` is unchanged.
+- `EvaluationStrategy.evaluate_node` signature collapses
+  `(node, node_id, nodes_depth, nodes_prob)` into
+  `(node, node_id, nodes: dict[int, Node])`.
+- Pickled `Tree` instances from 1.4.x partially fail on the migrated
+  surfaces (`tree.stats.*`, new `Node` provenance fields). Re-run the
+  search to recover full functionality.
+- YAML `key:` (null) for nested standardization / filtering configs now
+  enables the step with defaults instead of silently disabling it. To
+  disable, omit the key entirely.
 
 ### Added
-- Priority-rule support for MCTS expansion (`Tree(priority_rules=...)`,
-  `TreeConfig.use_priority`), tried *before* the policy on every node when
-  enabled. Priority rules match by simple substructure isomorphism and are
-  yielded with `prob=1.0`; combined with the existing per-product
-  fragment-count multiplier (`scaled_prob = prob × n_qualifying_fragments`),
-  a multi-fragment priority disconnect (e.g. 4-component Ugi → prior 4)
-  intentionally dominates UCB sibling selection. See
-  `Tree.__init__` docstring for the full mechanism.
+
+- Priority-rule support for MCTS expansion: a mapping of named SMARTS
+  rule sets passed to `Tree(..., priority_rules={"ugi": ..., ...})`,
+  tried ahead of the learned policy on every node. Each set gets its
+  own counter pair in `tree.stats.per_priority_source[<name>]`.
+  Reserved name `"policy"` is rejected; `use_priority=True` without
+  `priority_rules` raises.
 - Optional iterated rule application via
   `TreeConfig.priority_rule_multiapplication` and the new
-  `apply_reaction_rule(multirule=True, rm_dup=True)` kwargs — repeatedly
-  applies the same rule to generated reactants until no new set is produced
-  (e.g. strip every protective group of a given kind from a fully-protected
-  substrate).
-- Source-specific rule counters in `tree.stats` and `to_stats_dict()`
-  (`policy_rules_tried/succeeded`, `priority_rules_tried/succeeded`) and
-  per-route priority usage statistics.
-- Rule provenance metadata on tree nodes and route outputs, including
-  `rule_source`, collision-safe `rule_key` (formatted as `<source>:<id>`),
-  and exact 1-indexed `policy_rank`.
-- Route SVG labels for rule keys and policy ranks, opt-in partial-route
-  rendering with `allow_unsolved`, and JSON-route SVG rendering that can display
-  stored rule metadata.
-- Tutorial 13 for the priority-rule route analysis workflow.
+  `apply_reaction_rule(multirule=True, rm_dup=True)` kwargs — useful
+  for stripping every protective group of a given kind in one step.
+- Source-specific rule counters in `tree.stats` /
+  `tree.to_stats_dict()`: `policy_rules_tried/succeeded`,
+  `priority_rules_tried/succeeded` (aggregate), and the per-set
+  `per_priority_source[<set_name>]` breakdown.
+- Rule provenance on tree nodes and route outputs: `rule_source`,
+  collision-safe `rule_key` (formatted as `<source>:<id>`), and exact
+  1-indexed `policy_rank`.
+- Route SVG labels for rule keys and policy ranks, opt-in
+  partial-route rendering with `allow_unsolved`, and JSON-route SVG
+  rendering that can display stored rule metadata.
+- Tutorial 13 for the priority-rule workflow.
 
 ### Changed
 - Tree expansion now tracks exact policy Top-N rank from the expansion function

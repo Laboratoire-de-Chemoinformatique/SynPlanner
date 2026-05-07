@@ -547,3 +547,86 @@ def test_remove_reagents_before_check_valence_cr6():
     rxn2 = parse_smiles(_CR6_REAGENT_SMILES)
     rxn2 = remove_reag(rxn2)
     check_val(rxn2)  # must not raise
+
+
+# -- YAML coercion: "key:" (null) and "key: {}" both enable with defaults -------
+
+
+def test_yaml_null_value_enables_standardizer_with_defaults():
+    """`key:` in YAML parses to None and MUST enable the step with defaults.
+
+    Pre-1.5.0 ``key:`` silently left the field as None and the standardizer
+    was skipped (a real-world bug reported by the user). After the fix,
+    ``key:`` is equivalent to ``key: {}`` — both enable with default values.
+    Disabling a step is done by omitting the key from YAML entirely.
+    """
+    import yaml
+
+    yaml_with_null = """
+functional_groups_config:
+kekule_form_config:
+check_valence_config:
+deduplicate: true
+"""
+    yaml_with_empty_dict = """
+functional_groups_config: {}
+kekule_form_config: {}
+check_valence_config: {}
+deduplicate: true
+"""
+    yaml_omitted = """
+deduplicate: true
+"""
+
+    cfg_null = ReactionStandardizationConfig.model_validate(
+        yaml.safe_load(yaml_with_null)
+    )
+    cfg_dict = ReactionStandardizationConfig.model_validate(
+        yaml.safe_load(yaml_with_empty_dict)
+    )
+    cfg_omitted = ReactionStandardizationConfig.model_validate(
+        yaml.safe_load(yaml_omitted)
+    )
+
+    # null and {} produce identical configs
+    assert cfg_null.model_dump() == cfg_dict.model_dump()
+
+    # omitted leaves the field as None — no standardizer instantiated
+    assert cfg_null.model_dump() != cfg_omitted.model_dump()
+    assert cfg_omitted.functional_groups_config is None
+
+    # null produces actual instantiated config objects (not None)
+    assert isinstance(cfg_null.functional_groups_config, FunctionalGroupsConfig)
+    assert isinstance(cfg_null.kekule_form_config, KekuleFormConfig)
+    assert isinstance(cfg_null.check_valence_config, CheckValenceConfig)
+
+    # The standardizers list contains the three expected instances when null
+    standardizer_names_null = {
+        type(s).__name__ for s in cfg_null.create_standardizers()
+    }
+    standardizer_names_dict = {
+        type(s).__name__ for s in cfg_dict.create_standardizers()
+    }
+    assert standardizer_names_null == standardizer_names_dict
+    assert "CheckValenceStandardizer" in standardizer_names_null
+    assert "FunctionalGroupsStandardizer" in standardizer_names_null
+
+    # Omitted produces no standardizers
+    assert cfg_omitted.create_standardizers() == []
+
+
+def test_yaml_null_preserves_explicit_overrides():
+    """A mix of `key:` (null) and `key: {a: 1}` (overrides) on the same config."""
+    import yaml
+
+    text = """
+functional_groups_config:
+remove_reagents_config:
+  reagent_max_size: 12
+deduplicate: true
+"""
+    cfg = ReactionStandardizationConfig.model_validate(yaml.safe_load(text))
+    assert isinstance(cfg.functional_groups_config, FunctionalGroupsConfig)
+    assert isinstance(cfg.remove_reagents_config, RemoveReagentsConfig)
+    # Override survived through the coercion path
+    assert cfg.remove_reagents_config.reagent_max_size == 12

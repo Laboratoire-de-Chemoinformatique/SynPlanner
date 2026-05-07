@@ -103,7 +103,6 @@ def route_to_rdkit(tree, node_id: int, keep_mapping: bool = True) -> list[dict]:
     path_ids.reverse()
 
     steps = []
-    nodes_policy_rank = getattr(tree, "nodes_policy_rank", {})
     for before_id, after_id in itertools.pairwise(path_ids):
         before_node = tree.nodes[before_id]
         after_node = tree.nodes[after_id]
@@ -125,11 +124,11 @@ def route_to_rdkit(tree, node_id: int, keep_mapping: bool = True) -> list[dict]:
                 "target": target_mol,
                 "precursors": precursor_mols,
                 "in_stock": in_stock,
-                "rule_id": tree.nodes_rules.get(after_id),
-                "rule_source": tree.nodes_rule_source.get(after_id),
-                "rule_key": tree.nodes_rule_key.get(after_id),
-                "policy_rank": nodes_policy_rank.get(after_id),
-                "depth": tree.nodes_depth.get(after_id, 0),
+                "rule_id": after_node.rule_id,
+                "rule_source": after_node.rule_source,
+                "rule_key": after_node.rule_key,
+                "policy_rank": after_node.policy_rank,
+                "depth": after_node.depth,
             }
         )
 
@@ -176,7 +175,6 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
         ]
 
     routes_block = []
-    nodes_policy_rank = getattr(tree, "nodes_policy_rank", {})
     for winning_node in tree.winning_nodes:
         # build molecule graph (same logic as extract_routes)
         graph: dict[MoleculeContainer, dict[str, object]] = {}
@@ -191,11 +189,12 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
 
         for before_id, after_id in itertools.pairwise(path_ids):
             before_mol = tree.nodes[before_id].curr_precursor.molecule
-            after_mols = [x.molecule for x in tree.nodes[after_id].new_precursors]
+            after_node = tree.nodes[after_id]
+            after_mols = [x.molecule for x in after_node.new_precursors]
             graph[before_mol] = {
                 "children": after_mols,
-                "rule_key": tree.nodes_rule_key.get(after_id),
-                "policy_rank": nodes_policy_rank.get(after_id),
+                "rule_key": after_node.rule_key,
+                "policy_rank": after_node.policy_rank,
             }
 
             if id(before_mol) not in mol_cache:
