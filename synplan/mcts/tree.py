@@ -3,6 +3,7 @@
 import itertools
 import logging
 from time import time
+from typing import Any
 
 from chython.containers import MoleculeContainer
 from chython.reactor import Reactor
@@ -49,6 +50,7 @@ class Tree:
         expansion_function: PolicyNetworkFunction,
         evaluation_function: EvaluationStrategy = None,
         route_scorer: RouteScorer | None = None,
+        bonds_state: Any | None = None,
     ):
         """Initializes a tree object with optional parameters for tree search for target
         molecule.
@@ -63,10 +65,13 @@ class Tree:
         :param route_scorer: Optional post-search route scorer for
             re-ranking winning routes.  When set, :meth:`route_score`
             delegates to ``route_scorer.rescore(original, route)``.
+        :param bonds_state: Optional target-bond selector state. State ``2`` freezes
+            a bond and blocks rules that break it; state ``1`` is allowed.
         """
 
         # tree config parameters
         self.config = config
+        self.bonds_state = bonds_state
 
         # building blocks and reaction reaction_rules
         self.reaction_rules = tuple(reaction_rules)
@@ -247,7 +252,7 @@ class Tree:
             rules_tried_here += 1
             rule_produced = False
             for products in apply_reaction_rule(
-                curr_node.curr_precursor.molecule, rule
+                curr_node.curr_precursor.molecule, rule, bonds_state=self.bonds_state
             ):
                 # check repeated products against previously produced molecules
                 if not products or not (set(products) - tmp_products):

@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from chython.containers import MoleculeContainer, ReactionContainer
+from chython.containers.bonds import DynamicBond
 from chython.exceptions import InvalidAromaticRing
 from chython.reactor import Reactor
 
@@ -14,6 +15,27 @@ class Reaction(ReactionContainer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+
+def _bond_key(atom1: int, atom2: int) -> tuple[int, int]:
+    return tuple(sorted((int(atom1), int(atom2))))
+
+
+def _breaks_frozen_bond(reaction: ReactionContainer, bonds_state: Any | None) -> bool:
+    frozen_bonds = {bond for bond, state in (bonds_state or {}).items() if state == 2}
+    if not frozen_bonds:
+        return False
+
+    cgr = reaction.compose()
+    for atom1, atom2, bond in cgr.bonds():
+        if (
+            isinstance(bond, DynamicBond)
+            and bond.order is not None
+            and bond.p_order is None
+            and _bond_key(atom1, atom2) in frozen_bonds
+        ):
+            return True
+    return False
 
 
 def add_small_mols(
@@ -54,6 +76,7 @@ def apply_reaction_rule(
     top_reactions_num: int = 3,
     validate_products: bool = True,
     rebuild_with_cgr: bool = False,
+    bonds_state: Any | None = None,
 ) -> Iterator[list[MoleculeContainer,]]:
     """Applies a reaction rule to a given molecule.
 
@@ -64,6 +87,8 @@ def apply_reaction_rule(
         reaction rule.
     :param validate_products: If True, validates the final products.
     :param rebuild_with_cgr: If True, the products are extracted from CGR decomposition.
+    :param bonds_state: Optional mapping of selected target bonds. State ``2`` freezes
+        a bond and rejects rules that break it; state ``1`` is allowed to proceed.
     :return: An iterator yielding the products of reaction rule application.
     """
 
@@ -81,10 +106,20 @@ def apply_reaction_rule(
             )
 
             # take top-N reactions from reactor
-            reactions = sorted_reactions[:top_reactions_num]
+            reactions = []
+            for reaction in sorted_reactions:
+                if _breaks_frozen_bond(reaction, bonds_state):
+                    reactions = []
+                    break
+                reactions.append(reaction)
+                if len(reactions) == top_reactions_num:
+                    break
         else:
             reactions = []
             for reaction in reaction_rule(*reactants):
+                if _breaks_frozen_bond(reaction, bonds_state):
+                    reactions = []
+                    break
                 reactions.append(reaction)
                 if len(reactions) == top_reactions_num:
                     break
