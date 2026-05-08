@@ -29,6 +29,7 @@ class FilteredEntry:
 
     original: str
     reason: str
+    source_info: str = ""
     line_number: int | None = None
 
 

@@ -362,6 +362,25 @@ def test_write_batch_results_filtered():
     assert "no_change" in summary.filter_breakdown
 
 
+def test_write_batch_results_filtered_to_file(tmp_path):
+    """write_batch_results logs filter rejections to error file as stage=filter rows."""
+    written = []
+    summary = PipelineSummary()
+    err_path = tmp_path / "errors.tsv"
+    filtered = [
+        FilteredEntry("CC>>CC", "DynamicBondsFilter", source_info="US123"),
+        FilteredEntry("CN>>CN", "NoReactionFilter"),
+    ]
+    batches = [BatchResult(records=[], dedup_keys=[], filtered=filtered)]
+    with open(err_path, "w") as ef:
+        write_batch_results(batches, written.append, summary, error_file=ef)
+    assert summary.filtered == 2
+    assert summary.filter_breakdown == {"DynamicBondsFilter": 1, "NoReactionFilter": 1}
+    text = err_path.read_text()
+    assert "CC>>CC\tUS123\tfilter\tDynamicBondsFilter\t" in text
+    assert "CN>>CN\t\tfilter\tNoReactionFilter\t" in text
+
+
 def test_write_batch_results_on_batch_callback():
     """write_batch_results calls on_batch with the batch total."""
     totals = []

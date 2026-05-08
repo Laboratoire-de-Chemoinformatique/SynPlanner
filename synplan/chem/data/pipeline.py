@@ -95,7 +95,11 @@ def write_batch_results(
     :param write_fn: Callable that accepts a single pre-serialized record
         string and writes it to the output (e.g. writer.write_string).
     :param summary: PipelineSummary updated in-place.
-    :param error_file: Optional open text file handle for error rows.
+    :param error_file: Optional open text file handle for failed/rejected
+        rows. Standardization errors are written with their actual ``stage``
+        and ``error_type``; filter rejections are written with
+        ``stage="filter"`` and ``error_type=<filter class name>`` so both
+        live in the same five-column TSV.
     :param dedup: If True, skip records whose dedup key was seen before.
     :param seen: Existing dedup set; a new set is created if None.
     :param on_batch: Optional callback called with the batch total count
@@ -135,6 +139,10 @@ def write_batch_results(
                 summary.filter_breakdown.get(flt.reason, 0) + 1
             )
             summary.filtered += 1
+            if error_file is not None:
+                error_file.write(
+                    f"{flt.original}\t{flt.source_info}\tfilter\t{flt.reason}\t\n"
+                )
         batch_total = len(batch.records) + len(batch.errors) + len(batch.filtered)
         summary.total_input += batch_total
         if on_batch is not None:

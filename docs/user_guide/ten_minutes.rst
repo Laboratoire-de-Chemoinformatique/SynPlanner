@@ -203,7 +203,7 @@ Pass the scorer to the tree so routes are re-ranked during the search:
 
 The score S(T) is in [0, 1]: 1.0 means no competing interactions detected,
 lower values indicate steps that may require protecting group strategies.
-See :doc:`07_Protection_Scoring` for a detailed walkthrough.
+See :doc:`08_Protection_Scoring` for a detailed walkthrough.
 
 Batch planning (many targets)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -329,11 +329,12 @@ Next steps
 
 **Advanced search:**
 
-- :doc:`08_Combined_Ranking_Filtering_Policy` — combine ranking and filtering policies
-- :doc:`09_NMCS_Algorithms` — Nested Monte Carlo Search
+- :doc:`09_Combined_Ranking_Filtering_Policy` — combine ranking and filtering policies
+- :doc:`10_NMCS_Algorithms` — Nested Monte Carlo Search
 - :doc:`../methods/value` — value network concepts
 
 **Route analysis:**
 
-- :doc:`06_Clustering` — cluster routes by strategic bonds
-- :doc:`07_Protection_Scoring` — score routes for selectivity issues
+- :doc:`06_Tree_Analysis` — diagnose policy and search behaviour
+- :doc:`07_Clustering` — cluster routes by strategic bonds
+- :doc:`08_Protection_Scoring` — score routes for selectivity issues

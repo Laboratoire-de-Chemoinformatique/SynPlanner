@@ -774,7 +774,11 @@ def _filter_batch_worker(
                     )
                 )
             else:
-                filtered.append(FilteredEntry(original=orig_smi, reason=reason))
+                filtered.append(
+                    FilteredEntry(
+                        original=orig_smi, reason=reason, source_info=source_info
+                    )
+                )
 
     return build_batch_result(reactions, errors, filtered, fmt, compute_dedup=False)
 
