@@ -312,6 +312,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
             stochastic=stochastic,
         )
         self.normalize = normalize
+        self.rollout_calls = 0
 
     def evaluate_node(
         self,
@@ -322,10 +323,12 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
     ) -> float:
         """Evaluate node using rollout simulation."""
         current_depth = nodes_depth[node_id]
+        precursors = tuple(node.precursors_to_expand)
+        self.rollout_calls += len(precursors)
         raw = min(
             (
                 self.rollout.simulate_precursor(precursor, current_depth=current_depth)
-                for precursor in node.precursors_to_expand
+                for precursor in precursors
             ),
             default=1.0,
         )

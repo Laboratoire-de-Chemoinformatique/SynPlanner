@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import base64
 import contextlib
+import io
 import json
 import math
 from collections.abc import Iterable
@@ -169,6 +170,114 @@ def _search_type_label(tree: Tree) -> str:
         algorithm_name = str(getattr(tree.config, "algorithm", ""))
 
     return "MCTS" if algorithm_name == "UCT" else algorithm_name
+
+
+def _tree_depth_stats(
+    tree: Tree, fallback_depths: dict[int, int]
+) -> dict[str, object]:
+    raw_depths = getattr(tree, "nodes_depth", None) or fallback_depths
+    depth_values: list[int] = []
+    nodes_by_depth: dict[int, int] = {}
+
+    for raw_depth in raw_depths.values():
+        try:
+            depth = int(raw_depth)
+        except Exception:
+            continue
+        depth_values.append(depth)
+        nodes_by_depth[depth] = nodes_by_depth.get(depth, 0) + 1
+
+    mean_depth = (
+        round(sum(depth_values) / len(depth_values), 2) if depth_values else 0.0
+    )
+    return {
+        "meanDepth": mean_depth,
+        "nodesByDepth": {
+            str(depth): nodes_by_depth[depth] for depth in sorted(nodes_by_depth)
+        },
+    }
+
+
+def _tree_branching_stats(tree: Tree) -> dict[str, object]:
+    children = getattr(tree, "children", {}) or {}
+    expanded_nodes = getattr(tree, "expanded_nodes", None)
+    if expanded_nodes:
+        branch_node_ids = [
+            node_id for node_id in expanded_nodes if node_id in children
+        ]
+    else:
+        branch_node_ids = [
+            node_id for node_id, child_ids in children.items() if child_ids
+        ]
+
+    child_counts = [
+        len(children.get(node_id, set()) or set()) for node_id in branch_node_ids
+    ]
+    return {
+        "meanBranchingFactor": round(sum(child_counts) / len(child_counts), 2)
+        if child_counts
+        else 0.0,
+        "maxBranchingFactor": max(child_counts) if child_counts else 0,
+    }
+
+
+def _rollout_calls(tree: Tree) -> int | None:
+    stats = getattr(tree, "stats", {}) or {}
+    try:
+        return int(stats["rollout_calls"])
+    except Exception:
+        pass
+
+    evaluator = getattr(tree, "evaluator", None)
+    try:
+        return int(getattr(evaluator, "rollout_calls"))
+    except Exception:
+        return None
+
+
+def _nodes_by_depth_histogram_data_uri(nodes_by_depth: dict[str, int]) -> str:
+    if not nodes_by_depth:
+        return ""
+
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg", force=True)
+        from matplotlib import pyplot as plt
+    except Exception:
+        return ""
+
+    depths: list[int] = []
+    counts: list[int] = []
+    for raw_depth, raw_count in sorted(
+        nodes_by_depth.items(),
+        key=lambda item: int(item[0]),
+    ):
+        try:
+            depths.append(int(raw_depth))
+            counts.append(int(raw_count))
+        except Exception:
+            continue
+    if not depths:
+        return ""
+
+    fig, ax = plt.subplots(figsize=(3.2, 2.0), dpi=120)
+    ax.bar(depths, counts, width=0.72, color="#4e8cff", edgecolor="#132034")
+    ax.set_xlabel("Depth")
+    ax.set_ylabel("Nodes")
+    ax.set_xticks(depths)
+    ax.grid(axis="y", alpha=0.25, linewidth=0.6)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    fig.tight_layout(pad=0.8)
+
+    buffer = io.StringIO()
+    try:
+        fig.savefig(buffer, format="svg", bbox_inches="tight")
+    finally:
+        plt.close(fig)
+    encoded_svg = base64.b64encode(buffer.getvalue().encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded_svg}"
 
 
 def _winning_route_paths(
@@ -495,6 +604,13 @@ def _build_payload(
         }
         route_nodes = _route_nodes_by_route(tree, cluster_route_ids)
 
+    depth_stats = _tree_depth_stats(tree, nodes_depth_tree)
+    branching_stats = _tree_branching_stats(tree)
+    tree_stats = getattr(tree, "stats", {}) or {}
+    nodes_by_depth_histogram = _nodes_by_depth_histogram_data_uri(
+        depth_stats["nodesByDepth"]
+    )
+
     return {
         "nodes": nodes_payload,
         "edges": edges_payload,
@@ -510,6 +626,16 @@ def _build_payload(
             "bubbleScale": float(bubble_scale),
             "spacingScale": 1.0,
             "hasExpandableNodes": bool(has_expandable_nodes),
+            "numRoutes": len(getattr(tree, "winning_nodes", []) or []),
+            "numClusters": len(clusters_payload),
+            "elapsedTime": round(float(getattr(tree, "curr_time", 0.0) or 0.0), 2),
+            "rolloutCalls": _rollout_calls(tree),
+            "meanDepth": depth_stats["meanDepth"],
+            "nodesByDepth": depth_stats["nodesByDepth"],
+            "nodesByDepthHistogram": nodes_by_depth_histogram,
+            "deadEndNodes": int(tree_stats.get("dead_end_nodes", 0) or 0),
+            "meanBranchingFactor": branching_stats["meanBranchingFactor"],
+            "maxBranchingFactor": branching_stats["maxBranchingFactor"],
             "winningNodesTotal": len(winning_node_ids),
             "winningEdgesTotal": len(winning_edge_keys),
             "winningFirstStep": int(win_first_step)
@@ -893,6 +1019,17 @@ _TREE_PAGE_CSS = """\
         gap: 8px;
       }
 
+      #goto-step {
+        width: 76px;
+        min-width: 64px;
+        background: var(--control-bg);
+        color: var(--text);
+        border: 1px solid var(--control-border);
+        border-radius: 8px;
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+
       .row label {
         font-size: 12px;
         color: var(--muted);
@@ -958,6 +1095,34 @@ _TREE_PAGE_CSS = """\
         gap: 4px 8px;
         font-size: 12px;
         margin-top: 6px;
+      }
+
+      #winning-panel .kv {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+
+      #winning-panel .kv div {
+        overflow-wrap: anywhere;
+      }
+
+      .depth-histogram {
+        grid-column: 1 / -1;
+        margin-top: 4px;
+      }
+
+      .depth-histogram summary {
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .depth-histogram img {
+        display: block;
+        width: 100%;
+        max-width: 260px;
+        margin-top: 6px;
+        background: #ffffff;
+        border: 1px solid var(--divider);
+        border-radius: 8px;
       }
 
       #info .kv div:nth-child(odd),
@@ -1115,6 +1280,8 @@ _TREE_PAGE_SCRIPT = """\
       const startOverlayEl = document.getElementById("start-overlay");
       const startBtn = document.getElementById("start-btn");
       const speedSel = document.getElementById("speed");
+      const gotoStepInput = document.getElementById("goto-step");
+      const gotoStepBtn = document.getElementById("goto-step-btn");
       const toEndBtn = document.getElementById("to-end");
       const controlsEl = document.getElementById("controls");
       const controlsToggleBtn = document.getElementById("controls-toggle");
@@ -1144,6 +1311,9 @@ _TREE_PAGE_SCRIPT = """\
       const nodeRadiusWorld = __NODE_RADIUS_WORLD__;
       const totalSteps = Math.max(0, stats.totalSteps || 0);
       stepInput.max = String(totalSteps);
+      if (gotoStepInput) {
+        gotoStepInput.max = String(totalSteps);
+      }
 
       const rootEl = document.documentElement;
       const themeStorageKey = "synplanner-expansion-theme";
@@ -1985,6 +2155,9 @@ _TREE_PAGE_SCRIPT = """\
 
       function setStep(nextStep) {
         const target = clampStep(nextStep);
+        if (gotoStepInput) {
+          gotoStepInput.value = String(target);
+        }
         if (target === currentStep) return;
 
         currentStep = target;
@@ -2053,6 +2226,29 @@ _TREE_PAGE_SCRIPT = """\
         setStep(value);
       });
 
+      function goToRequestedStep() {
+        if (!gotoStepInput) return;
+        stopPlaying();
+        const target = clampStep(parseInt(gotoStepInput.value, 10));
+        gotoStepInput.value = String(target);
+        setStep(target);
+      }
+
+      if (gotoStepBtn) {
+        gotoStepBtn.addEventListener("click", goToRequestedStep);
+      }
+
+      if (gotoStepInput) {
+        gotoStepInput.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          goToRequestedStep();
+        });
+        gotoStepInput.addEventListener("change", () => {
+          gotoStepInput.value = String(clampStep(parseInt(gotoStepInput.value, 10)));
+        });
+      }
+
       speedSel.addEventListener("change", () => {
         if (playing) {
           stopPlaying();
@@ -2083,6 +2279,23 @@ _TREE_PAGE_SCRIPT = """\
         return String(value);
       }
 
+      function formatSeconds(value) {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return safe(value);
+        return `${num.toFixed(2)} s`;
+      }
+
+      function nodesByDepthHistogramMarkup() {
+        const source = stats.nodesByDepthHistogram;
+        if (!source) return "—";
+        return `
+          <details class="depth-histogram">
+            <summary>nodes_by_depth histogram</summary>
+            <img alt="Nodes by depth histogram" src="${source}" />
+          </details>
+        `;
+      }
+
       function computeActiveWinning(step) {
         const activeEdgeKeys = new Set();
         const activeWinningNodeIds = new Set();
@@ -2103,15 +2316,23 @@ _TREE_PAGE_SCRIPT = """\
         const totalWinningNodes = Number(stats.winningNodesTotal || 0);
 
         if (!totalWinningNodes) {
-          winningSummaryEl.textContent = "No winning nodes recorded in this tree.";
-          winningKvEl.innerHTML = "";
-          return;
+          winningSummaryEl.textContent =
+            `No winning nodes recorded in this tree · step ${step}`;
+        } else {
+          winningSummaryEl.textContent =
+            `Active winning nodes: ${activeWinningNodes} / ${totalWinningNodes} · step ${step}`;
         }
 
-        winningSummaryEl.textContent =
-          `Active winning nodes: ${activeWinningNodes} / ${totalWinningNodes} · step ${step}`;
-
         const rows = [
+          ["num_routes", safe(stats.numRoutes)],
+          ["num_clusters", safe(stats.numClusters)],
+          ["elapsed_time", formatSeconds(stats.elapsedTime)],
+          ["rollout_calls", safe(stats.rolloutCalls)],
+          ["mean_depth", safe(stats.meanDepth)],
+          ["nodes_by_depth", nodesByDepthHistogramMarkup()],
+          ["dead_end_nodes", safe(stats.deadEndNodes)],
+          ["mean_branching_factor", safe(stats.meanBranchingFactor)],
+          ["max_branching_factor", safe(stats.maxBranchingFactor)],
           ["First Winning Step", safe(stats.winningFirstStep)],
           ["Last Winning Step", safe(stats.winningLastStep)],
         ];
@@ -2370,6 +2591,8 @@ def _render_html(
               <option value="140">Medium</option>
               <option value="220">Slow</option>
             </select>
+            <input id="goto-step" type="number" min="0" value="0" aria-label="Go to step" />
+            <button id="goto-step-btn" type="button">Go to</button>
           </div>
           <div class="stat-grid" id="stats"></div>
           <div id="legend">

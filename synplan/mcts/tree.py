@@ -122,6 +122,8 @@ class Tree:
             "expansion_successes": 0,
             "total_rules_tried": 0,
             "total_rules_succeeded": 0,
+            "evaluation_calls": 0,
+            "rollout_calls": 0,
             "dead_end_nodes": 0,
             "first_solution_iteration": None,
             "first_solution_time": None,
@@ -367,12 +369,22 @@ class Tree:
         """
 
         node = self.nodes[node_id]
+        self.stats["evaluation_calls"] = self.stats.get("evaluation_calls", 0) + 1
+        rollout_calls_before = getattr(self.evaluator, "rollout_calls", None)
         node_value = self.evaluator.evaluate_node(
             node=node,
             node_id=node_id,
             nodes_depth=self.nodes_depth,
             nodes_prob=self.nodes_prob,
         )
+        rollout_calls_after = getattr(self.evaluator, "rollout_calls", None)
+        if isinstance(rollout_calls_before, int) and isinstance(
+            rollout_calls_after, int
+        ):
+            self.stats["rollout_calls"] = self.stats.get("rollout_calls", 0) + max(
+                0,
+                rollout_calls_after - rollout_calls_before,
+            )
         return node_value
 
     def _log_final_stats(self, reason: str = "completed") -> None:
@@ -695,6 +707,8 @@ class Tree:
             "total_rules_tried": self.stats["total_rules_tried"],
             "total_rules_succeeded": self.stats["total_rules_succeeded"],
             "rule_applicability_rate": round(self.rule_applicability_rate(), 4),
+            "evaluation_calls": self.stats.get("evaluation_calls", 0),
+            "rollout_calls": self.stats.get("rollout_calls", 0),
             "dead_end_nodes": self.stats["dead_end_nodes"],
             # Search dynamics
             "first_solution_iteration": self.stats["first_solution_iteration"],
