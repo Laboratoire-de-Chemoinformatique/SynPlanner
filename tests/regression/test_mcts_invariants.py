@@ -15,7 +15,7 @@ reaction rules, or specific molecule inputs:
    because running MCTS in CI is too heavy.
 
 Both tests are invariants of the source-and-API contract, not of any
-particular search outcome — they do not need updating as model weights or
+particular search outcome; they do not need updating as model weights or
 rule sets evolve.
 """
 
@@ -37,7 +37,7 @@ def test_solved_node_has_next_precursor_attribute():
 
     The current ``Node.__init__`` only assigns ``next_precursor`` in the
     non-empty branch. Any caller that reads ``node.next_precursor`` on a
-    solved node raises ``AttributeError`` — silent until it bites.
+    solved node raises ``AttributeError`` without further indication.
     """
     node = Node(precursors_to_expand=(), new_precursors=())
     # The cheapest invariant: the attribute exists, regardless of value.

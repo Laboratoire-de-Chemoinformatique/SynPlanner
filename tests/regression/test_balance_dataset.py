@@ -2,7 +2,7 @@
 
 The function is used in RL training to balance positive and negative examples
 extracted from MCTS rollouts. A degenerate output (only positives, only
-negatives, or empty) collapses the value-network training signal — the model
+negatives, or empty) collapses the value-network training signal: the model
 trains on a constant-label dataset and learns nothing useful.
 
 The invariants asserted here are completely independent of the balancing
@@ -11,7 +11,7 @@ strategy chosen:
 * For any input that contains both labels, the output must contain both.
 * The output must be a subset of the input (no fabricated entries).
 
-This is the "behaviour contract" of the function — the implementation can
+This is the "behaviour contract" of the function; the implementation can
 change (different downsampling strategy, oversampling, etc.) and these
 assertions still hold.
 """
@@ -49,7 +49,7 @@ def test_balance_output_contains_both_labels(balance_fn, input_dict):
         f"and 1, output contains only {sorted(labels)}. RL value-network "
         "training on this output collapses to a constant predictor. The "
         "function increments through positives but never inserts negatives "
-        "into the output dict — see reinforcement.py:188."
+        "into the output dict (see reinforcement.py:188)."
     )
 
 

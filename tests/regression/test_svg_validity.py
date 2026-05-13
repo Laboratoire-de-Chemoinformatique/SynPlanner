@@ -2,19 +2,19 @@
 
 Two bug classes are guarded:
 
-1. **Malformed SVG.** A typo in an f-string in
-   ``visualisation.py`` (missing closing quote after a colour interpolation
-   in the ``order==2, p_order==3`` bond branch) produces unparseable XML
-   that breaks the entire ``<svg>`` document. Invariant: any depiction we
-   produce must parse via ``xml.etree.ElementTree``.
+Malformed SVG: a typo in an f-string in ``visualisation.py`` (missing
+closing quote after a colour interpolation in the ``order==2, p_order==3``
+bond branch) produces unparseable XML that breaks the entire ``<svg>``
+document. Invariant: any depiction we produce must parse via
+``xml.etree.ElementTree``.
 
-2. **Class-level state leak.** ``cgr_display`` patches ``CGRContainer``
-   bond-rendering methods at the *class* level with no ``try/finally``
-   restore. After the first call, every subsequent ``CGRContainer.depict()``
-   in the same process uses the wide-bond style — including unrelated
-   callers. Invariant: a plain ``.depict()`` call before any ``cgr_display``
-   call must produce the same XML as a ``.depict()`` call after
-   ``cgr_display`` has been invoked.
+Class-level state leak: ``cgr_display`` patches ``CGRContainer``
+bond-rendering methods at the class level with no ``try/finally`` restore.
+After the first call, every subsequent ``CGRContainer.depict()`` in the
+same process uses the wide-bond style, including unrelated callers.
+Invariant: a plain ``.depict()`` call before any ``cgr_display`` call must
+produce the same XML as a ``.depict()`` call after ``cgr_display`` has been
+invoked.
 
 The first test depicts a small CGR derived from a conftest reaction; the
 second test calls ``cgr_display`` once on an unrelated CGR and compares
@@ -60,7 +60,7 @@ def test_depict_produces_parseable_svg(simple_cgr):
 
 
 def test_cgr_display_produces_parseable_svg(simple_cgr):
-    """``cgr_display`` must also return parseable XML — its wide-bond branch
+    """``cgr_display`` must also return parseable XML; its wide-bond branch
     is where the f-string bug lives."""
     from synplan.chem.reaction_routes.visualisation import cgr_display
 
@@ -77,34 +77,36 @@ def test_cgr_display_produces_parseable_svg(simple_cgr):
 
 
 def test_cgr_display_does_not_leak_state_into_depict(two_cgrs):
-    """``cgr_display`` must not permanently alter ``CGRContainer.depict``.
+    """``cgr_display`` must not permanently alter ``CGRContainer`` methods.
 
-    Sequence:
-        1. depict A normally  →  svg_a_before
-        2. cgr_display(B)     (this monkey-patches CGRContainer methods)
-        3. depict A normally  →  svg_a_after
-    Invariant: svg_a_before == svg_a_after (modulo non-determinism the
-    caller controls — coordinate seeds are reset before each depict).
+    The bug is structural: ``cgr_display`` assigns to ``CGRContainer``'s
+    class-level ``_render_bonds`` and ``__render_aromatic_bond`` attributes.
+    Without a try/finally restore, every subsequent ``.depict()`` call
+    anywhere in the process inherits the wide-bond renderer.
 
-    If they differ, ``cgr_display``'s class-level patches are still in
-    effect during step 3, meaning every unrelated CGR depiction in the
-    process is using the wide-bond renderer.
+    The invariant checked here is class-attribute identity *before* and
+    *after* the call: direct and deterministic, unaffected by chython's
+    coordinate generation.
     """
+    from chython.containers import CGRContainer
+
     from synplan.chem.reaction_routes.visualisation import cgr_display
 
-    cgr_a, cgr_b = two_cgrs
-    cgr_a.clean2d()
-    svg_a_before = cgr_a.depict()
+    _, cgr_b = two_cgrs
 
+    attrs_to_check = (
+        "_render_bonds",
+        "_CGRContainer__render_aromatic_bond",
+        "_WideBondDepictCGR__render_aromatic_bond",
+    )
+    before = {a: CGRContainer.__dict__.get(a) for a in attrs_to_check}
     _ = cgr_display(cgr_b)
+    after = {a: CGRContainer.__dict__.get(a) for a in attrs_to_check}
 
-    cgr_a.clean2d()
-    svg_a_after = cgr_a.depict()
-
-    assert svg_a_before == svg_a_after, (
-        "CGRContainer.depict() output changed for the same CGR after "
-        "cgr_display() was called on a different CGR. cgr_display patches "
-        "CGRContainer._render_bonds at the class level without a "
-        "try/finally restore (visualisation.py:511-517), so all subsequent "
-        "depictions in the process inherit the wide-bond renderer."
+    leaks = [a for a in attrs_to_check if before[a] is not after[a]]
+    assert not leaks, (
+        f"cgr_display left CGRContainer class-level attributes patched: "
+        f"{leaks}. Every subsequent CGRContainer.depict() in the process "
+        "will inherit the wide-bond renderer. Wrap the patches in "
+        "try/finally and restore the originals."
     )

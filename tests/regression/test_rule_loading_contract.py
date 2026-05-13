@@ -7,7 +7,7 @@ and pass it to functions that try to ``append``, ``sort``, or otherwise
 mutate it.
 
 Separately, ``_load_rules_pickle`` is supposed to unpack the legacy
-``[(Reactor, priority), ...]`` pickle format into bare Reactors — but the
+``[(Reactor, priority), ...]`` pickle format into bare Reactors, but the
 isinstance check is inverted, so the unpack never runs and downstream code
 gets ``(Reactor, priority)`` tuples it then tries to call as Reactors.
 
@@ -46,14 +46,14 @@ def real_rules_tsv(tmp_path: Path, sample_reactions_file, rule_cfg_factory) -> P
 
 def test_load_reaction_rules_returns_listlike(real_rules_tsv: Path):
     """Annotation is ``list[Reactor]``; callers must be able to treat it as a
-    sequence with the documented interface — at minimum, indexing and
-    ``len()``.
+    sequence with the documented interface (at minimum, indexing and
+    ``len()``).
 
     A tuple satisfies this, but so does any sequence. The point is that the
     *declared* return type is ``list[Reactor]`` and any caller depending on
     list-mutability (``append``, ``sort``) gets a runtime AttributeError.
-    This test only enforces the read-side contract — the strictest read of
-    the annotation — so it catches the change from list to tuple silently.
+    This test only enforces the read-side contract, the strictest read of
+    the annotation, so it catches the change from list to tuple silently.
     """
     rules = load_reaction_rules(str(real_rules_tsv))
     # cache.clear so other tests do not see this fixture's result
@@ -62,7 +62,7 @@ def test_load_reaction_rules_returns_listlike(real_rules_tsv: Path):
     assert isinstance(rules[0], Reactor)
     # Annotation says list; if a caller tries to mutate, it must not raise.
     # We assert the annotation's promise here without insisting it be a
-    # mutable-list subclass — but a tuple fails the canonical interpretation.
+    # mutable-list subclass, but a tuple fails the canonical interpretation.
     assert isinstance(rules, list), (
         f"load_reaction_rules is annotated -> list[Reactor] but returned "
         f"{type(rules).__name__}. Callers that try to mutate the result "
@@ -120,7 +120,7 @@ def test_load_reaction_rules_legacy_pickle_unpacks_priority_tuples(tmp_path: Pat
     The ``_load_rules_pickle`` code path is supposed to detect this legacy
     format and unpack it. With the isinstance check inverted, the unpack
     never runs and downstream callers see ``(Reactor, priority)`` tuples
-    where they expect Reactors — producing ``TypeError: 'tuple' object is
+    where they expect Reactors, producing ``TypeError: 'tuple' object is
     not callable`` deep inside MCTS.
     """
     # Build a minimal Reactor from a SMARTS that we know works.

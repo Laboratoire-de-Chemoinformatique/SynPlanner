@@ -2,19 +2,19 @@
 
 Two contracts are asserted:
 
-1. **Default-filename sanity.** ``read_routes_json`` advertises a JSON-reading
-   function but its default ``file_path`` argument is ``"routes.csv"``. Any
-   caller relying on the default will ``json.load`` a CSV file (or vice
-   versa). Test: introspect the signature, the default for a JSON reader
-   must end in ``.json``.
+Default-filename sanity: ``read_routes_json`` advertises a JSON-reading
+function but its default ``file_path`` argument is ``"routes.csv"``. Any
+caller relying on the default will ``json.load`` a CSV file (or vice
+versa). Test: introspect the signature; the default for a JSON reader
+must end in ``.json``.
 
-2. **Round-trip equivalence.** Writing a routes dict to JSON and reading it
-   back must yield a structurally equivalent object. The test fixture is the
-   already-checked-in routes JSON at ``tests/data/routes_mol_1.json``; we
-   load it, write a copy, and re-load — equality of the loaded structure is
-   the invariant. Catches silent drops in ``make_json`` (broad-except
-   skipping routes) and any future serialization breakage that loses
-   information.
+Round-trip equivalence: writing a routes dict to JSON and reading it
+back must yield a structurally equivalent object. The test fixture is the
+already-checked-in routes JSON at ``tests/data/routes_mol_1.json``; we
+load it, write a copy, and re-load. Equality of the loaded structure is
+the invariant. Catches silent drops in ``make_json`` (broad-except
+skipping routes) and any future serialization breakage that loses
+information.
 
 These tests do not pin the *contents* of the routes, so they survive any
 future change to chython rendering, reaction ordering, or the MCTS internals.
@@ -54,7 +54,7 @@ def test_write_then_read_routes_json_is_lossless(tmp_path: Path):
 
     We start from the JSON form (the canonical wire format) rather than the
     routes_dict form because ``write_routes_json`` accepts a dict shape, the
-    fixture is JSON, and the cleanest invariant is "JSON → ? → JSON
+    fixture is JSON, and the cleanest invariant is "JSON -> ? -> JSON
     preserves structure".
     """
     if not ROUTES_JSON_FIXTURE.exists():
@@ -86,7 +86,7 @@ def test_write_then_read_routes_json_is_lossless(tmp_path: Path):
     orig_ids = _route_ids(original)
     rt_ids = _route_ids(reloaded)
     assert orig_ids == rt_ids, (
-        f"write→read lost route ids. Missing: {orig_ids - rt_ids}. Added: "
+        f"write->read lost route ids. Missing: {orig_ids - rt_ids}. Added: "
         f"{rt_ids - orig_ids}. Likely cause: make_json's broad-except clause "
         "is silently dropping routes whose serialization raises."
     )

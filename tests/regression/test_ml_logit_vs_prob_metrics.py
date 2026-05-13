@@ -66,7 +66,7 @@ def _is_problike_name(name: str) -> bool:
 def _resolve_assignment_origin(
     arg: ast.expr, assignments: dict[str, ast.expr]
 ) -> ast.expr:
-    """Walk back through simple name→expr assignments until we hit a non-Name."""
+    """Walk back through simple name->expr assignments until we hit a non-Name."""
     seen = set()
     while isinstance(arg, ast.Name) and arg.id in assignments and arg.id not in seen:
         seen.add(arg.id)
@@ -84,7 +84,7 @@ def _check_module(path: Path) -> list[tuple[int, str]]:
     for func in ast.walk(tree):
         if not isinstance(func, ast.FunctionDef):
             continue
-        # Build a map: name → most-recent Assign value seen in this function.
+        # Build a map: name -> most-recent Assign value seen in this function.
         assignments: dict[str, ast.expr] = {}
         for node in ast.walk(func):
             if isinstance(node, ast.Assign):

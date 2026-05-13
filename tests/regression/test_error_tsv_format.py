@@ -104,7 +104,7 @@ def test_error_tsv_header_matches_reference(stage_error_tsv: Path):
     "stage_error_tsv", list(STAGE_RUNNERS), indirect=True, ids=list(STAGE_RUNNERS)
 )
 def test_error_tsv_column_count_invariant(stage_error_tsv: Path):
-    """Every row has exactly N columns — no tab injection, no missing fields."""
+    """Every row has exactly N columns (no tab injection, no missing fields)."""
     _, rows = parse_error_tsv(stage_error_tsv)
     if not rows:
         pytest.skip(f"{stage_error_tsv.name} produced no error rows for this input")
@@ -121,8 +121,8 @@ def test_error_tsv_column_count_invariant(stage_error_tsv: Path):
     "stage_error_tsv", list(STAGE_RUNNERS), indirect=True, ids=list(STAGE_RUNNERS)
 )
 def test_error_tsv_has_no_blank_rows(stage_error_tsv: Path):
-    """No blank lines between rows — those indicate an unescaped newline inside
-    some field has split one logical record into two."""
+    """No blank lines between rows. A blank line indicates an unescaped newline
+    inside some field has split one logical record into two."""
     text = stage_error_tsv.read_text(encoding="utf-8")
     lines = text.splitlines()
     if len(lines) < 2:
@@ -131,6 +131,6 @@ def test_error_tsv_has_no_blank_rows(stage_error_tsv: Path):
     blanks_in_middle = [i for i, line in enumerate(body[:-1]) if line == ""]
     assert not blanks_in_middle, (
         f"{stage_error_tsv.name} contains blank lines in the middle of its "
-        "rows — likely a record body was split by an unescaped newline in "
+        "rows; likely a record body was split by an unescaped newline in "
         f"original_smiles or error_message. Indices: {blanks_in_middle[:5]}."
     )

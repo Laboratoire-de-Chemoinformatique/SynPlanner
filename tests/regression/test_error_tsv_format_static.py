@@ -6,7 +6,7 @@ end-to-end pipeline run from a unit test because it requires the atom-mapping
 model. Its error-file bugs (3-column rows, missing header) are real but
 invisible to ``test_error_tsv_format.py``.
 
-This test cheaply closes that gap by asserting a *static* contract — the
+This test cheaply closes that gap by asserting a *static* contract: the
 exact reference header line must appear verbatim in every pipeline module
 that writes an error TSV. Catches:
 
@@ -19,7 +19,7 @@ standardize/filter/extract). It does catch the *spec drift* bug class where a
 new stage author copies the wrong format.
 
 Fragile dimensions: if the canonical header is intentionally evolved (a new
-column added), this test breaks in one place — update the constant in
+column added), this test breaks in one place; update the constant in
 ``conftest.py``.
 """
 

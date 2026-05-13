@@ -1,4 +1,4 @@
-"""Route-CGR clustering robustness invariants.
+"""Route-CGR clustering invariants — None-value handling.
 
 When a route's CGR cannot be composed (stereo, unbalanced atom maps,
 multi-product issues), ``compose_all_route_cgrs`` in the dict-branch silently
@@ -7,10 +7,10 @@ stores ``{route_id: None}`` in the result. The downstream
 which crashes on ``None.connected_components`` with an AttributeError that
 has nothing to do with the root cause.
 
-This is brittle: any caller that combines load-from-file with clustering
+This is fragile: any caller that combines load-from-file with clustering
 hits a confusing crash on the first stereo-bearing route. The invariant
-asserted here is that ``compose_all_sb_cgrs`` is *robust to None values* in
-the input dict — failed-CGR routes must either be filtered out or surface
+asserted here is that ``compose_all_sb_cgrs`` handles None values in
+the input dict; failed-CGR routes must either be filtered out or surface
 a clear, route-id-bearing error.
 
 The test uses no real CGRs; it constructs a minimal input dict with one None
@@ -33,7 +33,7 @@ def test_compose_all_sb_cgrs_handles_none_entries(simple_cgr):
       * a ValueError / typed exception is raised that identifies the route_id.
 
     Unacceptable: raw ``AttributeError: 'NoneType' object has no attribute
-    'connected_components'`` — the user has no way to map the error back
+    'connected_components'``; the user has no way to map the error back
     to which route failed.
     """
     mixed = {
@@ -68,6 +68,6 @@ def test_compose_all_sb_cgrs_handles_none_entries(simple_cgr):
     if "r_bad_stereo" in result:
         assert result["r_bad_stereo"] is None or result["r_bad_stereo"] is False, (
             "compose_all_sb_cgrs returned a non-None, non-False value for a "
-            "None input — the function must not fabricate a CGR for a failed "
+            "None input; the function must not fabricate a CGR for a failed "
             "route."
         )

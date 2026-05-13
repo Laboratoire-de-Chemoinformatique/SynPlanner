@@ -4,16 +4,16 @@ MDL's RDF format permits per-record framing in two equivalent ways:
 
 * ``$RFMT`` / ``$MFMT`` between records (the form many tools emit),
 * bare ``$RXN`` between records (the form used by, e.g., CHORISO and many
-  ORCA/RDKit RDF outputs — equivalent to a concatenation of raw V2000 RXN
+  ORCA/RDKit RDF outputs, equivalent to a concatenation of raw V2000 RXN
   records under a single RDF header).
 
 ``iter_rdf_text_blocks`` enters its "body" state on the first ``$RFMT``,
-``$MFMT``, or ``$RXN`` line — but once in the body it only splits on
+``$MFMT``, or ``$RXN`` line, but once in the body it only splits on
 ``$RFMT``/``$MFMT``. Bare-``$RXN`` files therefore yield exactly one block
 no matter how many reactions they contain. ``count_rdf_records`` (counter
 based on ``$RFMT``/``$MFMT`` only) returns 0 for the same input.
 
-These tests assert the equivalence — both framings must produce the same
+These tests assert the equivalence: both framings must produce the same
 number of records.
 """
 
@@ -34,7 +34,7 @@ def _minimal_rxn_block(diff: int) -> str:
     """A minimal MDL V2000 $RXN block representing a 1-atom 'reaction'.
 
     ``diff`` makes each call produce a slightly distinct molecule so the
-    blocks aren't byte-identical — protects against any deduplication that
+    blocks aren't byte-identical, which protects against any deduplication that
     might otherwise mask multi-record handling.
     """
     return (

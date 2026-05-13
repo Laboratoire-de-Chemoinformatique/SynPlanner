@@ -50,7 +50,7 @@ def test_extraction_with_validation_disabled_produces_rules(
     Strategy: run extraction twice on the *same* fixture, once with
     validation enabled (the baseline) and once disabled (the path under
     test). If the baseline produces zero rules, the fixture itself can't
-    exercise the bug — we skip loudly so a future fixture regression
+    exercise the bug; we skip loudly so a future fixture regression
     surfaces as a SKIP rather than a silent PASS. Otherwise, the
     disabled-validation path must produce a non-empty rule set; getting
     zero indicates the ``sort_rules`` "validation != 'passed'" sentinel
@@ -85,7 +85,7 @@ def test_extraction_with_validation_disabled_produces_rules(
     assert n_off > 0, (
         f"Extraction with reactor_validation=False produced 0 rules but "
         f"validation=True on the same input produced {n_on}. All rules were "
-        "rejected — likely sort_rules treats the absent 'reactor_validation' "
+        "rejected; likely sort_rules treats the absent 'reactor_validation' "
         "meta as a non-'passed' value and filters every rule out. Users "
         "disabling validation expect more rules to pass, not zero."
     )
@@ -100,7 +100,7 @@ def test_extraction_validation_off_produces_at_least_as_many_as_on(
 
     Property: |rules(validation=False)| >= |rules(validation=True)|. Skipping
     a filter cannot reduce the set of rules that pass it. If this invariant
-    fails, validation=False is more restrictive than validation=True — the
+    fails, validation=False is more restrictive than validation=True: the
     classic sentinel-comparison bug.
     """
     rules_on = tmp_path / "rules_on.tsv"

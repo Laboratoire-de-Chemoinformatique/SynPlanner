@@ -1,7 +1,7 @@
 """Conservation-of-records invariant across pipeline stages.
 
-A pipeline stage that drops records silently — incrementing a counter but
-never writing the dropped row anywhere — is a recurring bug class in this
+A pipeline stage that drops records silently (incrementing a counter but
+never writing the dropped row anywhere) is a recurring bug class in this
 project. Examples already triaged: pre-e1607e6 filtering, extraction's
 multi-product skip, mapping's ``ignore_errors=False`` swallow.
 
@@ -12,7 +12,7 @@ The invariant tested here is general and survives any future stage:
 and, separately, every record present in the input must be represented in
 exactly one output destination (success file, error TSV, or filter TSV).
 
-These tests only inspect counts and line totals — they don't care about
+These tests only inspect counts and line totals; they don't care about
 specific reactions or rule definitions, so they don't churn when chemistry
 inputs change.
 """
@@ -138,7 +138,7 @@ def test_input_records_fully_accounted_in_outputs(
     error_rows = _count_data_rows(err)
     assert success_lines + error_rows >= input_lines, (
         f"{runner_fn}: input had {input_lines} records but only "
-        f"{success_lines} succeeded and {error_rows} errored — "
+        f"{success_lines} succeeded and {error_rows} errored; "
         f"{input_lines - success_lines - error_rows} records silently lost. "
         "A pipeline stage incremented a counter without writing the dropped "
         "row to the error TSV."
@@ -155,7 +155,7 @@ def test_extraction_multi_product_records_are_traceable(
 
     The known bug is that ``n_multi_product`` is incremented inside
     ``_extract_rules_serial`` but the skipped reactions are never written to
-    ``error_file`` — they vanish from the output and only surface as a single
+    ``error_file``; they vanish from the output and only surface as a single
     aggregate number. This test asserts the inverse: either no multi-product
     skips happened, or every skipped reaction is recoverable from the error
     TSV.
