@@ -4,7 +4,7 @@
 Reaction standardization
 ================================
 
-``SynPlanner`` includes a variety of reaction standardizers.
+``SynPlanner`` includes several reaction standardizers.
 The list and order of application of standardizers can be specified in the configuration file.
 
 Download example configuration

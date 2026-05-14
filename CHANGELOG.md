@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Atom-mapping validator wired into the reader chokepoint
+  (`synplan.utils.files.parse_reaction`) and the SMARTS rule loader
+  (`synplan.utils.loading.load_reaction_rules`), with helpers in
+  `synplan.chem.utils`:
+  `reaction_mapping_status`, `reaction_string_mapping_status`,
+  `is_reaction_atom_mapped`, `assert_reaction_atom_mapped`, and the
+  `AtomMappingCheck` literal type (`"off" | "reject_unmapped" | "reject_partial"`).
+  Tagged reactions get `meta["mapping_status"]` for downstream routing.
+
+### Changed
+- `load_reaction_rules` now defaults to `check_atom_mapping="reject_unmapped"`:
+  SMARTS rules without atom maps are rejected with an actionable error
+  pointing at the offending TSV row. Pass `check_atom_mapping="off"` to
+  restore the old behaviour.
+- Multi-product reactions and rules-all-filtered-out are now traceable
+  through the per-reaction audit TSV (`<rules_path_base>.audit.tsv`) in
+  addition to the summary counters.
+
+### Fixed
+- Worked around chython's SMARTS writer emitting CXSMILES extension
+  blocks (`|...|`) mid-string between disconnected fragments by
+  stripping any CXSMILES block before tokenisation in the mapping
+  validator. Logged at
+  `reports/peer-review/priority-rules/chython_smarts_export_cxsmiles_bug.md`.
+- Regression tests now exercise the canonical-key invariant via two
+  SMILES with different mapping offsets instead of
+  `QueryCGRContainer.remap`, which is broken in the pinned chython
+  release (its override forwards an unsupported `copy=` kwarg to
+  `Graph.remap`). Bug logged in the same file.
+
 ## [1.5.0] - 2026-05-05
 
 > Migration guide: see [docs/user_guide/migration.rst](docs/user_guide/migration.rst).
@@ -178,9 +209,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `MoleculeContainer.depict_settings()`)
 - `routes_clustering_report` / `routes_subclustering_report`: safer target SMILES
   lookup with `.get()` fallback instead of direct key access
-- Removed unused `yaml` imports from `filtering.py` and `standardizing.py`
-- Removed unused `os` import from `cli.py`
-- Removed unused `Any` import from `mapping.py`
+- Removed unused imports: `yaml` from `filtering.py` / `standardizing.py`, `os` from `cli.py`, `Any` from `mapping.py`
 - Import order cleanup (ruff/black formatting)
 
 ## [1.4.1] - 2026-03-03

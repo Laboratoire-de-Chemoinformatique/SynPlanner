@@ -44,7 +44,7 @@ produces and gets its own counter pair under
 Validation rules:
 
 - The reserved name ``"policy"`` is rejected (raises ``ValueError``).
-- Empty rule lists are rejected — either populate the set or remove
+- Empty rule lists are rejected: either populate the set or remove
   the key.
 - Non-empty string keys are required.
 - Setting ``config.use_priority=True`` without supplying ``priority_rules``
@@ -69,8 +69,9 @@ produces four valid precursor fragments) enters UCB with prior 4. This
 is intentional: curated multi-fragment disconnects are designed to
 dominate sibling selection over single-fragment policy children.
 
-If you observe ``Node.prob`` values larger than 1.0, this is the cause —
-it is a feature of priority disconnects, not a bug.
+If you observe ``Node.prob`` values larger than 1.0, this is expected
+behaviour when a priority set introduces non-policy rules; see the
+priority semantics section above.
 
 Iterated application
 --------------------
@@ -104,11 +105,11 @@ Per-source statistics
 ``Tree.stats`` (a :class:`~synplan.mcts.tree.TreeStats` dataclass)
 exposes:
 
-- ``policy_rules_tried`` / ``policy_rules_succeeded`` — policy-only
+- ``policy_rules_tried`` / ``policy_rules_succeeded``: policy-only
   counters.
-- ``priority_rules_tried`` / ``priority_rules_succeeded`` — aggregate
+- ``priority_rules_tried`` / ``priority_rules_succeeded``: aggregate
   across all priority sources.
-- ``per_priority_source[<set_name>].tried`` and ``.succeeded`` — the
+- ``per_priority_source[<set_name>].tried`` and ``.succeeded``: the
   per-set breakdown.
 
 ``Tree.to_stats_dict()`` flattens ``per_priority_source`` into the
@@ -121,12 +122,12 @@ Rule provenance on nodes and routes
 
 Every child carries:
 
-- ``rule_source`` — either the priority set name or
+- ``rule_source``: either the priority set name or
   :data:`~synplan.mcts.tree.POLICY_SOURCE_NAME` (``"policy"``).
-- ``rule_key`` — collision-safe identifier formatted as
+- ``rule_key``: collision-safe identifier formatted as
   ``<source>:<id>`` so priority and policy IDs never collide in
   serialization.
-- ``policy_rank`` — exact 1-indexed Top-N position from the expansion
+- ``policy_rank``: exact 1-indexed Top-N position from the expansion
   function, or ``None`` for priority children.
 
 Route SVG, JSON, and RDKit exports propagate this metadata, and route

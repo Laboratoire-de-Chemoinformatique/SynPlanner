@@ -42,8 +42,8 @@ at the new location.
    * - ``tree.nodes_rules[nid]``
      - ``tree.nodes[nid].rule_id``
 
-Note that ``nodes_rules`` renamed to ``rule_id`` on the new attribute —
-all the others keep their suffix as the attribute name.
+Note that ``nodes_rules`` renamed to ``rule_id`` on the new attribute.
+All the others keep their suffix as the attribute name.
 
 ``Tree.stats`` is now a typed dataclass
 ---------------------------------------
@@ -63,7 +63,7 @@ instead of a plain ``dict``. Use attribute access:
 Subscripting on a known field raises ``TypeError`` with a migration hint;
 unknown keys still raise ``KeyError``. The defaults on every
 ``TreeStats`` field are static, so the ``.get(..., default)`` form is
-obsolete — drop the default.
+obsolete. Drop the default.
 
 ``Tree.to_stats_dict()`` is unchanged: it still returns a flat
 ``dict[str, Any]`` with the same keys, so CSV/JSON consumers downstream

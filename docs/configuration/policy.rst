@@ -103,13 +103,13 @@ for all available parameters.
 
 .. code-block:: yaml
 
-    # Minimal — logs to <results_dir>/lightning_logs/version_0/metrics.csv
+    # Minimal: logs to <results_dir>/lightning_logs/version_0/metrics.csv
     logger:
       type: csv
 
 .. code-block:: yaml
 
-    # Customized — flat output directory, flush more often
+    # Customized: flat output directory, flush more often
     logger:
       type: csv
       name: null                     # no "lightning_logs" subfolder

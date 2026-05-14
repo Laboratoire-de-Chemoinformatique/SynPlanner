@@ -6,9 +6,9 @@ This guide is a practical, task-oriented path through SynPlanner.
 What's inside
 -------------
 
-- Concepts and algorithms → see :doc:`/methods/methods`.
-- Configuration of pipelines (YAML and Python) → see :doc:`/configuration/configuration`.
-- CLI usage → see :doc:`cli_interface`.
+- Concepts and algorithms: see :doc:`/methods/methods`.
+- Configuration of pipelines (YAML and Python): see :doc:`/configuration/configuration`.
+- CLI usage: see :doc:`cli_interface`.
 
 Run in Google Colab
 -------------------
@@ -35,8 +35,7 @@ Tutorials
 -------------------
 
 ``SynPlanner`` is supplemented by several tutorials explaining different aspects of tool usage. These tutorials included
-some advanced explanations and configurations, that can be used not only for demonstrative and educational purposes but
-also for creating flexible pipelines.
+some advanced explanations and configurations, that can be used for both demonstration and building custom pipelines.
 
 **Introductory tutorials:**
 
