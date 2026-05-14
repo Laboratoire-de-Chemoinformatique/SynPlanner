@@ -29,10 +29,10 @@ from synplan.utils.config import BaseConfigModel, NestedConfigContainer
 from synplan.utils.files import (
     RawReactionReader,
     ReactionWriter,
-    format_source_fields,
+    extract_origin_fields,
     parse_reaction,
     reaction_source_info,
-    split_smiles_record,
+    write_error_tsv_header,
 )
 from synplan.utils.parallel import chunked, graceful_shutdown, process_pool_map_stream
 
@@ -753,8 +753,7 @@ def _filter_batch_worker(
                 orig_smi = reaction.meta.get("init_smiles", str(reaction))
                 source_info = reaction_source_info(reaction)
             else:
-                orig_smi, source_fields = split_smiles_record(raw)
-                source_info = format_source_fields(source_fields)
+                orig_smi, source_info = extract_origin_fields(raw, fmt=_fmt)
             if "/" in reason:
                 # Error: "stage/ErrorType: message"
                 stage_type = reason.split(":")[0]
@@ -882,9 +881,7 @@ def filter_reactions_from_file(
     error_fh = None
     if _error_path is not None:
         error_fh = open(_error_path, "w", encoding="utf-8")
-        error_fh.write(
-            "# original_smiles\tsource_info\tstage\terror_type\terror_message\n"
-        )
+        write_error_tsv_header(error_fh)
 
     try:
         # Build batches: each item is a list of (raw_string, fmt, ignore_errors)

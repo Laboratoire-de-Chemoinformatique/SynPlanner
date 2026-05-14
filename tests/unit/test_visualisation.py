@@ -79,8 +79,8 @@ def test_get_route_svg_unsolved_is_opt_in():
 def test_make_json_attaches_rule_metadata_from_tree():
     routes_dict = {
         7: {
-            0: read_smiles("C.O>>CO"),
-            1: read_smiles("CO.N>>CON"),
+            0: read_smiles("[CH4:1].[OH2:2]>>[CH3:1][OH:2]"),
+            1: read_smiles("[CH3:1][OH:2].[NH3:3]>>[CH3:1][NH2:3].[OH2:2]"),
         }
     }
 
@@ -103,8 +103,8 @@ def test_make_json_attaches_rule_metadata_from_tree():
 def test_get_route_svg_from_json_can_render_rule_labels():
     routes_dict = {
         7: {
-            0: read_smiles("C.O>>CO"),
-            1: read_smiles("CO.N>>CON"),
+            0: read_smiles("[CH4:1].[OH2:2]>>[CH3:1][OH:2]"),
+            1: read_smiles("[CH3:1][OH:2].[NH3:3]>>[CH3:1][NH2:3].[OH2:2]"),
         }
     }
 

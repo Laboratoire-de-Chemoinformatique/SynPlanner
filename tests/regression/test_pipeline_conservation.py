@@ -145,23 +145,35 @@ def test_input_records_fully_accounted_in_outputs(
     )
 
 
+def _audit_indices(audit_tsv: Path) -> set[int]:
+    """Read reaction_index (column 0) from the per-reaction audit TSV."""
+    if not audit_tsv.exists():
+        return set()
+    indices: set[int] = set()
+    for line in audit_tsv.read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        head = line.split("\t", 1)[0].strip()
+        if head.isdigit():
+            indices.add(int(head))
+    return indices
+
+
 def test_extraction_multi_product_records_are_traceable(
     tmp_path: Path,
     sample_reactions_file,
     rule_cfg_factory,
 ):
-    """Multi-product reactions must not vanish: their count is reflected in the
-    summary string OR rows appear in the error TSV.
+    """Multi-product reactions must not vanish silently.
 
-    The known bug is that ``n_multi_product`` is incremented inside
-    ``_extract_rules_serial`` but the skipped reactions are never written to
-    ``error_file``; they vanish from the output and only surface as a single
-    aggregate number. This test asserts the inverse: either no multi-product
-    skips happened, or every skipped reaction is recoverable from the error
-    TSV.
+    Multi-product skips are routed to the per-reaction *audit* TSV (not the
+    error TSV — they're not exceptions, they're documented skips). The
+    conservation invariant: every input reaction must show up either in the
+    rule coverage set (it produced retained rules) or in the audit TSV.
     """
     rules_path = tmp_path / "rules.tsv"
     err = tmp_path / "rules.errors.tsv"
+    audit = tmp_path / "rules.audit.tsv"
     extract_rules_from_reactions(
         config=rule_cfg_factory(),
         reaction_data_path=str(sample_reactions_file),
@@ -170,30 +182,28 @@ def test_extraction_multi_product_records_are_traceable(
         batch_size=4,
         ignore_errors=True,
         error_file_path=str(err),
+        audit_file_path=str(audit),
     )
     input_lines = _count_lines(sample_reactions_file)
-    # Sum rules with their reaction-id coverage:
     covered_ids: set[int] = set()
     if rules_path.exists():
         for line in rules_path.read_text(encoding="utf-8").splitlines()[1:]:
             if not line:
                 continue
             cols = line.split("\t")
-            # Reaction indices appear in one of the rule TSV columns; format
-            # is "rule_smarts\trule_id\treaction_ids_csv\t..." with the CSV
-            # of indices typically at column 2 or 3.
+            # Reaction indices appear as a CSV in one of the early columns;
+            # exact column varies by rule TSV layout, so scan a small range.
             for col in cols[1:4]:
                 for token in col.split(","):
                     token = token.strip()
                     if token.isdigit():
                         covered_ids.add(int(token))
-    error_rows = _count_data_rows(err)
-    # Every input row must appear either in the rule coverage set or as an
-    # error row. The set is by reaction-index, indexes are 0-based and dense.
-    missing = input_lines - len(covered_ids) - error_rows
+    audit_ids = _audit_indices(audit)
+    accounted = covered_ids | audit_ids
+    missing = input_lines - len(accounted)
     assert missing <= 0, (
         f"extract_rules dropped {missing} input record(s) silently: "
         f"{input_lines} inputs, {len(covered_ids)} covered by rules, "
-        f"{error_rows} in error TSV. Multi-product or stereo-bearing "
+        f"{len(audit_ids)} in audit TSV. Multi-product or stereo-bearing "
         "reactions are likely being counted but not written anywhere."
     )

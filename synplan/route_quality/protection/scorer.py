@@ -68,7 +68,19 @@ class CompetingSitesScore:
             if inter.step_id not in step_worst or p > step_worst[inter.step_id]:
                 step_worst[inter.step_id] = p
 
-        n_reactions = max(len(route), 1)
+        # Use the number of steps the scanner *actually processed*, not the
+        # full route length. Steps whose CGR fails to compose are silently
+        # skipped inside the scanner (logged but not raised); using
+        # ``len(route)`` as the denominator collapses a total scan failure
+        # into a perfect score (S(T) = 1.0) which is indistinguishable
+        # from a genuinely clean route.
+        n_processed = len(self._scanner.last_processed_steps)
+        if n_processed == 0 and len(route) > 0:
+            # Scanner could not process *any* step of a non-empty route.
+            # Return 0.0 so downstream ranking surfaces this as a problem
+            # without raising and breaking caller batches.
+            return 0.0, interactions
+        n_reactions = max(n_processed, 1)
         penalty = (sum(step_worst.values()) + halogen_count) / n_reactions
         score = max(1.0 - penalty, 0.0)
         return score, interactions

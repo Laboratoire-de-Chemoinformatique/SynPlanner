@@ -24,12 +24,20 @@ from synplan.chem.data.reaction_result import (
     ExtractionBatchResult,
 )
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
-from synplan.chem.utils import reverse_reaction, unite_molecules
+from synplan.chem.utils import (
+    canonical_query_cgr_key,
+    reverse_reaction,
+    unite_molecules,
+)
 from synplan.utils.config import RuleExtractionConfig
 from synplan.utils.files import (
     RawReactionReader,
+    extract_origin_fields,
     load_rule_index_mapping_tsv,
     parse_reaction,
+    tsv_safe,
+    write_error_row,
+    write_error_tsv_header,
 )
 from synplan.utils.parallel import graceful_shutdown, process_pool_map_stream
 
@@ -583,8 +591,9 @@ def _make_extracted_rule_record(rule: ReactionContainer) -> ExtractedRuleRecord:
     key and final TSV SMARTS in the worker avoids that serial bottleneck and
     avoids parser crashes in the parent.
     """
+    query_cgr = ~rule
     return ExtractedRuleRecord(
-        cgr_key=str(~rule),
+        cgr_key=canonical_query_cgr_key(query_cgr),
         rule_smarts=_rule_to_reactor_smarts(rule),
         reactor_validation=rule.meta.get("reactor_validation"),
     )
@@ -601,6 +610,32 @@ def _init_extraction_worker(config_dict: dict, ignore_errors: bool, fmt: str) ->
         "ignore_errors": ignore_errors,
         "fmt": fmt,
     }
+
+
+def _make_audit_entry(
+    index: int,
+    raw_item: object,
+    fmt: str,
+    stage: str,
+    error_type: str,
+    message: str,
+) -> ErrorEntry:
+    """Build an audit ErrorEntry tagged with the input ``line_number``.
+
+    Audit entries describe non-error reasons a reaction did not contribute
+    to the final rule set (multi-product skip, no-rules-extracted, all
+    rules filtered out). They share the ErrorEntry shape so the parent can
+    fold them into a single per-reaction audit file alongside true errors.
+    """
+    original, source_info = extract_origin_fields(raw_item, fmt)
+    return ErrorEntry(
+        original=original,
+        source_info=source_info,
+        stage=stage,
+        error_type=error_type,
+        message=tsv_safe(message),
+        line_number=index,
+    )
 
 
 def _extract_rules_batch_worker(
@@ -630,6 +665,7 @@ def _extract_rules_batch_worker(
 
     rule_records: list[tuple[int, list[ExtractedRuleRecord], str]] = []
     errors: list[ErrorEntry] = []
+    audit_entries: list[ErrorEntry] = []
     n_multi_product = 0
     for index, raw_item in batch:
         try:
@@ -638,23 +674,55 @@ def _extract_rules_batch_worker(
             extracted_rules, skipped = extract_rules(config, reaction)
             if skipped:
                 n_multi_product += 1
+                audit_entries.append(
+                    _make_audit_entry(
+                        index,
+                        raw_item,
+                        fmt,
+                        "extract_rules",
+                        "SkippedMultiProduct",
+                        "single_product_only=True and reaction has multiple "
+                        "products after reagent removal",
+                    )
+                )
+                continue
             rules_payload = [
                 _make_extracted_rule_record(rule) for rule in extracted_rules
             ]
+            if not rules_payload:
+                audit_entries.append(
+                    _make_audit_entry(
+                        index,
+                        raw_item,
+                        fmt,
+                        "extract_rules",
+                        "NoRulesExtracted",
+                        "reaction parsed successfully but no rules were extracted",
+                    )
+                )
+                continue
             rule_records.append((index, rules_payload, product_smi))
         except Exception as e:
             if not ignore_errors:
                 raise
-            orig = raw_item if isinstance(raw_item, str) else str(raw_item)
+            orig, source_info = extract_origin_fields(raw_item, fmt)
             etype = type(e).__qualname__
             stage = e.stage if hasattr(e, "stage") else "extract_rules"
             errors.append(
-                ErrorEntry(original=orig, stage=stage, error_type=etype, message=str(e))
+                ErrorEntry(
+                    original=orig,
+                    source_info=source_info,
+                    stage=stage,
+                    error_type=etype,
+                    message=tsv_safe(str(e)),
+                    line_number=index,
+                )
             )
     return ExtractionBatchResult(
         rule_records=rule_records,
         errors=errors,
         n_multi_product=n_multi_product,
+        audit_entries=audit_entries,
     )
 
 
@@ -666,9 +734,13 @@ def _update_rules_statistics(
 ) -> None:
     """Update rules statistics with the indices of reactions they came from.
 
-    Deduplication is performed by the worker-computed CGR string of each rule.
-    The parent never parses rule SMARTS back into ReactionContainers; that keeps
-    aggregation cheap and avoids parser round-trip failures for query SMARTS.
+    Deduplication is performed by ``cgr_key``, which is canonical with
+    respect to atom numbering (see
+    :func:`synplan.chem.utils.canonical_query_cgr_key`) — so chemically
+    identical rules from different workers collapse here at ingest time.
+    The parent never parses rule SMARTS back into ReactionContainers; that
+    keeps aggregation cheap and avoids parser round-trip failures for query
+    SMARTS.
     """
     for rule_record in rule_records:
         prev_stats_len = len(rules_statistics)
@@ -685,6 +757,9 @@ def _process_extraction_result(
     error_counts: Counter | None = None,
     multi_product_count: list[int] | None = None,
     products_file: TextIOWrapper | None = None,
+    audit_entries_by_index: dict[int, ErrorEntry] | None = None,
+    reaction_rule_keys_by_index: dict[int, list[str]] | None = None,
+    audit_counts: Counter | None = None,
 ) -> int:
     """Process a single ExtractionBatchResult, updating rules statistics.
 
@@ -695,25 +770,50 @@ def _process_extraction_result(
     :param error_counts: Optional counter to accumulate error categories.
     :param multi_product_count: Single-element list used as mutable accumulator.
     :param products_file: Optional file handle to write ``reaction_id\\tproduct_smiles``.
+    :param audit_entries_by_index: Optional mapping populated with informational
+        per-reaction audit entries (multi-product skips, no-rules-extracted,
+        parse errors). Used to build the final audit file in input-line order.
+    :param reaction_rule_keys_by_index: Optional mapping from reaction index to
+        the canonical CGR keys of the rules it produced. Used after
+        :func:`sort_rules` to attribute final filtering reasons back to the
+        source reaction.
+    :param audit_counts: Optional counter to accumulate audit-entry categories.
     :return: Number of reactions processed in this batch (for progress bar).
     """
     for index, rule_records, product_smi in result.rule_records:
         _update_rules_statistics(rules_statistics, cgr_to_rule, index, rule_records)
+        if reaction_rule_keys_by_index is not None:
+            reaction_rule_keys_by_index[index] = [
+                rule_record.cgr_key for rule_record in rule_records
+            ]
         if products_file is not None:
             products_file.write(f"{index}\t{product_smi}\n")
 
     for err in result.errors:
+        if audit_entries_by_index is not None and err.line_number is not None:
+            audit_entries_by_index[err.line_number] = err
         if error_file is not None:
-            error_file.write(
-                f"{err.original}\t{err.stage}\t{err.error_type}\t{err.message}\n"
+            write_error_row(
+                error_file,
+                err.original,
+                err.source_info,
+                err.stage,
+                err.error_type,
+                err.message,
             )
         if error_counts is not None:
             error_counts[(err.stage, err.error_type)] += 1
 
+    for entry in result.audit_entries:
+        if audit_entries_by_index is not None and entry.line_number is not None:
+            audit_entries_by_index[entry.line_number] = entry
+        if audit_counts is not None:
+            audit_counts[(entry.stage, entry.error_type)] += 1
+
     if multi_product_count is not None:
         multi_product_count[0] += result.n_multi_product
 
-    return len(result.rule_records) + len(result.errors)
+    return len(result.rule_records) + len(result.errors) + len(result.audit_entries)
 
 
 def sort_rules(
@@ -751,8 +851,10 @@ def sort_rules(
     for cgr, indices in rules_stats.items():
         rule = cgr_to_rule[cgr]
         filter_stats["total_unique_rules"] += 1
-        validation = rule.reactor_validation or "not_set"
-        if validation != "passed":
+        # Reject only rules that explicitly failed validation. ``None`` means
+        # validation was disabled in the extraction config; those rules pass
+        # through unfiltered (the user opted out of the check).
+        if rule.reactor_validation == "failed":
             filter_stats["rejected_reactor_validation"] += 1
             continue
         if len(indices) < min_popularity:
@@ -763,6 +865,139 @@ def sort_rules(
 
     passed.sort(key=lambda x: -len(x[1]))
     return passed, filter_stats
+
+
+def _filtered_rule_reason(
+    cgr_key: str,
+    rules_statistics: dict,
+    cgr_to_rule: dict,
+    min_popularity: int,
+) -> str:
+    """Mirror :func:`sort_rules`' filtering decision for one rule key.
+
+    Returns one of ``"reactor_validation_failed"``,
+    ``"reactor_validation_<state>"`` (for non-passed sentinels),
+    ``"below_min_popularity"`` or ``"retained"``.
+    """
+    rule = cgr_to_rule[cgr_key]
+    validation = rule.reactor_validation
+    if validation == "failed":
+        return "reactor_validation_failed"
+    if validation is not None and validation != "passed":
+        return f"reactor_validation_{validation}"
+    if len(rules_statistics[cgr_key]) < min_popularity:
+        return "below_min_popularity"
+    return "retained"
+
+
+def _make_rule_filter_audit_entry(
+    index: int,
+    rule_keys: list[str],
+    rules_statistics: dict,
+    cgr_to_rule: dict,
+    min_popularity: int,
+) -> ErrorEntry:
+    """Build an audit entry for a reaction whose extracted rules all got filtered."""
+    reason_counts = Counter(
+        _filtered_rule_reason(cgr_key, rules_statistics, cgr_to_rule, min_popularity)
+        for cgr_key in rule_keys
+    )
+    reason_counts.pop("retained", None)
+
+    if not reason_counts:
+        error_type = "UnknownRuleFilter"
+        message = "reaction did not map to a retained rule for an unknown reason"
+    elif set(reason_counts) == {"below_min_popularity"}:
+        error_type = "BelowMinPopularity"
+        message = f"all extracted rules were below min_popularity={min_popularity}"
+    elif all(reason.startswith("reactor_validation_") for reason in reason_counts):
+        error_type = "ReactorValidationFailed"
+        details = ", ".join(
+            f"{reason.removeprefix('reactor_validation_')}={count}"
+            for reason, count in sorted(reason_counts.items())
+        )
+        message = f"all extracted rules failed reactor validation ({details})"
+    else:
+        error_type = "AllRulesFiltered"
+        details = ", ".join(
+            f"{reason}={count}" for reason, count in sorted(reason_counts.items())
+        )
+        message = f"all extracted rules were filtered out ({details})"
+
+    return ErrorEntry(
+        original="",
+        stage="rule_filtering",
+        error_type=error_type,
+        message=tsv_safe(message),
+        line_number=index,
+    )
+
+
+def _add_rule_filter_audit_entries(
+    audit_entries_by_index: dict[int, ErrorEntry],
+    reaction_rule_keys_by_index: dict[int, list[str]],
+    retained_reaction_indices: set[int],
+    rules_statistics: dict,
+    cgr_to_rule: dict,
+    min_popularity: int,
+    audit_counts: Counter | None = None,
+) -> None:
+    """Post-sort sweep: tag reactions whose rules were all filtered out.
+
+    A reaction that produced rules but had every rule rejected by
+    :func:`sort_rules` (reactor validation, min popularity) is otherwise
+    silently dropped from the output. This sweep adds an audit entry
+    explaining the rejection so users can debug their config.
+    """
+    for index, rule_keys in reaction_rule_keys_by_index.items():
+        if index in retained_reaction_indices or index in audit_entries_by_index:
+            continue
+        entry = _make_rule_filter_audit_entry(
+            index,
+            rule_keys,
+            rules_statistics,
+            cgr_to_rule,
+            min_popularity,
+        )
+        audit_entries_by_index[index] = entry
+        if audit_counts is not None:
+            audit_counts[(entry.stage, entry.error_type)] += 1
+
+
+def _write_reaction_audit_file(
+    audit_file_path: Path,
+    reaction_data_path: str,
+    audit_entries_by_index: dict[int, ErrorEntry],
+) -> None:
+    """Write a per-reaction audit TSV, sorted by input line index.
+
+    The audit row carries the original SMILES/source from the *input* file
+    so it is reproducible against the user's data, plus the stage, error
+    type and message captured during extraction or post-sort filtering.
+    """
+    with open(audit_file_path, "w", encoding="utf-8") as audit_file:
+        audit_file.write(
+            "# reaction_index\toriginal_smiles\tsource_info\tstage\t"
+            "error_type\terror_message\n"
+        )
+        if not audit_entries_by_index:
+            return
+        raw_reader = RawReactionReader(reaction_data_path)
+        for index, raw_item in enumerate(raw_reader):
+            entry = audit_entries_by_index.get(index)
+            if entry is None:
+                continue
+            if entry.original:
+                original, source_info = entry.original, entry.source_info
+            else:
+                original, source_info = extract_origin_fields(
+                    raw_item, raw_reader.format
+                )
+            audit_file.write(
+                f"{index}\t{tsv_safe(original)}\t{tsv_safe(source_info)}\t"
+                f"{tsv_safe(entry.stage)}\t{tsv_safe(entry.error_type)}\t"
+                f"{tsv_safe(entry.message)}\n"
+            )
 
 
 def _extract_rules_serial(
@@ -776,6 +1011,9 @@ def _extract_rules_serial(
     error_counts: Counter | None = None,
     products_file: TextIOWrapper | None = None,
     fmt: str = "smi",
+    audit_entries_by_index: dict[int, ErrorEntry] | None = None,
+    reaction_rule_keys_by_index: dict[int, list[str]] | None = None,
+    audit_counts: Counter | None = None,
 ) -> tuple[int, int]:
     """Serial rules extraction path used when a single CPU is requested.
 
@@ -796,20 +1034,62 @@ def _extract_rules_serial(
             extracted_rules, skipped = extract_rules(config, reaction)
             if skipped:
                 n_multi_product += 1
+                entry = _make_audit_entry(
+                    index,
+                    raw_item,
+                    fmt,
+                    "extract_rules",
+                    "SkippedMultiProduct",
+                    "single_product_only=True and reaction has multiple "
+                    "products after reagent removal",
+                )
+                if audit_entries_by_index is not None:
+                    audit_entries_by_index[index] = entry
+                if audit_counts is not None:
+                    audit_counts[(entry.stage, entry.error_type)] += 1
+                continue
             rule_smarts = [
                 _make_extracted_rule_record(rule) for rule in extracted_rules
             ]
+            if not rule_smarts:
+                entry = _make_audit_entry(
+                    index,
+                    raw_item,
+                    fmt,
+                    "extract_rules",
+                    "NoRulesExtracted",
+                    "reaction parsed successfully but no rules were extracted",
+                )
+                if audit_entries_by_index is not None:
+                    audit_entries_by_index[index] = entry
+                if audit_counts is not None:
+                    audit_counts[(entry.stage, entry.error_type)] += 1
+                continue
             _update_rules_statistics(rules_statistics, cgr_to_rule, index, rule_smarts)
+            if reaction_rule_keys_by_index is not None:
+                reaction_rule_keys_by_index[index] = [
+                    rule_record.cgr_key for rule_record in rule_smarts
+                ]
             if products_file is not None:
                 products_file.write(f"{index}\t{product_smi}\n")
         except Exception as e:
             if not ignore_errors:
                 raise
-            orig = raw_item if isinstance(raw_item, str) else str(raw_item)
+            orig, source_info = extract_origin_fields(raw_item, fmt)
             etype = type(e).__qualname__
             stage = e.stage if hasattr(e, "stage") else "extract_rules"
+            err_entry = ErrorEntry(
+                original=orig,
+                source_info=source_info,
+                stage=stage,
+                error_type=etype,
+                message=tsv_safe(str(e)),
+                line_number=index,
+            )
+            if audit_entries_by_index is not None:
+                audit_entries_by_index[index] = err_entry
             if error_file is not None:
-                error_file.write(f"{orig}\t{stage}\t{etype}\t{e}\n")
+                write_error_row(error_file, orig, source_info, stage, etype, str(e))
             if error_counts is not None:
                 error_counts[(stage, etype)] += 1
     return n_processed, n_multi_product
@@ -821,6 +1101,8 @@ def _print_extraction_summary(
     filter_stats: dict[str, int],
     error_counts: Counter,
     error_file_path: Path | None,
+    audit_counts: Counter | None = None,
+    audit_file_path: Path | None = None,
 ) -> None:
     """Print a categorized summary of rule extraction results."""
     n_rules = len(sorted_rules)
@@ -865,8 +1147,15 @@ def _print_extraction_summary(
         summary_lines.append("Extraction errors:")
         for (stage, etype), count in error_counts.most_common():
             summary_lines.append(f"  {stage}/{etype}={count}")
+    if audit_counts:
+        n_audited = sum(audit_counts.values())
+        summary_lines.append(f"Non-retained reactions: {n_audited}")
+        for (stage, etype), count in audit_counts.most_common():
+            summary_lines.append(f"  {stage}/{etype}={count}")
     if error_file_path is not None:
         summary_lines.append(f"Errors written to: {error_file_path}")
+    if audit_file_path is not None:
+        summary_lines.append(f"Reaction audit written to: {audit_file_path}")
     summary = "\n".join(summary_lines)
     print(summary)
     logger.info(summary)
@@ -881,6 +1170,7 @@ def extract_rules_from_reactions(
     *,
     ignore_errors: bool = False,
     error_file_path: str | Path | None = None,
+    audit_file_path: str | Path | None = None,
 ) -> None:
     """
     Extracts reaction rules from a set of reactions based on the given configuration.
@@ -897,6 +1187,13 @@ def extract_rules_from_reactions(
     :param ignore_errors: If True, log extraction failures and keep processing.
     :param error_file_path: Path to write failed reactions (TSV). If None and
         ``ignore_errors`` is True, defaults to ``<output>.errors.tsv``.
+    :param audit_file_path: Path to write the per-reaction audit TSV (one row
+        per non-retained reaction, sorted by input line). If None and
+        ``ignore_errors`` is True, defaults to ``<output>.audit.tsv``. The
+        audit complements the streaming error file: errors record what
+        crashed during workers, the audit records every reaction whose rules
+        did not survive sort (multi-product skip, no-rules-extracted,
+        below-min-popularity, reactor-validation-failed).
     :return: None
 
     """
@@ -912,11 +1209,21 @@ def extract_rules_from_reactions(
     elif ignore_errors:
         _error_path = Path(f"{reaction_rules_path_base}.errors.tsv")
 
+    # Resolve audit file path
+    _audit_path: Path | None = None
+    if audit_file_path is not None:
+        _audit_path = Path(audit_file_path)
+    elif ignore_errors:
+        _audit_path = Path(f"{reaction_rules_path_base}.audit.tsv")
+
     error_counts: Counter = Counter()
+    audit_counts: Counter = Counter()
+    audit_entries_by_index: dict[int, ErrorEntry] = {}
+    reaction_rule_keys_by_index: dict[int, list[str]] = {}
     error_file = None
     if _error_path is not None:
         error_file = open(_error_path, "w", encoding="utf-8")
-        error_file.write("# original_smiles\tstage\terror_type\terror_message\n")
+        write_error_tsv_header(error_file)
 
     n_processed = 0
     n_multi_product = 0
@@ -943,6 +1250,9 @@ def extract_rules_from_reactions(
                 error_counts=error_counts,
                 products_file=products_tmp,
                 fmt=fmt,
+                audit_entries_by_index=audit_entries_by_index,
+                reaction_rule_keys_by_index=reaction_rule_keys_by_index,
+                audit_counts=audit_counts,
             )
         else:
             multi_product_count = [0]  # mutable accumulator
@@ -988,6 +1298,9 @@ def extract_rules_from_reactions(
                         error_counts=error_counts,
                         multi_product_count=multi_product_count,
                         products_file=products_tmp,
+                        audit_entries_by_index=audit_entries_by_index,
+                        reaction_rule_keys_by_index=reaction_rule_keys_by_index,
+                        audit_counts=audit_counts,
                     )
                     n_processed += batch_count
                     bar.update(batch_count)
@@ -1006,6 +1319,28 @@ def extract_rules_from_reactions(
     )
     filter_stats["skipped_multi_product"] = n_multi_product
 
+    # Reactions whose rules all got filtered: add a per-reaction audit entry
+    # explaining why none of their rules survived sort_rules.
+    retained_reaction_indices = {
+        index for _rule, indices in sorted_rules for index in indices
+    }
+    _add_rule_filter_audit_entries(
+        audit_entries_by_index,
+        reaction_rule_keys_by_index,
+        retained_reaction_indices,
+        extracted_rules_and_statistics,
+        cgr_to_rule,
+        config.min_popularity,
+        audit_counts=audit_counts,
+    )
+
+    if _audit_path is not None:
+        _write_reaction_audit_file(
+            _audit_path,
+            reaction_data_path,
+            audit_entries_by_index,
+        )
+
     # Always save rules as TSV (primary format: human-readable, safe, reproducible).
     rules_tsv_path = f"{reaction_rules_path_base}.tsv"
     with open(rules_tsv_path, "w", encoding="utf-8") as tsv_file:
@@ -1016,7 +1351,13 @@ def extract_rules_from_reactions(
             )
 
     _print_extraction_summary(
-        n_processed, sorted_rules, filter_stats, error_counts, _error_path
+        n_processed,
+        sorted_rules,
+        filter_stats,
+        error_counts,
+        _error_path,
+        audit_counts=audit_counts,
+        audit_file_path=_audit_path,
     )
 
     # Generate policy training mapping file from the temp products file.

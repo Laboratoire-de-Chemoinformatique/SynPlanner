@@ -47,27 +47,28 @@ def _repo_root() -> Path:
 
 @pytest.mark.parametrize("module_path", PIPELINE_MODULES_WITH_ERROR_TSV)
 def test_module_references_canonical_header(module_path: str):
-    """The 5-column reference header literal must appear in the source.
+    """Each pipeline module must either inline the canonical 5-column
+    header literal or route through the shared ``write_error_tsv_header``
+    helper (which writes the same literal).
 
-    ``ERROR_TSV_HEADER`` is the source-of-truth constant; we don't pin the
-    surrounding code (any wrapping/escaping is fine), only that the literal
-    line is somewhere in the file.
+    The point of this static check is to catch *spec drift* — a stage
+    author writing a 3- or 4-column header by hand. Both inlining the
+    canonical literal and calling the shared helper preserve the invariant.
     """
     p = _repo_root() / module_path
     assert p.exists(), f"module {module_path} not found at {p}"
     src = p.read_text(encoding="utf-8")
-    # The source writes the header through an f-string or .write call; the
-    # literal contains real tab characters and a trailing newline. We accept
-    # either the bare literal or the escaped form ("\\t").
     needles = [
         ERROR_TSV_HEADER,
         ERROR_TSV_HEADER.replace("\t", "\\t"),
+        "write_error_tsv_header(",
     ]
     hit = any(n in src for n in needles)
     assert hit, (
-        f"{module_path} does not contain the canonical 5-column error-TSV "
-        f"header literal {ERROR_TSV_HEADER!r}. Pipelines that write a "
-        "different header (4-column extraction-style or 3-column mapping-"
-        "style) break the cross-stage error-TSV invariant tested in "
-        "test_error_tsv_format.py."
+        f"{module_path} does not reference the canonical 5-column error-TSV "
+        f"header. Expected either the literal {ERROR_TSV_HEADER!r}, the "
+        "escaped form, or a call to ``write_error_tsv_header()`` from "
+        "``synplan.utils.files``. Pipelines that write a different header "
+        "(4-column extraction-style or 3-column mapping-style) break the "
+        "cross-stage error-TSV invariant tested in test_error_tsv_format.py."
     )

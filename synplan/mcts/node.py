@@ -67,6 +67,7 @@ class Node:
 
         if len(self.precursors_to_expand) == 0:
             self.curr_precursor = tuple()
+            self.next_precursor: tuple = ()
         else:
             self.curr_precursor = self.precursors_to_expand[0]
             self.next_precursor = self.precursors_to_expand[1:]

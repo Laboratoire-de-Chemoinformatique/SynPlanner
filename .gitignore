@@ -147,6 +147,7 @@ coverage/
 .DS_Store
 .AppleDouble
 .LSOverride
+.claude
 
 tutorials/tutorial_results/
 tutorials/synplan_data/

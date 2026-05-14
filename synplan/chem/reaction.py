@@ -100,7 +100,12 @@ def apply_reaction_rule(
                 if len(reactions) == top_reactions_num:
                     break
             return reactions
-        except (IndexError, InvalidAromaticRing):
+        except (IndexError, InvalidAromaticRing, ValueError):
+            # chython's Reactor raises ValueError (e.g. "AnyElement doesn't
+            # match to pattern") for stereo-bearing rules whose stereo template
+            # fails to align at apply time. Treat as "rule did not apply"
+            # rather than propagating out of the generator and tearing down
+            # the caller's search loop or batch.
             return []
 
     def _prepare_reactants(

@@ -15,10 +15,10 @@ Run benchmark from command line::
 Load resources in your own code::
 
     from scripts.sascore_bench import load_policy_from_config, load_resources_from_config
-    
+
     # Load just the policy
     policy = load_policy_from_config()
-    
+
     # Load all resources (policy, rules, building blocks, config)
     resources = load_resources_from_config()
     tree = Tree(

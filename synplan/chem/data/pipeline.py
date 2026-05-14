@@ -17,7 +17,7 @@ from synplan.chem.data.reaction_result import (
     FilteredEntry,
     PipelineSummary,
 )
-from synplan.utils.files import to_reaction_smiles_record
+from synplan.utils.files import to_reaction_smiles_record, write_error_row
 
 
 def reaction_cgr_key(rxn: ReactionContainer) -> str | None:
@@ -95,11 +95,7 @@ def write_batch_results(
     :param write_fn: Callable that accepts a single pre-serialized record
         string and writes it to the output (e.g. writer.write_string).
     :param summary: PipelineSummary updated in-place.
-    :param error_file: Optional open text file handle for failed/rejected
-        rows. Standardization errors are written with their actual ``stage``
-        and ``error_type``; filter rejections are written with
-        ``stage="filter"`` and ``error_type=<filter class name>`` so both
-        live in the same five-column TSV.
+    :param error_file: Optional open text file handle for error rows.
     :param dedup: If True, skip records whose dedup key was seen before.
     :param seen: Existing dedup set; a new set is created if None.
     :param on_batch: Optional callback called with the batch total count
@@ -130,9 +126,13 @@ def write_batch_results(
             )
             summary.errored += 1
             if error_file is not None:
-                error_file.write(
-                    f"{err.original}\t{err.source_info}\t{err.stage}\t"
-                    f"{err.error_type}\t{err.message}\n"
+                write_error_row(
+                    error_file,
+                    err.original,
+                    err.source_info,
+                    err.stage,
+                    err.error_type,
+                    err.message,
                 )
         for flt in batch.filtered:
             summary.filter_breakdown[flt.reason] = (
@@ -140,8 +140,17 @@ def write_batch_results(
             )
             summary.filtered += 1
             if error_file is not None:
-                error_file.write(
-                    f"{flt.original}\t{flt.source_info}\tfilter\t{flt.reason}\t\n"
+                # Record the filtered-out reaction in the error TSV so it can
+                # be traced. Previously this branch only incremented a
+                # counter, silently dropping which specific reactions were
+                # filtered.
+                write_error_row(
+                    error_file,
+                    flt.original,
+                    flt.source_info,
+                    "filter",
+                    flt.reason,
+                    "filtered",
                 )
         batch_total = len(batch.records) + len(batch.errors) + len(batch.filtered)
         summary.total_input += batch_total

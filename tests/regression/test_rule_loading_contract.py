@@ -1,10 +1,10 @@
 """Contract tests for ``load_reaction_rules`` and its helpers.
 
-The public function declares ``-> list[Reactor]`` but the helpers return
-``tuple``. This is a contract violation that surfaces at call sites which
-assume list mutability. Several training and MCTS code paths take the result
-and pass it to functions that try to ``append``, ``sort``, or otherwise
-mutate it.
+The public function declares ``-> tuple[Reactor, ...]`` and is decorated
+with ``functools.cache``. Returning a tuple makes the cached value
+immutable, so callers (including parallel tree workers sharing the same
+rules) cannot accidentally ``append``/``sort``/``extend`` and mutate the
+shared state.
 
 Separately, ``_load_rules_pickle`` is supposed to unpack the legacy
 ``[(Reactor, priority), ...]`` pickle format into bare Reactors, but the
@@ -44,30 +44,25 @@ def real_rules_tsv(tmp_path: Path, sample_reactions_file, rule_cfg_factory) -> P
     return rules_path
 
 
-def test_load_reaction_rules_returns_listlike(real_rules_tsv: Path):
-    """Annotation is ``list[Reactor]``; callers must be able to treat it as a
-    sequence with the documented interface (at minimum, indexing and
-    ``len()``).
+def test_load_reaction_rules_returns_immutable_tuple(real_rules_tsv: Path):
+    """The contract is ``-> tuple[Reactor, ...]``: a sequence that supports
+    indexing and ``len()`` but rejects mutation.
 
-    A tuple satisfies this, but so does any sequence. The point is that the
-    *declared* return type is ``list[Reactor]`` and any caller depending on
-    list-mutability (``append``, ``sort``) gets a runtime AttributeError.
-    This test only enforces the read-side contract, the strictest read of
-    the annotation, so it catches the change from list to tuple silently.
+    The decorator ``functools.cache`` returns the same object on every call
+    with the same arguments. Returning a tuple guarantees that parallel
+    consumers (multiple ``Tree`` instances, training workers) cannot
+    accidentally mutate the shared rule set.
     """
     rules = load_reaction_rules(str(real_rules_tsv))
     # cache.clear so other tests do not see this fixture's result
     load_reaction_rules.cache_clear()
     assert len(rules) > 0
     assert isinstance(rules[0], Reactor)
-    # Annotation says list; if a caller tries to mutate, it must not raise.
-    # We assert the annotation's promise here without insisting it be a
-    # mutable-list subclass, but a tuple fails the canonical interpretation.
-    assert isinstance(rules, list), (
-        f"load_reaction_rules is annotated -> list[Reactor] but returned "
-        f"{type(rules).__name__}. Callers that try to mutate the result "
-        "(append/sort/extend) raise AttributeError silently. Either change "
-        "the helpers to return list(...) or update the public annotation."
+    assert isinstance(rules, tuple), (
+        f"load_reaction_rules is annotated -> tuple[Reactor, ...] but "
+        f"returned {type(rules).__name__}. The tuple is part of the "
+        "contract: callers share the cached value across parallel tree "
+        "workers and must not be able to mutate it."
     )
 
 

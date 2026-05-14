@@ -154,8 +154,8 @@ def run_search(
             bar_format="{desc}{n} [{elapsed}]",
         ):
             target_smi = target_smi.strip()
-            target_mol = mol_from_smiles(target_smi)
             try:
+                target_mol = mol_from_smiles(target_smi)
                 # run search
                 tree = Tree(
                     target=target_mol,
