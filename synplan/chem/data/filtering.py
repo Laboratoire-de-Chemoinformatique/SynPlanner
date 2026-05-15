@@ -377,38 +377,82 @@ class WrongCHBreakingFilter:
 
 
 class CCsp3BreakingConfig(BaseConfigModel):
-    pass
+    decoration_depth: int = Field(default=1, ge=0)
+    ring_max_size: int = Field(default=7, ge=3)
 
 
 class CCsp3BreakingFilter:
-    """Checks if there is C(sp3)-C bond breaking."""
+    """Reject only structurally innocent sp3 C-C breaks (likely AAM errors).
+
+    A broken sp3 C-C bond is rejected only when BOTH carbons are sp3 AND both
+    sides are 'innocent' — i.e. within ``decoration_depth`` bonds, every
+    neighbour is a plain neutral sp3 carbon (or hydrogen) and not part of a
+    ring of size <= ``ring_max_size``. Real chemistry (decarboxylation,
+    alpha-cleavage, aryl-sp3 cleavage, ring openings, ...) survives because
+    at least one side carries a heteroatom, sp2/aromatic neighbour, charge,
+    or small-ring membership.
+    """
+
+    def __init__(self, decoration_depth: int = 1, ring_max_size: int = 7):
+        self.decoration_depth = decoration_depth
+        self.ring_max_size = ring_max_size
 
     @staticmethod
     def from_config(config: CCsp3BreakingConfig) -> "CCsp3BreakingFilter":
-        return CCsp3BreakingFilter()
+        return CCsp3BreakingFilter(
+            decoration_depth=config.decoration_depth,
+            ring_max_size=config.ring_max_size,
+        )
+
+    def _is_innocent(self, atom_id: int, mol) -> bool:
+        seen = {atom_id}
+        frontier = {atom_id}
+        for _ in range(self.decoration_depth):
+            nxt = set()
+            for n in frontier:
+                for nbr in mol._bonds[n]:
+                    if nbr in seen:
+                        continue
+                    a = mol.atom(nbr)
+                    if a.atomic_number != 6:
+                        return False
+                    if a.hybridization != 1:
+                        return False
+                    if a.charge != 0 or a.isotope is not None:
+                        return False
+                    for ring in mol.sssr:
+                        if nbr in ring and len(ring) <= self.ring_max_size:
+                            return False
+                    seen.add(nbr)
+                    nxt.add(nbr)
+            frontier = nxt
+        return True
 
     def __call__(self, reaction: ReactionContainer) -> bool:
-        """
-        Returns True if there is C(sp3)-C bonds breaking, else False.
-
-        :param reaction: Input reaction
-        :return: Returns True if there is C(sp3)-C bonds breaking, else False.
-
-        """
+        """Return True if reaction should be rejected (innocent sp3-sp3 break)."""
         cgr = ~reaction
         rc = cgr.augmented_substructure(cgr.center_atoms, deep=1)
 
+        reactant_atoms: dict = {}
+        for mol in reaction.reactants:
+            for nid, _atom in mol.atoms():
+                reactant_atoms[nid] = mol
+
         for n, m, bond in rc.bonds():
-            atom = rc.atom(n)
-            neigh = rc.atom(m)
-
             is_bond_broken = bond.order is not None and bond.p_order is None
-            are_atoms_carbons = atom.atomic_number == 6 and neigh.atomic_number == 6
-            is_atom_sp3 = (
-                rc._hybridizations.get(n, 0) == 1 or rc._hybridizations.get(m, 0) == 1
-            )
-
-            if is_bond_broken and are_atoms_carbons and is_atom_sp3:
+            if not is_bond_broken:
+                continue
+            a_n = rc.atom(n)
+            a_m = rc.atom(m)
+            if a_n.atomic_number != 6 or a_m.atomic_number != 6:
+                continue
+            if rc._hybridizations.get(n, 0) != 1 or rc._hybridizations.get(m, 0) != 1:
+                continue
+            mol_n = reactant_atoms.get(n)
+            mol_m = reactant_atoms.get(m)
+            if mol_n is None or mol_m is None:
+                continue
+            if self._is_innocent(n, mol_n) and self._is_innocent(m, mol_m):
                 return True
         return False
 
