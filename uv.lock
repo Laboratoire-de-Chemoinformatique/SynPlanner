@@ -6743,6 +6743,7 @@ version = "1.4.4"
 source = { editable = "." }
 dependencies = [
     { name = "adabelief-pytorch" },
+    { name = "cachedmethods" },
     { name = "chython-synplan", extra = ["racer-default"] },
     { name = "chytorch-rxnmap-synplan" },
     { name = "chytorch-synplan" },
@@ -6810,6 +6811,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "adabelief-pytorch", specifier = ">=0.2.1" },
+    { name = "cachedmethods", specifier = "<0.2" },
     { name = "chython-synplan", extras = ["racer-default"], specifier = ">=1.93" },
     { name = "chytorch-rxnmap-synplan", specifier = ">=1.7" },
     { name = "chytorch-synplan", specifier = ">=1.70" },
