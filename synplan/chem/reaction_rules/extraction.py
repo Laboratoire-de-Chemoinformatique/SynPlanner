@@ -24,6 +24,7 @@ from synplan.chem.data.reaction_result import (
     ExtractionBatchResult,
 )
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
+from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.utils import (
     canonical_query_cgr_key,
     reverse_reaction,
@@ -53,16 +54,19 @@ def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
         if isinstance(atom, QueryElement):
             q.add_atom(atom.copy(full=True), n, xy=xy)
         else:
-            q.add_atom(
-                QueryElement.from_atom(
-                    atom,
-                    neighbors=True,
-                    hydrogens=True,
-                    ring_sizes=True,
-                ),
-                n,
-                xy=xy,
+            query_atom = QueryElement.from_atom(
+                atom,
+                neighbors=True,
+                hydrogens=True,
+                ring_sizes=True,
             )
+            # Asymmetric hybridization copy: only stamp `(4,)` when the source
+            # is aromatic, so the SMARTS writer emits lowercase `[c]`. For
+            # sp3/sp2/sp atoms we deliberately leave `_hybridization=()` to
+            # keep the rule lenient on hybridization for non-aromatic targets.
+            if atom.hybridization == 4:
+                query_atom._hybridization = (4,)
+            q.add_atom(query_atom, n, xy=xy)
     for n, m, bond in mol.bonds():
         if n in atoms and m in atoms:
             if isinstance(bond, QueryBond):
@@ -408,7 +412,7 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
         molecule_substructure_as_query(m, m.atoms_numbers) for m in rule.reactants
     )
     products = tuple(rule.products)
-    reactor = Reactor(patterns=patterns, products=products, delete_atoms=False)
+    reactor = CanonicalRetroReactor(patterns=patterns, products=products, delete_atoms=False)
     try:
         for result_reaction in reactor(*reaction.reactants):  # unpack here
             try:
@@ -439,7 +443,9 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
 
 
 def create_rule(
-    config: RuleExtractionConfig, reaction: ReactionContainer
+    config: RuleExtractionConfig,
+    reaction: ReactionContainer,
+    _restrict_center_atoms: set[int] | None = None,
 ) -> ReactionContainer:
     """
     Creates a reaction rule from a given reaction based on the specified
@@ -455,13 +461,21 @@ def create_rule(
     :param reaction: The reaction object (ReactionContainer) from which to create the
                      rule. This object represents a chemical reaction with specified reactants,
                      products, and possibly reagents.
+    :param _restrict_center_atoms: Optional override of the reaction-center atom set.
+                     When given, only these atoms (plus their environment/leaving groups
+                     per config) are included in the rule, instead of all CGR center atoms.
+                     Used by extract_rules when multicenter_rules=False to build a separate
+                     rule per disconnected reaction-center component.
     :return: A ReactionContainer object representing the extracted reaction rule.
 
     """
 
     # 1. create reaction CGR
     cgr = ~reaction
-    center_atoms = set(cgr.center_atoms)
+    if _restrict_center_atoms is not None:
+        center_atoms = set(_restrict_center_atoms)
+    else:
+        center_atoms = set(cgr.center_atoms)
 
     # 2. add atoms of reaction environment based on config settings
     center_atoms = add_environment_atoms(
@@ -561,13 +575,14 @@ def extract_rules(
     if config.multicenter_rules:
         return [create_rule(config, reaction)], False
 
-    # extract separate rules for each distinct reaction center (deduplicate by CGR)
+    # extract one rule per disconnected reaction-center component, dedup by CGR
+    cgr = ~reaction
     seen_cgrs = {}
-    for center_reaction in islice(reaction.enumerate_centers(), 15):
-        rule = create_rule(config, center_reaction)
-        cgr = ~rule
-        if cgr not in seen_cgrs:
-            seen_cgrs[cgr] = rule
+    for component in islice(cgr.centers_list, 15):
+        rule = create_rule(config, reaction, _restrict_center_atoms=set(component))
+        rule_cgr = ~rule
+        if rule_cgr not in seen_cgrs:
+            seen_cgrs[rule_cgr] = rule
 
     return list(seen_cgrs.values()), False
 
@@ -578,7 +593,7 @@ def _rule_to_reactor_smarts(rule: ReactionContainer) -> str:
         molecule_substructure_as_query(m, m.atoms_numbers) for m in rule.reactants
     )
     products = tuple(rule.products)
-    reactor = Reactor(patterns=patterns, products=products, delete_atoms=False)
+    reactor = CanonicalRetroReactor(patterns=patterns, products=products, delete_atoms=False)
     return str(reactor)
 
 

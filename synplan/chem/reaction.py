@@ -7,6 +7,12 @@ from typing import Any
 from chython.containers import MoleculeContainer, ReactionContainer
 from chython.exceptions import InvalidAromaticRing
 from chython.reactor import Reactor
+from chython.reactor.base import (
+    restore_aromaticity,
+    snapshot_aromaticity_subset,
+)
+
+from synplan.chem.utils import validate_and_canonicalize
 
 
 class Reaction(ReactionContainer):
@@ -14,6 +20,62 @@ class Reaction(ReactionContainer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+
+class CanonicalRetroReactor(Reactor):
+    """Reactor subclass that emits **already-canonical** products in a
+    single aromatization pass.
+
+    Subclasses :class:`chython.reactor.Reactor` with
+    ``fix_aromatic_rings=False`` so the inner ``_patcher`` skips its
+    own ``kekule + thiele``; we inline the full canonicalize pipeline
+    here instead. Result: ``kekule`` and ``thiele`` each run once per
+    product (vs twice in the legacy wrapper + canonicalize pattern).
+
+    Failures raise ``InvalidAromaticRing``, which chython's
+    ``_single_stage`` catches and skips silently.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs["fix_aromatic_rings"] = False  # we run all aromatization in _patcher
+        super().__init__(*args, **kwargs)
+
+    def _patcher(self, structure: MoleculeContainer, mapping: dict[int, int]) -> MoleculeContainer:
+        new = super()._patcher(structure, mapping)
+
+        # Bug-6 protection: snapshot pre-kekule aromatic atoms.
+        pre_aromatic = {n for n, a in new.atoms() if a.hybridization == 4}
+        snapshot = (
+            snapshot_aromaticity_subset(new, pre_aromatic)
+            if pre_aromatic
+            else None
+        )
+
+        try:
+            new.kekule(ignore_pyrrole_hydrogen=self._fix_broken_pyrroles)
+        except InvalidAromaticRing:
+            raise  # caught by chython._single_stage → rule skipped
+
+        if new.check_valence():
+            # ValenceError would escape; InvalidAromaticRing is caught.
+            raise InvalidAromaticRing("patched molecule has invalid valence")
+
+        try:
+            new.standardize(_fix_stereo=False)
+            new.implicify_hydrogens(_fix_stereo=False)
+            if not new.thiele(fix_tautomers=self._fix_tautomers):
+                new.fix_stereo()
+            if pre_aromatic:
+                post_aromatic = {n for n, a in new.atoms() if a.hybridization == 4}
+                if not pre_aromatic.issubset(post_aromatic):
+                    restore_aromaticity(new, snapshot)
+            new.standardize_charges(prepare_molecule=False)
+            new.standardize_tautomers(prepare_molecule=False)
+            new.clean_stereo()
+        except InvalidAromaticRing:
+            raise  # reject half-canonicalized output
+
+        return new
 
 
 def add_small_mols(
@@ -48,26 +110,39 @@ def add_small_mols(
 
 def apply_reaction_rule(
     molecule: MoleculeContainer,
-    reaction_rule: Reactor,
+    reaction_rule: "CanonicalRetroReactor",
     sort_reactions: bool = False,
     top_reactions_num: int = 5,
-    validate_products: bool = True,
     rebuild_with_cgr: bool = False,
     multirule: bool = False,
     rm_dup: bool = False,
 ) -> Iterator[list[MoleculeContainer,]]:
     """Applies a reaction rule to a given molecule.
 
+    The yielded precursors are always in canonical form — either
+    produced directly by :class:`CanonicalRetroReactor._patcher`
+    (default path) or canonicalized via
+    :func:`synplan.chem.utils.validate_and_canonicalize` when the CGR
+    rebuild path is used. Callers can wrap them with
+    ``Precursor(mol, canonicalize=False)`` without further work.
+
     :param molecule: A molecule to which reaction rule will be applied.
-    :param reaction_rule: A reaction rule to be applied.
+    :param reaction_rule: A :class:`CanonicalRetroReactor`. (Any chython
+        ``Reactor`` instance also works mechanically but the yielded
+        precursors won't be canonicalized — only ``CanonicalRetroReactor``
+        is supported by SynPlanner's MCTS state-dedup contract.)
     :param sort_reactions: If True, candidate reactions are sorted by the
         number of large product fragments (length > 6) before truncation.
     :param top_reactions_num: The maximum amount of reactions after the
         application of reaction rule. **Default raised from 3 → 5 in 1.5.0**;
         callers that depended on the previous default must pass
         ``top_reactions_num=3`` explicitly.
-    :param validate_products: If True, validates the final products.
-    :param rebuild_with_cgr: If True, the products are extracted from CGR decomposition.
+    :param rebuild_with_cgr: If True, products are re-derived by composing
+        the reaction into a CGR and decomposing it (recovery path for
+        cases where the reactor's direct output has mapping or mass-
+        balance issues). The CGR-rebuilt fragments are canonicalized
+        explicitly via ``validate_and_canonicalize``; otherwise the
+        reactor's already-canonical products are yielded directly.
     :param multirule: If True, repeatedly applies the reaction rule to generated
         reactants in a BFS-style loop until no new reactant set is produced.
         Used for priority rules that should iterate (e.g. strip every protective
@@ -101,11 +176,7 @@ def apply_reaction_rule(
                     break
             return reactions
         except (IndexError, InvalidAromaticRing, ValueError):
-            # chython's Reactor raises ValueError (e.g. "AnyElement doesn't
-            # match to pattern") for stereo-bearing rules whose stereo template
-            # fails to align at apply time. Treat as "rule did not apply"
-            # rather than propagating out of the generator and tearing down
-            # the caller's search loop or batch.
+            # chython's stereo handling raises these on misaligned templates.
             return []
 
     def _prepare_reactants(
@@ -123,24 +194,24 @@ def apply_reaction_rule(
             return None
 
         if rebuild_with_cgr:
-            cgr = reaction.compose()
-            reactants = cgr.decompose()[1].split()
-        else:
-            reactants = reaction.products  # reactants are products in retro reaction
-        reactants = [mol for mol in reactants if len(mol) > 0]
-
-        if validate_products:
+            # CGR recovery path bypasses _patcher; canonicalize per fragment.
+            # chython.compose raises ValueError on element-substitution rules.
+            try:
+                cgr = reaction.compose()
+                reactants = cgr.decompose()[1].split()
+            except (ValueError, InvalidAromaticRing):
+                return None
+            reactants = [mol for mol in reactants if len(mol) > 0]
+            canon = []
             for mol in reactants:
-                try:
-                    tmp_mol = mol.copy()
-                    tmp_mol.remove_coordinate_bonds(keep_to_terminal=False)
-                    tmp_mol.kekule()
-                    if tmp_mol.check_valence():
-                        return None
-                except InvalidAromaticRing:
+                c = validate_and_canonicalize(mol)
+                if c is None:
                     return None
+                c.meta.update(mol.meta)
+                canon.append(c)
+            return canon
 
-        return reactants
+        return [mol for mol in reaction.products if len(mol) > 0]
 
     def _reactants_key(reactants: list[MoleculeContainer]) -> tuple[str, ...]:
         return tuple(sorted(str(reactant) for reactant in reactants))

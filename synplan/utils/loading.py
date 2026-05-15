@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Union
 import yaml
 from chython.files.SDFrw import SDFRead
 from chython.reactor.reactor import Reactor
+
+from synplan.chem.reaction import CanonicalRetroReactor
 from huggingface_hub import hf_hub_download, snapshot_download
 from torch import device
 from tqdm.auto import tqdm
@@ -328,7 +330,9 @@ def _load_rules_tsv(
                         "  set check_atom_mapping='off' to load it anyway."
                     )
             try:
-                reactors.append(Reactor.from_smarts(smarts_str, **reactor_kwargs))
+                reactors.append(
+                    CanonicalRetroReactor.from_smarts(smarts_str, **reactor_kwargs)
+                )
             except Exception as err:
                 raise ValueError(
                     f"Failed to load reaction rule at row {row_num} of "

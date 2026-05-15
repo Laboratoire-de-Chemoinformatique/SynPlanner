@@ -207,7 +207,9 @@ class RolloutSimulator:
                 return -1.0
 
             history[rollout_depth]["rule_index"] = rule_id
-            products = tuple(Precursor(product) for product in products)
+            # ``apply_reaction_rule`` already validated + canonicalized each
+            # product in a single kekule pass.
+            products = tuple(Precursor(product, canonicalize=False) for product in products)
             history[rollout_depth]["products"] = products
 
             if any(x in occurred_precursor for x in products) and products:

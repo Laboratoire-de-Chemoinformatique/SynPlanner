@@ -15,6 +15,8 @@ from collections.abc import Iterable
 
 from chython.reactor import Reactor
 
+from synplan.chem.reaction import CanonicalRetroReactor
+
 POLICY_SOURCE_NAME: str = "policy"
 """Reserved ``rule_source`` label for the learned-policy bucket; cannot be reused as a priority set name."""
 
@@ -81,7 +83,7 @@ def parse_priority_rules(
         for index, smarts in enumerate(smarts_list):
             try:
                 rules.append(
-                    Reactor.from_smarts(
+                    CanonicalRetroReactor.from_smarts(
                         smarts,
                         automorphism_filter=automorphism_filter,
                         delete_atoms=delete_atoms,

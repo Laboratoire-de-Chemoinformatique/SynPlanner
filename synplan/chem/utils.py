@@ -330,6 +330,37 @@ def safe_canonicalization(molecule: MoleculeContainer) -> MoleculeContainer:
         return molecule
 
 
+def validate_and_canonicalize(
+    molecule: MoleculeContainer,
+) -> MoleculeContainer | None:
+    """Validate + canonicalize a CGR-rebuilt molecule in one kekule pass.
+
+    Used by ``apply_reaction_rule`` on the ``rebuild_with_cgr=True``
+    path, where CGR decompose bypasses ``CanonicalRetroReactor._patcher``.
+    Drops on any error (matches ``_patcher``'s strict rejection).
+
+    For user inputs (targets, building blocks), use the permissive
+    ``safe_canonicalization`` instead.
+    """
+    # Atom-key sort, idempotent across calls.
+    molecule._atoms = dict(sorted(molecule._atoms.items()))
+    tmp = molecule.copy()
+    try:
+        tmp.remove_coordinate_bonds(keep_to_terminal=False)
+        tmp.kekule()
+        if tmp.check_valence():
+            return None
+        tmp.standardize(_fix_stereo=False)
+        tmp.implicify_hydrogens(_fix_stereo=False)
+        tmp.thiele(fix_tautomers=True)
+        tmp.standardize_charges(prepare_molecule=False)
+        tmp.standardize_tautomers(prepare_molecule=False)
+        tmp.clean_stereo()
+        return tmp
+    except InvalidAromaticRing:
+        return None
+
+
 def standardize_building_blocks(input_file: str, output_file: str) -> str:
     """Standardizes custom building blocks.
 

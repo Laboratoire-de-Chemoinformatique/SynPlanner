@@ -426,7 +426,9 @@ class Tree:
             molecule.meta["rule_key"] = rule_key
             molecule.meta["policy_rank"] = policy_rank
 
-        new_precursor = tuple(Precursor(mol) for mol in products)
+        # ``apply_reaction_rule`` already validated + canonicalized each
+        # product in a single kekule pass; skip the redundant copy here.
+        new_precursor = tuple(Precursor(mol, canonicalize=False) for mol in products)
         # Multiply prob by the number of qualifying fragments so that
         # disconnections producing more usable precursors are preferred. Note:
         # priority rules enter here with prob=1.0, so a priority disconnect
