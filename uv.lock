@@ -42,6 +42,7 @@ exclude-newer-span = "P7D"
 [manifest]
 constraints = [
     { name = "aiohttp", specifier = ">=3.13.4" },
+    { name = "cachedmethods", specifier = "<0.2" },
     { name = "cryptography", specifier = ">=46.0.7" },
     { name = "gitpython", specifier = ">=3.1.50" },
     { name = "jupyter-server", specifier = ">=2.18.0" },
@@ -465,11 +466,10 @@ wheels = [
 
 [[package]]
 name = "cachedmethods"
-version = "0.2.0"
+version = "0.1.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/3a/86/b01b20fce289159b01acd8f88b1a92152524485e8df528bb22cca811f157/cachedmethods-0.2.0.tar.gz", hash = "sha256:cb88921bee6bd6a5cb643f0bc418faf577e3038185b027958ff2d696a54fe123", size = 4238, upload-time = "2026-05-02T22:33:22.872Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dc/8d/70aba1659377400c30d1dea2e662fa935d433f4f55e897e318423e3d421d/cachedmethods-0.2.0-py3-none-any.whl", hash = "sha256:a6bbf09c64fdc896bbffc96a928df5e2570688a3e2f8504aceedd0ea552e97b7", size = 3293, upload-time = "2026-05-02T22:33:21.838Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/48/c134ce3453c970b79cdb165424624991ce5d0708f8d73bc884a0b21fc183/CachedMethods-0.1.4-py3-none-any.whl", hash = "sha256:e00f9734d4699ddd65ed39e6a4887e38d63a521e4a02fa1406e71b9cfa851438", size = 4046, upload-time = "2019-10-18T18:50:55.434Z" },
 ]
 
 [[package]]

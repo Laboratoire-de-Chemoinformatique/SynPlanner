@@ -20,6 +20,7 @@ classifiers = [
 
 dependencies = [
   "chython-synplan[racer-default]>=1.93",
+  "cachedmethods<0.2", # Drop this pin when chython-synplan ships a fix.
   "chytorch-synplan>=1.70",
   "chytorch-rxnmap-synplan>=1.7",
   "numpy>=2",
@@ -104,6 +105,7 @@ constraint-dependencies = [
   "aiohttp>=3.13.4",         # CVE-2026-22815, CVE-2026-34515, CVE-2026-34516, CVE-2026-34525
   "cryptography>=46.0.7",    # CVE-2026-39892
   "nbconvert>=7.17.1",       # CVE-2026-39377, CVE-2026-39378 (path traversal)
+  "cachedmethods<0.2", # Drop this pin when chython-synplan ships a fix.
 ]
 
 # PyTorch backend extras are mutually exclusive
