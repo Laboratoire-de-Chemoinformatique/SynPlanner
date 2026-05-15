@@ -27,9 +27,8 @@ _MAPPED_RXN = (
     ">>[CH:4]1=[CH:3][CH2:6][CH2:5][CH2:2][CH2:1]1"
 )
 
-# Same chemistry, mapping numbers shifted by +1000. Drives extraction to
-# emit a QueryCGRContainer with a different numbering; the canonical key
-# must collapse the two to the same value.
+# Same chemistry, mapping numbers shifted by +1000. Extraction emits a
+# QueryCGRContainer with different numbering; canonical key must match.
 _MAPPED_RXN_SHIFTED = (
     "[CH2:1001]=[CH2:1002].[CH:1003]([CH:1004]=[CH2:1005])=[CH2:1006]"
     ">>[CH:1004]1=[CH:1003][CH2:1006][CH2:1005][CH2:1002][CH2:1001]1"
@@ -47,11 +46,10 @@ def _first_rule(reaction_smi: str):
 def test_canonical_key_invariant_under_remap():
     """Renumbering atoms must not change the canonical key.
 
-    We cannot call ``QueryCGRContainer.remap`` directly because its chython
-    override forwards a ``copy=`` kwarg that the base ``Graph.remap`` does
-    not accept (a chython bug). Instead, exercise the invariant the way it
-    matters in production: two SMILES that differ only in mapping numbers
-    must produce identical canonical keys after extraction.
+    ``QueryCGRContainer.remap`` cannot be called directly: its chython override
+    forwards a ``copy=`` kwarg that the base ``Graph.remap`` does not accept
+    (chython bug). The test exercises the invariant via two SMILES with
+    different mapping offsets and compares the keys after extraction.
     """
     baseline_key = canonical_query_cgr_key(~_first_rule(_MAPPED_RXN))
     shifted_key = canonical_query_cgr_key(~_first_rule(_MAPPED_RXN_SHIFTED))

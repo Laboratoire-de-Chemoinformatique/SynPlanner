@@ -166,10 +166,10 @@ def test_extraction_multi_product_records_are_traceable(
 ):
     """Multi-product reactions must not vanish silently.
 
-    Multi-product skips are routed to the per-reaction *audit* TSV (not the
-    error TSV — they're not exceptions, they're documented skips). The
-    conservation invariant: every input reaction must show up either in the
-    rule coverage set (it produced retained rules) or in the audit TSV.
+    Multi-product skips go to the per-reaction audit TSV, not the error TSV
+    (the pipeline treats them as documented skips rather than failures). Every
+    input reaction must appear either in the rule-coverage set or the audit
+    TSV.
     """
     rules_path = tmp_path / "rules.tsv"
     err = tmp_path / "rules.errors.tsv"

@@ -17,9 +17,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - `load_reaction_rules` now defaults to `check_atom_mapping="reject_unmapped"`:
-  SMARTS rules without atom maps are rejected with an actionable error
-  pointing at the offending TSV row. Pass `check_atom_mapping="off"` to
-  restore the old behaviour.
+  SMARTS rules without atom maps are rejected with an error naming the
+  offending TSV row. Pass `check_atom_mapping="off"` to restore the old
+  behaviour.
 - Multi-product reactions and rules-all-filtered-out are now traceable
   through the per-reaction audit TSV (`<rules_path_base>.audit.tsv`) in
   addition to the summary counters.
