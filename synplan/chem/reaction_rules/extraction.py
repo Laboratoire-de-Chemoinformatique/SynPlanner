@@ -383,6 +383,39 @@ def assemble_final_rule(
     return rule
 
 
+def _isomorphism_cost_estimate(query, target) -> float:
+    """Cheap upper bound on subgraph-isomorphism enumeration cost.
+
+    Buckets atoms by ``(atomic_symbol, degree, is_aromatic)`` and multiplies
+    per-bucket ``perm(target_count, query_count)``. Caps at 1e15.
+
+    Returns ``0`` if any query bucket has fewer matches in the target — but a
+    zero result is NOT reliable as "will fail fast" because SMARTS D/h
+    constraints are more flexible than this crude bucketing. Only use the
+    high side for skip decisions (e.g. ``> _ISOMORPHISM_COST_SKIP_THRESHOLD``).
+    """
+    def _sig(mol, n):
+        a = mol.atom(n)
+        return (a.atomic_symbol, len(mol._bonds[n]),
+                getattr(a, "hybridization", None) == 4)
+
+    q_sig = Counter(_sig(query, n) for n in query.atoms_numbers)
+    t_sig = Counter(_sig(target, n) for n in target.atoms_numbers)
+    cost = 1.0
+    for sig, k in q_sig.items():
+        n = t_sig.get(sig, 0)
+        if n < k:
+            return 0.0
+        for i in range(k):
+            cost *= (n - i)
+        if cost > 1e15:
+            return cost
+    return cost
+
+
+_ISOMORPHISM_COST_SKIP_THRESHOLD = 1e9
+
+
 def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
     """
     Validates a reaction rule by ensuring it can correctly generate the products from
@@ -411,6 +444,10 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
         molecule_substructure_as_query(m, m.atoms_numbers) for m in rule.reactants
     )
     products = tuple(rule.products)
+    if patterns and reaction.reactants:
+        cost = _isomorphism_cost_estimate(patterns[0], reaction.reactants[0])
+        if cost > _ISOMORPHISM_COST_SKIP_THRESHOLD:
+            return False
     reactor = CanonicalRetroReactor(patterns=patterns, products=products, delete_atoms=False)
     try:
         for result_reaction in reactor(*reaction.reactants):  # unpack here
