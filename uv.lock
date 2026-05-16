@@ -36,13 +36,11 @@ conflicts = [[
 ]]
 
 [options]
-exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
-exclude-newer-span = "P7D"
+exclude-newer = "2026-05-17T22:00:00Z"
 
 [manifest]
 constraints = [
     { name = "aiohttp", specifier = ">=3.13.4" },
-    { name = "cachedmethods", specifier = "<0.2" },
     { name = "cryptography", specifier = ">=46.0.7" },
     { name = "gitpython", specifier = ">=3.1.50" },
     { name = "jupyter-server", specifier = ">=2.18.0" },
@@ -465,14 +463,6 @@ wheels = [
 ]
 
 [[package]]
-name = "cachedmethods"
-version = "0.1.4"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e1/48/c134ce3453c970b79cdb165424624991ce5d0708f8d73bc884a0b21fc183/CachedMethods-0.1.4-py3-none-any.whl", hash = "sha256:e00f9734d4699ddd65ed39e6a4887e38d63a521e4a02fa1406e71b9cfa851438", size = 4046, upload-time = "2019-10-18T18:50:55.434Z" },
-]
-
-[[package]]
 name = "cachetools"
 version = "7.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -679,33 +669,32 @@ wheels = [
 
 [[package]]
 name = "chython-synplan"
-version = "1.94"
+version = "1.95"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cachedmethods" },
     { name = "lazy-object-proxy" },
     { name = "lxml" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/68/4b/aa14ee82dca8e63f84c3f82fc57241b022071a03d1f66f041be86d14d3e6/chython_synplan-1.94.tar.gz", hash = "sha256:c57850a18c33dba71548d453cca03d3b1f96abfe3562e834f3261b7d9f80b1be", size = 895587, upload-time = "2026-02-15T19:14:15.871Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b8/82/022cc74d9969edf4bfb3c4ba18ecdc86f6d581c36730011a41ff17cc8978/chython_synplan-1.95.tar.gz", hash = "sha256:32e5bb2f5de1c386e7d40be8778f31b5f79dbd58291d6b0fa0c7051b1c77e388", size = 904662, upload-time = "2026-05-16T14:55:19.133Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/46/de/721ca8f3428869793e38ccdc2b9a97a7d29c2f64d51a9348ca6e87cebdf2/chython_synplan-1.94-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:d2e87d88b51e415546f8d37b2be082fc2906288364a581e34e7f8401b709e6d4", size = 1321725, upload-time = "2026-02-15T19:13:50.506Z" },
-    { url = "https://files.pythonhosted.org/packages/c9/c0/fef640e5ae9f0fa410530ca5abd7739f1727eab6bc4f11b0b056b8adb072/chython_synplan-1.94-cp310-cp310-macosx_13_0_x86_64.whl", hash = "sha256:c7deec4b4d8825ad1827ed087bf631a4132f82e70e88f5ff69a78ef60bfab139", size = 2011124, upload-time = "2026-02-15T19:13:51.929Z" },
-    { url = "https://files.pythonhosted.org/packages/ee/65/88f11cceb8d23be906cad442e440ec057c43476dd59541cc6894342a8538/chython_synplan-1.94-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:dcfd17c77257eada58441437378341c394f8ce2dcfae512f124e4036c5c0f4ac", size = 3327130, upload-time = "2026-02-15T19:13:53.349Z" },
-    { url = "https://files.pythonhosted.org/packages/55/84/a0b37e19c63695e697f3516548cbd764b82ed64b22219ecb6c3ce1db8c5f/chython_synplan-1.94-cp310-cp310-win_amd64.whl", hash = "sha256:9b60406b47ab2d186a96f0cc7167a0f5e7f0e96ed7ae59a9f0825d1ba200bca7", size = 1975071, upload-time = "2026-02-15T19:13:54.696Z" },
-    { url = "https://files.pythonhosted.org/packages/6d/9b/ae65e147a64dc0e348af64b28e9354698fc22a0dee9a0f5b5e44ef635606/chython_synplan-1.94-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:9bbdeda67856a0fc1a99fef751ff32fabff3df8d38995c50024c98baf99cef91", size = 1601985, upload-time = "2026-02-15T19:13:56.561Z" },
-    { url = "https://files.pythonhosted.org/packages/97/54/78a1ef7f766ed559096657ed24c86508316ee32af71b36954600043c4742/chython_synplan-1.94-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:d34157772cfc24e6dd6e891e9a1e728205f14df23a23cfafac4a28079cbfef8e", size = 2297376, upload-time = "2026-02-15T19:13:57.976Z" },
-    { url = "https://files.pythonhosted.org/packages/8e/67/e1325fb53142ba407051aef267ba39ac4785f2439824574bce36a94bfdf3/chython_synplan-1.94-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4a93b6384718486081f7c06c48a3c7070f48607b5abc6ce1a269ed986c0f773f", size = 5037194, upload-time = "2026-02-15T19:13:59.933Z" },
-    { url = "https://files.pythonhosted.org/packages/07/f7/038d029b976b1335d884985eadf7ec4fec5ae63a0e82c4489d49bbe09608/chython_synplan-1.94-cp311-cp311-win_amd64.whl", hash = "sha256:95e8009ec3514fe2d7f79223e532d330c7a0239606c162b75c1d836e413cbaff", size = 2229393, upload-time = "2026-02-15T19:14:01.523Z" },
-    { url = "https://files.pythonhosted.org/packages/df/97/fbc34d6736df4c31b3c091a1ee1e5057aeb363ccba5f31a0474a4354ba82/chython_synplan-1.94-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:4a3688406e202823f5c3637b3dc7b0d78ea106c333a3172538a5f8aa6fff801e", size = 1881896, upload-time = "2026-02-15T19:14:02.713Z" },
-    { url = "https://files.pythonhosted.org/packages/59/56/9fb7c62f8980f62602605ee2231252c08fd3e22950f03a6187115d110194/chython_synplan-1.94-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:1cef08791ecdd5ffe9259e2301ba1d414dde858cf562cedd515767bc92ce7cd7", size = 2580680, upload-time = "2026-02-15T19:14:03.978Z" },
-    { url = "https://files.pythonhosted.org/packages/ba/c8/48a98a991e8fcc36c2db5d1c8a6afb412fd42a28257b25696b0ebc316d16/chython_synplan-1.94-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e15c384cdfe19690063edfa8002a15dc356632f8364b2e034044544a9c7d40a2", size = 6723623, upload-time = "2026-02-15T19:14:05.468Z" },
-    { url = "https://files.pythonhosted.org/packages/a1/57/4255eed611e95214efd26399cf4d7d95ee13f4cb79474d8af78b39db2139/chython_synplan-1.94-cp312-cp312-win_amd64.whl", hash = "sha256:363843e11fdc1823ed31d50781fe76640cd4f6cb8aa16cb67388f6ec09e49065", size = 2484839, upload-time = "2026-02-15T19:14:07.061Z" },
-    { url = "https://files.pythonhosted.org/packages/77/24/3247a2268e9325b1462dcb1edb6a101b09df5283d8672090beeacba12a82/chython_synplan-1.94-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:2e28d8043476ff3ae7bf47fe7307f074247dcb204f5b745066a09fe397b96fb1", size = 2159544, upload-time = "2026-02-15T19:14:08.524Z" },
-    { url = "https://files.pythonhosted.org/packages/ba/18/03852ee2f0700cc629fc2934de8e43e46a16d6843c4f9f7de222fd7ece0b/chython_synplan-1.94-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:4e77ebef6096a6dae48db7254d308243446a0344ae7ed3174ab59a91cac96d36", size = 2861890, upload-time = "2026-02-15T19:14:10.47Z" },
-    { url = "https://files.pythonhosted.org/packages/a1/f2/d447df6516a925d458ff4738ef75a74f74d882b3947b1c61b7fcc72cae92/chython_synplan-1.94-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:fec69761bbe305fe611ab9503eb5d26f9dec5f2dbdf2ca948ddc0ec30c1f6c78", size = 8382778, upload-time = "2026-02-15T19:14:12.219Z" },
-    { url = "https://files.pythonhosted.org/packages/fc/6b/30eb614cc8464c6df98079e821670526d0a67b7d5456f75f3b3137918322/chython_synplan-1.94-cp313-cp313-win_amd64.whl", hash = "sha256:6cf8802fc2611cb6392049a059d28223765604b55dbd976a79b024996b771114", size = 2739343, upload-time = "2026-02-15T19:14:14.262Z" },
+    { url = "https://files.pythonhosted.org/packages/40/4e/e0c0cc409484ae7f9670d0ec18a9738c122bba5e6591575bec18c876b948/chython_synplan-1.95-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:8a85987c04f2b07196b452408816631769f82012d456aed22918a2cad62c32a0", size = 1339161, upload-time = "2026-05-16T14:54:54.999Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/4e/db8f90743a4cdc7174c34412f83fb8b7f004811fc69ee46d1895e993fc52/chython_synplan-1.95-cp310-cp310-macosx_13_0_x86_64.whl", hash = "sha256:bcd2beb5532422b21fca4fd3fe268116ab7d50863230e08f7a79d0d2dc3ac2ac", size = 2028554, upload-time = "2026-05-16T14:54:56.84Z" },
+    { url = "https://files.pythonhosted.org/packages/4e/cb/d0b7063728c1397110b8392572d8718470e4ff574e94a9101c8b04286c20/chython_synplan-1.95-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1ed6736cd6b00b6a8910719b7f9c2aab24358145cdadecf62f1dd1fcdb76e15b", size = 3344563, upload-time = "2026-05-16T14:54:58.137Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/d0/67451775b8772f277c6587f6fa3160e1c690341b454af1286824a2fa848a/chython_synplan-1.95-cp310-cp310-win_amd64.whl", hash = "sha256:1c395877b9f0742481dcf08de68aa35463e7957d47cfbb21e9a7456f052d7738", size = 1992541, upload-time = "2026-05-16T14:54:59.374Z" },
+    { url = "https://files.pythonhosted.org/packages/85/62/d18e340ca9e283d1fa90ec06c173c30d8069c7f1eeaf781afcd37a015aa4/chython_synplan-1.95-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:5164b180f34f00b77665afffcc674d074f14f4122de6ac9bbb52711293b56b25", size = 1619425, upload-time = "2026-05-16T14:55:00.688Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/b2/4426f20c52f65fd5cfda5b359f5321a9d4fff9787f47244c77d3e91c43ae/chython_synplan-1.95-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:d264210dc034a00663d3674619c1d822f7d09f33a176b3eb8ff343ff32c558f3", size = 2314806, upload-time = "2026-05-16T14:55:02.011Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/e5/946e79acf6294b4aceda31e879a82b7315b4ca9f1d589ed2d65098a51b23/chython_synplan-1.95-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:64d4c9c7d015256054915fab55becc892b24282f1cf6fe9c3122dff94649c67f", size = 5054639, upload-time = "2026-05-16T14:55:03.488Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/25/2675877fc6551408967d001d1720da8256cd9a3cb86369bc89b785f6b9de/chython_synplan-1.95-cp311-cp311-win_amd64.whl", hash = "sha256:f074f2121f751f1a2c27e8ece767f9c2b19a4e4af5d6de1906b329f5f806b2f2", size = 2246853, upload-time = "2026-05-16T14:55:05.693Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/97/fe0f4af299c51934397a5750d408b6a12c20d35098e23866a242c0a9b69f/chython_synplan-1.95-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:5d5cfcda20f8755f51edf832c3d9f728af09dfa735c2fec29ae5fee723ee9be1", size = 1899335, upload-time = "2026-05-16T14:55:06.865Z" },
+    { url = "https://files.pythonhosted.org/packages/98/f1/64c0f15f7a2474a2c7d98b926aa38dd5a0645282acccbb228bb1068a3bb7/chython_synplan-1.95-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:7ea8857c1c36ed298ab43a1ec2a9d59dcd91e810521cddc091042c9fd9aee668", size = 2598109, upload-time = "2026-05-16T14:55:08.038Z" },
+    { url = "https://files.pythonhosted.org/packages/97/04/10992199c87321f93061a56b6a4d83d75e979e4af149e8512bd9bee5bab9/chython_synplan-1.95-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6e7726f223d5f89d194b128f506ed914494a1881b1c41e41d8b6e2b61f17e142", size = 6741064, upload-time = "2026-05-16T14:55:09.692Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/39/5aeb5bf3e62db2bf5ac6c0bea7b3d1e3d72657356a4b473241a1f956a7b1/chython_synplan-1.95-cp312-cp312-win_amd64.whl", hash = "sha256:4eaa87d27e3a861f4c66cc441cfd406cb09590ca44a2d96ebbfb488c99cfa7a4", size = 2502288, upload-time = "2026-05-16T14:55:11.086Z" },
+    { url = "https://files.pythonhosted.org/packages/22/f6/b388491d3f5b0871b3e1758737b2a723417f15cba30a8dd4603749777169/chython_synplan-1.95-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:d0b3bfd7b4b99b9c55c1f63a2241e67efea01ed887f671e3c65c5188c281a6a4", size = 2176977, upload-time = "2026-05-16T14:55:12.645Z" },
+    { url = "https://files.pythonhosted.org/packages/41/43/0d708108a5a522983b58fe3c1f222c67b62e6ff9fdc35bfd267913ff9042/chython_synplan-1.95-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:ca3ee56dca4a0c35475bf23a956054b30df97cf2edc137db921bd50d7e2a93e0", size = 2879314, upload-time = "2026-05-16T14:55:13.998Z" },
+    { url = "https://files.pythonhosted.org/packages/a5/b4/56f08dffa05f5f2eeae4888f4fa8c0dd0eb528abb854099e1d14ab63b40a/chython_synplan-1.95-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0e56b4049684877048c0feee40856e3679e53538c411d169acae741260b5e4b9", size = 8400214, upload-time = "2026-05-16T14:55:15.821Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/00/d6679989de589fa16ff138cbb69524b7cf019f3a31930b9b32688750204d/chython_synplan-1.95-cp313-cp313-win_amd64.whl", hash = "sha256:7dc5d63a64f22e07e76a5abc181637f6685c3d622bfcbb2b0f85b50fae9f1e4a", size = 2756798, upload-time = "2026-05-16T14:55:17.739Z" },
 ]
 
 [package.optional-dependencies]
@@ -6743,7 +6732,6 @@ version = "1.4.4"
 source = { editable = "." }
 dependencies = [
     { name = "adabelief-pytorch" },
-    { name = "cachedmethods" },
     { name = "chython-synplan", extra = ["racer-default"] },
     { name = "chytorch-rxnmap-synplan" },
     { name = "chytorch-synplan" },
@@ -6811,8 +6799,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "adabelief-pytorch", specifier = ">=0.2.1" },
-    { name = "cachedmethods", specifier = "<0.2" },
-    { name = "chython-synplan", extras = ["racer-default"], specifier = ">=1.93" },
+    { name = "chython-synplan", extras = ["racer-default"], specifier = ">=1.95" },
     { name = "chytorch-rxnmap-synplan", specifier = ">=1.7" },
     { name = "chytorch-synplan", specifier = ">=1.70" },
     { name = "click", specifier = ">=8.0.0" },

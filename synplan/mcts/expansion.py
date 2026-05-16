@@ -127,11 +127,8 @@ class PolicyNetworkFunction:
         if probs is None:
             return None
 
-        sorted_probs, sorted_rules = torch.sort(probs, descending=True)
-        sorted_probs, sorted_rules = (
-            sorted_probs[: self.config.top_rules],
-            sorted_rules[: self.config.top_rules],
-        )
+        k = min(self.config.top_rules, probs.numel())
+        sorted_probs, sorted_rules = torch.topk(probs, k=k, sorted=True)
 
         if self.policy_net.policy_type == "filtering":
             sorted_probs = torch.softmax(sorted_probs, -1)

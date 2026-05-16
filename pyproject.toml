@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "chython-synplan[racer-default]>=1.93",
+  "chython-synplan[racer-default]>=1.95",
   "chytorch-synplan>=1.70",
   "chytorch-rxnmap-synplan>=1.7",
   "numpy>=2",
@@ -90,7 +90,7 @@ artifacts = ["*.tsv", "*.csv", "*.yaml", "*.json"]
 
 [tool.uv]
 # Supply-chain hardening.
-exclude-newer = "7 days"
+exclude-newer = "2026-05-17"
 
 # Floors on transitive dependencies that ship CVE fixes.
 constraint-dependencies = [

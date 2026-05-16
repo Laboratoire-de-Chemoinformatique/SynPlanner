@@ -37,6 +37,7 @@ class CanonicalRetroReactor(Reactor):
     """
 
     def __init__(self, *args, **kwargs):
+        kwargs["fix_tautomers"] = True
         kwargs["fix_aromatic_rings"] = False  # we run all aromatization in _patcher
         super().__init__(*args, **kwargs)
 
@@ -216,9 +217,12 @@ def apply_reaction_rule(
     def _reactants_key(reactants: list[MoleculeContainer]) -> tuple[str, ...]:
         return tuple(sorted(str(reactant) for reactant in reactants))
 
-    seen_reactants = set()
+    track_keys = rm_dup or multirule
+    seen_reactants: set[tuple[str, ...]] = set()
     pending_reactants: list[list[MoleculeContainer]] = [[molecule]]
-    expanded_keys = {_reactants_key([molecule])}
+    expanded_keys: set[tuple[str, ...]] = (
+        {_reactants_key([molecule])} if multirule else set()
+    )
     pending_index = 0
 
     while pending_index < len(pending_reactants):
@@ -241,7 +245,9 @@ def apply_reaction_rule(
                     reactant for reactant in merged_reactants if len(reactant) > 0
                 ]
 
-                reactants_key = _reactants_key(merged_reactants)
+                reactants_key = (
+                    _reactants_key(merged_reactants) if track_keys else None
+                )
 
                 if rm_dup and reactants_key in seen_reactants:
                     continue

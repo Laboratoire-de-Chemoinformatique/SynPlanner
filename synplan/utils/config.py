@@ -130,8 +130,15 @@ class ReactorConfig(BaseConfigModel):
         Suzuki) where different match orientations produce different products.
     :param delete_atoms: If True, atoms in reactants but not in products are removed.
     :param one_shot: If True, do only single reaction center per application.
-    :param fix_aromatic_rings: Proceed kekule and thiele on products.
-    :param fix_tautomers: Fix tautomers in products.
+
+    .. note::
+        ``fix_aromatic_rings`` and ``fix_tautomers`` are intentionally not
+        exposed. SynPlanner's
+        :class:`~synplan.chem.reaction.CanonicalRetroReactor` forces
+        ``fix_aromatic_rings=False`` and runs the full kekule + thiele +
+        tautomer-fix canonicalize pipeline inline in its ``_patcher``;
+        tautomer fixing inside that inline call relies on chython's default
+        ``fix_tautomers=True``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -139,8 +146,6 @@ class ReactorConfig(BaseConfigModel):
     automorphism_filter: bool = True
     delete_atoms: bool = False
     one_shot: bool = True
-    fix_aromatic_rings: bool = True
-    fix_tautomers: bool = True
 
     def to_reactor_kwargs(self) -> dict:
         """Convert to kwargs dict for Reactor constructor."""
