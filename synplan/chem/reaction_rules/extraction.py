@@ -15,7 +15,6 @@ from chython.containers.query import QueryContainer
 from chython.containers.reaction import ReactionContainer
 from chython.exceptions import InvalidAromaticRing
 from chython.periodictable import QueryElement
-from chython.reactor import Reactor
 from tqdm.auto import tqdm
 
 from synplan.chem.data.reaction_result import (

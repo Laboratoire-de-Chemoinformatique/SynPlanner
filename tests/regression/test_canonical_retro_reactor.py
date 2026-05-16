@@ -20,7 +20,6 @@ from chython.reactor import Reactor
 
 from synplan.chem.reaction import CanonicalRetroReactor
 
-
 _RULES = [
     # (rule_smarts, target_smiles, label)
     (

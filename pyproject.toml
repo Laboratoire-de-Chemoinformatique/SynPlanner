@@ -1,6 +1,6 @@
 [project]
 name = "SynPlanner"
-version = "1.4.4"
+version = "1.5.0"
 description = "Toolbox for chemical synthesis planning"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
@@ -142,7 +142,7 @@ explicit = true
 
 # -- optional bump-my-version compatibility ----------------------------------
 [tool.bumpversion]
-current_version = "1.4.4"
+current_version = "1.5.0"
 commit = false
 tag = false
 

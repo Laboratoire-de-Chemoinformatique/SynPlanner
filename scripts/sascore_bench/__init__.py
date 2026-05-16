@@ -31,15 +31,15 @@ Load resources in your own code::
 """
 
 from scripts.sascore_bench.run_benchmark import (
+    DEFAULT_CONFIG_PATH,
     load_config,
     load_policy_from_config,
     load_resources_from_config,
-    DEFAULT_CONFIG_PATH,
 )
 
 __all__ = [
+    "DEFAULT_CONFIG_PATH",
     "load_config",
     "load_policy_from_config",
     "load_resources_from_config",
-    "DEFAULT_CONFIG_PATH",
 ]

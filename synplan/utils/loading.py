@@ -15,12 +15,11 @@ from typing import TYPE_CHECKING, Union
 import yaml
 from chython.files.SDFrw import SDFRead
 from chython.reactor.reactor import Reactor
-
-from synplan.chem.reaction import CanonicalRetroReactor
 from huggingface_hub import hf_hub_download, snapshot_download
 from torch import device
 from tqdm.auto import tqdm
 
+from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.utils import (
     AtomMappingCheck,
     _standardize_sdf_text,

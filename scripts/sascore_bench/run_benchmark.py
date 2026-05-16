@@ -54,17 +54,16 @@ import argparse
 import csv
 import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml
 from tqdm.auto import tqdm
 
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.tree import Tree
-from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
+from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import (
     load_building_blocks,
     load_combined_policy_function,
@@ -82,7 +81,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONFIG_PATH = Path(__file__).parent / "config.yaml"
 
 
-def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
+def load_config(config_path: Path | None = None) -> dict[str, Any]:
     """
     Load configuration from YAML file.
 
@@ -108,13 +107,13 @@ def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
         )
 
     logger.info(f"Loading config from: {config_path}")
-    with open(config_path, "r") as f:
+    with open(config_path) as f:
         config = yaml.safe_load(f)
 
     return config
 
 
-def load_policy_from_config(config_path: Optional[Path] = None):
+def load_policy_from_config(config_path: Path | None = None):
     """
     Load just the combined policy function from config.
 
@@ -157,7 +156,7 @@ def load_policy_from_config(config_path: Optional[Path] = None):
     return policy_function
 
 
-def load_resources_from_config(config_path: Optional[Path] = None):
+def load_resources_from_config(config_path: Path | None = None):
     """
     Load all resources (policy, reaction rules, building blocks) from config.
 
@@ -295,7 +294,7 @@ def run_benchmark(
     n_solved = 0
     n_errors = 0
 
-    with open(targets_path, "r", encoding="utf-8") as targets_file:
+    with open(targets_path, encoding="utf-8") as targets_file:
         targets = [line.strip() for line in targets_file if line.strip()]
 
     with open(stats_file, "w", encoding="utf-8", newline="") as csvfile:
@@ -325,7 +324,7 @@ def run_benchmark(
                 )
 
                 # Run tree search
-                for solved, node_id in tree:
+                for _solved, _node_id in tree:
                     pass
 
                 # Extract stats
@@ -538,7 +537,7 @@ def main():
     print("\n" + "=" * 60)
     print("BENCHMARK SUMMARY")
     print("=" * 60)
-    print(f"Policy: Combined (filtering + ranking)")
+    print("Policy: Combined (filtering + ranking)")
     print(
         f"Config: max_time={tree_config.max_time}s, "
         f"max_depth={tree_config.max_depth}, "

@@ -5,38 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Added
-- Atom-mapping validator wired into the reader chokepoint
-  (`synplan.utils.files.parse_reaction`) and the SMARTS rule loader
-  (`synplan.utils.loading.load_reaction_rules`), with helpers in
-  `synplan.chem.utils`:
-  `reaction_mapping_status`, `reaction_string_mapping_status`,
-  `is_reaction_atom_mapped`, `assert_reaction_atom_mapped`, and the
-  `AtomMappingCheck` literal type (`"off" | "reject_unmapped" | "reject_partial"`).
-  Tagged reactions get `meta["mapping_status"]` for downstream routing.
-
-### Changed
-- `load_reaction_rules` now defaults to `check_atom_mapping="reject_unmapped"`:
-  SMARTS rules without atom maps are rejected with an error naming the
-  offending TSV row. Pass `check_atom_mapping="off"` to restore the old
-  behaviour.
-- Multi-product reactions and rules-all-filtered-out are now traceable
-  through the per-reaction audit TSV (`<rules_path_base>.audit.tsv`) in
-  addition to the summary counters.
-
-### Fixed
-- Worked around chython's SMARTS writer emitting CXSMILES extension
-  blocks (`|...|`) mid-string between disconnected fragments by
-  stripping any CXSMILES block before tokenisation in the mapping
-  validator. Logged at
-  `reports/peer-review/priority-rules/chython_smarts_export_cxsmiles_bug.md`.
-- Regression tests now exercise the canonical-key invariant via two
-  SMILES with different mapping offsets instead of
-  `QueryCGRContainer.remap`, which is broken in the pinned chython
-  release (its override forwards an unsupported `copy=` kwarg to
-  `Graph.remap`). Bug logged in the same file.
-
-## [1.5.0] - 2026-05-05
+## [1.5.0] - 2026-05-16
 
 > Migration guide: see [docs/user_guide/migration.rst](docs/user_guide/migration.rst).
 > Priority rules concept page: see [docs/methods/priority_rules.rst](docs/methods/priority_rules.rst).
@@ -59,8 +28,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - YAML `key:` (null) for nested standardization / filtering configs now
   enables the step with defaults instead of silently disabling it. To
   disable, omit the key entirely.
+- `ReactorConfig` no longer exposes `fix_aromatic_rings` or
+  `fix_tautomers`. `CanonicalRetroReactor` always forces
+  `fix_aromatic_rings=False` and runs the inline kekule + thiele +
+  tautomer-fix pipeline in its `_patcher`; tautomer fixing inside
+  that inline call relies on chython's default `fix_tautomers=True`.
+- `load_reaction_rules` now defaults to `check_atom_mapping="reject_unmapped"`:
+  SMARTS rules without atom maps are rejected with an error naming the
+  offending TSV row. Pass `check_atom_mapping="off"` to restore the old
+  behaviour.
 
 ### Added
+
+- Atom-mapping validator wired into the reader chokepoint
+  (`synplan.utils.files.parse_reaction`) and the SMARTS rule loader
+  (`synplan.utils.loading.load_reaction_rules`), with helpers in
+  `synplan.chem.utils`:
+  `reaction_mapping_status`, `reaction_string_mapping_status`,
+  `is_reaction_atom_mapped`, `assert_reaction_atom_mapped`, and the
+  `AtomMappingCheck` literal type (`"off" | "reject_unmapped" | "reject_partial"`).
+  Tagged reactions get `meta["mapping_status"]` for downstream routing.
 
 - Priority-rule support for MCTS expansion: a mapping of named SMARTS
   rule sets passed to `Tree(..., priority_rules={"ugi": ..., ...})`,
@@ -85,10 +72,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Tutorial 13 for the priority-rule workflow.
 
 ### Changed
+- Bumped `chython-synplan` floor to `>=1.95`, which carries upstream fixes
+  for: multi-component query mapping against single-component targets (Bug
+  #3), `[C]` uppercase aliphatic strictening against aromatic carbons (Bug
+  #4), and aromatic snapshot/restore protection in the reactor (Bug #6).
 - Tree expansion now tracks exact policy Top-N rank from the expansion function
   and enforces the configured top-rules limit during rule iteration.
+- Policy rule selection in `expansion.py:_predict_rules_common` uses
+  `torch.topk` instead of full `torch.sort` over the rule-probability
+  tensor. Same Top-K output; ~10% per-iter speed-up in MCTS on 17k-rule
+  rule sets.
+- `apply_reaction_rule` now skips computing the canonical-SMILES dedup
+  key when neither `rm_dup` nor `multirule` is enabled — a no-op for
+  performance (chython caches the SMILES anyway) but cleaner control flow.
 - Route, RDKit, JSON, SVG, and tree-stat exports now carry source-aware rule
   metadata through serialized and rendered route outputs.
+- Multi-product reactions and rules-all-filtered-out are now traceable
+  through the per-reaction audit TSV (`<rules_path_base>.audit.tsv`) in
+  addition to the summary counters.
 
 ### Fixed
 - Winning rule rank reporting now uses stored policy ranks when available instead
@@ -100,6 +101,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   checks.
 - Repeated route SVG renders now clear stale molecule labels and statuses before
   applying route-specific annotations.
+- Worked around chython's SMARTS writer emitting CXSMILES extension
+  blocks (`|...|`) mid-string between disconnected fragments by
+  stripping any CXSMILES block before tokenisation in the mapping
+  validator.
+- Regression tests now exercise the canonical-key invariant via two
+  SMILES with different mapping offsets instead of
+  `QueryCGRContainer.remap`, which was broken in chython ≤1.94 (its
+  override forwarded an unsupported `copy=` kwarg to `Graph.remap`).
 
 ## [1.4.4] - 2026-05-04
 
@@ -519,7 +528,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CLI interface (`synplan` command)
 - Docker images for CLI and GUI
 
-[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.4...HEAD
+[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.4...v1.5.0
 [1.4.4]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.1...v1.4.2

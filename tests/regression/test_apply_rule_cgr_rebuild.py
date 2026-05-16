@@ -23,7 +23,6 @@ from chython import smarts, smiles
 from synplan.chem.reaction import CanonicalRetroReactor, apply_reaction_rule
 from synplan.chem.utils import safe_canonicalization
 
-
 # Only bond-rearrangement rules (no element substitutions). chython's
 # ``reaction.compose()`` raises ``ValueError: elements should be of the
 # same type`` when a mapped atom's element changes across sides

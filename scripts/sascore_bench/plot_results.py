@@ -108,7 +108,7 @@ def load_benchmark_results(results_folder: Path) -> dict:
     return results
 
 
-def plot_comparison(benchmark_results: dict, output_path: Path = None):
+def plot_comparison(benchmark_results: dict, output_path: Path | None = None):
     """Create comparison bar chart."""
 
     # SAScore categories to plot
