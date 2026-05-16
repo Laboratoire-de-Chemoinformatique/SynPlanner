@@ -601,6 +601,10 @@ def extract_rules(
 
     """
 
+    if config.ignore_stereo:
+        reaction = reaction.copy()
+        reaction.clean_stereo()
+
     standardizer = RemoveReagentsStandardizer()
     reaction = standardizer(reaction)
 
@@ -720,7 +724,9 @@ def _extract_rules_batch_worker(
     n_multi_product = 0
     for index, raw_item in batch:
         try:
-            reaction = parse_reaction(raw_item, fmt=fmt)
+            reaction = parse_reaction(
+                raw_item, fmt=fmt, ignore_stereo=config.ignore_stereo
+            )
             product_smi = str(unite_molecules(reaction.products))
             extracted_rules, skipped = extract_rules(config, reaction)
             if skipped:
@@ -1080,7 +1086,9 @@ def _extract_rules_serial(
     ):
         n_processed += 1
         try:
-            reaction = parse_reaction(raw_item, fmt=fmt)
+            reaction = parse_reaction(
+                raw_item, fmt=fmt, ignore_stereo=config.ignore_stereo
+            )
             product_smi = str(unite_molecules(reaction.products))
             extracted_rules, skipped = extract_rules(config, reaction)
             if skipped:

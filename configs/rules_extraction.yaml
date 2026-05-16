@@ -1,5 +1,6 @@
 min_popularity: 3
 single_product_only: True
+ignore_stereo: True
 environment_atom_count: 1
 multicenter_rules: True
 include_rings: False

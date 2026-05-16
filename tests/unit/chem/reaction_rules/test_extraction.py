@@ -200,6 +200,40 @@ def test_process_extraction_result_uses_worker_serialized_rule(monkeypatch):
     assert cgr_to_rule["stable-cgr"].rule_smarts == "[C:1]>>[O:1]"
 
 
+def test_ignore_stereo_allows_validation_of_stereo_cleaned_rules():
+    """Extraction can opt into the stereo-cleaned rule/reactor contract."""
+    rxn_smi = (
+        "[CH3:27][O-:28]."
+        "[F:6][C:5]([F:8])([F:7])[c:4]1[cH:3][c:2]"
+        "([cH:16][c:15]2[C@H:14]3[C@:12]"
+        "([CH2:26][N:18]([C:19](=[O:25])[O:20]"
+        "[C:21]([CH3:24])([CH3:22])[CH3:23])[CH2:17]3)"
+        "([O:11][CH2:10][c:9]12)[CH3:13])[Br:1]>>"
+        "[F:6][C:5]([F:8])([F:7])[c:4]1[c:9]2[CH2:10][O:11]"
+        "[C@:12]3([CH2:26][NH:18][CH2:17][C@H:14]3[c:15]2"
+        "[cH:16][c:2]([O:28][CH3:27])[cH:3]1)[CH3:13]"
+    )
+    base = {
+        "min_popularity": 1,
+        "single_product_only": True,
+        "environment_atom_count": 1,
+        "multicenter_rules": True,
+        "include_rings": False,
+        "include_func_groups": False,
+        "keep_leaving_groups": True,
+        "keep_incoming_groups": False,
+        "keep_reagents": False,
+    }
+
+    stereo_cfg = RuleExtractionConfig(**base, ignore_stereo=False)
+    stereo_rules, _ = extraction.extract_rules(stereo_cfg, smiles(rxn_smi))
+    no_stereo_cfg = RuleExtractionConfig(**base, ignore_stereo=True)
+    no_stereo_rules, _ = extraction.extract_rules(no_stereo_cfg, smiles(rxn_smi))
+
+    assert stereo_rules[0].meta["reactor_validation"] == "failed"
+    assert no_stereo_rules[0].meta["reactor_validation"] == "passed"
+
+
 def test_print_extraction_summary_includes_error_count(capsys):
     """The processed-reaction summary should always report failed reactions."""
     record = ExtractedRuleRecord(

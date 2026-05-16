@@ -178,6 +178,20 @@ def test_parse_reaction_preserves_mapped_source_fields():
     assert serialize_reaction(rxn, "smi").endswith("\t42\tUS123,US456")
 
 
+def test_parse_reaction_can_ignore_stereo():
+    """The reaction parser can drop stereo without affecting source metadata."""
+    record = (
+        "[C@H:1]([CH3:2])([OH:3])[Cl:4]>>"
+        "[C@@H:1]([CH3:2])([OH:3])[Br:5]\t42"
+    )
+
+    rxn = parse_reaction(record, ignore_stereo=True)
+
+    assert "@" not in str(rxn)
+    assert rxn.meta["init_smiles"].startswith("[C@H:1]")
+    assert rxn.meta["source_0001"] == "42"
+
+
 def test_standardization_errors_are_not_written_to_output():
     """ignore_errors logs bad reactions but does not mix them into output records."""
 

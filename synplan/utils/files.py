@@ -641,6 +641,7 @@ def parse_reaction(
     fmt: str = "smi",
     *,
     check_atom_mapping: "AtomMappingCheck" = "off",
+    ignore_stereo: bool = False,
 ) -> ReactionContainer:
     """Parse a raw string into a ReactionContainer.
 
@@ -649,6 +650,8 @@ def parse_reaction(
     :param check_atom_mapping: see :data:`synplan.chem.utils.AtomMappingCheck`.
         When enabled the parsed reaction is tagged via
         ``rxn.meta["mapping_status"]``.
+    :param ignore_stereo: If True, discard atom/bond stereochemistry while
+        parsing. Atom-map checks still use the original string.
     """
     if check_atom_mapping != "off":
         from synplan.chem.utils import (
@@ -658,6 +661,9 @@ def parse_reaction(
 
     if isinstance(item, ReactionContainer):
         rxn = item
+        if ignore_stereo:
+            rxn = rxn.copy()
+            rxn.clean_stereo()
         if check_atom_mapping != "off":
             status = reaction_mapping_status(rxn)
             _check_mapping_status(status, check_atom_mapping)
@@ -670,14 +676,14 @@ def parse_reaction(
         if check_atom_mapping != "off":
             status = reaction_string_mapping_status(smiles_part)
             _check_mapping_status(status, check_atom_mapping)
-        rxn = smiles(smiles_part)
+        rxn = smiles(smiles_part, ignore_stereo=ignore_stereo)
         rxn.meta["init_smiles"] = smiles_part
         _store_source_fields(rxn, source_fields)
         if check_atom_mapping != "off":
             rxn.meta["mapping_status"] = status
         return rxn
     else:  # rdf block
-        with RDFRead(StringIO(item), ignore=True) as r:
+        with RDFRead(StringIO(item), ignore=True, ignore_stereo=ignore_stereo) as r:
             rxn = next(iter(r))
         if check_atom_mapping != "off":
             status = reaction_mapping_status(rxn)
@@ -689,20 +695,29 @@ def parse_reaction(
 # Process-pool worker globals (set via init_parse_worker, read in parse_one).
 _parse_fmt = "smi"
 _parse_check_atom_mapping: "AtomMappingCheck" = "off"
+_parse_ignore_stereo = False
 
 
-def init_parse_worker(fmt: str, check_atom_mapping: "AtomMappingCheck" = "off"):
+def init_parse_worker(
+    fmt: str,
+    check_atom_mapping: "AtomMappingCheck" = "off",
+    ignore_stereo: bool = False,
+):
     """Pool initializer: set format and mapping-check mode for ``parse_one``."""
-    global _parse_fmt, _parse_check_atom_mapping
+    global _parse_fmt, _parse_check_atom_mapping, _parse_ignore_stereo
     _parse_fmt = fmt
     _parse_check_atom_mapping = check_atom_mapping
+    _parse_ignore_stereo = ignore_stereo
 
 
 def parse_one(item: str):
     """Parse a single raw item → ``(ReactionContainer | None, error | None)``."""
     try:
         rxn = parse_reaction(
-            item, fmt=_parse_fmt, check_atom_mapping=_parse_check_atom_mapping
+            item,
+            fmt=_parse_fmt,
+            check_atom_mapping=_parse_check_atom_mapping,
+            ignore_stereo=_parse_ignore_stereo,
         )
         if rxn is None:
             return None, "parse returned None"

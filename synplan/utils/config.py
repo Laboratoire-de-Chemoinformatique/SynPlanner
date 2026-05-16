@@ -188,6 +188,9 @@ class RuleExtractionConfig(BaseConfigModel):
         reaction in the extracted rule.
     :param single_product_only: If True, skips reactions that have more than
         one product (after reagent removal).
+    :param ignore_stereo: If True, removes atom/bond stereochemistry from
+        input reactions before rule extraction. This is useful for rule sets
+        whose reactor/canonicalization path does not preserve stereo.
     :param atom_info_retention: Controls the amount of information about
         each atom to retain ('none', 'reaction_center', or 'all').
     """
@@ -198,6 +201,7 @@ class RuleExtractionConfig(BaseConfigModel):
     reverse_rule: bool = True
     as_query_container: bool = True
     single_product_only: bool = True
+    ignore_stereo: bool = False
 
     # adjustable parameters
     environment_atom_count: int = 1
