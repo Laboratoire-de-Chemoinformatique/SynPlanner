@@ -54,6 +54,7 @@ import argparse
 import csv
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -109,6 +110,15 @@ def load_config(config_path: Path | None = None) -> dict[str, Any]:
     logger.info(f"Loading config from: {config_path}")
     with open(config_path) as f:
         config = yaml.safe_load(f)
+
+    threshold = float(config.get("policy", {}).get("rule_prob_threshold", 0.0))
+    if threshold > 0 and os.environ.get("SYNPLANNER_ALLOW_RULE_PROB_THRESHOLD") != "1":
+        raise SystemExit(
+            f"{config_path}: policy.rule_prob_threshold={threshold} clips valid "
+            "low-probability rules inside top-k. Set it to 0.0 and control "
+            "proposal breadth with policy.top_rules, or rerun with "
+            "SYNPLANNER_ALLOW_RULE_PROB_THRESHOLD=1 if this is intentional."
+        )
 
     return config
 
