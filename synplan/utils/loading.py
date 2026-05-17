@@ -541,7 +541,7 @@ def load_policy_function(
 
     # Priority 2: Create config from weights_path and kwargs
     if weights_path is not None:
-        policy_config = PolicyNetworkConfig(weights_path=weights_path)
+        policy_config = PolicyNetworkConfig(weights_path=weights_path, **config_kwargs)
         return PolicyNetworkFunction(policy_config=policy_config)
 
     raise ValueError("Must provide either policy_config or weights_path")

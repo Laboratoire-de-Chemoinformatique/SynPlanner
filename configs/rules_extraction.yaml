@@ -10,7 +10,7 @@ keep_incoming_groups: False
 keep_reagents: False
 atom_info_retention:
   reaction_center:
-    neighbors: True
+    neighbors: False
     implicit_hydrogens: False
     ring_sizes: False
   environment:

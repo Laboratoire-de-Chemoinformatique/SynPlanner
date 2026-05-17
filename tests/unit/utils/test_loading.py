@@ -1,7 +1,7 @@
 import gzip
 
 from synplan.chem.utils import _standardize_smiles_batch
-from synplan.utils.loading import load_building_blocks
+from synplan.utils.loading import load_building_blocks, load_policy_function
 
 
 def test_load_building_blocks_csv_header(tmp_path):
@@ -48,3 +48,27 @@ def test_load_building_blocks_csv_standardize_true_runs(tmp_path):
     expected = frozenset(_standardize_smiles_batch(["OCC", "CCN"]))
     bbs = load_building_blocks(path, standardize=True, silent=True, num_workers=1)
     assert bbs == expected
+
+
+def test_load_policy_function_weights_path_applies_overrides(monkeypatch):
+    captured = {}
+
+    class DummyPolicyNetworkFunction:
+        def __init__(self, policy_config):
+            captured["policy_config"] = policy_config
+
+    monkeypatch.setattr(
+        "synplan.mcts.expansion.PolicyNetworkFunction",
+        DummyPolicyNetworkFunction,
+    )
+
+    load_policy_function(
+        weights_path="policy.ckpt",
+        top_rules=500,
+        rule_prob_threshold=0.0,
+    )
+
+    policy_config = captured["policy_config"]
+    assert policy_config.weights_path == "policy.ckpt"
+    assert policy_config.top_rules == 500
+    assert policy_config.rule_prob_threshold == 0.0
