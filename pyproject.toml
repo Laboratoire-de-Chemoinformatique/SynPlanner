@@ -89,8 +89,9 @@ packages = ["synplan", "scripts"]
 artifacts = ["*.tsv", "*.csv", "*.yaml", "*.json"]
 
 [tool.uv]
-# Supply-chain hardening.
-exclude-newer = "2026-05-17"
+# Supply-chain hardening. Use an explicit UTC timestamp so `uv --locked`
+# resolves the same cutoff in local shells and Docker builders.
+exclude-newer = "2026-05-17T22:00:00Z"
 
 # Floors on transitive dependencies that ship CVE fixes.
 constraint-dependencies = [
