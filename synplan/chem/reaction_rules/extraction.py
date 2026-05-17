@@ -394,10 +394,14 @@ def _isomorphism_cost_estimate(query, target) -> float:
     constraints are more flexible than this crude bucketing. Only use the
     high side for skip decisions (e.g. ``> _ISOMORPHISM_COST_SKIP_THRESHOLD``).
     """
+
     def _sig(mol, n):
         a = mol.atom(n)
-        return (a.atomic_symbol, len(mol._bonds[n]),
-                getattr(a, "hybridization", None) == 4)
+        return (
+            a.atomic_symbol,
+            len(mol._bonds[n]),
+            getattr(a, "hybridization", None) == 4,
+        )
 
     q_sig = Counter(_sig(query, n) for n in query.atoms_numbers)
     t_sig = Counter(_sig(target, n) for n in target.atoms_numbers)
@@ -407,7 +411,7 @@ def _isomorphism_cost_estimate(query, target) -> float:
         if n < k:
             return 0.0
         for i in range(k):
-            cost *= (n - i)
+            cost *= n - i
         if cost > 1e15:
             return cost
     return cost
@@ -448,7 +452,9 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
         cost = _isomorphism_cost_estimate(patterns[0], reaction.reactants[0])
         if cost > _ISOMORPHISM_COST_SKIP_THRESHOLD:
             return False
-    reactor = CanonicalRetroReactor(patterns=patterns, products=products, delete_atoms=False)
+    reactor = CanonicalRetroReactor(
+        patterns=patterns, products=products, delete_atoms=False
+    )
     try:
         for result_reaction in reactor(*reaction.reactants):  # unpack here
             try:
@@ -633,7 +639,9 @@ def _rule_to_reactor_smarts(rule: ReactionContainer) -> str:
         molecule_substructure_as_query(m, m.atoms_numbers) for m in rule.reactants
     )
     products = tuple(rule.products)
-    reactor = CanonicalRetroReactor(patterns=patterns, products=products, delete_atoms=False)
+    reactor = CanonicalRetroReactor(
+        patterns=patterns, products=products, delete_atoms=False
+    )
     return str(reactor)
 
 

@@ -41,15 +41,15 @@ class CanonicalRetroReactor(Reactor):
         kwargs["fix_aromatic_rings"] = False  # we run all aromatization in _patcher
         super().__init__(*args, **kwargs)
 
-    def _patcher(self, structure: MoleculeContainer, mapping: dict[int, int]) -> MoleculeContainer:
+    def _patcher(
+        self, structure: MoleculeContainer, mapping: dict[int, int]
+    ) -> MoleculeContainer:
         new = super()._patcher(structure, mapping)
 
         # Bug-6 protection: snapshot pre-kekule aromatic atoms.
         pre_aromatic = {n for n, a in new.atoms() if a.hybridization == 4}
         snapshot = (
-            snapshot_aromaticity_subset(new, pre_aromatic)
-            if pre_aromatic
-            else None
+            snapshot_aromaticity_subset(new, pre_aromatic) if pre_aromatic else None
         )
 
         try:
@@ -245,9 +245,7 @@ def apply_reaction_rule(
                     reactant for reactant in merged_reactants if len(reactant) > 0
                 ]
 
-                reactants_key = (
-                    _reactants_key(merged_reactants) if track_keys else None
-                )
+                reactants_key = _reactants_key(merged_reactants) if track_keys else None
 
                 if rm_dup and reactants_key in seen_reactants:
                     continue

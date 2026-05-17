@@ -12,6 +12,7 @@ Speedup is measured separately in
 against real rules and real targets — that's the source of truth, not
 a unit test.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -79,9 +80,7 @@ def _legacy_canonical_product_sets(rule_smarts, target_smi):
                 break
         if not valid:
             continue
-        out.add(
-            tuple(sorted(str(safe_canonicalization(p)) for p in reaction.products))
-        )
+        out.add(tuple(sorted(str(safe_canonicalization(p)) for p in reaction.products)))
     return out
 
 

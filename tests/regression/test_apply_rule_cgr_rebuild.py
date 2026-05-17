@@ -15,6 +15,7 @@ sets that are **already canonical** (``str(p)`` is stable under
 ``safe_canonicalization``) and that match the direct-path output as
 canonical-SMILES sets.
 """
+
 from __future__ import annotations
 
 import pytest

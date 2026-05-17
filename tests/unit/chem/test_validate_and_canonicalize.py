@@ -8,6 +8,7 @@ every molecule SynPlanner can realistically encounter — otherwise the
 ``Precursor.__hash__`` / ``__eq__`` dedup that drives MCTS would diverge
 between the two flows.
 """
+
 from __future__ import annotations
 
 import pytest

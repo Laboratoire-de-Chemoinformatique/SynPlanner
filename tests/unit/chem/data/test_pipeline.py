@@ -180,10 +180,7 @@ def test_parse_reaction_preserves_mapped_source_fields():
 
 def test_parse_reaction_can_ignore_stereo():
     """The reaction parser can drop stereo without affecting source metadata."""
-    record = (
-        "[C@H:1]([CH3:2])([OH:3])[Cl:4]>>"
-        "[C@@H:1]([CH3:2])([OH:3])[Br:5]\t42"
-    )
+    record = "[C@H:1]([CH3:2])([OH:3])[Cl:4]>>[C@@H:1]([CH3:2])([OH:3])[Br:5]\t42"
 
     rxn = parse_reaction(record, ignore_stereo=True)
 
