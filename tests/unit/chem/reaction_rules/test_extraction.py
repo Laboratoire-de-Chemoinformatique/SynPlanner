@@ -200,6 +200,44 @@ def test_process_extraction_result_uses_worker_serialized_rule(monkeypatch):
     assert cgr_to_rule["stable-cgr"].rule_smarts == "[C:1]>>[O:1]"
 
 
+def test_parallel_extraction_timeout_scales_with_batch_size(monkeypatch, tmp_path):
+    """Parallel extraction timeout is configured as seconds/reaction * batch size."""
+
+    observed = {}
+
+    def fake_process_pool_map_stream(items, _worker_fn, **kwargs):
+        observed["timeout"] = kwargs["timeout"]
+        batch = next(iter(items))
+        yield kwargs["on_timeout"](TimeoutError("slow batch"), batch)
+
+    monkeypatch.setattr(
+        extraction, "process_pool_map_stream", fake_process_pool_map_stream
+    )
+
+    input_path = tmp_path / "reactions.smi"
+    input_path.write_text(
+        "[CH3:1][OH:2]>>[CH3:1][Cl:2]\n"
+        "[CH3:1][NH2:2]>>[CH3:1][OH:2]\n",
+        encoding="utf-8",
+    )
+    error_path = tmp_path / "rules.errors.tsv"
+
+    extraction.extract_rules_from_reactions(
+        config=RuleExtractionConfig(worker_timeout_per_reaction=2.5),
+        reaction_data_path=str(input_path),
+        reaction_rules_path=str(tmp_path / "rules.tsv"),
+        num_cpus=2,
+        batch_size=4,
+        ignore_errors=True,
+        error_file_path=str(error_path),
+    )
+
+    assert observed["timeout"] == 10.0
+    error_text = error_path.read_text(encoding="utf-8")
+    assert "rule extraction batch exceeded 10s timeout" in error_text
+    assert "2.5s/reaction * batch_size=4" in error_text
+
+
 def test_ignore_stereo_allows_validation_of_stereo_cleaned_rules():
     """Extraction can opt into the stereo-cleaned rule/reactor contract."""
     rxn_smi = (

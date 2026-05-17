@@ -191,6 +191,9 @@ class RuleExtractionConfig(BaseConfigModel):
     :param ignore_stereo: If True, removes atom/bond stereochemistry from
         input reactions before rule extraction. This is useful for rule sets
         whose reactor/canonicalization path does not preserve stereo.
+    :param worker_timeout_per_reaction: Seconds allowed per reaction in a
+        parallel extraction batch. The worker timeout is this value multiplied
+        by the configured batch size.
     :param atom_info_retention: Controls the amount of information about
         each atom to retain ('none', 'reaction_center', or 'all').
     """
@@ -202,6 +205,7 @@ class RuleExtractionConfig(BaseConfigModel):
     as_query_container: bool = True
     single_product_only: bool = True
     ignore_stereo: bool = False
+    worker_timeout_per_reaction: float = Field(default=10.0, gt=0)
 
     # adjustable parameters
     environment_atom_count: int = 1

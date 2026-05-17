@@ -17,3 +17,4 @@ atom_info_retention:
     neighbors: False
     implicit_hydrogens: False
     ring_sizes: False
+worker_timeout_per_reaction: 10.0

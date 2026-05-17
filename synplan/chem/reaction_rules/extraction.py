@@ -1323,6 +1323,7 @@ def extract_rules_from_reactions(
             )
         else:
             multi_product_count = [0]  # mutable accumulator
+            worker_timeout = batch_size * config.worker_timeout_per_reaction
 
             def _make_batches():
                 batch = []
@@ -1333,6 +1334,32 @@ def extract_rules_from_reactions(
                         batch = []
                 if batch:
                     yield batch
+
+            def _make_timeout_result(e, batch):
+                errors = []
+                for index, raw_item in batch:
+                    orig, source_info = extract_origin_fields(raw_item, fmt)
+                    errors.append(
+                        ErrorEntry(
+                            original=orig,
+                            source_info=source_info,
+                            stage="extract_rules",
+                            error_type="TimeoutError",
+                            message=tsv_safe(
+                                "rule extraction batch exceeded "
+                                f"{worker_timeout:g}s timeout "
+                                f"({config.worker_timeout_per_reaction:g}s/reaction "
+                                f"* batch_size={batch_size}): {e}"
+                            ),
+                            line_number=index,
+                        )
+                    )
+                return ExtractionBatchResult(
+                    rule_records=[],
+                    errors=errors,
+                    n_multi_product=0,
+                    audit_entries=[],
+                )
 
             bar = tqdm(
                 desc="Number of reactions processed: ",
@@ -1348,7 +1375,8 @@ def extract_rules_from_reactions(
                     ordered=True,
                     initializer=_init_extraction_worker,
                     initargs=(config.to_dict(), ignore_errors, fmt),
-                    timeout=300,
+                    timeout=worker_timeout,
+                    on_timeout=_make_timeout_result,
                     # Avoid ProcessPoolExecutor worker recycling here: CPython
                     # documents open hangs with max_tasks_per_child in 3.13/3.14.
                     # The shared pool helper now performs bounded cleanup of
