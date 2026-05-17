@@ -1,5 +1,6 @@
 min_popularity: 3
 single_product_only: True
+ignore_stereo: True
 environment_atom_count: 1
 multicenter_rules: True
 include_rings: False
@@ -9,10 +10,11 @@ keep_incoming_groups: False
 keep_reagents: False
 atom_info_retention:
   reaction_center:
-    neighbors: True
+    neighbors: False
     implicit_hydrogens: False
     ring_sizes: False
   environment:
     neighbors: False
     implicit_hydrogens: False
     ring_sizes: False
+worker_timeout_per_reaction: 10.0

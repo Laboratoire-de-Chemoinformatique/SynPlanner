@@ -1,7 +1,7 @@
 """Module containing configuration classes."""
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 import yaml
 from chython import smarts
@@ -64,6 +64,61 @@ class BaseConfigModel(BaseModel):
             )
 
 
+class NestedConfigContainer(BaseConfigModel):
+    """Base for configs that hold optional ``XxxConfig | None = None`` nested fields.
+
+    Subclasses declare a ``_NESTED_CONFIG_TYPES`` ``ClassVar`` mapping the
+    field name to the concrete nested config class — for example::
+
+        class MyConfig(NestedConfigContainer):
+            substep_config: SubstepConfig | None = None
+
+            _NESTED_CONFIG_TYPES: ClassVar[dict[str, type]] = {
+                "substep_config": SubstepConfig,
+            }
+
+    The container then provides:
+
+    * **YAML-friendly coercion.** Both ``substep_config:`` (parsed as
+      ``None``) and ``substep_config: {}`` (empty mapping) produce a
+      default-instantiated ``SubstepConfig``. Explicit dicts are validated
+      against the declared type. To *disable* a nested config, omit the key
+      from the input entirely (the field default of ``None`` is preserved).
+
+      Pre-1.5.0 ``substep_config:`` silently left the field as ``None`` and
+      the substep was skipped — see the 1.5.0 ⚠️ Backwards-incompatible
+      block in the CHANGELOG.
+
+    * ``to_dict()`` that emits each non-``None`` nested config (recursively)
+      and skips top-level fields not listed in ``_NESTED_CONFIG_TYPES``.
+      Subclasses with additional scalar fields override ``to_dict`` if they
+      need them in the output.
+    """
+
+    _NESTED_CONFIG_TYPES: ClassVar[dict[str, type]] = {}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_nested_configs(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for field_name, cfg_cls in cls._NESTED_CONFIG_TYPES.items():
+                if field_name not in data:
+                    continue
+                value = data[field_name]
+                if value is None or isinstance(value, dict):
+                    data[field_name] = cfg_cls(**(value or {}))
+        return data
+
+    def to_dict(self) -> dict[str, Any]:
+        """Dict of nested configs, ``None`` entries excluded."""
+        result: dict[str, Any] = {}
+        for field_name in self._NESTED_CONFIG_TYPES:
+            config = getattr(self, field_name)
+            if config is not None:
+                result[field_name] = config.to_dict()
+        return result
+
+
 class ReactorConfig(BaseConfigModel):
     """Configuration for chython Reactor instances.
 
@@ -75,8 +130,15 @@ class ReactorConfig(BaseConfigModel):
         Suzuki) where different match orientations produce different products.
     :param delete_atoms: If True, atoms in reactants but not in products are removed.
     :param one_shot: If True, do only single reaction center per application.
-    :param fix_aromatic_rings: Proceed kekule and thiele on products.
-    :param fix_tautomers: Fix tautomers in products.
+
+    .. note::
+        ``fix_aromatic_rings`` and ``fix_tautomers`` are intentionally not
+        exposed. SynPlanner's
+        :class:`~synplan.chem.reaction.CanonicalRetroReactor` forces
+        ``fix_aromatic_rings=False`` and runs the full kekule + thiele +
+        tautomer-fix canonicalize pipeline inline in its ``_patcher``;
+        tautomer fixing inside that inline call relies on chython's default
+        ``fix_tautomers=True``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -84,8 +146,6 @@ class ReactorConfig(BaseConfigModel):
     automorphism_filter: bool = True
     delete_atoms: bool = False
     one_shot: bool = True
-    fix_aromatic_rings: bool = True
-    fix_tautomers: bool = True
 
     def to_reactor_kwargs(self) -> dict:
         """Convert to kwargs dict for Reactor constructor."""
@@ -128,6 +188,12 @@ class RuleExtractionConfig(BaseConfigModel):
         reaction in the extracted rule.
     :param single_product_only: If True, skips reactions that have more than
         one product (after reagent removal).
+    :param ignore_stereo: If True, removes atom/bond stereochemistry from
+        input reactions before rule extraction. This is useful for rule sets
+        whose reactor/canonicalization path does not preserve stereo.
+    :param worker_timeout_per_reaction: Seconds allowed per reaction in a
+        parallel extraction batch. The worker timeout is this value multiplied
+        by the configured batch size.
     :param atom_info_retention: Controls the amount of information about
         each atom to retain ('none', 'reaction_center', or 'all').
     """
@@ -138,6 +204,8 @@ class RuleExtractionConfig(BaseConfigModel):
     reverse_rule: bool = True
     as_query_container: bool = True
     single_product_only: bool = True
+    ignore_stereo: bool = False
+    worker_timeout_per_reaction: float = Field(default=10.0, gt=0)
 
     # adjustable parameters
     environment_atom_count: int = 1
@@ -354,6 +422,18 @@ class TreeConfig(BaseConfigModel):
     :param lnmcs_ratio: Pruning percentile for LazyNMCS algorithm.
         Only candidates scoring above this percentile threshold are
         explored. Value in range [0.0, 1.0]. Defaults to 0.2.
+    :param use_priority: When ``True``, curated priority rules passed to
+        :class:`~synplan.mcts.tree.Tree` (``priority_rules=...``) are tried
+        ahead of the policy on every expansion. Each priority rule that
+        matches the current precursor enters with ``prob=1.0``; combined
+        with the per-fragment multiplier in ``_add_child_if_new``, an
+        N-fragment priority disconnect produces ``Node.prob = N`` and
+        therefore dominates UCB sibling selection. Defaults to ``False``.
+    :param priority_rule_multiapplication: When ``True``, priority rules are
+        applied repeatedly to a single precursor until no further match is
+        possible (BFS to fixpoint), instead of stopping at the first match.
+        Useful for repeated motifs such as multi-site deprotections. Has no
+        effect on policy rules. Defaults to ``False``.
     """
 
     max_iterations: int = Field(default=100, gt=0)
@@ -370,6 +450,8 @@ class TreeConfig(BaseConfigModel):
     max_rules_applied: int = 10  # needed only in pruning
     stop_at_first: bool = False
     enable_pruning: bool = False
+    use_priority: bool = False
+    priority_rule_multiapplication: bool = False
 
     # UCT configuration
     search_strategy: Literal["expansion_first", "evaluation_first"] = "expansion_first"

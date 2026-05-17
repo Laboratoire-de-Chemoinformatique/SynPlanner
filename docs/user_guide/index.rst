@@ -6,9 +6,9 @@ This guide is a practical, task-oriented path through SynPlanner.
 What's inside
 -------------
 
-- Concepts and algorithms → see :doc:`/methods/methods`.
-- Configuration of pipelines (YAML and Python) → see :doc:`/configuration/configuration`.
-- CLI usage → see :doc:`cli_interface`.
+- Concepts and algorithms: see :doc:`/methods/methods`.
+- Configuration of pipelines (YAML and Python): see :doc:`/configuration/configuration`.
+- CLI usage: see :doc:`cli_interface`.
 
 Run in Google Colab
 -------------------
@@ -35,8 +35,7 @@ Tutorials
 -------------------
 
 ``SynPlanner`` is supplemented by several tutorials explaining different aspects of tool usage. These tutorials included
-some advanced explanations and configurations, that can be used not only for demonstrative and educational purposes but
-also for creating flexible pipelines.
+some advanced explanations and configurations, that can be used for both demonstration and building custom pipelines.
 
 **Introductory tutorials:**
 
@@ -50,6 +49,7 @@ also for creating flexible pipelines.
 - `Rules Extraction`_ - demonstrates how to extract reaction rules from reaction data.
 - `Policy Training`_ - demonstrates how to train ranking and filtering policy networks.
 - `Retrosynthetic Planning`_ - demonstrates how retrosynthetic planning can be performed for target molecules.
+- `Tree Analysis`_ - demonstrates how to analyze tree search results: policy performance, winning rule ranks, branching profile, and route details.
 - `Clustering`_ - demonstrates how to cluster predicted retrosynthetic routes.
 - `Protection Scoring`_ - demonstrates how to detect competing functional groups and score routes for selectivity issues, inspired by `Westerlund et al. (2025) <https://doi.org/10.26434/chemrxiv-2025-gdrr8>`_.
 
@@ -57,9 +57,9 @@ also for creating flexible pipelines.
 
 - `Combined Ranking and Filtering Policy`_ - demonstrates how to combine ranking and filtering policy networks.
 - `NMCS Algorithms`_ - demonstrates Nested Monte Carlo Search algorithms for retrosynthetic planning.
-- `Tree Analysis`_ - demonstrates how to analyze tree search results: policy performance, winning rule ranks, branching profile, and route details.
 - `Planning with RDKit`_ - demonstrates how to use SynPlanner with RDKit Mol objects for input and output.
 - `Rule Analysis`_ - demonstrates how to analyze and visualize reaction rules.
+- `Priority Rules`_ - demonstrates how to create custom retrosynthetic planner with user defined retrosynthetic SMARTS.
 
 .. _Welcome to Chython: 00_Welcome_to_Chython.ipynb
 .. _Coming from RDKit: 01_Coming_from_RDKit.ipynb
@@ -68,13 +68,14 @@ also for creating flexible pipelines.
 .. _Rules Extraction: 03_Rules_Extraction.ipynb
 .. _Policy Training: 04_Policy_Training.ipynb
 .. _Retrosynthetic Planning: 05_Retrosynthetic_Planning.ipynb
-.. _Clustering: 06_Clustering.ipynb
-.. _Protection Scoring: 07_Protection_Scoring.ipynb
-.. _Combined Ranking and Filtering Policy: 08_Combined_Ranking_Filtering_Policy.ipynb
-.. _NMCS Algorithms: 09_NMCS_Algorithms.ipynb
-.. _Tree Analysis: 10_Tree_Analysis.ipynb
+.. _Tree Analysis: 06_Tree_Analysis.ipynb
+.. _Clustering: 07_Clustering.ipynb
+.. _Protection Scoring: 08_Protection_Scoring.ipynb
+.. _Combined Ranking and Filtering Policy: 09_Combined_Ranking_Filtering_Policy.ipynb
+.. _NMCS Algorithms: 10_NMCS_Algorithms.ipynb
 .. _Planning with RDKit: 11_Planning_with_RDKit.ipynb
 .. _Rule Analysis: 12_Rule_Analysis.ipynb
+.. _Priority Rules: 13_Priority_Rules.ipynb
 
 .. toctree::
     :hidden:
@@ -89,12 +90,14 @@ also for creating flexible pipelines.
     03_Rules_Extraction
     04_Policy_Training
     05_Retrosynthetic_Planning
-    06_Clustering
-    07_Protection_Scoring
-    08_Combined_Ranking_Filtering_Policy
-    09_NMCS_Algorithms
-    10_Tree_Analysis
+    06_Tree_Analysis
+    07_Clustering
+    08_Protection_Scoring
+    09_Combined_Ranking_Filtering_Policy
+    10_NMCS_Algorithms
     11_Planning_with_RDKit
     12_Rule_Analysis
+    13_Priority_Rules
     ../configuration/configuration
     ../methods/methods
+   migration

@@ -1,6 +1,6 @@
 [project]
 name = "SynPlanner"
-version = "1.4.4"
+version = "1.5.0"
 description = "Toolbox for chemical synthesis planning"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "chython-synplan[racer-default]>=1.93",
+  "chython-synplan[racer-default]>=1.95",
   "chytorch-synplan>=1.70",
   "chytorch-rxnmap-synplan>=1.7",
   "numpy>=2",
@@ -47,22 +47,20 @@ dependencies = [
 cpu = ["torch>=2.0"]
 cu126 = ["torch>=2.0"]
 cu128 = ["torch>=2.0"]
-litlogger = ["litlogger>=2026.4.16"]
 wandb = ["wandb>=0.17"]
 mlflow = ["mlflow>=2"]
 loggers = [
-  "litlogger>=2026.4.16",
   "wandb>=0.17",
   "mlflow>=2",
 ]
 
 [dependency-groups]
 dev = [
-  "pytest>=7.4.3,<8",
-  "pytest-cov>=4.0,<5",
+  "pytest>=9.0.3",
+  "pytest-cov>=7.1.0",
   "twine>=6.2.0,<7",
   "ruff>=0.14.4,<0.15",
-  "jupyterlab>=4.0",
+  "jupyterlab>=4.5.7",
   "grpcio-tools>=1.78.0",
 ]
 docs = [
@@ -91,6 +89,27 @@ packages = ["synplan", "scripts"]
 artifacts = ["*.tsv", "*.csv", "*.yaml", "*.json"]
 
 [tool.uv]
+# Supply-chain hardening. Use an explicit UTC timestamp so `uv --locked`
+# resolves the same cutoff in local shells and Docker builders.
+exclude-newer = "2026-05-17T22:00:00Z"
+
+# Floors on transitive dependencies that ship CVE fixes.
+constraint-dependencies = [
+  "urllib3>=2.7.0",          # GHSA-38jv-5279-wg99, GHSA-gm62-xv2j-4w53, GHSA-qccp-gfcp-xxvc
+  "gitpython>=3.1.50",       # GHSA-rpm5-65cw-6hj4, CVE-2026-44243, CVE-2026-44244, GHSA-mv93-w799-cj2w
+  "jupyter-server>=2.18.0",  # GHSA-5mrq-x3x5-8v8f, CVE-2026-35397, CVE-2026-40110
+  "pillow>=12.2.0",          # CVE-2026-40192 (FITS bomb), CVE-2026-42308 (PSD OOB)
+  "tornado>=6.5.5",          # CVE-2026-31958, CVE-2026-35536
+  "mistune>=3.2.1",          # CVE-2026-33079 (ReDoS)
+  "lxml>=6.1.0",             # CVE-2026-41066 (XXE)
+  "aiohttp>=3.13.4",         # CVE-2026-22815, CVE-2026-34515, CVE-2026-34516, CVE-2026-34525
+  "cryptography>=46.0.7",    # CVE-2026-39892
+  "nbconvert>=7.17.1",       # CVE-2026-39377, CVE-2026-39378 (path traversal)
+  # cachedmethods pin removed: chython-synplan now vendors its own caching
+  # decorators (chython/_cache.py) so the third-party package is no longer
+  # a transitive dependency.
+]
+
 # PyTorch backend extras are mutually exclusive
 conflicts = [
   [
@@ -124,7 +143,7 @@ explicit = true
 
 # -- optional bump-my-version compatibility ----------------------------------
 [tool.bumpversion]
-current_version = "1.4.4"
+current_version = "1.5.0"
 commit = false
 tag = false
 

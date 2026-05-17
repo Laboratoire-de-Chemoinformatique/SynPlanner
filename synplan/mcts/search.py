@@ -8,6 +8,7 @@ import os.path
 from pathlib import Path
 
 from chython.containers import MoleculeContainer
+from chython.reactor import Reactor
 from tqdm.auto import tqdm
 
 from synplan.chem.reaction_routes.io import write_routes_csv, write_routes_json
@@ -57,6 +58,7 @@ def run_search(
     building_blocks_path: str,
     results_root: str = "search_results",
     route_scorer: RouteScorer | None = None,
+    priority_rules: dict[str, list[Reactor]] | None = None,
 ) -> None:
     """Performs a tree search on a set of target molecules using specified configuration
     and reaction rules, logging the results and statistics.
@@ -73,6 +75,12 @@ def run_search(
         will be saved.
     :param route_scorer: Optional post-search route scorer for re-ranking
         winning routes (e.g. ProtectionRouteScorer).
+    :param priority_rules: Optional mapping of curated rule sets
+        (``{set_name: [Reactor, ...]}``) forwarded to every per-target
+        :class:`Tree`. See :meth:`Tree.__init__` for the full semantics.
+        When supplied, set ``search_config["use_priority"] = True`` (or pass
+        a :class:`TreeConfig` with ``use_priority=True``); otherwise the rules
+        are accepted but never tried.
     :return: None.
     """
 
@@ -146,8 +154,8 @@ def run_search(
             bar_format="{desc}{n} [{elapsed}]",
         ):
             target_smi = target_smi.strip()
-            target_mol = mol_from_smiles(target_smi)
             try:
+                target_mol = mol_from_smiles(target_smi)
                 # run search
                 tree = Tree(
                     target=target_mol,
@@ -157,6 +165,7 @@ def run_search(
                     expansion_function=policy_function,
                     evaluation_function=evaluation_function,
                     route_scorer=route_scorer,
+                    priority_rules=priority_rules,
                 )
 
                 _ = list(tree)

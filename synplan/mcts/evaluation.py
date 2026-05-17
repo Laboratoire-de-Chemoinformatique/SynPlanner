@@ -12,6 +12,7 @@ import random
 from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from random import uniform
+from typing import TYPE_CHECKING
 
 import torch
 
@@ -20,6 +21,9 @@ from synplan.chem.rdkit_utils import RDKitScore
 from synplan.mcts.expansion import PolicyNetworkFunction
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training import mol_to_pyg
+
+if TYPE_CHECKING:
+    from synplan.mcts.node import Node
 
 
 class ValueNetworkFunction:
@@ -203,7 +207,11 @@ class RolloutSimulator:
                 return -1.0
 
             history[rollout_depth]["rule_index"] = rule_id
-            products = tuple(Precursor(product) for product in products)
+            # ``apply_reaction_rule`` already validated + canonicalized each
+            # product in a single kekule pass.
+            products = tuple(
+                Precursor(product, canonicalize=False) for product in products
+            )
             history[rollout_depth]["products"] = products
 
             if any(x in occurred_precursor for x in products) and products:
@@ -243,15 +251,16 @@ class EvaluationStrategy(ABC):
         self,
         node,
         node_id: int,
-        nodes_depth: dict[int, int],
-        nodes_prob: dict[int, float],
+        nodes: "dict[int, Node]",
     ) -> float:
         """Evaluate a node and return its score.
 
         :param node: The node to evaluate.
         :param node_id: ID of the node.
-        :param nodes_depth: Dictionary mapping node IDs to depths.
-        :param nodes_prob: Dictionary mapping node IDs to policy probabilities.
+        :param nodes: The tree's ``Node``-by-id mapping. Implementations read
+            per-node search state via ``nodes[some_id].depth`` /
+            ``nodes[some_id].prob`` etc. (Pre-1.5.0 this was two separate
+            ``nodes_depth`` and ``nodes_prob`` parallel-dict parameters.)
         :return: Evaluation score for the node.
         """
         pass
@@ -317,11 +326,10 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         self,
         node,
         node_id: int,
-        nodes_depth: dict[int, int],
-        nodes_prob: dict[int, float],
+        nodes: "dict[int, Node]",
     ) -> float:
         """Evaluate node using rollout simulation."""
-        current_depth = nodes_depth[node_id]
+        current_depth = nodes[node_id].depth
         raw = min(
             (
                 self.rollout.simulate_precursor(precursor, current_depth=current_depth)
@@ -359,8 +367,7 @@ class ValueNetworkEvaluationStrategy(EvaluationStrategy):
         self,
         node,
         node_id: int,
-        nodes_depth: dict[int, int],
-        nodes_prob: dict[int, float],
+        nodes: "dict[int, Node]",
     ) -> float:
         """Evaluate node using value network."""
         score = float(self.value_network.predict_value(node.new_precursors))
@@ -390,8 +397,7 @@ class RDKitEvaluationStrategy(EvaluationStrategy):
         self,
         node,
         node_id: int,
-        nodes_depth: dict[int, int],
-        nodes_prob: dict[int, float],
+        nodes: "dict[int, Node]",
     ) -> float:
         """Evaluate node using RDKit scorer."""
         score = float(self.scorer(node))
@@ -415,11 +421,11 @@ class PolicyEvaluationStrategy(EvaluationStrategy):
         self,
         node,
         node_id: int,
-        nodes_depth: dict[int, int],
-        nodes_prob: dict[int, float],
+        nodes: "dict[int, Node]",
     ) -> float:
         """Evaluate node using policy probability."""
-        score = nodes_prob.get(node_id, 0.0)
+        target = nodes.get(node_id)
+        score = target.prob if target is not None else 0.0
         return self._to_01(score) if self.normalize else score
 
 
@@ -440,8 +446,7 @@ class RandomEvaluationStrategy(EvaluationStrategy):
         self,
         node,
         node_id: int,
-        nodes_depth: dict[int, int],
-        nodes_prob: dict[int, float],
+        nodes: "dict[int, Node]",
     ) -> float:
         """Evaluate node using random score."""
         score = uniform(0.0, 1.0)

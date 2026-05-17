@@ -34,7 +34,7 @@ ORD ``.pb`` datasets can be converted to SynPlanner-compatible reaction SMILES:
 
 Building blocks standardization
 -------------------------------
-It is crucial to standardize custom building blocks for compatibility with ``SynPlanner``.
+Standardize custom building blocks for compatibility with ``SynPlanner``.
 
 .. code-block:: bash
 

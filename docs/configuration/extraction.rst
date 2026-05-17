@@ -4,7 +4,7 @@
 Reaction rules
 ================================
 
-The reaction rules extraction protocol is flexible and can adjust the specificity of extracted reaction rules.
+The reaction rules extraction protocol can adjust the specificity of extracted reaction rules.
 
 Download example configuration
 --------------------------------

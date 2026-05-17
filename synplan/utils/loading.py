@@ -19,7 +19,13 @@ from huggingface_hub import hf_hub_download, snapshot_download
 from torch import device
 from tqdm.auto import tqdm
 
-from synplan.chem.utils import _standardize_sdf_text, _standardize_smiles_batch
+from synplan.chem.reaction import CanonicalRetroReactor
+from synplan.chem.utils import (
+    AtomMappingCheck,
+    _standardize_sdf_text,
+    _standardize_smiles_batch,
+    reaction_string_mapping_status,
+)
 from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.networks.value import ValueNetwork
 from synplan.utils.config import ReactorConfig
@@ -250,10 +256,13 @@ def download_all_data(save_to="."):
 
 @functools.cache
 def load_reaction_rules(
-    file: str, reactor_config: ReactorConfig | None = None
-) -> list[Reactor]:
+    file: str,
+    reactor_config: ReactorConfig | None = None,
+    *,
+    check_atom_mapping: "AtomMappingCheck" = "reject_unmapped",
+) -> tuple[Reactor, ...]:
     """Loads the reaction rules from a TSV or pickle file and converts them into a
-    list of Reactor objects.
+    tuple of Reactor objects.
 
     Supported formats
 
@@ -261,42 +270,78 @@ def load_reaction_rules(
       ``reaction_indices`` columns (preferred).
     - ``.pickle`` -- legacy pickle format (deprecated).
 
+    The result is a tuple so it can be safely shared across parallel tree
+    workers without risk of accidental mutation. ``functools.cache`` returns
+    the same object on subsequent calls, so immutability also protects the
+    cached value.
+
     :param file: The path to the file that stores the reaction rules.
     :param reactor_config: Optional ReactorConfig to control Reactor construction
         (e.g. automorphism_filter, delete_atoms). If None, uses defaults.
-    :return: A list of reaction rules as Reactor objects.
+    :param check_atom_mapping: atom-mapping inspection mode applied to each
+        SMARTS row before ``Reactor.from_smarts``. ``"reject_unmapped"`` (the
+        default) rejects fully unmapped rules and allows partials (legitimate
+        leaving/incoming groups). Only honoured for the TSV path; pickled
+        rules are pre-compiled Reactor objects that can't be string-checked.
+    :return: A tuple of reaction rules as Reactor objects.
     """
     ext = Path(file).suffix.lower()
 
     reactor_kwargs = reactor_config.to_reactor_kwargs() if reactor_config else {}
 
     if ext == ".tsv":
-        return _load_rules_tsv(file, reactor_kwargs)
+        return _load_rules_tsv(
+            file, reactor_kwargs, check_atom_mapping=check_atom_mapping
+        )
 
-    # Legacy pickle path
+    # Legacy pickle path — cannot string-check pre-compiled Reactors.
     return _load_rules_pickle(file)
 
 
-def _load_rules_tsv(file: str, reactor_kwargs: dict | None = None) -> tuple:
+def _load_rules_tsv(
+    file: str,
+    reactor_kwargs: dict | None = None,
+    *,
+    check_atom_mapping: "AtomMappingCheck" = "reject_unmapped",
+) -> tuple[Reactor, ...]:
     """Load reaction rules from a TSV file."""
     if reactor_kwargs is None:
         reactor_kwargs = {}
-    # delete_atoms default for SynPlanner rules is False
     reactor_kwargs.setdefault("delete_atoms", False)
-    reactors = []
+    reactors: list[Reactor] = []
     with open(file, encoding="utf-8") as f:
         f.readline()  # skip header
-        for line in f:
+        for row_num, line in enumerate(f, start=2):
             line = line.rstrip("\n")
             if not line:
                 continue
             parts = line.split("\t")
             smarts_str = parts[0]
-            reactors.append(Reactor.from_smarts(smarts_str, **reactor_kwargs))
+            if check_atom_mapping != "off":
+                status = reaction_string_mapping_status(smarts_str)
+                if status == "unmapped" or (
+                    status == "partially_mapped"
+                    and check_atom_mapping == "reject_partial"
+                ):
+                    raise ValueError(
+                        f"Rule at row {row_num} of {file!r} is {status}:\n"
+                        f"  SMARTS: {smarts_str}\n"
+                        "  set check_atom_mapping='off' to load it anyway."
+                    )
+            try:
+                reactors.append(
+                    CanonicalRetroReactor.from_smarts(smarts_str, **reactor_kwargs)
+                )
+            except Exception as err:
+                raise ValueError(
+                    f"Failed to load reaction rule at row {row_num} of "
+                    f"{file!r}:\n  SMARTS: {smarts_str}\n"
+                    f"  error: {type(err).__name__}: {err}"
+                ) from err
     return tuple(reactors)
 
 
-def _load_rules_pickle(file: str) -> tuple:
+def _load_rules_pickle(file: str) -> tuple[Reactor, ...]:
     """Load reaction rules from a legacy pickle file."""
     with open(file, "rb") as f:
         reaction_rules = pickle.load(f)
@@ -305,8 +350,8 @@ def _load_rules_pickle(file: str) -> tuple:
     if isinstance(reaction_rules[0], Reactor):
         return tuple(reaction_rules)
 
-    # Legacy format: list of (rule, priority) tuples
-    if not isinstance(reaction_rules[0][0], Reactor):
+    # Legacy format: list of (rule, priority) tuples; unpack to bare Reactors.
+    if isinstance(reaction_rules[0][0], Reactor):
         reaction_rules = [rule for rule, _ in reaction_rules]
 
     return tuple(reaction_rules)
@@ -496,7 +541,7 @@ def load_policy_function(
 
     # Priority 2: Create config from weights_path and kwargs
     if weights_path is not None:
-        policy_config = PolicyNetworkConfig(weights_path=weights_path)
+        policy_config = PolicyNetworkConfig(weights_path=weights_path, **config_kwargs)
         return PolicyNetworkFunction(policy_config=policy_config)
 
     raise ValueError("Must provide either policy_config or weights_path")

@@ -6,6 +6,7 @@ from collections.abc import Iterator
 import torch
 import torch_geometric
 import torch_geometric.data
+from chython.containers import ReactionContainer
 from chython.reactor.reactor import Reactor
 
 from synplan.chem.precursor import Precursor
@@ -126,11 +127,8 @@ class PolicyNetworkFunction:
         if probs is None:
             return None
 
-        sorted_probs, sorted_rules = torch.sort(probs, descending=True)
-        sorted_probs, sorted_rules = (
-            sorted_probs[: self.config.top_rules],
-            sorted_rules[: self.config.top_rules],
-        )
+        k = min(self.config.top_rules, probs.numel())
+        sorted_probs, sorted_rules = torch.topk(probs, k=k, sorted=True)
 
         if self.policy_net.policy_type == "filtering":
             sorted_probs = torch.softmax(sorted_probs, -1)
@@ -360,3 +358,19 @@ class CombinedPolicyNetworkFunction:
         for prob, rule_id in zip(sorted_probs, sorted_rules):
             if prob > self.rule_prob_threshold:
                 yield prob, rule_id
+
+
+def _rule_query_pattern(rule) -> ReactionContainer | None:
+    """Return the first query pattern stored on a chython :class:`Reactor`.
+
+    chython's :class:`Reactor` keeps the LHS query patterns on the private
+    ``_patterns`` tuple — see ``chython/reactor/reactor.py``. We use ``[0]``
+    because the priority-rule applicability check only needs *any* substructure
+    to test ``pattern < molecule`` against the current precursor.
+    """
+
+    patterns = getattr(rule, "_patterns", None)
+    if patterns:
+        return patterns[0]
+
+    return None

@@ -8,12 +8,16 @@ from collections.abc import Iterable, Iterator
 from io import StringIO
 from os.path import splitext
 from pathlib import Path
-from typing import TextIO
+from typing import TYPE_CHECKING, TextIO
 
 from chython import smiles
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
+from chython.exceptions import MappingError
 from chython.files.RDFrw import RDFRead, RDFWrite
 from chython.files.SDFrw import SDFRead, SDFWrite
+
+if TYPE_CHECKING:
+    from synplan.chem.utils import AtomMappingCheck
 
 
 class FileHandler:
@@ -124,6 +128,75 @@ def reaction_source_info(reaction: ReactionContainer) -> str:
         if key != "init_smiles"
     ]
     return format_source_fields(meta_fields)
+
+
+def tsv_safe(text: str) -> str:
+    """Strip embedded tabs/newlines so TSV row alignment is preserved."""
+    return text.replace("\t", " ").replace("\n", " ").replace("\r", " ")
+
+
+def extract_origin_fields(raw_item, fmt: str) -> tuple[str, str]:
+    """Return ``(original_smiles, source_info)`` for an error entry.
+
+    For SMILES input, splits the raw record into the SMILES part and the
+    extra source columns (USPTO patent id, etc.); putting the latter into
+    ``source_info`` keeps the TSV's first column clean.
+    For RDF input, the raw record is a multi-line block; we collapse it to
+    a single first-line identifier to preserve column alignment.
+    """
+    if not isinstance(raw_item, str):
+        return tsv_safe(str(raw_item)), ""
+    if fmt == "smi":
+        smiles_part, source_fields = split_smiles_record(raw_item)
+        return tsv_safe(smiles_part), format_source_fields(source_fields)
+    # RDF (or unknown framing): take first non-empty line as the identifier.
+    first_line = next(
+        (ln.strip() for ln in raw_item.splitlines() if ln.strip()),
+        raw_item.strip(),
+    )
+    return tsv_safe(first_line), ""
+
+
+ERROR_TSV_HEADER = "# original_smiles\tsource_info\tstage\terror_type\terror_message\n"
+
+
+def write_error_tsv_header(file: TextIO) -> None:
+    """Write the canonical commented header row for an error TSV."""
+    file.write(ERROR_TSV_HEADER)
+
+
+def parse_error_message(
+    msg: str, default_stage: str, default_error_type: str = "Error"
+) -> tuple[str, str, str]:
+    """Split a blended ``"stage: type: detail"`` exception string.
+
+    Fall back to ``(default_stage, default_error_type, msg)`` when the
+    string is not in the blended form.
+    """
+    if ":" not in msg:
+        return default_stage, default_error_type, msg
+    head, _, rest = msg.partition(":")
+    stage = head.strip() or default_stage
+    etype, _, detail = rest.partition(":")
+    error_type = etype.strip() or default_error_type
+    message = (detail.strip() or rest.strip()) or msg
+    return stage, error_type, message
+
+
+def write_error_row(
+    file: TextIO,
+    original: str,
+    source_info: str,
+    stage: str,
+    error_type: str,
+    message: str,
+) -> None:
+    """Write one row to an error TSV, escaping every field for column safety."""
+    file.write(
+        f"{tsv_safe(original)}\t{tsv_safe(source_info)}\t"
+        f"{tsv_safe(stage)}\t{tsv_safe(error_type)}\t"
+        f"{tsv_safe(message)}\n"
+    )
 
 
 class SMILESRead:
@@ -496,31 +569,52 @@ def iter_csv_smiles_blocks(
 
 
 def count_rdf_records(path: str | Path) -> int:
-    """Count number of RDF records (by $RFMT/$MFMT markers)."""
+    """Count number of RDF records.
+
+    MDL permits two equivalent framings: ``$RFMT``/``$MFMT`` between records
+    (each frames one ``$RXN``), or bare ``$RXN`` records under a single RDF
+    header. We count whichever framing the file actually uses: if any
+    ``$RFMT``/``$MFMT`` lines exist they delimit, otherwise ``$RXN`` lines do.
+    """
     p = Path(path)
+    rfmt_count = 0
+    rxn_count = 0
     with open(p, encoding="utf-8") as f:
-        return sum(1 for line in f if line.startswith(("$RFMT", "$MFMT")))
+        for line in f:
+            if line.startswith(("$RFMT", "$MFMT")):
+                rfmt_count += 1
+            elif line.startswith("$RXN"):
+                rxn_count += 1
+    return rfmt_count if rfmt_count > 0 else rxn_count
 
 
 def iter_rdf_text_blocks(path: str | Path, records_per_block: int) -> Iterator[str]:
-    """Yield RDF text blocks of up to `records_per_block` records.
+    """Yield RDF text blocks of up to ``records_per_block`` records.
 
-    Each block is a string containing one or more $RFMT/$MFMT records,
-    parseable via ``RDFRead(StringIO(block))``.
+    Each block is a string containing one or more records, parseable via
+    ``RDFRead(StringIO(block))``. Both legal MDL framings are supported:
+    ``$RFMT``/``$MFMT``-framed records, and bare ``$RXN``-framed records
+    (CHORISO-style). The delimiter is detected on the first record start.
     """
     p = Path(path)
     buf: list[str] = []
     count = 0
     step = max(1, records_per_block)
     in_header = True
+    delimiters: tuple[str, ...] = ("$RFMT", "$MFMT")
     with open(p, encoding="utf-8") as f:
         for line in f:
             if in_header:
                 if line.startswith(("$RFMT", "$MFMT", "$RXN")):
                     in_header = False
+                    # If the first delimiter is a bare $RXN (no $RFMT/$MFMT
+                    # wrapper anywhere ahead of it), records are split on
+                    # $RXN. Otherwise $RFMT/$MFMT delimit.
+                    if line.startswith("$RXN"):
+                        delimiters = ("$RXN",)
                     buf.append(line)
                 continue
-            if line.startswith(("$RFMT", "$MFMT")):
+            if line.startswith(delimiters):
                 count += 1
                 if count % step == 0:
                     yield "".join(buf)
@@ -531,51 +625,100 @@ def iter_rdf_text_blocks(path: str | Path, records_per_block: int) -> Iterator[s
         yield "".join(buf)
 
 
+def _check_mapping_status(status: str, mode: "AtomMappingCheck") -> None:
+    if mode == "off":
+        return
+    if status == "unmapped":
+        raise MappingError(
+            "reaction has no shared atom numbers between reactants and products"
+        )
+    if status == "partially_mapped" and mode == "reject_partial":
+        raise MappingError("reaction is only partially atom-mapped")
+
+
 def parse_reaction(
-    item: str | ReactionContainer, fmt: str = "smi"
+    item: str | ReactionContainer,
+    fmt: str = "smi",
+    *,
+    check_atom_mapping: "AtomMappingCheck" = "off",
+    ignore_stereo: bool = False,
 ) -> ReactionContainer:
     """Parse a raw string into a ReactionContainer.
 
-    If *item* is already a ReactionContainer it is returned as-is.
-
-    :param item: A SMILES string, an RDF text block, or a ReactionContainer.
-    :param fmt: ``"smi"`` for SMILES strings, ``"rdf"`` for RDF text blocks.
-    :return: The parsed ReactionContainer.
+    :param item: SMILES string, RDF text block, or ReactionContainer.
+    :param fmt: ``"smi"`` or ``"rdf"``.
+    :param check_atom_mapping: see :data:`synplan.chem.utils.AtomMappingCheck`.
+        When enabled the parsed reaction is tagged via
+        ``rxn.meta["mapping_status"]``.
+    :param ignore_stereo: If True, discard atom/bond stereochemistry while
+        parsing. Atom-map checks still use the original string.
     """
+    if check_atom_mapping != "off":
+        from synplan.chem.utils import (
+            reaction_mapping_status,
+            reaction_string_mapping_status,
+        )
+
     if isinstance(item, ReactionContainer):
-        return item
+        rxn = item
+        if ignore_stereo:
+            rxn = rxn.copy()
+            rxn.clean_stereo()
+        if check_atom_mapping != "off":
+            status = reaction_mapping_status(rxn)
+            _check_mapping_status(status, check_atom_mapping)
+            rxn.meta["mapping_status"] = status
+        return rxn
     if fmt == "smi":
         smiles_part, source_fields = split_smiles_record(item)
-        rxn = smiles(smiles_part)
+        # String-based check works for SMILES and rule SMARTS alike; the
+        # SMARTS parser drops parsed_mapping so container check would lie.
+        if check_atom_mapping != "off":
+            status = reaction_string_mapping_status(smiles_part)
+            _check_mapping_status(status, check_atom_mapping)
+        rxn = smiles(smiles_part, ignore_stereo=ignore_stereo)
         rxn.meta["init_smiles"] = smiles_part
         _store_source_fields(rxn, source_fields)
+        if check_atom_mapping != "off":
+            rxn.meta["mapping_status"] = status
         return rxn
     else:  # rdf block
-        with RDFRead(StringIO(item), ignore=True) as r:
+        with RDFRead(StringIO(item), ignore=True, ignore_stereo=ignore_stereo) as r:
             rxn = next(iter(r))
+        if check_atom_mapping != "off":
+            status = reaction_mapping_status(rxn)
+            _check_mapping_status(status, check_atom_mapping)
+            rxn.meta["mapping_status"] = status
         return rxn
 
 
-# -- Process-pool parse worker ------------------------------------------------
-# Module-level state + functions for ProcessPoolExecutor pickling.
-
+# Process-pool worker globals (set via init_parse_worker, read in parse_one).
 _parse_fmt = "smi"
+_parse_check_atom_mapping: "AtomMappingCheck" = "off"
+_parse_ignore_stereo = False
 
 
-def init_parse_worker(fmt: str):
-    """Initializer: store the input format so ``parse_one`` knows how to parse."""
-    global _parse_fmt
+def init_parse_worker(
+    fmt: str,
+    check_atom_mapping: "AtomMappingCheck" = "off",
+    ignore_stereo: bool = False,
+):
+    """Pool initializer: set format and mapping-check mode for ``parse_one``."""
+    global _parse_fmt, _parse_check_atom_mapping, _parse_ignore_stereo
     _parse_fmt = fmt
+    _parse_check_atom_mapping = check_atom_mapping
+    _parse_ignore_stereo = ignore_stereo
 
 
 def parse_one(item: str):
-    """Parse a single raw item → ``(ReactionContainer | None, error | None)``.
-
-    *item* is a SMILES string (for .smi) or an RDF text block (for .rdf).
-    The format is set once per worker via :func:`init_parse_worker`.
-    """
+    """Parse a single raw item → ``(ReactionContainer | None, error | None)``."""
     try:
-        rxn = parse_reaction(item, fmt=_parse_fmt)
+        rxn = parse_reaction(
+            item,
+            fmt=_parse_fmt,
+            check_atom_mapping=_parse_check_atom_mapping,
+            ignore_stereo=_parse_ignore_stereo,
+        )
         if rxn is None:
             return None, "parse returned None"
         if not isinstance(rxn, ReactionContainer):

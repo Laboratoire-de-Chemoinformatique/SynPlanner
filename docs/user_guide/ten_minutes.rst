@@ -10,8 +10,8 @@ to find synthetic routes for target molecules.
     instead of RDKit. If you are used to RDKit's API, see the
     :doc:`01_Coming_from_RDKit` tutorial for a side-by-side comparison before continuing here.
 
-Step 1 — Installation
----------------------
+Step 1: Installation
+--------------------
 
 .. code-block:: bash
 
@@ -19,8 +19,8 @@ Step 1 — Installation
 
 See :doc:`../get_started/installation` for GPU support and conda-based setup.
 
-Step 2 — Download data
------------------------
+Step 2: Download data
+---------------------
 
 Use the preset downloader to fetch pre-trained models, reaction rules, and building blocks
 from HuggingFace.
@@ -43,17 +43,17 @@ After downloading, you will have:
 
     synplan_data/
     ├── policy/supervised_gcn/v1/
-    │   ├── reaction_rules.tsv          ← reaction rules
+    │   ├── reaction_rules.tsv          # reaction rules
     │   └── v1/
-    │       ├── ranking_policy.ckpt     ← ranking policy network weights
-    │       └── filtering_policy.ckpt   ← filtering policy network weights
+    │       ├── ranking_policy.ckpt     # ranking policy network weights
+    │       └── filtering_policy.ckpt   # filtering policy network weights
     ├── value/supervised_gcn/v1/
-    │   └── value_network.ckpt          ← value network weights (advanced)
+    │   └── value_network.ckpt          # value network weights (advanced)
     └── building_blocks/emolecules-salt-ln/
-        └── building_blocks.tsv         ← purchasable building blocks
+        └── building_blocks.tsv         # purchasable building blocks
 
-Step 3 — Key concepts
-----------------------
+Step 3: Key concepts
+--------------------
 
 Before running planning, it helps to understand what each component does:
 
@@ -69,16 +69,16 @@ Before running planning, it helps to understand what each component does:
     A graph neural network that predicts which reaction rules are applicable to a given molecule,
     ranked by predicted probability. Two types are available:
 
-    - *Ranking policy* — ranks all applicable rules.
-    - *Filtering policy* — filters out unlikely rules before ranking (faster for large rule sets).
+    - *Ranking policy*: ranks all applicable rules.
+    - *Filtering policy*: filters out unlikely rules before ranking (faster for large rule sets).
 
 **Evaluation function**
     Estimates the retrosynthetic feasibility of a newly created precursor node.
     Two main types:
 
-    - *Rollout* (default) — performs a short forward simulation to estimate feasibility.
+    - *Rollout* (default): performs a short forward simulation to estimate feasibility.
       No additional training required; works with any building block set.
-    - *Value network* (advanced) — a trained GCN that instantly predicts feasibility.
+    - *Value network* (advanced): a trained GCN that instantly predicts feasibility.
       Faster per evaluation but requires a separate training step.
 
 **Search tree (MCTS)**
@@ -86,11 +86,10 @@ Before running planning, it helps to understand what each component does:
     evaluating, and backpropagating nodes. Planning stops when a route to building blocks
     is found, or when the iteration/time limit is reached.
 
-Step 4 — Plan via Python API
------------------------------
+Step 4: Plan via Python API
+---------------------------
 
-The example below uses the ranking policy network and rollout evaluation — the default configuration,
-requiring no value network.
+The example below uses the ranking policy network and rollout evaluation. This is the default configuration, requiring no value network.
 
 .. code-block:: python
 
@@ -176,7 +175,7 @@ After the search, extract routes and generate an HTML report:
 Score routes for protection group issues
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The protection scoring module flags competing functional groups in a route — steps where
+The protection scoring module flags competing functional groups in a route: steps where
 a reagent may react with an unintended site, indicating a potential need for protecting groups.
 This follows the methodology of `Westerlund et al. (2025) <https://doi.org/10.26434/chemrxiv-2025-gdrr8>`_.
 
@@ -203,7 +202,7 @@ Pass the scorer to the tree so routes are re-ranked during the search:
 
 The score S(T) is in [0, 1]: 1.0 means no competing interactions detected,
 lower values indicate steps that may require protecting group strategies.
-See :doc:`07_Protection_Scoring` for a detailed walkthrough.
+See :doc:`08_Protection_Scoring` for a detailed walkthrough.
 
 Batch planning (many targets)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -260,8 +259,8 @@ Key parameters to tune
                               up the search.
     ========================= ===============================================================
 
-Step 5 — Plan via CLI
-----------------------
+Step 5: Plan via CLI
+--------------------
 
 Batch-plan a list of targets from the command line:
 
@@ -279,23 +278,14 @@ Batch-plan a list of targets from the command line:
 Results are written to ``planning_results/``: a CSV with per-target statistics,
 JSON routes, and HTML visualisations.
 
-To use the value network for faster evaluation (advanced):
-
-.. code-block:: bash
-
-    synplan planning \
-      --config configs/planning_standard.yaml \
-      --targets targets.smi \
-      --reaction_rules synplan_data/policy/supervised_gcn/v1/reaction_rules.tsv \
-      --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \
-      --policy_network synplan_data/policy/supervised_gcn/v1/v1/ranking_policy.ckpt \
-      --value_network synplan_data/value/supervised_gcn/v1/value_network.ckpt \
-      --results_dir planning_results
+To use the value network for faster evaluation (advanced), add
+``--value_network synplan_data/value/supervised_gcn/v1/value_network.ckpt``
+to the command above.
 
 See :doc:`cli_interface` for a full list of all CLI commands and options.
 
-Step 6 — Visualise results
----------------------------
+Step 6: Visualise results
+-------------------------
 
 After planning, open the HTML report:
 
@@ -316,24 +306,25 @@ Next steps
 
 **Go deeper into planning:**
 
-- :doc:`05_Retrosynthetic_Planning` — detailed planning tutorial with route inspection
-- :doc:`../configuration/planning` — all planning configuration parameters
-- :doc:`../methods/mcts` — how MCTS and search strategies work
+- :doc:`05_Retrosynthetic_Planning`: detailed planning tutorial with route inspection
+- :doc:`../configuration/planning`: all planning configuration parameters
+- :doc:`../methods/mcts`: how MCTS and search strategies work
 
 **Train your own models on custom data:**
 
-- :doc:`02_Data_Curation` — prepare reaction data
-- :doc:`03_Rules_Extraction` — extract reaction rules
-- :doc:`04_Policy_Training` — train ranking and filtering policy networks
-- :doc:`../configuration/policy` — policy network configuration
+- :doc:`02_Data_Curation`: prepare reaction data
+- :doc:`03_Rules_Extraction`: extract reaction rules
+- :doc:`04_Policy_Training`: train ranking and filtering policy networks
+- :doc:`../configuration/policy`: policy network configuration
 
 **Advanced search:**
 
-- :doc:`08_Combined_Ranking_Filtering_Policy` — combine ranking and filtering policies
-- :doc:`09_NMCS_Algorithms` — Nested Monte Carlo Search
-- :doc:`../methods/value` — value network concepts
+- :doc:`09_Combined_Ranking_Filtering_Policy`: combine ranking and filtering policies
+- :doc:`10_NMCS_Algorithms`: Nested Monte Carlo Search
+- :doc:`../methods/value`: value network concepts
 
 **Route analysis:**
 
-- :doc:`06_Clustering` — cluster routes by strategic bonds
-- :doc:`07_Protection_Scoring` — score routes for selectivity issues
+- :doc:`06_Tree_Analysis`: diagnose policy and search behaviour
+- :doc:`07_Clustering`: cluster routes by strategic bonds
+- :doc:`08_Protection_Scoring`: score routes for selectivity issues

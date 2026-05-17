@@ -35,6 +35,4 @@ instead of expansive rollout simulations.
     node_evaluation:
       evaluation_type: gcn
 
-**Conclusion**. In general, the advanced planning algorithm is slower than the default (around 2x slow down),
-but explores the search tree more exhaustively and may help if the default planning algorithm fails to find
-a solution for the given molecule.
+**Conclusion**. The advanced algorithm is roughly 2x slower but explores the search tree more exhaustively.

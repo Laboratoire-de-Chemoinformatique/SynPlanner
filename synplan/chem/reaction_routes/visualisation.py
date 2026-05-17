@@ -508,6 +508,25 @@ def cgr_display(cgr: CGRContainer) -> str:
         str: An SVG string representing the depiction of the CGR
              with wider DynamicBonds.
     """
+    # Save the originals so we can restore them. The patches must be undone
+    # even on exception; otherwise every subsequent CGRContainer.depict()
+    # in the process inherits the wide-bond renderer.
+    _saved_aromatic = CGRContainer.__dict__.get(
+        "_CGRContainer__render_aromatic_bond"
+    )
+    _saved_render_bonds = CGRContainer.__dict__.get("_render_bonds")
+    _saved_extra = CGRContainer.__dict__.get(
+        "_WideBondDepictCGR__render_aromatic_bond"
+    )
+
+    def _restore(attr: str, original):
+        if original is None:
+            # Attribute did not exist before our patch; remove our addition.
+            if attr in CGRContainer.__dict__:
+                delattr(CGRContainer, attr)
+        else:
+            setattr(CGRContainer, attr, original)
+
     CGRContainer._CGRContainer__render_aromatic_bond = (
         WideBondDepictCGR._WideBondDepictCGR__render_aromatic_bond
     )
@@ -515,8 +534,13 @@ def cgr_display(cgr: CGRContainer) -> str:
     CGRContainer._WideBondDepictCGR__render_aromatic_bond = (
         WideBondDepictCGR._WideBondDepictCGR__render_aromatic_bond
     )
-    cgr.clean2d()
-    return cgr.depict()
+    try:
+        cgr.clean2d()
+        return cgr.depict()
+    finally:
+        _restore("_CGRContainer__render_aromatic_bond", _saved_aromatic)
+        _restore("_render_bonds", _saved_render_bonds)
+        _restore("_WideBondDepictCGR__render_aromatic_bond", _saved_extra)
 
 
 class CustomDepictMolecule(DepictMolecule):

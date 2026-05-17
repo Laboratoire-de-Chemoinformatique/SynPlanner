@@ -26,13 +26,13 @@ It integrates Monte Carlo Tree Search (MCTS) with graph neural networks
 to evaluate applicable reaction rules (policy network) and
 the synthesizability of intermediate products (value network).
 
-- **Data curation:** standardize and filter raw chemical reaction data
-- **Rule extraction:** extract reaction templates with configurable specificity
-- **Model training:** train policy and value networks (supervised + RL)
-- **Retrosynthesis:** MCTS-based planning with multiple search strategies
-- **Route quality:** competing-sites scoring for functional group selectivity ([Westerlund et al.](https://chemrxiv.org/engage/chemrxiv/article-details/68ff62f6ef936fb4a29b02d8))
-- **Route clustering:** group routes by strategic bonds ([Gilmullin et al.](https://chemrxiv.org/doi/full/10.26434/chemrxiv-2025-lnkz6-vz))
-- **Visualization:** HTML route reports and interactive GUI
+- Data curation: standardize and filter raw chemical reaction data
+- Rule extraction: extract reaction templates with configurable specificity
+- Model training: train policy and value networks (supervised + RL)
+- Retrosynthesis: MCTS-based planning with multiple search strategies
+- Route quality: competing-sites scoring for functional group selectivity ([Westerlund et al.](https://chemrxiv.org/engage/chemrxiv/article-details/68ff62f6ef936fb4a29b02d8))
+- Route clustering: group routes by strategic bonds ([Gilmullin et al.](https://chemrxiv.org/doi/full/10.26434/chemrxiv-2025-lnkz6-vz))
+- Visualization: HTML route reports and interactive GUI
 
 ## Installation
 

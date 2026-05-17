@@ -178,6 +178,17 @@ def test_parse_reaction_preserves_mapped_source_fields():
     assert serialize_reaction(rxn, "smi").endswith("\t42\tUS123,US456")
 
 
+def test_parse_reaction_can_ignore_stereo():
+    """The reaction parser can drop stereo without affecting source metadata."""
+    record = "[C@H:1]([CH3:2])([OH:3])[Cl:4]>>[C@@H:1]([CH3:2])([OH:3])[Br:5]\t42"
+
+    rxn = parse_reaction(record, ignore_stereo=True)
+
+    assert "@" not in str(rxn)
+    assert rxn.meta["init_smiles"].startswith("[C@H:1]")
+    assert rxn.meta["source_0001"] == "42"
+
+
 def test_standardization_errors_are_not_written_to_output():
     """ignore_errors logs bad reactions but does not mix them into output records."""
 
@@ -360,6 +371,25 @@ def test_write_batch_results_filtered():
     write_batch_results(batches, written.append, summary)
     assert summary.filtered == 1
     assert "no_change" in summary.filter_breakdown
+
+
+def test_write_batch_results_filtered_to_file(tmp_path):
+    """write_batch_results logs filter rejections to error file as stage=filter rows."""
+    written = []
+    summary = PipelineSummary()
+    err_path = tmp_path / "errors.tsv"
+    filtered = [
+        FilteredEntry("CC>>CC", "DynamicBondsFilter", source_info="US123"),
+        FilteredEntry("CN>>CN", "NoReactionFilter"),
+    ]
+    batches = [BatchResult(records=[], dedup_keys=[], filtered=filtered)]
+    with open(err_path, "w") as ef:
+        write_batch_results(batches, written.append, summary, error_file=ef)
+    assert summary.filtered == 2
+    assert summary.filter_breakdown == {"DynamicBondsFilter": 1, "NoReactionFilter": 1}
+    text = err_path.read_text()
+    assert "CC>>CC\tUS123\tfilter\tDynamicBondsFilter\t" in text
+    assert "CN>>CN\t\tfilter\tNoReactionFilter\t" in text
 
 
 def test_write_batch_results_on_batch_callback():
@@ -547,3 +577,86 @@ def test_remove_reagents_before_check_valence_cr6():
     rxn2 = parse_smiles(_CR6_REAGENT_SMILES)
     rxn2 = remove_reag(rxn2)
     check_val(rxn2)  # must not raise
+
+
+# -- YAML coercion: "key:" (null) and "key: {}" both enable with defaults -------
+
+
+def test_yaml_null_value_enables_standardizer_with_defaults():
+    """`key:` in YAML parses to None and MUST enable the step with defaults.
+
+    Pre-1.5.0 ``key:`` silently left the field as None and the standardizer
+    was skipped (a real-world bug reported by the user). After the fix,
+    ``key:`` is equivalent to ``key: {}`` — both enable with default values.
+    Disabling a step is done by omitting the key from YAML entirely.
+    """
+    import yaml
+
+    yaml_with_null = """
+functional_groups_config:
+kekule_form_config:
+check_valence_config:
+deduplicate: true
+"""
+    yaml_with_empty_dict = """
+functional_groups_config: {}
+kekule_form_config: {}
+check_valence_config: {}
+deduplicate: true
+"""
+    yaml_omitted = """
+deduplicate: true
+"""
+
+    cfg_null = ReactionStandardizationConfig.model_validate(
+        yaml.safe_load(yaml_with_null)
+    )
+    cfg_dict = ReactionStandardizationConfig.model_validate(
+        yaml.safe_load(yaml_with_empty_dict)
+    )
+    cfg_omitted = ReactionStandardizationConfig.model_validate(
+        yaml.safe_load(yaml_omitted)
+    )
+
+    # null and {} produce identical configs
+    assert cfg_null.model_dump() == cfg_dict.model_dump()
+
+    # omitted leaves the field as None — no standardizer instantiated
+    assert cfg_null.model_dump() != cfg_omitted.model_dump()
+    assert cfg_omitted.functional_groups_config is None
+
+    # null produces actual instantiated config objects (not None)
+    assert isinstance(cfg_null.functional_groups_config, FunctionalGroupsConfig)
+    assert isinstance(cfg_null.kekule_form_config, KekuleFormConfig)
+    assert isinstance(cfg_null.check_valence_config, CheckValenceConfig)
+
+    # The standardizers list contains the three expected instances when null
+    standardizer_names_null = {
+        type(s).__name__ for s in cfg_null.create_standardizers()
+    }
+    standardizer_names_dict = {
+        type(s).__name__ for s in cfg_dict.create_standardizers()
+    }
+    assert standardizer_names_null == standardizer_names_dict
+    assert "CheckValenceStandardizer" in standardizer_names_null
+    assert "FunctionalGroupsStandardizer" in standardizer_names_null
+
+    # Omitted produces no standardizers
+    assert cfg_omitted.create_standardizers() == []
+
+
+def test_yaml_null_preserves_explicit_overrides():
+    """A mix of `key:` (null) and `key: {a: 1}` (overrides) on the same config."""
+    import yaml
+
+    text = """
+functional_groups_config:
+remove_reagents_config:
+  reagent_max_size: 12
+deduplicate: true
+"""
+    cfg = ReactionStandardizationConfig.model_validate(yaml.safe_load(text))
+    assert isinstance(cfg.functional_groups_config, FunctionalGroupsConfig)
+    assert isinstance(cfg.remove_reagents_config, RemoveReagentsConfig)
+    # Override survived through the coercion path
+    assert cfg.remove_reagents_config.reagent_max_size == 12

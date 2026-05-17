@@ -4,7 +4,7 @@
 Reaction filtration
 ================================
 
-``SynPlanner`` includes a variety of reaction filters.
+``SynPlanner`` includes several reaction filters.
 The list and order of application of filters can be specified in the configuration file.
 
 Download example configuration

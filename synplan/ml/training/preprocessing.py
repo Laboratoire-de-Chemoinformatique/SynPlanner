@@ -603,6 +603,11 @@ def mol_to_pyg(molecule: MoleculeContainer, canonicalize: bool = True) -> Data |
                 float(bond.in_ring),
             ]
         )
+    # Purely edgeless precursors such as [NH4+].[OH-] have no bonded fragment
+    # for the graph policy to expand. Disconnected organic salts still pass
+    # through here as long as at least one component has bonds.
+    if not edge_index:
+        return None
     edge_index = torch.tensor(edge_index, dtype=torch.long)
     edge_attr = torch.tensor(edge_attr, dtype=torch.float)
 

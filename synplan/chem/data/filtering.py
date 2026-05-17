@@ -5,7 +5,7 @@ import time
 from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import ClassVar
 
 import numpy as np
 from chython.algorithms.fingerprints.morgan import MorganFingerprint
@@ -25,14 +25,14 @@ from synplan.chem.data.standardizing import (
     KekuleFormStandardizer,
     StandardizationError,
 )
-from synplan.utils.config import BaseConfigModel
+from synplan.utils.config import BaseConfigModel, NestedConfigContainer
 from synplan.utils.files import (
     RawReactionReader,
     ReactionWriter,
-    format_source_fields,
+    extract_origin_fields,
     parse_reaction,
     reaction_source_info,
-    split_smiles_record,
+    write_error_tsv_header,
 )
 from synplan.utils.parallel import chunked, graceful_shutdown, process_pool_map_stream
 
@@ -377,38 +377,82 @@ class WrongCHBreakingFilter:
 
 
 class CCsp3BreakingConfig(BaseConfigModel):
-    pass
+    decoration_depth: int = Field(default=1, ge=0)
+    ring_max_size: int = Field(default=7, ge=3)
 
 
 class CCsp3BreakingFilter:
-    """Checks if there is C(sp3)-C bond breaking."""
+    """Reject only structurally innocent sp3 C-C breaks (likely AAM errors).
+
+    A broken sp3 C-C bond is rejected only when BOTH carbons are sp3 AND both
+    sides are 'innocent' — i.e. within ``decoration_depth`` bonds, every
+    neighbour is a plain neutral sp3 carbon (or hydrogen) and not part of a
+    ring of size <= ``ring_max_size``. Real chemistry (decarboxylation,
+    alpha-cleavage, aryl-sp3 cleavage, ring openings, ...) survives because
+    at least one side carries a heteroatom, sp2/aromatic neighbour, charge,
+    or small-ring membership.
+    """
+
+    def __init__(self, decoration_depth: int = 1, ring_max_size: int = 7):
+        self.decoration_depth = decoration_depth
+        self.ring_max_size = ring_max_size
 
     @staticmethod
     def from_config(config: CCsp3BreakingConfig) -> "CCsp3BreakingFilter":
-        return CCsp3BreakingFilter()
+        return CCsp3BreakingFilter(
+            decoration_depth=config.decoration_depth,
+            ring_max_size=config.ring_max_size,
+        )
+
+    def _is_innocent(self, atom_id: int, mol) -> bool:
+        seen = {atom_id}
+        frontier = {atom_id}
+        for _ in range(self.decoration_depth):
+            nxt = set()
+            for n in frontier:
+                for nbr in mol._bonds[n]:
+                    if nbr in seen:
+                        continue
+                    a = mol.atom(nbr)
+                    if a.atomic_number != 6:
+                        return False
+                    if a.hybridization != 1:
+                        return False
+                    if a.charge != 0 or a.isotope is not None:
+                        return False
+                    for ring in mol.sssr:
+                        if nbr in ring and len(ring) <= self.ring_max_size:
+                            return False
+                    seen.add(nbr)
+                    nxt.add(nbr)
+            frontier = nxt
+        return True
 
     def __call__(self, reaction: ReactionContainer) -> bool:
-        """
-        Returns True if there is C(sp3)-C bonds breaking, else False.
-
-        :param reaction: Input reaction
-        :return: Returns True if there is C(sp3)-C bonds breaking, else False.
-
-        """
+        """Return True if reaction should be rejected (innocent sp3-sp3 break)."""
         cgr = ~reaction
         rc = cgr.augmented_substructure(cgr.center_atoms, deep=1)
 
+        reactant_atoms: dict = {}
+        for mol in reaction.reactants:
+            for nid, _atom in mol.atoms():
+                reactant_atoms[nid] = mol
+
         for n, m, bond in rc.bonds():
-            atom = rc.atom(n)
-            neigh = rc.atom(m)
-
             is_bond_broken = bond.order is not None and bond.p_order is None
-            are_atoms_carbons = atom.atomic_number == 6 and neigh.atomic_number == 6
-            is_atom_sp3 = (
-                rc._hybridizations.get(n, 0) == 1 or rc._hybridizations.get(m, 0) == 1
-            )
-
-            if is_bond_broken and are_atoms_carbons and is_atom_sp3:
+            if not is_bond_broken:
+                continue
+            a_n = rc.atom(n)
+            a_m = rc.atom(m)
+            if a_n.atomic_number != 6 or a_m.atomic_number != 6:
+                continue
+            if rc._hybridizations.get(n, 0) != 1 or rc._hybridizations.get(m, 0) != 1:
+                continue
+            mol_n = reactant_atoms.get(n)
+            mol_m = reactant_atoms.get(m)
+            if mol_n is None or mol_m is None:
+                continue
+            if self._is_innocent(n, mol_n) and self._is_innocent(m, mol_m):
                 return True
         return False
 
@@ -482,7 +526,7 @@ class CCRingBreakingFilter:
         return False
 
 
-class ReactionFilterConfig(BaseConfigModel):
+class ReactionFilterConfig(NestedConfigContainer):
     """
     Configuration class for reaction filtering. This class manages configuration
     settings for various reaction filters, including paths, file formats, and filter-
@@ -528,24 +572,6 @@ class ReactionFilterConfig(BaseConfigModel):
         "cc_sp3_breaking_config": CCsp3BreakingConfig,
         "cc_ring_breaking_config": CCRingBreakingConfig,
     }
-
-    @model_validator(mode="before")
-    @classmethod
-    def _coerce_nested(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            for field_name, cfg_cls in cls._NESTED_CONFIG_TYPES.items():
-                if field_name in data and isinstance(data[field_name], dict):
-                    data[field_name] = cfg_cls(**data[field_name])
-        return data
-
-    def to_dict(self) -> dict[str, Any]:
-        """Converts the configuration into a dictionary, excluding None fields."""
-        result = {}
-        for field_name in self._NESTED_CONFIG_TYPES:
-            config = getattr(self, field_name)
-            if config is not None:
-                result[field_name] = config.to_dict()
-        return result
 
     def create_filters(self):
         filter_instances = []
@@ -771,8 +797,7 @@ def _filter_batch_worker(
                 orig_smi = reaction.meta.get("init_smiles", str(reaction))
                 source_info = reaction_source_info(reaction)
             else:
-                orig_smi, source_fields = split_smiles_record(raw)
-                source_info = format_source_fields(source_fields)
+                orig_smi, source_info = extract_origin_fields(raw, fmt=_fmt)
             if "/" in reason:
                 # Error: "stage/ErrorType: message"
                 stage_type = reason.split(":")[0]
@@ -792,7 +817,11 @@ def _filter_batch_worker(
                     )
                 )
             else:
-                filtered.append(FilteredEntry(original=orig_smi, reason=reason))
+                filtered.append(
+                    FilteredEntry(
+                        original=orig_smi, reason=reason, source_info=source_info
+                    )
+                )
 
     return build_batch_result(reactions, errors, filtered, fmt, compute_dedup=False)
 
@@ -896,9 +925,7 @@ def filter_reactions_from_file(
     error_fh = None
     if _error_path is not None:
         error_fh = open(_error_path, "w", encoding="utf-8")
-        error_fh.write(
-            "# original_smiles\tsource_info\tstage\terror_type\terror_message\n"
-        )
+        write_error_tsv_header(error_fh)
 
     try:
         # Build batches: each item is a list of (raw_string, fmt, ignore_errors)

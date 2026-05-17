@@ -200,6 +200,78 @@ def test_process_extraction_result_uses_worker_serialized_rule(monkeypatch):
     assert cgr_to_rule["stable-cgr"].rule_smarts == "[C:1]>>[O:1]"
 
 
+def test_parallel_extraction_timeout_scales_with_batch_size(monkeypatch, tmp_path):
+    """Parallel extraction timeout is configured as seconds/reaction * batch size."""
+
+    observed = {}
+
+    def fake_process_pool_map_stream(items, _worker_fn, **kwargs):
+        observed["timeout"] = kwargs["timeout"]
+        batch = next(iter(items))
+        yield kwargs["on_timeout"](TimeoutError("slow batch"), batch)
+
+    monkeypatch.setattr(
+        extraction, "process_pool_map_stream", fake_process_pool_map_stream
+    )
+
+    input_path = tmp_path / "reactions.smi"
+    input_path.write_text(
+        "[CH3:1][OH:2]>>[CH3:1][Cl:2]\n"
+        "[CH3:1][NH2:2]>>[CH3:1][OH:2]\n",
+        encoding="utf-8",
+    )
+    error_path = tmp_path / "rules.errors.tsv"
+
+    extraction.extract_rules_from_reactions(
+        config=RuleExtractionConfig(worker_timeout_per_reaction=2.5),
+        reaction_data_path=str(input_path),
+        reaction_rules_path=str(tmp_path / "rules.tsv"),
+        num_cpus=2,
+        batch_size=4,
+        ignore_errors=True,
+        error_file_path=str(error_path),
+    )
+
+    assert observed["timeout"] == 10.0
+    error_text = error_path.read_text(encoding="utf-8")
+    assert "rule extraction batch exceeded 10s timeout" in error_text
+    assert "2.5s/reaction * batch_size=4" in error_text
+
+
+def test_ignore_stereo_allows_validation_of_stereo_cleaned_rules():
+    """Extraction can opt into the stereo-cleaned rule/reactor contract."""
+    rxn_smi = (
+        "[CH3:27][O-:28]."
+        "[F:6][C:5]([F:8])([F:7])[c:4]1[cH:3][c:2]"
+        "([cH:16][c:15]2[C@H:14]3[C@:12]"
+        "([CH2:26][N:18]([C:19](=[O:25])[O:20]"
+        "[C:21]([CH3:24])([CH3:22])[CH3:23])[CH2:17]3)"
+        "([O:11][CH2:10][c:9]12)[CH3:13])[Br:1]>>"
+        "[F:6][C:5]([F:8])([F:7])[c:4]1[c:9]2[CH2:10][O:11]"
+        "[C@:12]3([CH2:26][NH:18][CH2:17][C@H:14]3[c:15]2"
+        "[cH:16][c:2]([O:28][CH3:27])[cH:3]1)[CH3:13]"
+    )
+    base = {
+        "min_popularity": 1,
+        "single_product_only": True,
+        "environment_atom_count": 1,
+        "multicenter_rules": True,
+        "include_rings": False,
+        "include_func_groups": False,
+        "keep_leaving_groups": True,
+        "keep_incoming_groups": False,
+        "keep_reagents": False,
+    }
+
+    stereo_cfg = RuleExtractionConfig(**base, ignore_stereo=False)
+    stereo_rules, _ = extraction.extract_rules(stereo_cfg, smiles(rxn_smi))
+    no_stereo_cfg = RuleExtractionConfig(**base, ignore_stereo=True)
+    no_stereo_rules, _ = extraction.extract_rules(no_stereo_cfg, smiles(rxn_smi))
+
+    assert stereo_rules[0].meta["reactor_validation"] == "failed"
+    assert no_stereo_rules[0].meta["reactor_validation"] == "passed"
+
+
 def test_print_extraction_summary_includes_error_count(capsys):
     """The processed-reaction summary should always report failed reactions."""
     record = ExtractedRuleRecord(

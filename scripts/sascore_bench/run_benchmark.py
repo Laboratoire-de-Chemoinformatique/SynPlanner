@@ -57,14 +57,14 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml
 from tqdm.auto import tqdm
 
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.tree import Tree
-from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
+from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import (
     load_building_blocks,
     load_combined_policy_function,
@@ -82,7 +82,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONFIG_PATH = Path(__file__).parent / "config.yaml"
 
 
-def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
+def load_config(config_path: Path | None = None) -> dict[str, Any]:
     """
     Load configuration from YAML file.
 
@@ -104,18 +104,26 @@ def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
 
     if not config_path.exists():
         raise FileNotFoundError(
-            f"Config file not found: {config_path}\n"
-            f"Expected at: {DEFAULT_CONFIG_PATH}"
+            f"Config file not found: {config_path}\nExpected at: {DEFAULT_CONFIG_PATH}"
         )
 
     logger.info(f"Loading config from: {config_path}")
-    with open(config_path, "r") as f:
+    with open(config_path) as f:
         config = yaml.safe_load(f)
+
+    threshold = float(config.get("policy", {}).get("rule_prob_threshold", 0.0))
+    if threshold > 0 and os.environ.get("SYNPLANNER_ALLOW_RULE_PROB_THRESHOLD") != "1":
+        raise SystemExit(
+            f"{config_path}: policy.rule_prob_threshold={threshold} clips valid "
+            "low-probability rules inside top-k. Set it to 0.0 and control "
+            "proposal breadth with policy.top_rules, or rerun with "
+            "SYNPLANNER_ALLOW_RULE_PROB_THRESHOLD=1 if this is intentional."
+        )
 
     return config
 
 
-def load_policy_from_config(config_path: Optional[Path] = None):
+def load_policy_from_config(config_path: Path | None = None):
     """
     Load just the combined policy function from config.
 
@@ -158,7 +166,7 @@ def load_policy_from_config(config_path: Optional[Path] = None):
     return policy_function
 
 
-def load_resources_from_config(config_path: Optional[Path] = None):
+def load_resources_from_config(config_path: Path | None = None):
     """
     Load all resources (policy, reaction rules, building blocks) from config.
 
@@ -261,7 +269,7 @@ def extract_tree_stats(tree: Tree, target_smi: str) -> dict:
         "num_routes": len(tree.winning_nodes),
         "num_nodes": len(tree),
         "num_iter": tree.curr_iteration,
-        "tree_depth": max(tree.nodes_depth.values()),
+        "tree_depth": max(n.depth for n in tree.nodes.values()),
         "search_time": round(tree.curr_time, 1),
         "solved": len(tree.winning_nodes) > 0,
     }
@@ -296,7 +304,7 @@ def run_benchmark(
     n_solved = 0
     n_errors = 0
 
-    with open(targets_path, "r", encoding="utf-8") as targets_file:
+    with open(targets_path, encoding="utf-8") as targets_file:
         targets = [line.strip() for line in targets_file if line.strip()]
 
     with open(stats_file, "w", encoding="utf-8", newline="") as csvfile:
@@ -326,7 +334,7 @@ def run_benchmark(
                 )
 
                 # Run tree search
-                for solved, node_id in tree:
+                for _solved, _node_id in tree:
                     pass
 
                 # Extract stats
@@ -539,7 +547,7 @@ def main():
     print("\n" + "=" * 60)
     print("BENCHMARK SUMMARY")
     print("=" * 60)
-    print(f"Policy: Combined (filtering + ranking)")
+    print("Policy: Combined (filtering + ranking)")
     print(
         f"Config: max_time={tree_config.max_time}s, "
         f"max_depth={tree_config.max_depth}, "
@@ -563,7 +571,7 @@ def main():
 
     print("-" * 60)
     print(
-        f"{'TOTAL':<20} {total_solved:<10} {total_molecules:<10} {total_solved/total_molecules:.1%}"
+        f"{'TOTAL':<20} {total_solved:<10} {total_molecules:<10} {total_solved / total_molecules:.1%}"
     )
     print("=" * 60)
     print(f"\nResults saved to: {results_root}")

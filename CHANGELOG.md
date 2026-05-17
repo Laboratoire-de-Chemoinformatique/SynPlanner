@@ -5,6 +5,111 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-05-16
+
+> Migration guide: see [docs/user_guide/migration.rst](docs/user_guide/migration.rst).
+> Priority rules concept page: see [docs/methods/priority_rules.rst](docs/methods/priority_rules.rst).
+
+### ⚠️ Backwards-incompatible
+
+- `apply_reaction_rule` default `top_reactions_num` raised from 3 → 5;
+  pin the old behaviour with `apply_reaction_rule(..., top_reactions_num=3)`.
+- Per-node state moved from nine `Tree.nodes_*` parallel dicts onto
+  `Node` attributes (e.g. `tree.nodes_depth[nid]` → `tree.nodes[nid].depth`).
+  Old reads raise `AttributeError` with a migration hint.
+- `Tree.stats` is now a `TreeStats` dataclass — use attribute access,
+  not subscript or `.get()`. `Tree.to_stats_dict()` is unchanged.
+- `EvaluationStrategy.evaluate_node` signature collapses
+  `(node, node_id, nodes_depth, nodes_prob)` into
+  `(node, node_id, nodes: dict[int, Node])`.
+- Pickled `Tree` instances from 1.4.x partially fail on the migrated
+  surfaces (`tree.stats.*`, new `Node` provenance fields). Re-run the
+  search to recover full functionality.
+- YAML `key:` (null) for nested standardization / filtering configs now
+  enables the step with defaults instead of silently disabling it. To
+  disable, omit the key entirely.
+- `ReactorConfig` no longer exposes `fix_aromatic_rings` or
+  `fix_tautomers`. `CanonicalRetroReactor` always forces
+  `fix_aromatic_rings=False` and runs the inline kekule + thiele +
+  tautomer-fix pipeline in its `_patcher`; tautomer fixing inside
+  that inline call relies on chython's default `fix_tautomers=True`.
+- `load_reaction_rules` now defaults to `check_atom_mapping="reject_unmapped"`:
+  SMARTS rules without atom maps are rejected with an error naming the
+  offending TSV row. Pass `check_atom_mapping="off"` to restore the old
+  behaviour.
+
+### Added
+
+- Atom-mapping validator wired into the reader chokepoint
+  (`synplan.utils.files.parse_reaction`) and the SMARTS rule loader
+  (`synplan.utils.loading.load_reaction_rules`), with helpers in
+  `synplan.chem.utils`:
+  `reaction_mapping_status`, `reaction_string_mapping_status`,
+  `is_reaction_atom_mapped`, `assert_reaction_atom_mapped`, and the
+  `AtomMappingCheck` literal type (`"off" | "reject_unmapped" | "reject_partial"`).
+  Tagged reactions get `meta["mapping_status"]` for downstream routing.
+
+- Priority-rule support for MCTS expansion: a mapping of named SMARTS
+  rule sets passed to `Tree(..., priority_rules={"ugi": ..., ...})`,
+  tried ahead of the learned policy on every node. Each set gets its
+  own counter pair in `tree.stats.per_priority_source[<name>]`.
+  Reserved name `"policy"` is rejected; `use_priority=True` without
+  `priority_rules` raises.
+- Optional iterated rule application via
+  `TreeConfig.priority_rule_multiapplication` and the new
+  `apply_reaction_rule(multirule=True, rm_dup=True)` kwargs — useful
+  for stripping every protective group of a given kind in one step.
+- Source-specific rule counters in `tree.stats` /
+  `tree.to_stats_dict()`: `policy_rules_tried/succeeded`,
+  `priority_rules_tried/succeeded` (aggregate), and the per-set
+  `per_priority_source[<set_name>]` breakdown.
+- Rule provenance on tree nodes and route outputs: `rule_source`,
+  collision-safe `rule_key` (formatted as `<source>:<id>`), and exact
+  1-indexed `policy_rank`.
+- Route SVG labels for rule keys and policy ranks, opt-in
+  partial-route rendering with `allow_unsolved`, and JSON-route SVG
+  rendering that can display stored rule metadata.
+- Tutorial 13 for the priority-rule workflow.
+
+### Changed
+- Bumped `chython-synplan` floor to `>=1.95`, which carries upstream fixes
+  for: multi-component query mapping against single-component targets (Bug
+  #3), `[C]` uppercase aliphatic strictening against aromatic carbons (Bug
+  #4), and aromatic snapshot/restore protection in the reactor (Bug #6).
+- Tree expansion now tracks exact policy Top-N rank from the expansion function
+  and enforces the configured top-rules limit during rule iteration.
+- Policy rule selection in `expansion.py:_predict_rules_common` uses
+  `torch.topk` instead of full `torch.sort` over the rule-probability
+  tensor. Same Top-K output; ~10% per-iter speed-up in MCTS on 17k-rule
+  rule sets.
+- `apply_reaction_rule` now skips computing the canonical-SMILES dedup
+  key when neither `rm_dup` nor `multirule` is enabled — a no-op for
+  performance (chython caches the SMILES anyway) but cleaner control flow.
+- Route, RDKit, JSON, SVG, and tree-stat exports now carry source-aware rule
+  metadata through serialized and rendered route outputs.
+- Multi-product reactions and rules-all-filtered-out are now traceable
+  through the per-reaction audit TSV (`<rules_path_base>.audit.tsv`) in
+  addition to the summary counters.
+
+### Fixed
+- Winning rule rank reporting now uses stored policy ranks when available instead
+  of approximating ranks from sibling probabilities.
+- Route JSON export now attaches rule metadata to the matching retrosynthetic
+  step order and avoids closure state leakage while building nested route nodes.
+- Route SVG and RDKit route extraction now derive paths from node IDs, preserving
+  priority/policy metadata and respecting `min_mol_size` during building-block
+  checks.
+- Repeated route SVG renders now clear stale molecule labels and statuses before
+  applying route-specific annotations.
+- Worked around chython's SMARTS writer emitting CXSMILES extension
+  blocks (`|...|`) mid-string between disconnected fragments by
+  stripping any CXSMILES block before tokenisation in the mapping
+  validator.
+- Regression tests now exercise the canonical-key invariant via two
+  SMILES with different mapping offsets instead of
+  `QueryCGRContainer.remap`, which was broken in chython ≤1.94 (its
+  override forwarded an unsupported `copy=` kwarg to `Graph.remap`).
+
 ## [1.4.4] - 2026-05-04
 
 ### Changed
@@ -113,9 +218,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `MoleculeContainer.depict_settings()`)
 - `routes_clustering_report` / `routes_subclustering_report`: safer target SMILES
   lookup with `.get()` fallback instead of direct key access
-- Removed unused `yaml` imports from `filtering.py` and `standardizing.py`
-- Removed unused `os` import from `cli.py`
-- Removed unused `Any` import from `mapping.py`
+- Removed unused imports: `yaml` from `filtering.py` / `standardizing.py`, `os` from `cli.py`, `Any` from `mapping.py`
 - Import order cleanup (ruff/black formatting)
 
 ## [1.4.1] - 2026-03-03
@@ -425,7 +528,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CLI interface (`synplan` command)
 - Docker images for CLI and GUI
 
-[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.4...HEAD
+[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.4...v1.5.0
 [1.4.4]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.1...v1.4.2

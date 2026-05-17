@@ -54,12 +54,12 @@ Check code against the existing project shape:
 - For parallel chemistry code, check worker cleanup, timeout semantics, batch
   sizing, file descriptor use, and whether exceptions are surfaced from worker
   futures.
-- For reaction standardization, filtering, and rule extraction, verify progress
-  reporting, ``ignore_errors`` behavior, ``error_file`` output, deduplication
-  keys, and summary counts.
-- For ML training changes, check dataset cache invalidation, train/validation
-  leakage, long-tail class behavior, logger configuration, result directory
-  creation, checkpointing, and GPU/CPU assumptions.
+- When reviewing reaction standardization, filtering, and rule extraction —
+  verify progress reporting, ``ignore_errors`` behavior, ``error_file`` output,
+  deduplication keys, and summary counts.
+- Verify ML training changes by checking dataset cache invalidation,
+  train/validation leakage, long-tail class behavior, logger configuration,
+  result directory creation, checkpointing, and GPU/CPU assumptions.
 - For logging integrations, keep optional remote services out of core
   dependencies. Use extras such as ``SynPlanner[litlogger]``,
   ``SynPlanner[wandb]``, ``SynPlanner[mlflow]``, or ``SynPlanner[loggers]``.
@@ -127,8 +127,7 @@ Check the relevant files:
 - ``docs/configuration/*.rst`` for YAML/config fields.
 - ``docs/api_reference/*.rst`` for new public modules that should appear in API
   docs.
-- ``tutorials/*.ipynb`` when the notebook workflow would otherwise show stale
-  API calls.
+- ``tutorials/*.ipynb`` when the notebook workflow would otherwise show stale API calls.
 - ``CHANGELOG.md`` for user-visible changes, release notes, dependency changes,
   and developer workflow changes.
 - ``docs/_static/switcher.json`` when cutting a new stable version.
