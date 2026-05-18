@@ -91,7 +91,7 @@ artifacts = ["*.tsv", "*.csv", "*.yaml", "*.json"]
 [tool.uv]
 # Supply-chain hardening. Use an explicit UTC timestamp so `uv --locked`
 # resolves the same cutoff in local shells and Docker builders.
-exclude-newer = "2026-05-17T22:00:00Z"
+exclude-newer = "2026-05-18T22:00:00Z"
 
 # Floors on transitive dependencies that ship CVE fixes.
 constraint-dependencies = [
@@ -105,9 +105,6 @@ constraint-dependencies = [
   "aiohttp>=3.13.4",         # CVE-2026-22815, CVE-2026-34515, CVE-2026-34516, CVE-2026-34525
   "cryptography>=46.0.7",    # CVE-2026-39892
   "nbconvert>=7.17.1",       # CVE-2026-39377, CVE-2026-39378 (path traversal)
-  # cachedmethods pin removed: chython-synplan now vendors its own caching
-  # decorators (chython/_cache.py) so the third-party package is no longer
-  # a transitive dependency.
 ]
 
 # PyTorch backend extras are mutually exclusive
