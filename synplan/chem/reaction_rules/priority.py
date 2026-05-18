@@ -13,8 +13,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from chython.reactor import Reactor
-
 from synplan.chem.reaction import CanonicalRetroReactor
 
 POLICY_SOURCE_NAME: str = "policy"
@@ -53,7 +51,7 @@ def parse_priority_rules(
     *,
     automorphism_filter: bool = False,
     delete_atoms: bool = False,
-) -> dict[str, list[Reactor]]:
+) -> dict[str, list[CanonicalRetroReactor]]:
     """Parse a ``{set_name: [SMARTS, ...]}`` mapping into chython :class:`Reactor`s.
 
     On a parsing failure, raises :exc:`PrioritySmartsError` naming the offending
@@ -68,7 +66,7 @@ def parse_priority_rules(
     :return: ``{set_name: [Reactor, ...]}`` ready to pass as
         ``Tree(priority_rules=...)``.
     """
-    result: dict[str, list[Reactor]] = {}
+    result: dict[str, list[CanonicalRetroReactor]] = {}
     for set_name, smarts_list in smarts_by_set.items():
         if not isinstance(set_name, str) or not set_name:
             raise ValueError(
@@ -79,7 +77,7 @@ def parse_priority_rules(
                 f"priority-rule set name {set_name!r} collides with the reserved "
                 f"policy source name. Rename your priority set."
             )
-        rules: list[Reactor] = []
+        rules: list[CanonicalRetroReactor] = []
         for index, smarts in enumerate(smarts_list):
             try:
                 rules.append(

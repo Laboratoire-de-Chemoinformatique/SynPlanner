@@ -9,12 +9,12 @@ from random import shuffle
 
 import torch
 from chython.containers import MoleculeContainer
-from chython.reactor import Reactor
 from pytorch_lightning import Trainer
 from torch.utils.data import random_split
 from torch_geometric.data.lightning import LightningDataset
 
 from synplan.chem.precursor import compose_precursors
+from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.mcts.tree import Tree
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training.preprocessing import ValueNetworkDataset
@@ -101,7 +101,7 @@ def run_tree_search(
     value_config: ValueNetworkConfig,
     reaction_rules_path: str,
     building_blocks_path: str,
-    priority_rules: dict[str, list[Reactor]] | None = None,
+    priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
 ) -> Tree:
     """Runs tree search for the given target molecule.
 

@@ -7,9 +7,9 @@ import torch
 import torch_geometric
 import torch_geometric.data
 from chython.containers import ReactionContainer
-from chython.reactor.reactor import Reactor
 
 from synplan.chem.precursor import Precursor
+from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.training import mol_to_pyg
 from synplan.utils.config import PolicyNetworkConfig
@@ -136,8 +136,8 @@ class PolicyNetworkFunction:
         return sorted_probs, sorted_rules
 
     def predict_reaction_rules(
-        self, precursor: Precursor, reaction_rules: list[Reactor]
-    ) -> Iterator[tuple[float, Reactor, int]]:
+        self, precursor: Precursor, reaction_rules: list[CanonicalRetroReactor]
+    ) -> Iterator[tuple[float, CanonicalRetroReactor, int]]:
         """The policy function predicts the list of reaction rules for a given precursor.
 
         :param precursor: The current precursor for which the reaction rules are predicted.
@@ -322,8 +322,8 @@ class CombinedPolicyNetworkFunction:
         return sorted_probs, sorted_rules
 
     def predict_reaction_rules(
-        self, precursor: Precursor, reaction_rules: list[Reactor]
-    ) -> Iterator[tuple[float, Reactor, int]]:
+        self, precursor: Precursor, reaction_rules: list[CanonicalRetroReactor]
+    ) -> Iterator[tuple[float, CanonicalRetroReactor, int]]:
         """Predicts reaction rules using Bayesian-style log-space combination.
 
         :param precursor: The current precursor for which the reaction rules are predicted.

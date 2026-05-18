@@ -11,13 +11,13 @@ import torch
 from chython import smiles
 from chython.containers import MoleculeContainer
 from chython.exceptions import InvalidAromaticRing
-from chython.reactor import Reactor
 from torch import Tensor
 from torch_geometric.data import InMemoryDataset
 from torch_geometric.data.data import Data
 from torch_geometric.transforms import ToUndirected
 from tqdm.auto import tqdm
 
+from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.utils.cache import load_pyg_dataset, save_pyg_dataset
 from synplan.utils.loading import load_reaction_rules
 from synplan.utils.parallel import chunked, default_num_workers, process_pool_map_stream
@@ -368,7 +368,7 @@ class FilteringPolicyDataset(InMemoryDataset):
 
 
 def reaction_rules_appliance(
-    molecule: MoleculeContainer, reaction_rules: list[Reactor]
+    molecule: MoleculeContainer, reaction_rules: list[CanonicalRetroReactor]
 ) -> tuple[list[int], list[int]]:
     """Applies each reaction rule from the list of reaction rules to a given molecule
     and returns the indexes of the successfully applied regular and prioritized reaction

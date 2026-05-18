@@ -8,9 +8,9 @@ import os.path
 from pathlib import Path
 
 from chython.containers import MoleculeContainer
-from chython.reactor import Reactor
 from tqdm.auto import tqdm
 
+from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction_routes.io import write_routes_csv, write_routes_json
 from synplan.chem.reaction_routes.route_cgr import extract_reactions
 from synplan.chem.utils import mol_from_smiles
@@ -58,7 +58,7 @@ def run_search(
     building_blocks_path: str,
     results_root: str = "search_results",
     route_scorer: RouteScorer | None = None,
-    priority_rules: dict[str, list[Reactor]] | None = None,
+    priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
 ) -> None:
     """Performs a tree search on a set of target molecules using specified configuration
     and reaction rules, logging the results and statistics.

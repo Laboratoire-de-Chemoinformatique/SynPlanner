@@ -6,11 +6,10 @@ from dataclasses import dataclass, field, fields
 from time import time
 
 from chython.containers import MoleculeContainer
-from chython.reactor import Reactor
 from tqdm.auto import tqdm
 
 from synplan.chem.precursor import Precursor
-from synplan.chem.reaction import Reaction, apply_reaction_rule
+from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
 from synplan.chem.reaction_rules import POLICY_SOURCE_NAME
 from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.expansion import PolicyNetworkFunction, _rule_query_pattern
@@ -97,12 +96,12 @@ class Tree:
         self,
         target: MoleculeContainer,
         config: TreeConfig,
-        reaction_rules: list[Reactor],
+        reaction_rules: list[CanonicalRetroReactor],
         building_blocks: set[str],
         expansion_function: PolicyNetworkFunction,
         evaluation_function: EvaluationStrategy = None,
         route_scorer: RouteScorer | None = None,
-        priority_rules: dict[str, list[Reactor]] | None = None,
+        priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
     ):
         """Initializes a tree object with optional parameters for tree search for target
         molecule.
@@ -144,7 +143,7 @@ class Tree:
         # building blocks and reaction reaction_rules
         self.reaction_rules = tuple(reaction_rules)
         self.building_blocks = frozenset(building_blocks)
-        self.priority_rules: dict[str, tuple[Reactor, ...]] = {
+        self.priority_rules: dict[str, tuple[CanonicalRetroReactor, ...]] = {
             name: tuple(rules) for name, rules in (priority_rules or {}).items()
         }
         if self.config.use_priority and not self.priority_rules:

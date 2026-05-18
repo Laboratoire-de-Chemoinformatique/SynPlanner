@@ -260,7 +260,7 @@ def load_reaction_rules(
     reactor_config: ReactorConfig | None = None,
     *,
     check_atom_mapping: "AtomMappingCheck" = "reject_unmapped",
-) -> tuple[Reactor, ...]:
+) -> tuple[CanonicalRetroReactor, ...]:
     """Loads the reaction rules from a TSV or pickle file and converts them into a
     tuple of Reactor objects.
 
@@ -303,12 +303,12 @@ def _load_rules_tsv(
     reactor_kwargs: dict | None = None,
     *,
     check_atom_mapping: "AtomMappingCheck" = "reject_unmapped",
-) -> tuple[Reactor, ...]:
+) -> tuple[CanonicalRetroReactor, ...]:
     """Load reaction rules from a TSV file."""
     if reactor_kwargs is None:
         reactor_kwargs = {}
     reactor_kwargs.setdefault("delete_atoms", False)
-    reactors: list[Reactor] = []
+    reactors: list[CanonicalRetroReactor] = []
     with open(file, encoding="utf-8") as f:
         f.readline()  # skip header
         for row_num, line in enumerate(f, start=2):
@@ -341,7 +341,7 @@ def _load_rules_tsv(
     return tuple(reactors)
 
 
-def _load_rules_pickle(file: str) -> tuple[Reactor, ...]:
+def _load_rules_pickle(file: str) -> tuple[CanonicalRetroReactor, ...]:
     """Load reaction rules from a legacy pickle file."""
     with open(file, "rb") as f:
         reaction_rules = pickle.load(f)
