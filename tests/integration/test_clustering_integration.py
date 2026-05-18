@@ -33,7 +33,7 @@ TEST_MOLECULES = {
 def data_paths():
     """Download preset data."""
     return download_preset(
-        preset_name="synplanner-article", save_to="./tutorials/synplan_data"
+        preset_name="synplanner-gps", save_to="./tutorials/synplan_data"
     )
 
 

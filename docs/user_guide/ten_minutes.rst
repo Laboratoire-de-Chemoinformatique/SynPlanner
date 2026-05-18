@@ -27,7 +27,7 @@ from HuggingFace.
 
 .. code-block:: bash
 
-    synplan download_preset --preset synplanner-article --save_to synplan_data
+    synplan download_preset --preset synplanner-gps --save_to synplan_data
 
 Or from Python:
 
@@ -35,7 +35,7 @@ Or from Python:
 
     from synplan.utils.loading import download_preset
 
-    paths = download_preset("synplanner-article", save_to="synplan_data")
+    paths = download_preset("synplanner-gps", save_to="synplan_data")
 
 After downloading, you will have:
 
@@ -103,7 +103,7 @@ The example below uses the ranking policy network and rollout evaluation. This i
     from synplan.mcts.tree import Tree
 
     # Download preset data (skip if already downloaded)
-    paths = download_preset("synplanner-article", save_to="synplan_data")
+    paths = download_preset("synplanner-gps", save_to="synplan_data")
 
     # Load components
     building_blocks = load_building_blocks(paths["building_blocks"], standardize=True)

@@ -97,7 +97,7 @@ def download_button(
 
 @st.cache_resource
 def load_planning_resources_cached():
-    paths = download_preset(preset_name="synplanner-article", save_to=".")
+    paths = download_preset(preset_name="synplanner-gps", save_to=".")
     return (
         str(paths["building_blocks"]),
         str(paths["ranking_policy"]),
