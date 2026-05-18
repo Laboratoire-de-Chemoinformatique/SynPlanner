@@ -68,7 +68,7 @@ Extract rules using the repository configuration in ``configs/rules_extraction.y
     keep_incoming_groups               Retains incoming groups in the extracted reaction rule if set to True.
     keep_reagents                      Includes reagents in the extracted reaction rule when True.
     single_product_only                Skips reactions with more than one product after reagent removal. Default True.
-    ignore_stereo                      Strips atom/bond stereochemistry from input reactions before extraction. Default False in the dataclass; the shipped YAML sets True because the reactor path does not preserve stereo.
+    ignore_stereo                      Strips atom/bond stereochemistry from input reactions before extraction. Default True (the reactor path does not preserve stereo).
     worker_timeout_per_reaction        Seconds allowed per reaction in a parallel extraction batch. The per-batch worker timeout is this value times the batch size. Default 10.0.
     reactor_validation                 Skip rules whose forward-application in the reactor does not reproduce the original products. Default True.
     atom_info_retention                Dictates the level of detail retained about atoms in the reaction center and their environment.
