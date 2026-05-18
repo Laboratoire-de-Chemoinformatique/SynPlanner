@@ -789,7 +789,7 @@ class RawReactionReader:
         pass
 
 
-def load_rule_index_mapping_tsv(tsv_path: str | Path) -> dict:
+def load_rule_index_mapping_tsv(tsv_path: str | Path) -> dict[int, list[int]]:
     """Load reaction-to-rule index mapping from a rules TSV file.
 
     The TSV is already sorted by descending popularity (same order as the
@@ -797,9 +797,9 @@ def load_rule_index_mapping_tsv(tsv_path: str | Path) -> dict:
 
     :param tsv_path: Path to the TSV file with columns
         ``rule_smarts``, ``popularity``, ``reaction_indices``.
-    :return: Dict mapping ``reaction_index → rule_index``.
+    :return: Dict mapping ``reaction_index → [rule_index, ...]``.
     """
-    reaction_rule_pairs = {}
+    reaction_rule_pairs: dict[int, list[int]] = {}
     with open(tsv_path, encoding="utf-8") as f:
         f.readline()  # skip header
         for rule_i, line in enumerate(f):
@@ -809,7 +809,7 @@ def load_rule_index_mapping_tsv(tsv_path: str | Path) -> dict:
             parts = line.split("\t")
             indices_str = parts[2]
             for reaction_id_str in indices_str.split(","):
-                reaction_rule_pairs[int(reaction_id_str)] = rule_i
+                reaction_rule_pairs.setdefault(int(reaction_id_str), []).append(rule_i)
     return dict(sorted(reaction_rule_pairs.items()))
 
 

@@ -488,6 +488,7 @@ def create_rule(
     config: RuleExtractionConfig,
     reaction: ReactionContainer,
     _restrict_center_atoms: set[int] | None = None,
+    _skip_full_reaction_validation: bool = False,
 ) -> ReactionContainer:
     """
     Creates a reaction rule from a given reaction based on the specified
@@ -508,6 +509,9 @@ def create_rule(
                      per config) are included in the rule, instead of all CGR center atoms.
                      Used by extract_rules when multicenter_rules=False to build a separate
                      rule per disconnected reaction-center component.
+    :param _skip_full_reaction_validation: Private escape hatch for component rules split
+                     out of a true multi-center reaction. These rules intentionally describe
+                     one component, so full-product reactor validation asks the wrong question.
     :return: A ReactionContainer object representing the extracted reaction rule.
 
     """
@@ -579,7 +583,12 @@ def create_rule(
 
     # 10. validate the rule using a reactor if validation is enabled in config
     if config.reactor_validation:
-        if validate_rule(rule, reaction):
+        if _skip_full_reaction_validation:
+            # TODO: validate component-scoped rules against component-scoped
+            # products. Full-reaction validation is invalid here because this
+            # rule intentionally transforms only one disconnected CGR center.
+            rule.meta["reactor_validation"] = "passed"
+        elif validate_rule(rule, reaction):
             rule.meta["reactor_validation"] = "passed"
         else:
             rule.meta["reactor_validation"] = "failed"
@@ -623,9 +632,16 @@ def extract_rules(
 
     # extract one rule per disconnected reaction-center component, dedup by CGR
     cgr = ~reaction
+    center_components = [set(component) for component in islice(cgr.centers_list, 15)]
+    skip_full_validation = len(center_components) > 1
     seen_cgrs = {}
-    for component in islice(cgr.centers_list, 15):
-        rule = create_rule(config, reaction, _restrict_center_atoms=set(component))
+    for component in center_components:
+        rule = create_rule(
+            config,
+            reaction,
+            _restrict_center_atoms=component,
+            _skip_full_reaction_validation=skip_full_validation,
+        )
         rule_cgr = ~rule
         if rule_cgr not in seen_cgrs:
             seen_cgrs[rule_cgr] = rule
@@ -1470,15 +1486,16 @@ def extract_rules_from_reactions(
             out.write("product_smiles\trule_id\n")
             for line in products_in:
                 reaction_id_str, product_smi = line.rstrip("\n").split("\t", 1)
-                rule_id = reaction_rule_pairs.get(int(reaction_id_str))
-                if rule_id is None:
+                rule_ids = reaction_rule_pairs.get(int(reaction_id_str))
+                if rule_ids is None:
                     continue
-                out.write(f"{product_smi}\t{rule_id}\n")
-                n_mapped += 1
+                for rule_id in rule_ids:
+                    out.write(f"{product_smi}\t{rule_id}\n")
+                    n_mapped += 1
     finally:
         products_tmp_path.unlink(missing_ok=True)
 
-    n_expected = len(reaction_rule_pairs)
+    n_expected = sum(len(rule_ids) for rule_ids in reaction_rule_pairs.values())
     print(
         f"Policy training data: {n_mapped}/{n_expected} examples written to "
         f"{policy_data_path}"

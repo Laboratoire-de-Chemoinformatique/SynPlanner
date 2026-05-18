@@ -216,8 +216,7 @@ def test_parallel_extraction_timeout_scales_with_batch_size(monkeypatch, tmp_pat
 
     input_path = tmp_path / "reactions.smi"
     input_path.write_text(
-        "[CH3:1][OH:2]>>[CH3:1][Cl:2]\n"
-        "[CH3:1][NH2:2]>>[CH3:1][OH:2]\n",
+        "[CH3:1][OH:2]>>[CH3:1][Cl:2]\n[CH3:1][NH2:2]>>[CH3:1][OH:2]\n",
         encoding="utf-8",
     )
     error_path = tmp_path / "rules.errors.tsv"
