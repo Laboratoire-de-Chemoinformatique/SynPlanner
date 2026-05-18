@@ -111,6 +111,12 @@ class RouteScanner:
         self._fg_detector = fg_detector
         self._incompatibility = incompatibility
         self._halogen_detector = halogen_detector
+        # Step-ids that ``scan_route`` actually processed on its last call
+        # (i.e. whose CGR composed successfully). Consumers (e.g.
+        # ``CompetingSitesScore``) use this to distinguish "scanned, no
+        # issues" from "scan failed and silently skipped" when normalizing
+        # the score by route length.
+        self.last_processed_steps: set[int] = set()
 
     def scan_route(
         self, route: dict[int, ReactionContainer]
@@ -137,6 +143,7 @@ class RouteScanner:
         """
         interactions: list[CompetingInteraction] = []
         total_halogen_count = 0
+        processed_steps: set[int] = set()
 
         for step_id in sorted(route):
             reaction = route[step_id]
@@ -153,6 +160,7 @@ class RouteScanner:
             except Exception:
                 logger.warning("Could not compose CGR for step %d, skipping.", step_id)
                 continue
+            processed_steps.add(step_id)
 
             # 3. Find reaction center atoms (reuse CGR)
             center_atoms = get_reaction_center_atoms(reaction, cgr=cgr)
@@ -208,6 +216,7 @@ class RouteScanner:
                     )
                 )
 
+        self.last_processed_steps = processed_steps
         return interactions, total_halogen_count
 
     @staticmethod

@@ -1,6 +1,7 @@
 [
   {"name": "dev", "version": "latest", "url": "/en/latest/"},
-  {"name": "1.4.4 (stable)", "version": "stable", "url": "/en/stable/"},
+  {"name": "1.5.0 (stable)", "version": "stable", "url": "/en/stable/"},
+  {"name": "1.4.4", "version": "v1.4.4", "url": "/en/v1.4.4/"},
   {"name": "1.4.3", "version": "v1.4.3", "url": "/en/v1.4.3/"},
   {"name": "1.4.2", "version": "v1.4.2", "url": "/en/v1.4.2/"},
   {"name": "1.4.1", "version": "v1.4.1", "url": "/en/v1.4.1/"},

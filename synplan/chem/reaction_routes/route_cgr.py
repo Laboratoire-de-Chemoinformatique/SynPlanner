@@ -571,5 +571,11 @@ def compose_all_sb_cgrs(route_cgrs_dict: dict):
     """
     all_sb_cgrs = dict()
     for num, cgr in route_cgrs_dict.items():
+        if cgr is None:
+            # An upstream route-CGR composition failed (stereo, unbalanced
+            # atom maps, multi-product, etc.) and the dict-branch of
+            # ``compose_all_route_cgrs`` stored ``None`` here. Skip it so a
+            # single failed route doesn't crash the whole clustering step.
+            continue
         all_sb_cgrs[num] = compose_sb_cgr(cgr)
     return all_sb_cgrs

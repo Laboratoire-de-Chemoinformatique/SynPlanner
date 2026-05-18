@@ -134,6 +134,7 @@ def test_score_maximally_conflicting_route():
         ],
         0,  # halogen_count
     )
+    mock_scanner.last_processed_steps = {0}
     scorer = CompetingSitesScore(mock_scanner)
     route = {0: MagicMock()}
     score, interactions = scorer.score_route(route)
@@ -164,6 +165,7 @@ def test_score_with_competing_severity():
         ],
         0,
     )
+    mock_scanner.last_processed_steps = {0}
     scorer = CompetingSitesScore(mock_scanner)
     route = {0: MagicMock()}
     score, _ = scorer.score_route(route)
@@ -193,6 +195,7 @@ def test_score_mixed_severities():
         ],
         0,
     )
+    mock_scanner.last_processed_steps = {0, 1}
     scorer = CompetingSitesScore(mock_scanner)
     route = {0: MagicMock(), 1: MagicMock()}
     score, _ = scorer.score_route(route)
@@ -215,6 +218,7 @@ def test_score_with_halogen_count():
         ],
         2,  # halogen_count
     )
+    mock_scanner.last_processed_steps = {0}
     scorer = CompetingSitesScore(mock_scanner)
     route = {0: MagicMock()}
     score, _ = scorer.score_route(route)
@@ -229,6 +233,7 @@ def test_score_with_halogen_count_partial():
         [],  # no FG interactions
         1,  # 1 halogen
     )
+    mock_scanner.last_processed_steps = {0, 1}
     scorer = CompetingSitesScore(mock_scanner)
     route = {0: MagicMock(), 1: MagicMock()}
     score, _ = scorer.score_route(route)

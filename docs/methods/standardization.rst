@@ -17,6 +17,31 @@ features that are tied to atoms and bonds. The BERT network is used for chemical
 In a benchmarking study [https://doi.org/10.1021/acs.jcim.2c00344], GraphormerMapper achieved 89.5% correctly
 mapped reactions on the "Golden" benchmarking data set, compared to 84.5% for IBM RxnMapper.
 
+Atom-mapping enforcement at readers
+------------------------------------
+
+Every downstream stage in SynPlanner (filtering, rule extraction, policy
+and value training, retrosynthetic search) relies on atom-to-atom mapping
+to compose CGRs and pattern-match rules. Unmapped or partially mapped
+input is silently miscomputed because there is no shared atom identity
+between reactants and products, so atom numbering is essentially random.
+
+The :func:`synplan.utils.files.parse_reaction` reader and the
+:func:`synplan.utils.loading.load_reaction_rules` SMARTS loader accept a
+``check_atom_mapping`` flag with three values:
+
+- ``"off"``: no check (use only when input is known mapped or the
+  caller is explicitly mapping the data, e.g. the mapping pipeline).
+- ``"reject_unmapped"``: raise on reactions whose reactant and product
+  sides share no atom numbers. Default for ``load_reaction_rules``;
+  rule SMARTS with leaving/incoming groups (partial maps) still load.
+- ``"reject_partial"``: additionally raise on partial maps. Useful
+  when curating training data that needs full mapping coverage.
+
+The status is recorded on ``rxn.meta["mapping_status"]`` so worker
+processes can route partially-mapped reactions to audit logs instead
+of failing the whole batch.
+
 Reaction standardization
 --------------------------------
 
@@ -24,7 +49,7 @@ The reaction data are standardized using an original protocol for reaction data 
 published earlier [https://doi.org/10.1002/minf.202100119]. This protocol includes two layers:
 standardization of individual molecules (reactants, reagents, products) and reaction standardization.
 Steps for standardization of individual molecules include functional group standardization, aromatization/kekulization,
-valence checking, hydrogens manipulation, cleaning isotopes, and radicals, etc.
+and valence checking.
 The reaction standardization layer includes reaction role assignment, reaction equation balancing,
 and atom-to-atom mapping fixing. The duplicate reactions and erroneous reactions are removed.
 

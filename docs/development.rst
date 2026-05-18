@@ -49,13 +49,13 @@ Version is managed from ``pyproject.toml`` with ``uv version``.
 
 .. code-block:: bash
 
-   # patch: 1.4.3 → 1.4.4
+   # patch: 1.4.3 -> 1.4.4
    uv version --bump patch --no-sync
 
-   # minor: 1.4.4 → 1.5.0
+   # minor: 1.4.4 -> 1.5.0
    uv version --bump minor --no-sync
 
-   # major: 1.5.0 → 2.0.0
+   # major: 1.5.0 -> 2.0.0
    uv version --bump major --no-sync
 
 This updates ``pyproject.toml`` and relocks the project without syncing the
@@ -63,9 +63,9 @@ local environment.
 
 **Manual steps after bumping:**
 
-1. Update ``docs/_static/switcher.json`` — add the old version to the list and
+1. Update ``docs/_static/switcher.json``: add the old version to the list and
    rename ``(stable)`` to the new version.
-2. Update ``CHANGELOG.md`` — move items from ``[Unreleased]`` into a new
+2. Update ``CHANGELOG.md``: move items from ``[Unreleased]`` into a new
    section and add footer links.
 3. Update ``docs/get_started/docker_images.rst`` so the documented GHCR
    ``VERSION`` matches the new release.

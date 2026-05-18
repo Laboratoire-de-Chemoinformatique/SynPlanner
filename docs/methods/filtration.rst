@@ -4,7 +4,7 @@
 Reaction filtration
 ================================
 
-Reaction filtration is a crucial step in reaction data curation. It ensures the validity of reactions
+Reaction filtration is a required step in reaction data curation. It ensures the validity of reactions
 used for reaction rule extraction. The current version of ``SynPlanner`` includes 11 reaction filters (see below).
 In brackets, it is shown how this filter should be listed in the configuration file to be activated.
 

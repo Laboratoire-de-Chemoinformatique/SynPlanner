@@ -13,7 +13,7 @@ The protocol for reaction rule extraction in SynPlanner includes several steps:
 
 The input reaction is converted to the Condensed Graph of Reaction (CGR), which is a single graph encoding an ensemble
 of reactants and products. CGR results from the superposition of the atoms of products and reactants having the same numbers.
-It contains both conventional chemical bonds (single, double, triple, aromatic, etc.) and so-called “dynamic” bonds describing
+It contains both conventional chemical bonds (single, double, triple, aromatic, etc.) and so-called "dynamic" bonds describing
 chemical transformations, i.e. breaking or forming a bond or changing bond order. Given CGRs it is possible to extract the
 reaction center of the reaction.
 
@@ -79,7 +79,7 @@ Functional groups
 
 If reaction center atoms and their neighboring atoms are part of some specific substructural motif,
 they should be also included in the reaction rule for a better description of the chemical context or reaction.
-These motifs can be some “functional groups” with specific electronic and steric properties that influence
+These motifs can be some "functional groups" with specific electronic and steric properties that influence
 the reactivity of reaction center atoms and may define the reaction performance.
 
 The list of functional groups can be specified in the configuration file, where each group is represented by ``chython`` SMARTS.

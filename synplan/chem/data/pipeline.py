@@ -17,7 +17,7 @@ from synplan.chem.data.reaction_result import (
     FilteredEntry,
     PipelineSummary,
 )
-from synplan.utils.files import to_reaction_smiles_record
+from synplan.utils.files import to_reaction_smiles_record, write_error_row
 
 
 def reaction_cgr_key(rxn: ReactionContainer) -> str | None:
@@ -126,15 +126,32 @@ def write_batch_results(
             )
             summary.errored += 1
             if error_file is not None:
-                error_file.write(
-                    f"{err.original}\t{err.source_info}\t{err.stage}\t"
-                    f"{err.error_type}\t{err.message}\n"
+                write_error_row(
+                    error_file,
+                    err.original,
+                    err.source_info,
+                    err.stage,
+                    err.error_type,
+                    err.message,
                 )
         for flt in batch.filtered:
             summary.filter_breakdown[flt.reason] = (
                 summary.filter_breakdown.get(flt.reason, 0) + 1
             )
             summary.filtered += 1
+            if error_file is not None:
+                # Record the filtered-out reaction in the error TSV so it can
+                # be traced. Previously this branch only incremented a
+                # counter, silently dropping which specific reactions were
+                # filtered.
+                write_error_row(
+                    error_file,
+                    flt.original,
+                    flt.source_info,
+                    "filter",
+                    flt.reason,
+                    "filtered",
+                )
         batch_total = len(batch.records) + len(batch.errors) + len(batch.filtered)
         summary.total_input += batch_total
         if on_batch is not None:

@@ -143,26 +143,33 @@ class _MockTree:
         node1 = Node(
             precursors_to_expand=(p_aspirin,),
             new_precursors=(),
+            depth=0,
         )
         # Node 2: target was aspirin, produced salicylic + acetic_anh
         # salicylic still needs expansion
         node2 = Node(
             precursors_to_expand=(p_salicylic,),
             new_precursors=(p_salicylic, p_acetic),
+            depth=1,
+            rule_id=42,
+            rule_source="policy",
+            rule_key="policy:42",
         )
         # Node 3: target was salicylic, produced phenol + co2
         # both are building blocks → solved
         node3 = Node(
             precursors_to_expand=(),
             new_precursors=(p_phenol, p_co2),
+            depth=2,
+            rule_id=7,
+            rule_source="priority",
+            rule_key="priority:7",
         )
 
         self.nodes = {1: node1, 2: node2, 3: node3}
         self.parents = {1: 0, 2: 1, 3: 2}
         self.children = {1: {2}, 2: {3}, 3: set()}
         self.winning_nodes = [3]
-        self.nodes_rules = {2: 42, 3: 7}
-        self.nodes_depth = {1: 0, 2: 1, 3: 2}
 
     def route_to_node(self, node_id):
         path = []
@@ -193,8 +200,12 @@ class TestRouteToRdkit:
     def test_step_has_metadata(self, mock_tree):
         steps = route_to_rdkit(mock_tree, 3)
         assert steps[0]["rule_id"] == 42
+        assert steps[0]["rule_source"] == "policy"
+        assert steps[0]["rule_key"] == "policy:42"
         assert steps[0]["depth"] == 1
         assert steps[1]["rule_id"] == 7
+        assert steps[1]["rule_source"] == "priority"
+        assert steps[1]["rule_key"] == "priority:7"
         assert steps[1]["depth"] == 2
 
     def test_in_stock_flags(self, mock_tree):

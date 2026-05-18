@@ -25,7 +25,7 @@ Overview of datasets
 
 .. note::
     Reaction and molecule file formats are parsed and recognized automatically by ``SynPlanner`` from file extensions.
-    Be sure to store the data with the correct extension.
+    Store the data with the correct extension.
 
 Data repository structure
 --------------------------
@@ -52,7 +52,7 @@ Data is hosted on HuggingFace in a component-based structure:
     │   └── {name}/
     │       ├── building_blocks.tsv
     │       └── meta.yaml
-    ├── reaction_data/             # Raw → standardized → filtered pipeline
+    ├── reaction_data/             # Raw -> standardized -> filtered pipeline
     │   └── {source}/
     │       ├── raw/
     │       ├── standardized/{YYYY-MM-DD}/
@@ -73,28 +73,28 @@ Data is hosted on HuggingFace in a component-based structure:
 Data sources and bundles
 ------------------------
 
-| **policy/supervised_gcn/v1/** — reaction rules and policy weights
-| ``reaction_rules.tsv`` — 24k reaction rules in SMARTS format (TSV)
-| ``v1/ranking_policy.ckpt`` — ranking policy network trained on filtered USPTO and corresponding rules
-| ``v1/filtering_policy.ckpt`` — filtering policy network trained on ChEMBL molecules and corresponding rules
-| ``pipeline.yaml`` — full reproducibility manifest (standardization, filtration, extraction, training configs)
+| **policy/supervised_gcn/v1/**: reaction rules and policy weights
+| ``reaction_rules.tsv``: 24k reaction rules in SMARTS format (TSV)
+| ``v1/ranking_policy.ckpt``: ranking policy network trained on filtered USPTO and corresponding rules
+| ``v1/filtering_policy.ckpt``: filtering policy network trained on ChEMBL molecules and corresponding rules
+| ``pipeline.yaml``: full reproducibility manifest (standardization, filtration, extraction, training configs)
 
-| **value/supervised_gcn/v1/** — value network weights
-| ``value_network.ckpt`` — value network trained from planning simulations on ChEMBL targets
+| **value/supervised_gcn/v1/**: value network weights
+| ``value_network.ckpt``: value network trained from planning simulations on ChEMBL targets
 
-| **building_blocks/emolecules-salt-ln/** — building blocks
-| ``building_blocks.tsv`` — 186k standardized building blocks (eMolecules + Sigma Aldrich)
+| **building_blocks/emolecules-salt-ln/**: building blocks
+| ``building_blocks.tsv``: 186k standardized building blocks (eMolecules + Sigma Aldrich)
 
-| **reaction_data/uspto/** — reaction data pipeline
-| ``raw/uspto_full_mapped.smi.zip`` — original USPTO dataset (1.48M reactions, compressed)
-| ``standardized/2024-12-31/`` — standardized reactions + config + errors
-| ``filtered/2024-12-31/`` — filtered reactions + config + errors
+| **reaction_data/uspto/**: reaction data pipeline
+| ``raw/uspto_full_mapped.smi.zip``: original USPTO dataset (1.48M reactions, compressed)
+| ``standardized/2024-12-31/``: standardized reactions + config + errors
+| ``filtered/2024-12-31/``: filtered reactions + config + errors
 
-| **training_data/** — per-network training inputs (date-versioned)
-| ``filtering_policy/2024-12-31/molecules_for_training.smi.zip`` — ChEMBL molecules for filtering policy training
-| ``value_network/2024-12-31/targets_for_training.smi.zip`` — ChEMBL targets for value network tuning
+| **training_data/**: per-network training inputs (date-versioned)
+| ``filtering_policy/2024-12-31/molecules_for_training.smi.zip``: ChEMBL molecules for filtering policy training
+| ``value_network/2024-12-31/targets_for_training.smi.zip``: ChEMBL targets for value network tuning
 
-| **benchmarks/sascore/** — SynPlanner original benchmarks (downloaded separately)
+| **benchmarks/sascore/**: SynPlanner original benchmarks (downloaded separately)
 | 7 target subsets split by SAScore range (1.5–8.5)
 
 Download data

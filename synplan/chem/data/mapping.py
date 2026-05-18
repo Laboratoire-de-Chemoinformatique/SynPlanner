@@ -39,7 +39,16 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
 from synplan.utils.config import BaseConfigModel
-from synplan.utils.files import RawReactionReader, init_parse_worker, parse_one
+from synplan.utils.files import (
+    RawReactionReader,
+    extract_origin_fields,
+    init_parse_worker,
+    parse_error_message,
+    parse_one,
+    tsv_safe,
+    write_error_row,
+    write_error_tsv_header,
+)
 from synplan.utils.parallel import default_num_workers, select_device
 
 logger = logging.getLogger(__name__)
@@ -437,10 +446,25 @@ def map_reactions_from_file(
                 stats["mapped"] += n_ok
 
                 if fail_out:
-                    for fi, fl, fe in fails:
-                        # Truncate RDF blocks to first line for error log
+                    for _fi, fl, fe in fails:
+                        # Truncate RDF blocks to first line; SMILES records pass
+                        # through extract_origin_fields which splits off
+                        # tab-separated source columns into ``source_info``.
                         fl_short = fl.split("\n")[0] if "\n" in fl else fl
-                        fail_out.write(f"{offset + fi}\t{fl_short}\t{fe}\n")
+                        original, source_info = extract_origin_fields(
+                            fl_short, fmt="smi"
+                        )
+                        stage, error_type, message = parse_error_message(
+                            tsv_safe(str(fe)), default_stage="mapping"
+                        )
+                        write_error_row(
+                            fail_out,
+                            original,
+                            source_info,
+                            stage,
+                            error_type,
+                            message,
+                        )
 
                 pbar.update(len(raw_items))
         except Exception as e:
@@ -463,6 +487,7 @@ def map_reactions_from_file(
         out = open(output_path, "w", encoding="utf-8")
         if _error_path:
             fail_out = open(_error_path, "w", encoding="utf-8")
+            write_error_tsv_header(fail_out)
 
         pool = ProcessPoolExecutor(
             max_workers=workers,

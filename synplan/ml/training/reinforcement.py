@@ -14,6 +14,7 @@ from torch.utils.data import random_split
 from torch_geometric.data.lightning import LightningDataset
 
 from synplan.chem.precursor import compose_precursors
+from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.mcts.tree import Tree
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training.preprocessing import ValueNetworkDataset
@@ -100,6 +101,7 @@ def run_tree_search(
     value_config: ValueNetworkConfig,
     reaction_rules_path: str,
     building_blocks_path: str,
+    priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
 ) -> Tree:
     """Runs tree search for the given target molecule.
 
@@ -109,6 +111,8 @@ def run_tree_search(
     :param value_config: The value network configuration.
     :param reaction_rules_path: The path to the file with reaction rules.
     :param building_blocks_path: The path to the file with building blocks.
+    :param priority_rules: Optional curated rule sets, forwarded to
+        :class:`Tree`. Pair with ``tree_config.use_priority=True``.
     :return: The built search tree for the given molecule.
     """
 
@@ -138,6 +142,7 @@ def run_tree_search(
         building_blocks=building_blocks,
         expansion_function=policy_function,
         evaluation_function=evaluator,
+        priority_rules=priority_rules,
     )
     tree._tqdm = False
 

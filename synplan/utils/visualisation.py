@@ -24,22 +24,23 @@ from synplan.mcts.tree import Tree
 def get_child_nodes(
     tree: Tree,
     molecule: MoleculeContainer,
-    graph: dict[MoleculeContainer, list[MoleculeContainer]],
+    graph: dict[MoleculeContainer, dict[str, Any]],
 ) -> dict[str, Any]:
     """Extracts the child nodes of the given molecule.
 
     :param tree: The built tree.
     :param molecule: The molecule in the tree from which to extract child nodes.
-    :param graph: The relationship between the given molecule and child nodes.
+    :param graph: The relationship between the given molecule and the reaction
+        metadata for its child nodes.
     :return: The dict with extracted child nodes.
     """
 
-    nodes = []
-    try:
-        graph[molecule]
-    except KeyError:
+    reaction = graph.get(molecule)
+    if reaction is None:
         return []
-    for precursor in graph[molecule]:
+
+    nodes = []
+    for precursor in reaction["children"]:
         temp_obj = {
             "smiles": str(precursor),
             "type": "mol",
@@ -49,7 +50,13 @@ def get_child_nodes(
         if node:
             temp_obj["children"] = [node]
         nodes.append(temp_obj)
-    return {"type": "reaction", "children": nodes}
+
+    reaction_node = {"type": "reaction", "children": nodes}
+    if reaction.get("rule_key"):
+        reaction_node["rule_key"] = reaction["rule_key"]
+    if reaction.get("policy_rank") is not None:
+        reaction_node["policy_rank"] = reaction["policy_rank"]
+    return reaction_node
 
 
 def extract_routes(
@@ -83,13 +90,24 @@ def extract_routes(
     if winning_nodes:
         for winning_node in winning_nodes:
             # Create graph for route
-            nodes = tree.route_to_node(winning_node)
-            graph, pred = {}, {}
-            for before, after in pairwise(nodes):
-                before = before.curr_precursor.molecule
-                graph[before] = after = [x.molecule for x in after.new_precursors]
-                for x in after:
-                    pred[x] = before
+            graph = {}
+            path_ids = []
+            nid = winning_node
+            while nid:
+                path_ids.append(nid)
+                nid = tree.parents[nid]
+            path_ids.reverse()
+
+            for before_id, after_id in pairwise(path_ids):
+                before = tree.nodes[before_id].curr_precursor.molecule
+                after_node = tree.nodes[after_id]
+                graph[before] = {
+                    "children": [
+                        precursor.molecule for precursor in after_node.new_precursors
+                    ],
+                    "rule_key": after_node.rule_key,
+                    "policy_rank": after_node.policy_rank,
+                }
 
             routes_block.append(
                 {
@@ -111,7 +129,7 @@ def extract_routes(
     return routes_block
 
 
-def render_svg(pred, columns, box_colors):
+def render_svg(pred, columns, box_colors, labeled: bool = False):
     """
     Renders an SVG representation of a retrosynthetic route.
 
@@ -132,6 +150,8 @@ def render_svg(pred, columns, box_colors):
         box_colors (dict): A dictionary mapping molecule status strings (e.g.,
                           'target', 'mulecule', 'instock') to SVG color strings
                           for the boxes around the molecules.
+        labeled (bool): If True, upstream preparation may include the full
+                        ``rule_key`` in the rendered arrow labels.
 
     Returns:
         str: A string containing the complete SVG code for the retrosynthetic
@@ -141,6 +161,7 @@ def render_svg(pred, columns, box_colors):
     c_max_x = 0.0
     c_max_y = 0.0
     render = []
+    flat_molecules = []
     cx = count()
     cy = count()
     arrow_points = {}
@@ -155,6 +176,7 @@ def render_svg(pred, columns, box_colors):
     for ms in columns:
         heights = []
         for m in ms:
+            flat_molecules.append(m)
             m.clean2d()
             plane = _get_plane(m)
             # X-shift for target
@@ -230,6 +252,8 @@ def render_svg(pred, columns, box_colors):
         'refX="0" refY="3" orient="auto">\n      <path d="M0,0 L0,6 L9,3"/>\n    </marker>\n  </defs>',
     ]
 
+    rendered_arrow_labels = set()
+    arrow_label_elements = []
     for s, p in pred:
         s_min_x, _s_max, s_y = arrow_points[s][:3]
         _p_min_x, p_max, p_y = arrow_points[p][:3]
@@ -240,79 +264,236 @@ def render_svg(pred, columns, box_colors):
         if p_y != s_y:
             arrow += f'  <circle cx="{mid_x}" cy="{p_y}" r="0.1"/>'
         svg.append(arrow)
-    for atoms, bonds, define, masks, uid, box in render:
+
+        if s not in rendered_arrow_labels:
+            label_text = flat_molecules[s].meta.get("label")
+            if label_text:
+                # Keep the rule label clear of the arrow head and bend.
+                label_x = ((mid_x + (s_min_x - 1.0)) / 2.0) - 0.45
+                label_y = s_y
+                label_width = max(1.2, 0.18 * len(label_text) + 0.35)
+                label_height = 0.5
+                label_rect = (
+                    f'  <rect x="{label_x - label_width / 2.0:.2f}" '
+                    f'y="{label_y - label_height / 2.0:.2f}" '
+                    f'width="{label_width:.2f}" height="{label_height:.2f}" '
+                    'rx="0.08" ry="0.08" fill="white" stroke="black" '
+                    'stroke-width=".02"/>'
+                )
+                label_svg = (
+                    f'  <text x="{label_x:.2f}" y="{label_y:.2f}" '
+                    'text-anchor="middle" dominant-baseline="central" '
+                    'font-family="monospace" font-size="0.24" fill="black">'
+                    f"{label_text}</text>"
+                )
+                arrow_label_elements.append(label_rect)
+                arrow_label_elements.append(label_svg)
+            rendered_arrow_labels.add(s)
+    svg.extend(arrow_label_elements)
+    for depicted_molecule in render:
+        atoms, bonds, define, masks, uid, box, *extras = depicted_molecule
         molecule_svg = _graph_svg(
             atoms, bonds, define, masks, uid, -font125, -box_y, width, height
         )
         molecule_svg.insert(0, box)
+        if extras:
+            molecule_svg[1:1] = extras
         svg.extend(molecule_svg)
     svg.append("</svg>")
     return "\n".join(svg)
 
 
-def get_route_svg(tree: Tree, node_id: int) -> str:
+def _route_box_colors() -> dict[str, str]:
+    return {
+        "target": "#98EEFF",
+        "mulecule": "#F0AB90",
+        "instock": "#9BFAB3",
+    }
+
+
+def _mirror_route_layout(columns, pred):
+    """Mirror root-to-leaf route columns so the target stays on the right."""
+    if len(columns) <= 1:
+        return columns, tuple(pred)
+
+    old_to_new = {}
+    new_col_starts = []
+    acc = 0
+    for column in reversed(columns):
+        new_col_starts.append(acc)
+        acc += len(column)
+
+    old_idx = 0
+    for col_idx, column in enumerate(columns):
+        new_start = new_col_starts[len(columns) - 1 - col_idx]
+        for pos_in_col in range(len(column)):
+            old_to_new[old_idx] = new_start + pos_in_col
+            old_idx += 1
+
+    mirrored_columns = list(reversed(columns))
+    mirrored_pred = tuple(
+        (old_to_new[parent_idx], old_to_new[child_idx])
+        for parent_idx, child_idx in pred
+    )
+    return mirrored_columns, mirrored_pred
+
+
+def _render_route_svg(columns, pred, labeled: bool = False) -> str:
+    """Shared backend for prepared route columns and parent->child edges."""
+    columns, pred = _mirror_route_layout(columns, pred)
+    return render_svg(pred, columns, _route_box_colors(), labeled=labeled)
+
+
+def _format_arrow_label(
+    rule_key: str | None,
+    policy_rank: int | None,
+    *,
+    include_rule_key: bool,
+) -> str | None:
+    """Build the per-arrow label text for route SVGs."""
+
+    parts = []
+    if include_rule_key and rule_key:
+        parts.append(rule_key)
+    if policy_rank is not None:
+        parts.append(f"Top-{policy_rank}")
+    if parts:
+        return " | ".join(parts)
+    return None
+
+
+def _prepare_tree_route_svg_inputs(
+    tree: Tree,
+    node_id: int,
+    labeled: bool = False,
+    allow_unsolved: bool = False,
+):
+    if node_id not in tree.nodes:
+        return None
+    if not allow_unsolved and node_id not in tree.winning_nodes:
+        return None
+
+    path_ids = []
+    nid = node_id
+    while nid:
+        path_ids.append(nid)
+        nid = tree.parents[nid]
+    path_ids.reverse()
+
+    nodes = [tree.nodes[i] for i in path_ids]
+
+    # Clear previous route annotations so repeated calls do not leak labels.
+    for node in nodes:
+        curr_precursor = getattr(node, "curr_precursor", None)
+        if curr_precursor is not None and hasattr(curr_precursor, "molecule"):
+            curr_precursor.molecule.meta.pop("label", None)
+            curr_precursor.molecule.meta.pop("status", None)
+
+        for precursor in getattr(node, "new_precursors", ()):
+            if hasattr(precursor, "molecule"):
+                precursor.molecule.meta.pop("label", None)
+                precursor.molecule.meta.pop("status", None)
+
+    for parent_idx in range(len(path_ids) - 1):
+        child_id = path_ids[parent_idx + 1]
+        child_node = tree.nodes[child_id]
+        label_text = _format_arrow_label(
+            child_node.rule_key,
+            child_node.policy_rank,
+            include_rule_key=labeled,
+        )
+        if not label_text:
+            continue
+
+        parent_node = nodes[parent_idx]
+        curr_precursor = getattr(parent_node, "curr_precursor", None)
+        if curr_precursor is not None and hasattr(curr_precursor, "molecule"):
+            curr_precursor.molecule.meta["label"] = label_text
+
+    for node in nodes:
+        for precursor in getattr(node, "new_precursors", ()):
+            precursor.molecule.meta["status"] = (
+                "instock"
+                if precursor.is_building_block(
+                    tree.building_blocks, tree.config.min_mol_size
+                )
+                else "mulecule"
+            )
+    nodes[0].curr_precursor.molecule.meta["status"] = "target"
+
+    columns = [[nodes[0].curr_precursor.molecule]]
+    pred = []
+
+    if len(nodes) == 1:
+        return columns, tuple(pred)
+
+    first_layer_precursors = list(nodes[1].new_precursors)
+    columns.append([x.molecule for x in first_layer_precursors])
+    pred.extend((0, idx) for idx in range(1, len(first_layer_precursors) + 1))
+
+    frontier = [
+        idx
+        for idx, precursor in enumerate(first_layer_precursors, 1)
+        if not precursor.is_building_block(
+            tree.building_blocks, tree.config.min_mol_size
+        )
+    ]
+
+    route_iter = iter(nodes[2:])
+    next_idx = count(len(first_layer_precursors) + 1)
+
+    while frontier:
+        parent_indices = list(frontier)
+        frontier = []
+        layer_precursors = []
+
+        for child_node, parent_idx in zip(
+            islice(route_iter, len(parent_indices)), parent_indices
+        ):
+            for precursor in child_node.new_precursors:
+                layer_precursors.append(precursor)
+                child_idx = next(next_idx)
+                pred.append((parent_idx, child_idx))
+
+                if not precursor.is_building_block(
+                    tree.building_blocks, tree.config.min_mol_size
+                ):
+                    frontier.append(child_idx)
+
+        if layer_precursors:
+            columns.append([x.molecule for x in layer_precursors])
+
+    return columns, tuple(pred)
+
+
+def get_route_svg(
+    tree: Tree,
+    node_id: int,
+    labeled: bool = False,
+    allow_unsolved: bool = False,
+) -> str:
     """Visualizes the retrosynthetic route.
 
     :param tree: The built tree.
     :param node_id: The id of the node from which to visualize the route.
+    :param labeled: If True, include each disconnection's ``Node.rule_key`` in
+        the arrow label. Stored policy ranks are shown as ``Top-N`` whenever
+        available, even when ``labeled`` is False.
+    :param allow_unsolved: If True, also render partial routes ending at non-winning
+        nodes. Default keeps the historical solved-only behavior.
     :return: The SVG string.
     """
-    if node_id not in tree.winning_nodes:
-        return None
-    nodes = tree.route_to_node(node_id)
-    # Set up node_id types for different box colors
-    for n in nodes:
-        for precursor in n.new_precursors:
-            precursor.molecule.meta["status"] = (
-                "instock"
-                if precursor.is_building_block(tree.building_blocks)
-                else "mulecule"
-            )
-    nodes[0].curr_precursor.molecule.meta["status"] = "target"
-    # Box colors
-    box_colors = {
-        "target": "#98EEFF",  # 152, 238, 255
-        "mulecule": "#F0AB90",  # 240, 171, 144
-        "instock": "#9BFAB3",  # 155, 250, 179
-    }
-
-    # first column is target
-    # second column are first new precursor_to_expand
-    columns = [
-        [nodes[0].curr_precursor.molecule],
-        [x.molecule for x in nodes[1].new_precursors],
-    ]
-    pred = {x: 0 for x in range(1, len(columns[1]) + 1)}
-    cx = [
-        n
-        for n, x in enumerate(nodes[1].new_precursors, 1)
-        if not x.is_building_block(tree.building_blocks)
-    ]
-    size = len(cx)
-    nodes = iter(nodes[2:])
-    cy = count(len(columns[1]) + 1)
-    while size:
-        layer = []
-        for s in islice(nodes, size):
-            n = cx.pop(0)
-            for x in s.new_precursors:
-                layer.append(x)
-                m = next(cy)
-                if not x.is_building_block(tree.building_blocks):
-                    cx.append(m)
-                pred[m] = n
-        size = len(cx)
-        columns.append([x.molecule for x in layer])
-
-    columns = [
-        columns[::-1] for columns in columns[::-1]
-    ]  # Reverse array to make retrosynthetic graph
-    pred = tuple(  # Change dict to tuple to make multiple precursor_to_expand available
-        (abs(source - len(pred)), abs(target - len(pred)))
-        for target, source in pred.items()
+    prepared = _prepare_tree_route_svg_inputs(
+        tree,
+        node_id,
+        labeled=labeled,
+        allow_unsolved=allow_unsolved,
     )
-    svg = render_svg(pred, columns, box_colors)
-    return svg
+    if prepared is None:
+        return None
+
+    columns, pred = prepared
+    return _render_route_svg(columns, pred, labeled=labeled)
 
 
 def _get_root(routes_json: dict, route_id: int) -> dict:
@@ -332,12 +513,14 @@ def _extract_levels_and_parents(root: dict):
     BFS traversal of the tree to collect molecules by depth
     and record parent links for each mol-node.
 
-    Returns (levels, parent_of) where:
+    Returns (levels, parent_of, outgoing_reaction_of) where:
       - levels[d] is a list of mol dicts at depth d
       - parent_of[node_id] = parent_mol_dict or None for root
+      - outgoing_reaction_of[node_id] = reaction dict branching from the mol node
     """
     levels = []
     parent_of = {}
+    outgoing_reaction_of = {}
     queue = deque([(root, 0, None)])
 
     while queue:
@@ -349,29 +532,26 @@ def _extract_levels_and_parents(root: dict):
             levels.extend([] for _ in range(depth - len(levels) + 1))
         levels[depth].append(node)
         parent_of[id(node)] = parent
+        outgoing_reaction_of[id(node)] = None
 
         # enqueue next-layer molecule children
         for reaction in node.get("children") or []:
             if not isinstance(reaction, dict) or reaction.get("type") != "reaction":
                 continue
+            outgoing_reaction_of[id(node)] = reaction
             for mol_child in reaction.get("children") or []:
                 if isinstance(mol_child, dict) and mol_child.get("type") == "mol":
                     queue.append((mol_child, depth + 1, node))
 
-    return levels, parent_of
+    return levels, parent_of, outgoing_reaction_of
 
 
-def get_route_svg_from_json(routes_json: dict, route_id: int) -> str:
-    """
-    Visualize the retrosynthetic route for routes_json[route_id] as an SVG.
-    """
-    # 1) Locate the root tree for this route
+def _prepare_json_route_svg_inputs(
+    routes_json: dict, route_id: int, labeled: bool = False
+):
     root = _get_root(routes_json, route_id)
+    levels, parent_of, outgoing_reaction_of = _extract_levels_and_parents(root)
 
-    # 2) Build per-depth molecule lists & parent mapping
-    levels, parent_of = _extract_levels_and_parents(root)
-
-    # 3) Create MoleculeContainer instances and set statuses
     mol_container = {}
     for depth, mols in enumerate(levels):
         for mol in mols:
@@ -382,32 +562,39 @@ def get_route_svg_from_json(routes_json: dict, route_id: int) -> str:
                 container.meta["status"] = (
                     "instock" if mol.get("in_stock") else "mulecule"
                 )
+
+            reaction = outgoing_reaction_of.get(id(mol))
+            label_text = _format_arrow_label(
+                reaction.get("rule_key") if reaction else None,
+                reaction.get("policy_rank") if reaction else None,
+                include_rule_key=labeled,
+            )
+            if label_text:
+                container.meta["label"] = label_text
+
             mol_container[id(mol)] = container
 
-    # 4) Mirror the columns (reverse depth order)
-    json_columns = list(reversed(levels))
-
-    # 5) Flatten and index node IDs for layout ordering
-    flat_ids = [id(m) for lvl in json_columns for m in lvl]
-    index_map = {nid: idx for idx, nid in enumerate(flat_ids)}
-
-    # 6) Build predecessor edges (parent -> child) in flattened indices
     pred = []
+    flat_ids = [id(mol) for level in levels for mol in level]
+    index_map = {node_id: idx for idx, node_id in enumerate(flat_ids)}
     for node_id, parent in parent_of.items():
         if parent is not None:
             pred.append((index_map[id(parent)], index_map[node_id]))
-    pred = tuple(pred)
 
-    # 7) Map JSON columns to MoleculeContainer columns
-    columns = [[mol_container[id(m)] for m in lvl] for lvl in json_columns]
+    columns = [[mol_container[id(mol)] for mol in level] for level in levels]
+    return columns, tuple(pred)
 
-    # 8) Render SVG with status color coding
-    box_colors = {
-        "target": "#98EEFF",
-        "mulecule": "#F0AB90",
-        "instock": "#9BFAB3",
-    }
-    return render_svg(pred, columns, box_colors)
+
+def get_route_svg_from_json(
+    routes_json: dict, route_id: int, labeled: bool = False
+) -> str:
+    """
+    Visualize the retrosynthetic route for routes_json[route_id] as an SVG.
+    """
+    columns, pred = _prepare_json_route_svg_inputs(
+        routes_json, route_id, labeled=labeled
+    )
+    return _render_route_svg(columns, pred, labeled=labeled)
 
 
 def generate_results_html(

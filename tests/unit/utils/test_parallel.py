@@ -4,6 +4,7 @@ Covers: ordered mode, unordered mode, timeout, initializer pattern,
 backpressure, and graceful shutdown.
 """
 
+import multiprocessing as mp
 import signal
 import sys
 import time
@@ -426,19 +427,36 @@ def test_process_pool_uses_public_terminate_workers_when_available(monkeypatch):
 _is_windows = sys.platform == "win32"
 
 
+def _run_sigterm_body() -> None:
+    # Runs in a spawned subprocess; the parent checks exitcode.
+    import os
+
+    from synplan.utils.parallel import graceful_shutdown as _gs
+
+    with _gs() as stop:
+        assert not stop.is_set()
+        os.kill(os.getpid(), signal.SIGTERM)
+        time.sleep(0.1)
+        assert stop.is_set()
+
+
 @pytest.mark.skipif(
     _is_windows,
     reason="os.kill(SIGTERM) terminates the process on Windows; handler cannot catch it",
 )
 def test_graceful_shutdown_sigterm():
-    """SIGTERM sets the stop event (POSIX only)."""
-    with graceful_shutdown() as stop:
-        assert not stop.is_set()
-        import os
+    """SIGTERM sets the stop event (POSIX only).
 
-        os.kill(os.getpid(), signal.SIGTERM)
-        time.sleep(0.1)
-        assert stop.is_set()
+    Body runs in a spawned subprocess. On Linux GHA runners, a stale SIGTERM
+    can be delivered to the pytest process after the context manager restores
+    SIG_DFL, killing pytest before ``pytest_sessionfinish`` writes coverage.xml.
+    """
+    ctx = mp.get_context("spawn")
+    proc = ctx.Process(target=_run_sigterm_body)
+    proc.start()
+    proc.join(timeout=10)
+    assert not proc.is_alive(), "subprocess hung"
+    assert proc.exitcode == 0, f"subprocess exitcode={proc.exitcode}"
 
 
 # -- T10: graceful_shutdown restores original handler -----------------------

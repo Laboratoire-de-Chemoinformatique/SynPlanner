@@ -14,7 +14,10 @@ class BaseSearchStrategy(ABC):
 
     Contract:
     - Holds a reference to `tree` with fields like `children`, `parents`,
-      `nodes_visit`, `nodes_total_value`, etc.
+      and `nodes` (a `dict[int, Node]`). Per-node search state lives on
+      ``Node`` directly: ``tree.nodes[node_id].visit``,
+      ``tree.nodes[node_id].total_value``, ``tree.nodes[node_id].prob``,
+      etc. (Pre-1.5.0 these were parallel ``Tree.nodes_*`` dicts.)
     - Subclasses must implement `step()` and return `(found_route, node_ids)`.
     """
 
@@ -122,7 +125,7 @@ class NMCSPlayoutMixin:
                         self._mark_solved(cid)
                         sequence.append(cid)
                         return cid, sequence
-                    value = self.tree.nodes_prob[cid]
+                    value = self.tree.nodes[cid].prob
                     if value > best_value:
                         best_value = value
                         selected_id = cid
@@ -305,10 +308,10 @@ class UCT(BaseSearchStrategy):
     - PUCT: Q(s) + c * P(s) * sqrt(N(parent)) / (N(s)+1)
     - value-only: V_init(s) / (N(s)+1)
 
-    Where Q is the running estimate of node value (`nodes_total_value`), P is the
-    policy prior (`nodes_prob`), N are visit counts, and c is an exploration
-    constant. With probability `epsilon`, selection chooses a random child to
-    encourage exploration.
+    Where Q is the running estimate of node value (``Node.total_value``),
+    P is the policy prior (``Node.prob``), N are visit counts
+    (``Node.visit``), and c is an exploration constant. With probability
+    ``epsilon``, selection chooses a random child to encourage exploration.
     """
 
     def __init__(self, tree):
@@ -338,27 +341,21 @@ class UCT(BaseSearchStrategy):
 
         Returns the UCT/PUCT/value-based score as described in the class doc.
         """
-        prob = self.tree.nodes_prob[node_id]
-        visit = self.tree.nodes_visit[node_id]
+        node = self.tree.nodes[node_id]
+        parent_visit = self.tree.nodes[self.tree.parents[node_id]].visit
+        prob = node.prob
+        visit = node.visit
 
         if self.ucb_type == "puct":
-            u = (
-                self.c_ucb
-                * prob
-                * sqrt(self.tree.nodes_visit[self.tree.parents[node_id]])
-            ) / (visit + 1)
-            return self.tree.nodes_total_value[node_id] + u
+            u = (self.c_ucb * prob * sqrt(parent_visit)) / (visit + 1)
+            return node.total_value + u
 
         if self.ucb_type == "uct":
-            u = (
-                self.c_ucb
-                * sqrt(self.tree.nodes_visit[self.tree.parents[node_id]])
-                / (visit + 1)
-            )
-            return self.tree.nodes_total_value[node_id] + u
+            u = (self.c_ucb * sqrt(parent_visit)) / (visit + 1)
+            return node.total_value + u
 
         # value-based
-        return self.tree.nodes_init_value[node_id] / (visit + 1)
+        return node.init_value / (visit + 1)
 
     def _select_node(self, node_id: int) -> int:
         """Pick the child with the highest selection score (ties broken deterministically).
@@ -391,14 +388,13 @@ class UCT(BaseSearchStrategy):
         - "cumulative": running sum update (Monte Carlo return style)
         """
         while node_id:
+            node = self.tree.nodes[node_id]
             if self.backprop_type == "muzero":
-                self.tree.nodes_total_value[node_id] = (
-                    self.tree.nodes_total_value[node_id]
-                    * self.tree.nodes_visit[node_id]
-                    + value
-                ) / (self.tree.nodes_visit[node_id] + 1)
+                node.total_value = (node.total_value * node.visit + value) / (
+                    node.visit + 1
+                )
             else:  # cumulative
-                self.tree.nodes_total_value[node_id] += value
+                node.total_value += value
             node_id = self.tree.parents[node_id]
 
     def step(self) -> tuple[bool, list[int]]:
@@ -415,7 +411,7 @@ class UCT(BaseSearchStrategy):
         while explore_route:
             self.tree.visited_nodes.add(node_id)
 
-            if self.tree.nodes_visit[node_id]:  # already visited
+            if self.tree.nodes[node_id].visit:  # already visited
                 if not self.tree.children[node_id]:  # dead node
                     self.tree._update_visits(node_id)
                     explore_route = False
@@ -441,7 +437,7 @@ class UCT(BaseSearchStrategy):
                         if self.tree.config.search_strategy == "evaluation_first":
                             # recalculate node value based on children synthesisability and backpropagation
                             child_values = [
-                                self.tree.nodes_init_value[child_id]
+                                self.tree.nodes[child_id].init_value
                                 for child_id in self.tree.children[node_id]
                             ]
                             if self.evaluation_agg == "max":
@@ -471,7 +467,7 @@ class UCT(BaseSearchStrategy):
                             self.tree.found_a_route = True
                             return True, list(found_after_expansion)
                 else:
-                    self._backpropagate(node_id, self.tree.nodes_total_value[node_id])
+                    self._backpropagate(node_id, self.tree.nodes[node_id].total_value)
                     self.tree._update_visits(node_id)
                     explore_route = False
 
