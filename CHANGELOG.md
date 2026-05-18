@@ -70,6 +70,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   partial-route rendering with `allow_unsolved`, and JSON-route SVG
   rendering that can display stored rule metadata.
 - Tutorial 13 for the priority-rule workflow.
+- `reactor_validation` knob on `RuleExtractionConfig` (default `True`): skip
+  rules whose reactor cannot reconstruct the original products. The flag is
+  tagged on each rule and counted in the extraction summary.
+- `single_product_only`, `ignore_stereo`, and `worker_timeout_per_reaction`
+  exposed on `RuleExtractionConfig` and `configs/rules_extraction.yaml`.
 
 ### Changed
 - Bumped `chython-synplan` floor to `>=1.95`, which carries upstream fixes

@@ -45,6 +45,8 @@ Run planning using the repository configuration in ``configs/planning_standard.y
       min_mol_size: 6
       epsilon: 0
       silent: True
+      use_priority: False
+      priority_rule_multiapplication: False
       # NMCS-specific parameters (used when algorithm is "nmcs" or "lazy_nmcs")
       nmcs_level: 2
       nmcs_playout_mode: greedy
@@ -81,6 +83,8 @@ Run planning using the repository configuration in ``configs/planning_standard.y
     tree:nmcs_level                          Nesting level for NMCS and LazyNMCS algorithms. Higher levels provide more thorough search but are more computationally expensive. Defaults to 2
     tree:nmcs_playout_mode                   Playout mode for NMCS base-level rollouts. Options are "greedy" (best value), "random", or "policy" (best policy probability). Defaults to "greedy"
     tree:lnmcs_ratio                         Pruning percentile for LazyNMCS algorithm. Only candidates scoring above this percentile threshold are explored. Value in range [0.0, 1.0]. Defaults to 0.2
+    tree:use_priority                        Try curated priority rules passed via ``Tree(priority_rules=...)`` ahead of the policy on every expansion. Requires a non-empty ``priority_rules`` mapping. Defaults to False
+    tree:priority_rule_multiapplication      Apply each priority rule to its product set until no new tuple is produced (BFS to fixpoint), instead of stopping at the first match. Affects priority rules only, not the policy. Defaults to False
     node_evaluation:evaluation_agg           The way the evaluation scores are aggregated. Options are "max" (using the maximum score) and "average" (using the average score)
     node_evaluation:evaluation_type          The method used for node evaluation. Options include "random" (random number between 0 and 1), "rollout" (using rollout simulations), and "gcn" (graph convolutional networks)
     node_expansion:top_rules                 The maximum amount of rules to be selected for node expansion from the list of predicted reaction rules

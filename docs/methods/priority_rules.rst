@@ -89,7 +89,7 @@ expansion step.
 SMARTS dialect note
 -------------------
 
-Priority rules are loaded through ``Reactor.from_smarts``, which parses
+Priority rules are loaded through ``CanonicalRetroReactor.from_smarts``, which parses
 patterns with chython's aromaticity perception. This differs from
 RDKit's. Patterns authored against RDKit may match unexpectedly under
 chython.
