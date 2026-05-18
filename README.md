@@ -48,7 +48,7 @@ synplan --version
 **1.** Download pre-trained models, rules, and building blocks:
 
 ```bash
-synplan download_preset --preset synplanner-article --save_to synplan_data
+synplan download_preset --preset synplanner-gps --save_to synplan_data
 ```
 
 **2.** Run planning on a target molecule:

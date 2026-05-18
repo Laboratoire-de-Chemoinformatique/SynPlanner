@@ -14,10 +14,10 @@ Download a ready-to-use data preset from HuggingFace with all components needed 
 
 .. code-block:: bash
 
-    synplan download_preset --preset synplanner-article --save_to synplan_data
+    synplan download_preset --preset synplanner-gps --save_to synplan_data
 
 **Parameters**:
-    - ``preset`` - preset name (default: ``synplanner-article``).
+    - ``preset`` - preset name (default: ``synplanner-gps``).
     - ``save_to`` - the directory where downloaded data will be stored.
 
 ORD conversion

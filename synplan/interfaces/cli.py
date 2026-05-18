@@ -74,8 +74,8 @@ def synplan():
 @synplan.command(name="download_preset")
 @click.option(
     "--preset",
-    default="synplanner-article",
-    help="Preset name (e.g. 'synplanner-article').",
+    default="synplanner-gps",
+    help="Preset name (e.g. 'synplanner-gps').",
 )
 @click.option(
     "--save_to", "save_to", default=".", help="Directory to save downloaded data."

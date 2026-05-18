@@ -10,9 +10,9 @@ Download a ready-to-use preset with all components needed for retrosynthetic pla
 
 .. code-block:: bash
 
-   synplan download_preset --preset synplanner-article --save_to synplan_data
+   synplan download_preset --preset synplanner-gps --save_to synplan_data
 
-This downloads the ``synplanner-article`` preset, which includes:
+This downloads the ``synplanner-gps`` preset, which includes:
 
 - Reaction rules (TSV): ``policy/supervised_gcn/v1/reaction_rules.tsv``
 - Ranking policy weights: ``policy/supervised_gcn/v1/v1/ranking_policy.ckpt``
@@ -26,7 +26,7 @@ Python API:
 
    from synplan.utils.loading import download_preset
 
-   paths = download_preset("synplanner-article", save_to="synplan_data")
+   paths = download_preset("synplanner-gps", save_to="synplan_data")
    rules_path = paths["reaction_rules"]
    policy_path = paths["ranking_policy"]
    bb_path = paths["building_blocks"]
