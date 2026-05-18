@@ -587,7 +587,7 @@ def create_rule(
             # TODO: validate component-scoped rules against component-scoped
             # products. Full-reaction validation is invalid here because this
             # rule intentionally transforms only one disconnected CGR center.
-            rule.meta["reactor_validation"] = "passed"
+            rule.meta["reactor_validation"] = "failed"
         elif validate_rule(rule, reaction):
             rule.meta["reactor_validation"] = "passed"
         else:
