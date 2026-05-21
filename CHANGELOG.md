@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### [1.5.1] - 2026-05-16
+
+#### Fixed
+
+- Automatically detects useful symmetric B/Mg coupling SMARTS rules during TSV
+  rule loading and disables chython's automorphism filter for those reactors, so
+  both valid precursor orientations are retained.
+
+#### Changed
+
+- Reuses the parsed chython reaction rule while loading SMARTS TSV files, avoiding
+  an extra parse before constructing `CanonicalRetroReactor` instances.
+
 ## [1.5.0] - 2026-05-16
 
 > Migration guide: see [docs/user_guide/migration.rst](docs/user_guide/migration.rst).

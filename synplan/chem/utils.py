@@ -475,260 +475,16 @@ _ORGANOMETALLIC_SYMBOLS = frozenset({"B", "Mg"})
 _BORON_TOKEN = re.compile(r"\[B(?!r)")
 
 
-def _contains_organometallic_token(text: str) -> bool:
-    return "[Mg" in text or bool(_BORON_TOKEN.search(text))
-
-
 def parse_reaction_rule_smarts(rule_smarts: str) -> ReactionContainer:
-    """Parse reaction-rule SMARTS with chython and validate the result type."""
+    """Parse a reaction-rule SMARTS string with chython.
+
+    This is a small guard around ``chython.smarts`` for loader code that expects
+    a reaction rule, not a single molecule/query SMARTS.
+    """
     reaction_rule = smarts_parser(rule_smarts)
     if not isinstance(reaction_rule, ReactionContainer):
         raise ValueError("SMARTS string was not processed by chython as a reaction")
     return reaction_rule
-
-
-def has_atom(
-    molecules: Iterable[QueryContainer],
-    symbols: frozenset[str] = _ORGANOMETALLIC_SYMBOLS,
-) -> bool:
-    return any(
-        atom.atomic_symbol in symbols for mol in molecules for _, atom in mol.atoms()
-    )
-
-
-def has_c_b_or_c_mg_bond(molecules: Iterable[QueryContainer]) -> bool:
-    for mol in molecules:
-        for a, b, _ in mol.bonds():
-            symbol_a = mol.atom(a).atomic_symbol
-            symbol_b = mol.atom(b).atomic_symbol
-            if (symbol_a == "C" and symbol_b in _ORGANOMETALLIC_SYMBOLS) or (
-                symbol_b == "C" and symbol_a in _ORGANOMETALLIC_SYMBOLS
-            ):
-                return True
-    return False
-
-
-def keep_symm_coupling_rule(rule: str | ReactionContainer) -> bool:
-    if isinstance(rule, str):
-        if not _contains_organometallic_token(rule):
-            return False
-        rule = parse_reaction_rule_smarts(rule)
-
-    # reject boronate/Grignard transformations on the target side
-    if has_atom(rule.reactants):
-        return False
-
-    # keep only rules that make an organoboron/organomagnesium precursor
-    return has_c_b_or_c_mg_bond(rule.products)
-
-
-def _query_graph_atom_label(query: QueryContainer, atom_number: int) -> tuple:
-    """Atom-map-independent label for a QueryContainer atom."""
-    atom = query.atom(atom_number)
-    return (
-        repr(atom),
-        getattr(atom, "atomic_number", None),
-        getattr(atom, "atomic_symbol", None),
-        getattr(atom, "isotope", None),
-        getattr(atom, "charge", None),
-        getattr(atom, "is_radical", None),
-        tuple(getattr(atom, "neighbors", ()) or ()),
-        tuple(getattr(atom, "hybridization", ()) or ()),
-        tuple(getattr(atom, "implicit_hydrogens", ()) or ()),
-        tuple(getattr(atom, "ring_sizes", ()) or ()),
-    )
-
-
-def _bond_label(bond) -> tuple:
-    return (
-        tuple(getattr(bond, "order", ()) or ()),
-        getattr(bond, "in_ring", None),
-        getattr(bond, "stereo", None),
-    )
-
-
-def _query_graph_bond_labels(query: QueryContainer) -> dict[tuple[int, int], tuple]:
-    """Bond labels from chython's query graph adjacency map.
-
-    QueryContainer does not expose a public exact automorphism API, so symmetry
-    detection works directly with the stable ``_atoms``/``_bonds`` graph dicts.
-    """
-    labels = {}
-    for atom_1, neighbors in query._bonds.items():
-        for atom_2, bond in neighbors.items():
-            labels[(atom_1, atom_2)] = _bond_label(bond)
-    return labels
-
-
-def _bond_key(atom_1: int, atom_2: int) -> tuple[int, int]:
-    return (atom_1, atom_2) if atom_1 < atom_2 else (atom_2, atom_1)
-
-
-def _edge_label(
-    query: QueryContainer,
-    bond_labels: dict[tuple[int, int], tuple],
-    atom_1: int,
-    atom_2: int,
-) -> tuple | None:
-    if atom_2 not in query._bonds[atom_1]:
-        return None
-    return bond_labels[(atom_1, atom_2)]
-
-
-def _reaction_side_bond_labels(
-    molecules: Iterable[QueryContainer],
-) -> dict[tuple[int, int], tuple]:
-    labels = {}
-    for molecule in molecules:
-        for atom_1, atom_2, bond in molecule.bonds():
-            labels[_bond_key(atom_1, atom_2)] = _bond_label(bond)
-    return labels
-
-
-def _rule_component_change_signatures(
-    reaction_rule: ReactionContainer, component_atoms: set[int]
-) -> dict[int, tuple]:
-    """Coarse local bond-change signatures for atoms in one reactant component.
-
-    External leaving/incoming group atom labels are intentionally ignored: for
-    symmetry detection, an aryl-B/aryl-I split is still symmetric if both
-    reaction centers have the same local bond-change pattern.
-    """
-    reactant_bonds = _reaction_side_bond_labels(reaction_rule.reactants)
-    product_bonds = _reaction_side_bond_labels(reaction_rule.products)
-    signatures: dict[int, list[tuple]] = {atom: [] for atom in component_atoms}
-
-    for atom_1, atom_2 in reactant_bonds.keys() | product_bonds.keys():
-        bond_key = (atom_1, atom_2)
-        reactant_label = reactant_bonds.get(bond_key)
-        product_label = product_bonds.get(bond_key)
-        if reactant_label == product_label:
-            continue
-        if atom_1 in component_atoms:
-            signatures[atom_1].append(
-                (atom_2 in component_atoms, reactant_label, product_label)
-            )
-        if atom_2 in component_atoms:
-            signatures[atom_2].append(
-                (atom_1 in component_atoms, reactant_label, product_label)
-            )
-
-    return {
-        atom: tuple(sorted(atom_signatures, key=repr))
-        for atom, atom_signatures in signatures.items()
-    }
-
-
-def _refined_query_graph_colors(
-    query: QueryContainer,
-    atom_labels: dict[int, tuple],
-    bond_labels: dict[tuple[int, int], tuple],
-) -> dict[int, int]:
-    """Run 1-WL colour refinement on a query graph."""
-    atoms = tuple(query._atoms)
-    colors = _compress_labels(atom_labels)
-
-    for _ in range(len(atoms)):
-        signatures = {}
-        for atom in atoms:
-            neighborhood = tuple(
-                sorted(
-                    [
-                        (
-                            bond_labels[(atom, neighbor)],
-                            colors[neighbor],
-                        )
-                        for neighbor in query._bonds[atom]
-                    ],
-                    key=repr,
-                )
-            )
-            signatures[atom] = (colors[atom], neighborhood)
-        refined = _compress_labels(signatures)
-        if refined == colors:
-            return refined
-        colors = refined
-    return colors
-
-
-def _partial_mapping_is_consistent(
-    query: QueryContainer,
-    bond_labels: dict[tuple[int, int], tuple],
-    mapping: dict[int, int],
-    atom: int,
-    mapped_atom: int,
-) -> bool:
-    for other_atom, mapped_other_atom in mapping.items():
-        original_label = _edge_label(query, bond_labels, atom, other_atom)
-        mapped_label = _edge_label(query, bond_labels, mapped_atom, mapped_other_atom)
-        if original_label != mapped_label:
-            return False
-    return True
-
-
-def _has_query_graph_automorphism_moving_atoms(
-    query: QueryContainer,
-    atom_labels: dict[int, tuple],
-    moved_atoms: set[int],
-) -> bool:
-    """Exact automorphism search that stops after the first useful mapping."""
-    atoms = tuple(query._atoms)
-    bond_labels = _query_graph_bond_labels(query)
-    colors = _refined_query_graph_colors(query, atom_labels, bond_labels)
-
-    candidates_by_atom = {
-        atom: tuple(other for other in atoms if colors[other] == colors[atom])
-        for atom in atoms
-    }
-    if all(len(candidates_by_atom[atom]) == 1 for atom in moved_atoms):
-        return False
-
-    search_order = tuple(
-        sorted(
-            atoms,
-            key=lambda atom: (
-                atom not in moved_atoms,
-                len(candidates_by_atom[atom]),
-                -len(query._bonds[atom]),
-                atom,
-            ),
-        )
-    )
-    mapping: dict[int, int] = {}
-    used: set[int] = set()
-
-    def search(index: int, moves_tracked_atom: bool) -> bool:
-        if index == len(search_order):
-            return moves_tracked_atom
-
-        atom = search_order[index]
-        candidates = candidates_by_atom[atom]
-        if atom in moved_atoms:
-            candidates = tuple(
-                sorted(candidates, key=lambda candidate: candidate == atom)
-            )
-
-        for candidate in candidates:
-            if candidate in used:
-                continue
-            if atom_labels[atom] != atom_labels[candidate]:
-                continue
-            if not _partial_mapping_is_consistent(
-                query, bond_labels, mapping, atom, candidate
-            ):
-                continue
-            mapping[atom] = candidate
-            used.add(candidate)
-            if search(
-                index + 1,
-                moves_tracked_atom or (atom in moved_atoms and candidate != atom),
-            ):
-                return True
-            used.remove(candidate)
-            del mapping[atom]
-        return False
-
-    return search(0, False)
 
 
 def is_symmetric_reaction_rule(rule: str | ReactionContainer) -> int:
@@ -748,14 +504,173 @@ def is_symmetric_reaction_rule(rule: str | ReactionContainer) -> int:
     """
     reaction_rule = parse_reaction_rule_smarts(rule) if isinstance(rule, str) else rule
 
+    def atom_label(query: QueryContainer, atom_number: int) -> tuple:
+        atom = query.atom(atom_number)
+        return (
+            repr(atom),
+            getattr(atom, "atomic_number", None),
+            getattr(atom, "atomic_symbol", None),
+            getattr(atom, "isotope", None),
+            getattr(atom, "charge", None),
+            getattr(atom, "is_radical", None),
+            tuple(getattr(atom, "neighbors", ()) or ()),
+            tuple(getattr(atom, "hybridization", ()) or ()),
+            tuple(getattr(atom, "implicit_hydrogens", ()) or ()),
+            tuple(getattr(atom, "ring_sizes", ()) or ()),
+        )
+
+    def bond_label(bond) -> tuple:
+        return (
+            tuple(getattr(bond, "order", ()) or ()),
+            getattr(bond, "in_ring", None),
+            getattr(bond, "stereo", None),
+        )
+
+    def bond_key(atom_1: int, atom_2: int) -> tuple[int, int]:
+        return (atom_1, atom_2) if atom_1 < atom_2 else (atom_2, atom_1)
+
+    def side_bond_labels(
+        molecules: Iterable[QueryContainer],
+    ) -> dict[tuple[int, int], tuple]:
+        labels = {}
+        for molecule in molecules:
+            for atom_1, atom_2, bond in molecule.bonds():
+                labels[bond_key(atom_1, atom_2)] = bond_label(bond)
+        return labels
+
+    reactant_bonds = side_bond_labels(reaction_rule.reactants)
+    product_bonds = side_bond_labels(reaction_rule.products)
+
+    def component_change_signatures(component_atoms: set[int]) -> dict[int, tuple]:
+        """Return local bond-change signatures for atoms in one reactant graph."""
+        signatures: dict[int, list[tuple]] = {atom: [] for atom in component_atoms}
+        for atom_1, atom_2 in reactant_bonds.keys() | product_bonds.keys():
+            key = (atom_1, atom_2)
+            reactant_label = reactant_bonds.get(key)
+            product_label = product_bonds.get(key)
+            if reactant_label == product_label:
+                continue
+            if atom_1 in component_atoms:
+                signatures[atom_1].append(
+                    (atom_2 in component_atoms, reactant_label, product_label)
+                )
+            if atom_2 in component_atoms:
+                signatures[atom_2].append(
+                    (atom_1 in component_atoms, reactant_label, product_label)
+                )
+        return {
+            atom: tuple(sorted(atom_signatures, key=repr))
+            for atom, atom_signatures in signatures.items()
+        }
+
+    def has_moving_automorphism(
+        query: QueryContainer,
+        labels_by_atom: dict[int, tuple],
+        moved_atoms: set[int],
+    ) -> bool:
+        """Find an exact graph automorphism that moves a changed atom."""
+        # QueryContainer has no public exact automorphism API, so the search uses
+        # chython's stable ``_atoms``/``_bonds`` adjacency dicts directly.
+        atoms = tuple(query._atoms)
+        bond_labels = {
+            (atom_1, atom_2): bond_label(bond)
+            for atom_1, neighbors in query._bonds.items()
+            for atom_2, bond in neighbors.items()
+        }
+        colors = _compress_labels(labels_by_atom)
+
+        for _ in range(len(atoms)):
+            signatures = {
+                atom: (
+                    colors[atom],
+                    tuple(
+                        sorted(
+                            (
+                                (bond_labels[(atom, neighbor)], colors[neighbor])
+                                for neighbor in query._bonds[atom]
+                            ),
+                            key=repr,
+                        )
+                    ),
+                )
+                for atom in atoms
+            }
+            refined = _compress_labels(signatures)
+            if refined == colors:
+                break
+            colors = refined
+
+        candidates_by_atom = {
+            atom: tuple(other for other in atoms if colors[other] == colors[atom])
+            for atom in atoms
+        }
+        if all(len(candidates_by_atom[atom]) == 1 for atom in moved_atoms):
+            return False
+
+        search_order = tuple(
+            sorted(
+                atoms,
+                key=lambda atom: (
+                    atom not in moved_atoms,
+                    len(candidates_by_atom[atom]),
+                    -len(query._bonds[atom]),
+                    atom,
+                ),
+            )
+        )
+        mapping: dict[int, int] = {}
+        used: set[int] = set()
+
+        def edge_label(atom_1: int, atom_2: int) -> tuple | None:
+            if atom_2 not in query._bonds[atom_1]:
+                return None
+            return bond_labels[(atom_1, atom_2)]
+
+        def mapping_is_consistent(atom: int, mapped_atom: int) -> bool:
+            for other_atom, mapped_other_atom in mapping.items():
+                if edge_label(atom, other_atom) != edge_label(
+                    mapped_atom, mapped_other_atom
+                ):
+                    return False
+            return True
+
+        def search(index: int, moves_tracked_atom: bool) -> bool:
+            if index == len(search_order):
+                return moves_tracked_atom
+
+            atom = search_order[index]
+            candidates = candidates_by_atom[atom]
+            if atom in moved_atoms:
+                candidates = tuple(
+                    sorted(candidates, key=lambda candidate: candidate == atom)
+                )
+
+            for candidate in candidates:
+                if (
+                    candidate in used
+                    or labels_by_atom[atom] != labels_by_atom[candidate]
+                    or not mapping_is_consistent(atom, candidate)
+                ):
+                    continue
+                mapping[atom] = candidate
+                used.add(candidate)
+                if search(
+                    index + 1,
+                    moves_tracked_atom or (atom in moved_atoms and candidate != atom),
+                ):
+                    return True
+                used.remove(candidate)
+                del mapping[atom]
+            return False
+
+        return search(0, False)
+
     for reactant in reaction_rule.reactants:
         component_atoms = set(reactant._atoms)
         if len(component_atoms) < 2:
             continue
 
-        change_signatures = _rule_component_change_signatures(
-            reaction_rule, component_atoms
-        )
+        change_signatures = component_change_signatures(component_atoms)
         changed_atoms = {
             atom for atom, signature in change_signatures.items() if signature
         }
@@ -763,23 +678,54 @@ def is_symmetric_reaction_rule(rule: str | ReactionContainer) -> int:
             continue
 
         atom_labels = {
-            atom: (_query_graph_atom_label(reactant, atom), change_signatures[atom])
+            atom: (atom_label(reactant, atom), change_signatures[atom])
             for atom in component_atoms
         }
-        if _has_query_graph_automorphism_moving_atoms(
-            reactant, atom_labels, changed_atoms
-        ):
+        if has_moving_automorphism(reactant, atom_labels, changed_atoms):
             return 1
     return 0
 
 
 def is_useful_symmetric_reaction_rule(rule: str | ReactionContainer) -> bool:
-    """Return True for useful B/Mg symmetric coupling rules."""
+    """Return True for useful symmetric B/Mg coupling rules.
+
+    Useful rules are symmetric rules that do not already contain B/Mg on the
+    target side and do create a C-B or C-Mg precursor bond. This excludes common
+    boronate-protection/deprotection rules that are symmetric but do not need
+    the reactor automorphism-filter override.
+    """
+
+    def contains_organometallic_token(text: str) -> bool:
+        return "[Mg" in text or bool(_BORON_TOKEN.search(text))
+
+    def has_organometallic_atom(molecules: Iterable[QueryContainer]) -> bool:
+        return any(
+            atom.atomic_symbol in _ORGANOMETALLIC_SYMBOLS
+            for molecule in molecules
+            for _, atom in molecule.atoms()
+        )
+
+    def has_c_organometallic_bond(molecules: Iterable[QueryContainer]) -> bool:
+        for molecule in molecules:
+            for atom_1, atom_2, _ in molecule.bonds():
+                symbol_1 = molecule.atom(atom_1).atomic_symbol
+                symbol_2 = molecule.atom(atom_2).atomic_symbol
+                if (symbol_1 == "C" and symbol_2 in _ORGANOMETALLIC_SYMBOLS) or (
+                    symbol_2 == "C" and symbol_1 in _ORGANOMETALLIC_SYMBOLS
+                ):
+                    return True
+        return False
+
     if isinstance(rule, str):
-        if not _contains_organometallic_token(rule):
+        if not contains_organometallic_token(rule):
             return False
         rule = parse_reaction_rule_smarts(rule)
-    return keep_symm_coupling_rule(rule) and bool(is_symmetric_reaction_rule(rule))
+
+    if has_organometallic_atom(rule.reactants):
+        return False
+    if not has_c_organometallic_bond(rule.products):
+        return False
+    return bool(is_symmetric_reaction_rule(rule))
 
 
 def _query_cgr_atom_label(query_cgr: QueryCGRContainer, atom_number: int) -> tuple:
