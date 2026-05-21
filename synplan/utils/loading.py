@@ -20,12 +20,14 @@ from torch import device
 from tqdm.auto import tqdm
 
 from synplan.chem.reaction import CanonicalRetroReactor
+from synplan.chem.reaction_rules.symmetry import (
+    is_useful_symmetric_reaction_rule,
+    parse_reaction_rule_smarts,
+)
 from synplan.chem.utils import (
     AtomMappingCheck,
     _standardize_sdf_text,
     _standardize_smiles_batch,
-    is_useful_symmetric_reaction_rule,
-    parse_reaction_rule_smarts,
     reaction_string_mapping_status,
 )
 from synplan.ml.networks.policy import PolicyNetwork
@@ -286,9 +288,9 @@ def load_reaction_rules(
         default) rejects fully unmapped rules and allows partials (legitimate
         leaving/incoming groups). Only honoured for the TSV path; pickled
         rules are pre-compiled Reactor objects that can't be string-checked.
-    :param detect_symmetric_rules: when True, detect useful symmetric B/Mg
-        coupling rules in TSV files and disable chython's automorphism filter
-        only for those reactors.
+    :param detect_symmetric_rules: when True, detect useful symmetric coupling,
+        olefination, metathesis, and nitrile/decyanation-like rules in TSV files
+        and disable chython's automorphism filter only for those reactors.
     :return: A tuple of reaction rules as Reactor objects.
     """
     ext = Path(file).suffix.lower()
