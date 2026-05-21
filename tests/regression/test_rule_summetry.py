@@ -145,6 +145,19 @@ def test_extra_organometallic_metals_need_complementary_precursor_handle(
             id="cross-metathesis",
         ),
         pytest.param(
+            "[C:1]-[C:2]>>[C:1]=[O:3].[C:2]-[Cl:4]",
+            id="benzaldehyde-benzyl-chloride",
+        ),
+        pytest.param(
+            "[c:1]-[C:2]=[C:3]-[c:4]>>"
+            "[Br:5]-[c:1].[C:2](-[Br:6])=[C:3](-[Br:7]).[Br:8]-[c:4]",
+            id="dibromoalkene-halobenzene",
+        ),
+        pytest.param(
+            "[c:1]-[N:2]=[N:3]-[c:4]>>[c:1]-[N+:5]#[N:6].[c:4]-[H:7]",
+            id="diazotisation-coupling",
+        ),
+        pytest.param(
             "[n:1]:1:[c:2](:[c:3]):[c:5](:[c:4]):[n:6]:[c:8]:1-[C:7]>>"
             "[N:1]-[c:2](:[c:3]):[c:5](:[c:4])-[N:6]."
             "[C:7]-[C:8]#[N:9]",

@@ -9,10 +9,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 #### Fixed
 
-- Automatically detects useful symmetric coupling, olefination, metathesis, and
-  nitrile/decyanation-like SMARTS rules during TSV rule loading and disables
-  chython's automorphism filter for those reactors, so both valid precursor
-  orientations are retained.
+- Automatically detects useful symmetric coupling, olefination, metathesis,
+  azo-coupling, and nitrile/decyanation-like SMARTS rules during TSV rule
+  loading and disables chython's automorphism filter for those reactors, so both
+  valid precursor orientations are retained.
 
 #### Changed
 
