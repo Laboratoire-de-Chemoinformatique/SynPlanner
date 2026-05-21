@@ -24,6 +24,8 @@ from synplan.chem.utils import (
     AtomMappingCheck,
     _standardize_sdf_text,
     _standardize_smiles_batch,
+    is_useful_symmetric_reaction_rule,
+    parse_reaction_rule_smarts,
     reaction_string_mapping_status,
 )
 from synplan.ml.networks.policy import PolicyNetwork
@@ -329,8 +331,21 @@ def _load_rules_tsv(
                         "  set check_atom_mapping='off' to load it anyway."
                     )
             try:
+                reaction_rule = parse_reaction_rule_smarts(smarts_str)
+                if reaction_rule.reagents:
+                    raise ValueError("reaction SMARTS with reagents are not supported")
+
+                rule_kwargs = dict(reactor_kwargs)
+                if is_useful_symmetric_reaction_rule(reaction_rule):
+                    # chython collapses equivalent reaction-center matches for
+                    # these rules; disabling the filter keeps both precursors.
+                    rule_kwargs["automorphism_filter"] = False
                 reactors.append(
-                    CanonicalRetroReactor.from_smarts(smarts_str, **reactor_kwargs)
+                    CanonicalRetroReactor(
+                        patterns=tuple(reaction_rule.reactants),
+                        products=tuple(reaction_rule.products),
+                        **rule_kwargs,
+                    )
                 )
             except Exception as err:
                 raise ValueError(
