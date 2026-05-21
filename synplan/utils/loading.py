@@ -262,6 +262,7 @@ def load_reaction_rules(
     reactor_config: ReactorConfig | None = None,
     *,
     check_atom_mapping: "AtomMappingCheck" = "reject_unmapped",
+    detect_symmetric_rules: bool = True,
 ) -> tuple[CanonicalRetroReactor, ...]:
     """Loads the reaction rules from a TSV or pickle file and converts them into a
     tuple of Reactor objects.
@@ -285,6 +286,9 @@ def load_reaction_rules(
         default) rejects fully unmapped rules and allows partials (legitimate
         leaving/incoming groups). Only honoured for the TSV path; pickled
         rules are pre-compiled Reactor objects that can't be string-checked.
+    :param detect_symmetric_rules: when True, detect useful symmetric B/Mg
+        coupling rules in TSV files and disable chython's automorphism filter
+        only for those reactors.
     :return: A tuple of reaction rules as Reactor objects.
     """
     ext = Path(file).suffix.lower()
@@ -293,7 +297,10 @@ def load_reaction_rules(
 
     if ext == ".tsv":
         return _load_rules_tsv(
-            file, reactor_kwargs, check_atom_mapping=check_atom_mapping
+            file,
+            reactor_kwargs,
+            check_atom_mapping=check_atom_mapping,
+            detect_symmetric_rules=detect_symmetric_rules,
         )
 
     # Legacy pickle path — cannot string-check pre-compiled Reactors.
@@ -305,6 +312,7 @@ def _load_rules_tsv(
     reactor_kwargs: dict | None = None,
     *,
     check_atom_mapping: "AtomMappingCheck" = "reject_unmapped",
+    detect_symmetric_rules: bool = True,
 ) -> tuple[CanonicalRetroReactor, ...]:
     """Load reaction rules from a TSV file."""
     if reactor_kwargs is None:
@@ -336,10 +344,11 @@ def _load_rules_tsv(
                     raise ValueError("reaction SMARTS with reagents are not supported")
 
                 rule_kwargs = dict(reactor_kwargs)
-                if is_useful_symmetric_reaction_rule(reaction_rule):
-                    # chython collapses equivalent reaction-center matches for
-                    # these rules; disabling the filter keeps both precursors.
-                    rule_kwargs["automorphism_filter"] = False
+                if detect_symmetric_rules:
+                    if is_useful_symmetric_reaction_rule(reaction_rule):
+                        # chython collapses equivalent reaction-center matches for
+                        # these rules; disabling the filter keeps both precursors.
+                        rule_kwargs["automorphism_filter"] = False
                 reactors.append(
                     CanonicalRetroReactor(
                         patterns=tuple(reaction_rule.reactants),
