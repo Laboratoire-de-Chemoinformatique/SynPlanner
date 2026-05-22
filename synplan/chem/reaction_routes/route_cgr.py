@@ -1,31 +1,220 @@
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
+from chython.periodictable import DynamicElement
+from synplan.chem.reaction_routes.visualisation import (
+    enable_transient_bond_cgr_depiction,
+)
 
 from synplan.mcts.tree import Tree
 
 
-def find_next_atom_num(reactions: list):
-    """
-    Find the next available atom number across a list of reactions.
+class RouteDynamicBond(DynamicBond):
+    __slots__ = ("route_order",)
 
-    This function iterates through a list of reaction containers, composes
-    each reaction to get its Condensed Graph of Reaction (CGR), and finds
-    the maximum atom index used within each CGR. It then returns the maximum
-    atom index found across all reactions plus one, providing a unique
-    next available atom number.
+    def __init__(self, order=None, p_order=None, route_order=None):
+        if order is None and p_order is None:
+            self._order = self._p_order = None
+        else:
+            super().__init__(order, p_order)
+        self.route_order = route_order
 
-    Args:
-        reactions (list): A list of ReactionContainer objects.
+    @classmethod
+    def from_bond(cls, bond: DynamicBond, route_order=None):
+        copy = object.__new__(cls)
+        copy._order = bond.order
+        copy._p_order = bond.p_order
+        copy.route_order = route_order
+        return copy
 
-    Returns:
-        int: The next available integer atom number, which is one greater
-             than the maximum atom index found in any of the provided reaction CGRs.
-    """
+    def copy(self, *args, **kwargs):
+        return self.from_bond(self, self.route_order)
+
+
+_ROUTE_ATOM_CLASSES = {}
+
+
+def _route_atom_class_from_class(atom_class, symbol):
+    if atom_class in _ROUTE_ATOM_CLASSES:
+        return _ROUTE_ATOM_CLASSES[atom_class]
+
+    class_name = f"Route{atom_class.__name__}"
+
+    def atomic_symbol(self):
+        return symbol
+
+    def copy(self, *args, **kwargs):
+        copy = object.__new__(self.__class__)
+        copy._isotope = self.isotope
+        copy._charge = self.charge
+        copy._is_radical = self.is_radical
+        copy._p_is_radical = self.p_is_radical
+        copy._p_charge = self.p_charge
+        copy._xy = self._xy.__class__(self._xy.x, self._xy.y)
+        copy.route_order = set(self.route_order)
+        return copy
+
+    route_atom_class = type(
+        class_name,
+        (atom_class,),
+        {
+            "__module__": __name__,
+            "__slots__": ("route_order",),
+            "atomic_symbol": property(atomic_symbol),
+            "copy": copy,
+        },
+    )
+    globals()[class_name] = route_atom_class
+    _ROUTE_ATOM_CLASSES[atom_class] = route_atom_class
+    return route_atom_class
+
+
+def __getattr__(name):
+    if name.startswith("RouteDynamic"):
+        atom_class_name = name[5:]
+        for atom_class in DynamicElement.__subclasses__():
+            if atom_class.__name__ == atom_class_name:
+                return _route_atom_class_from_class(atom_class, atom_class_name[7:])
+    raise AttributeError(name)
+
+
+def _route_atom_class(atom):
+    if hasattr(atom, "route_order"):
+        return atom.__class__
+    return _route_atom_class_from_class(atom.__class__, atom.atomic_symbol)
+
+
+def _route_atom(atom, route_orders):
+    if hasattr(atom, "route_order"):
+        atom.route_order.update(route_orders)
+        return atom
+
+    route_atom_class = _route_atom_class(atom)
+    route_atom = object.__new__(route_atom_class)
+    route_atom._isotope = atom.isotope
+    route_atom._charge = atom.charge
+    route_atom._is_radical = atom.is_radical
+    route_atom._p_is_radical = atom.p_is_radical
+    route_atom._p_charge = atom.p_charge
+    route_atom._xy = atom._xy.__class__(atom._xy.x, atom._xy.y)
+    route_atom.route_order = set(route_orders)
+    return route_atom
+
+
+def _next_atom_number(*containers):
     max_num = 0
-    for reaction in reactions:
-        cgr = reaction.compose()
-        max_num = max(max_num, max(cgr._atoms.keys()))
+    for container in containers:
+        atoms = getattr(container, "_atoms", {})
+        if atoms:
+            max_num = max(max_num, max(atoms))
     return max_num + 1
+
+
+def _protected_bond():
+    """Build Chython's unsupported ``DynamicBond(None, None)`` route marker.
+
+    Chython rejects this state in ``DynamicBond.__init__`` because it is not a
+    normal reaction bond. Route composition uses it only as a sentinel for
+    transient protecting-group bonds that form and later break.
+    """
+    bond = object.__new__(RouteDynamicBond)
+    bond._order = bond._p_order = None
+    bond.route_order = None
+    return bond
+
+
+def _bond_key(atom1, atom2):
+    return tuple(sorted((atom1, atom2)))
+
+
+def _route_order_depths(reactions):
+    final_step = len(reactions) - 1
+    reactant_atoms = [
+        {atom for reactant in reaction.reactants for atom in reactant._atoms}
+        for reaction in reactions
+    ]
+    product_atoms = [
+        {atom for product in reaction.products for atom in product._atoms}
+        for reaction in reactions
+    ]
+    successors = {idx: set() for idx in range(len(reactions))}
+
+    for idx, atoms in enumerate(product_atoms):
+        for next_idx in range(idx + 1, len(reactions)):
+            if atoms & reactant_atoms[next_idx]:
+                successors[idx].add(next_idx)
+
+    depths = {}
+
+    def depth(idx):
+        if idx in depths:
+            return depths[idx]
+        if idx == final_step:
+            depths[idx] = 1
+        else:
+            next_depths = [depth(next_idx) for next_idx in successors[idx]]
+            depths[idx] = (
+                min(next_depths) + 1 if next_depths else final_step - idx + 1
+            )
+        return depths[idx]
+
+    return [depth(idx) for idx in range(len(reactions))]
+
+
+def _record_route_orders(cgr, route_order, bond_route_orders, atom_route_orders):
+    for atom_num, atom in cgr._atoms.items():
+        if getattr(atom, "is_dynamic", False):
+            atom_route_orders.setdefault(atom_num, set()).add(route_order)
+
+    for atom1, atom2, bond in cgr.bonds():
+        if bond.order == bond.p_order:
+            continue
+        key = _bond_key(atom1, atom2)
+        bond_route_orders.setdefault(key, set()).add(route_order)
+        atom_route_orders.setdefault(atom1, set()).add(route_order)
+        atom_route_orders.setdefault(atom2, set()).add(route_order)
+
+
+def _set_bond(cgr, atom1, atom2, bond):
+    cgr._bonds[atom1][atom2] = cgr._bonds[atom2][atom1] = bond
+
+
+def _apply_route_orders(cgr, bond_route_orders, atom_route_orders):
+    for atom1, atom2, bond in list(cgr.bonds()):
+        if bond.order == bond.p_order and bond.order is not None:
+            continue
+        route_orders = bond_route_orders.get(_bond_key(atom1, atom2))
+        if not route_orders:
+            atom1_orders = atom_route_orders.get(atom1, set())
+            atom2_orders = atom_route_orders.get(atom2, set())
+            route_orders = (atom1_orders & atom2_orders) or (
+                atom1_orders | atom2_orders
+            )
+        if not route_orders:
+            continue
+        route_order = min(route_orders)
+        if isinstance(bond, RouteDynamicBond):
+            bond.route_order = route_order
+        else:
+            _set_bond(
+                cgr,
+                atom1,
+                atom2,
+                RouteDynamicBond.from_bond(bond, route_order),
+            )
+
+    for atom_num, route_orders in atom_route_orders.items():
+        if atom_num in cgr._atoms:
+            cgr._atoms[atom_num] = _route_atom(cgr._atoms[atom_num], route_orders)
+
+    cgr.flush_cache()
+    return cgr
+
+
+def _remove_transient_bonds(cgr):
+    for atom1, atom2, bond in list(cgr.bonds()):
+        if bond.order is None and bond.p_order is None:
+            cgr.delete_bond(atom1, atom2)
+    return cgr
 
 
 def get_clean_mapping(
@@ -57,15 +246,12 @@ def get_clean_mapping(
               if no mapping is found or if the initial mapping is empty.
     """
     dict_map = {}
-    m = list(curr_prod.get_mapping(prod))
-
-    if len(m) == 0:
+    rr = next(iter(curr_prod.get_mapping(prod)), None)
+    if rr is None:
         return dict_map
 
     curr_atoms = set(curr_prod._atoms.keys())
     prod_atoms = set(prod._atoms.keys())
-
-    rr = m[0]
 
     # Build mapping while checking for conflicts
     for key, value in rr.items():
@@ -169,7 +355,7 @@ def process_first_reaction(first_react: ReactionContainer, tree: Tree, route_id:
             len(curr_mol) <= tree.config.min_mol_size
             or str(curr_mol) in tree.building_blocks
         ):
-            bb_set = react_key_set
+            bb_set = bb_set.union(react_key_set)
 
         if validate_molecule_components(curr_mol, route_id) == 0:
             return set()
@@ -199,7 +385,7 @@ def update_reaction_dict(
 
     Args:
         reaction (ReactionContainer): The ReactionContainer object representing the reaction.
-        route_id (int): The ID of the tree node associated with this synthethic route,
+        route_id (int): The ID of the tree node associated with this synthetic route,
                        used for validation reporting.
         mapping (dict): The primary atom mapping dictionary to filter and apply.
         react_dict (dict): The dictionary to update with filtered mappings for each reactant.
@@ -233,10 +419,10 @@ def update_reaction_dict(
         # Filter the mapping to include only keys present in the current react_key
         filtered_mapping = {k: v for k, v in mapping.items() if k in react_key_set}
         if prev_remap:
-            prev_remappping = {
+            prev_remapping = {
                 k: v for k, v in prev_remap.items() if k in react_key_set
             }
-            filtered_mapping.update(prev_remappping)
+            filtered_mapping.update(prev_remapping)
         react_dict[react_key] = filtered_mapping
 
     return react_dict, bb_set
@@ -273,20 +459,57 @@ def process_target_blocks(
               their presence in the leaving group lists or building block set after mapping
               to the reference molecule.
     """
-    target_block = []
+    target_block = set()
+    target_atoms = set(lg_atom_nums) | set(curr_lg_atom_nums) | set(bb_set)
     if len(curr_products) > 1:
         for prod in curr_products:
-            dict_map = get_clean_mapping(curr_prod, prod)
             if prod._atoms.keys() != curr_prod._atoms.keys():
-                for key in list(prod._atoms.keys()):
-                    if key in lg_atom_nums or key in curr_lg_atom_nums:
-                        target_block.append(key)
-                    if key in bb_set:
-                        target_block.append(key)
-    return target_block
+                for key in prod._atoms:
+                    if key in target_atoms:
+                        target_block.add(key)
+    return list(target_block)
 
 
-def compose_route_cgr(tree_or_routes, route_id):
+def _compose_cgrs(
+    curr_cgr: CGRContainer,
+    accum_cgr: CGRContainer,
+    preserve_transient_bonds: bool,
+):
+    composed_cgr = curr_cgr.compose(accum_cgr)
+    if not preserve_transient_bonds:
+        return composed_cgr
+
+    for atom1, atom2, bond in curr_cgr.bonds():
+        next_bond = accum_cgr._bonds.get(atom1, {}).get(atom2)
+        if (
+            bond.order is None
+            and (
+                bond.p_order is None
+                or (
+                    next_bond is not None
+                    and next_bond.order == bond.p_order
+                    and next_bond.p_order is None
+                )
+            )
+            and atom2 not in composed_cgr._bonds.get(atom1, {})
+        ):
+            if bond.p_order is None:
+                composed_cgr.add_bond(atom1, atom2, bond)
+                continue
+            composed_cgr.add_bond(atom1, atom2, _protected_bond())
+
+    for atom1, atom2, bond in accum_cgr.bonds():
+        if (
+            bond.order is None
+            and bond.p_order is None
+            and atom2 not in composed_cgr._bonds.get(atom1, {})
+        ):
+            composed_cgr.add_bond(atom1, atom2, bond)
+
+    return composed_cgr
+
+
+def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=False):
     """
     Process a single synthesis route maintaining consistent state.
 
@@ -296,6 +519,10 @@ def compose_route_cgr(tree_or_routes, route_id):
         or dict mapping route_id -> {step_id: ReactionContainer}
     route_id : int
         the route index (in the Tree’s winning_nodes, or the dict’s keys)
+    preserve_transient_bonds : bool
+        If True, preserve transient protecting-group bonds that are formed in
+        an earlier step and broken in a later step as DynamicBond(None, None).
+        The default False keeps Chython's standard CGR composition behavior.
 
     Returns
     -------
@@ -303,7 +530,50 @@ def compose_route_cgr(tree_or_routes, route_id):
       - if successful: { 'cgr': <composed CGR>, 'reactions_dict': {step: ReactionContainer,…} }
       - on error: None
     """
-    # ----------- dict-based branch ------------
+    def remap_composition_conflicts(curr_cgr, accum_cgr, start_num):
+        curr_atoms = curr_cgr._atoms
+        accum_atoms = accum_cgr._atoms
+        used_nums = set(curr_atoms) | set(accum_atoms)
+        remap = {}
+        next_num = start_num
+
+        for atom_num in sorted(set(curr_atoms) & set(accum_atoms)):
+            curr_atom = curr_atoms[atom_num]
+            accum_atom = accum_atoms[atom_num]
+            curr_identity = (
+                curr_atom.atomic_number,
+                getattr(curr_atom, "isotope", None),
+            )
+            accum_identity = (
+                accum_atom.atomic_number,
+                getattr(accum_atom, "isotope", None),
+            )
+            if curr_identity == accum_identity:
+                continue
+            while next_num in used_nums or next_num in remap.values():
+                next_num += 1
+            remap[atom_num] = next_num
+            used_nums.add(next_num)
+            next_num += 1
+
+        if remap:
+            curr_cgr = curr_cgr.remap(remap, copy=True)
+        return curr_cgr, next_num, remap
+
+    def update_react_remaps_for_conflicts(react_dict, reaction, remap):
+        if not remap:
+            return
+        for curr_mol in reaction.reactants:
+            react_key = tuple(curr_mol._atoms)
+            if react_key not in react_dict:
+                continue
+            stored_remap = react_dict[react_key]
+            for atom_num in react_key:
+                mapped_atom_num = stored_remap.get(atom_num, atom_num)
+                if mapped_atom_num in remap:
+                    stored_remap[atom_num] = remap[mapped_atom_num]
+
+    # ----------- dict-based route ------------
     if isinstance(tree_or_routes, dict):
         routes_dict = tree_or_routes
         if route_id not in routes_dict:
@@ -312,36 +582,65 @@ def compose_route_cgr(tree_or_routes, route_id):
         step_map = routes_dict[route_id]
         sorted_ids = sorted(step_map)
         reactions = [step_map[i] for i in sorted_ids]
+        cgrs = [rxn.compose() for rxn in reactions]
+        route_orders = _route_order_depths(reactions)
+        bond_route_orders = {}
+        atom_route_orders = {}
+        _record_route_orders(
+            cgrs[-1], route_orders[-1], bond_route_orders, atom_route_orders
+        )
 
         # start from the last (final) reaction
-        accum_cgr = reactions[-1].compose()
-        reactions_dict = {len(reactions) - 1: reactions[-1]}
+        accum_cgr = cgrs[-1]
+        reactions_dict = {
+            len(reactions) - 1: ReactionContainer.from_cgr(cgrs[-1])
+        }
+        max_num = _next_atom_number(*cgrs)
         # now fold backwards through the earlier steps
         for idx in range(len(reactions) - 2, -1, -1):
-            rxn = reactions[idx]
-            curr_cgr = rxn.compose()
-            accum_cgr = curr_cgr.compose(accum_cgr)
-            reactions_dict[idx] = rxn
+            curr_cgr = cgrs[idx]
+            curr_cgr, max_num, _ = remap_composition_conflicts(
+                curr_cgr, accum_cgr, max_num
+            )
+            _record_route_orders(
+                curr_cgr, route_orders[idx], bond_route_orders, atom_route_orders
+            )
+            accum_cgr = _compose_cgrs(
+                curr_cgr, accum_cgr, preserve_transient_bonds
+            )
+            reactions_dict[idx] = ReactionContainer.from_cgr(curr_cgr)
 
+        _apply_route_orders(accum_cgr, bond_route_orders, atom_route_orders)
+        if preserve_transient_bonds:
+            accum_cgr = enable_transient_bond_cgr_depiction(accum_cgr)
         return {"cgr": accum_cgr, "reactions_dict": reactions_dict}
 
-    # ----------- tree-based branch ------------
+    # ----------- tree-based route ------------
     tree = tree_or_routes
     try:
         # original tree-based logic:
         reactions = tree.synthesis_route(route_id)
+        cgrs = [rxn.compose() for rxn in reactions]
+        route_orders = _route_order_depths(reactions)
+        bond_route_orders = {}
+        atom_route_orders = {}
+        _record_route_orders(
+            cgrs[-1], route_orders[-1], bond_route_orders, atom_route_orders
+        )
 
         first_react = reactions[-1]
-        reactions_dict = {len(reactions) - 1: first_react}
+        reactions_dict = {
+            len(reactions) - 1: ReactionContainer.from_cgr(cgrs[-1])
+        }
 
-        accum_cgr = first_react.compose()
+        accum_cgr = cgrs[-1]
         bb_set = process_first_reaction(first_react, tree, route_id)
         react_dict = {}
-        max_num = find_next_atom_num(reactions)
+        max_num = _next_atom_number(*cgrs)
 
         for step in range(len(reactions) - 2, -1, -1):
             reaction = reactions[step]
-            curr_cgr = reaction.compose()
+            curr_cgr = cgrs[step]
             curr_prod = reaction.products[0]
 
             accum_products = accum_cgr.decompose()[1].split()
@@ -354,12 +653,12 @@ def compose_route_cgr(tree_or_routes, route_id):
             if prev_remap:
                 curr_cgr = curr_cgr.remap(prev_remap, copy=True)
 
-            # identify new atom‐numbers for any overlap
+            # identify new atom-numbers for any overlap
             target_block = process_target_blocks(
                 curr_products,
                 curr_prod,
                 lg_atom_nums,
-                [list(p._atoms.keys()) for p in curr_products[1:]],
+                get_leaving_groups(curr_products),
                 bb_set,
             )
             mapping = {}
@@ -385,13 +684,28 @@ def compose_route_cgr(tree_or_routes, route_id):
             if not react_dict and not bb_set:
                 return None
 
-            # apply the new overlap‐mapping
+            # apply the new overlap-mapping
             if mapping:
                 curr_cgr.remap(mapping, copy=False)
 
-            reactions_dict[step] = ReactionContainer.from_cgr(curr_cgr)
-            accum_cgr = curr_cgr.compose(accum_cgr)
+            curr_cgr, max_num, conflict_mapping = remap_composition_conflicts(
+                curr_cgr, accum_cgr, max_num
+            )
+            update_react_remaps_for_conflicts(
+                react_dict, reaction, conflict_mapping
+            )
+            _record_route_orders(
+                curr_cgr, route_orders[step], bond_route_orders, atom_route_orders
+            )
 
+            reactions_dict[step] = ReactionContainer.from_cgr(curr_cgr)
+            accum_cgr = _compose_cgrs(
+                curr_cgr, accum_cgr, preserve_transient_bonds
+            )
+
+        _apply_route_orders(accum_cgr, bond_route_orders, atom_route_orders)
+        if preserve_transient_bonds:
+            accum_cgr = enable_transient_bond_cgr_depiction(accum_cgr)
         return {"cgr": accum_cgr, "reactions_dict": reactions_dict}
 
     except Exception as e:
@@ -399,7 +713,11 @@ def compose_route_cgr(tree_or_routes, route_id):
         return None
 
 
-def compose_all_route_cgrs(tree_or_routes, route_id=None):
+def compose_all_route_cgrs(
+    tree_or_routes,
+    route_id=None,
+    preserve_transient_bonds=False,
+):
     """
     Process routes (reassign atom mappings) to compose RouteCGR.
 
@@ -410,6 +728,8 @@ def compose_all_route_cgrs(tree_or_routes, route_id=None):
     route_id : int or None
         if None, do *all* winning nodes (or all keys of the dict);
         otherwise only that specific route.
+    preserve_transient_bonds : bool
+        Forwarded to ``compose_route_cgr``.
 
     Returns
     -------
@@ -423,7 +743,11 @@ def compose_all_route_cgrs(tree_or_routes, route_id=None):
         routes_dict = tree_or_routes
 
         def _single(route_id):
-            res = compose_route_cgr(routes_dict, route_id)
+            res = compose_route_cgr(
+                routes_dict,
+                route_id,
+                preserve_transient_bonds=preserve_transient_bonds,
+            )
             return res["cgr"] if res else None
 
         if route_id is not None:
@@ -440,7 +764,11 @@ def compose_all_route_cgrs(tree_or_routes, route_id=None):
     route_cgrs = {}
 
     if route_id is not None:
-        res = compose_route_cgr(tree, route_id)
+        res = compose_route_cgr(
+            tree,
+            route_id,
+            preserve_transient_bonds=preserve_transient_bonds,
+        )
         if res:
             route_cgrs[route_id] = res["cgr"]
         else:
@@ -448,16 +776,20 @@ def compose_all_route_cgrs(tree_or_routes, route_id=None):
         return route_cgrs
 
     for route_id in sorted(set(tree.winning_nodes)):
-        res = compose_route_cgr(tree, route_id)
+        res = compose_route_cgr(
+            tree,
+            route_id,
+            preserve_transient_bonds=preserve_transient_bonds,
+        )
         if res:
             route_cgrs[route_id] = res["cgr"]
 
     return route_cgrs
 
 
-def extract_reactions(tree: Tree, route_id=None):
+def extract_reactions(tree: Tree, route_id=None, preserve_transient_bonds=False):
     """
-    Collect mapped reaction sequences from a synthesis tree (basically routes_dict, which might be later convered to routes_json).
+    Collect mapped reaction sequences from a synthesis tree (basically routes_dict, which might be later converted to routes_json).
 
     Traverses either a single branch (if `route_id` is given) or all winning nodes,
     composing CGR-based reactions for each, and returns a dict of reaction mappings.
@@ -470,6 +802,8 @@ def extract_reactions(tree: Tree, route_id=None):
         supporting `compose_route_cgr(...)`.
     route_id : hashable, optional
         If provided, only extract reactions for this specific route/route.
+    preserve_transient_bonds : bool
+        Forwarded to ``compose_route_cgr``.
 
     Returns
     -------
@@ -480,7 +814,11 @@ def extract_reactions(tree: Tree, route_id=None):
     """
     react_dict = {}
     if route_id is not None:
-        result = compose_route_cgr(tree, route_id)
+        result = compose_route_cgr(
+            tree,
+            route_id,
+            preserve_transient_bonds=preserve_transient_bonds,
+        )
         if result:
             react_dict[route_id] = result["reactions_dict"]
         else:
@@ -488,7 +826,11 @@ def extract_reactions(tree: Tree, route_id=None):
         return react_dict
 
     for route_id in set(tree.winning_nodes):
-        result = compose_route_cgr(tree, route_id)
+        result = compose_route_cgr(
+            tree,
+            route_id,
+            preserve_transient_bonds=preserve_transient_bonds,
+        )
         if result:
             react_dict[route_id] = result["reactions_dict"]
 
@@ -500,13 +842,13 @@ def compose_sb_cgr(route_cgr: CGRContainer):
     Reduces a Routes Condensed Graph of reaction (RouteCGR) by performing the following steps:
 
     1. Extracts substructures corresponding to connected components from the input RouteCGR.
-    2. Selects the first substructure as the target to work on.
+    2. Selects the target RouteCGR component and product fragment using the lowest atom numbers.
     3. Iterates over all bonds in the target RouteCGR:
        - If a bond is identified as a "leaving group" (its primary order is None while its original order is defined),
          the bond is removed.
        - If a bond has a modified order (both primary and original orders are integers) and the primary order is less than the original,
          the bond is deleted and then re-added with a new dynamic bond using the primary order (this updates the bond to the reduced form).
-    4. After bond modifications, re-extracts the substructure from the target RouteCGR (now called the reduced RouteCGR or ReducedRouteCGR).
+    4. After bond modifications, extracts the target-atom substructure from the target RouteCGR.
     5. If the charge distributions (_p_charges vs. _charges) differ, neutralizes the charges by setting them to zero.
 
     Args:
@@ -515,15 +857,33 @@ def compose_sb_cgr(route_cgr: CGRContainer):
     Returns:
         The reduced RouteCGR object.
     """
-    # Get all connected components of the RouteCGR as separate substructures.
+    route_cgr = _remove_transient_bonds(route_cgr.copy())
+
+    # Get the RouteCGR component with the target product.  Route construction
+    # keeps target atoms at the lowest atom numbers, while later leaving-group
+    # atoms can be remapped above that range.
     cgr_prods = [route_cgr.substructure(c) for c in route_cgr.connected_components]
-    target_cgr = cgr_prods[0]
+    target_cgr = min(cgr_prods, key=lambda cgr: min(cgr._atoms))
+
+    # `ReactionContainer.from_cgr` may split off several product fragments
+    # (leaving groups, salts, etc.).  The target product is the fragment with
+    # the lowest atom numbers; after deleting leaving-group bonds we should
+    # return exactly these atoms, not whichever connected component happens to
+    # be yielded first.
+    reaction = ReactionContainer.from_cgr(target_cgr)
+    target_product = min(reaction.products, key=lambda mol: min(mol._atoms))
+    target_atom_nums = set(target_product._atoms)
 
     # Iterate over each bond in the target RouteCGR.
+    checked_bonds = set()
     bond_items = list(target_cgr._bonds.items())
     for atom1, bond_set in bond_items:
         bond_set_items = list(bond_set.items())
         for atom2, bond in bond_set_items:
+            bond_key = tuple(sorted((atom1, atom2)))
+            if bond_key in checked_bonds:
+                continue
+            checked_bonds.add(bond_key)
 
             # Removing bonds corresponding to leaving groups:
             # If product bond order is None (indicating a leaving group) but an original bond order exists,
@@ -542,8 +902,10 @@ def compose_sb_cgr(route_cgr: CGRContainer):
                 target_cgr.delete_bond(atom1, atom2)
                 target_cgr.add_bond(atom1, atom2, DynamicBond(p_order, p_order))
 
-    # After modifying bonds, extract the reduced RouteCGR from the target's connected components.
-    sb_cgr = [target_cgr.substructure(c) for c in target_cgr.connected_components][0]
+    # After modifying bonds, extract the target atom substructure.  Selecting
+    # connected_components[0] here is order-dependent and can return a detached
+    # leaving group instead of the target scaffold.
+    sb_cgr = target_cgr.substructure(target_atom_nums)
 
     # Neutralize charges if the primary charges and current charges differ.
     if sb_cgr._p_charges != sb_cgr._charges:
@@ -572,10 +934,6 @@ def compose_all_sb_cgrs(route_cgrs_dict: dict):
     all_sb_cgrs = dict()
     for num, cgr in route_cgrs_dict.items():
         if cgr is None:
-            # An upstream route-CGR composition failed (stereo, unbalanced
-            # atom maps, multi-product, etc.) and the dict-branch of
-            # ``compose_all_route_cgrs`` stored ``None`` here. Skip it so a
-            # single failed route doesn't crash the whole clustering step.
             continue
         all_sb_cgrs[num] = compose_sb_cgr(cgr)
     return all_sb_cgrs

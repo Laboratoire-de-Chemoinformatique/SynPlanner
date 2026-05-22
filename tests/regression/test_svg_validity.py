@@ -76,6 +76,40 @@ def test_cgr_display_produces_parseable_svg(simple_cgr):
         )
 
 
+def test_cgr_depiction_renders_none_none_dynamic_bond_blue():
+    """``DynamicBond(None, None)`` marks a protecting bond in route CGRs."""
+    import pickle
+
+    from chython import smiles
+
+    from synplan.chem.reaction_routes.route_cgr import compose_route_cgr
+    from synplan.chem.reaction_routes.visualisation import cgr_display
+
+    routes = {
+        1: {
+            0: smiles(
+                "[CH3:1].[CH3:2][Cl:3]>>[CH3:1][CH3:2].[ClH:3]"
+            ),
+            1: smiles("[CH3:1][CH3:2]>>[CH4:1]"),
+        }
+    }
+    cgr = compose_route_cgr(routes, 1, preserve_transient_bonds=True)["cgr"]
+
+    assert "[.>.]" in str(cgr)
+
+    svg = cgr.depict()
+    assert 'stroke="blue"' in svg
+    ET.fromstring(svg)
+
+    svg = cgr_display(cgr)
+
+    assert 'stroke="blue"' in svg
+    ET.fromstring(svg)
+
+    roundtrip = pickle.loads(pickle.dumps(cgr))
+    assert 'stroke="blue"' in roundtrip.depict()
+
+
 def test_cgr_display_does_not_leak_state_into_depict(two_cgrs):
     """``cgr_display`` must not permanently alter ``CGRContainer`` methods.
 

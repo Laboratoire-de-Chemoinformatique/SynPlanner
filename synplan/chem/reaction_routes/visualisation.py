@@ -47,6 +47,7 @@ class WideBondDepictCGR(DepictCGR):
 
         broken = config["broken_color"]
         formed = config["formed_color"]
+        protecting = "blue"
         dash1, dash2 = config["dashes"]
         double_space = config["double_space"]
         triple_space = config["triple_space"]
@@ -200,7 +201,7 @@ class WideBondDepictCGR(DepictCGR):
                     )
                     svg.append(
                         f'      <line x1="{nx - dx:.2f}" y1="{ny + dy:.2f}" '
-                        f'x2="{mx - dx:.2f}" y2="{my + dy:.2f}" stroke="{formed} stroke-width="{wide_width:.2f}""/>'
+                        f'x2="{mx - dx:.2f}" y2="{my + dy:.2f}" stroke="{formed}" stroke-width="{wide_width:.2f}"/>'
                     )
                 elif p_order is None:
                     dx, dy = rv(double_space)
@@ -317,7 +318,12 @@ class WideBondDepictCGR(DepictCGR):
                         f'y2="{my + dy3:.2f}" stroke="{broken}" stroke-width="{wide_width:.2f}"/>'
                     )
             elif order is None:
-                if p_order == 1:
+                if p_order is None:
+                    svg.append(
+                        f'      <line x1="{nx:.2f}" y1="{ny:.2f}" x2="{mx:.2f}" y2="{my:.2f}"'
+                        f' stroke="{protecting}" stroke-width="{wide_width:.2f}"/>'
+                    )
+                elif p_order == 1:
                     svg.append(
                         f'      <line x1="{nx:.2f}" y1="{ny:.2f}" x2="{mx:.2f}" y2="{my:.2f}"'
                         f' stroke="{formed}" stroke-width="{wide_width:.2f}"/>'
@@ -488,6 +494,36 @@ class WideBondDepictCGR(DepictCGR):
                 f'      <line x1="{an_x + n_x:.2f}" y1="{-an_y - n_y:.2f}"'
                 f' x2="{bn_x + n_x:.2f}" y2="{-bn_y - n_y:.2f}" stroke-dasharray="{dash3:.2f} {dash4:.2f}"/>'
             )
+
+
+class ProtectionDepictCGRContainer(CGRContainer):
+    __slots__ = ()
+
+    _render_bonds = WideBondDepictCGR._render_bonds
+    _WideBondDepictCGR__render_aromatic_bond = (
+        WideBondDepictCGR._WideBondDepictCGR__render_aromatic_bond
+    )
+
+    def _format_bond(self, n, m, adjacency, **kwargs):
+        bond = self._bonds[n][m]
+        if bond.order is None and bond.p_order is None:
+            return "[.>.]"
+        return super()._format_bond(n, m, adjacency, **kwargs)
+
+    def __getstate__(self):
+        return {
+            slot: getattr(self, slot)
+            for slot in CGRContainer.__slots__
+            if hasattr(self, slot)
+        }
+
+
+def enable_transient_bond_cgr_depiction(cgr: CGRContainer) -> CGRContainer:
+    cgr.__class__ = ProtectionDepictCGRContainer
+    return cgr
+
+
+enable_protection_cgr_depiction = enable_transient_bond_cgr_depiction
 
 
 def cgr_display(cgr: CGRContainer) -> str:
