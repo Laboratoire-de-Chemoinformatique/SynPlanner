@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING
 import torch
 
 from synplan.chem.precursor import Precursor, compose_precursors
-from synplan.chem.reaction_rules.priority import POLICY_SOURCE_NAME
 from synplan.chem.rdkit_utils import RDKitScore
+from synplan.chem.reaction_rules.priority import POLICY_SOURCE_NAME
 from synplan.mcts.expansion import PolicyNetworkFunction
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training import mol_to_pyg
