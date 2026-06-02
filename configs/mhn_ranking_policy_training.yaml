@@ -1,0 +1,19 @@
+# Modern-Hopfield-style ranking policy with dynamic Chython reaction-rule templates.
+architecture: mhn_ranking
+vector_dim: 512
+num_conv_layers: 5
+learning_rate: 0.0005
+dropout: 0.4
+num_epoch: 100
+batch_size: 1000
+
+mhn_association_dim: 512
+mhn_beta: 0.05
+mhn_template_fp_size: 2048
+mhn_template_fp_min_radius: 1
+mhn_template_fp_max_radius: 4
+mhn_template_fp_active_bits: 2
+mhn_normalize_associations: true
+
+logger:
+  type: csv
