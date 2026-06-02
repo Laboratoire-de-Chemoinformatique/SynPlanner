@@ -305,6 +305,7 @@ class PolicyNetworkConfig(BaseConfigModel):
     """
 
     policy_type: Literal["filtering", "ranking"] = "ranking"
+    architecture: Literal["linear", "mhn_ranking"] = "linear"
     embedder_type: Literal["gcn", "gcn_concat", "gps"] = "gcn"
     vector_dim: int = Field(default=256, gt=0)
     batch_size: int = Field(default=500, gt=0)
@@ -332,6 +333,29 @@ class PolicyNetworkConfig(BaseConfigModel):
     priority_rules_fraction: float = Field(default=0.5, ge=0.0)
     rule_prob_threshold: float = Field(default=0.0, ge=0.0)
     top_rules: int = Field(default=50, gt=0)
+
+    # MHN ranking policy parameters
+    mhn_association_dim: int = Field(default=512, gt=0)
+    mhn_beta: float = Field(default=0.05, gt=0.0)
+    mhn_template_fp_size: int = Field(default=2048, gt=0)
+    mhn_template_fp_min_radius: int = Field(default=1, ge=0)
+    mhn_template_fp_max_radius: int = Field(default=4, ge=0)
+    mhn_template_fp_active_bits: int = Field(default=2, gt=0)
+    mhn_normalize_associations: bool = True
+
+    @model_validator(mode="after")
+    def _validate_architecture(self) -> "PolicyNetworkConfig":
+        if self.architecture == "mhn_ranking" and self.policy_type != "ranking":
+            raise ValueError(
+                "architecture='mhn_ranking' requires policy_type='ranking'"
+            )
+        if self.mhn_template_fp_size & (self.mhn_template_fp_size - 1):
+            raise ValueError("mhn_template_fp_size must be a positive power of two")
+        if self.mhn_template_fp_max_radius < self.mhn_template_fp_min_radius:
+            raise ValueError(
+                "mhn_template_fp_max_radius must be >= mhn_template_fp_min_radius"
+            )
+        return self
 
     @field_validator("logger")
     @classmethod

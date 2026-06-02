@@ -18,6 +18,7 @@ from torch.utils.data import Subset, random_split
 from torch_geometric.data.lightning import LightningDataset
 
 from synplan.ml.networks.policy import PolicyNetwork
+from synplan.ml.networks.mhn_ranking import MHNRankingPolicyNetwork
 from synplan.ml.training.preprocessing import (
     FilteringPolicyDataset,
     RankingPolicyDataset,
@@ -298,10 +299,13 @@ def run_policy_training(
     """
     results_path = Path(results_path)
     results_path.mkdir(parents=True, exist_ok=True)
+    if config.architecture == "mhn_ranking" and config.policy_type != "ranking":
+        raise ValueError("architecture='mhn_ranking' requires policy_type='ranking'")
 
-    network = PolicyNetwork(
+    dataset = datamodule.train_dataset.dataset
+    network_kwargs = dict(
         vector_dim=config.vector_dim,
-        n_rules=datamodule.train_dataset.dataset.num_classes,
+        n_rules=dataset.num_classes,
         batch_size=config.batch_size,
         dropout=config.dropout,
         num_conv_layers=config.num_conv_layers,
@@ -312,6 +316,17 @@ def run_policy_training(
         attn_type=config.attn_type,
         attn_dropout=config.attn_dropout,
     )
+    if config.architecture == "mhn_ranking":
+        network = MHNRankingPolicyNetwork.for_training(
+            **network_kwargs,
+            dataset=dataset,
+            config=config,
+        )
+    else:
+        network = PolicyNetwork(
+            **network_kwargs,
+            architecture=config.architecture,
+        )
 
     checkpoint = ModelCheckpoint(
         dirpath=results_path, filename=weights_file_name, monitor="val_loss", mode="min"

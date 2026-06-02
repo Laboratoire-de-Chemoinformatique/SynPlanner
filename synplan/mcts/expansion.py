@@ -1,7 +1,7 @@
 """Module containing a class that represents a policy function for node expansion in the
 tree search."""
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
 import torch
 import torch_geometric
@@ -11,8 +11,14 @@ from chython.containers import ReactionContainer
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.ml.networks.policy import PolicyNetwork
+from synplan.ml.template_features import (
+    rule_smarts_from_reactors,
+    template_feature_digest,
+    template_features_from_smarts,
+)
 from synplan.ml.training import mol_to_pyg
 from synplan.utils.config import PolicyNetworkConfig
+from synplan.utils.loading import load_policy_net
 
 
 class PolicyNetworkFunction:
@@ -30,9 +36,9 @@ class PolicyNetworkFunction:
 
         self.config = policy_config
 
-        policy_net = PolicyNetwork.load_from_checkpoint(
+        policy_net = load_policy_net(
+            PolicyNetwork,
             self.config.weights_path,
-            map_location=torch.device("cpu"),
             batch_size=1,
             dropout=0,
         )
@@ -42,6 +48,55 @@ class PolicyNetworkFunction:
             self.policy_net = torch_geometric.compile(policy_net, dynamic=True)
         else:
             self.policy_net = policy_net
+        self._template_feature_digest: str | None = None
+        self._template_associations: torch.Tensor | None = None
+        self._template_association_cache: dict[str, torch.Tensor] = {}
+
+    @property
+    def architecture(self) -> str:
+        """Return the loaded checkpoint architecture."""
+        return getattr(self.policy_net, "architecture", "linear")
+
+    @property
+    def n_rules(self) -> int:
+        """Return the fixed or currently bound output dimensionality."""
+        if self.architecture == "mhn_ranking":
+            if self._template_associations is not None:
+                return self._template_associations.shape[0]
+        return self.policy_net.n_rules
+
+    def _prepare_template_associations(
+        self, reaction_rules: Sequence[CanonicalRetroReactor]
+    ) -> None:
+        """Encode runtime templates once for MHN ranking prediction."""
+        if self.architecture != "mhn_ranking":
+            return
+
+        rule_smarts = rule_smarts_from_reactors(reaction_rules)
+        feature_digest = template_feature_digest(
+            rule_smarts,
+            fp_size=self.policy_net.mhn_template_fp_size,
+            min_radius=self.policy_net.mhn_template_fp_min_radius,
+            max_radius=self.policy_net.mhn_template_fp_max_radius,
+            active_bits=self.policy_net.mhn_template_fp_active_bits,
+        )
+        if self._template_feature_digest == feature_digest:
+            return
+
+        associations = self._template_association_cache.get(feature_digest)
+        if associations is None:
+            features = template_features_from_smarts(
+                rule_smarts,
+                fp_size=self.policy_net.mhn_template_fp_size,
+                min_radius=self.policy_net.mhn_template_fp_min_radius,
+                max_radius=self.policy_net.mhn_template_fp_max_radius,
+                active_bits=self.policy_net.mhn_template_fp_active_bits,
+            )
+            with torch.no_grad():
+                associations = self.policy_net.encode_templates(features).detach()
+            self._template_association_cache[feature_digest] = associations
+        self._template_associations = associations
+        self._template_feature_digest = feature_digest
 
     def _get_graph(self, precursor: Precursor) -> torch_geometric.data.Data | None:
         """Convert precursor molecule to PyG graph.
@@ -72,8 +127,18 @@ class PolicyNetworkFunction:
             return None
 
         with torch.no_grad():
-            x = self._get_embedding(pyg_graph)
-            logits = self.policy_net.y_predictor(x)
+            if self.architecture == "mhn_ranking":
+                if self._template_associations is None:
+                    raise ValueError(
+                        "mhn_ranking templates are prepared by predict_reaction_rules()."
+                    )
+                logits = self.policy_net.get_logits(
+                    pyg_graph,
+                    template_associations=self._template_associations,
+                )
+            else:
+                x = self._get_embedding(pyg_graph)
+                logits = self.policy_net.y_predictor(x)
             logits = logits[0].double()
 
         del pyg_graph
@@ -88,6 +153,10 @@ class PolicyNetworkFunction:
         :param precursor: The current precursor.
         :return: Probability tensor for all rules, or None if graph conversion fails.
         """
+        if self.architecture == "mhn_ranking":
+            logits = self.get_logits(precursor)
+            return torch.softmax(logits, dim=-1) if logits is not None else None
+
         pyg_graph = self._get_graph(precursor)
         if not pyg_graph:
             return None
@@ -115,7 +184,7 @@ class PolicyNetworkFunction:
         :param n_rules: Expected number of reaction rules.
         :return: Tuple of (sorted_probs, sorted_rule_ids) or None if prediction fails.
         """
-        out_dim = list(self.policy_net.modules())[-1].out_features
+        out_dim = self.n_rules
         if out_dim != n_rules:
             raise Exception(
                 f"The policy network output dimensionality is {out_dim}, but the number of reaction rules is {n_rules}. "
@@ -136,7 +205,7 @@ class PolicyNetworkFunction:
         return sorted_probs, sorted_rules
 
     def predict_reaction_rules(
-        self, precursor: Precursor, reaction_rules: list[CanonicalRetroReactor]
+        self, precursor: Precursor, reaction_rules: Sequence[CanonicalRetroReactor]
     ) -> Iterator[tuple[float, CanonicalRetroReactor, int]]:
         """The policy function predicts the list of reaction rules for a given precursor.
 
@@ -146,6 +215,7 @@ class PolicyNetworkFunction:
         :return: Yielding the predicted probability for the reaction rule, reaction rule
             and reaction rule id.
         """
+        self._prepare_template_associations(reaction_rules)
         result = self._predict_rules_common(precursor, len(reaction_rules))
         if result is None:
             return []
@@ -158,17 +228,21 @@ class PolicyNetworkFunction:
                 yield prob, reaction_rules[rule_id], rule_id
 
     def predict_reaction_rules_light(
-        self, precursor: Precursor, reaction_rules_len: int
+        self,
+        precursor: Precursor,
+        reaction_rules: Sequence[CanonicalRetroReactor],
     ) -> Iterator[tuple[float, int]]:
         """The policy function predicts the list of reaction rules for a given precursor.
 
         Light version that doesn't return Reactor objects.
 
         :param precursor: The current precursor for which the reaction rules are predicted.
-        :param reaction_rules_len: The number of reaction rules.
+        :param reaction_rules: The reaction rules used to prepare MHN templates and
+            validate output dimensions.
         :return: Yielding the predicted probability and reaction rule id.
         """
-        result = self._predict_rules_common(precursor, reaction_rules_len)
+        self._prepare_template_associations(reaction_rules)
+        result = self._predict_rules_common(precursor, len(reaction_rules))
         if result is None:
             return []
 
@@ -264,12 +338,12 @@ class CombinedPolicyNetworkFunction:
     @property
     def n_rules(self) -> int:
         """Get the number of reaction rules the networks were trained on."""
-        return list(self.filtering_net.policy_net.modules())[-1].out_features
+        return self.filtering_net.n_rules
 
     def _validate_dimensions(self, expected_n_rules: int) -> None:
         """Validate that network output dimensions match expected number of rules."""
-        filtering_dim = list(self.filtering_net.policy_net.modules())[-1].out_features
-        ranking_dim = list(self.ranking_net.policy_net.modules())[-1].out_features
+        filtering_dim = self.filtering_net.n_rules
+        ranking_dim = self.ranking_net.n_rules
 
         if filtering_dim != expected_n_rules or ranking_dim != expected_n_rules:
             raise Exception(
@@ -322,7 +396,7 @@ class CombinedPolicyNetworkFunction:
         return sorted_probs, sorted_rules
 
     def predict_reaction_rules(
-        self, precursor: Precursor, reaction_rules: list[CanonicalRetroReactor]
+        self, precursor: Precursor, reaction_rules: Sequence[CanonicalRetroReactor]
     ) -> Iterator[tuple[float, CanonicalRetroReactor, int]]:
         """Predicts reaction rules using Bayesian-style log-space combination.
 
@@ -330,6 +404,7 @@ class CombinedPolicyNetworkFunction:
         :param reaction_rules: The list of reaction rules.
         :return: Yielding (probability, reaction_rule, rule_id) tuples.
         """
+        self.ranking_net._prepare_template_associations(reaction_rules)
         result = self._predict_rules_common(precursor, len(reaction_rules))
         if result is None:
             return
@@ -340,17 +415,21 @@ class CombinedPolicyNetworkFunction:
                 yield prob, reaction_rules[rule_id], rule_id
 
     def predict_reaction_rules_light(
-        self, precursor: Precursor, reaction_rules_len: int
+        self,
+        precursor: Precursor,
+        reaction_rules: Sequence[CanonicalRetroReactor],
     ) -> Iterator[tuple[float, int]]:
         """Predicts reaction rules using Bayesian-style log-space combination.
 
         Light version without returning Reactor objects.
 
         :param precursor: The current precursor for which the reaction rules are predicted.
-        :param reaction_rules_len: The number of reaction rules.
+        :param reaction_rules: The reaction rules used to prepare MHN templates and
+            validate output dimensions.
         :return: Yielding (probability, rule_id) tuples.
         """
-        result = self._predict_rules_common(precursor, reaction_rules_len)
+        self.ranking_net._prepare_template_associations(reaction_rules)
+        result = self._predict_rules_common(precursor, len(reaction_rules))
         if result is None:
             return
 

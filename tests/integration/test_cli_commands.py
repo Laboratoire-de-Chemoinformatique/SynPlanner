@@ -125,3 +125,37 @@ def test_ranking_policy_training_cli_accepts_litlogger(monkeypatch):
 
     assert result.exit_code == 0
     assert observed["config"].logger == {"type": "litlogger"}
+
+
+def test_mhn_ranking_policy_training_cli_uses_policy_data_only(monkeypatch):
+    observed = {}
+
+    monkeypatch.setattr(cli, "create_policy_dataset", lambda **_kwargs: object())
+
+    def fake_run_policy_training(datamodule, *, config, results_path):
+        observed["datamodule"] = datamodule
+        observed["config"] = config
+        observed["results_path"] = results_path
+
+    monkeypatch.setattr(cli, "run_policy_training", fake_run_policy_training)
+
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        with open("config.yaml", "w", encoding="utf-8") as config:
+            config.write("architecture: mhn_ranking\n")
+        with open("policy.tsv", "w", encoding="utf-8") as policy_data:
+            policy_data.write("product_smiles\trule_id\nCC\t0\n")
+
+        result = runner.invoke(
+            cli.synplan,
+            [
+                "ranking_policy_training",
+                "--config",
+                "config.yaml",
+                "--policy_data",
+                "policy.tsv",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert observed["config"].architecture == "mhn_ranking"

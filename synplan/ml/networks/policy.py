@@ -27,6 +27,7 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
         n_rules: int,
         vector_dim: int,
         policy_type: str = "ranking",
+        architecture: str = "linear",
         **kwargs,
     ):
         """Initializes a policy network with the given number of reaction rules (output
@@ -39,6 +40,7 @@ class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
         super().__init__(vector_dim, *args, **kwargs)
         self.save_hyperparameters()
         self.policy_type = policy_type
+        self.architecture = architecture
         self.n_rules = n_rules
         self.head_dropout = Dropout(kwargs.get("dropout", 0.4))
         self.y_predictor = Linear(vector_dim, n_rules)

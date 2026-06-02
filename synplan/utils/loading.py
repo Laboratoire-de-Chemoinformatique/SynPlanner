@@ -17,6 +17,7 @@ from chython.files.SDFrw import SDFRead
 from chython.reactor.reactor import Reactor
 from huggingface_hub import hf_hub_download, snapshot_download
 from torch import device
+from torch import load as torch_load
 from tqdm.auto import tqdm
 
 from synplan.chem.reaction import CanonicalRetroReactor
@@ -489,8 +490,26 @@ def load_value_net(
     return model_class.load_from_checkpoint(value_network_path, map_location)
 
 
+def _policy_network_class_from_checkpoint(checkpoint_path: str | Path):
+    """Return the policy class declared by a checkpoint.
+
+    Checkpoints created before architecture selection existed are linear.
+    """
+    checkpoint = torch_load(checkpoint_path, map_location="cpu", weights_only=False)
+    architecture = checkpoint.get("hyper_parameters", {}).get("architecture", "linear")
+    if architecture == "linear":
+        return PolicyNetwork
+    if architecture == "mhn_ranking":
+        from synplan.ml.networks.mhn_ranking import MHNRankingPolicyNetwork
+
+        return MHNRankingPolicyNetwork
+    raise ValueError(f"Unknown policy checkpoint architecture: {architecture!r}")
+
+
 def load_policy_net(
-    model_class: PolicyNetwork, policy_network_path: str | Path
+    model_class: type[PolicyNetwork],
+    policy_network_path: str | Path,
+    **load_kwargs,
 ) -> PolicyNetwork:
     """Loads the policy network.
 
@@ -499,9 +518,13 @@ def load_policy_net(
     :return: The loaded policy network.
     """
 
-    map_location = device("cpu")
+    if model_class is PolicyNetwork:
+        model_class = _policy_network_class_from_checkpoint(policy_network_path)
+    load_kwargs.setdefault("batch_size", 1)
     return model_class.load_from_checkpoint(
-        policy_network_path, map_location, batch_size=1
+        policy_network_path,
+        map_location=device("cpu"),
+        **load_kwargs,
     )
 
 

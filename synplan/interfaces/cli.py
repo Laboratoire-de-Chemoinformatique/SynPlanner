@@ -557,6 +557,10 @@ def filtering_policy_training_cli(
 
     policy_config = PolicyNetworkConfig.from_yaml(config_path)
     policy_config.policy_type = "filtering"
+    if policy_config.architecture == "mhn_ranking":
+        raise click.UsageError(
+            "architecture=mhn_ranking is only supported by ranking_policy_training"
+        )
     if logger_type is not None:
         policy_config.logger = {"type": logger_type}
 
@@ -570,7 +574,11 @@ def filtering_policy_training_cli(
         cache=not no_cache,
     )
 
-    run_policy_training(datamodule, config=policy_config, results_path=results_dir)
+    run_policy_training(
+        datamodule,
+        config=policy_config,
+        results_path=results_dir,
+    )
 
 
 @synplan.command(name="value_network_tuning")

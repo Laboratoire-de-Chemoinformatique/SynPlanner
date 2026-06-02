@@ -10,6 +10,7 @@ Download example configuration
 ------------------------------
 
 - GitHub: `configs/policy_training.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/policy_training.yaml>`_
+- GitHub: `configs/mhn_ranking_policy_training.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/mhn_ranking_policy_training.yaml>`_
 
 Quickstart (CLI)
 ----------------
@@ -37,6 +38,34 @@ Train a policy network using the repository configuration in ``configs/policy_tr
     logger:
       type: csv
 
+MHN ranking policy
+------------------
+
+``architecture: mhn_ranking`` replaces the fixed ranking head with a dense
+molecule-template association model inspired by
+`MHNreact <https://github.com/ml-jku/mhn-react>`_ and the
+`MHNreact paper <https://doi.org/10.1021/acs.jcim.1c01065>`_. SynPlanner keeps
+its graph embedder for product molecules and builds template fingerprints with
+Chython. Template embeddings are encoded lazily on the first prediction and
+cached for reuse.
+
+.. code-block:: bash
+
+   synplan ranking_policy_training \
+     --config configs/mhn_ranking_policy_training.yaml \
+     --policy_data reaction_rules_policy_data.tsv \
+     --results_dir mhn_ranking_policy_network
+
+The rules TSV is inferred from the extracted policy mapping name:
+``<base>_policy_data.tsv`` uses ``<base>.tsv``. Keep both generated files
+together when training ``mhn_ranking``.
+
+Standalone MHN ranking checkpoints can score unseen, reordered, or replaced
+runtime rule sets. Combined filtering + MHN ranking policies remain restricted
+to the filtering checkpoint's ordered rule set because filtering heads have a
+fixed output index. SynPlanner validates dimensions; the supplied filtering
+rules must retain their training order.
+
 **Configuration parameters**
 
 .. table::
@@ -52,12 +81,45 @@ Train a policy network using the repository configuration in ``configs/policy_tr
     num_epoch                          The number of training epochs
     batch_size                         The size of the training batch of input molecular graphs
     embedder_type                      Graph embedder: ``gcn``, ``gcn_concat``, or ``gps``
+    architecture                       Ranking head: ``linear`` (default) or ``mhn_ranking``
     heads                              Number of attention heads for ``embedder_type: gps``
     attn_type                          GPS attention type: ``multihead``, ``performer``, or ``null``
     attn_dropout                       Attention dropout for GPS layers
     log_grad_norm                      If true, log module-level gradient norms during training
     logger                             Training logger configuration (see below). Set to ``null`` to disable.
+    mhn_association_dim                MHN molecule-template association dimension
+    mhn_beta                           Scale applied to MHN association logits
+    mhn_template_fp_size               Chython Morgan template fingerprint size; must be a power of two
+    mhn_template_fp_min_radius         Minimum Chython Morgan fingerprint radius
+    mhn_template_fp_max_radius         Maximum Chython Morgan fingerprint radius
+    mhn_template_fp_active_bits        Active bits per Chython Morgan fingerprint feature
+    mhn_normalize_associations         Apply non-affine LayerNorm after each MHN projection
     ================================== =========================================================================
+
+Benchmark recipe
+----------------
+
+Train the baseline and MHN ranking policies against the same extracted rules and
+``*_policy_data.tsv`` mapping, then compare validation ``balanced_accuracy_y``,
+``top5_accuracy_y``, and ``top10_accuracy_y`` logs. For planning benchmarks, use
+the same targets, building blocks, reaction rules, and tree configuration for
+both checkpoints. Record checkpoint size, first-expansion latency (which
+includes lazy MHN rule binding), warm expansion latency, and the generated
+``tree_search_stats.csv`` summary.
+
+.. code-block:: bash
+
+   synplan ranking_policy_training \
+     --config configs/policy_training.yaml \
+     --policy_data reaction_rules_policy_data.tsv \
+     --results_dir benchmark/linear
+
+   synplan ranking_policy_training \
+     --config configs/mhn_ranking_policy_training.yaml \
+     --policy_data reaction_rules_policy_data.tsv \
+     --results_dir benchmark/mhn_ranking
+
+   du -h benchmark/linear/*.ckpt benchmark/mhn_ranking/*.ckpt
 
 Training logger
 ---------------
