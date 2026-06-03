@@ -1,21 +1,23 @@
 from chython.periodictable import At, DynamicElement
 
 
-class Marked:
-    """Mixin that adds a mark property and overrides isotope.
+class Marked(At):
+    """Chython-based atom that adds route marks and pseudo-element symbols.
 
-    Must be used together with an Element-based class (e.g. At) via
-    multiple inheritance so the real atom behavior comes from Element.
-    Uses __slots__ = () to avoid layout conflict with Element's slots.
-    Concrete subclasses (MarkedAt) define the actual storage slot.
+    Chython still owns isotope validation, charge/radical state, valence rules,
+    coordinates, and copying; this class only adds SynPlanner's route mark,
+    display symbol, and standalone hash compatible with previous marker use.
     """
 
+    marker_symbol = "X"
+    isotopes_distribution = range(10_000)
     __slots__ = ()
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, isotope: int | None = None, *args, mark=None, **kwargs):
+        super().__init__(0 if isotope is None else isotope, *args, **kwargs)
         self._mark = None
-        self._isotope = 0
+        if mark is not None:
+            self.mark = mark
 
     @property
     def mark(self):
@@ -26,45 +28,18 @@ class Marked:
         self._mark = mark
 
     @property
-    def isotope(self):
-        return getattr(self, "_isotope", 0)
-
-    @isotope.setter
-    def isotope(self, value):
-        self._isotope = int(value) if value is not None else 0
-
-    def __repr__(self):
-        return f"{self.symbol}({self.isotope})"
-
-    @property
     def atomic_symbol(self) -> str:
-        return self.__class__.__name__[6:]
+        return self.marker_symbol
 
     @property
     def symbol(self) -> str:
-        return "X"
-
-    def __len__(self):
-        return super().__len__()
-
-
-class MarkedAt(Marked, At):
-    __slots__ = ("_mark",)
-    atomic_number = At.atomic_number
-
-    @property
-    def atomic_symbol(self):
-        return "At"
-
-    @property
-    def symbol(self):
-        return "X"
+        return self.marker_symbol
 
     def __repr__(self):
-        return f"X({self.isotope})"
+        return f"{self.symbol}({self.isotope or 0})"
 
     def __str__(self):
-        return f"X({self.isotope})"
+        return repr(self)
 
     def __hash__(self):
         return hash(
@@ -75,6 +50,20 @@ class MarkedAt(Marked, At):
                 getattr(self, "is_radical", False),
             )
         )
+
+    def __len__(self):
+        return super().__len__()
+
+
+class MarkedAt(Marked):
+    __slots__ = ("_mark",)
+
+
+class MarkedY(Marked):
+    """Display-only marker for route-supporting pseudo-reactants."""
+
+    marker_symbol = "Y"
+    __slots__ = ("_mark",)
 
 
 class DynamicX(DynamicElement):

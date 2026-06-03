@@ -1220,9 +1220,6 @@ def download_subclustering_results():
                 subcluster_html_content = routes_subclustering_report(
                     tree,
                     processed_subcluster_data,
-                    user_input_cluster_num_display,
-                    selected_subcluster_idx,
-                    sb_cgrs_for_report,
                     if_lg_group=True,
                 )
                 st.download_button(

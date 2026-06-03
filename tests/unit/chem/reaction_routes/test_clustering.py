@@ -3,10 +3,10 @@ import pickle
 import pytest
 from chython.containers import CGRContainer, ReactionContainer
 
-import synplan.chem.reaction_routes.clustering as clustering
 from synplan.chem.reaction_routes.clustering import (
     cluster_routes,
     subcluster_all_clusters,
+    subcluster_one_cluster,
 )
 
 
@@ -63,8 +63,16 @@ def test_subcluster_one_cluster_valid(sb_cgrs_dict, routes_cgrs_dict):
     for route_id, value in result.items():
         assert isinstance(route_id, int)
         assert isinstance(value, tuple)
-        assert len(value) == 5
-        sb_cgr, unlabeled_rxn, synthon_cgr, new_rxn, lg_groups = value
+        assert len(value) == 7
+        (
+            sb_cgr,
+            unlabeled_rxn,
+            synthon_cgr,
+            new_rxn,
+            lg_groups,
+            lg_sizes,
+            supporting_groups,
+        ) = value
 
         # The SB-CGR should be exactly what we passed in
         assert sb_cgr is sb_cgrs_dict[route_id]
@@ -81,6 +89,8 @@ def test_subcluster_one_cluster_valid(sb_cgrs_dict, routes_cgrs_dict):
 
         # Leaving-group info is a dict of (CGRContainer, int) tuples
         assert isinstance(lg_groups, dict)
+        assert lg_sizes == len(lg_groups)
+        assert isinstance(supporting_groups, dict)
         for key, (lg_cgr, idx) in lg_groups.items():
             assert isinstance(key, int)
             assert isinstance(lg_cgr, CGRContainer)
@@ -91,68 +101,6 @@ def test_subcluster_one_cluster_empty():
     """subcluster_one_cluster returns empty dict for empty group."""
     result = subcluster_one_cluster({"route_ids": []}, {}, {})
     assert result == {}
-
-
-class SubclusterError(Exception):
-    """Raised when subcluster_one_cluster cannot complete successfully."""
-
-
-def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
-    """
-    Generate synthon data for each route in a single cluster.
-
-    Returns a dict mapping route_id → (sb_cgr, original_reaction,
-                                     synthon_cgr, new_reaction, lg_groups),
-    or raises SubclusterError on any failure.
-    """
-    route_ids = group.get("route_ids")
-    if not isinstance(route_ids, (list, tuple)):
-        raise SubclusterError(
-            f"'route_ids' must be a list or tuple, got {type(route_ids).__name__}"
-        )
-
-    result = {}
-    for route_id in route_ids:
-        sb_cgr = sb_cgrs_dict[route_id]
-        route_cgr = route_cgrs_dict[route_id]
-
-        # 1) Replace leaving groups (LG) to X
-        try:
-            synthon_cgr, lg_groups = clustering.lg_replacer(route_cgr)
-        except (KeyError, ValueError) as e:
-            raise SubclusterError(f"LG replacement failed for route {route_id}") from e
-
-        # 2) Build ReactionContainer
-        try:
-            synthon_rxn = ReactionContainer.from_cgr(synthon_cgr)
-        except Exception as e:
-            raise SubclusterError(
-                f"Failed to parse synthon CGR for route {route_id}"
-            ) from e
-
-        # 3) Prepare for LG-based reaction replacement
-        try:
-            old_reactants = synthon_rxn.reactants
-            target_mol = synthon_rxn.products[0]
-            max_atom_idx = max(target_mol._atoms)
-            new_reactants = clustering.lg_reaction_replacer(
-                synthon_rxn, lg_groups, max_atom_idx
-            )
-            new_rxn = ReactionContainer(reactants=new_reactants, products=[target_mol])
-        except (IndexError, TypeError) as e:
-            raise SubclusterError(
-                f"LG reaction replacement failed for route {route_id}"
-            ) from e
-
-        result[route_id] = (
-            sb_cgr,
-            ReactionContainer(reactants=old_reactants, products=[target_mol]),
-            synthon_cgr,
-            new_rxn,
-            lg_groups,
-        )
-
-    return result
 
 
 def test_subcluster_one_cluster_invalid_route():

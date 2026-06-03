@@ -1,22 +1,35 @@
+from types import SimpleNamespace
+
 import pytest
 from chython import smiles
 from chython.containers import CGRContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
 
 from synplan.chem.reaction_routes.io import (
-    TreeWrapper,
     make_dict,
     read_routes_csv,
     read_routes_json,
 )
-
-# === Tests for route_cgr.py functions ===
 from synplan.chem.reaction_routes.route_cgr import (
-    RouteDynamicBond,
     compose_all_route_cgrs,
     compose_route_cgr,
     compose_sb_cgr,
 )
+from synplan.chem.reaction_routes.route_cgr_container import RouteCGRContainer
+from synplan.chem.reaction_routes.route_cgr_state import RouteDynamicBond
+
+
+class _MockRouteTree:
+    def __init__(self, routes_dict):
+        self._routes_dict = routes_dict
+        self.winning_nodes = list(routes_dict)
+        self.config = SimpleNamespace(min_mol_size=999)
+        self.building_blocks = set()
+
+    def synthesis_route(self, route_id):
+        steps = self._routes_dict[route_id]
+        return [steps[step_id] for step_id in sorted(steps)]
+
 
 # --- Test Data ---
 CSV_DATA = """route_id,step_id,smiles,meta
@@ -56,12 +69,8 @@ def routes_data_json_to_dict():
 
 
 @pytest.fixture(scope="module")
-def routes_data_tree():
-    mol_id = 1
-    config = 1
-    path = "tests/data/forest"
-    tree = TreeWrapper.load_tree_from_id(mol_id, config, path)
-    return tree
+def routes_data_tree(routes_data_csv_to_dict):
+    return _MockRouteTree(routes_data_csv_to_dict)
 
 
 @pytest.mark.parametrize(
@@ -77,6 +86,7 @@ def test_compose_route_cgr_dict_based_single_route(routes_fixture, request):
     assert result is not None
     assert "cgr" in result and "reactions_dict" in result
     assert isinstance(result["cgr"], CGRContainer)
+    assert isinstance(result["cgr"], RouteCGRContainer)
     assert isinstance(result["reactions_dict"], dict)
     # Ensure all steps are present
     assert len(result["reactions_dict"]) == len(data[route_id])
@@ -105,6 +115,7 @@ def test_compose_route_cgr_tree_based_single_route(routes_data_tree):
     assert "cgr" in result
     assert "reactions_dict" in result
     assert isinstance(result["cgr"], CGRContainer)
+    assert isinstance(result["cgr"], RouteCGRContainer)
     assert isinstance(result["reactions_dict"], dict)
 
 
@@ -134,47 +145,58 @@ def test_compose_route_cgr_preserves_formed_then_broken_bond():
     """Preserved transient bonds are marked as DynamicBond(None, None)."""
     routes = {
         1: {
-            0: smiles(
-                "[CH3:1].[CH3:2][Cl:3]>>[CH3:1][CH3:2].[ClH:3]"
-            ),
+            0: smiles("[CH3:1].[CH3:2][Cl:3]>>[CH3:1][CH3:2].[ClH:3]"),
             1: smiles("[CH3:1][CH3:2]>>[CH4:1]"),
         }
     }
 
-    default_cgr = compose_route_cgr(routes, 1)["cgr"]
-    protected_cgr = compose_route_cgr(
-        routes, 1, preserve_transient_bonds=True
-    )["cgr"]
+    default_cgr = compose_route_cgr(routes, 1, preserve_transient_bonds=False)["cgr"]
+    transient_cgr = compose_route_cgr(routes, 1, preserve_transient_bonds=True)["cgr"]
 
+    assert isinstance(default_cgr, RouteCGRContainer)
+    assert isinstance(transient_cgr, RouteCGRContainer)
     assert 2 not in default_cgr._bonds.get(1, {})
-    assert protected_cgr.connected_components == [{1, 2, 3}]
-    assert str(compose_sb_cgr(protected_cgr)) == str(compose_sb_cgr(default_cgr))
+    assert transient_cgr.connected_components == [{1, 2, 3}]
+    assert str(compose_sb_cgr(transient_cgr)) == str(compose_sb_cgr(default_cgr))
 
-    bond = protected_cgr._bonds[1][2]
+    bond = transient_cgr._bonds[1][2]
     assert isinstance(bond, DynamicBond)
     assert bond.order is None
     assert bond.p_order is None
     assert bond.route_order == 1
-    assert protected_cgr._atoms[1].route_order == {1, 2}
-    assert protected_cgr._atoms[2].route_order == {1, 2}
+    assert transient_cgr._atoms[1].route_order == {1, 2}
+    assert transient_cgr._atoms[2].route_order == {1, 2}
 
     batch_cgr = compose_all_route_cgrs(
         routes, route_id=1, preserve_transient_bonds=True
     )[1]
+    assert isinstance(batch_cgr, RouteCGRContainer)
     batch_bond = batch_cgr._bonds[1][2]
     assert batch_bond.order is None
     assert batch_bond.p_order is None
 
 
+def test_compose_route_cgr_preserves_transient_bonds_by_default():
+    routes = {
+        1: {
+            0: smiles("[CH3:1].[CH3:2][Cl:3]>>[CH3:1][CH3:2].[ClH:3]"),
+            1: smiles("[CH3:1][CH3:2]>>[CH4:1]"),
+        }
+    }
+
+    route_cgr = compose_route_cgr(routes, 1)["cgr"]
+
+    assert isinstance(route_cgr, RouteCGRContainer)
+    bond = route_cgr._bonds[1][2]
+    assert bond.order is None
+    assert bond.p_order is None
+
+
 def test_compose_route_cgr_route_order_uses_route_depth_for_convergent_route():
     routes = {
         1: {
-            0: smiles(
-                "[CH3:1].[CH3:2][Cl:10]>>[CH3:1][CH3:2].[ClH:10]"
-            ),
-            1: smiles(
-                "[CH3:3].[CH3:4][Cl:11]>>[CH3:3][CH3:4].[ClH:11]"
-            ),
+            0: smiles("[CH3:1].[CH3:2][Cl:10]>>[CH3:1][CH3:2].[ClH:10]"),
+            1: smiles("[CH3:3].[CH3:4][Cl:11]>>[CH3:3][CH3:4].[ClH:11]"),
             2: smiles(
                 "[CH3:1][CH3:2].[CH3:3][CH3:4][Cl:12]>>"
                 "[CH3:1][CH2:2][CH2:3][CH3:4].[ClH:12]"
@@ -194,13 +216,8 @@ def test_compose_route_cgr_route_order_uses_route_depth_for_convergent_route():
 def test_compose_route_cgr_route_order_covers_all_final_dynamic_bonds():
     routes = {
         1: {
-            0: smiles(
-                "[CH3:1].[CH3:2][Cl:10]>>[CH3:1][CH3:2].[ClH:10]"
-            ),
-            1: smiles(
-                "[CH3:1][CH3:2].[CH3:3][Cl:11]>>"
-                "[CH3:1][CH2:2][CH3:3].[ClH:11]"
-            ),
+            0: smiles("[CH3:1].[CH3:2][Cl:10]>>[CH3:1][CH3:2].[ClH:10]"),
+            1: smiles("[CH3:1][CH3:2].[CH3:3][Cl:11]>>[CH3:1][CH2:2][CH3:3].[ClH:11]"),
         }
     }
 
@@ -215,3 +232,58 @@ def test_compose_route_cgr_route_order_covers_all_final_dynamic_bonds():
     assert any(bond.order is None for _, _, bond in dynamic_bonds)
     assert all(isinstance(bond, RouteDynamicBond) for _, _, bond in dynamic_bonds)
     assert all(bond.route_order is not None for _, _, bond in dynamic_bonds)
+
+
+def test_compose_sb_cgr_syncs_copied_atom_state_after_charge_reduction():
+    routes = {
+        1: {
+            0: smiles("[NH3+:1][CH3:2]>>[NH2:1][CH3:2]"),
+        }
+    }
+
+    route_cgr = compose_route_cgr(routes, 1)["cgr"]
+    sb_cgr = compose_sb_cgr(route_cgr)
+
+    for atom_num, atom in sb_cgr.atoms():
+        assert atom.charge == sb_cgr._charges[atom_num]
+        assert atom.p_charge == sb_cgr._p_charges[atom_num]
+        assert atom.is_radical == sb_cgr._radicals[atom_num]
+        assert atom.p_is_radical == sb_cgr._p_radicals[atom_num]
+    assert sb_cgr._atoms[1].charge == 0
+    assert "+" not in str(sb_cgr)
+
+
+def test_compose_sb_cgr_preserves_product_side_charge_delta():
+    routes = {
+        1: {
+            0: smiles("[NH2:1][CH3:2]>>[NH3+:1][CH3:2]"),
+        }
+    }
+
+    route_cgr = compose_route_cgr(routes, 1)["cgr"]
+    sb_cgr = compose_sb_cgr(route_cgr)
+
+    assert sb_cgr._charges[1] == 0
+    assert sb_cgr._p_charges[1] == 1
+    assert sb_cgr._atoms[1].charge == 0
+    assert sb_cgr._atoms[1].p_charge == 1
+    assert ">+" in str(sb_cgr)
+
+
+def test_compose_sb_cgr_preserves_unchanged_charged_atoms_with_charge_delta():
+    routes = {
+        1: {
+            0: smiles("[O-:1][CH2:2][NH2:3]>>[O-:1][CH2:2][NH3+:3]"),
+        }
+    }
+
+    route_cgr = compose_route_cgr(routes, 1)["cgr"]
+    sb_cgr = compose_sb_cgr(route_cgr)
+
+    assert sb_cgr._charges[1] == -1
+    assert sb_cgr._p_charges[1] == -1
+    assert sb_cgr._atoms[1].charge == -1
+    assert sb_cgr._atoms[1].p_charge == -1
+    assert sb_cgr._charges[3] == 0
+    assert sb_cgr._p_charges[3] == 1
+    assert "O0>-" not in str(sb_cgr)

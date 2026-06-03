@@ -1,7 +1,5 @@
 import csv
 import json
-import os
-import pickle
 from typing import Any
 
 from chython import smiles as read_smiles
@@ -86,11 +84,12 @@ def read_routes_json(file_path="routes.json", to_dict=False):
 
 
 def read_routes_csv(file_path="routes.csv"):
-    """
-    Read a CSV with columns: route_id, step_id, smiles, meta
-    and return a nested dict mapping
-        route_id (int) -> step_id (int) -> ReactionContainer
-    (ignoring meta for now, but you could extract it if needed).
+    """Read route reactions from a CSV file.
+
+    The input CSV is expected to contain ``route_id``, ``step_id``, ``smiles``,
+    and ``meta`` columns. The ``meta`` value is currently ignored.
+
+    Returns a nested dictionary: ``route_id -> step_id -> ReactionContainer``.
     """
     routes_dict = {}
     with open(file_path, newline="") as csvfile:
@@ -235,11 +234,12 @@ def write_routes_json(
 
 
 def write_routes_csv(routes_dict, file_path="routes.csv"):
-    """
-    Write out a nested routes_dict of the form
-        { route_id: { step_id: reaction_obj, ... }, ... }
-    to a CSV with columns: route_id, step_id, smiles, meta
-    where smiles is format(reaction, 'm') and meta is left blank.
+    """Write route reactions to a CSV file.
+
+    ``routes_dict`` is a nested ``route_id -> step_id -> reaction`` mapping. The
+    output file contains ``route_id``, ``step_id``, ``smiles``, and ``meta``
+    columns; ``smiles`` is written with ``format(reaction, "m")`` and ``meta``
+    is left blank.
     """
     with open(file_path, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -283,92 +283,3 @@ def export_tree_to_csv(tree: Tree, file_path: str = "routes.csv", route_id=None)
     if routes_dict is None:
         raise ValueError("Failed to extract reactions for the specified route_id.")
     write_routes_csv(routes_dict, file_path)
-
-
-class TreeWrapper:
-    def __init__(self, tree, mol_id=1, config=1, path="planning_results/forest"):
-        """Initializes the TreeWrapper."""
-        self.tree = tree
-        self.mol_id = mol_id
-        self.config = config
-        self.path = path
-        # Ensure the directory exists before creating the filename
-        os.makedirs(self.path, exist_ok=True)
-        self.filename = os.path.join(self.path, f"tree_{mol_id}_{config}.pkl")
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        tree_state = self.tree.__dict__.copy()
-        # Reset or remove non-pickleable attributes (e.g., _tqdm, policy_network, value_network)
-        if "_tqdm" in tree_state:
-            tree_state["_tqdm"] = True  # Reset to a simple flag
-        for attr in ["policy_network", "value_network"]:
-            if attr in tree_state:
-                tree_state[attr] = None
-        state["tree_state"] = tree_state
-        del state["tree"]
-        return state
-
-    def __setstate__(self, state):
-        tree_state = state.pop("tree_state")
-        self.__dict__.update(state)
-        new_tree = Tree.__new__(Tree)
-        new_tree.__dict__.update(tree_state)
-        self.tree = new_tree
-
-    def save_tree(self):
-        """Saves the TreeWrapper instance (including the tree state) to a file."""
-        try:
-            with open(self.filename, "wb") as f:
-                pickle.dump(self, f)
-            print(
-                f"Tree wrapper for mol_id '{self.mol_id}', config '{self.config}' saved to '{self.filename}'."
-            )
-        except Exception as e:
-            print(f"Error saving tree to {self.filename}: {e}")
-
-    @classmethod
-    def load_tree_from_id(cls, mol_id, config=1, path="planning_results/forest"):
-        """
-        Loads a Tree object from a saved file using mol_id and config.
-
-        Args:
-            mol_id: The molecule ID used for saving.
-            config: The configuration used for saving.
-            path: The directory where the file is located
-
-        Returns:
-            The loaded Tree object, or None if loading fails.
-        """
-        filename = os.path.join(path, f"tree_{mol_id}_{config}.pkl")
-        print(f"Attempting to load tree from: {filename}")
-        try:
-            # Ensure the 'Tree' class is defined in the current scope
-            if "Tree" not in globals() and "Tree" not in locals():
-                raise NameError(
-                    "The 'Tree' class definition is required to load the object."
-                )
-
-            with open(filename, "rb") as f:
-                loaded_wrapper = pickle.load(f)  # This implicitly calls __setstate__
-
-            print(
-                f"Tree object for mol_id '{mol_id}', config '{config}' successfully loaded from '{filename}'."
-            )
-            # The __setstate__ method already reconstructed the tree inside the wrapper
-            return loaded_wrapper.tree
-
-        except FileNotFoundError:
-            print(f"Error: File not found at {filename}")
-            return None
-        except (pickle.UnpicklingError, EOFError) as e:
-            print(
-                f"Error: Could not unpickle file {filename}. It might be corrupted or empty. Details: {e}"
-            )
-            return None
-        except NameError as e:
-            print(f"Error during loading: {e}. Ensure 'Tree' class is defined.")
-            return None
-        except Exception as e:
-            print(f"An unexpected error occurred loading tree from {filename}: {e}")
-            return None

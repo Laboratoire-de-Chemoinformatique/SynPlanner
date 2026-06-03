@@ -4,9 +4,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from chython.containers import CGRContainer, ReactionContainer
+from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
 
+from synplan.chem.reaction_routes.analysis import route_cgr_pseudo_reactants_by_role
 from synplan.chem.reaction_routes.io import (
     make_dict,
     make_json,
@@ -15,7 +16,7 @@ from synplan.chem.reaction_routes.io import (
 )
 from synplan.chem.reaction_routes.leaving_groups import *
 from synplan.chem.reaction_routes.route_cgr import *
-from synplan.chem.reaction_routes.visualisation import *
+from synplan.chem.reaction_routes.depiction import *
 from synplan.utils.visualisation import (
     routes_clustering_report,
     routes_subclustering_report,
@@ -82,7 +83,7 @@ def run_cluster_cli(
             routes_json, clusters, idx, sb_cgrs, html_path=str(report_path)
         )
 
-    # Optional subclustering (Under development)
+    # Optional subclustering
     if perform_subcluster and subcluster_results_dir:
         click.echo("\nSubClustering")
         sub_dir = cluster_results_dir / subcluster_results_dir
@@ -98,9 +99,6 @@ def run_cluster_cli(
                 routes_subclustering_report(
                     routes_json,
                     subcluster,
-                    cluster_idx,
-                    sub_idx,
-                    sb_cgrs,
                     aam=False,
                     html_path=str(subreport_path),
                 )
@@ -440,6 +438,47 @@ def lg_reaction_replacer(
     return new_reactants
 
 
+def supporting_groups_from_route_cgr(route_cgr: CGRContainer) -> dict[int, tuple]:
+    """Return route-supporting pseudo-reactants indexed as Y markers."""
+
+    supporting = route_cgr_pseudo_reactants_by_role(route_cgr)["supporting"]
+    return {idx: (mol, None) for idx, mol in enumerate(supporting, start=1)}
+
+
+def _marked_y_molecule(mark: int, atom_num: int) -> MoleculeContainer:
+    mol = MoleculeContainer()
+    atom = MarkedY()
+    atom.mark = mark
+    atom.isotope = mark
+    mol.add_atom(atom, atom_num)
+    return mol
+
+
+def replace_supporting_reactants_with_y(
+    synthon_reaction: ReactionContainer,
+) -> ReactionContainer:
+    """Replace whole supporting reactants in a synthon reaction with Y markers."""
+
+    if not synthon_reaction.products:
+        return synthon_reaction
+
+    target_mol = synthon_reaction.products[0]
+    target_atoms = set(target_mol._atoms)
+    max_atom_idx = max(target_atoms, default=0)
+    new_reactants = []
+    y_mark = 1
+
+    for reactant in synthon_reaction.reactants:
+        if set(reactant._atoms) & target_atoms:
+            new_reactants.append(reactant)
+            continue
+
+        new_reactants.append(_marked_y_molecule(y_mark, max_atom_idx + y_mark))
+        y_mark += 1
+
+    return ReactionContainer(reactants=new_reactants, products=[target_mol])
+
+
 class SubclusterError(Exception):
     """Raised when subcluster_one_cluster cannot complete successfully."""
 
@@ -465,7 +504,8 @@ def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
     -------
     dict or None
         If successful, returns a dict mapping each `route_id` to a tuple:
-        `(sb_cgr, original_reaction, synthon_cgr, new_reaction, lg_groups)`.
+        `(sb_cgr, original_reaction, synthon_cgr, synthon_reaction,
+        lg_groups, lg_sizes, supporting_groups)`.
         Or raises SubclusterError on any failure: if any step (X replacement or reaction
         parsing) fails for a route.
 
@@ -504,6 +544,8 @@ def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
             max_atom_idx = max(target_mol._atoms)
             new_reactants = lg_reaction_replacer(synthon_rxn, lg_groups, max_atom_idx)
             new_rxn = ReactionContainer(reactants=new_reactants, products=[target_mol])
+            new_rxn = replace_supporting_reactants_with_y(new_rxn)
+            supporting_groups = supporting_groups_from_route_cgr(route_cgr)
         except (IndexError, TypeError) as e:
             raise SubclusterError(
                 f"Leaving group (X) reaction replacement failed for route {route_id}"
@@ -516,55 +558,32 @@ def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
             new_rxn,
             lg_groups,
             lg_sizes,
+            supporting_groups,
         )
 
     return result
 
 
-def group_routes_by_synthon_detail(data_dict: dict[Any, list]) -> dict[str, dict]:
-    """
-    Groups routes based on synthon CGR (result_list[0]), reaction data, and lg_sizes.
-    The final group index is formatted as "{lg_sizes}_{temp_index}".
+def group_routes_by_synthon_detail(
+    data_dict: dict[Any, list], cluster_id: str | None = None
+) -> dict[str, dict]:
+    """Group routes by synthon reaction details.
 
-    Args:
-        data_dict: Dictionary {route_id: [sb_cgr, unlabeled_reaction, synthon_cgr, synthon_reaction,
-                                         route_specific_data, lg_sizes, ...]}.
-
-    Returns:
-        Dictionary {
-            group_index (str): {
-                'sb_cgr': ...,
-                'unlabeled_reaction': ...,
-                'synthon_cgr': ...,
-                'synthon_reaction': ...,
-                'routes_data': {route_id: route_specific_data, ...},
-                'lg_sizes': ...,
-                'post_processed': False
-            }
-        }
+    The input maps ``route_id`` to the tuple returned by
+    ``subcluster_one_cluster``. Routes are grouped by SB-CGR string, synthon
+    reaction string, and leaving-group sizes. Each output subgroup contains the
+    representative CGRs/reactions, grouped route IDs, leaving-group data, and
+    supporting-group data.
     """
     # 1. Bucket route_ids by their grouping key
     temp_groups = defaultdict(list)
     for route_id, result_list in data_dict.items():
         # unpack values with defaults
         sb_cgr = result_list[0] if len(result_list) > 0 else None
-        unlabeled_reaction = result_list[1] if len(result_list) > 1 else None
-        synthon_cgr = result_list[2] if len(result_list) > 2 else None
         synthon_reaction = result_list[3] if len(result_list) > 3 else None
         lg_sizes = result_list[5] if len(result_list) > 5 else None
 
-        # Attempt to use all parts of the key; skip if unhashable
-        try:
-            group_key = (
-                sb_cgr,
-                unlabeled_reaction,
-                synthon_cgr,
-                synthon_reaction,
-                lg_sizes,
-            )
-        except TypeError:
-            print(f"Warning: Skipping route {route_id} due to unhashable key element.")
-            continue
+        group_key = (str(sb_cgr), str(synthon_reaction), lg_sizes)
 
         temp_groups[group_key].append(route_id)
 
@@ -576,7 +595,7 @@ def group_routes_by_synthon_detail(data_dict: dict[Any, list]) -> dict[str, dict
     counters = defaultdict(int)  # counters per lg_sizes
 
     for group_key, route_ids in sorted_groups:
-        sb_cgr, unlabeled_reaction, synthon_cgr, synthon_reaction, lg_sizes = group_key
+        _sb_key, _synthon_key, lg_sizes = group_key
 
         # Increment the counter for this lg_sizes
         counters[lg_sizes] += 1
@@ -585,16 +604,24 @@ def group_routes_by_synthon_detail(data_dict: dict[Any, list]) -> dict[str, dict
 
         # Collect the route-specific data (at index 4) for each route
         routes_data = {}
+        supporting_data = {}
         for rid in sorted(route_ids):
             orig = data_dict.get(rid, [])
             routes_data[rid] = orig[4] if len(orig) > 4 else None
+            supporting_data[rid] = orig[6] if len(orig) > 6 else {}
+
+        representative = data_dict[route_ids[0]]
 
         final_groups[group_index] = {
-            "sb_cgr": sb_cgr,
-            "unlabeled_reaction": unlabeled_reaction,
-            "synthon_cgr": synthon_cgr,
-            "synthon_reaction": synthon_reaction,
+            "cluster_id": cluster_id,
+            "subcluster_id": group_index,
+            "route_ids": sorted(route_ids),
+            "sb_cgr": representative[0],
+            "unlabeled_reaction": representative[1],
+            "synthon_cgr": representative[2],
+            "synthon_reaction": representative[3],
             "routes_data": routes_data,
+            "supporting_data": supporting_data,
             "lg_sizes": lg_sizes,
             "post_processed": False,
         }
@@ -629,7 +656,9 @@ def subcluster_all_clusters(groups, sb_cgrs_dict, route_cgrs_dict):
         group_synthons = subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict)
         if group_synthons is None:
             return None
-        all_subgroups[group_index] = group_routes_by_synthon_detail(group_synthons)
+        all_subgroups[group_index] = group_routes_by_synthon_detail(
+            group_synthons, cluster_id=group_index
+        )
     return all_subgroups
 
 
@@ -671,7 +700,7 @@ def all_lg_collect(subgroup):
     return result
 
 
-def replace_leaving_groups_in_synthon(subgroup, to_remove):  # Under development
+def replace_leaving_groups_in_synthon(subgroup, to_remove):
     """
     Replace specified leaving groups (LG) in a synthon CGR with new fragments and return the updated CGR
     along with a mapping from adjusted LG marks to their atom indices.
@@ -785,9 +814,25 @@ def new_lg_reaction_replacer(synthon_reaction, new_lgs, max_in_target_mol):
     return new_reactants
 
 
-def post_process_subgroup(
-    subgroup,
-):  # Under development: Error in replace_leaving_groups_in_synthon , 'cuz synthon_reaction.clean2d crashes
+def remove_and_shift(nested_dict, to_remove):
+    """Remove selected route-data positions and close the index gaps."""
+
+    rem_set = set(to_remove)
+
+    result = {}
+    for outer_k, inner in nested_dict.items():
+        new_inner = {}
+        for old_k, v in inner.items():
+            if old_k in rem_set:
+                continue
+            shift = sum(1 for r in rem_set if r < old_k)
+            new_k = old_k - shift
+            new_inner[new_k] = v
+        result[outer_k] = new_inner
+    return result
+
+
+def post_process_subgroup(subgroup):
     """
     Drop leaving-groups common to all pathways and rebuild a minimal synthon.
 
@@ -819,7 +864,7 @@ def post_process_subgroup(
     synthon_reaction = ReactionContainer.from_cgr(new_synthon_cgr)
     synthon_reaction.clean2d()
     old_reactants = ReactionContainer.from_cgr(new_synthon_cgr).reactants
-    target_mol = synthon_reaction.products[0]  # TO DO: target_mol might be non 0
+    target_mol = synthon_reaction.products[0]
     max_in_target_mol = max(target_mol._atoms)
     new_reactants = new_lg_reaction_replacer(
         synthon_reaction, new_lgs, max_in_target_mol
@@ -827,34 +872,25 @@ def post_process_subgroup(
     new_synthon_reaction = ReactionContainer(
         reactants=new_reactants, products=[target_mol]
     )
+    new_synthon_reaction = replace_supporting_reactants_with_y(new_synthon_reaction)
     new_synthon_reaction.clean2d()
     subgroup["synthon_reaction"] = new_synthon_reaction
     subgroup["routes_data"] = remove_and_shift(subgroup["routes_data"], to_remove)
     subgroup["post_processed"] = True
     subgroup["group_lgs"] = group_by_identical_values(subgroup["routes_data"])
+    if "supporting_data" in subgroup:
+        subgroup["group_supporting"] = group_by_identical_values(
+            subgroup["supporting_data"]
+        )
     return subgroup
 
 
-def group_by_identical_values(routes_data):  # Under development
-    """
-    Groups entries in a nested dictionary based on identical sets of core values.
+def group_by_identical_values(routes_data):
+    """Group route IDs whose nested values are identical.
 
-    Identifies route IDs whose inner dictionaries contain the
-    same sequence of leaving groups, when ordered by subkey. These are collapsed into a single entry.
-
-    Args:
-        routes_data (dict): A dictionary mapping outer keys to inner dictionaries.
-            Each inner dictionary maps subkeys to a tuple `(value_obj, other_info)`.
-            `value_obj` is used for grouping, `other_info` is ignored.
-            Example: {'route_1': {'pos_a': (1, 'infoA'), 'pos_b': (2, 'infoB')}, ...}
-
-    Returns:
-        dict: A dictionary where:
-            - Keys are tuples of the original outer keys that were grouped.
-            - Values are dictionaries mapping the original subkeys to the
-              `value_obj` from the first outer key in the group's tuple.
-            The dictionary is sorted descending by the number of grouped outer keys.
-            Example: {('route_1', 'route_2'): {'pos_a': 1, 'pos_b': 2}, ...}
+    Each inner dictionary is ordered by subkey and compared using only the first
+    element of each tuple value. The result maps grouped route-ID tuples to the
+    representative value dictionary and is sorted by descending group size.
     """
     # Step 1: Build a signature for each outer key: the tuple of all first-elements in its inner dict
     signature_map = defaultdict(list)

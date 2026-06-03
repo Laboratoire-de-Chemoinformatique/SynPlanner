@@ -89,11 +89,10 @@ Pickled trees from 1.4.x
 ------------------------
 
 Pickled ``Tree`` instances from 1.4.x are *partially* compatible with
-1.5.0. Direct unpickling (via
-:meth:`~synplan.mcts.tree.TreeWrapper.load_tree_from_id` or equivalent)
-still succeeds because ``TreeWrapper.__setstate__`` uses
-``Tree.__new__(Tree)`` plus ``__dict__.update``, so legacy attributes
-survive verbatim.
+1.5.0 only when loaded through project-specific legacy unpickling code.
+The old reaction-route tree wrapper has been removed from the public API.
+When a legacy pickle can still be loaded, its legacy attributes survive
+verbatim.
 
 Code paths that only read ``tree.synthesis_route``,
 ``tree.route_to_node``, or ``tree.nodes[id].precursors_to_expand``

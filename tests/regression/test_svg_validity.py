@@ -2,7 +2,7 @@
 
 Two bug classes are guarded:
 
-Malformed SVG: a typo in an f-string in ``visualisation.py`` (missing
+Malformed SVG: a typo in an f-string in ``depiction.py`` (missing
 closing quote after a colour interpolation in the ``order==2, p_order==3``
 bond branch) produces unparseable XML that breaks the entire ``<svg>``
 document. Invariant: any depiction we produce must parse via
@@ -41,7 +41,7 @@ def two_cgrs(simple_cgr, diels_alder_cgr):
 def test_depict_produces_parseable_svg(simple_cgr):
     """``CGRContainer.depict()`` must return parseable XML.
 
-    Catches the broken f-string in ``visualisation.py`` (the missing closing
+    Catches the broken f-string in ``depiction.py`` (the missing closing
     quote after ``{formed}`` in the wide-bond DynamicBond branch) and any
     future SVG-formatting regression that emits malformed XML.
     """
@@ -54,7 +54,7 @@ def test_depict_produces_parseable_svg(simple_cgr):
     except ET.ParseError as e:
         pytest.fail(
             f"CGRContainer.depict() produced unparseable XML: {e}. Likely "
-            "cause: an f-string in visualisation.py emits malformed "
+            "cause: an f-string in depiction.py emits malformed "
             "attribute syntax (e.g. missing closing quote)."
         )
 
@@ -62,7 +62,7 @@ def test_depict_produces_parseable_svg(simple_cgr):
 def test_cgr_display_produces_parseable_svg(simple_cgr):
     """``cgr_display`` must also return parseable XML; its wide-bond branch
     is where the f-string bug lives."""
-    from synplan.chem.reaction_routes.visualisation import cgr_display
+    from synplan.chem.reaction_routes.depiction import cgr_display
 
     svg = cgr_display(simple_cgr)
     assert isinstance(svg, str) and svg.strip()
@@ -71,9 +71,29 @@ def test_cgr_display_produces_parseable_svg(simple_cgr):
     except ET.ParseError as e:
         pytest.fail(
             f"cgr_display produced unparseable XML: {e}. Likely the broken "
-            "f-string at visualisation.py:203 in the order==2/p_order==3 "
+            "f-string at depiction.py:203 in the order==2/p_order==3 "
             "DynamicBond branch fired for this CGR."
         )
+
+
+def test_route_cgr_container_import_is_depiction_lazy():
+    import subprocess
+    import sys
+
+    code = (
+        "import sys; "
+        "import synplan.chem.reaction_routes.route_cgr_container; "
+        "raise SystemExit("
+        "'synplan.chem.reaction_routes.depiction' in sys.modules"
+        ")"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_cgr_depiction_renders_none_none_dynamic_bond_blue():
@@ -82,14 +102,12 @@ def test_cgr_depiction_renders_none_none_dynamic_bond_blue():
 
     from chython import smiles
 
+    from synplan.chem.reaction_routes.depiction import cgr_display
     from synplan.chem.reaction_routes.route_cgr import compose_route_cgr
-    from synplan.chem.reaction_routes.visualisation import cgr_display
 
     routes = {
         1: {
-            0: smiles(
-                "[CH3:1].[CH3:2][Cl:3]>>[CH3:1][CH3:2].[ClH:3]"
-            ),
+            0: smiles("[CH3:1].[CH3:2][Cl:3]>>[CH3:1][CH3:2].[ClH:3]"),
             1: smiles("[CH3:1][CH3:2]>>[CH4:1]"),
         }
     }
@@ -110,6 +128,56 @@ def test_cgr_depiction_renders_none_none_dynamic_bond_blue():
     assert 'stroke="blue"' in roundtrip.depict()
 
 
+@pytest.fixture
+def transient_route_cgr():
+    from chython import smiles
+
+    from synplan.chem.reaction_routes.route_cgr import compose_route_cgr
+
+    routes = {
+        1: {
+            0: smiles("[CH3:1].[CH3:2][Cl:3]>>[CH3:1][CH3:2].[ClH:3]"),
+            1: smiles("[CH3:1][CH3:2]>>[CH4:1]"),
+        }
+    }
+    return compose_route_cgr(routes, 1, preserve_transient_bonds=True)["cgr"]
+
+
+def _route_cgr_renderer_attrs(route_cls):
+    attrs = ("_render_bonds", "_DepictCGR__render_aromatic_bond")
+    return {attr: route_cls.__dict__.get(attr) for attr in attrs}
+
+
+def test_route_cgr_depict_restores_renderer_attrs(transient_route_cgr):
+    route_cls = transient_route_cgr.__class__
+    before = _route_cgr_renderer_attrs(route_cls)
+
+    svg = transient_route_cgr.depict()
+
+    assert 'stroke="blue"' in svg
+    assert _route_cgr_renderer_attrs(route_cls) == before
+
+
+def test_route_cgr_depict_restores_renderer_attrs_after_error(
+    monkeypatch,
+    transient_route_cgr,
+):
+    from chython.containers import CGRContainer
+
+    route_cls = transient_route_cgr.__class__
+    before = _route_cgr_renderer_attrs(route_cls)
+
+    def fail_depict(*args, **kwargs):
+        raise RuntimeError("forced depict failure")
+
+    monkeypatch.setattr(CGRContainer, "depict", fail_depict)
+
+    with pytest.raises(RuntimeError, match="forced depict failure"):
+        transient_route_cgr.depict()
+
+    assert _route_cgr_renderer_attrs(route_cls) == before
+
+
 def test_cgr_display_does_not_leak_state_into_depict(two_cgrs):
     """``cgr_display`` must not permanently alter ``CGRContainer`` methods.
 
@@ -124,14 +192,13 @@ def test_cgr_display_does_not_leak_state_into_depict(two_cgrs):
     """
     from chython.containers import CGRContainer
 
-    from synplan.chem.reaction_routes.visualisation import cgr_display
+    from synplan.chem.reaction_routes.depiction import cgr_display
 
     _, cgr_b = two_cgrs
 
     attrs_to_check = (
         "_render_bonds",
-        "_CGRContainer__render_aromatic_bond",
-        "_WideBondDepictCGR__render_aromatic_bond",
+        "_DepictCGR__render_aromatic_bond",
     )
     before = {a: CGRContainer.__dict__.get(a) for a in attrs_to_check}
     _ = cgr_display(cgr_b)
