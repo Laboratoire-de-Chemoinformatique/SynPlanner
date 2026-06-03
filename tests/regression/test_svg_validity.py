@@ -80,19 +80,36 @@ def test_route_cgr_container_import_is_depiction_lazy():
     import subprocess
     import sys
 
+    def subprocess_stream(value):
+        if value is None:
+            return "<empty>"
+        if isinstance(value, bytes):
+            value = value.decode("utf-8", errors="replace")
+        return value or "<empty>"
+
     code = (
-        "import sys; "
+        "import faulthandler, sys; "
+        "faulthandler.dump_traceback_later(20, file=sys.stderr); "
         "import synplan.chem.reaction_routes.route_cgr_container; "
         "raise SystemExit("
         "'synplan.chem.reaction_routes.depiction' in sys.modules"
         ")"
     )
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired as e:
+        pytest.fail(
+            "Timed out after 30s importing route_cgr_container in a "
+            "subprocess. Captured child-process output follows.\n\n"
+            f"stdout:\n{subprocess_stream(e.stdout)}\n\n"
+            f"stderr:\n{subprocess_stream(e.stderr)}"
+        )
     assert result.returncode == 0, result.stderr
 
 
