@@ -1,13 +1,48 @@
+from chython import smiles
+
 from synplan.chem.reaction_routes.analysis import (
+    collect_bb_usage_stats,
     compare_sb_cgr_clusters,
     flatten_route_id_groups,
     route_cgr_overlap_rows,
     route_cgr_subset,
+    route_ids_with_exact_bb,
 )
+from synplan.chem.reaction_routes.notebook_plots import top_bb_usage_rows
+from synplan.chem.reaction_routes.route_cgr import compose_route_cgr
+
+
+def _route_cgr():
+    routes = {
+        1: {
+            0: smiles("[CH3:1].[CH3:2][Cl:3]>>[CH3:1][CH3:2].[ClH:3]"),
+        }
+    }
+    return compose_route_cgr(routes, 1, preserve_transient_bonds=True)["cgr"]
+
+
+def test_route_ids_with_exact_bb_matches_exact_pseudo_reactants():
+    route_cgr = _route_cgr()
+
+    assert route_ids_with_exact_bb("ClC", {7: route_cgr}, kind="real") == [7]
+    assert route_ids_with_exact_bb("CC", {7: route_cgr}, kind="real") == []
+    assert route_ids_with_exact_bb("ClC", {7: route_cgr}, kind="supporting") == []
+
+
+def test_collect_bb_usage_stats_classifies_target_atom_overlap():
+    route_cgr = _route_cgr()
+
+    stats = collect_bb_usage_stats({7: route_cgr})
+
+    assert "ClC" in stats["real_bb"]
+    assert stats["real_bb"]["ClC"]["route_ids"] == [7]
+    assert stats["real_bb"]["ClC"]["route_count"] == 1
+    assert stats["supporting"] == {}
+    assert "ClC" in stats["by_route"][7]["real_bb"]
 
 
 def test_route_id_helpers():
-    route_cgr = object()
+    route_cgr = _route_cgr()
 
     assert flatten_route_id_groups({"a": [3, 1], "b": [2]}) == [1, 2, 3]
     assert route_cgr_subset({7: route_cgr, 8: None}, [7]) == {7: route_cgr}
@@ -60,3 +95,16 @@ def test_compare_sb_cgr_clusters():
     assert result["unique_cluster_ids_1"] == ["1.1"]
     assert result["overlap_cluster_ids"] == [("1.2", "2.1")]
     assert result["unique_cluster_ids_2"] == ["2.2"]
+
+
+def test_top_bb_usage_rows_filters_and_sorts():
+    stats = {
+        "CC": {"route_count": 99, "occurrences": 99},
+        "CCCC": {"route_count": 2, "occurrences": 4},
+        "CCCO": {"route_count": 3, "occurrences": 3},
+    }
+
+    assert top_bb_usage_rows(stats, top_n=2, min_mol_size=4) == [
+        ("CCCO", 3, 3),
+        ("CCCC", 2, 4),
+    ]
