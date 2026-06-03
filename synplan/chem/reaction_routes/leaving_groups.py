@@ -41,6 +41,21 @@ class Marked(At):
     def __str__(self):
         return repr(self)
 
+    def __eq__(self, other):
+        if not isinstance(other, Marked):
+            return NotImplemented
+        return (
+            self.isotope,
+            getattr(self, "atomic_number", 0),
+            getattr(self, "charge", 0),
+            getattr(self, "is_radical", False),
+        ) == (
+            other.isotope,
+            getattr(other, "atomic_number", 0),
+            getattr(other, "charge", 0),
+            getattr(other, "is_radical", False),
+        )
+
     def __hash__(self):
         return hash(
             (
