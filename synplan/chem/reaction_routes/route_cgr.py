@@ -60,51 +60,90 @@ def _route_order_depths(reactions):
     return [depth(idx) for idx in range(len(reactions))]
 
 
-def _record_route_orders(cgr, route_order, bond_route_orders, atom_route_orders):
+def _record_route_orders(
+    cgr,
+    route_order,
+    route_step_order,
+    bond_route_orders,
+    atom_route_orders,
+    bond_route_step_orders,
+    atom_route_step_orders,
+):
+    """Collect route depth and chronological step metadata after remapping."""
+
     for atom_num, atom in cgr._atoms.items():
         if getattr(atom, "is_dynamic", False):
             atom_route_orders.setdefault(atom_num, set()).add(route_order)
+            atom_route_step_orders.setdefault(atom_num, set()).add(
+                route_step_order
+            )
 
     for atom1, atom2, bond in cgr.bonds():
         if bond.order == bond.p_order:
             continue
         key = _bond_key(atom1, atom2)
         bond_route_orders.setdefault(key, set()).add(route_order)
+        bond_route_step_orders.setdefault(key, set()).add(route_step_order)
         atom_route_orders.setdefault(atom1, set()).add(route_order)
         atom_route_orders.setdefault(atom2, set()).add(route_order)
+        atom_route_step_orders.setdefault(atom1, set()).add(route_step_order)
+        atom_route_step_orders.setdefault(atom2, set()).add(route_step_order)
 
 
 def _set_bond(cgr, atom1, atom2, bond):
     cgr._bonds[atom1][atom2] = cgr._bonds[atom2][atom1] = bond
 
 
-def _apply_route_orders(cgr, bond_route_orders, atom_route_orders):
+def _apply_route_orders(
+    cgr,
+    bond_route_orders,
+    atom_route_orders,
+    bond_route_step_orders,
+    atom_route_step_orders,
+):
     for atom1, atom2, bond in list(cgr.bonds()):
         if bond.order == bond.p_order and bond.order is not None:
             continue
-        route_orders = bond_route_orders.get(_bond_key(atom1, atom2))
+        key = _bond_key(atom1, atom2)
+        route_orders = bond_route_orders.get(key)
         if not route_orders:
             atom1_orders = atom_route_orders.get(atom1, set())
             atom2_orders = atom_route_orders.get(atom2, set())
             route_orders = (atom1_orders & atom2_orders) or (
                 atom1_orders | atom2_orders
             )
-        if not route_orders:
+        route_step_orders = bond_route_step_orders.get(key)
+        if not route_step_orders:
+            atom1_steps = atom_route_step_orders.get(atom1, set())
+            atom2_steps = atom_route_step_orders.get(atom2, set())
+            route_step_orders = (atom1_steps & atom2_steps) or (
+                atom1_steps | atom2_steps
+            )
+        if not route_orders and not route_step_orders:
             continue
-        route_order = min(route_orders)
+        route_order = min(route_orders) if route_orders else None
         if isinstance(bond, RouteDynamicBond):
             bond.route_order = route_order
+            bond.route_step_order = set(route_step_orders)
         else:
             _set_bond(
                 cgr,
                 atom1,
                 atom2,
-                RouteDynamicBond.from_bond(bond, route_order),
+                RouteDynamicBond.from_bond(
+                    bond,
+                    route_order,
+                    route_step_orders,
+                ),
             )
 
-    for atom_num, route_orders in atom_route_orders.items():
+    for atom_num in sorted(set(atom_route_orders) | set(atom_route_step_orders)):
         if atom_num in cgr._atoms:
-            cgr._atoms[atom_num] = route_atom(cgr._atoms[atom_num], route_orders)
+            cgr._atoms[atom_num] = route_atom(
+                cgr._atoms[atom_num],
+                atom_route_orders.get(atom_num, set()),
+                atom_route_step_orders.get(atom_num, set()),
+            )
 
     cgr.flush_cache()
     return cgr
@@ -470,10 +509,21 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
         reactions = [step_map[i] for i in sorted_ids]
         cgrs = [rxn.compose() for rxn in reactions]
         route_orders = _route_order_depths(reactions)
+        # Depth is kept for route interpretation; step order preserves exact
+        # chronological route identity for hashing.
+        route_step_orders = list(range(1, len(reactions) + 1))
         bond_route_orders = {}
         atom_route_orders = {}
+        bond_route_step_orders = {}
+        atom_route_step_orders = {}
         _record_route_orders(
-            cgrs[-1], route_orders[-1], bond_route_orders, atom_route_orders
+            cgrs[-1],
+            route_orders[-1],
+            route_step_orders[-1],
+            bond_route_orders,
+            atom_route_orders,
+            bond_route_step_orders,
+            atom_route_step_orders,
         )
 
         # start from the last (final) reaction
@@ -489,14 +539,26 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
                 curr_cgr, accum_cgr, max_num
             )
             _record_route_orders(
-                curr_cgr, route_orders[idx], bond_route_orders, atom_route_orders
+                curr_cgr,
+                route_orders[idx],
+                route_step_orders[idx],
+                bond_route_orders,
+                atom_route_orders,
+                bond_route_step_orders,
+                atom_route_step_orders,
             )
             accum_cgr = _compose_cgrs(
                 curr_cgr, accum_cgr, preserve_transient_bonds
             )
             reactions_dict[idx] = ReactionContainer.from_cgr(curr_cgr)
 
-        _apply_route_orders(accum_cgr, bond_route_orders, atom_route_orders)
+        _apply_route_orders(
+            accum_cgr,
+            bond_route_orders,
+            atom_route_orders,
+            bond_route_step_orders,
+            atom_route_step_orders,
+        )
         accum_cgr = enable_route_cgr_container(accum_cgr)
         return {"cgr": accum_cgr, "reactions_dict": reactions_dict}
 
@@ -507,10 +569,21 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
         reactions = tree.synthesis_route(route_id)
         cgrs = [rxn.compose() for rxn in reactions]
         route_orders = _route_order_depths(reactions)
+        # Depth is kept for route interpretation; step order preserves exact
+        # chronological route identity for hashing.
+        route_step_orders = list(range(1, len(reactions) + 1))
         bond_route_orders = {}
         atom_route_orders = {}
+        bond_route_step_orders = {}
+        atom_route_step_orders = {}
         _record_route_orders(
-            cgrs[-1], route_orders[-1], bond_route_orders, atom_route_orders
+            cgrs[-1],
+            route_orders[-1],
+            route_step_orders[-1],
+            bond_route_orders,
+            atom_route_orders,
+            bond_route_step_orders,
+            atom_route_step_orders,
         )
 
         first_react = reactions[-1]
@@ -580,7 +653,13 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
                 react_dict, reaction, conflict_mapping
             )
             _record_route_orders(
-                curr_cgr, route_orders[step], bond_route_orders, atom_route_orders
+                curr_cgr,
+                route_orders[step],
+                route_step_orders[step],
+                bond_route_orders,
+                atom_route_orders,
+                bond_route_step_orders,
+                atom_route_step_orders,
             )
 
             reactions_dict[step] = ReactionContainer.from_cgr(curr_cgr)
@@ -588,7 +667,13 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
                 curr_cgr, accum_cgr, preserve_transient_bonds
             )
 
-        _apply_route_orders(accum_cgr, bond_route_orders, atom_route_orders)
+        _apply_route_orders(
+            accum_cgr,
+            bond_route_orders,
+            atom_route_orders,
+            bond_route_step_orders,
+            atom_route_step_orders,
+        )
         accum_cgr = enable_route_cgr_container(accum_cgr)
         return {"cgr": accum_cgr, "reactions_dict": reactions_dict}
 

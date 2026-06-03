@@ -13,18 +13,20 @@ from typing import Any
 
 from synplan.chem.reaction_routes.route_cgr import _bond_key
 
-HASH_SCHEMA = "route-cgr-exact-v1"
-BUCKET_HASH_SCHEMA = "route-cgr-wl-bucket-v1"
-ROUTE_ORDER_AGNOSTIC_HASH_SCHEMA = "route-cgr-exact-without-route-order-v1"
+HASH_SCHEMA = "route-cgr-exact-v2"
+BUCKET_HASH_SCHEMA = "route-cgr-wl-bucket-v2"
+ROUTE_ORDER_AGNOSTIC_HASH_SCHEMA = "route-cgr-exact-without-route-order-v2"
 ROUTE_ORDER_AGNOSTIC_BUCKET_HASH_SCHEMA = (
-    "route-cgr-wl-bucket-without-route-order-v1"
+    "route-cgr-wl-bucket-without-route-order-v2"
 )
 HASH_INCLUDES = (
     "atom element, isotope, charge, radical state",
     "dynamic atom product charge and radical state",
-    "atom route_order values",
+    "atom route_order depth values",
+    "atom route_step_order chronological values",
     "bond order and product order",
-    "bond route_order value",
+    "bond route_order depth value",
+    "bond route_step_order chronological values",
     "transient bonds encoded as (None, None)",
 )
 HASH_EXCLUDES = (
@@ -131,6 +133,11 @@ def atom_label(
                 if include_route_order
                 else []
             ),
+            "route_step_orders": (
+                _route_orders(getattr(atom, "route_step_order", None))
+                if include_route_order
+                else []
+            ),
         }
     )
 
@@ -144,6 +151,11 @@ def bond_label(bond: Any, *, include_route_order: bool = True) -> str:
             "p_order": bond.p_order,
             "route_orders": (
                 _route_orders(getattr(bond, "route_order", None))
+                if include_route_order
+                else []
+            ),
+            "route_step_orders": (
+                _route_orders(getattr(bond, "route_step_order", None))
                 if include_route_order
                 else []
             ),
@@ -419,7 +431,7 @@ def route_cgr_hash(route_cgr: Any) -> str:
 
 
 def route_cgr_fingerprint_without_route_order(route_cgr: Any) -> dict[str, Any]:
-    """Return exact RouteCGR fingerprint while ignoring atom/bond route_order."""
+    """Return exact RouteCGR fingerprint while ignoring route-order metadata."""
 
     return _route_cgr_fingerprint_from_prepared(
         _prepare_route_cgr(route_cgr, include_route_order=False),
@@ -428,7 +440,7 @@ def route_cgr_fingerprint_without_route_order(route_cgr: Any) -> dict[str, Any]:
 
 
 def route_cgr_hash_without_route_order(route_cgr: Any) -> str:
-    """Return an exact RouteCGR hash with atom/bond route_order excluded."""
+    """Return an exact RouteCGR hash with route-order metadata excluded."""
 
     return _stable_digest(route_cgr_fingerprint_without_route_order(route_cgr))
 
@@ -594,19 +606,26 @@ def route_cgr_metadata(route_cgr: Any) -> dict[str, Any]:
             "order": bond.order,
             "p_order": bond.p_order,
             "route_orders": _route_orders(getattr(bond, "route_order", None)),
+            "route_step_orders": _route_orders(
+                getattr(bond, "route_step_order", None)
+            ),
         }
         if bond.order is None and bond.p_order is None:
             transient_bonds.append(bond_info)
-        if bond_info["route_orders"]:
+        if bond_info["route_orders"] or bond_info["route_step_orders"]:
             bond_route_orders.append(bond_info)
 
     atom_route_orders = [
         {
             "atom": atom_id,
             "route_orders": route_orders,
+            "route_step_orders": _route_orders(
+                getattr(atom, "route_step_order", None)
+            ),
         }
         for atom_id, atom in route_cgr.atoms()
         if (route_orders := _route_orders(getattr(atom, "route_order", None)))
+        or _route_orders(getattr(atom, "route_step_order", None))
     ]
     return {
         "transient_bonds": transient_bonds,
@@ -648,14 +667,14 @@ def hash_route_cgrs(route_cgrs: Mapping[int, Any]) -> dict[str, Any]:
 
 
 def route_order_variant_sets(route_cgrs: Mapping[int, Any]) -> list[list[list[int]]]:
-    """Return route IDs that differ only by atom/bond route_order metadata.
+    """Return route IDs that differ only by atom/bond route-order metadata.
 
     The function first groups by a cheap route-order-agnostic WL bucket, then
     exact-confirms only candidate buckets with more than one route. Full
     route-order-aware exact hashes are computed only for confirmed candidates.
 
     Each returned item is a partition of route IDs with the same RouteCGR after
-    removing route_order, split by their full route-order-aware identity.
+    removing route-order metadata, split by their full route-order-aware identity.
     """
 
     agnostic_cache = _RouteCGRHashCache(include_route_order=False)

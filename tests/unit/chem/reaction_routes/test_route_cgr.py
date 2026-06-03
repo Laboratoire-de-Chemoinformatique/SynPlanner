@@ -164,8 +164,11 @@ def test_compose_route_cgr_preserves_formed_then_broken_bond():
     assert bond.order is None
     assert bond.p_order is None
     assert bond.route_order == 1
+    assert bond.route_step_order == {1, 2}
     assert transient_cgr._atoms[1].route_order == {1, 2}
     assert transient_cgr._atoms[2].route_order == {1, 2}
+    assert transient_cgr._atoms[1].route_step_order == {1, 2}
+    assert transient_cgr._atoms[2].route_step_order == {1, 2}
 
     batch_cgr = compose_all_route_cgrs(
         routes, route_id=1, preserve_transient_bonds=True
@@ -209,8 +212,13 @@ def test_compose_route_cgr_route_order_uses_route_depth_for_convergent_route():
     assert route_cgr._bonds[2][3].route_order == 1
     assert route_cgr._bonds[1][2].route_order == 2
     assert route_cgr._bonds[3][4].route_order == 2
+    assert route_cgr._bonds[2][3].route_step_order == {3}
+    assert route_cgr._bonds[1][2].route_step_order == {1}
+    assert route_cgr._bonds[3][4].route_step_order == {2}
     assert route_cgr._atoms[2].route_order == {1, 2}
     assert route_cgr._atoms[3].route_order == {1, 2}
+    assert route_cgr._atoms[2].route_step_order == {1, 3}
+    assert route_cgr._atoms[3].route_step_order == {2, 3}
 
 
 def test_compose_route_cgr_route_order_covers_all_final_dynamic_bonds():
@@ -232,6 +240,7 @@ def test_compose_route_cgr_route_order_covers_all_final_dynamic_bonds():
     assert any(bond.order is None for _, _, bond in dynamic_bonds)
     assert all(isinstance(bond, RouteDynamicBond) for _, _, bond in dynamic_bonds)
     assert all(bond.route_order is not None for _, _, bond in dynamic_bonds)
+    assert all(bond.route_step_order for _, _, bond in dynamic_bonds)
 
 
 def test_compose_sb_cgr_syncs_copied_atom_state_after_charge_reduction():

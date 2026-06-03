@@ -21,12 +21,14 @@ class _Atom:
     is_radical = False
     p_is_radical = False
     route_order = None
+    route_step_order = None
 
 
 class _Bond:
     order = 1
     p_order = 1
     route_order = None
+    route_step_order = None
 
 
 class _RouteCGR:
@@ -99,6 +101,30 @@ def test_route_cgr_hash_includes_atom_route_order():
     assert route_cgr_hash(route_cgr) != route_cgr_hash(changed)
 
 
+def test_route_cgr_hash_includes_bond_route_step_order():
+    route_cgr = _transient_route_cgr()
+    changed = route_cgr.copy()
+
+    for _, _, bond in changed.bonds():
+        if getattr(bond, "route_step_order", None):
+            bond.route_step_order.add(99)
+            break
+
+    assert route_cgr_hash(route_cgr) != route_cgr_hash(changed)
+
+
+def test_route_cgr_hash_includes_atom_route_step_order():
+    route_cgr = _transient_route_cgr()
+    changed = route_cgr.copy()
+
+    for _, atom in changed.atoms():
+        if getattr(atom, "route_step_order", None):
+            atom.route_step_order.add(99)
+            break
+
+    assert route_cgr_hash(route_cgr) != route_cgr_hash(changed)
+
+
 def test_route_cgr_hash_without_route_order_ignores_route_order():
     route_cgr = _transient_route_cgr()
     changed = route_cgr.copy()
@@ -106,6 +132,7 @@ def test_route_cgr_hash_without_route_order_ignores_route_order():
     for _, _, bond in changed.bonds():
         if getattr(bond, "route_order", None) is not None:
             bond.route_order += 1
+            bond.route_step_order.add(99)
             break
 
     assert route_cgr_hash(route_cgr) != route_cgr_hash(changed)
