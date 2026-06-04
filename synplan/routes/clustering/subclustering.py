@@ -104,7 +104,9 @@ def lg_replacer(route_cgr: CGRContainer):
                         lg_cgr = lg_process_reset(lg_cgr, atom2)
                         try:
                             lg_cgr.clean2d()
-                        except (ImportError, AttributeError, Exception):
+                        except (ImportError, AttributeError):
+                            # 2D coordinates are optional for subclustering;
+                            # keep the chemically valid leaving group.
                             pass
                     else:
                         continue

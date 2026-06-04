@@ -9,6 +9,19 @@ if TYPE_CHECKING:
     from synplan.mcts.tree import Tree
 
 
+def _route_molecule_smiles(mol) -> str:
+    """Return the route-IO molecule string using the existing preparation flow."""
+    try:
+        mol.kekule()
+        mol.implicify_hydrogens()
+        mol.thiele()
+    except InvalidAromaticRing:
+        # Keep serializing the original molecule string when aromatic
+        # preparation fails; route export should remain best-effort.
+        pass
+    return str(mol)
+
+
 def _route_step_metadata_from_tree(
     tree: "Tree", route_id: int
 ) -> dict[int, dict[str, Any]]:
@@ -146,33 +159,18 @@ def make_json(
             prod_map = {}  # smiles -> list of step_ids
             for sid, rxn in steps.items():
                 for prod in rxn.products:
-                    try:
-                        prod.kekule()
-                        prod.implicify_hydrogens()
-                        prod.thiele()
-                    except InvalidAromaticRing:
-                        pass
-                    s = str(prod)
+                    s = _route_molecule_smiles(prod)
                     prod_map.setdefault(s, []).append(sid)
         except Exception as e:
             print(f"Error processing route {route_id}: {e}")
             continue
-
-        def transform(mol):
-            try:
-                mol.kekule()
-                mol.implicify_hydrogens()
-                mol.thiele()
-            except InvalidAromaticRing:
-                pass
-            return str(mol)
 
         def build_mol_node(sid, _steps=steps, _atom_nums=atom_nums):
             """Find the product with any overlap to target atoms and recurse into its reaction."""
             rxn = _steps[sid]
             for p in rxn.products:
                 if _atom_nums & set(p._atoms.keys()):
-                    smiles = str(p)
+                    smiles = _route_molecule_smiles(p)
                     return {
                         "type": "mol",
                         "smiles": smiles,
@@ -195,7 +193,7 @@ def make_json(
                 node.update(_route_step_metadata[sid])
 
             for react in rxn.reactants:
-                r_smi = transform(react)
+                r_smi = _route_molecule_smiles(react)
                 # Look up any prior step producing this reactant
                 prior = [ps for ps in _prod_map.get(r_smi, []) if ps < sid]
                 if prior:

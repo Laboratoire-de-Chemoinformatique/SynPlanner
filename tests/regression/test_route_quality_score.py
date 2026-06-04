@@ -32,9 +32,7 @@ from unittest.mock import MagicMock
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCORER_PATH = (
-    REPO_ROOT / "synplan" / "routes" / "quality" / "protection" / "scorer.py"
-)
+SCORER_PATH = REPO_ROOT / "synplan" / "routes" / "quality" / "protection" / "scorer.py"
 
 
 def test_failed_scan_does_not_yield_perfect_score():

@@ -208,7 +208,7 @@ def route_cgr_graph(
     adjacency = defaultdict(list)
 
     for atom_id in node_labels:
-        adjacency[atom_id]
+        adjacency.setdefault(atom_id, [])
 
     for atom1, atom2, bond in route_cgr.bonds():
         label = bond_label(bond, include_route_order=include_route_order)

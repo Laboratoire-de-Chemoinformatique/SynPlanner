@@ -4,13 +4,6 @@ import sys
 
 def test_legacy_hash_route_exports_constants_and_functions():
     import synplan.chem.reaction_routes.hash_route as legacy_hash_route
-    from synplan.chem.reaction_routes.hash_route import (
-        BUCKET_HASH_SCHEMA,
-        HASH_EXCLUDES,
-        HASH_INCLUDES,
-        HASH_SCHEMA,
-        route_cgr_hash,
-    )
     from synplan.routes.route_cgr.hash import (
         BUCKET_HASH_SCHEMA as NEW_BUCKET_HASH_SCHEMA,
     )
@@ -27,11 +20,11 @@ def test_legacy_hash_route_exports_constants_and_functions():
         route_cgr_hash as new_route_cgr_hash,
     )
 
-    assert HASH_SCHEMA == NEW_HASH_SCHEMA
-    assert BUCKET_HASH_SCHEMA == NEW_BUCKET_HASH_SCHEMA
-    assert HASH_INCLUDES == NEW_HASH_INCLUDES
-    assert HASH_EXCLUDES == NEW_HASH_EXCLUDES
-    assert route_cgr_hash is new_route_cgr_hash
+    assert legacy_hash_route.HASH_SCHEMA == NEW_HASH_SCHEMA
+    assert legacy_hash_route.BUCKET_HASH_SCHEMA == NEW_BUCKET_HASH_SCHEMA
+    assert legacy_hash_route.HASH_INCLUDES == NEW_HASH_INCLUDES
+    assert legacy_hash_route.HASH_EXCLUDES == NEW_HASH_EXCLUDES
+    assert legacy_hash_route.route_cgr_hash is new_route_cgr_hash
     assert "HASH_SCHEMA" in legacy_hash_route.__all__
     assert "route_cgr_hash" in legacy_hash_route.__all__
 
@@ -48,10 +41,7 @@ def test_legacy_clustering_exports_old_module_level_helpers():
     assert legacy_clustering.DynamicX is NewDynamicX
     assert legacy_clustering.cgr_display is new_cgr_display
     assert legacy_clustering.cluster_routes is new_cluster_routes
-    assert (
-        legacy_clustering.compose_all_route_cgrs
-        is new_compose_all_route_cgrs
-    )
+    assert legacy_clustering.compose_all_route_cgrs is new_compose_all_route_cgrs
     for name in (
         "DynamicX",
         "cgr_display",
