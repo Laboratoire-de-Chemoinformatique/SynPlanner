@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import pytest
 
-from synplan.chem.reaction_routes.route_cgr import compose_all_sb_cgrs
+from synplan.routes.route_cgr import compose_all_sb_cgrs
 
 
 def test_compose_all_sb_cgrs_handles_none_entries(simple_cgr):

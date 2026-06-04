@@ -16,16 +16,16 @@ from pathlib import Path
 import pytest
 from chython.containers import CGRContainer, ReactionContainer
 
-from synplan.chem.reaction_routes.clustering import (
+from synplan.routes.clustering import (
     cluster_routes,
     post_process_subgroup,
     subcluster_all_clusters,
 )
-from synplan.chem.reaction_routes.depiction import (
+from synplan.routes.depiction import (
     cgr_display,
     depict_custom_reaction,
 )
-from synplan.chem.reaction_routes.io import (
+from synplan.routes.io import (
     make_dict,
     make_json,
     read_routes_csv,
@@ -33,7 +33,7 @@ from synplan.chem.reaction_routes.io import (
     write_routes_csv,
     write_routes_json,
 )
-from synplan.chem.reaction_routes.route_cgr import (
+from synplan.routes.route_cgr import (
     compose_all_route_cgrs,
     compose_all_sb_cgrs,
 )

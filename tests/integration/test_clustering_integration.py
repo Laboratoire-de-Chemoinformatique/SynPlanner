@@ -2,11 +2,11 @@ import logging
 
 import pytest
 
-from synplan.chem.reaction_routes.clustering import (
+from synplan.routes.clustering import (
     cluster_routes,
     subcluster_all_clusters,
 )
-from synplan.chem.reaction_routes.route_cgr import (
+from synplan.routes.route_cgr import (
     compose_all_route_cgrs,
     compose_all_sb_cgrs,
 )
