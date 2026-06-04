@@ -337,10 +337,12 @@ class PolicyNetworkConfig(BaseConfigModel):
     # MHN ranking policy parameters
     mhn_association_dim: int = Field(default=512, gt=0)
     mhn_beta: float = Field(default=0.05, gt=0.0)
-    mhn_template_fp_size: int = Field(default=2048, gt=0)
-    mhn_template_fp_min_radius: int = Field(default=1, ge=0)
-    mhn_template_fp_max_radius: int = Field(default=4, ge=0)
-    mhn_template_fp_active_bits: int = Field(default=2, gt=0)
+    mhn_rule_fp_size: int = Field(default=2048, gt=0)
+    mhn_rule_fp_min_radius: int = Field(default=1, gt=0)
+    mhn_rule_fp_max_radius: int = Field(default=4, ge=0)
+    mhn_rule_fp_active_bits: int = Field(default=2, gt=0)
+    mhn_rule_fp_type: Literal["legacy", "query_cgr"] = "query_cgr"
+    mhn_rule_fp_schema_version: str = Field(default="1", min_length=1)
     mhn_normalize_associations: bool = True
 
     @model_validator(mode="after")
@@ -349,12 +351,10 @@ class PolicyNetworkConfig(BaseConfigModel):
             raise ValueError(
                 "architecture='mhn_ranking' requires policy_type='ranking'"
             )
-        if self.mhn_template_fp_size & (self.mhn_template_fp_size - 1):
-            raise ValueError("mhn_template_fp_size must be a positive power of two")
-        if self.mhn_template_fp_max_radius < self.mhn_template_fp_min_radius:
-            raise ValueError(
-                "mhn_template_fp_max_radius must be >= mhn_template_fp_min_radius"
-            )
+        if self.mhn_rule_fp_size & (self.mhn_rule_fp_size - 1):
+            raise ValueError("mhn_rule_fp_size must be a positive power of two")
+        if self.mhn_rule_fp_max_radius < self.mhn_rule_fp_min_radius:
+            raise ValueError("mhn_rule_fp_max_radius must be >= mhn_rule_fp_min_radius")
         return self
 
     @field_validator("logger")

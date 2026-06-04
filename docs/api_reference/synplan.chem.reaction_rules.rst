@@ -20,6 +20,14 @@ synplan.chem.reaction\_rules.extraction module
    :undoc-members:
    :show-inheritance:
 
+synplan.chem.reaction\_rules.fingerprints module
+------------------------------------------------
+
+.. automodule:: synplan.chem.reaction_rules.fingerprints
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

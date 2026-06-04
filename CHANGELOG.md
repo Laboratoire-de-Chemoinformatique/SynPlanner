@@ -11,15 +11,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - MHN ranking policy architecture (`architecture: mhn_ranking`) for ranking
   policy training. The model keeps SynPlanner's molecular graph embedder and
-  replaces the fixed linear rule head with molecule-template associations,
+  replaces the fixed linear rule head with molecule-rule associations,
   allowing standalone MHN ranking checkpoints to score reordered or newly
   supplied runtime rule sets.
-- Chython-based template fingerprints for MHN rules, built from the same SMARTS
+- Chython-based rule fingerprints for MHN rules, built from the same SMARTS
   representation used by runtime `CanonicalRetroReactor` objects. Training now
   infers the paired rules TSV from extracted `*_policy_data.tsv` files so the
-  template features stay aligned with ranking labels.
-- Bounded runtime caches for template fingerprints and encoded MHN template
-  associations. Repeated predictions reuse prepared rule features, while varied
+  rule fingerprints stay aligned with ranking labels. The query-CGR mode is the default and includes a schema version in rule fingerprint digests.
+- Bounded runtime caches for rule fingerprints and encoded MHN rule
+  associations. Repeated predictions reuse prepared rule fingerprints, while varied
   runtime rule sets evict old entries instead of growing memory without limit.
 - Repository training configuration and policy documentation for the MHN ranking
   workflow, including `configs/mhn_ranking_policy_training.yaml`, CLI examples,

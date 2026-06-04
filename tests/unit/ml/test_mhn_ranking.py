@@ -13,18 +13,37 @@ from torch_geometric.data import Batch, Data
 from synplan.chem.utils import reaction_query_to_reaction
 from synplan.ml.networks.mhn_ranking import MHNRankingPolicyNetwork
 from synplan.ml.networks.policy import PolicyNetwork
-from synplan.ml.template_features import (
-    _MAX_TEMPLATE_FEATURE_CACHE_SIZE,
+from synplan.ml.rule_fingerprints import (
+    _MAX_RULE_FINGERPRINT_CACHE_SIZE,
+    RuleFingerprintConfig,
     _cache_set,
     _side_fingerprint,
     reaction_rules_path_from_policy_data,
-    template_features_from_smarts,
+    rule_fingerprint_digest,
+    rule_fingerprints_from_smarts,
 )
 from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.loading import _policy_network_class_from_checkpoint
 
 RULE_A = "[c:1]-[N:2]>>[c:1]-[N+:2](-[O-:3])=[O:4]"
 RULE_B = "[C:1]-[O:2]>>[C:1].[O:2]"
+RULE_D2 = "[C;D2:1]-[O:2]>>[C:1].[O:2]"
+RULE_D3 = "[C;D3:1]-[O:2]>>[C:1].[O:2]"
+RULE_H1 = "[O;h1:1]>>[O:1]"
+RULE_H0 = "[O;h0:1]>>[O:1]"
+RULE_R5 = "[C;r5:1]-[O:2]>>[C:1].[O:2]"
+RULE_R6 = "[C;r6:1]-[O:2]>>[C:1].[O:2]"
+
+
+def _fp_config(
+    *,
+    fp_size: int = 16,
+    fp_type: str = "query_cgr",
+    schema_version: str = "1",
+) -> RuleFingerprintConfig:
+    return RuleFingerprintConfig(
+        fp_size=fp_size, fp_type=fp_type, schema_version=schema_version
+    )
 
 
 def _graph_batch() -> Batch:
@@ -46,44 +65,85 @@ def _graph_batch() -> Batch:
     return Batch.from_data_list([graph])
 
 
-def _network(template_features: torch.Tensor) -> MHNRankingPolicyNetwork:
+def _network(rule_fingerprints: torch.Tensor) -> MHNRankingPolicyNetwork:
     return MHNRankingPolicyNetwork(
-        n_rules=template_features.shape[0],
+        n_rules=rule_fingerprints.shape[0],
         vector_dim=8,
         batch_size=1,
         dropout=0.0,
         num_conv_layers=1,
         learning_rate=0.001,
-        template_features=template_features,
+        rule_fingerprints=rule_fingerprints,
         mhn_association_dim=4,
-        mhn_template_fp_size=template_features.shape[1],
+        mhn_rule_fp_size=rule_fingerprints.shape[1],
     )
 
 
-def test_template_features_are_deterministic_and_permutation_equivariant():
-    features_1 = template_features_from_smarts((RULE_A, RULE_B), fp_size=16)
-    features_2 = template_features_from_smarts((RULE_A, RULE_B), fp_size=16)
-    reversed_features = template_features_from_smarts((RULE_B, RULE_A), fp_size=16)
+def test_rule_fingerprints_are_deterministic_and_permutation_equivariant():
+    fingerprints_1 = rule_fingerprints_from_smarts((RULE_A, RULE_B), _fp_config())
+    fingerprints_2 = rule_fingerprints_from_smarts((RULE_A, RULE_B), _fp_config())
+    reversed_fingerprints = rule_fingerprints_from_smarts(
+        (RULE_B, RULE_A), _fp_config()
+    )
 
-    assert torch.equal(features_1, features_2)
-    assert tuple(features_1.shape) == (2, 16)
-    assert torch.equal(reversed_features, features_1.flip(0))
+    assert torch.equal(fingerprints_1, fingerprints_2)
+    assert tuple(fingerprints_1.shape) == (2, 16)
+    assert torch.equal(reversed_fingerprints, fingerprints_1.flip(0))
 
 
-def test_template_feature_error_identifies_rule():
+def test_rule_fingerprint_error_identifies_rule():
     with pytest.raises(ValueError, match=r"index 0"):
-        template_features_from_smarts(("invalid",), fp_size=16)
+        rule_fingerprints_from_smarts(("invalid",), _fp_config())
 
 
-def test_template_feature_cache_set_is_bounded_lru():
+def test_legacy_rule_fingerprints_drop_query_labels():
+    legacy_rule_fingerprints = rule_fingerprints_from_smarts(
+        (RULE_D2, RULE_D3), _fp_config(fp_size=2048, fp_type="legacy")
+    )
+
+    assert torch.equal(legacy_rule_fingerprints[0], legacy_rule_fingerprints[1])
+
+
+@pytest.mark.parametrize(
+    ("left_rule", "right_rule"),
+    [
+        (RULE_D2, RULE_D3),
+        (RULE_H1, RULE_H0),
+        (RULE_R5, RULE_R6),
+    ],
+)
+def test_query_cgr_rule_fingerprints_keep_query_labels(left_rule, right_rule):
+    query_cgr_rule_fingerprints = rule_fingerprints_from_smarts(
+        (left_rule, right_rule), _fp_config(fp_size=2048, fp_type="query_cgr")
+    )
+
+    assert not torch.equal(
+        query_cgr_rule_fingerprints[0], query_cgr_rule_fingerprints[1]
+    )
+
+
+def test_rule_fingerprint_digest_includes_fingerprint_config():
+    legacy_digest = rule_fingerprint_digest((RULE_A,), _fp_config(fp_type="legacy"))
+    query_cgr_digest = rule_fingerprint_digest(
+        (RULE_A,), _fp_config(fp_type="query_cgr")
+    )
+    schema_digest = rule_fingerprint_digest(
+        (RULE_A,), _fp_config(fp_type="query_cgr", schema_version="2")
+    )
+
+    assert legacy_digest != query_cgr_digest
+    assert query_cgr_digest != schema_digest
+
+
+def test_rule_fingerprint_cache_set_is_bounded_lru():
     cache = OrderedDict()
 
-    for index in range(_MAX_TEMPLATE_FEATURE_CACHE_SIZE + 2):
+    for index in range(_MAX_RULE_FINGERPRINT_CACHE_SIZE + 2):
         _cache_set(cache, str(index), torch.tensor([float(index)]))
 
-    assert len(cache) == _MAX_TEMPLATE_FEATURE_CACHE_SIZE
+    assert len(cache) == _MAX_RULE_FINGERPRINT_CACHE_SIZE
     assert list(cache) == [
-        str(index) for index in range(2, _MAX_TEMPLATE_FEATURE_CACHE_SIZE + 2)
+        str(index) for index in range(2, _MAX_RULE_FINGERPRINT_CACHE_SIZE + 2)
     ]
 
     _cache_set(cache, "2", torch.tensor([2.0]))
@@ -112,13 +172,7 @@ def test_reaction_rules_path_rejects_non_extracted_mapping_name(tmp_path):
 
 def test_side_fingerprint_max_pools_fragments():
     reaction = reaction_query_to_reaction(smarts(RULE_B))
-    pooled = _side_fingerprint(
-        reaction.products,
-        fp_size=16,
-        min_radius=1,
-        max_radius=4,
-        active_bits=2,
-    )
+    pooled = _side_fingerprint(reaction.products, _fp_config())
     individual = [
         torch.as_tensor(
             molecule.morgan_fingerprint(
@@ -139,12 +193,22 @@ def test_mhn_config_validation():
     with pytest.raises(ValueError, match="requires policy_type='ranking'"):
         PolicyNetworkConfig(architecture="mhn_ranking", policy_type="filtering")
     with pytest.raises(ValueError, match="positive power of two"):
-        PolicyNetworkConfig(mhn_template_fp_size=1000)
+        PolicyNetworkConfig(mhn_rule_fp_size=1000)
+    with pytest.raises(ValueError):
+        PolicyNetworkConfig(mhn_rule_fp_min_radius=0)
+    with pytest.raises(ValueError):
+        PolicyNetworkConfig(mhn_rule_fp_type="unknown")
+    with pytest.raises(ValueError):
+        RuleFingerprintConfig(min_radius=0)
+
+    config = PolicyNetworkConfig(architecture="mhn_ranking")
+    assert config.mhn_rule_fp_type == "query_cgr"
+    assert config.mhn_rule_fp_schema_version == "1"
 
 
 def test_mhn_logits_probabilities_and_gradient_flow():
-    features = template_features_from_smarts((RULE_A, RULE_B), fp_size=16)
-    network = _network(features)
+    fingerprints = rule_fingerprints_from_smarts((RULE_A, RULE_B), _fp_config())
+    network = _network(fingerprints)
     batch = _graph_batch()
 
     logits = network.get_logits(batch)
@@ -155,21 +219,23 @@ def test_mhn_logits_probabilities_and_gradient_flow():
 
     network._get_loss(batch)["loss"].backward()
     assert network.molecule_encoder[0].weight.grad is not None
-    assert network.template_encoder[0].weight.grad is not None
+    assert network.rule_encoder[0].weight.grad is not None
 
 
-def test_mhn_accepts_dynamic_template_count_without_persisting_templates():
-    features = template_features_from_smarts((RULE_A, RULE_B), fp_size=16)
-    network = _network(features)
-    dynamic_features = template_features_from_smarts((RULE_B,), fp_size=16)
+def test_mhn_accepts_dynamic_rule_count_without_persisting_rules():
+    fingerprints = rule_fingerprints_from_smarts((RULE_A, RULE_B), _fp_config())
+    network = _network(fingerprints)
+    dynamic_rule_fingerprints = rule_fingerprints_from_smarts((RULE_B,), _fp_config())
 
-    logits = network.get_logits(_graph_batch(), template_features=dynamic_features)
+    logits = network.get_logits(
+        _graph_batch(), rule_fingerprints=dynamic_rule_fingerprints
+    )
 
     assert tuple(logits.shape) == (1, 1)
-    assert "_training_template_features" not in network.state_dict()
+    assert "_training_rule_fingerprints" not in network.state_dict()
 
 
-def test_mhn_prepares_training_templates_from_policy_mapping(tmp_path):
+def test_mhn_prepares_training_rules_from_policy_mapping(tmp_path):
     rules_path = tmp_path / "reaction_rules.tsv"
     rules_path.write_text(
         f"rule_smarts\tpopularity\treaction_indices\n{RULE_A}\t1\t0\n{RULE_B}\t1\t1\n",
@@ -189,7 +255,9 @@ def test_mhn_prepares_training_templates_from_policy_mapping(tmp_path):
         config=PolicyNetworkConfig(
             architecture="mhn_ranking",
             mhn_association_dim=4,
-            mhn_template_fp_size=16,
+            mhn_rule_fp_size=16,
+            mhn_rule_fp_type="query_cgr",
+            mhn_rule_fp_schema_version="1",
         ),
         n_rules=1,
         vector_dim=8,
@@ -201,12 +269,14 @@ def test_mhn_prepares_training_templates_from_policy_mapping(tmp_path):
     )
 
     assert network.n_rules == 2
-    assert tuple(network._training_template_features.shape) == (2, 16)
+    assert tuple(network._training_rule_fingerprints.shape) == (2, 16)
     assert network.hparams["n_rules"] == 2
-    assert network.hparams["mhn_template_feature_digest"] == (
-        network.mhn_template_feature_digest
+    assert network.hparams["mhn_rule_fingerprint_digest"] == (
+        network.mhn_rule_fingerprint_digest
     )
-    assert network.mhn_template_feature_digest is not None
+    assert network.mhn_rule_fingerprint_digest is not None
+    assert network.hparams["mhn_rule_fp_type"] == "query_cgr"
+    assert network.hparams["mhn_rule_fp_schema_version"] == "1"
     assert "policy_data_path" not in network.hparams
 
 

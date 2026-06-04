@@ -10,6 +10,17 @@ Subpackages
    synplan.ml.networks
    synplan.ml.training
 
+Submodules
+----------
+
+synplan.ml.rule\_fingerprints module
+------------------------------------
+
+.. automodule:: synplan.ml.rule_fingerprints
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import torch
 
 import synplan.mcts.expansion as expansion
+from synplan.ml.rule_fingerprints import RULE_FINGERPRINT_SCHEMA_VERSION
 
 
 class _Rule:
@@ -21,13 +22,15 @@ class _MHNPolicy(torch.nn.Module):
     architecture = "mhn_ranking"
     policy_type = "ranking"
     n_rules = 2
-    mhn_template_fp_size = 4
-    mhn_template_fp_min_radius = 1
-    mhn_template_fp_max_radius = 2
-    mhn_template_fp_active_bits = 2
+    mhn_rule_fp_size = 4
+    mhn_rule_fp_min_radius = 1
+    mhn_rule_fp_max_radius = 2
+    mhn_rule_fp_active_bits = 2
+    mhn_rule_fp_type = "query_cgr"
+    mhn_rule_fp_schema_version = RULE_FINGERPRINT_SCHEMA_VERSION
 
-    def encode_templates(self, features):
-        return features + 1
+    def encode_rules(self, rule_fingerprints):
+        return rule_fingerprints + 1
 
 
 class _LinearPolicy(torch.nn.Module):
@@ -47,64 +50,74 @@ def _wrapper(monkeypatch, policy):
     )
 
 
-def test_mhn_preparation_caches_encoded_templates(monkeypatch):
+def test_mhn_preparation_caches_encoded_rules(monkeypatch):
     calls = []
 
-    def fake_features(rule_smarts, **_kwargs):
-        calls.append(tuple(rule_smarts))
+    def fake_rule_fingerprints(rule_smarts, fingerprint_config):
+        calls.append((tuple(rule_smarts), fingerprint_config))
         return torch.zeros((len(rule_smarts), 4))
 
-    monkeypatch.setattr(expansion, "template_features_from_smarts", fake_features)
+    monkeypatch.setattr(
+        expansion, "rule_fingerprints_from_smarts", fake_rule_fingerprints
+    )
     wrapper = _wrapper(monkeypatch, _MHNPolicy())
     rules = [_Rule("A"), _Rule("B")]
 
-    wrapper._prepare_template_associations(rules)
-    first = wrapper._template_associations
-    wrapper._prepare_template_associations(rules)
+    wrapper._prepare_rule_associations(rules)
+    first = wrapper._rule_associations
+    wrapper._prepare_rule_associations(rules)
 
-    assert calls == [("A", "B")]
-    assert wrapper._template_associations is first
+    assert len(calls) == 1
+    assert calls[0][0] == ("A", "B")
+    fingerprint_config = calls[0][1]
+    assert fingerprint_config.fp_size == 4
+    assert fingerprint_config.min_radius == 1
+    assert fingerprint_config.max_radius == 2
+    assert fingerprint_config.active_bits == 2
+    assert fingerprint_config.fp_type == "query_cgr"
+    assert fingerprint_config.schema_version == RULE_FINGERPRINT_SCHEMA_VERSION
+    assert wrapper._rule_associations is first
     assert wrapper.n_rules == 2
 
 
 def test_mhn_association_cache_is_bounded(monkeypatch):
     monkeypatch.setattr(
         expansion,
-        "template_features_from_smarts",
-        lambda rule_smarts, **_kwargs: torch.zeros((len(rule_smarts), 4)),
+        "rule_fingerprints_from_smarts",
+        lambda rule_smarts, _config: torch.zeros((len(rule_smarts), 4)),
     )
     wrapper = _wrapper(monkeypatch, _MHNPolicy())
 
-    for index in range(expansion._MAX_TEMPLATE_ASSOCIATION_CACHE_SIZE + 2):
-        wrapper._prepare_template_associations([_Rule(f"A{index}")])
+    for index in range(expansion._MAX_RULE_ASSOCIATION_CACHE_SIZE + 2):
+        wrapper._prepare_rule_associations([_Rule(f"A{index}")])
 
-    assert len(wrapper._template_association_cache) == (
-        expansion._MAX_TEMPLATE_ASSOCIATION_CACHE_SIZE
+    assert len(wrapper._rule_association_cache) == (
+        expansion._MAX_RULE_ASSOCIATION_CACHE_SIZE
     )
 
 
-def test_linear_template_preparation_is_noop(monkeypatch):
+def test_linear_rule_preparation_is_noop(monkeypatch):
     wrapper = _wrapper(monkeypatch, _LinearPolicy())
 
-    wrapper._prepare_template_associations([_Rule("A"), _Rule("B")])
+    wrapper._prepare_rule_associations([_Rule("A"), _Rule("B")])
 
-    assert wrapper._template_associations is None
+    assert wrapper._rule_associations is None
 
 
-def test_light_prediction_uses_integer_count_without_preparing_templates(monkeypatch):
+def test_light_prediction_uses_integer_count_without_preparing_rules(monkeypatch):
     wrapper = _wrapper(monkeypatch, _MHNPolicy())
     observed = []
     wrapper._predict_rules_common = lambda _precursor, n_rules: observed.append(n_rules)
 
     assert list(wrapper.predict_reaction_rules_light(SimpleNamespace(), 2)) == []
-    assert wrapper._template_associations is None
+    assert wrapper._rule_associations is None
     assert observed == [2]
 
 
-def test_combined_prediction_prepares_mhn_templates():
+def test_combined_prediction_prepares_mhn_rules():
     prepared = []
     ranking = SimpleNamespace(
-        _prepare_template_associations=lambda rules: prepared.append(rules)
+        _prepare_rule_associations=lambda rules: prepared.append(rules)
     )
     combined = expansion.CombinedPolicyNetworkFunction.__new__(
         expansion.CombinedPolicyNetworkFunction
@@ -117,11 +130,11 @@ def test_combined_prediction_prepares_mhn_templates():
     assert prepared == [rules]
 
 
-def test_combined_light_prediction_uses_integer_count_without_preparing_templates():
+def test_combined_light_prediction_uses_integer_count_without_preparing_rules():
     prepared = []
     observed = []
     ranking = SimpleNamespace(
-        _prepare_template_associations=lambda rules: prepared.append(rules)
+        _prepare_rule_associations=lambda rules: prepared.append(rules)
     )
     combined = expansion.CombinedPolicyNetworkFunction.__new__(
         expansion.CombinedPolicyNetworkFunction

@@ -12,16 +12,18 @@ from chython.containers import ReactionContainer
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.ml.networks.policy import PolicyNetwork
-from synplan.ml.template_features import (
+from synplan.ml.rule_fingerprints import (
+    RULE_FINGERPRINT_SCHEMA_VERSION,
+    RuleFingerprintConfig,
+    rule_fingerprint_digest,
+    rule_fingerprints_from_smarts,
     rule_smarts_from_reactors,
-    template_feature_digest,
-    template_features_from_smarts,
 )
 from synplan.ml.training import mol_to_pyg
 from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.loading import load_policy_net
 
-_MAX_TEMPLATE_ASSOCIATION_CACHE_SIZE = 4
+_MAX_RULE_ASSOCIATION_CACHE_SIZE = 4
 
 
 class PolicyNetworkFunction:
@@ -51,9 +53,9 @@ class PolicyNetworkFunction:
             self.policy_net = torch_geometric.compile(policy_net, dynamic=True)
         else:
             self.policy_net = policy_net
-        self._template_feature_digest: str | None = None
-        self._template_associations: torch.Tensor | None = None
-        self._template_association_cache: OrderedDict[str, torch.Tensor] = OrderedDict()
+        self._rule_fingerprint_digest: str | None = None
+        self._rule_associations: torch.Tensor | None = None
+        self._rule_association_cache: OrderedDict[str, torch.Tensor] = OrderedDict()
 
     @property
     def architecture(self) -> str:
@@ -64,50 +66,49 @@ class PolicyNetworkFunction:
     def n_rules(self) -> int:
         """Return the fixed or currently bound output dimensionality."""
         if self.architecture == "mhn_ranking":
-            if self._template_associations is not None:
-                return self._template_associations.shape[0]
+            if self._rule_associations is not None:
+                return self._rule_associations.shape[0]
         return self.policy_net.n_rules
 
-    def _prepare_template_associations(
+    def _prepare_rule_associations(
         self, reaction_rules: Sequence[CanonicalRetroReactor]
     ) -> None:
-        """Encode runtime templates once for MHN ranking prediction."""
+        """Encode runtime rules once for MHN ranking prediction."""
         if self.architecture != "mhn_ranking":
             return
 
         rule_smarts = rule_smarts_from_reactors(reaction_rules)
-        feature_digest = template_feature_digest(
-            rule_smarts,
-            fp_size=self.policy_net.mhn_template_fp_size,
-            min_radius=self.policy_net.mhn_template_fp_min_radius,
-            max_radius=self.policy_net.mhn_template_fp_max_radius,
-            active_bits=self.policy_net.mhn_template_fp_active_bits,
+        fingerprint_config = RuleFingerprintConfig(
+            fp_size=self.policy_net.mhn_rule_fp_size,
+            min_radius=self.policy_net.mhn_rule_fp_min_radius,
+            max_radius=self.policy_net.mhn_rule_fp_max_radius,
+            active_bits=self.policy_net.mhn_rule_fp_active_bits,
+            fp_type=getattr(self.policy_net, "mhn_rule_fp_type", "query_cgr"),
+            schema_version=getattr(
+                self.policy_net,
+                "mhn_rule_fp_schema_version",
+                RULE_FINGERPRINT_SCHEMA_VERSION,
+            ),
         )
-        if self._template_feature_digest == feature_digest:
+        fingerprint_digest = rule_fingerprint_digest(rule_smarts, fingerprint_config)
+        if self._rule_fingerprint_digest == fingerprint_digest:
             return
 
-        associations = self._template_association_cache.get(feature_digest)
+        associations = self._rule_association_cache.get(fingerprint_digest)
         if associations is None:
-            features = template_features_from_smarts(
-                rule_smarts,
-                fp_size=self.policy_net.mhn_template_fp_size,
-                min_radius=self.policy_net.mhn_template_fp_min_radius,
-                max_radius=self.policy_net.mhn_template_fp_max_radius,
-                active_bits=self.policy_net.mhn_template_fp_active_bits,
+            fingerprints = rule_fingerprints_from_smarts(
+                rule_smarts, fingerprint_config
             )
             with torch.no_grad():
-                associations = self.policy_net.encode_templates(features).detach()
-            self._template_association_cache[feature_digest] = associations
-            self._template_association_cache.move_to_end(feature_digest)
-            while (
-                len(self._template_association_cache)
-                > _MAX_TEMPLATE_ASSOCIATION_CACHE_SIZE
-            ):
-                self._template_association_cache.popitem(last=False)
+                associations = self.policy_net.encode_rules(fingerprints).detach()
+            self._rule_association_cache[fingerprint_digest] = associations
+            self._rule_association_cache.move_to_end(fingerprint_digest)
+            while len(self._rule_association_cache) > _MAX_RULE_ASSOCIATION_CACHE_SIZE:
+                self._rule_association_cache.popitem(last=False)
         else:
-            self._template_association_cache.move_to_end(feature_digest)
-        self._template_associations = associations
-        self._template_feature_digest = feature_digest
+            self._rule_association_cache.move_to_end(fingerprint_digest)
+        self._rule_associations = associations
+        self._rule_fingerprint_digest = fingerprint_digest
 
     def _get_graph(self, precursor: Precursor) -> torch_geometric.data.Data | None:
         """Convert precursor molecule to PyG graph.
@@ -139,13 +140,13 @@ class PolicyNetworkFunction:
 
         with torch.no_grad():
             if self.architecture == "mhn_ranking":
-                if self._template_associations is None:
+                if self._rule_associations is None:
                     raise ValueError(
-                        "mhn_ranking templates are prepared by predict_reaction_rules()."
+                        "mhn_ranking rules are prepared by predict_reaction_rules()."
                     )
                 logits = self.policy_net.get_logits(
                     pyg_graph,
-                    template_associations=self._template_associations,
+                    rule_associations=self._rule_associations,
                 )
             else:
                 x = self._get_embedding(pyg_graph)
@@ -226,7 +227,7 @@ class PolicyNetworkFunction:
         :return: Yielding the predicted probability for the reaction rule, reaction rule
             and reaction rule id.
         """
-        self._prepare_template_associations(reaction_rules)
+        self._prepare_rule_associations(reaction_rules)
         result = self._predict_rules_common(precursor, len(reaction_rules))
         if result is None:
             return []
@@ -413,7 +414,7 @@ class CombinedPolicyNetworkFunction:
         :param reaction_rules: The list of reaction rules.
         :return: Yielding (probability, reaction_rule, rule_id) tuples.
         """
-        self.ranking_net._prepare_template_associations(reaction_rules)
+        self.ranking_net._prepare_rule_associations(reaction_rules)
         result = self._predict_rules_common(precursor, len(reaction_rules))
         if result is None:
             return

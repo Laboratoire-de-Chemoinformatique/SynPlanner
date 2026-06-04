@@ -42,11 +42,11 @@ MHN ranking policy
 ------------------
 
 ``architecture: mhn_ranking`` replaces the fixed ranking head with a dense
-molecule-template association model inspired by
+molecule-rule association model inspired by
 `MHNreact <https://github.com/ml-jku/mhn-react>`_ and the
 `MHNreact paper <https://doi.org/10.1021/acs.jcim.1c01065>`_. SynPlanner keeps
-its graph embedder for product molecules and builds template fingerprints with
-Chython. Template embeddings are encoded lazily on the first prediction and
+its graph embedder for product molecules and builds rule fingerprints with
+Chython. Rule embeddings are encoded lazily on the first prediction and
 cached for reuse.
 
 .. code-block:: bash
@@ -87,12 +87,14 @@ rules must retain their training order.
     attn_dropout                       Attention dropout for GPS layers
     log_grad_norm                      If true, log module-level gradient norms during training
     logger                             Training logger configuration (see below). Set to ``null`` to disable.
-    mhn_association_dim                MHN molecule-template association dimension
+    mhn_association_dim                MHN molecule-rule association dimension
     mhn_beta                           Scale applied to MHN association logits
-    mhn_template_fp_size               Chython Morgan template fingerprint size; must be a power of two
-    mhn_template_fp_min_radius         Minimum Chython Morgan fingerprint radius
-    mhn_template_fp_max_radius         Maximum Chython Morgan fingerprint radius
-    mhn_template_fp_active_bits        Active bits per Chython Morgan fingerprint feature
+    mhn_rule_fp_size                   Chython Morgan rule fingerprint size; must be a power of two
+    mhn_rule_fp_min_radius             Minimum Chython Morgan fingerprint radius
+    mhn_rule_fp_max_radius             Maximum Chython Morgan fingerprint radius
+    mhn_rule_fp_active_bits            Active bits per Chython Morgan fingerprint feature
+    mhn_rule_fp_type                   Rule fingerprint source: ``query_cgr`` (default) or ``legacy``
+    mhn_rule_fp_schema_version         Rule fingerprint schema version included in digests and caches
     mhn_normalize_associations         Apply non-affine LayerNorm after each MHN projection
     ================================== =========================================================================
 
