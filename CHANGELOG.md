@@ -14,13 +14,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   replaces the fixed linear rule head with molecule-rule associations,
   allowing standalone MHN ranking checkpoints to score reordered or newly
   supplied runtime rule sets.
-- Chython-based rule fingerprints for MHN rules, built from the same SMARTS
+- Chython-based rule representations for MHN rules, built from the same SMARTS
   representation used by runtime `CanonicalRetroReactor` objects. Training now
-  infers the paired rules TSV from extracted `*_policy_data.tsv` files so the
-  rule fingerprints stay aligned with ranking labels. The query-CGR mode is the default and includes a schema version in rule fingerprint digests.
-- Bounded runtime caches for rule fingerprints and encoded MHN rule
-  associations. Repeated predictions reuse prepared rule fingerprints, while varied
-  runtime rule sets evict old entries instead of growing memory without limit.
+  infers the paired rules TSV from extracted `*_policy_data.tsv` files so rule
+  representations stay aligned with ranking labels. The default fingerprint mode
+  uses query-CGR fingerprints, while the optional `query_cgr_graph` mode embeds
+  labeled QueryCGR rule graphs with a rule-side GNN/GPS encoder.
+- Bounded runtime caches for rule representations and encoded MHN rule
+  associations. Repeated predictions reuse prepared rule representations, while
+  varied runtime rule sets evict old entries instead of growing memory without
+  limit.
 - Repository training configuration and policy documentation for the MHN ranking
   workflow, including `configs/mhn_ranking_policy_training.yaml`, CLI examples,
   configuration fields, and benchmark guidance.
@@ -28,8 +31,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [1.5.0] - 2026-05-16
 
-> Migration guide: see [docs/user_guide/migration.rst](docs/user_guide/migration.rst).
-> Priority rules concept page: see [docs/methods/priority_rules.rst](docs/methods/priority_rules.rst).
+> Migration guide: see `docs/user_guide/migration.rst`.
+> Priority rules concept page: see `docs/methods/priority_rules.rst`.
 
 ### ⚠️ Backwards-incompatible
 
@@ -554,7 +557,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CLI interface (`synplan` command)
 - Docker images for CLI and GUI
 
-[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.2...HEAD
+[1.5.2]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.0...v1.5.2
 [1.5.0]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.4...v1.5.0
 [1.4.4]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.2...v1.4.3

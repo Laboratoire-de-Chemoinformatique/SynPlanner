@@ -8,6 +8,7 @@ import torch
 
 import synplan.mcts.expansion as expansion
 from synplan.ml.rule_fingerprints import RULE_FINGERPRINT_SCHEMA_VERSION
+from synplan.ml.rule_graphs import RULE_GRAPH_SCHEMA_VERSION
 
 
 class _Rule:
@@ -22,15 +23,26 @@ class _MHNPolicy(torch.nn.Module):
     architecture = "mhn_ranking"
     policy_type = "ranking"
     n_rules = 2
+    mhn_rule_encoder_type = "fingerprint"
     mhn_rule_fp_size = 4
     mhn_rule_fp_min_radius = 1
     mhn_rule_fp_max_radius = 2
     mhn_rule_fp_active_bits = 2
     mhn_rule_fp_type = "query_cgr"
     mhn_rule_fp_schema_version = RULE_FINGERPRINT_SCHEMA_VERSION
+    mhn_rule_embedder_type = "gps"
+    mhn_rule_graph_batch_size = 2
+    mhn_rule_graph_schema_version = RULE_GRAPH_SCHEMA_VERSION
 
-    def encode_rules(self, rule_fingerprints):
-        return rule_fingerprints + 1
+    def encode_rules(self, rule_representations):
+        return rule_representations + 1
+
+
+class _MHNGraphPolicy(_MHNPolicy):
+    mhn_rule_encoder_type = "query_cgr_graph"
+
+    def encode_rules(self, rule_representations):
+        return torch.ones((len(rule_representations), 4))
 
 
 class _LinearPolicy(torch.nn.Module):
@@ -78,6 +90,26 @@ def test_mhn_preparation_caches_encoded_rules(monkeypatch):
     assert fingerprint_config.schema_version == RULE_FINGERPRINT_SCHEMA_VERSION
     assert wrapper._rule_associations is first
     assert wrapper.n_rules == 2
+
+
+def test_mhn_preparation_uses_query_cgr_rule_graphs(monkeypatch):
+    calls = []
+
+    def fake_rule_graphs(rule_smarts, *, schema_version):
+        calls.append((tuple(rule_smarts), schema_version))
+        return [SimpleNamespace(rule=text) for text in rule_smarts]
+
+    monkeypatch.setattr(expansion, "query_cgr_graphs_from_smarts", fake_rule_graphs)
+    wrapper = _wrapper(monkeypatch, _MHNGraphPolicy())
+    rules = [_Rule("A"), _Rule("B")]
+
+    wrapper._prepare_rule_associations(rules)
+    first = wrapper._rule_associations
+    wrapper._prepare_rule_associations(rules)
+
+    assert calls == [(("A", "B"), RULE_GRAPH_SCHEMA_VERSION)]
+    assert tuple(first.shape) == (2, 4)
+    assert wrapper._rule_associations is first
 
 
 def test_mhn_association_cache_is_bounded(monkeypatch):

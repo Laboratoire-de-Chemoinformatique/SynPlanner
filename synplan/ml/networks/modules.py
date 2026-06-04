@@ -20,7 +20,11 @@ class GraphEmbedding(Module):
     convolution."""
 
     def __init__(
-        self, vector_dim: int = 512, dropout: float = 0.4, num_conv_layers: int = 5
+        self,
+        vector_dim: int = 512,
+        dropout: float = 0.4,
+        num_conv_layers: int = 5,
+        node_dim: int = 11,
     ):
         """Initializes a graph convolutional module. Needed to convert molecule atom
         vectors to the single vector using graph convolution.
@@ -35,7 +39,7 @@ class GraphEmbedding(Module):
         """
 
         super().__init__()
-        self.expansion = Linear(11, vector_dim)
+        self.expansion = Linear(node_dim, vector_dim)
         self.dropout = Dropout(dropout)
         self.gcn_convs = ModuleList(
             [
@@ -68,13 +72,17 @@ class GraphEmbeddingConcat(GraphEmbedding, Module):
     """Needed to concat."""  # TODO for what ?
 
     def __init__(
-        self, vector_dim: int = 512, dropout: float = 0.4, num_conv_layers: int = 8
+        self,
+        vector_dim: int = 512,
+        dropout: float = 0.4,
+        num_conv_layers: int = 8,
+        node_dim: int = 11,
     ):
-        super().__init__()
+        Module.__init__(self)
 
         gcn_dim = vector_dim // num_conv_layers
 
-        self.expansion = Linear(11, gcn_dim)
+        self.expansion = Linear(node_dim, gcn_dim)
         self.dropout = Dropout(dropout)
         self.gcn_convs = ModuleList(
             [
@@ -128,6 +136,7 @@ class GraphEmbeddingGPS(Module):
     def __init__(
         self,
         vector_dim: int = 256,
+        node_dim: int = 11,
         edge_dim: int = 4,
         dropout: float = 0.3,
         num_conv_layers: int = 5,
@@ -136,7 +145,7 @@ class GraphEmbeddingGPS(Module):
         attn_dropout: float = 0.5,
     ):
         super().__init__()
-        self.node_expansion = Linear(11, vector_dim)
+        self.node_expansion = Linear(node_dim, vector_dim)
         self.edge_expansion = Linear(edge_dim, vector_dim)
         self.pool = VariancePreservingAggregation()
 
@@ -175,6 +184,58 @@ class GraphEmbeddingGPS(Module):
         return self.pool(atoms, index=graph.batch)
 
 
+def build_graph_embedder(
+    embedder_type: str,
+    vector_dim: int,
+    *,
+    dropout: float = 0.4,
+    num_conv_layers: int = 5,
+    heads: int = 4,
+    attn_type: str = "performer",
+    attn_dropout: float = 0.5,
+    node_dim: int = 11,
+    edge_dim: int = 4,
+) -> Module:
+    """Build a SynPlanner graph embedder for a concrete node/edge schema."""
+    valid_embedder_types = {"gcn", "gcn_concat", "gps"}
+    if embedder_type not in valid_embedder_types:
+        expected = "', '".join(sorted(valid_embedder_types))
+        raise ValueError(f"embedder_type must be one of '{expected}'")
+    if num_conv_layers <= 0:
+        raise ValueError("num_conv_layers must be > 0")
+    if embedder_type == "gps":
+        return GraphEmbeddingGPS(
+            vector_dim,
+            node_dim=node_dim,
+            edge_dim=edge_dim,
+            dropout=dropout,
+            num_conv_layers=num_conv_layers,
+            heads=heads,
+            attn_type=attn_type,
+            attn_dropout=attn_dropout,
+        )
+    if embedder_type == "gcn_concat":
+        if vector_dim % num_conv_layers:
+            raise ValueError(
+                "embedder_type='gcn_concat' requires vector_dim to be divisible "
+                "by num_conv_layers"
+            )
+        return GraphEmbeddingConcat(
+            vector_dim,
+            dropout=dropout,
+            num_conv_layers=num_conv_layers,
+            node_dim=node_dim,
+        )
+    if embedder_type == "gcn":
+        return GraphEmbedding(
+            vector_dim,
+            dropout=dropout,
+            num_conv_layers=num_conv_layers,
+            node_dim=node_dim,
+        )
+    raise AssertionError("unreachable graph embedder type")
+
+
 class MCTSNetwork(LightningModule, ABC):
     """Basic class for policy and value networks."""
 
@@ -209,19 +270,17 @@ class MCTSNetwork(LightningModule, ABC):
         :param attn_dropout: Attention dropout probability (GPS only).
         """
         super().__init__()
-        if embedder_type == "gps":
-            self.embedder = GraphEmbeddingGPS(
-                vector_dim,
-                dropout=dropout,
-                num_conv_layers=num_conv_layers,
-                heads=heads,
-                attn_type=attn_type,
-                attn_dropout=attn_dropout,
-            )
-        elif gcn_concat or embedder_type == "gcn_concat":
-            self.embedder = GraphEmbeddingConcat(vector_dim, dropout, num_conv_layers)
-        else:
-            self.embedder = GraphEmbedding(vector_dim, dropout, num_conv_layers)
+        if gcn_concat and embedder_type != "gps":
+            embedder_type = "gcn_concat"
+        self.embedder = build_graph_embedder(
+            embedder_type,
+            vector_dim,
+            dropout=dropout,
+            num_conv_layers=num_conv_layers,
+            heads=heads,
+            attn_type=attn_type,
+            attn_dropout=attn_dropout,
+        )
         self.batch_size = batch_size
         self.lr = learning_rate
 

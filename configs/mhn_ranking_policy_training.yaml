@@ -9,6 +9,13 @@ batch_size: 1000
 
 mhn_association_dim: 512
 mhn_beta: 0.05
+mhn_rule_encoder_type: fingerprint
+# To switch from rule fingerprints to QueryCGR rule graphs, use:
+# mhn_rule_encoder_type: query_cgr_graph
+# mhn_rule_embedder_type: gps
+mhn_rule_embedder_type: gps
+mhn_rule_graph_batch_size: 1024
+mhn_rule_graph_schema_version: "1"
 mhn_rule_fp_size: 2048
 mhn_rule_fp_min_radius: 1
 mhn_rule_fp_max_radius: 4

@@ -337,6 +337,10 @@ class PolicyNetworkConfig(BaseConfigModel):
     # MHN ranking policy parameters
     mhn_association_dim: int = Field(default=512, gt=0)
     mhn_beta: float = Field(default=0.05, gt=0.0)
+    mhn_rule_encoder_type: Literal["fingerprint", "query_cgr_graph"] = "fingerprint"
+    mhn_rule_embedder_type: Literal["gcn", "gcn_concat", "gps"] = "gps"
+    mhn_rule_graph_batch_size: int = Field(default=1024, gt=0)
+    mhn_rule_graph_schema_version: str = Field(default="1", min_length=1)
     mhn_rule_fp_size: int = Field(default=2048, gt=0)
     mhn_rule_fp_min_radius: int = Field(default=1, gt=0)
     mhn_rule_fp_max_radius: int = Field(default=4, ge=0)
@@ -355,6 +359,21 @@ class PolicyNetworkConfig(BaseConfigModel):
             raise ValueError("mhn_rule_fp_size must be a positive power of two")
         if self.mhn_rule_fp_max_radius < self.mhn_rule_fp_min_radius:
             raise ValueError("mhn_rule_fp_max_radius must be >= mhn_rule_fp_min_radius")
+        if self.embedder_type == "gcn_concat" and (
+            self.vector_dim % self.num_conv_layers
+        ):
+            raise ValueError(
+                "embedder_type='gcn_concat' requires vector_dim to be divisible "
+                "by num_conv_layers"
+            )
+        if (
+            self.mhn_rule_encoder_type == "query_cgr_graph"
+            and self.mhn_rule_embedder_type != "gps"
+        ):
+            raise ValueError(
+                "mhn_rule_encoder_type='query_cgr_graph' requires "
+                "mhn_rule_embedder_type='gps'"
+            )
         return self
 
     @field_validator("logger")

@@ -45,9 +45,9 @@ MHN ranking policy
 molecule-rule association model inspired by
 `MHNreact <https://github.com/ml-jku/mhn-react>`_ and the
 `MHNreact paper <https://doi.org/10.1021/acs.jcim.1c01065>`_. SynPlanner keeps
-its graph embedder for product molecules and builds rule fingerprints with
-Chython. Rule embeddings are encoded lazily on the first prediction and
-cached for reuse.
+its graph embedder for product molecules and can encode rules either from
+Chython fingerprints or from native QueryCGR rule graphs. Rule embeddings are
+encoded lazily on the first prediction and cached for reuse.
 
 .. code-block:: bash
 
@@ -60,11 +60,58 @@ The rules TSV is inferred from the extracted policy mapping name:
 ``<base>_policy_data.tsv`` uses ``<base>.tsv``. Keep both generated files
 together when training ``mhn_ranking``.
 
+``embedder_type`` controls the product molecule encoder. Use
+``mhn_rule_encoder_type: query_cgr_graph`` and ``mhn_rule_embedder_type: gps``
+to embed labeled QueryCGR rule graphs instead of Morgan rule fingerprints;
+``mhn_rule_fp_*`` fields are used only by ``mhn_rule_encoder_type: fingerprint``.
+QueryCGR rule graphs currently require the rule-side GPS embedder because rule
+bond dynamics are encoded as edge attributes. The rule graph GPS shares
+``vector_dim``, ``num_conv_layers``, ``heads``, ``attn_type``,
+``attn_dropout``, and ``dropout`` with the product graph encoder.
+
+To switch the default rule-fingerprint configuration to QueryCGR rule graphs:
+
+.. code-block:: yaml
+
+   mhn_rule_encoder_type: query_cgr_graph
+   mhn_rule_embedder_type: gps
+
+Common MHN configurations:
+
+.. code-block:: yaml
+
+   # Product GCN + rule fingerprints
+   embedder_type: gcn
+   mhn_rule_encoder_type: fingerprint
+
+   # Product GCN + QueryCGR rule graphs
+   embedder_type: gcn
+   mhn_rule_encoder_type: query_cgr_graph
+   mhn_rule_embedder_type: gps
+
+   # Product GPS + rule fingerprints
+   embedder_type: gps
+   mhn_rule_encoder_type: fingerprint
+
+   # Product GPS + QueryCGR rule graphs
+   embedder_type: gps
+   mhn_rule_encoder_type: query_cgr_graph
+   mhn_rule_embedder_type: gps
+
 Standalone MHN ranking checkpoints can score unseen, reordered, or replaced
 runtime rule sets. Combined filtering + MHN ranking policies remain restricted
 to the filtering checkpoint's ordered rule set because filtering heads have a
 fixed output index. SynPlanner validates dimensions; the supplied filtering
 rules must retain their training order.
+
+.. note::
+
+   Dynamic MHN rule associations are prepared by
+   ``predict_reaction_rules(precursor, reaction_rules)``. The lighter
+   ``predict_reaction_rules_light(precursor, reaction_rules_len)`` API receives
+   only an integer count, so it cannot bind a new runtime rule set by itself;
+   use the full prediction path when MHN rules may change, or call the light
+   path only after the same wrapper has already prepared the same rule set.
 
 **Configuration parameters**
 
@@ -80,7 +127,7 @@ rules must retain their training order.
     dropout                            The dropout value
     num_epoch                          The number of training epochs
     batch_size                         The size of the training batch of input molecular graphs
-    embedder_type                      Graph embedder: ``gcn``, ``gcn_concat``, or ``gps``
+    embedder_type                      Graph embedder: ``gcn``, ``gcn_concat``, or ``gps``; ``gcn_concat`` requires ``vector_dim`` divisible by ``num_conv_layers``
     architecture                       Ranking head: ``linear`` (default) or ``mhn_ranking``
     heads                              Number of attention heads for ``embedder_type: gps``
     attn_type                          GPS attention type: ``multihead``, ``performer``, or ``null``
@@ -89,6 +136,10 @@ rules must retain their training order.
     logger                             Training logger configuration (see below). Set to ``null`` to disable.
     mhn_association_dim                MHN molecule-rule association dimension
     mhn_beta                           Scale applied to MHN association logits
+    mhn_rule_encoder_type              Rule encoder mode: ``fingerprint`` (default) or ``query_cgr_graph``
+    mhn_rule_embedder_type             Rule graph embedder for ``query_cgr_graph``: ``gps`` (required)
+    mhn_rule_graph_batch_size          Rule graph batch size used while embedding all rules
+    mhn_rule_graph_schema_version      QueryCGR rule graph schema version included in digests and caches
     mhn_rule_fp_size                   Chython Morgan rule fingerprint size; must be a power of two
     mhn_rule_fp_min_radius             Minimum Chython Morgan fingerprint radius
     mhn_rule_fp_max_radius             Maximum Chython Morgan fingerprint radius

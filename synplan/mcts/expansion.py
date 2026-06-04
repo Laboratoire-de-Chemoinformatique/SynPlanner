@@ -13,11 +13,13 @@ from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.rule_fingerprints import (
-    RULE_FINGERPRINT_SCHEMA_VERSION,
-    RuleFingerprintConfig,
-    rule_fingerprint_digest,
     rule_fingerprints_from_smarts,
     rule_smarts_from_reactors,
+)
+from synplan.ml.rule_graphs import query_cgr_graphs_from_smarts
+from synplan.ml.rule_representations import (
+    rule_representation_config_from_policy,
+    rule_representation_digest,
 )
 from synplan.ml.training import mol_to_pyg
 from synplan.utils.config import PolicyNetworkConfig
@@ -53,7 +55,7 @@ class PolicyNetworkFunction:
             self.policy_net = torch_geometric.compile(policy_net, dynamic=True)
         else:
             self.policy_net = policy_net
-        self._rule_fingerprint_digest: str | None = None
+        self._rule_representation_digest: str | None = None
         self._rule_associations: torch.Tensor | None = None
         self._rule_association_cache: OrderedDict[str, torch.Tensor] = OrderedDict()
 
@@ -78,37 +80,36 @@ class PolicyNetworkFunction:
             return
 
         rule_smarts = rule_smarts_from_reactors(reaction_rules)
-        fingerprint_config = RuleFingerprintConfig(
-            fp_size=self.policy_net.mhn_rule_fp_size,
-            min_radius=self.policy_net.mhn_rule_fp_min_radius,
-            max_radius=self.policy_net.mhn_rule_fp_max_radius,
-            active_bits=self.policy_net.mhn_rule_fp_active_bits,
-            fp_type=getattr(self.policy_net, "mhn_rule_fp_type", "query_cgr"),
-            schema_version=getattr(
-                self.policy_net,
-                "mhn_rule_fp_schema_version",
-                RULE_FINGERPRINT_SCHEMA_VERSION,
-            ),
+        representation_config = rule_representation_config_from_policy(self.policy_net)
+        representation_digest = rule_representation_digest(
+            rule_smarts, representation_config
         )
-        fingerprint_digest = rule_fingerprint_digest(rule_smarts, fingerprint_config)
-        if self._rule_fingerprint_digest == fingerprint_digest:
+        if self._rule_representation_digest == representation_digest:
             return
 
-        associations = self._rule_association_cache.get(fingerprint_digest)
+        associations = self._rule_association_cache.get(representation_digest)
         if associations is None:
-            fingerprints = rule_fingerprints_from_smarts(
-                rule_smarts, fingerprint_config
-            )
+            if representation_config.encoder_type == "fingerprint":
+                rule_representations = rule_fingerprints_from_smarts(
+                    rule_smarts, representation_config.fingerprint_config
+                )
+            else:
+                rule_representations = query_cgr_graphs_from_smarts(
+                    rule_smarts,
+                    schema_version=representation_config.graph_schema_version,
+                )
             with torch.no_grad():
-                associations = self.policy_net.encode_rules(fingerprints).detach()
-            self._rule_association_cache[fingerprint_digest] = associations
-            self._rule_association_cache.move_to_end(fingerprint_digest)
+                associations = self.policy_net.encode_rules(
+                    rule_representations
+                ).detach()
+            self._rule_association_cache[representation_digest] = associations
+            self._rule_association_cache.move_to_end(representation_digest)
             while len(self._rule_association_cache) > _MAX_RULE_ASSOCIATION_CACHE_SIZE:
                 self._rule_association_cache.popitem(last=False)
         else:
-            self._rule_association_cache.move_to_end(fingerprint_digest)
+            self._rule_association_cache.move_to_end(representation_digest)
         self._rule_associations = associations
-        self._rule_fingerprint_digest = fingerprint_digest
+        self._rule_representation_digest = representation_digest
 
     def _get_graph(self, precursor: Precursor) -> torch_geometric.data.Data | None:
         """Convert precursor molecule to PyG graph.
