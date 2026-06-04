@@ -2,6 +2,8 @@ import logging
 
 import pytest
 
+from synplan.chem.utils import mol_from_smiles
+from synplan.mcts.tree import Tree
 from synplan.routes.clustering import (
     cluster_routes,
     subcluster_all_clusters,
@@ -10,8 +12,6 @@ from synplan.routes.route_cgr import (
     compose_all_route_cgrs,
     compose_all_sb_cgrs,
 )
-from synplan.chem.utils import mol_from_smiles
-from synplan.mcts.tree import Tree
 from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import (
     download_preset,

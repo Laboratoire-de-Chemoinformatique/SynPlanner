@@ -12,12 +12,12 @@ from synplan.chem.data.standardizing import (
     ReactionStandardizationConfig,
     standardize_reactions_from_file,
 )
-from synplan.routes.clustering import run_cluster_cli
 from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions
 from synplan.chem.utils import standardize_building_blocks
 from synplan.mcts.search import run_search
 from synplan.ml.training.reinforcement import run_updating
 from synplan.ml.training.supervised import create_policy_dataset, run_policy_training
+from synplan.routes.clustering import run_cluster_cli
 from synplan.utils.config import (
     PolicyEvaluationConfig,
     PolicyNetworkConfig,

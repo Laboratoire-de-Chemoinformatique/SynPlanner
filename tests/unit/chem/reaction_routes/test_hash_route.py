@@ -1,5 +1,6 @@
 from chython import smiles
 
+from synplan.routes.route_cgr import compose_route_cgr
 from synplan.routes.route_cgr.hash import (
     HASH_SCHEMA,
     compare_route_cgr_dicts,
@@ -10,7 +11,6 @@ from synplan.routes.route_cgr.hash import (
     route_cgrs_equal,
     route_order_variant_sets,
 )
-from synplan.routes.route_cgr import compose_route_cgr
 
 
 class _Atom:
