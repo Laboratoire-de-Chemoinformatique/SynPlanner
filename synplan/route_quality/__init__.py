@@ -1,39 +1,66 @@
-"""Route quality assessment module for synthetic route analysis.
+"""Compatibility wrapper for :mod:`synplan.routes.quality`.
 
-Provides functional group detection, reaction classification, and
-incompatibility scoring to identify synthesis steps that may require
-protecting group strategies.
-
-This module is inspired by the work of Westerlund et al.:
-
-    Westerlund, A. M.; Sigmund, L. M.; Kannas, C.; Genheden, S.; Kabeshov, M.
-    "Toward lab-ready AI synthesis plans with protection strategies and route scoring."
-    *ChemRxiv*, 2025. https://doi.org/10.26434/chemrxiv-2025-gdrr8
-
-The competing-sites score S(T) and the functional-group incompatibility
-framework follow the methodology described in that paper.
+Import from ``synplan.routes.quality`` in new code.
 """
 
-from synplan.route_quality.protection.config import ProtectionConfig
-from synplan.route_quality.protection.functional_groups import (
-    FunctionalGroupDetector,
-    FunctionalGroupMatch,
-    HalogenDetector,
-    HalogenMatch,
-)
-from synplan.route_quality.protection.reaction_classifier import (
-    classify_reaction_type,
-    classify_reaction_type_broad,
-    classify_reaction_type_detailed,
-    get_reaction_center_atoms,
-)
-from synplan.route_quality.protection.scanner import (
-    CompetingInteraction,
-    IncompatibilityMatrix,
-    RouteScanner,
-)
-from synplan.route_quality.protection.scorer import CompetingSitesScore
-from synplan.route_quality.scorer import ProtectionRouteScorer, RouteScorer
+from importlib import import_module
+
+_LAZY_EXPORTS = {
+    "CompetingInteraction": (
+        "synplan.routes.quality.protection.scanner",
+        "CompetingInteraction",
+    ),
+    "CompetingSitesScore": (
+        "synplan.routes.quality.protection.scorer",
+        "CompetingSitesScore",
+    ),
+    "FunctionalGroupDetector": (
+        "synplan.routes.quality.protection.functional_groups",
+        "FunctionalGroupDetector",
+    ),
+    "FunctionalGroupMatch": (
+        "synplan.routes.quality.protection.functional_groups",
+        "FunctionalGroupMatch",
+    ),
+    "HalogenDetector": (
+        "synplan.routes.quality.protection.functional_groups",
+        "HalogenDetector",
+    ),
+    "HalogenMatch": (
+        "synplan.routes.quality.protection.functional_groups",
+        "HalogenMatch",
+    ),
+    "IncompatibilityMatrix": (
+        "synplan.routes.quality.protection.scanner",
+        "IncompatibilityMatrix",
+    ),
+    "ProtectionConfig": (
+        "synplan.routes.quality.protection.config",
+        "ProtectionConfig",
+    ),
+    "ProtectionRouteScorer": (
+        "synplan.routes.quality.scorer",
+        "ProtectionRouteScorer",
+    ),
+    "RouteScanner": ("synplan.routes.quality.protection.scanner", "RouteScanner"),
+    "RouteScorer": ("synplan.routes.quality.scorer", "RouteScorer"),
+    "classify_reaction_type": (
+        "synplan.routes.quality.protection.reaction_classifier",
+        "classify_reaction_type",
+    ),
+    "classify_reaction_type_broad": (
+        "synplan.routes.quality.protection.reaction_classifier",
+        "classify_reaction_type_broad",
+    ),
+    "classify_reaction_type_detailed": (
+        "synplan.routes.quality.protection.reaction_classifier",
+        "classify_reaction_type_detailed",
+    ),
+    "get_reaction_center_atoms": (
+        "synplan.routes.quality.protection.reaction_classifier",
+        "get_reaction_center_atoms",
+    ),
+}
 
 __all__ = [
     "CompetingInteraction",
@@ -52,3 +79,16 @@ __all__ = [
     "classify_reaction_type_detailed",
     "get_reaction_center_atoms",
 ]
+
+
+def __getattr__(name):
+    if name in _LAZY_EXPORTS:
+        module_name, attr_name = _LAZY_EXPORTS[name]
+        value = getattr(import_module(module_name), attr_name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module 'synplan.route_quality' has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted([*globals(), *_LAZY_EXPORTS])

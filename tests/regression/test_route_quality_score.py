@@ -32,7 +32,9 @@ from unittest.mock import MagicMock
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCORER_PATH = REPO_ROOT / "synplan" / "route_quality" / "protection" / "scorer.py"
+SCORER_PATH = (
+    REPO_ROOT / "synplan" / "routes" / "quality" / "protection" / "scorer.py"
+)
 
 
 def test_failed_scan_does_not_yield_perfect_score():
@@ -48,7 +50,7 @@ def test_failed_scan_does_not_yield_perfect_score():
     surfaces it through the return type.
     """
     try:
-        from synplan.route_quality.protection.scorer import CompetingSitesScore
+        from synplan.routes.quality.protection.scorer import CompetingSitesScore
     except Exception as e:  # pragma: no cover
         pytest.skip(f"CompetingSitesScore unavailable: {e}")
 

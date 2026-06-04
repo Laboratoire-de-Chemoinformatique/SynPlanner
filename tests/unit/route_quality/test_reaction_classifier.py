@@ -3,7 +3,7 @@
 import pytest
 from chython import smiles
 
-from synplan.route_quality.protection.reaction_classifier import (
+from synplan.routes.quality.protection.reaction_classifier import (
     classify_reaction_type,
     classify_reaction_type_broad,
     classify_reaction_type_detailed,
