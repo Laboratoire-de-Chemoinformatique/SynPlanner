@@ -3,60 +3,55 @@
 All notable changes to SynPlanner are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
-
-### ⚠️ Backwards-incompatible
-
-- Removed the old reaction-route `visualisation.py` module and legacy
-  `ProtectionDepictCGRContainer` naming. RouteCGR rendering helpers now live in
-  `synplan.chem.reaction_routes.depiction`, while the RouteCGR subclass is owned
-  by `route_cgr_container.py`.
-- Removed the old `TreeWrapper` helper from `synplan.chem.reaction_routes.io`.
-- `compose_route_cgr`, `compose_all_route_cgrs`, and `extract_reactions` now
-  preserve transient route bonds by default.
+## [1.5.3] - 2026-06-04
 
 ### Added
 
-- Route-aware RouteCGR composition with `route_order` metadata on dynamic atoms
-  and bonds, plus transient bonds for bonds formed and later removed during a
-  synthetic route.
-- Exact RouteCGR hashing in `synplan.chem.reaction_routes.hash_route`, including
-  a fast WL bucket hash followed by exact canonical confirmation for shared
+- Added `synplan.routes` as the public route post-processing layer for route
+  clustering, route quality, RouteCGR utilities, route I/O, analysis, depiction,
+  and notebook plotting.
+- Added `synplan.routes.route_cgr` to group RouteCGR builder, container,
+  depiction, state, and hashing helpers.
+- Added route-aware RouteCGR composition with `route_order` metadata on dynamic
+  atoms and bonds, plus transient bonds for bonds formed and later removed
+  during a synthetic route.
+- Added exact RouteCGR hashing in `synplan.routes.route_cgr.hash`, including a
+  fast WL bucket hash followed by exact canonical confirmation for shared
   buckets.
-- RouteCGR comparison helpers for identifying overlapping and unique route IDs
-  across route dictionaries whose route IDs do not need to match.
-- RouteCGR analysis helpers for selected building-block lookup and real versus
-  supporting pseudo-reactant usage statistics.
-- Notebook plotting helpers for SB-CGR Venn diagrams and Chython SVG-based
-  building-block usage plots.
-- Tutorials 15 and 16 covering RouteCGR route-set comparison and building-block
-  search.
-- API documentation for `synplan.chem.reaction_routes`, including the module map
-  for `depiction.py`, `notebook_plots.py`, and `route_cgr_container.py`.
-- `matplotlib-venn` dependency for notebook overlap plots.
+- Added RouteCGR comparison helpers for identifying overlapping and unique route
+  IDs across route dictionaries whose route IDs do not need to match.
+- Added RouteCGR analysis helpers for selected building-block lookup and real
+  versus supporting pseudo-reactant usage statistics.
+- Added `synplan.routes.clustering` as a package, with clustering logic in
+  `synplan.routes.clustering.core` and route marker helpers in
+  `synplan.routes.clustering.leaving_groups`.
+- Added API documentation for `synplan.routes`.
 
 ### Changed
 
-- SB-CGR reduction now preserves product-side charge/radical deltas and
-  synchronizes copied Chython atom objects with CGR state dictionaries after
-  reduction.
-- Route subclustering reports now use fewer required parameters and can display
-  supporting pseudo-reactants separately from leaving groups.
-- Synthon pseudo-reaction depiction now uses route markers `X` and `Y` for
-  leaving groups and supporting groups, respectively.
+- Moved route clustering, route analysis, route depiction, route I/O, notebook
+  plotting, and RouteCGR implementation from `synplan.chem.reaction_routes` to
+  `synplan.routes`.
+- Moved route-quality and protection implementation from `synplan.route_quality`
+  to `synplan.routes.quality`.
+- Updated internal imports, tests, and documentation to use `synplan.routes` for
+  route post-processing.
+- Kept `synplan.chem.reaction_routes.*` and `synplan.route_quality.*` as
+  compatibility wrappers for existing user imports. New code should import from
+  `synplan.routes`.
 
 ### Fixed
 
-- RouteCGR hashing now uses container charge/radical dictionaries where
-  available, avoiding stale atom-object state after CGR composition or
-  reduction.
-- Route comparison now computes exact hashes only inside overlapping WL buckets,
-  improving comparison speed for large route sets.
+- Preserved legacy route compatibility exports, including hash schema constants
+  from `synplan.chem.reaction_routes.hash_route` and clustering helpers such as
+  `DynamicX`, `cgr_display`, `cluster_routes`, and `compose_all_route_cgrs`.
+- Avoided importing the full route post-processing stack when importing the
+  legacy `synplan.chem.reaction_routes` package root.
 
 ## [1.5.0] - 2026-05-16
 
-> Migration guide: see [docs/user_guide/migration.rst](docs/user_guide/migration.rst).
-> Priority rules concept page: see [docs/methods/priority_rules.rst](docs/methods/priority_rules.rst).
+> Migration guide: see [docs/user_guide/migration.rst](https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/user_guide/migration.rst).
+> Priority rules concept page: see [docs/methods/priority_rules.rst](https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/methods/priority_rules.rst).
 
 ### ⚠️ Backwards-incompatible
 
@@ -581,7 +576,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CLI interface (`synplan` command)
 - Docker images for CLI and GUI
 
-[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.0...HEAD
+[1.5.3]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.0...HEAD
 [1.5.0]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.4...v1.5.0
 [1.4.4]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.2...v1.4.3

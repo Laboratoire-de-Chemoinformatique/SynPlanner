@@ -183,7 +183,7 @@ Pass the scorer to the tree so routes are re-ranked during the search:
 
 .. code-block:: python
 
-    from synplan.route_quality.scorer import ProtectionRouteScorer
+    from synplan.routes.quality.scorer import ProtectionRouteScorer
 
     # Build scorer with default configuration (bundled data)
     route_scorer = ProtectionRouteScorer.from_config()

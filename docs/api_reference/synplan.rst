@@ -12,6 +12,7 @@ Subpackages
    synplan.mcts
    synplan.ml
    synplan.route_quality
+   synplan.routes
    synplan.utils
 
 Module contents

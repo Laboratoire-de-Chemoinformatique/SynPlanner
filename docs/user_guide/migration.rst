@@ -12,6 +12,49 @@ For the full per-release log, see :doc:`/release_notes`.
    :local:
    :depth: 2
 
+1.5.3
+=====
+
+Route post-processing moved to ``synplan.routes``
+-------------------------------------------------
+
+Route-level post-processing now lives in ``synplan.routes``. This includes
+RouteCGR construction and hashing, route IO, route clustering, route analysis,
+depiction, notebook plotting helpers, and route-quality scoring.
+
+The old ``synplan.chem.reaction_routes`` and ``synplan.route_quality`` import
+paths remain available as compatibility wrappers in 1.5.3. New code should use
+the ``synplan.routes`` paths below.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 45 55
+
+   * - Old path
+     - New path
+   * - ``synplan.chem.reaction_routes.analysis``
+     - ``synplan.routes.analysis``
+   * - ``synplan.chem.reaction_routes.clustering``
+     - ``synplan.routes.clustering``
+   * - ``synplan.chem.reaction_routes.depiction``
+     - ``synplan.routes.depiction``
+   * - ``synplan.chem.reaction_routes.hash_route``
+     - ``synplan.routes.route_cgr.hash``
+   * - ``synplan.chem.reaction_routes.io``
+     - ``synplan.routes.io``
+   * - ``synplan.chem.reaction_routes.leaving_groups``
+     - ``synplan.routes.clustering.leaving_groups``
+   * - ``synplan.chem.reaction_routes.notebook_plots``
+     - ``synplan.routes.notebook_plots``
+   * - ``synplan.chem.reaction_routes.route_cgr``
+     - ``synplan.routes.route_cgr``
+   * - ``synplan.route_quality``
+     - ``synplan.routes.quality``
+   * - ``synplan.route_quality.protection``
+     - ``synplan.routes.quality.protection``
+   * - ``synplan.route_quality.scorer``
+     - ``synplan.routes.quality.scorer``
+
 1.5.0
 =====
 

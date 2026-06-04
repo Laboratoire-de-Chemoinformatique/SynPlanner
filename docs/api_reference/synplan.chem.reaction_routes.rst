@@ -1,111 +1,40 @@
-synplan.chem.reaction\_routes package
-=====================================
+synplan.chem.reaction\_routes compatibility package
+====================================================
 
-RouteCGR Module Map
--------------------
+``synplan.chem.reaction_routes`` is kept as a compatibility namespace for
+existing user imports. New code should import route post-processing helpers from
+``synplan.routes``.
 
-``route_cgr_container.py`` owns the ``RouteCGRContainer`` subclass and
-container-specific behavior such as transient-bond string formatting and
-pickling state.
+Compatibility mapping
+---------------------
 
-``depiction.py`` is for CGR and SVG rendering helpers shared by route-CGR
-visualization code.
+.. list-table::
+   :header-rows: 1
 
-``route_cgr_depiction.py`` wires ``RouteCGRContainer`` rendering to the shared
-depiction helpers.
-
-``notebook_plots.py`` contains notebook-only analysis plots and HTML helpers.
-
-Submodules
-----------
-
-synplan.chem.reaction\_routes.analysis module
----------------------------------------------
-
-.. automodule:: synplan.chem.reaction_routes.analysis
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-synplan.chem.reaction\_routes.clustering module
------------------------------------------------
-
-.. automodule:: synplan.chem.reaction_routes.clustering
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-synplan.chem.reaction\_routes.depiction module
-----------------------------------------------
-
-.. automodule:: synplan.chem.reaction_routes.depiction
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-synplan.chem.reaction\_routes.hash\_route module
-------------------------------------------------
-
-.. automodule:: synplan.chem.reaction_routes.hash_route
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-synplan.chem.reaction\_routes.io module
----------------------------------------
-
-.. automodule:: synplan.chem.reaction_routes.io
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-synplan.chem.reaction\_routes.leaving\_groups module
-----------------------------------------------------
-
-.. automodule:: synplan.chem.reaction_routes.leaving_groups
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-synplan.chem.reaction\_routes.notebook\_plots module
-----------------------------------------------------
-
-.. automodule:: synplan.chem.reaction_routes.notebook_plots
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-synplan.chem.reaction\_routes.route\_cgr module
------------------------------------------------
-
-.. automodule:: synplan.chem.reaction_routes.route_cgr
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-synplan.chem.reaction\_routes.route\_cgr\_container module
-----------------------------------------------------------
-
-.. automodule:: synplan.chem.reaction_routes.route_cgr_container
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-synplan.chem.reaction\_routes.route\_cgr\_depiction module
-----------------------------------------------------------
-
-.. automodule:: synplan.chem.reaction_routes.route_cgr_depiction
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-synplan.chem.reaction\_routes.route\_cgr\_state module
-------------------------------------------------------
-
-.. automodule:: synplan.chem.reaction_routes.route_cgr_state
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   * - Old import path
+     - New import path
+   * - ``synplan.chem.reaction_routes.analysis``
+     - ``synplan.routes.analysis``
+   * - ``synplan.chem.reaction_routes.clustering``
+     - ``synplan.routes.clustering``
+   * - ``synplan.chem.reaction_routes.depiction``
+     - ``synplan.routes.depiction``
+   * - ``synplan.chem.reaction_routes.hash_route``
+     - ``synplan.routes.route_cgr.hash``
+   * - ``synplan.chem.reaction_routes.io``
+     - ``synplan.routes.io``
+   * - ``synplan.chem.reaction_routes.leaving_groups``
+     - ``synplan.routes.clustering.leaving_groups``
+   * - ``synplan.chem.reaction_routes.notebook_plots``
+     - ``synplan.routes.notebook_plots``
+   * - ``synplan.chem.reaction_routes.route_cgr``
+     - ``synplan.routes.route_cgr``
+   * - ``synplan.chem.reaction_routes.route_cgr_container``
+     - ``synplan.routes.route_cgr.container``
+   * - ``synplan.chem.reaction_routes.route_cgr_depiction``
+     - ``synplan.routes.route_cgr.depiction``
+   * - ``synplan.chem.reaction_routes.route_cgr_state``
+     - ``synplan.routes.route_cgr.state``
 
 Module contents
 ---------------
@@ -114,3 +43,4 @@ Module contents
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
