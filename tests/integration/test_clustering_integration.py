@@ -1,4 +1,4 @@
-import logging
+from pathlib import Path
 
 import pytest
 
@@ -6,123 +6,74 @@ from synplan.chem.reaction_routes.clustering import (
     cluster_routes,
     subcluster_all_clusters,
 )
+from synplan.chem.reaction_routes.io import read_routes_json
 from synplan.chem.reaction_routes.route_cgr import (
     compose_all_route_cgrs,
     compose_all_sb_cgrs,
 )
-from synplan.chem.utils import mol_from_smiles
-from synplan.mcts.tree import Tree
-from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
-from synplan.utils.loading import (
-    download_preset,
-    load_building_blocks,
-    load_evaluation_function,
-    load_policy_function,
-    load_reaction_rules,
-)
 
-# Test molecules with different complexity levels
-TEST_MOLECULES = {
-    "simple": "CCNc1nc(Sc2ccc(C)cc2)cc(C(F)(F)F)n1",
-    "medium": "c1cc(ccc1C2=NN(C(C=C2)=N)CCCC(O)=O)OCc3cc([N+]([O-])=O)ccc3",
-    "complex": "c1cnccc1C(c2cncs2)(c3ccc4c(c(c(c(n4)Cl)Cc5ccc(cc5)Cl)Cl)c3)O",
+TEST_DATA = Path(__file__).resolve().parent.parent / "data" / "clustering"
+ROUTE_FIXTURES = {
+    "simple": TEST_DATA / "routes_mol_simple.json",
+    "medium": TEST_DATA / "routes_mol_medium.json",
+    "complex": TEST_DATA / "routes_mol_complex.json",
 }
 
 
-@pytest.fixture(scope="module")
-def data_paths():
-    """Download preset data."""
-    return download_preset(
-        preset_name="synplanner-gps", save_to="./tutorials/synplan_data"
-    )
+@pytest.fixture(scope="module", params=ROUTE_FIXTURES, ids=ROUTE_FIXTURES)
+def route_fixture_name(request):
+    """Route fixture target name."""
+    return request.param
 
 
 @pytest.fixture(scope="module")
-def building_blocks(data_paths):
-    """Load building blocks."""
-    return load_building_blocks(
-        data_paths["building_blocks"], standardize=False, silent=True
-    )
+def route_fixture_path(route_fixture_name):
+    """Path to a deterministic generated route fixture."""
+    path = ROUTE_FIXTURES[route_fixture_name]
+    assert path.exists(), f"Test data missing: {path}"
+    return path
 
 
 @pytest.fixture(scope="module")
-def reaction_rules(data_paths):
-    """Load reaction rules."""
-    return load_reaction_rules(data_paths["reaction_rules"])
+def fixture_routes_dict(route_fixture_path):
+    """Load deterministic route fixture data as {route_id: {step_id: Reaction}}."""
+    routes = read_routes_json(route_fixture_path, to_dict=True)
+    assert routes, "Route fixture should contain at least one route"
+    return routes
 
 
 @pytest.fixture(scope="module")
-def policy_network(data_paths):
-    """Initialize policy network."""
-    return load_policy_function(weights_path=data_paths["ranking_policy"])
+def fixture_route_cgrs(fixture_routes_dict):
+    """Compose RouteCGRs from fixed route fixtures."""
+    cgrs = compose_all_route_cgrs(fixture_routes_dict)
+    assert cgrs, "Route fixture should compose at least one RouteCGR"
+    return cgrs
 
 
 @pytest.fixture(scope="module")
-def tree_config():
-    """Get tree configuration."""
-    return TreeConfig(
-        search_strategy="expansion_first",
-        algorithm="UCT",
-        enable_pruning=False,
-        max_iterations=300,
-        max_time=120,
-        max_depth=6,
-        min_mol_size=1,
-        silent=True,
+def fixture_sb_cgrs(fixture_route_cgrs):
+    """Compose strategic-bond CGRs from fixed RouteCGR fixtures."""
+    sb_cgrs = compose_all_sb_cgrs(fixture_route_cgrs)
+    assert sb_cgrs, "Route fixture should compose at least one SB-CGR"
+    return sb_cgrs
+
+
+@pytest.fixture(scope="module")
+def fixture_clusters(fixture_sb_cgrs):
+    """Cluster fixed SB-CGR fixtures."""
+    clusters = cluster_routes(fixture_sb_cgrs, use_strat=False)
+    assert clusters, "Route fixture should produce at least one cluster"
+    return clusters
+
+
+@pytest.fixture(scope="module")
+def fixture_subclusters(fixture_clusters, fixture_sb_cgrs, fixture_route_cgrs):
+    """Subcluster fixed route fixtures."""
+    subclusters = subcluster_all_clusters(
+        fixture_clusters, fixture_sb_cgrs, fixture_route_cgrs
     )
-
-
-def run_clustering_workflow(
-    target_smiles, building_blocks, reaction_rules, policy_network, tree_config
-):
-    """Helper function to run the complete clustering workflow."""
-
-    # Create target molecule
-    target_molecule = mol_from_smiles(
-        target_smiles, clean2d=True, standardize=True, clean_stereo=True
-    )
-
-    # Create evaluation config and strategy
-    eval_config = RolloutEvaluationConfig(
-        policy_network=policy_network,
-        reaction_rules=reaction_rules,
-        building_blocks=building_blocks,
-        min_mol_size=tree_config.min_mol_size,
-        max_depth=tree_config.max_depth,
-        normalize=tree_config.normalize_scores,
-    )
-    evaluator = load_evaluation_function(eval_config)
-
-    # Create and solve tree
-    tree = Tree(
-        target=target_molecule,
-        config=tree_config,
-        reaction_rules=reaction_rules,
-        building_blocks=building_blocks,
-        expansion_function=policy_network,
-        evaluation_function=evaluator,
-    )
-
-    # Solve tree
-    tree_solved = False
-    for solved, _ in tree:
-        if solved:
-            tree_solved = True
-    tree._log_final_stats("completed")
-
-    if not tree_solved:
-        pytest.fail(f"Tree solving failed for molecule: {target_smiles}")
-
-    # Get route CGRs
-    all_route_cgrs = compose_all_route_cgrs(tree)
-    all_sb_cgrs = compose_all_sb_cgrs(all_route_cgrs)
-
-    # Perform clustering
-    clusters = cluster_routes(all_sb_cgrs, use_strat=False)
-
-    # Perform subclustering
-    subclusters = subcluster_all_clusters(clusters, all_sb_cgrs, all_route_cgrs)
-    return tree, clusters, subclusters
+    assert subclusters, "Route fixture should produce at least one subcluster"
+    return subclusters
 
 
 def calc_num_routes_subclusters(subclusters):
@@ -134,81 +85,82 @@ def calc_num_routes_subclusters(subclusters):
     return count
 
 
-@pytest.mark.integration
-def test_simple_molecule_clustering(
-    building_blocks, reaction_rules, policy_network, tree_config, caplog
-):
-    """Test clustering workflow with a simple molecule (Aspirin)."""
-    caplog.set_level(logging.DEBUG)
-    target_smiles = TEST_MOLECULES["simple"]
-    _tree, clusters, subclusters = run_clustering_workflow(
-        target_smiles, building_blocks, reaction_rules, policy_network, tree_config
-    )
-    # Verify clustering results
-    assert len(clusters) > 0, "Should have at least one cluster"
-    total_routes = sum(cluster["group_size"] for cluster in clusters.values())
-    assert total_routes > 0, "Should have at least one route"
+def build_route_fixture_clustering(route_fixture_name):
+    """Build clustering data from one generated route fixture."""
+    fixture_path = ROUTE_FIXTURES[route_fixture_name]
+    assert fixture_path.exists(), f"Test data missing: {fixture_path}"
 
-    # Verify subclustering results
-    assert len(subclusters) > 0, "Should have at least one subcluster"
+    routes = read_routes_json(fixture_path, to_dict=True)
+    assert routes, "Route fixture should contain at least one route"
+
+    route_cgrs = compose_all_route_cgrs(routes)
+    assert route_cgrs, "Route fixture should compose at least one RouteCGR"
+
+    sb_cgrs = compose_all_sb_cgrs(route_cgrs)
+    assert sb_cgrs, "Route fixture should compose at least one SB-CGR"
+
+    clusters = cluster_routes(sb_cgrs, use_strat=False)
+    assert clusters, "Route fixture should produce at least one cluster"
+
+    subclusters = subcluster_all_clusters(clusters, sb_cgrs, route_cgrs)
+    assert subclusters, "Route fixture should produce at least one subcluster"
+
+    return route_cgrs, sb_cgrs, clusters, subclusters
+
+
+def assert_route_fixture_clustering(
+    route_fixture_name, route_cgrs, sb_cgrs, clusters, subclusters
+):
+    """Assert the clustering invariants for one generated route fixture."""
+    assert set(sb_cgrs).issubset(set(route_cgrs))
+
+    total_routes = sum(cluster["group_size"] for cluster in clusters.values())
+    assert total_routes == len(sb_cgrs), (
+        f"Every SB-CGR route should cluster for {route_fixture_name}"
+    )
+
     total_subclusters = calc_num_routes_subclusters(subclusters)
     assert total_subclusters == total_routes, (
-        "Total subclusters should match total routes"
+        f"Total subclusters should match total routes for {route_fixture_name}"
     )
     assert sorted(subclusters.keys()) == sorted(clusters.keys()), (
-        "Subcluster keys should match cluster keys"
-    )
-
-
-@pytest.mark.integration
-def test_medium_molecule_clustering(
-    building_blocks, reaction_rules, policy_network, tree_config, caplog
-):
-    """Test clustering workflow with a medium complexity molecule (Capivasertib)."""
-    caplog.set_level(logging.DEBUG)
-    target_smiles = TEST_MOLECULES["medium"]
-    _tree, clusters, subclusters = run_clustering_workflow(
-        target_smiles, building_blocks, reaction_rules, policy_network, tree_config
-    )
-
-    # Verify clustering results
-    assert len(clusters) > 0, "Should have at least one cluster"
-    total_routes = sum(cluster["group_size"] for cluster in clusters.values())
-    assert total_routes > 0, "Should have at least one route"
-
-    # Verify subclustering results
-    assert len(subclusters) > 0, "Should have at least one subcluster"
-    total_subclusters = calc_num_routes_subclusters(subclusters)
-    assert total_subclusters == total_routes, (
-        "Total subclusters should match total routes"
-    )
-    assert sorted(subclusters.keys()) == sorted(clusters.keys()), (
-        "Subcluster keys should match cluster keys"
+        f"Subcluster keys should match cluster keys for {route_fixture_name}"
     )
 
 
 @pytest.mark.integration
-def test_complex_molecule_clustering(
-    building_blocks, reaction_rules, policy_network, tree_config, caplog
+def test_route_fixture_clustering_pipeline(
+    route_fixture_name,
+    fixture_route_cgrs,
+    fixture_sb_cgrs,
+    fixture_clusters,
+    fixture_subclusters,
 ):
-    """Test clustering workflow with a complex molecule (Ibuprofen)."""
-    caplog.set_level(logging.DEBUG)
-    target_smiles = TEST_MOLECULES["complex"]
-    _tree, clusters, subclusters = run_clustering_workflow(
-        target_smiles, building_blocks, reaction_rules, policy_network, tree_config
+    """Cluster and subcluster fixed routes without running MCTS planning."""
+    assert_route_fixture_clustering(
+        route_fixture_name,
+        fixture_route_cgrs,
+        fixture_sb_cgrs,
+        fixture_clusters,
+        fixture_subclusters,
     )
 
-    # Verify clustering results
-    assert len(clusters) > 0, "Should have at least one cluster"
+
+@pytest.mark.integration
+def test_complex_molecule_clustering():
+    """Regression: complex target clustering uses a fixed route fixture."""
+    assert_route_fixture_clustering(
+        "complex", *build_route_fixture_clustering("complex")
+    )
+
+
+@pytest.mark.integration
+def test_route_fixture_clustering_with_strategic_bonds(
+    route_fixture_name, fixture_sb_cgrs
+):
+    """The fixed route fixtures also cluster when strategic bonds are explicit."""
+    clusters = cluster_routes(fixture_sb_cgrs, use_strat=True)
+
+    assert clusters, f"Should have a strategic-bond cluster for {route_fixture_name}"
     total_routes = sum(cluster["group_size"] for cluster in clusters.values())
-    assert total_routes > 0, "Should have at least one route"
-
-    # Verify subclustering results
-    assert len(subclusters) > 0, "Should have at least one subcluster"
-    total_subclusters = calc_num_routes_subclusters(subclusters)
-    assert total_subclusters == total_routes, (
-        "Total subclusters should match total routes"
-    )
-    assert sorted(subclusters.keys()) == sorted(clusters.keys()), (
-        "Subcluster keys should match cluster keys"
-    )
+    assert total_routes == len(fixture_sb_cgrs)
