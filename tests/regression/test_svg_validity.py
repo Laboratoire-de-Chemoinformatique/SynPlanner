@@ -62,7 +62,7 @@ def test_depict_produces_parseable_svg(simple_cgr):
 def test_cgr_display_produces_parseable_svg(simple_cgr):
     """``cgr_display`` must also return parseable XML; its wide-bond branch
     is where the f-string bug lives."""
-    from synplan.chem.reaction_routes.depiction import cgr_display
+    from synplan.routes.depiction import cgr_display
 
     svg = cgr_display(simple_cgr)
     assert isinstance(svg, str) and svg.strip()
@@ -82,8 +82,8 @@ def test_cgr_depiction_renders_none_none_dynamic_bond_blue():
 
     from chython import smiles
 
-    from synplan.chem.reaction_routes.depiction import cgr_display
-    from synplan.chem.reaction_routes.route_cgr import compose_route_cgr
+    from synplan.routes.depiction import cgr_display
+    from synplan.routes.route_cgr import compose_route_cgr
 
     routes = {
         1: {
@@ -112,7 +112,7 @@ def test_cgr_depiction_renders_none_none_dynamic_bond_blue():
 def transient_route_cgr():
     from chython import smiles
 
-    from synplan.chem.reaction_routes.route_cgr import compose_route_cgr
+    from synplan.routes.route_cgr import compose_route_cgr
 
     routes = {
         1: {
@@ -172,7 +172,7 @@ def test_cgr_display_does_not_leak_state_into_depict(two_cgrs):
     """
     from chython.containers import CGRContainer
 
-    from synplan.chem.reaction_routes.depiction import cgr_display
+    from synplan.routes.depiction import cgr_display
 
     _, cgr_b = two_cgrs
 

@@ -5,18 +5,19 @@ from chython import smiles
 from chython.containers import CGRContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
 
-from synplan.chem.reaction_routes.io import (
+from synplan.routes.io import (
     make_dict,
     read_routes_csv,
     read_routes_json,
 )
-from synplan.chem.reaction_routes.route_cgr import (
+from synplan.routes.route_cgr import (
     compose_all_route_cgrs,
     compose_route_cgr,
     compose_sb_cgr,
+    get_clean_mapping,
 )
-from synplan.chem.reaction_routes.route_cgr_container import RouteCGRContainer
-from synplan.chem.reaction_routes.route_cgr_state import RouteDynamicBond
+from synplan.routes.route_cgr.container import RouteCGRContainer
+from synplan.routes.route_cgr.state import RouteDynamicBond
 
 
 class _MockRouteTree:
@@ -103,6 +104,15 @@ def test_compose_route_cgr_dict_based_invalid_route_id(routes_fixture, request):
     invalid_route_id = 999
     with pytest.raises(KeyError):
         compose_route_cgr(data, invalid_route_id)
+
+
+def test_get_clean_mapping_preserves_non_identity_atom_mapping():
+    current = smiles("[CH3:1][CH3:2]")
+    target = smiles("[CH3:10][CH3:20]")
+
+    assert list(current.get_mapping(target)) == [{1: 20, 2: 10}]
+    assert get_clean_mapping(current, target) == {1: 20, 2: 10}
+    assert get_clean_mapping(current, target, reverse=True) == {20: 1, 10: 2}
 
 
 def test_compose_route_cgr_tree_based_single_route(routes_data_tree):

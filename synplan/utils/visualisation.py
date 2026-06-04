@@ -13,11 +13,11 @@ from chython.algorithms.depict import _graph_svg, _render_config
 from chython.containers.molecule import MoleculeContainer
 from IPython.display import HTML, display
 
-from synplan.chem.reaction_routes.depiction import (
+from synplan.routes.depiction import (
     cgr_display,
     depict_custom_reaction,
 )
-from synplan.chem.reaction_routes.io import make_dict
+from synplan.routes.io import make_dict
 from synplan.mcts.tree import Tree
 
 

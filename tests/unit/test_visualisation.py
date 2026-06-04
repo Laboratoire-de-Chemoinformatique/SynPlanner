@@ -2,7 +2,7 @@ from chython import smiles as read_smiles
 from chython.containers import MoleculeContainer
 
 from synplan.chem.precursor import Precursor
-from synplan.chem.reaction_routes.io import make_json
+from synplan.routes.io import make_json
 from synplan.mcts.node import Node
 from synplan.utils.visualisation import get_route_svg, get_route_svg_from_json
 

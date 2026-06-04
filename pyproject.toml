@@ -156,7 +156,15 @@ replace = 'version = "{new_version}"'
 [tool.ruff]
 line-length = 88
 target-version = "py310"
-extend-exclude = ["synplan/chem/reaction_routes"]
+extend-exclude = [
+    "synplan/chem/reaction_routes",
+    "synplan/routes/analysis.py",
+    "synplan/routes/route_cgr",
+    "synplan/routes/clustering",
+    "synplan/routes/depiction.py",
+    "synplan/routes/io.py",
+    "synplan/routes/notebook_plots.py",
+]
 
 [tool.ruff.lint]
 select = [

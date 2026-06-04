@@ -12,7 +12,7 @@ from synplan.chem.data.standardizing import (
     ReactionStandardizationConfig,
     standardize_reactions_from_file,
 )
-from synplan.chem.reaction_routes.clustering import run_cluster_cli
+from synplan.routes.clustering import run_cluster_cli
 from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions
 from synplan.chem.utils import standardize_building_blocks
 from synplan.mcts.search import run_search

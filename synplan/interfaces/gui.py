@@ -11,12 +11,12 @@ import streamlit as st
 from huggingface_hub.utils import disable_progress_bars
 from streamlit_ketcher import st_ketcher
 
-from synplan.chem.reaction_routes.clustering import *
-from synplan.chem.reaction_routes.route_cgr import *
+from synplan.routes.clustering import *
+from synplan.routes.route_cgr import *
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.search import extract_tree_stats
 from synplan.mcts.tree import Tree
-from synplan.route_quality.scorer import ProtectionRouteScorer
+from synplan.routes.quality.scorer import ProtectionRouteScorer
 from synplan.utils.config import TreeConfig
 from synplan.utils.loading import (
     download_preset,
