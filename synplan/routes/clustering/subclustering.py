@@ -1,4 +1,5 @@
 from collections import defaultdict
+from contextlib import suppress
 from typing import Any
 
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
@@ -102,39 +103,37 @@ def lg_replacer(route_cgr: CGRContainer):
                     if len(lg_cgrs) == 2:
                         lg_cgr = lg_cgrs[1]
                         lg_cgr = lg_process_reset(lg_cgr, atom2)
-                        try:
+                        # 2D coordinates are optional for subclustering;
+                        # keep the chemically valid leaving group.
+                        with suppress(ImportError, AttributeError):
                             lg_cgr.clean2d()
-                        except (ImportError, AttributeError):
-                            # 2D coordinates are optional for subclustering;
-                            # keep the chemically valid leaving group.
-                            pass
                     else:
                         continue
                     lg_groups[k] = (lg_cgr, atom2)
-                    target_cgr = [
+                    target_cgr = next(
                         target_cgr.substructure(c)
                         for c in target_cgr.connected_components
-                    ][0]
+                    )
                     target_cgr.add_atom(lg, atom2)
-                    if order == 4 and p_order == None:
+                    if order == 4 and p_order is None:
                         order = 1
                     target_cgr.add_bond(atom1, atom2, DynamicBond(order, p_order))
-                    target_cgr = [
+                    target_cgr = next(
                         target_cgr.substructure(c)
                         for c in target_cgr.connected_components
-                    ][0]
+                    )
                     k += 1
                     atom_nums.append(atom2)
 
-    synthon_cgr = [target_cgr.substructure(c) for c in target_cgr.connected_components][
-        0
-    ]
+    synthon_cgr = next(
+        target_cgr.substructure(c) for c in target_cgr.connected_components
+    )
     reaction = ReactionContainer.from_cgr(synthon_cgr)
     reactants = reaction.reactants
 
     atom_mark_map = {}  # To map atom numbers to their new marks
     g = 1
-    for n, r in enumerate(reactants):
+    for r in reactants:
         for atom_num in atom_nums:
             if atom_num in r._atoms:
                 synthon_cgr._atoms[atom_num].mark = g
@@ -187,7 +186,7 @@ def lg_reaction_replacer(
                     if atom_num == val[1]:
                         lg.mark = k
                         lg.isotope = k
-                        atom1 = list(reactant._bonds[atom_num].keys())[0]
+                        atom1 = next(iter(reactant._bonds[atom_num].keys()))
                         bond = reactant._bonds[atom_num][atom1]
                         reactant.delete_bond(atom1, atom_num)
                         reactant.delete_atom(atom_num)
@@ -562,7 +561,7 @@ def new_lg_reaction_replacer(synthon_reaction, new_lgs, max_in_target_mol):
                     if atom_num == val:
                         lg.mark = k
                         lg.isotope = k
-                        atom1 = list(reactant._bonds[atom_num].keys())[0]
+                        atom1 = next(iter(reactant._bonds[atom_num].keys()))
                         bond = reactant._bonds[atom_num][atom1]
                         reactant.delete_bond(atom1, atom_num)
                         reactant.delete_atom(atom_num)
@@ -610,19 +609,17 @@ def post_process_subgroup(subgroup):
     -------
     dict
         The same dict, now with:
-        - `'synthon_reaction'`: cleaned ReactionContainer
+        - `'synthon_reaction'`: post-processed ReactionContainer
         - `'routes_data'`: filtered route table
         - `'post_processed'`: True
     """
-    if "post_processed" in subgroup.keys() and subgroup["post_processed"] == True:
+    if subgroup.get("post_processed") is True:
         return subgroup
     result = all_lg_collect(subgroup)
     # to find constant lg that need to be removed
     to_remove = [ind for ind, cgr_set in result.items() if len(cgr_set) == 1]
     new_synthon_cgr, new_lgs = replace_leaving_groups_in_synthon(subgroup, to_remove)
     synthon_reaction = ReactionContainer.from_cgr(new_synthon_cgr)
-    synthon_reaction.clean2d()
-    old_reactants = ReactionContainer.from_cgr(new_synthon_cgr).reactants
     target_mol = synthon_reaction.products[0]
     max_in_target_mol = max(target_mol._atoms)
     new_reactants = new_lg_reaction_replacer(
@@ -632,7 +629,6 @@ def post_process_subgroup(subgroup):
         reactants=new_reactants, products=[target_mol]
     )
     new_synthon_reaction = replace_supporting_reactants_with_y(new_synthon_reaction)
-    new_synthon_reaction.clean2d()
     subgroup["synthon_reaction"] = new_synthon_reaction
     subgroup["routes_data"] = remove_and_shift(subgroup["routes_data"], to_remove)
     subgroup["post_processed"] = True
@@ -662,7 +658,7 @@ def group_by_identical_values(routes_data):
 
     # Step 2: Build the grouped result
     grouped = {}
-    for signature, outer_keys in signature_map.items():
+    for _signature, outer_keys in signature_map.items():
         # Use the representative inner dict from the first outer key in this group
         rep_inner = routes_data[outer_keys[0]]
         # Build mapping subkey -> value_obj

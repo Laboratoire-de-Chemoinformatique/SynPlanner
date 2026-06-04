@@ -11,12 +11,14 @@ import streamlit as st
 from huggingface_hub.utils import disable_progress_bars
 from streamlit_ketcher import st_ketcher
 
-from synplan.routes.clustering import *
-from synplan.routes.route_cgr import *
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.search import extract_tree_stats
 from synplan.mcts.tree import Tree
+from synplan.routes.clustering import *
+from synplan.routes.depiction import cgr_display, depict_custom_reaction
+from synplan.routes.io import make_json
 from synplan.routes.quality.scorer import ProtectionRouteScorer
+from synplan.routes.route_cgr import *
 from synplan.utils.config import TreeConfig
 from synplan.utils.loading import (
     download_preset,
@@ -901,7 +903,6 @@ def generate_sb_cgr_image(_cgr):
 
 @st.cache_data
 def generate_synthon_reaction_image(_synthon_reaction):
-    _synthon_reaction.clean2d()
     return depict_custom_reaction(_synthon_reaction)
 
 

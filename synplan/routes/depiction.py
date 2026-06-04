@@ -92,8 +92,7 @@ def _wide_aromatic_bond(self, n_x, n_y, m_x, m_y, c_x, c_y, color):
     )
     if svg and color:
         return (
-            svg[:-2]
-            + f' stroke-width="{_render_config["dynamic_bond_width"]:.2f}"/>'
+            svg[:-2] + f' stroke-width="{_render_config["dynamic_bond_width"]:.2f}"/>'
         )
     return svg
 
@@ -124,9 +123,11 @@ def wide_cgr_renderer(container_cls=CGRContainer):
             WideBondDepictCGR._DepictCGR__render_aromatic_bond
         ),
     }
-    with _temporary_render_config(dynamic_bond_width=_dynamic_bond_width()):
-        with _temporary_class_attrs(container_cls, updates):
-            yield
+    with (
+        _temporary_render_config(dynamic_bond_width=_dynamic_bond_width()),
+        _temporary_class_attrs(container_cls, updates),
+    ):
+        yield
 
 
 def cgr_display(cgr: CGRContainer) -> str:
@@ -144,4 +145,5 @@ def depict_custom_reaction(reaction: ReactionContainer):
     rendering work to Chython.
     """
 
+    reaction.clean2d()
     return reaction.depict()

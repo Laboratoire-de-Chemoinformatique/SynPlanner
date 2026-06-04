@@ -13,12 +13,12 @@ from chython.algorithms.depict import _graph_svg, _render_config
 from chython.containers.molecule import MoleculeContainer
 from IPython.display import HTML, display
 
+from synplan.mcts.tree import Tree
 from synplan.routes.depiction import (
     cgr_display,
     depict_custom_reaction,
 )
 from synplan.routes.io import make_dict
-from synplan.mcts.tree import Tree
 
 
 def get_child_nodes(
@@ -1566,7 +1566,6 @@ def routes_subclustering_report(
 
     try:
         synthon_reaction = subcluster["synthon_reaction"]
-        synthon_reaction.clean2d()
         synthon_svg = depict_custom_reaction(synthon_reaction)
 
         extra_synthon = f"<tr>{td}{font_normal}Synthon pseudo reaction:{font_close}<br>{synthon_svg}</td></tr>"
