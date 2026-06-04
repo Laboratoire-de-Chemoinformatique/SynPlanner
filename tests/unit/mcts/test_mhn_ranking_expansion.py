@@ -68,6 +68,22 @@ def test_mhn_preparation_caches_encoded_templates(monkeypatch):
     assert wrapper.n_rules == 2
 
 
+def test_mhn_association_cache_is_bounded(monkeypatch):
+    monkeypatch.setattr(
+        expansion,
+        "template_features_from_smarts",
+        lambda rule_smarts, **_kwargs: torch.zeros((len(rule_smarts), 4)),
+    )
+    wrapper = _wrapper(monkeypatch, _MHNPolicy())
+
+    for index in range(expansion._MAX_TEMPLATE_ASSOCIATION_CACHE_SIZE + 2):
+        wrapper._prepare_template_associations([_Rule(f"A{index}")])
+
+    assert len(wrapper._template_association_cache) == (
+        expansion._MAX_TEMPLATE_ASSOCIATION_CACHE_SIZE
+    )
+
+
 def test_linear_template_preparation_is_noop(monkeypatch):
     wrapper = _wrapper(monkeypatch, _LinearPolicy())
 
@@ -76,19 +92,13 @@ def test_linear_template_preparation_is_noop(monkeypatch):
     assert wrapper._template_associations is None
 
 
-def test_mhn_light_prediction_prepares_templates(monkeypatch):
-    monkeypatch.setattr(
-        expansion,
-        "template_features_from_smarts",
-        lambda rule_smarts, **_kwargs: torch.zeros((len(rule_smarts), 4)),
-    )
+def test_light_prediction_uses_integer_count_without_preparing_templates(monkeypatch):
     wrapper = _wrapper(monkeypatch, _MHNPolicy())
     observed = []
     wrapper._predict_rules_common = lambda _precursor, n_rules: observed.append(n_rules)
-    rules = [_Rule("A"), _Rule("B")]
 
-    assert list(wrapper.predict_reaction_rules_light(SimpleNamespace(), rules)) == []
-    assert tuple(wrapper._template_associations.shape) == (2, 4)
+    assert list(wrapper.predict_reaction_rules_light(SimpleNamespace(), 2)) == []
+    assert wrapper._template_associations is None
     assert observed == [2]
 
 
@@ -106,15 +116,18 @@ def test_combined_prediction_prepares_mhn_templates():
     assert prepared == [rules]
 
 
-def test_combined_light_prediction_prepares_mhn_templates():
+def test_combined_light_prediction_uses_integer_count_without_preparing_templates():
     prepared = []
+    observed = []
     ranking = SimpleNamespace(
         _prepare_template_associations=lambda rules: prepared.append(rules)
     )
     combined = CombinedPolicyNetworkFunction.__new__(CombinedPolicyNetworkFunction)
     combined.ranking_net = ranking
-    combined._predict_rules_common = lambda _precursor, _n_rules: None
-    rules = [_Rule("A"), _Rule("B")]
+    combined._predict_rules_common = lambda _precursor, n_rules: observed.append(
+        n_rules
+    )
 
-    assert list(combined.predict_reaction_rules_light(SimpleNamespace(), rules)) == []
-    assert prepared == [rules]
+    assert list(combined.predict_reaction_rules_light(SimpleNamespace(), 2)) == []
+    assert prepared == []
+    assert observed == [2]

@@ -17,8 +17,8 @@ from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 from torch.utils.data import Subset, random_split
 from torch_geometric.data.lightning import LightningDataset
 
-from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.networks.mhn_ranking import MHNRankingPolicyNetwork
+from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.training.preprocessing import (
     FilteringPolicyDataset,
     RankingPolicyDataset,

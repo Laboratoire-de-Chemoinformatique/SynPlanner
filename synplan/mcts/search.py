@@ -124,6 +124,14 @@ def run_search(
         "newick_tree",
         "newick_meta",
         "error",
+        # Priority rules
+        "fraction_routes_with_priority",
+        "n_routes_with_priority",
+        "per_priority_source",
+        "priority_rules_tried",
+        "policy_rules_tried",
+        "priority_rules_succeeded",
+        "policy_rules_succeeded",
     ]
 
     # Load resources
@@ -200,10 +208,6 @@ def run_search(
                     extended=True,
                 )
 
-                # save stats
-                statswriter.writerow(extract_tree_stats(tree, target_smi))
-                csvfile.flush()
-
                 # save json routes
                 with open(routes_file, "w", encoding="utf-8") as f:
                     json.dump(extracted_routes, f)
@@ -218,5 +222,9 @@ def run_search(
                 write_routes_json(
                     routes_dict, os.path.join(routes_folder, f"mapped_routes_{ti}.json")
                 )
+
+            # save stats
+            statswriter.writerow(extract_tree_stats(tree, target_smi))
+            csvfile.flush()
 
     print(f"Number of solved target molecules: {n_solved}")

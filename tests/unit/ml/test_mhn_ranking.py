@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from types import SimpleNamespace
 
 import pytest
@@ -13,6 +14,8 @@ from synplan.chem.utils import reaction_query_to_reaction
 from synplan.ml.networks.mhn_ranking import MHNRankingPolicyNetwork
 from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.template_features import (
+    _MAX_TEMPLATE_FEATURE_CACHE_SIZE,
+    _cache_set,
     _side_fingerprint,
     reaction_rules_path_from_policy_data,
     template_features_from_smarts,
@@ -70,6 +73,24 @@ def test_template_features_are_deterministic_and_permutation_equivariant():
 def test_template_feature_error_identifies_rule():
     with pytest.raises(ValueError, match=r"index 0"):
         template_features_from_smarts(("invalid",), fp_size=16)
+
+
+def test_template_feature_cache_set_is_bounded_lru():
+    cache = OrderedDict()
+
+    for index in range(_MAX_TEMPLATE_FEATURE_CACHE_SIZE + 2):
+        _cache_set(cache, str(index), torch.tensor([float(index)]))
+
+    assert len(cache) == _MAX_TEMPLATE_FEATURE_CACHE_SIZE
+    assert list(cache) == [
+        str(index) for index in range(2, _MAX_TEMPLATE_FEATURE_CACHE_SIZE + 2)
+    ]
+
+    _cache_set(cache, "2", torch.tensor([2.0]))
+    _cache_set(cache, "new", torch.tensor([99.0]))
+
+    assert "3" not in cache
+    assert list(cache)[-1] == "new"
 
 
 def test_reaction_rules_path_is_inferred_from_extracted_policy_mapping(tmp_path):
@@ -182,6 +203,10 @@ def test_mhn_prepares_training_templates_from_policy_mapping(tmp_path):
     assert network.n_rules == 2
     assert tuple(network._training_template_features.shape) == (2, 16)
     assert network.hparams["n_rules"] == 2
+    assert network.hparams["mhn_template_feature_digest"] == (
+        network.mhn_template_feature_digest
+    )
+    assert network.mhn_template_feature_digest is not None
     assert "policy_data_path" not in network.hparams
 
 

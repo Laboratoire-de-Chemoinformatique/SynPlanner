@@ -1,6 +1,7 @@
 """Module containing a class that represents a policy function for node expansion in the
 tree search."""
 
+from collections import OrderedDict
 from collections.abc import Iterator, Sequence
 
 import torch
@@ -19,6 +20,8 @@ from synplan.ml.template_features import (
 from synplan.ml.training import mol_to_pyg
 from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.loading import load_policy_net
+
+_MAX_TEMPLATE_ASSOCIATION_CACHE_SIZE = 4
 
 
 class PolicyNetworkFunction:
@@ -50,7 +53,7 @@ class PolicyNetworkFunction:
             self.policy_net = policy_net
         self._template_feature_digest: str | None = None
         self._template_associations: torch.Tensor | None = None
-        self._template_association_cache: dict[str, torch.Tensor] = {}
+        self._template_association_cache: OrderedDict[str, torch.Tensor] = OrderedDict()
 
     @property
     def architecture(self) -> str:
@@ -95,6 +98,14 @@ class PolicyNetworkFunction:
             with torch.no_grad():
                 associations = self.policy_net.encode_templates(features).detach()
             self._template_association_cache[feature_digest] = associations
+            self._template_association_cache.move_to_end(feature_digest)
+            while (
+                len(self._template_association_cache)
+                > _MAX_TEMPLATE_ASSOCIATION_CACHE_SIZE
+            ):
+                self._template_association_cache.popitem(last=False)
+        else:
+            self._template_association_cache.move_to_end(feature_digest)
         self._template_associations = associations
         self._template_feature_digest = feature_digest
 
@@ -230,19 +241,17 @@ class PolicyNetworkFunction:
     def predict_reaction_rules_light(
         self,
         precursor: Precursor,
-        reaction_rules: Sequence[CanonicalRetroReactor],
+        reaction_rules_len: int,
     ) -> Iterator[tuple[float, int]]:
         """The policy function predicts the list of reaction rules for a given precursor.
 
         Light version that doesn't return Reactor objects.
 
         :param precursor: The current precursor for which the reaction rules are predicted.
-        :param reaction_rules: The reaction rules used to prepare MHN templates and
-            validate output dimensions.
+        :param reaction_rules_len: The number of reaction rules.
         :return: Yielding the predicted probability and reaction rule id.
         """
-        self._prepare_template_associations(reaction_rules)
-        result = self._predict_rules_common(precursor, len(reaction_rules))
+        result = self._predict_rules_common(precursor, reaction_rules_len)
         if result is None:
             return []
 
@@ -417,19 +426,17 @@ class CombinedPolicyNetworkFunction:
     def predict_reaction_rules_light(
         self,
         precursor: Precursor,
-        reaction_rules: Sequence[CanonicalRetroReactor],
+        reaction_rules_len: int,
     ) -> Iterator[tuple[float, int]]:
         """Predicts reaction rules using Bayesian-style log-space combination.
 
         Light version without returning Reactor objects.
 
         :param precursor: The current precursor for which the reaction rules are predicted.
-        :param reaction_rules: The reaction rules used to prepare MHN templates and
-            validate output dimensions.
+        :param reaction_rules_len: The number of reaction rules.
         :return: Yielding (probability, rule_id) tuples.
         """
-        self.ranking_net._prepare_template_associations(reaction_rules)
-        result = self._predict_rules_common(precursor, len(reaction_rules))
+        result = self._predict_rules_common(precursor, reaction_rules_len)
         if result is None:
             return
 

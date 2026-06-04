@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import OrderedDict
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -15,8 +16,29 @@ from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.utils import reaction_query_to_reaction
 from synplan.utils.loading import load_reaction_rules
 
-_TEMPLATE_FEATURE_CACHE: dict[str, torch.Tensor] = {}
+_MAX_TEMPLATE_FEATURE_CACHE_SIZE = 8
+_TEMPLATE_FEATURE_CACHE: OrderedDict[str, torch.Tensor] = OrderedDict()
 _POLICY_DATA_SUFFIX = "_policy_data.tsv"
+
+
+def _cache_get(cache: OrderedDict[str, torch.Tensor], key: str) -> torch.Tensor | None:
+    value = cache.get(key)
+    if value is not None:
+        cache.move_to_end(key)
+    return value
+
+
+def _cache_set(
+    cache: OrderedDict[str, torch.Tensor],
+    key: str,
+    value: torch.Tensor,
+    *,
+    max_size: int = _MAX_TEMPLATE_FEATURE_CACHE_SIZE,
+) -> None:
+    cache[key] = value
+    cache.move_to_end(key)
+    while len(cache) > max_size:
+        cache.popitem(last=False)
 
 
 def validate_morgan_settings(
@@ -146,7 +168,7 @@ def template_features_from_smarts(
         max_radius=max_radius,
         active_bits=active_bits,
     )
-    cached = _TEMPLATE_FEATURE_CACHE.get(digest)
+    cached = _cache_get(_TEMPLATE_FEATURE_CACHE, digest)
     if cached is not None:
         return cached
 
@@ -181,5 +203,5 @@ def template_features_from_smarts(
         if features
         else torch.empty((0, fp_size), dtype=torch.float)
     )
-    _TEMPLATE_FEATURE_CACHE[digest] = tensor
+    _cache_set(_TEMPLATE_FEATURE_CACHE, digest, tensor)
     return tensor

@@ -26,6 +26,7 @@ from synplan.ml.networks.modules import MCTSNetwork
 from synplan.ml.template_features import (
     load_rule_smarts,
     reaction_rules_path_from_policy_data,
+    template_feature_digest,
     template_features_from_smarts,
 )
 
@@ -84,6 +85,7 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
         mhn_template_fp_max_radius: int = 4,
         mhn_template_fp_active_bits: int = 2,
         mhn_normalize_associations: bool = True,
+        mhn_template_feature_digest: str | None = None,
         **kwargs,
     ):
         if training_labels is not None and policy_data_path is None:
@@ -92,6 +94,13 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
             reaction_rules_path = reaction_rules_path_from_policy_data(policy_data_path)
             rule_smarts = load_rule_smarts(reaction_rules_path)
             n_rules = len(rule_smarts)
+            mhn_template_feature_digest = template_feature_digest(
+                rule_smarts,
+                fp_size=mhn_template_fp_size,
+                min_radius=mhn_template_fp_min_radius,
+                max_radius=mhn_template_fp_max_radius,
+                active_bits=mhn_template_fp_active_bits,
+            )
             if training_labels is not None:
                 labels = training_labels.view(-1)
                 if labels.numel() and (labels.min() < 0 or labels.max() >= n_rules):
@@ -125,6 +134,7 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
         self.mhn_template_fp_min_radius = mhn_template_fp_min_radius
         self.mhn_template_fp_max_radius = mhn_template_fp_max_radius
         self.mhn_template_fp_active_bits = mhn_template_fp_active_bits
+        self.mhn_template_feature_digest = mhn_template_feature_digest
 
         def normalization():
             if mhn_normalize_associations:
