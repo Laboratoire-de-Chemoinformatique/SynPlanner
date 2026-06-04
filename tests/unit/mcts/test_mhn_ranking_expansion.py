@@ -7,7 +7,6 @@ from types import SimpleNamespace
 import torch
 
 import synplan.mcts.expansion as expansion
-from synplan.mcts.expansion import CombinedPolicyNetworkFunction, PolicyNetworkFunction
 
 
 class _Rule:
@@ -43,7 +42,7 @@ def _wrapper(monkeypatch, policy):
         "load_policy_net",
         lambda *_args, **_kwargs: policy,
     )
-    return PolicyNetworkFunction(
+    return expansion.PolicyNetworkFunction(
         SimpleNamespace(weights_path="policy.ckpt", priority_rules_fraction=0.5)
     )
 
@@ -107,7 +106,9 @@ def test_combined_prediction_prepares_mhn_templates():
     ranking = SimpleNamespace(
         _prepare_template_associations=lambda rules: prepared.append(rules)
     )
-    combined = CombinedPolicyNetworkFunction.__new__(CombinedPolicyNetworkFunction)
+    combined = expansion.CombinedPolicyNetworkFunction.__new__(
+        expansion.CombinedPolicyNetworkFunction
+    )
     combined.ranking_net = ranking
     combined._predict_rules_common = lambda _precursor, _n_rules: None
     rules = [_Rule("A"), _Rule("B")]
@@ -122,7 +123,9 @@ def test_combined_light_prediction_uses_integer_count_without_preparing_template
     ranking = SimpleNamespace(
         _prepare_template_associations=lambda rules: prepared.append(rules)
     )
-    combined = CombinedPolicyNetworkFunction.__new__(CombinedPolicyNetworkFunction)
+    combined = expansion.CombinedPolicyNetworkFunction.__new__(
+        expansion.CombinedPolicyNetworkFunction
+    )
     combined.ranking_net = ranking
     combined._predict_rules_common = lambda _precursor, n_rules: observed.append(
         n_rules

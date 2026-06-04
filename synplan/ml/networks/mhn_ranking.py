@@ -8,7 +8,7 @@ https://doi.org/10.1021/acs.jcim.1c01065
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any
 
 import torch
 from torch import Tensor
@@ -59,7 +59,7 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
         dataset: RankingPolicyDataset,
         config: PolicyNetworkConfig,
         **network_kwargs: Any,
-    ) -> Self:
+    ) -> MHNRankingPolicyNetwork:
         """Create a network with templates inferred from extracted policy data."""
         return cls(
             **network_kwargs,
