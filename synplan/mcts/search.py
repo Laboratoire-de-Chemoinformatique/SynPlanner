@@ -11,11 +11,11 @@ from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
 from synplan.chem.reaction import CanonicalRetroReactor
-from synplan.chem.reaction_routes.io import write_routes_csv, write_routes_json
-from synplan.chem.reaction_routes.route_cgr import extract_reactions
+from synplan.routes.io import write_routes_csv, write_routes_json
+from synplan.routes.route_cgr import extract_reactions
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.tree import Tree, TreeConfig
-from synplan.route_quality.scorer import RouteScorer
+from synplan.routes.quality.scorer import RouteScorer
 from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.loading import (
     load_building_blocks,

@@ -14,7 +14,7 @@ from synplan.chem.reaction_rules import POLICY_SOURCE_NAME
 from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.expansion import PolicyNetworkFunction, _rule_query_pattern
 from synplan.mcts.node import Node
-from synplan.route_quality.scorer import RouteScorer
+from synplan.routes.quality.scorer import RouteScorer
 from synplan.utils.config import TreeConfig
 
 from .algorithm import (
