@@ -38,12 +38,6 @@ def test_legacy_hash_route_exports_constants_and_functions():
 
 def test_legacy_clustering_exports_old_module_level_helpers():
     import synplan.chem.reaction_routes.clustering as legacy_clustering
-    from synplan.chem.reaction_routes.clustering import (
-        DynamicX,
-        cgr_display,
-        cluster_routes,
-        compose_all_route_cgrs,
-    )
     from synplan.routes.clustering import cluster_routes as new_cluster_routes
     from synplan.routes.clustering.leaving_groups import DynamicX as NewDynamicX
     from synplan.routes.depiction import cgr_display as new_cgr_display
@@ -51,10 +45,13 @@ def test_legacy_clustering_exports_old_module_level_helpers():
         compose_all_route_cgrs as new_compose_all_route_cgrs,
     )
 
-    assert DynamicX is NewDynamicX
-    assert cgr_display is new_cgr_display
-    assert cluster_routes is new_cluster_routes
-    assert compose_all_route_cgrs is new_compose_all_route_cgrs
+    assert legacy_clustering.DynamicX is NewDynamicX
+    assert legacy_clustering.cgr_display is new_cgr_display
+    assert legacy_clustering.cluster_routes is new_cluster_routes
+    assert (
+        legacy_clustering.compose_all_route_cgrs
+        is new_compose_all_route_cgrs
+    )
     for name in (
         "DynamicX",
         "cgr_display",
