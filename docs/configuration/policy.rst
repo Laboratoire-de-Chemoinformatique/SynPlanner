@@ -66,8 +66,9 @@ to embed labeled QueryCGR rule graphs instead of Morgan rule fingerprints;
 ``mhn_rule_fp_*`` fields are used only by ``mhn_rule_encoder_type: fingerprint``.
 QueryCGR rule graphs currently require the rule-side GPS embedder because rule
 bond dynamics are encoded as edge attributes. The rule graph GPS shares
-``vector_dim``, ``num_conv_layers``, ``heads``, ``attn_type``,
-``attn_dropout``, and ``dropout`` with the product graph encoder.
+``vector_dim``, ``num_conv_layers``, ``heads``, and ``attn_type`` with the
+product graph encoder. It uses the global ``dropout`` and ``attn_dropout``
+values unless ``mhn_rule_dropout`` or ``mhn_rule_attn_dropout`` are set.
 
 To switch the default rule-fingerprint configuration to QueryCGR rule graphs:
 
@@ -140,6 +141,8 @@ rules must retain their training order.
     mhn_rule_embedder_type             Rule graph embedder for ``query_cgr_graph``: ``gps`` (required)
     mhn_rule_graph_batch_size          Rule graph batch size used while embedding all rules
     mhn_rule_graph_schema_version      QueryCGR rule graph schema version included in digests and caches
+    mhn_rule_dropout                   Optional dropout override for MHN rule-side projection and graph embedder; defaults to ``dropout``
+    mhn_rule_attn_dropout              Optional attention-dropout override for the rule-side GPS embedder; defaults to ``attn_dropout``
     mhn_rule_fp_size                   Chython Morgan rule fingerprint size; must be a power of two
     mhn_rule_fp_min_radius             Minimum Chython Morgan fingerprint radius
     mhn_rule_fp_max_radius             Maximum Chython Morgan fingerprint radius

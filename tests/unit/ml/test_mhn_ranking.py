@@ -361,6 +361,14 @@ def test_mhn_config_validation():
     with pytest.raises(ValueError):
         PolicyNetworkConfig(mhn_rule_graph_batch_size=0)
     with pytest.raises(ValueError):
+        PolicyNetworkConfig(mhn_rule_dropout=-0.1)
+    with pytest.raises(ValueError):
+        PolicyNetworkConfig(mhn_rule_dropout=1.1)
+    with pytest.raises(ValueError):
+        PolicyNetworkConfig(mhn_rule_attn_dropout=-0.1)
+    with pytest.raises(ValueError):
+        PolicyNetworkConfig(mhn_rule_attn_dropout=1.1)
+    with pytest.raises(ValueError):
         RuleFingerprintConfig(min_radius=0)
 
     config = PolicyNetworkConfig(architecture="mhn_ranking")
@@ -368,6 +376,8 @@ def test_mhn_config_validation():
     assert config.mhn_rule_embedder_type == "gps"
     assert config.mhn_rule_graph_batch_size == 1024
     assert config.mhn_rule_graph_schema_version == "1"
+    assert config.mhn_rule_dropout is None
+    assert config.mhn_rule_attn_dropout is None
     assert config.mhn_rule_fp_type == "query_cgr"
     assert config.mhn_rule_fp_schema_version == "1"
 
@@ -401,6 +411,35 @@ def test_mhn_config_scenarios_product_embedder_and_rule_encoder(config_kwargs):
 
     assert config.embedder_type == config_kwargs["embedder_type"]
     assert config.mhn_rule_encoder_type == config_kwargs["mhn_rule_encoder_type"]
+
+
+def test_mhn_rule_side_dropout_overrides_product_gps_dropout():
+    rule_graphs = query_cgr_graphs_from_smarts((RULE_A, RULE_B))
+    network = MHNRankingPolicyNetwork(
+        n_rules=len(rule_graphs),
+        vector_dim=8,
+        batch_size=1,
+        dropout=0.3,
+        num_conv_layers=1,
+        learning_rate=0.001,
+        embedder_type="gps",
+        heads=4,
+        attn_dropout=0.5,
+        rule_graphs=rule_graphs,
+        mhn_association_dim=4,
+        mhn_rule_encoder_type="query_cgr_graph",
+        mhn_rule_embedder_type="gps",
+        mhn_rule_dropout=0.1,
+        mhn_rule_attn_dropout=0.2,
+    )
+
+    assert network.molecule_encoder[1].p == pytest.approx(0.3)
+    assert network.rule_encoder[1].p == pytest.approx(0.1)
+    assert network.rule_embedder is not None
+    assert network.rule_embedder.convs[0].dropout == pytest.approx(0.1)
+    assert network.rule_embedder.convs[0].attn.dropout.p == pytest.approx(0.2)
+    assert network.hparams["mhn_rule_dropout"] == pytest.approx(0.1)
+    assert network.hparams["mhn_rule_attn_dropout"] == pytest.approx(0.2)
 
 
 def test_graph_embedder_builder_validates_contract():

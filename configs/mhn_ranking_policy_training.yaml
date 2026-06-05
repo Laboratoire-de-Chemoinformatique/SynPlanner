@@ -13,6 +13,9 @@ mhn_rule_encoder_type: fingerprint
 # To switch from rule fingerprints to QueryCGR rule graphs, use:
 # mhn_rule_encoder_type: query_cgr_graph
 # mhn_rule_embedder_type: gps
+# Optional rule-side overrides; null means use global dropout/attn_dropout.
+# mhn_rule_dropout: 0.1
+# mhn_rule_attn_dropout: 0.1
 mhn_rule_embedder_type: gps
 mhn_rule_graph_batch_size: 1024
 mhn_rule_graph_schema_version: "1"
