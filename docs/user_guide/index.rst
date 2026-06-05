@@ -80,27 +80,27 @@ some advanced explanations and configurations, that can be used for both demonst
 .. _MHN Ranking Training: 14_MHN_Ranking_Training.ipynb
 
 .. toctree::
-    :hidden:
-    :titlesonly:
+   :hidden:
+   :titlesonly:
 
-    ten_minutes
-    cli_interface
-    data
-    00_Welcome_to_Chython
-    01_Coming_from_RDKit
-    02_Data_Curation
-    03_Rules_Extraction
-    04_Policy_Training
-    05_Retrosynthetic_Planning
-    06_Tree_Analysis
-    07_Clustering
-    08_Protection_Scoring
-    09_Combined_Ranking_Filtering_Policy
-    10_NMCS_Algorithms
-    11_Planning_with_RDKit
-    12_Rule_Analysis
-    13_Priority_Rules
-    14_MHN_Ranking_Training
-    ../configuration/configuration
-    ../methods/methods
+   ten_minutes
+   cli_interface
+   data
    migration
+   00_Welcome_to_Chython
+   01_Coming_from_RDKit
+   02_Data_Curation
+   03_Rules_Extraction
+   04_Policy_Training
+   05_Retrosynthetic_Planning
+   06_Tree_Analysis
+   07_Clustering
+   08_Protection_Scoring
+   09_Combined_Ranking_Filtering_Policy
+   10_NMCS_Algorithms
+   11_Planning_with_RDKit
+   12_Rule_Analysis
+   13_Priority_Rules
+   14_MHN_Ranking_Training
+   ../configuration/configuration
+   ../methods/methods
