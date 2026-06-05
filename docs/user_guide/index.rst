@@ -60,6 +60,7 @@ some advanced explanations and configurations, that can be used for both demonst
 - `Planning with RDKit`_ - demonstrates how to use SynPlanner with RDKit Mol objects for input and output.
 - `Rule Analysis`_ - demonstrates how to analyze and visualize reaction rules.
 - `Priority Rules`_ - demonstrates how to create custom retrosynthetic planner with user defined retrosynthetic SMARTS.
+- `MHN Ranking Training`_ - demonstrates how to train and fine-tune the MHN ranking policy architecture.
 
 .. _Welcome to Chython: 00_Welcome_to_Chython.ipynb
 .. _Coming from RDKit: 01_Coming_from_RDKit.ipynb
@@ -76,6 +77,7 @@ some advanced explanations and configurations, that can be used for both demonst
 .. _Planning with RDKit: 11_Planning_with_RDKit.ipynb
 .. _Rule Analysis: 12_Rule_Analysis.ipynb
 .. _Priority Rules: 13_Priority_Rules.ipynb
+.. _MHN Ranking Training: 14_MHN_Ranking_Training.ipynb
 
 .. toctree::
     :hidden:
@@ -98,6 +100,7 @@ some advanced explanations and configurations, that can be used for both demonst
     11_Planning_with_RDKit
     12_Rule_Analysis
     13_Priority_Rules
+    14_MHN_Ranking_Training
     ../configuration/configuration
     ../methods/methods
    migration
