@@ -69,6 +69,15 @@ class PolicyNetworkFunction:
 
         self.config = policy_config
         policy_net = policy_net or _load_policy_network(self.config)
+        if (
+            type(self) is PolicyNetworkFunction
+            and getattr(policy_net, "architecture", "linear") == "mhn_ranking"
+        ):
+            raise ValueError(
+                "PolicyNetworkFunction cannot wrap mhn_ranking checkpoints directly; "
+                "use policy_network_function_from_config() or load_policy_function() "
+                "so MHNPolicyNetworkFunction can prepare runtime rules."
+            )
         if compile:
             self.policy_net = torch_geometric.compile(policy_net, dynamic=True)
         else:

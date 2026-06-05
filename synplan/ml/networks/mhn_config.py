@@ -16,7 +16,11 @@ if TYPE_CHECKING:
 
 
 class MHNRankingNetworkConfig(BaseModel):
-    """Pydantic view of the PolicyNetworkConfig fields used by MHN ranking."""
+    """Pydantic view of the PolicyNetworkConfig fields used by MHN ranking.
+
+    This model is the explicit allow-list for MHN fields passed from the
+    general ``PolicyNetworkConfig`` into ``MHNRankingPolicyNetwork``.
+    """
 
     architecture: Literal["mhn_ranking"] = "mhn_ranking"
     mhn_association_dim: int = Field(default=512, gt=0)
@@ -60,9 +64,7 @@ class MHNRankingNetworkConfig(BaseModel):
         return self
 
     @classmethod
-    def from_policy_config(
-        cls, config: PolicyNetworkConfig
-    ) -> MHNRankingNetworkConfig:
+    def from_policy_config(cls, config: PolicyNetworkConfig) -> MHNRankingNetworkConfig:
         """Extract the MHN network contract from the general policy config."""
         return cls.model_validate(config.model_dump(include=MHN_NETWORK_CONFIG_FIELDS))
 

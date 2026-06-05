@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
 import torch
 
 import synplan.mcts.expansion as expansion
@@ -136,6 +137,21 @@ def test_linear_wrapper_has_no_mhn_rule_preparation_state(monkeypatch):
     assert not isinstance(wrapper, expansion.MHNPolicyNetworkFunction)
     assert not hasattr(wrapper, "_prepare_rule_associations")
     assert not hasattr(wrapper, "_rule_associations")
+
+
+def test_direct_policy_wrapper_rejects_mhn_checkpoint():
+    with pytest.raises(ValueError, match="policy_network_function_from_config"):
+        expansion.PolicyNetworkFunction(
+            SimpleNamespace(weights_path="policy.ckpt"), policy_net=_MHNPolicy()
+        )
+
+
+def test_mhn_light_prediction_requires_prepared_rule_associations(monkeypatch):
+    wrapper = _wrapper(monkeypatch, _MHNPolicy())
+    wrapper._get_graph = lambda _precursor: SimpleNamespace()
+
+    with pytest.raises(ValueError, match="prepared by predict_reaction_rules"):
+        list(wrapper.predict_reaction_rules_light(SimpleNamespace(), 2))
 
 
 def test_light_prediction_uses_integer_count_without_preparing_rules(monkeypatch):
