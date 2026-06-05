@@ -27,6 +27,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Repository training configuration and policy documentation for the MHN ranking
   workflow, including `configs/mhn_ranking_policy_training.yaml`, CLI examples,
   configuration fields, and benchmark guidance.
+- `synplan mhn_network_tuning` CLI command for fine-tuning an existing
+  MHN ranking checkpoint on a new `*_policy_data.tsv` mapping and its paired
+  reaction-rules TSV using a standard policy training config.
 
 
 ## [1.5.0] - 2026-05-16

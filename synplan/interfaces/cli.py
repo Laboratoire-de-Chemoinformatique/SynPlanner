@@ -17,7 +17,11 @@ from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions
 from synplan.chem.utils import standardize_building_blocks
 from synplan.mcts.search import run_search
 from synplan.ml.training.reinforcement import run_updating
-from synplan.ml.training.supervised import create_policy_dataset, run_policy_training
+from synplan.ml.training.supervised import (
+    create_policy_dataset,
+    run_mhn_network_tuning,
+    run_policy_training,
+)
 from synplan.utils.config import (
     PolicyEvaluationConfig,
     PolicyNetworkConfig,
@@ -493,6 +497,69 @@ def ranking_policy_training_cli(
     )
 
     run_policy_training(datamodule, config=policy_config, results_path=results_dir)
+
+
+@synplan.command(name="mhn_network_tuning")
+@click.option(
+    "--config",
+    "config_path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the configuration file for MHN policy fine-tuning.",
+)
+@click.option(
+    "--policy_network",
+    "policy_network",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to an already trained MHN ranking policy checkpoint.",
+)
+@click.option(
+    "--new_policy_data",
+    "new_policy_data",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the new ranking policy mapping file (*_policy_data.tsv).",
+)
+@click.option(
+    "--results_dir",
+    default=Path("."),
+    type=click.Path(),
+    help="Path to the directory where the tuned MHN checkpoint will be stored.",
+)
+@click.option(
+    "--workers",
+    "num_workers",
+    default=0,
+    type=int,
+    help="CPU workers for dataset preprocessing (0 = auto-detect).",
+)
+@click.option(
+    "--no-cache",
+    "no_cache",
+    is_flag=True,
+    default=False,
+    help="Disable dataset caching (always reprocess from scratch).",
+)
+def mhn_network_tuning_cli(
+    config_path: str,
+    policy_network: str,
+    new_policy_data: str,
+    results_dir: str,
+    num_workers: int,
+    no_cache: bool,
+) -> None:
+    """Fine-tune an existing MHN ranking checkpoint on new policy data."""
+    policy_config = PolicyNetworkConfig.from_yaml(config_path)
+
+    run_mhn_network_tuning(
+        policy_network_path=policy_network,
+        new_policy_data_path=new_policy_data,
+        results_path=results_dir,
+        config=policy_config,
+        num_workers=num_workers,
+        cache=not no_cache,
+    )
 
 
 @synplan.command(name="filtering_policy_training")

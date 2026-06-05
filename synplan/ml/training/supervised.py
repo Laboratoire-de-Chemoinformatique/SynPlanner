@@ -275,6 +275,53 @@ def _create_logger(logger_config: dict | None, results_path: Path):
         raise ValueError(f"Unknown logger type: '{logger_type}'")
 
 
+def _fit_policy_network(
+    network: PolicyNetwork | MHNRankingPolicyNetwork,
+    datamodule: LightningDataset,
+    config: PolicyNetworkConfig,
+    results_path: str,
+    *,
+    weights_file_name: str = "policy_network",
+    accelerator: str = "gpu",
+    devices: list[int] | str | int = "auto",
+    silent: bool = False,
+) -> None:
+    """Fit a prepared policy network and save the best checkpoint."""
+    results_path = Path(results_path)
+    results_path.mkdir(parents=True, exist_ok=True)
+
+    checkpoint = ModelCheckpoint(
+        dirpath=results_path, filename=weights_file_name, monitor="val_loss", mode="min"
+    )
+
+    callbacks = [checkpoint]
+    if config.log_grad_norm:
+        callbacks.append(GradNormLogger())
+
+    trainer_kwargs = dict(
+        accelerator=accelerator,
+        devices=devices,
+        max_epochs=config.num_epoch,
+        callbacks=callbacks,
+        logger=_create_logger(config.logger, results_path),
+        gradient_clip_val=1.0,
+        enable_progress_bar=not silent,
+    )
+    if config.trainer:
+        trainer_kwargs.update(config.trainer)
+
+    trainer = Trainer(**trainer_kwargs)
+
+    if silent:
+        with DisableLogger(), HiddenPrints():
+            trainer.fit(network, datamodule)
+    else:
+        trainer.fit(network, datamodule)
+
+    ba = round(trainer.logged_metrics["train_balanced_accuracy_y_step"].item(), 3)
+    print(f"Policy network balanced accuracy: {ba}")
+
+
 def run_policy_training(
     datamodule: LightningDataset,
     config: PolicyNetworkConfig,
@@ -328,38 +375,87 @@ def run_policy_training(
             architecture=config.architecture,
         )
 
-    checkpoint = ModelCheckpoint(
-        dirpath=results_path, filename=weights_file_name, monitor="val_loss", mode="min"
-    )
-
-    callbacks = [checkpoint]
-    if config.log_grad_norm:
-        callbacks.append(GradNormLogger())
-
-    if silent:
-        enable_progress_bar = False
-    else:
-        enable_progress_bar = True
-
-    trainer_kwargs = dict(
+    _fit_policy_network(
+        network,
+        datamodule,
+        config,
+        str(results_path),
+        weights_file_name=weights_file_name,
         accelerator=accelerator,
         devices=devices,
-        max_epochs=config.num_epoch,
-        callbacks=callbacks,
-        logger=_create_logger(config.logger, results_path),
-        gradient_clip_val=1.0,
-        enable_progress_bar=enable_progress_bar,
+        silent=silent,
     )
-    if config.trainer:
-        trainer_kwargs.update(config.trainer)
 
-    trainer = Trainer(**trainer_kwargs)
 
-    if silent:
-        with DisableLogger(), HiddenPrints():
-            trainer.fit(network, datamodule)
-    else:
-        trainer.fit(network, datamodule)
+def _policy_config_from_mhn_checkpoint(
+    network: MHNRankingPolicyNetwork,
+    config: PolicyNetworkConfig | None = None,
+) -> PolicyNetworkConfig:
+    """Recover a training config from an MHN checkpoint or user config."""
+    if config is not None:
+        values = config.model_dump()
+        values["architecture"] = "mhn_ranking"
+        values["policy_type"] = "ranking"
+        return PolicyNetworkConfig.model_validate(values)
 
-    ba = round(trainer.logged_metrics["train_balanced_accuracy_y_step"].item(), 3)
-    print(f"Policy network balanced accuracy: {ba}")
+    hparams = dict(getattr(network, "hparams", {}) or {})
+    values = {}
+    for field in PolicyNetworkConfig.model_fields:
+        if field in hparams:
+            values[field] = hparams[field]
+        elif hasattr(network, field):
+            values[field] = getattr(network, field)
+    values["architecture"] = "mhn_ranking"
+    values["policy_type"] = "ranking"
+    return PolicyNetworkConfig.model_validate(values)
+
+
+def run_mhn_network_tuning(
+    *,
+    policy_network_path: str,
+    new_policy_data_path: str,
+    results_path: str,
+    config: PolicyNetworkConfig | None = None,
+    num_workers: int = 0,
+    cache: bool = True,
+    weights_file_name: str = "policy_network",
+    accelerator: str = "gpu",
+    devices: list[int] | str | int = "auto",
+    silent: bool = False,
+) -> None:
+    """Fine-tune an existing MHN ranking checkpoint on new ranking policy data."""
+    network = MHNRankingPolicyNetwork.load_from_checkpoint(
+        policy_network_path, map_location=torch.device("cpu")
+    )
+    if getattr(network, "architecture", None) != "mhn_ranking":
+        raise ValueError("mhn_network_tuning requires an mhn_ranking checkpoint")
+
+    config = _policy_config_from_mhn_checkpoint(network, config)
+    datamodule = create_policy_dataset(
+        policy_data_path=new_policy_data_path,
+        results_dir=results_path,
+        dataset_type="ranking",
+        batch_size=config.batch_size,
+        num_workers=num_workers,
+        cache=cache,
+    )
+    dataset = datamodule.train_dataset.dataset
+    network.bind_training_rules_from_policy_data(
+        new_policy_data_path, training_labels=dataset._data.y_rules
+    )
+    network.batch_size = config.batch_size
+    network.lr = config.learning_rate
+    network.hparams["batch_size"] = config.batch_size
+    network.hparams["learning_rate"] = config.learning_rate
+    network.hparams["num_epoch"] = config.num_epoch
+
+    _fit_policy_network(
+        network,
+        datamodule,
+        config,
+        results_path,
+        weights_file_name=weights_file_name,
+        accelerator=accelerator,
+        devices=devices,
+        silent=silent,
+    )

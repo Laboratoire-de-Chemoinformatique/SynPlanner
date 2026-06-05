@@ -159,3 +159,60 @@ def test_mhn_ranking_policy_training_cli_uses_policy_data_only(monkeypatch):
 
     assert result.exit_code == 0
     assert observed["config"].architecture == "mhn_ranking"
+
+
+def test_mhn_network_tuning_cli_passes_checkpoint_and_new_policy_data(monkeypatch):
+    observed = {}
+
+    def fake_run_mhn_network_tuning(**kwargs):
+        observed.update(kwargs)
+
+    monkeypatch.setattr(cli, "run_mhn_network_tuning", fake_run_mhn_network_tuning)
+
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        with open("policy_network.ckpt", "w", encoding="utf-8") as checkpoint:
+            checkpoint.write("")
+        with open("config.yaml", "w", encoding="utf-8") as config:
+            config.write(
+                "architecture: mhn_ranking\n"
+                "num_epoch: 3\n"
+                "learning_rate: 0.0001\n"
+                "batch_size: 4\n"
+                "logger:\n"
+                "  type: csv\n"
+            )
+        with open("new_reaction_rules_policy_data.tsv", "w", encoding="utf-8") as data:
+            data.write("product_smiles\trule_id\nCC\t0\n")
+
+        result = runner.invoke(
+            cli.synplan,
+            [
+                "mhn_network_tuning",
+                "--config",
+                "config.yaml",
+                "--policy_network",
+                "policy_network.ckpt",
+                "--new_policy_data",
+                "new_reaction_rules_policy_data.tsv",
+                "--results_dir",
+                "mhn_tuned",
+                "--workers",
+                "2",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert observed["config"].architecture == "mhn_ranking"
+    assert observed["config"].num_epoch == 3
+    assert observed["config"].learning_rate == 0.0001
+    assert observed["config"].batch_size == 4
+    assert observed["config"].logger == {"type": "csv"}
+    assert observed == {
+        "policy_network_path": "policy_network.ckpt",
+        "new_policy_data_path": "new_reaction_rules_policy_data.tsv",
+        "results_path": "mhn_tuned",
+        "config": observed["config"],
+        "num_workers": 2,
+        "cache": True,
+    }
