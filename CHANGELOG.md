@@ -30,6 +30,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `synplan mhn_network_tuning` CLI command for fine-tuning an existing
   MHN ranking checkpoint on a new `*_policy_data.tsv` mapping and its paired
   reaction-rules TSV using a standard policy training config.
+- Tutorial 14 for the MHN workflow.
 
 
 ## [1.5.0] - 2026-05-16
