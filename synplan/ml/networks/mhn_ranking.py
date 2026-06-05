@@ -55,6 +55,10 @@ _MHN_CONFIG_FIELDS = {
     "mhn_rule_embedder_type",
     "mhn_rule_graph_batch_size",
     "mhn_rule_graph_schema_version",
+    "mhn_rule_vector_dim",
+    "mhn_rule_num_conv_layers",
+    "mhn_rule_heads",
+    "mhn_rule_attn_type",
     "mhn_rule_dropout",
     "mhn_rule_attn_dropout",
     "mhn_rule_fp_size",
@@ -108,6 +112,10 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
         mhn_rule_embedder_type: Literal["gcn", "gcn_concat", "gps"] = "gps",
         mhn_rule_graph_batch_size: int = 1024,
         mhn_rule_graph_schema_version: str = RULE_GRAPH_SCHEMA_VERSION,
+        mhn_rule_vector_dim: int | None = None,
+        mhn_rule_num_conv_layers: int | None = None,
+        mhn_rule_heads: int | None = None,
+        mhn_rule_attn_type: Literal["performer", "multihead"] | None = None,
         mhn_rule_dropout: float | None = None,
         mhn_rule_attn_dropout: float | None = None,
         mhn_rule_fp_size: int = 2048,
@@ -188,6 +196,10 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
         self.mhn_rule_graph_schema_version = (
             rule_representation_config.graph_schema_version
         )
+        self.mhn_rule_vector_dim = mhn_rule_vector_dim
+        self.mhn_rule_num_conv_layers = mhn_rule_num_conv_layers
+        self.mhn_rule_heads = mhn_rule_heads
+        self.mhn_rule_attn_type = mhn_rule_attn_type
         self.mhn_rule_dropout = mhn_rule_dropout
         self.mhn_rule_attn_dropout = mhn_rule_attn_dropout
         self.mhn_rule_fp_size = rule_fingerprint_config.fp_size
@@ -204,6 +216,22 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
             return Identity()
 
         dropout = kwargs.get("dropout", 0.4)
+        rule_vector_dim = (
+            vector_dim if mhn_rule_vector_dim is None else mhn_rule_vector_dim
+        )
+        rule_num_conv_layers = (
+            kwargs.get("num_conv_layers", 5)
+            if mhn_rule_num_conv_layers is None
+            else mhn_rule_num_conv_layers
+        )
+        rule_heads = (
+            kwargs.get("heads", 4) if mhn_rule_heads is None else mhn_rule_heads
+        )
+        rule_attn_type = (
+            kwargs.get("attn_type", "performer")
+            if mhn_rule_attn_type is None
+            else mhn_rule_attn_type
+        )
         rule_dropout = dropout if mhn_rule_dropout is None else mhn_rule_dropout
         rule_attn_dropout = (
             kwargs.get("attn_dropout", 0.5)
@@ -225,17 +253,17 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
         else:
             self.rule_embedder = build_graph_embedder(
                 self.mhn_rule_embedder_type,
-                vector_dim,
+                rule_vector_dim,
                 dropout=rule_dropout,
-                num_conv_layers=kwargs.get("num_conv_layers", 5),
-                heads=kwargs.get("heads", 4),
-                attn_type=kwargs.get("attn_type", "performer"),
+                num_conv_layers=rule_num_conv_layers,
+                heads=rule_heads,
+                attn_type=rule_attn_type,
                 attn_dropout=rule_attn_dropout,
                 node_dim=RULE_GRAPH_NODE_FEATURE_DIM,
                 edge_dim=RULE_GRAPH_EDGE_FEATURE_DIM,
             )
             self.rule_encoder = Sequential(
-                Linear(vector_dim, mhn_association_dim),
+                Linear(rule_vector_dim, mhn_association_dim),
                 Dropout(rule_dropout),
                 normalization(),
             )

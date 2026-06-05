@@ -361,6 +361,14 @@ def test_mhn_config_validation():
     with pytest.raises(ValueError):
         PolicyNetworkConfig(mhn_rule_graph_batch_size=0)
     with pytest.raises(ValueError):
+        PolicyNetworkConfig(mhn_rule_vector_dim=0)
+    with pytest.raises(ValueError):
+        PolicyNetworkConfig(mhn_rule_num_conv_layers=0)
+    with pytest.raises(ValueError):
+        PolicyNetworkConfig(mhn_rule_heads=0)
+    with pytest.raises(ValueError):
+        PolicyNetworkConfig(mhn_rule_attn_type="unknown")
+    with pytest.raises(ValueError):
         PolicyNetworkConfig(mhn_rule_dropout=-0.1)
     with pytest.raises(ValueError):
         PolicyNetworkConfig(mhn_rule_dropout=1.1)
@@ -376,6 +384,10 @@ def test_mhn_config_validation():
     assert config.mhn_rule_embedder_type == "gps"
     assert config.mhn_rule_graph_batch_size == 1024
     assert config.mhn_rule_graph_schema_version == "1"
+    assert config.mhn_rule_vector_dim is None
+    assert config.mhn_rule_num_conv_layers is None
+    assert config.mhn_rule_heads is None
+    assert config.mhn_rule_attn_type is None
     assert config.mhn_rule_dropout is None
     assert config.mhn_rule_attn_dropout is None
     assert config.mhn_rule_fp_type == "query_cgr"
@@ -424,11 +436,16 @@ def test_mhn_rule_side_dropout_overrides_product_gps_dropout():
         learning_rate=0.001,
         embedder_type="gps",
         heads=4,
+        attn_type="multihead",
         attn_dropout=0.5,
         rule_graphs=rule_graphs,
         mhn_association_dim=4,
         mhn_rule_encoder_type="query_cgr_graph",
         mhn_rule_embedder_type="gps",
+        mhn_rule_vector_dim=6,
+        mhn_rule_num_conv_layers=2,
+        mhn_rule_heads=2,
+        mhn_rule_attn_type="performer",
         mhn_rule_dropout=0.1,
         mhn_rule_attn_dropout=0.2,
     )
@@ -436,8 +453,17 @@ def test_mhn_rule_side_dropout_overrides_product_gps_dropout():
     assert network.molecule_encoder[1].p == pytest.approx(0.3)
     assert network.rule_encoder[1].p == pytest.approx(0.1)
     assert network.rule_embedder is not None
+    assert network.rule_embedder.node_expansion.out_features == 6
+    assert len(network.rule_embedder.convs) == 2
+    assert network.rule_embedder.convs[0].heads == 2
+    assert network.rule_embedder.convs[0].attn_type == "performer"
     assert network.rule_embedder.convs[0].dropout == pytest.approx(0.1)
     assert network.rule_embedder.convs[0].attn.dropout.p == pytest.approx(0.2)
+    assert network.rule_encoder[0].in_features == 6
+    assert network.hparams["mhn_rule_vector_dim"] == 6
+    assert network.hparams["mhn_rule_num_conv_layers"] == 2
+    assert network.hparams["mhn_rule_heads"] == 2
+    assert network.hparams["mhn_rule_attn_type"] == "performer"
     assert network.hparams["mhn_rule_dropout"] == pytest.approx(0.1)
     assert network.hparams["mhn_rule_attn_dropout"] == pytest.approx(0.2)
 

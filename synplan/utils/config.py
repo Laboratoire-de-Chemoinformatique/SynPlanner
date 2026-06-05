@@ -341,6 +341,10 @@ class PolicyNetworkConfig(BaseConfigModel):
     mhn_rule_embedder_type: Literal["gcn", "gcn_concat", "gps"] = "gps"
     mhn_rule_graph_batch_size: int = Field(default=1024, gt=0)
     mhn_rule_graph_schema_version: str = Field(default="1", min_length=1)
+    mhn_rule_vector_dim: int | None = Field(default=None, gt=0)
+    mhn_rule_num_conv_layers: int | None = Field(default=None, gt=0)
+    mhn_rule_heads: int | None = Field(default=None, gt=0)
+    mhn_rule_attn_type: Literal["performer", "multihead"] | None = None
     mhn_rule_dropout: float | None = Field(default=None, ge=0.0, le=1.0)
     mhn_rule_attn_dropout: float | None = Field(default=None, ge=0.0, le=1.0)
     mhn_rule_fp_size: int = Field(default=2048, gt=0)

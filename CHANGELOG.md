@@ -26,7 +26,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   limit.
 - Repository training configuration and policy documentation for the MHN ranking
   workflow, including `configs/mhn_ranking_policy_training.yaml`, CLI examples,
-  configuration fields, and benchmark guidance.
+  configuration fields, and benchmark guidance. QueryCGR graph-rule mode can
+  override rule-side GPS dimension, layer count, heads, attention type, dropout,
+  and attention dropout independently from the product GPS encoder.
 - `synplan mhn_network_tuning` CLI command for fine-tuning an existing
   MHN ranking checkpoint on a new `*_policy_data.tsv` mapping and its paired
   reaction-rules TSV using a standard policy training config.

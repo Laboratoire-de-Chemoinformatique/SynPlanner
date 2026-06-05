@@ -65,17 +65,29 @@ together when training ``mhn_ranking``.
 to embed labeled QueryCGR rule graphs instead of Morgan rule fingerprints;
 ``mhn_rule_fp_*`` fields are used only by ``mhn_rule_encoder_type: fingerprint``.
 QueryCGR rule graphs currently require the rule-side GPS embedder because rule
-bond dynamics are encoded as edge attributes. The rule graph GPS shares
-``vector_dim``, ``num_conv_layers``, ``heads``, and ``attn_type`` with the
-product graph encoder. It uses the global ``dropout`` and ``attn_dropout``
-values unless ``mhn_rule_dropout`` or ``mhn_rule_attn_dropout`` are set.
+bond dynamics are encoded as edge attributes. By default, the rule graph GPS shares ``vector_dim``, ``num_conv_layers``,
+``heads``, and ``attn_type`` with the product graph encoder. Override
+``mhn_rule_vector_dim``, ``mhn_rule_num_conv_layers``, ``mhn_rule_heads``, or
+``mhn_rule_attn_type`` when the rule encoder should use a different GPS shape.
+It uses the global ``dropout`` and ``attn_dropout`` values unless
+``mhn_rule_dropout`` or ``mhn_rule_attn_dropout`` are set.
 
-To switch the default rule-fingerprint configuration to QueryCGR rule graphs:
+To switch the default rule-fingerprint configuration to QueryCGR rule graphs,
+while keeping product GPS settings at ``vector_dim: 256``,
+``num_conv_layers: 5``, and ``heads: 8`` but using Performer attention for the
+rule GPS:
 
 .. code-block:: yaml
 
+   embedder_type: gps
+   vector_dim: 256
+   num_conv_layers: 5
+   heads: 8
+   attn_type: multihead
+
    mhn_rule_encoder_type: query_cgr_graph
    mhn_rule_embedder_type: gps
+   mhn_rule_attn_type: performer
 
 Common MHN configurations:
 
@@ -141,6 +153,10 @@ rules must retain their training order.
     mhn_rule_embedder_type             Rule graph embedder for ``query_cgr_graph``: ``gps`` (required)
     mhn_rule_graph_batch_size          Rule graph batch size used while embedding all rules
     mhn_rule_graph_schema_version      QueryCGR rule graph schema version included in digests and caches
+    mhn_rule_vector_dim                Optional hidden dimension override for the rule graph GPS; defaults to ``vector_dim``
+    mhn_rule_num_conv_layers           Optional layer-count override for the rule graph GPS; defaults to ``num_conv_layers``
+    mhn_rule_heads                     Optional attention-head override for the rule graph GPS; defaults to ``heads``
+    mhn_rule_attn_type                 Optional attention type override for the rule graph GPS; defaults to ``attn_type``
     mhn_rule_dropout                   Optional dropout override for MHN rule-side projection and graph embedder; defaults to ``dropout``
     mhn_rule_attn_dropout              Optional attention-dropout override for the rule-side GPS embedder; defaults to ``attn_dropout``
     mhn_rule_fp_size                   Chython Morgan rule fingerprint size; must be a power of two
