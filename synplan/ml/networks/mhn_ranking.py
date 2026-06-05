@@ -41,34 +41,12 @@ from synplan.chem.reaction_rules.rule_fingerprints import (
     reaction_rules_path_from_policy_data,
     rule_fingerprints_from_smarts,
 )
+from synplan.ml.networks.mhn_config import mhn_network_kwargs_from_policy
 from synplan.ml.networks.modules import MCTSNetwork, build_graph_embedder
 
 if TYPE_CHECKING:
     from synplan.ml.training.preprocessing import RankingPolicyDataset
     from synplan.utils.config import PolicyNetworkConfig
-
-_MHN_CONFIG_FIELDS = {
-    "architecture",
-    "mhn_association_dim",
-    "mhn_beta",
-    "mhn_rule_encoder_type",
-    "mhn_rule_embedder_type",
-    "mhn_rule_graph_batch_size",
-    "mhn_rule_graph_schema_version",
-    "mhn_rule_vector_dim",
-    "mhn_rule_num_conv_layers",
-    "mhn_rule_heads",
-    "mhn_rule_attn_type",
-    "mhn_rule_dropout",
-    "mhn_rule_attn_dropout",
-    "mhn_rule_fp_size",
-    "mhn_rule_fp_min_radius",
-    "mhn_rule_fp_max_radius",
-    "mhn_rule_fp_active_bits",
-    "mhn_rule_fp_type",
-    "mhn_rule_fp_schema_version",
-    "mhn_normalize_associations",
-}
 
 
 class MHNRankingPolicyNetwork(MCTSNetwork):
@@ -88,7 +66,7 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
         """Create a network with rules inferred from extracted policy data."""
         return cls(
             **network_kwargs,
-            **config.model_dump(include=_MHN_CONFIG_FIELDS),
+            **mhn_network_kwargs_from_policy(config),
             policy_data_path=dataset.policy_data_path,
             training_labels=dataset._data.y_rules,
         )

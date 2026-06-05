@@ -29,6 +29,10 @@ from synplan.chem.reaction_rules.rule_fingerprints import (
     rule_fingerprints_from_smarts,
 )
 from synplan.chem.utils import reaction_query_to_reaction
+from synplan.ml.networks.mhn_config import (
+    MHNRankingNetworkConfig,
+    mhn_network_kwargs_from_policy,
+)
 from synplan.ml.networks.mhn_ranking import MHNRankingPolicyNetwork
 from synplan.ml.networks.modules import build_graph_embedder
 from synplan.ml.networks.policy import PolicyNetwork
@@ -399,6 +403,30 @@ def test_mhn_config_validation():
         mhn_rule_embedder_type="gps",
     )
     assert graph_config.mhn_rule_encoder_type == "query_cgr_graph"
+
+
+def test_mhn_network_config_extracts_policy_fields():
+    config = PolicyNetworkConfig(
+        architecture="mhn_ranking",
+        mhn_association_dim=128,
+        mhn_rule_encoder_type="query_cgr_graph",
+        mhn_rule_embedder_type="gps",
+        mhn_rule_vector_dim=64,
+        mhn_rule_num_conv_layers=2,
+        mhn_rule_heads=2,
+        mhn_rule_attn_type="performer",
+    )
+
+    mhn_config = MHNRankingNetworkConfig.from_policy_config(config)
+    kwargs = mhn_network_kwargs_from_policy(config)
+
+    assert mhn_config.mhn_association_dim == 128
+    assert mhn_config.mhn_rule_encoder_type == "query_cgr_graph"
+    assert kwargs["mhn_rule_vector_dim"] == 64
+    assert kwargs["mhn_rule_num_conv_layers"] == 2
+    assert kwargs["mhn_rule_heads"] == 2
+    assert kwargs["mhn_rule_attn_type"] == "performer"
+    assert "embedder_type" not in kwargs
 
 
 @pytest.mark.parametrize(

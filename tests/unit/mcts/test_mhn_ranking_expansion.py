@@ -59,7 +59,7 @@ def _wrapper(monkeypatch, policy):
         "load_policy_net",
         lambda *_args, **_kwargs: policy,
     )
-    return expansion.PolicyNetworkFunction(
+    return expansion.policy_network_function_from_config(
         SimpleNamespace(weights_path="policy.ckpt", priority_rules_fraction=0.5)
     )
 
@@ -130,12 +130,12 @@ def test_mhn_association_cache_is_bounded(monkeypatch):
     )
 
 
-def test_linear_rule_preparation_is_noop(monkeypatch):
+def test_linear_wrapper_has_no_mhn_rule_preparation_state(monkeypatch):
     wrapper = _wrapper(monkeypatch, _LinearPolicy())
 
-    wrapper._prepare_rule_associations([_Rule("A"), _Rule("B")])
-
-    assert wrapper._rule_associations is None
+    assert not isinstance(wrapper, expansion.MHNPolicyNetworkFunction)
+    assert not hasattr(wrapper, "_prepare_rule_associations")
+    assert not hasattr(wrapper, "_rule_associations")
 
 
 def test_light_prediction_uses_integer_count_without_preparing_rules(monkeypatch):
@@ -150,9 +150,10 @@ def test_light_prediction_uses_integer_count_without_preparing_rules(monkeypatch
 
 def test_combined_prediction_prepares_mhn_rules():
     prepared = []
-    ranking = SimpleNamespace(
-        _prepare_rule_associations=lambda rules: prepared.append(rules)
+    ranking = expansion.MHNPolicyNetworkFunction.__new__(
+        expansion.MHNPolicyNetworkFunction
     )
+    ranking._prepare_rule_associations = lambda rules: prepared.append(rules)
     combined = expansion.CombinedPolicyNetworkFunction.__new__(
         expansion.CombinedPolicyNetworkFunction
     )
@@ -167,9 +168,10 @@ def test_combined_prediction_prepares_mhn_rules():
 def test_combined_light_prediction_uses_integer_count_without_preparing_rules():
     prepared = []
     observed = []
-    ranking = SimpleNamespace(
-        _prepare_rule_associations=lambda rules: prepared.append(rules)
+    ranking = expansion.MHNPolicyNetworkFunction.__new__(
+        expansion.MHNPolicyNetworkFunction
     )
+    ranking._prepare_rule_associations = lambda rules: prepared.append(rules)
     combined = expansion.CombinedPolicyNetworkFunction.__new__(
         expansion.CombinedPolicyNetworkFunction
     )

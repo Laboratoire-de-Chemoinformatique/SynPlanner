@@ -53,13 +53,12 @@ def test_load_building_blocks_csv_standardize_true_runs(tmp_path):
 def test_load_policy_function_weights_path_applies_overrides(monkeypatch):
     captured = {}
 
-    class DummyPolicyNetworkFunction:
-        def __init__(self, policy_config):
-            captured["policy_config"] = policy_config
+    def dummy_policy_network_function_from_config(policy_config):
+        captured["policy_config"] = policy_config
 
     monkeypatch.setattr(
-        "synplan.mcts.expansion.PolicyNetworkFunction",
-        DummyPolicyNetworkFunction,
+        "synplan.mcts.expansion.policy_network_function_from_config",
+        dummy_policy_network_function_from_config,
     )
 
     load_policy_function(

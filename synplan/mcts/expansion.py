@@ -28,36 +28,51 @@ from synplan.utils.loading import load_policy_net
 _MAX_RULE_ASSOCIATION_CACHE_SIZE = 4
 
 
+def _load_policy_network(policy_config: PolicyNetworkConfig) -> torch.nn.Module:
+    """Load a policy checkpoint for use in tree-search expansion."""
+    return load_policy_net(
+        PolicyNetwork,
+        policy_config.weights_path,
+        batch_size=1,
+        dropout=0,
+    ).eval()
+
+
+def policy_network_function_from_config(
+    policy_config: PolicyNetworkConfig, compile: bool = False
+) -> "PolicyNetworkFunction":
+    """Build the expansion wrapper that matches the loaded policy architecture."""
+    policy_net = _load_policy_network(policy_config)
+    if getattr(policy_net, "architecture", "linear") == "mhn_ranking":
+        return MHNPolicyNetworkFunction(
+            policy_config, compile=compile, policy_net=policy_net
+        )
+    return PolicyNetworkFunction(policy_config, compile=compile, policy_net=policy_net)
+
+
 class PolicyNetworkFunction:
     """Policy function implemented as a policy neural network for node expansion in tree
     search."""
 
     def __init__(
-        self, policy_config: PolicyNetworkConfig, compile: bool = False
+        self,
+        policy_config: PolicyNetworkConfig,
+        compile: bool = False,
+        policy_net: torch.nn.Module | None = None,
     ) -> None:
         """Initializes the expansion function (ranking or filter policy network).
 
         :param policy_config: An expansion policy configuration.
         :param compile: Is supposed to speed up the training with model compilation.
+        :param policy_net: Optional already-loaded policy checkpoint.
         """
 
         self.config = policy_config
-
-        policy_net = load_policy_net(
-            PolicyNetwork,
-            self.config.weights_path,
-            batch_size=1,
-            dropout=0,
-        )
-
-        policy_net = policy_net.eval()
+        policy_net = policy_net or _load_policy_network(self.config)
         if compile:
             self.policy_net = torch_geometric.compile(policy_net, dynamic=True)
         else:
             self.policy_net = policy_net
-        self._rule_representation_digest: str | None = None
-        self._rule_associations: torch.Tensor | None = None
-        self._rule_association_cache: OrderedDict[str, torch.Tensor] = OrderedDict()
 
     @property
     def architecture(self) -> str:
@@ -66,50 +81,8 @@ class PolicyNetworkFunction:
 
     @property
     def n_rules(self) -> int:
-        """Return the fixed or currently bound output dimensionality."""
-        if self.architecture == "mhn_ranking":
-            if self._rule_associations is not None:
-                return self._rule_associations.shape[0]
+        """Return the fixed output dimensionality."""
         return self.policy_net.n_rules
-
-    def _prepare_rule_associations(
-        self, reaction_rules: Sequence[CanonicalRetroReactor]
-    ) -> None:
-        """Encode runtime rules once for MHN ranking prediction."""
-        if self.architecture != "mhn_ranking":
-            return
-
-        rule_smarts = rule_smarts_from_reactors(reaction_rules)
-        representation_config = rule_representation_config_from_policy(self.policy_net)
-        representation_digest = rule_representation_digest(
-            rule_smarts, representation_config
-        )
-        if self._rule_representation_digest == representation_digest:
-            return
-
-        associations = self._rule_association_cache.get(representation_digest)
-        if associations is None:
-            if representation_config.encoder_type == "fingerprint":
-                rule_representations = rule_fingerprints_from_smarts(
-                    rule_smarts, representation_config.fingerprint_config
-                )
-            else:
-                rule_representations = query_cgr_graphs_from_smarts(
-                    rule_smarts,
-                    schema_version=representation_config.graph_schema_version,
-                )
-            with torch.no_grad():
-                associations = self.policy_net.encode_rules(
-                    rule_representations
-                ).detach()
-            self._rule_association_cache[representation_digest] = associations
-            self._rule_association_cache.move_to_end(representation_digest)
-            while len(self._rule_association_cache) > _MAX_RULE_ASSOCIATION_CACHE_SIZE:
-                self._rule_association_cache.popitem(last=False)
-        else:
-            self._rule_association_cache.move_to_end(representation_digest)
-        self._rule_associations = associations
-        self._rule_representation_digest = representation_digest
 
     def _get_graph(self, precursor: Precursor) -> torch_geometric.data.Data | None:
         """Convert precursor molecule to PyG graph.
@@ -140,18 +113,8 @@ class PolicyNetworkFunction:
             return None
 
         with torch.no_grad():
-            if self.architecture == "mhn_ranking":
-                if self._rule_associations is None:
-                    raise ValueError(
-                        "mhn_ranking rules are prepared by predict_reaction_rules()."
-                    )
-                logits = self.policy_net.get_logits(
-                    pyg_graph,
-                    rule_associations=self._rule_associations,
-                )
-            else:
-                x = self._get_embedding(pyg_graph)
-                logits = self.policy_net.y_predictor(x)
+            x = self._get_embedding(pyg_graph)
+            logits = self.policy_net.y_predictor(x)
             logits = logits[0].double()
 
         del pyg_graph
@@ -166,10 +129,6 @@ class PolicyNetworkFunction:
         :param precursor: The current precursor.
         :return: Probability tensor for all rules, or None if graph conversion fails.
         """
-        if self.architecture == "mhn_ranking":
-            logits = self.get_logits(precursor)
-            return torch.softmax(logits, dim=-1) if logits is not None else None
-
         pyg_graph = self._get_graph(precursor)
         if not pyg_graph:
             return None
@@ -228,7 +187,6 @@ class PolicyNetworkFunction:
         :return: Yielding the predicted probability for the reaction rule, reaction rule
             and reaction rule id.
         """
-        self._prepare_rule_associations(reaction_rules)
         result = self._predict_rules_common(precursor, len(reaction_rules))
         if result is None:
             return []
@@ -289,6 +247,104 @@ class PolicyNetworkFunction:
         return self.get_logits(precursor)
 
 
+class MHNPolicyNetworkFunction(PolicyNetworkFunction):
+    """Expansion wrapper for MHN ranking checkpoints.
+
+    MHN policies score a runtime rule set through cached molecule-rule
+    associations, so their rule preparation stays outside the generic policy
+    wrapper used by ordinary ranking/filtering checkpoints.
+    """
+
+    def __init__(
+        self,
+        policy_config: PolicyNetworkConfig,
+        compile: bool = False,
+        policy_net: torch.nn.Module | None = None,
+    ) -> None:
+        super().__init__(policy_config, compile=compile, policy_net=policy_net)
+        if self.architecture != "mhn_ranking":
+            raise ValueError("MHNPolicyNetworkFunction requires mhn_ranking checkpoint")
+        self._rule_representation_digest: str | None = None
+        self._rule_associations: torch.Tensor | None = None
+        self._rule_association_cache: OrderedDict[str, torch.Tensor] = OrderedDict()
+
+    @property
+    def n_rules(self) -> int:
+        """Return the currently bound MHN rule dimensionality."""
+        if self._rule_associations is not None:
+            return self._rule_associations.shape[0]
+        return self.policy_net.n_rules
+
+    def _prepare_rule_associations(
+        self, reaction_rules: Sequence[CanonicalRetroReactor]
+    ) -> None:
+        """Encode runtime rules once for MHN ranking prediction."""
+        rule_smarts = rule_smarts_from_reactors(reaction_rules)
+        representation_config = rule_representation_config_from_policy(self.policy_net)
+        representation_digest = rule_representation_digest(
+            rule_smarts, representation_config
+        )
+        if self._rule_representation_digest == representation_digest:
+            return
+
+        associations = self._rule_association_cache.get(representation_digest)
+        if associations is None:
+            if representation_config.encoder_type == "fingerprint":
+                rule_representations = rule_fingerprints_from_smarts(
+                    rule_smarts, representation_config.fingerprint_config
+                )
+            else:
+                rule_representations = query_cgr_graphs_from_smarts(
+                    rule_smarts,
+                    schema_version=representation_config.graph_schema_version,
+                )
+            with torch.no_grad():
+                associations = self.policy_net.encode_rules(
+                    rule_representations
+                ).detach()
+            self._rule_association_cache[representation_digest] = associations
+            self._rule_association_cache.move_to_end(representation_digest)
+            while len(self._rule_association_cache) > _MAX_RULE_ASSOCIATION_CACHE_SIZE:
+                self._rule_association_cache.popitem(last=False)
+        else:
+            self._rule_association_cache.move_to_end(representation_digest)
+        self._rule_associations = associations
+        self._rule_representation_digest = representation_digest
+
+    def get_logits(self, precursor: Precursor) -> torch.Tensor | None:
+        """Get MHN logits for the currently prepared rule associations."""
+        pyg_graph = self._get_graph(precursor)
+        if not pyg_graph:
+            return None
+
+        if self._rule_associations is None:
+            raise ValueError(
+                "mhn_ranking rules are prepared by predict_reaction_rules()."
+            )
+
+        with torch.no_grad():
+            logits = self.policy_net.get_logits(
+                pyg_graph,
+                rule_associations=self._rule_associations,
+            )
+            logits = logits[0].double()
+
+        del pyg_graph
+        return logits
+
+    def get_probs(self, precursor: Precursor) -> torch.Tensor | None:
+        """Get MHN ranking probabilities for prepared runtime rules."""
+        logits = self.get_logits(precursor)
+        return torch.softmax(logits, dim=-1) if logits is not None else None
+
+    def predict_reaction_rules(
+        self, precursor: Precursor, reaction_rules: Sequence[CanonicalRetroReactor]
+    ) -> Iterator[tuple[float, CanonicalRetroReactor, int]]:
+        """Prepare the runtime rule set, then predict with the MHN ranking policy."""
+        self._prepare_rule_associations(reaction_rules)
+        yield from super().predict_reaction_rules(precursor, reaction_rules)
+
+
 class CombinedPolicyNetworkFunction:
     """Combined policy function that adds filtering and ranking logits.
 
@@ -339,8 +395,8 @@ class CombinedPolicyNetworkFunction:
                 f"ranking_config must have policy_type='ranking', got '{ranking_config.policy_type}'"
             )
 
-        self.filtering_net = PolicyNetworkFunction(filtering_config)
-        self.ranking_net = PolicyNetworkFunction(ranking_config)
+        self.filtering_net = policy_network_function_from_config(filtering_config)
+        self.ranking_net = policy_network_function_from_config(ranking_config)
         self.top_rules = top_rules
         self.rule_prob_threshold = rule_prob_threshold
         self.ranking_weight = ranking_weight
@@ -415,7 +471,8 @@ class CombinedPolicyNetworkFunction:
         :param reaction_rules: The list of reaction rules.
         :return: Yielding (probability, reaction_rule, rule_id) tuples.
         """
-        self.ranking_net._prepare_rule_associations(reaction_rules)
+        if isinstance(self.ranking_net, MHNPolicyNetworkFunction):
+            self.ranking_net._prepare_rule_associations(reaction_rules)
         result = self._predict_rules_common(precursor, len(reaction_rules))
         if result is None:
             return

@@ -553,19 +553,19 @@ def load_policy_function(
         >>> # Using path with overrides
         >>> policy_fn = load_policy_function(weights_path="path.ckpt", top_rules=100)
     """
-    from synplan.mcts.expansion import PolicyNetworkFunction
+    from synplan.mcts.expansion import policy_network_function_from_config
     from synplan.utils.config import PolicyNetworkConfig
 
     # Priority 1: Use provided config
     if policy_config is not None:
         if isinstance(policy_config, dict):
             policy_config = PolicyNetworkConfig.from_dict(policy_config)
-        return PolicyNetworkFunction(policy_config=policy_config)
+        return policy_network_function_from_config(policy_config=policy_config)
 
     # Priority 2: Create config from weights_path and kwargs
     if weights_path is not None:
         policy_config = PolicyNetworkConfig(weights_path=weights_path, **config_kwargs)
-        return PolicyNetworkFunction(policy_config=policy_config)
+        return policy_network_function_from_config(policy_config=policy_config)
 
     raise ValueError("Must provide either policy_config or weights_path")
 
