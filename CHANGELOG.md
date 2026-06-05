@@ -17,7 +17,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Chython-based rule representations for MHN rules, built from the same SMARTS
   representation used by runtime `CanonicalRetroReactor` objects. Training now
   infers the paired rules TSV from extracted `*_policy_data.tsv` files so rule
-  representations stay aligned with ranking labels. The default fingerprint mode
+  representations stay aligned with ranking labels. Chython-facing rule
+  representation builders live under `synplan.chem.reaction_rules`, keeping ML
+  modules focused on neural training and inference. The default fingerprint mode
   uses query-CGR fingerprints, while the optional `query_cgr_graph` mode embeds
   labeled QueryCGR rule graphs with a rule-side GNN/GPS encoder.
 - Bounded runtime caches for rule representations and encoded MHN rule

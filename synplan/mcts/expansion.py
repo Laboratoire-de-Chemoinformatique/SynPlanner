@@ -11,16 +11,16 @@ from chython.containers import ReactionContainer
 
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor
-from synplan.ml.networks.policy import PolicyNetwork
-from synplan.ml.rule_fingerprints import (
-    rule_fingerprints_from_smarts,
-    rule_smarts_from_reactors,
-)
-from synplan.ml.rule_graphs import query_cgr_graphs_from_smarts
-from synplan.ml.rule_representations import (
+from synplan.chem.reaction_rules.graphs import query_cgr_graphs_from_smarts
+from synplan.chem.reaction_rules.representations import (
     rule_representation_config_from_policy,
     rule_representation_digest,
 )
+from synplan.chem.reaction_rules.rule_fingerprints import (
+    rule_fingerprints_from_smarts,
+    rule_smarts_from_reactors,
+)
+from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.training import mol_to_pyg
 from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.loading import load_policy_net

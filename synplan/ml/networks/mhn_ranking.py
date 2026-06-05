@@ -24,24 +24,24 @@ from torchmetrics.functional.classification import (
     specificity,
 )
 
-from synplan.ml.networks.modules import MCTSNetwork, build_graph_embedder
-from synplan.ml.rule_fingerprints import (
+from synplan.chem.reaction_rules.graphs import (
+    RULE_GRAPH_EDGE_FEATURE_DIM,
+    RULE_GRAPH_NODE_FEATURE_DIM,
+    RULE_GRAPH_SCHEMA_VERSION,
+    query_cgr_graphs_from_smarts,
+)
+from synplan.chem.reaction_rules.representations import (
+    RuleRepresentationConfig,
+    rule_representation_digest,
+)
+from synplan.chem.reaction_rules.rule_fingerprints import (
     RULE_FINGERPRINT_SCHEMA_VERSION,
     RuleFingerprintConfig,
     load_rule_smarts,
     reaction_rules_path_from_policy_data,
     rule_fingerprints_from_smarts,
 )
-from synplan.ml.rule_graphs import (
-    RULE_GRAPH_EDGE_FEATURE_DIM,
-    RULE_GRAPH_NODE_FEATURE_DIM,
-    RULE_GRAPH_SCHEMA_VERSION,
-    query_cgr_graphs_from_smarts,
-)
-from synplan.ml.rule_representations import (
-    RuleRepresentationConfig,
-    rule_representation_digest,
-)
+from synplan.ml.networks.modules import MCTSNetwork, build_graph_embedder
 
 if TYPE_CHECKING:
     from synplan.ml.training.preprocessing import RankingPolicyDataset

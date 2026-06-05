@@ -10,11 +10,16 @@ import torch
 from chython import smarts
 from torch_geometric.data import Batch, Data
 
-from synplan.chem.utils import reaction_query_to_reaction
-from synplan.ml.networks.mhn_ranking import MHNRankingPolicyNetwork
-from synplan.ml.networks.modules import build_graph_embedder
-from synplan.ml.networks.policy import PolicyNetwork
-from synplan.ml.rule_fingerprints import (
+from synplan.chem.reaction_rules.graphs import (
+    RULE_GRAPH_EDGE_FEATURE_DIM,
+    RULE_GRAPH_NODE_FEATURE_DIM,
+    query_cgr_graphs_from_smarts,
+)
+from synplan.chem.reaction_rules.representations import (
+    RuleRepresentationConfig,
+    rule_representation_digest,
+)
+from synplan.chem.reaction_rules.rule_fingerprints import (
     _MAX_RULE_FINGERPRINT_CACHE_SIZE,
     RuleFingerprintConfig,
     _cache_set,
@@ -23,15 +28,10 @@ from synplan.ml.rule_fingerprints import (
     rule_fingerprint_digest,
     rule_fingerprints_from_smarts,
 )
-from synplan.ml.rule_graphs import (
-    RULE_GRAPH_EDGE_FEATURE_DIM,
-    RULE_GRAPH_NODE_FEATURE_DIM,
-    query_cgr_graphs_from_smarts,
-)
-from synplan.ml.rule_representations import (
-    RuleRepresentationConfig,
-    rule_representation_digest,
-)
+from synplan.chem.utils import reaction_query_to_reaction
+from synplan.ml.networks.mhn_ranking import MHNRankingPolicyNetwork
+from synplan.ml.networks.modules import build_graph_embedder
+from synplan.ml.networks.policy import PolicyNetwork
 from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.loading import _policy_network_class_from_checkpoint
 

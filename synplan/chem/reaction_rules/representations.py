@@ -8,11 +8,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
-from synplan.ml.rule_fingerprints import (
+from synplan.chem.reaction_rules.graphs import RULE_GRAPH_SCHEMA_VERSION
+from synplan.chem.reaction_rules.rule_fingerprints import (
     RULE_FINGERPRINT_SCHEMA_VERSION,
     RuleFingerprintConfig,
 )
-from synplan.ml.rule_graphs import RULE_GRAPH_SCHEMA_VERSION
 
 RuleEncoderType = Literal["fingerprint", "query_cgr_graph"]
 RuleGraphEmbedderType = Literal["gcn", "gcn_concat", "gps"]

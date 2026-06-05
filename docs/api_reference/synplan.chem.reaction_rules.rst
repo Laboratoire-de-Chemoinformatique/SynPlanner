@@ -28,6 +28,30 @@ synplan.chem.reaction\_rules.fingerprints module
    :undoc-members:
    :show-inheritance:
 
+synplan.chem.reaction\_rules.graphs module
+----------------------------------------------
+
+.. automodule:: synplan.chem.reaction_rules.graphs
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+synplan.chem.reaction\_rules.rule\_fingerprints module
+------------------------------------------------------
+
+.. automodule:: synplan.chem.reaction_rules.rule_fingerprints
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+synplan.chem.reaction\_rules.representations module
+---------------------------------------------------
+
+.. automodule:: synplan.chem.reaction_rules.representations
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

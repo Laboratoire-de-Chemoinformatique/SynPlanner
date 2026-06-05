@@ -7,8 +7,10 @@ from types import SimpleNamespace
 import torch
 
 import synplan.mcts.expansion as expansion
-from synplan.ml.rule_fingerprints import RULE_FINGERPRINT_SCHEMA_VERSION
-from synplan.ml.rule_graphs import RULE_GRAPH_SCHEMA_VERSION
+from synplan.chem.reaction_rules.graphs import RULE_GRAPH_SCHEMA_VERSION
+from synplan.chem.reaction_rules.rule_fingerprints import (
+    RULE_FINGERPRINT_SCHEMA_VERSION,
+)
 
 
 class _Rule:
