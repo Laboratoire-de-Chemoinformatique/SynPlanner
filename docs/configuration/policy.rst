@@ -61,16 +61,17 @@ The rules TSV is inferred from the extracted policy mapping name:
 together when training ``mhn_ranking``.
 
 ``embedder_type`` controls the product molecule encoder. Use
-``mhn_rule_encoder_type: query_cgr_graph`` and ``mhn_rule_embedder_type: gps``
+``rule_encoder_type: query_cgr_graph`` (with ``rule_embedder.embedder_type: gps``)
 to embed labeled QueryCGR rule graphs instead of Morgan rule fingerprints;
-``mhn_rule_fp_*`` fields are used only by ``mhn_rule_encoder_type: fingerprint``.
+``rule_fp_*`` fields are used only by ``rule_encoder_type: fingerprint``.
 QueryCGR rule graphs currently require the rule-side GPS embedder because rule
-bond dynamics are encoded as edge attributes. By default, the rule graph GPS shares ``vector_dim``, ``num_conv_layers``,
-``heads``, and ``attn_type`` with the product graph encoder. Override
-``mhn_rule_vector_dim``, ``mhn_rule_num_conv_layers``, ``mhn_rule_heads``, or
-``mhn_rule_attn_type`` when the rule encoder should use a different GPS shape.
-It uses the global ``dropout`` and ``attn_dropout`` values unless
-``mhn_rule_dropout`` or ``mhn_rule_attn_dropout`` are set.
+bond dynamics are encoded as edge attributes. By default, the rule graph GPS
+shares ``vector_dim``, ``num_conv_layers``, ``heads``, and ``attn_type`` with the
+product graph encoder. Set ``rule_embedder.vector_dim``,
+``rule_embedder.num_conv_layers``, ``rule_embedder.heads``, or
+``rule_embedder.attn_type`` when the rule encoder should use a different GPS
+shape. It uses the global ``dropout`` and ``attn_dropout`` values unless
+``rule_embedder.dropout`` or ``rule_embedder.attn_dropout`` are set.
 
 To switch the default rule-fingerprint configuration to QueryCGR rule graphs,
 while keeping product GPS settings at ``vector_dim: 256``,
@@ -85,9 +86,10 @@ rule GPS:
    heads: 8
    attn_type: multihead
 
-   mhn_rule_encoder_type: query_cgr_graph
-   mhn_rule_embedder_type: gps
-   mhn_rule_attn_type: performer
+   rule_encoder_type: query_cgr_graph
+   rule_embedder:
+     embedder_type: gps
+     attn_type: performer
 
 Common MHN configurations:
 
@@ -95,21 +97,23 @@ Common MHN configurations:
 
    # Product GCN + rule fingerprints
    embedder_type: gcn
-   mhn_rule_encoder_type: fingerprint
+   rule_encoder_type: fingerprint
 
    # Product GCN + QueryCGR rule graphs
    embedder_type: gcn
-   mhn_rule_encoder_type: query_cgr_graph
-   mhn_rule_embedder_type: gps
+   rule_encoder_type: query_cgr_graph
+   rule_embedder:
+     embedder_type: gps
 
    # Product GPS + rule fingerprints
    embedder_type: gps
-   mhn_rule_encoder_type: fingerprint
+   rule_encoder_type: fingerprint
 
    # Product GPS + QueryCGR rule graphs
    embedder_type: gps
-   mhn_rule_encoder_type: query_cgr_graph
-   mhn_rule_embedder_type: gps
+   rule_encoder_type: query_cgr_graph
+   rule_embedder:
+     embedder_type: gps
 
 Standalone MHN ranking checkpoints can score unseen, reordered, or replaced
 runtime rule sets. Combined filtering + MHN ranking policies remain restricted
@@ -147,25 +151,25 @@ rules must retain their training order.
     attn_dropout                       Attention dropout for GPS layers
     log_grad_norm                      If true, log module-level gradient norms during training
     logger                             Training logger configuration (see below). Set to ``null`` to disable.
-    mhn_association_dim                MHN molecule-rule association dimension
-    mhn_beta                           Scale applied to MHN association logits
-    mhn_rule_encoder_type              Rule encoder mode: ``fingerprint`` (default) or ``query_cgr_graph``
-    mhn_rule_embedder_type             Rule graph embedder for ``query_cgr_graph``: ``gps`` (required)
-    mhn_rule_graph_batch_size          Rule graph batch size used while embedding all rules
-    mhn_rule_graph_schema_version      QueryCGR rule graph schema version included in digests and caches
-    mhn_rule_vector_dim                Optional hidden dimension override for the rule graph GPS; defaults to ``vector_dim``
-    mhn_rule_num_conv_layers           Optional layer-count override for the rule graph GPS; defaults to ``num_conv_layers``
-    mhn_rule_heads                     Optional attention-head override for the rule graph GPS; defaults to ``heads``
-    mhn_rule_attn_type                 Optional attention type override for the rule graph GPS; defaults to ``attn_type``
-    mhn_rule_dropout                   Optional dropout override for MHN rule-side projection and graph embedder; defaults to ``dropout``
-    mhn_rule_attn_dropout              Optional attention-dropout override for the rule-side GPS embedder; defaults to ``attn_dropout``
-    mhn_rule_fp_size                   Chython Morgan rule fingerprint size; must be a power of two
-    mhn_rule_fp_min_radius             Minimum Chython Morgan fingerprint radius
-    mhn_rule_fp_max_radius             Maximum Chython Morgan fingerprint radius
-    mhn_rule_fp_active_bits            Active bits per Chython Morgan fingerprint feature
-    mhn_rule_fp_type                   Rule fingerprint source: ``query_cgr`` (default) or ``legacy``
-    mhn_rule_fp_schema_version         Rule fingerprint schema version included in digests and caches
-    mhn_normalize_associations         Apply non-affine LayerNorm after each MHN projection
+    association_dim                    MHN molecule-rule association dimension
+    beta                               Scale applied to MHN association logits
+    normalize_associations             Apply non-affine LayerNorm after each MHN projection
+    rule_encoder_type                  Rule encoder mode: ``fingerprint`` (default) or ``query_cgr_graph``
+    rule_graph_batch_size              Rule graph batch size used while embedding all rules
+    rule_graph_schema_version          QueryCGR rule graph schema version included in digests and caches
+    rule_fp_size                       Chython Morgan rule fingerprint size; must be a power of two
+    rule_fp_min_radius                 Minimum Chython Morgan fingerprint radius
+    rule_fp_max_radius                 Maximum Chython Morgan fingerprint radius
+    rule_fp_active_bits                Active bits per Chython Morgan fingerprint feature
+    rule_fp_type                       Rule fingerprint source: ``query_cgr`` (default) or ``legacy``
+    rule_fp_schema_version             Rule fingerprint schema version included in digests and caches
+    rule_embedder.embedder_type        Rule graph embedder for ``query_cgr_graph``: ``gps`` (required)
+    rule_embedder.vector_dim           Optional hidden dimension override for the rule graph GPS; defaults to ``vector_dim``
+    rule_embedder.num_conv_layers      Optional layer-count override for the rule graph GPS; defaults to ``num_conv_layers``
+    rule_embedder.heads                Optional attention-head override for the rule graph GPS; defaults to ``heads``
+    rule_embedder.attn_type            Optional attention type override for the rule graph GPS; defaults to ``attn_type``
+    rule_embedder.dropout              Optional dropout override for the rule-side projection and graph embedder; defaults to ``dropout``
+    rule_embedder.attn_dropout         Optional attention-dropout override for the rule-side GPS embedder; defaults to ``attn_dropout``
     ================================== =========================================================================
 
 Benchmark recipe

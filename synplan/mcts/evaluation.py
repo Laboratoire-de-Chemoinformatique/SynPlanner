@@ -1,12 +1,4 @@
-"""Module containing evaluation strategies for node evaluation in tree search.
-
-This module implements the Strategy pattern for different evaluation methods:
-- Rollout simulation
-- Value network (GCN)
-- RDKit-based scores
-- Policy probabilities
-- Random scores
-"""
+"""Evaluation strategies for scoring nodes in tree search."""
 
 import random
 from abc import ABC, abstractmethod
@@ -259,8 +251,7 @@ class EvaluationStrategy(ABC):
         :param node_id: ID of the node.
         :param nodes: The tree's ``Node``-by-id mapping. Implementations read
             per-node search state via ``nodes[some_id].depth`` /
-            ``nodes[some_id].prob`` etc. (Pre-1.5.0 this was two separate
-            ``nodes_depth`` and ``nodes_prob`` parallel-dict parameters.)
+            ``nodes[some_id].prob`` etc.
         :return: Evaluation score for the node.
         """
         pass

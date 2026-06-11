@@ -1,21 +1,21 @@
-synplan.chem.reaction\_rules.manual package
-===========================================
+synplan.chem.reaction.rules.manual package
+==========================================
 
 Submodules
 ----------
 
-synplan.chem.reaction\_rules.manual.decompositions module
----------------------------------------------------------
+synplan.chem.reaction.rules.manual.decompositions module
+--------------------------------------------------------
 
-.. automodule:: synplan.chem.reaction_rules.manual.decompositions
+.. automodule:: synplan.chem.reaction.rules.manual.decompositions
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.reaction\_rules.manual.transformations module
-----------------------------------------------------------
+synplan.chem.reaction.rules.manual.transformations module
+---------------------------------------------------------
 
-.. automodule:: synplan.chem.reaction_rules.manual.transformations
+.. automodule:: synplan.chem.reaction.rules.manual.transformations
    :members:
    :undoc-members:
    :show-inheritance:
@@ -23,7 +23,7 @@ synplan.chem.reaction\_rules.manual.transformations module
 Module contents
 ---------------
 
-.. automodule:: synplan.chem.reaction_rules.manual
+.. automodule:: synplan.chem.reaction.rules.manual
    :members:
    :undoc-members:
    :show-inheritance:

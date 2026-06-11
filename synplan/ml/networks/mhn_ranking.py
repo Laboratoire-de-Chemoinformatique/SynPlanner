@@ -24,25 +24,24 @@ from torchmetrics.functional.classification import (
     specificity,
 )
 
-from synplan.chem.reaction_rules.graphs import (
+from synplan.chem.reaction.rules.representation import (
+    RULE_FINGERPRINT_SCHEMA_VERSION,
     RULE_GRAPH_EDGE_FEATURE_DIM,
     RULE_GRAPH_NODE_FEATURE_DIM,
     RULE_GRAPH_SCHEMA_VERSION,
-    query_cgr_graphs_from_smarts,
-)
-from synplan.chem.reaction_rules.representations import (
-    RuleRepresentationConfig,
-    rule_representation_digest,
-)
-from synplan.chem.reaction_rules.rule_fingerprints import (
-    RULE_FINGERPRINT_SCHEMA_VERSION,
     RuleFingerprintConfig,
+    RuleRepresentationConfig,
     load_rule_smarts,
     reaction_rules_path_from_policy_data,
-    rule_fingerprints_from_smarts,
 )
-from synplan.ml.networks.mhn_config import mhn_network_kwargs_from_policy
-from synplan.ml.networks.modules import MCTSNetwork, build_graph_embedder
+from synplan.chem.reaction.rules.representation import (
+    rule_representation_digest as compute_rule_representation_digest,
+)
+from synplan.ml.featurization.fingerprints import rule_fingerprints_from_smarts
+from synplan.ml.featurization.graphs import query_cgr_graphs_from_smarts
+from synplan.ml.networks.base import MCTSNetwork
+from synplan.ml.networks.embedders import build_graph_embedder
+from synplan.utils.config import mhn_network_kwargs_from_policy
 
 if TYPE_CHECKING:
     from synplan.ml.training.preprocessing import RankingPolicyDataset
@@ -82,54 +81,52 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
         training_labels: Tensor | None = None,
         architecture: str = "mhn_ranking",
         policy_type: str = "ranking",
-        mhn_association_dim: int = 512,
-        mhn_beta: float = 0.05,
-        mhn_rule_encoder_type: Literal[
-            "fingerprint", "query_cgr_graph"
-        ] = "fingerprint",
-        mhn_rule_embedder_type: Literal["gcn", "gcn_concat", "gps"] = "gps",
-        mhn_rule_graph_batch_size: int = 1024,
-        mhn_rule_graph_schema_version: str = RULE_GRAPH_SCHEMA_VERSION,
-        mhn_rule_vector_dim: int | None = None,
-        mhn_rule_num_conv_layers: int | None = None,
-        mhn_rule_heads: int | None = None,
-        mhn_rule_attn_type: Literal["performer", "multihead"] | None = None,
-        mhn_rule_dropout: float | None = None,
-        mhn_rule_attn_dropout: float | None = None,
-        mhn_rule_fp_size: int = 2048,
-        mhn_rule_fp_min_radius: int = 1,
-        mhn_rule_fp_max_radius: int = 4,
-        mhn_rule_fp_active_bits: int = 2,
-        mhn_rule_fp_type: Literal["legacy", "query_cgr"] = "query_cgr",
-        mhn_rule_fp_schema_version: str = RULE_FINGERPRINT_SCHEMA_VERSION,
-        mhn_normalize_associations: bool = True,
-        mhn_rule_representation_digest: str | None = None,
+        association_dim: int = 512,
+        beta: float = 0.05,
+        rule_encoder_type: Literal["fingerprint", "query_cgr_graph"] = "fingerprint",
+        rule_embedder_type: Literal["gcn", "gcn_concat", "gps"] = "gps",
+        rule_graph_batch_size: int = 1024,
+        rule_graph_schema_version: str = RULE_GRAPH_SCHEMA_VERSION,
+        rule_vector_dim: int | None = None,
+        rule_num_conv_layers: int | None = None,
+        rule_heads: int | None = None,
+        rule_attn_type: Literal["performer", "multihead"] | None = None,
+        rule_dropout: float | None = None,
+        rule_attn_dropout: float | None = None,
+        rule_fp_size: int = 2048,
+        rule_fp_min_radius: int = 1,
+        rule_fp_max_radius: int = 4,
+        rule_fp_active_bits: int = 2,
+        rule_fp_type: Literal["legacy", "query_cgr"] = "query_cgr",
+        rule_fp_schema_version: str = RULE_FINGERPRINT_SCHEMA_VERSION,
+        normalize_associations: bool = True,
+        rule_representation_digest: str | None = None,
         **kwargs,
     ):
         if training_labels is not None and policy_data_path is None:
             raise ValueError("training_labels requires policy_data_path")
 
         rule_fingerprint_config = RuleFingerprintConfig(
-            fp_size=mhn_rule_fp_size,
-            min_radius=mhn_rule_fp_min_radius,
-            max_radius=mhn_rule_fp_max_radius,
-            active_bits=mhn_rule_fp_active_bits,
-            fp_type=mhn_rule_fp_type,
-            schema_version=mhn_rule_fp_schema_version,
+            fp_size=rule_fp_size,
+            min_radius=rule_fp_min_radius,
+            max_radius=rule_fp_max_radius,
+            active_bits=rule_fp_active_bits,
+            fp_type=rule_fp_type,
+            schema_version=rule_fp_schema_version,
         )
         rule_representation_config = RuleRepresentationConfig(
-            encoder_type=mhn_rule_encoder_type,
+            encoder_type=rule_encoder_type,
             fingerprint_config=rule_fingerprint_config,
-            graph_schema_version=mhn_rule_graph_schema_version,
-            graph_embedder_type=mhn_rule_embedder_type,
-            graph_batch_size=mhn_rule_graph_batch_size,
+            graph_schema_version=rule_graph_schema_version,
+            graph_embedder_type=rule_embedder_type,
+            graph_batch_size=rule_graph_batch_size,
         )
 
         if policy_data_path is not None:
             reaction_rules_path = reaction_rules_path_from_policy_data(policy_data_path)
             rule_smarts = load_rule_smarts(reaction_rules_path)
             n_rules = len(rule_smarts)
-            mhn_rule_representation_digest = rule_representation_digest(
+            rule_representation_digest = compute_rule_representation_digest(
                 rule_smarts, rule_representation_config
             )
             if training_labels is not None:
@@ -167,70 +164,57 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
             raise ValueError("MHNRankingPolicyNetwork requires policy_type='ranking'")
         self.policy_type = policy_type
         self.n_rules = n_rules
-        self.mhn_beta = mhn_beta
-        self.mhn_rule_encoder_type = rule_representation_config.encoder_type
-        self.mhn_rule_embedder_type = rule_representation_config.graph_embedder_type
-        self.mhn_rule_graph_batch_size = rule_representation_config.graph_batch_size
-        self.mhn_rule_graph_schema_version = (
-            rule_representation_config.graph_schema_version
-        )
-        self.mhn_rule_vector_dim = mhn_rule_vector_dim
-        self.mhn_rule_num_conv_layers = mhn_rule_num_conv_layers
-        self.mhn_rule_heads = mhn_rule_heads
-        self.mhn_rule_attn_type = mhn_rule_attn_type
-        self.mhn_rule_dropout = mhn_rule_dropout
-        self.mhn_rule_attn_dropout = mhn_rule_attn_dropout
-        self.mhn_rule_fp_size = rule_fingerprint_config.fp_size
-        self.mhn_rule_fp_min_radius = rule_fingerprint_config.min_radius
-        self.mhn_rule_fp_max_radius = rule_fingerprint_config.max_radius
-        self.mhn_rule_fp_active_bits = rule_fingerprint_config.active_bits
-        self.mhn_rule_fp_type = rule_fingerprint_config.fp_type
-        self.mhn_rule_fp_schema_version = rule_fingerprint_config.schema_version
-        self.mhn_rule_representation_digest = mhn_rule_representation_digest
+        self.beta = beta
+        # Canonical rule-representation identity; the rule encoder wiring knobs
+        # below sit outside it (``None`` falls back to the molecule-side value).
+        self.rule_representation_config = rule_representation_config
+        self.rule_vector_dim = rule_vector_dim
+        self.rule_num_conv_layers = rule_num_conv_layers
+        self.rule_heads = rule_heads
+        self.rule_attn_type = rule_attn_type
+        self.rule_dropout = rule_dropout
+        self.rule_attn_dropout = rule_attn_dropout
+        self.rule_representation_digest = rule_representation_digest
 
         def normalization():
-            if mhn_normalize_associations:
-                return LayerNorm(mhn_association_dim, elementwise_affine=False)
+            if normalize_associations:
+                return LayerNorm(association_dim, elementwise_affine=False)
             return Identity()
 
         dropout = kwargs.get("dropout", 0.4)
-        rule_vector_dim = (
-            vector_dim if mhn_rule_vector_dim is None else mhn_rule_vector_dim
-        )
+        rule_vector_dim = vector_dim if rule_vector_dim is None else rule_vector_dim
         rule_num_conv_layers = (
             kwargs.get("num_conv_layers", 5)
-            if mhn_rule_num_conv_layers is None
-            else mhn_rule_num_conv_layers
+            if rule_num_conv_layers is None
+            else rule_num_conv_layers
         )
-        rule_heads = (
-            kwargs.get("heads", 4) if mhn_rule_heads is None else mhn_rule_heads
-        )
+        rule_heads = kwargs.get("heads", 4) if rule_heads is None else rule_heads
         rule_attn_type = (
             kwargs.get("attn_type", "performer")
-            if mhn_rule_attn_type is None
-            else mhn_rule_attn_type
+            if rule_attn_type is None
+            else rule_attn_type
         )
-        rule_dropout = dropout if mhn_rule_dropout is None else mhn_rule_dropout
+        rule_dropout = dropout if rule_dropout is None else rule_dropout
         rule_attn_dropout = (
             kwargs.get("attn_dropout", 0.5)
-            if mhn_rule_attn_dropout is None
-            else mhn_rule_attn_dropout
+            if rule_attn_dropout is None
+            else rule_attn_dropout
         )
         self.molecule_encoder = Sequential(
-            Linear(vector_dim, mhn_association_dim),
+            Linear(vector_dim, association_dim),
             Dropout(dropout),
             normalization(),
         )
-        if self.mhn_rule_encoder_type == "fingerprint":
+        if self.rule_representation_config.encoder_type == "fingerprint":
             self.rule_embedder = None
             self.rule_encoder = Sequential(
-                Linear(rule_fingerprint_config.fp_size, mhn_association_dim),
+                Linear(rule_fingerprint_config.fp_size, association_dim),
                 Dropout(rule_dropout),
                 normalization(),
             )
         else:
             self.rule_embedder = build_graph_embedder(
-                self.mhn_rule_embedder_type,
+                self.rule_representation_config.graph_embedder_type,
                 rule_vector_dim,
                 dropout=rule_dropout,
                 num_conv_layers=rule_num_conv_layers,
@@ -241,7 +225,7 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
                 edge_dim=RULE_GRAPH_EDGE_FEATURE_DIM,
             )
             self.rule_encoder = Sequential(
-                Linear(rule_vector_dim, mhn_association_dim),
+                Linear(rule_vector_dim, association_dim),
                 Dropout(rule_dropout),
                 normalization(),
             )
@@ -274,51 +258,44 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
                     f"reaction-rule range [0, {n_rules - 1}]"
                 )
 
-        rule_fingerprint_config = RuleFingerprintConfig(
-            fp_size=self.mhn_rule_fp_size,
-            min_radius=self.mhn_rule_fp_min_radius,
-            max_radius=self.mhn_rule_fp_max_radius,
-            active_bits=self.mhn_rule_fp_active_bits,
-            fp_type=self.mhn_rule_fp_type,
-            schema_version=self.mhn_rule_fp_schema_version,
-        )
-        rule_representation_config = RuleRepresentationConfig(
-            encoder_type=self.mhn_rule_encoder_type,
-            fingerprint_config=rule_fingerprint_config,
-            graph_schema_version=self.mhn_rule_graph_schema_version,
-            graph_embedder_type=self.mhn_rule_embedder_type,
-            graph_batch_size=self.mhn_rule_graph_batch_size,
-        )
+        # Rebinding the rule set never changes the representation contract, so
+        # reuse the single stored config.
+        rule_representation_config = self.rule_representation_config
+        rule_fingerprint_config = rule_representation_config.fingerprint_config
         self.n_rules = n_rules
-        self.mhn_rule_representation_digest = rule_representation_digest(
+        self.rule_representation_digest = compute_rule_representation_digest(
             rule_smarts, rule_representation_config
         )
         self.hparams["n_rules"] = n_rules
-        self.hparams["mhn_rule_representation_digest"] = (
-            self.mhn_rule_representation_digest
-        )
+        self.hparams["rule_representation_digest"] = self.rule_representation_digest
         self._training_rule_fingerprints = torch.empty(
-            (0, self.mhn_rule_fp_size), dtype=torch.float, device=self.device
+            (0, self.rule_representation_config.fingerprint_config.fp_size),
+            dtype=torch.float,
+            device=self.device,
         )
         self._training_rule_graphs = []
-        if self.mhn_rule_encoder_type == "fingerprint":
+        if self.rule_representation_config.encoder_type == "fingerprint":
             self.set_training_rule_fingerprints(
                 rule_fingerprints_from_smarts(rule_smarts, rule_fingerprint_config)
             )
         else:
             self.set_training_rule_graphs(
                 query_cgr_graphs_from_smarts(
-                    rule_smarts, schema_version=self.mhn_rule_graph_schema_version
+                    rule_smarts,
+                    schema_version=self.rule_representation_config.graph_schema_version,
                 )
             )
 
     def set_training_rule_fingerprints(self, rule_fingerprints: Tensor) -> None:
         """Attach ordered training rule fingerprints without storing them."""
-        if self.mhn_rule_encoder_type != "fingerprint":
+        if self.rule_representation_config.encoder_type != "fingerprint":
             raise ValueError(
-                "Rule fingerprints require mhn_rule_encoder_type='fingerprint'"
+                "Rule fingerprints require rule_encoder_type='fingerprint'"
             )
-        expected_shape = (self.n_rules, self.mhn_rule_fp_size)
+        expected_shape = (
+            self.n_rules,
+            self.rule_representation_config.fingerprint_config.fp_size,
+        )
         if tuple(rule_fingerprints.shape) != expected_shape:
             raise ValueError(
                 f"Expected rule fingerprints with shape {expected_shape}, "
@@ -328,10 +305,8 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
 
     def set_training_rule_graphs(self, rule_graphs: Sequence[Data]) -> None:
         """Attach ordered training rule graphs without storing them in checkpoints."""
-        if self.mhn_rule_encoder_type != "query_cgr_graph":
-            raise ValueError(
-                "Rule graphs require mhn_rule_encoder_type='query_cgr_graph'"
-            )
+        if self.rule_representation_config.encoder_type != "query_cgr_graph":
+            raise ValueError("Rule graphs require rule_encoder_type='query_cgr_graph'")
         if len(rule_graphs) != self.n_rules:
             raise ValueError(
                 f"Expected {self.n_rules} rule graphs, got {len(rule_graphs)}"
@@ -342,7 +317,7 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
         """Embed QueryCGR rule graphs into the association space."""
         if self.rule_embedder is None:
             raise ValueError(
-                "Rule graph encoding requires mhn_rule_encoder_type='query_cgr_graph'"
+                "Rule graph encoding requires rule_encoder_type='query_cgr_graph'"
             )
         if not rule_graphs:
             return torch.empty(
@@ -350,7 +325,7 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
             )
 
         encoded_chunks = []
-        batch_size = self.mhn_rule_graph_batch_size
+        batch_size = self.rule_representation_config.graph_batch_size
         for start in range(0, len(rule_graphs), batch_size):
             rule_batch = Batch.from_data_list(
                 list(rule_graphs[start : start + batch_size])
@@ -360,7 +335,7 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
 
     def encode_rules(self, rule_representations: Tensor | Sequence[Data]) -> Tensor:
         """Project raw rule representations into the association space."""
-        if self.mhn_rule_encoder_type == "fingerprint":
+        if self.rule_representation_config.encoder_type == "fingerprint":
             if not torch.is_tensor(rule_representations):
                 raise ValueError("Fingerprint rule encoding requires a tensor input")
             return self.rule_encoder(rule_representations.float())
@@ -382,7 +357,7 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
     ) -> Tensor:
         """Calculate dense molecule-rule association logits."""
         if rule_associations is None:
-            if self.mhn_rule_encoder_type == "fingerprint":
+            if self.rule_representation_config.encoder_type == "fingerprint":
                 if rule_fingerprints is None:
                     rule_fingerprints = self._training_rule_fingerprints
                 if rule_fingerprints.numel() == 0:
@@ -395,7 +370,7 @@ class MHNRankingPolicyNetwork(MCTSNetwork):
                     raise ValueError("No rule graphs are attached or bound")
                 rule_associations = self.encode_rule_graphs(rule_graphs)
         molecules = self.encode_molecules(batch)
-        return self.mhn_beta * molecules @ rule_associations.T
+        return self.beta * molecules @ rule_associations.T
 
     def forward(
         self,

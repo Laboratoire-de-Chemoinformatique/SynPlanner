@@ -94,7 +94,7 @@ patterns with chython's aromaticity perception. This differs from
 RDKit's. Patterns authored against RDKit may match unexpectedly under
 chython.
 
-The :func:`synplan.chem.reaction_rules.parse_priority_rules` helper
+The :func:`synplan.chem.reaction.rules.parse_priority_rules` helper
 reports a SMARTS as broken via chython *and* runs an RDKit fallback
 parse so you can distinguish "broken pattern" from "dialect mismatch".
 Validate priority rules on a known target before scaling up.

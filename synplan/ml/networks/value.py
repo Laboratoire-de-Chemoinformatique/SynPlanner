@@ -15,7 +15,7 @@ from torchmetrics.functional.classification import (
     binary_specificity,
 )
 
-from synplan.ml.networks.modules import MCTSNetwork
+from synplan.ml.networks.base import MCTSNetwork
 
 
 class ValueNetwork(MCTSNetwork, LightningModule, ABC):

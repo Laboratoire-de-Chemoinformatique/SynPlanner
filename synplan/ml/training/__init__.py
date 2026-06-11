@@ -1,4 +1,6 @@
-from .preprocessing import MENDEL_INFO, ValueNetworkDataset, mol_to_pyg
+from synplan.ml.featurization.molecules import MENDEL_INFO, mol_to_pyg
+
+from .preprocessing import ValueNetworkDataset
 from .supervised import *
 from .supervised import (
     create_policy_dataset,

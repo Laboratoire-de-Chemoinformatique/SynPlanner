@@ -10,33 +10,33 @@ import torch
 from chython import smarts
 from torch_geometric.data import Batch, Data
 
-from synplan.chem.reaction_rules.graphs import (
+from synplan.chem.reaction.rules.representation import (
     RULE_GRAPH_EDGE_FEATURE_DIM,
     RULE_GRAPH_NODE_FEATURE_DIM,
-    query_cgr_graphs_from_smarts,
-)
-from synplan.chem.reaction_rules.representations import (
-    RuleRepresentationConfig,
-    rule_representation_digest,
-)
-from synplan.chem.reaction_rules.rule_fingerprints import (
-    _MAX_RULE_FINGERPRINT_CACHE_SIZE,
     RuleFingerprintConfig,
-    _cache_set,
-    _side_fingerprint,
+    RuleRepresentationConfig,
     reaction_rules_path_from_policy_data,
     rule_fingerprint_digest,
-    rule_fingerprints_from_smarts,
+    rule_representation_digest,
 )
 from synplan.chem.utils import reaction_query_to_reaction
-from synplan.ml.networks.mhn_config import (
-    MHNRankingNetworkConfig,
+from synplan.ml.featurization.cache import (
+    MAX_RULE_FINGERPRINT_CACHE_SIZE,
+    cache_set,
+)
+from synplan.ml.featurization.fingerprints import (
+    _side_fingerprint,
+    rule_fingerprints_from_smarts,
+)
+from synplan.ml.featurization.graphs import query_cgr_graphs_from_smarts
+from synplan.ml.networks.embedders import build_graph_embedder
+from synplan.ml.networks.mhn_ranking import MHNRankingPolicyNetwork
+from synplan.ml.networks.policy import PolicyNetwork
+from synplan.utils.config import (
+    MHNRankingPolicyNetworkConfig,
+    PolicyNetworkConfig,
     mhn_network_kwargs_from_policy,
 )
-from synplan.ml.networks.mhn_ranking import MHNRankingPolicyNetwork
-from synplan.ml.networks.modules import build_graph_embedder
-from synplan.ml.networks.policy import PolicyNetwork
-from synplan.utils.config import PolicyNetworkConfig
 from synplan.utils.loading import _policy_network_class_from_checkpoint
 
 RULE_A = "[c:1]-[N:2]>>[c:1]-[N+:2](-[O-:3])=[O:4]"
@@ -102,8 +102,8 @@ def _network(rule_fingerprints: torch.Tensor) -> MHNRankingPolicyNetwork:
         num_conv_layers=1,
         learning_rate=0.001,
         rule_fingerprints=rule_fingerprints,
-        mhn_association_dim=4,
-        mhn_rule_fp_size=rule_fingerprints.shape[1],
+        association_dim=4,
+        rule_fp_size=rule_fingerprints.shape[1],
     )
 
 
@@ -118,10 +118,10 @@ def _graph_rule_network(rule_graphs: list[Data]) -> MHNRankingPolicyNetwork:
         embedder_type="gps",
         heads=4,
         rule_graphs=rule_graphs,
-        mhn_association_dim=4,
-        mhn_rule_encoder_type="query_cgr_graph",
-        mhn_rule_embedder_type="gps",
-        mhn_rule_graph_batch_size=1,
+        association_dim=4,
+        rule_encoder_type="query_cgr_graph",
+        rule_embedder_type="gps",
+        rule_graph_batch_size=1,
     )
 
 
@@ -279,25 +279,25 @@ def test_rule_representation_digest_includes_encoder_contract():
     assert fingerprint_digest != graph_digest
     assert graph_digest != graph_schema_digest
     assert graph_digest != graph_batch_digest
-    with pytest.raises(ValueError, match="mhn_rule_embedder_type='gps'"):
+    with pytest.raises(ValueError, match="embedder_type='gps'"):
         RuleRepresentationConfig(
             encoder_type="query_cgr_graph", graph_embedder_type="gcn"
         )
 
 
-def test_rule_fingerprint_cache_set_is_bounded_lru():
+def test_rule_fingerprintcache_set_is_bounded_lru():
     cache = OrderedDict()
 
-    for index in range(_MAX_RULE_FINGERPRINT_CACHE_SIZE + 2):
-        _cache_set(cache, str(index), torch.tensor([float(index)]))
+    for index in range(MAX_RULE_FINGERPRINT_CACHE_SIZE + 2):
+        cache_set(cache, str(index), torch.tensor([float(index)]))
 
-    assert len(cache) == _MAX_RULE_FINGERPRINT_CACHE_SIZE
+    assert len(cache) == MAX_RULE_FINGERPRINT_CACHE_SIZE
     assert list(cache) == [
-        str(index) for index in range(2, _MAX_RULE_FINGERPRINT_CACHE_SIZE + 2)
+        str(index) for index in range(2, MAX_RULE_FINGERPRINT_CACHE_SIZE + 2)
     ]
 
-    _cache_set(cache, "2", torch.tensor([2.0]))
-    _cache_set(cache, "new", torch.tensor([99.0]))
+    cache_set(cache, "2", torch.tensor([2.0]))
+    cache_set(cache, "new", torch.tensor([99.0]))
 
     assert "3" not in cache
     assert list(cache)[-1] == "new"
@@ -343,114 +343,115 @@ def test_mhn_config_validation():
     with pytest.raises(ValueError, match="requires policy_type='ranking'"):
         PolicyNetworkConfig(architecture="mhn_ranking", policy_type="filtering")
     with pytest.raises(ValueError, match="positive power of two"):
-        PolicyNetworkConfig(mhn_rule_fp_size=1000)
+        MHNRankingPolicyNetworkConfig(rule_fp_size=1000)
     with pytest.raises(ValueError):
-        PolicyNetworkConfig(mhn_rule_fp_min_radius=0)
+        MHNRankingPolicyNetworkConfig(rule_fp_min_radius=0)
     with pytest.raises(ValueError):
-        PolicyNetworkConfig(mhn_rule_fp_type="unknown")
+        MHNRankingPolicyNetworkConfig(rule_fp_type="unknown")
     with pytest.raises(ValueError):
-        PolicyNetworkConfig(mhn_rule_encoder_type="unknown")
+        MHNRankingPolicyNetworkConfig(rule_encoder_type="unknown")
     with pytest.raises(ValueError):
-        PolicyNetworkConfig(mhn_rule_embedder_type="unknown")
-    with pytest.raises(ValueError, match="mhn_rule_embedder_type='gps'"):
-        PolicyNetworkConfig(
-            architecture="mhn_ranking",
-            mhn_rule_encoder_type="query_cgr_graph",
-            mhn_rule_embedder_type="gcn",
+        MHNRankingPolicyNetworkConfig(rule_embedder={"embedder_type": "unknown"})
+    with pytest.raises(ValueError, match="embedder_type='gps'"):
+        MHNRankingPolicyNetworkConfig(
+            rule_encoder_type="query_cgr_graph",
+            rule_embedder={"embedder_type": "gcn"},
         )
     with pytest.raises(ValueError, match="divisible"):
         PolicyNetworkConfig(
             embedder_type="gcn_concat", vector_dim=10, num_conv_layers=3
         )
     with pytest.raises(ValueError):
-        PolicyNetworkConfig(mhn_rule_graph_batch_size=0)
+        MHNRankingPolicyNetworkConfig(rule_graph_batch_size=0)
     with pytest.raises(ValueError):
-        PolicyNetworkConfig(mhn_rule_vector_dim=0)
+        MHNRankingPolicyNetworkConfig(rule_embedder={"vector_dim": 0})
     with pytest.raises(ValueError):
-        PolicyNetworkConfig(mhn_rule_num_conv_layers=0)
+        MHNRankingPolicyNetworkConfig(rule_embedder={"num_conv_layers": 0})
     with pytest.raises(ValueError):
-        PolicyNetworkConfig(mhn_rule_heads=0)
+        MHNRankingPolicyNetworkConfig(rule_embedder={"heads": 0})
     with pytest.raises(ValueError):
-        PolicyNetworkConfig(mhn_rule_attn_type="unknown")
+        MHNRankingPolicyNetworkConfig(rule_embedder={"attn_type": "unknown"})
     with pytest.raises(ValueError):
-        PolicyNetworkConfig(mhn_rule_dropout=-0.1)
+        MHNRankingPolicyNetworkConfig(rule_embedder={"dropout": -0.1})
     with pytest.raises(ValueError):
-        PolicyNetworkConfig(mhn_rule_dropout=1.1)
+        MHNRankingPolicyNetworkConfig(rule_embedder={"dropout": 1.1})
     with pytest.raises(ValueError):
-        PolicyNetworkConfig(mhn_rule_attn_dropout=-0.1)
+        MHNRankingPolicyNetworkConfig(rule_embedder={"attn_dropout": -0.1})
     with pytest.raises(ValueError):
-        PolicyNetworkConfig(mhn_rule_attn_dropout=1.1)
+        MHNRankingPolicyNetworkConfig(rule_embedder={"attn_dropout": 1.1})
     with pytest.raises(ValueError):
         RuleFingerprintConfig(min_radius=0)
 
-    config = PolicyNetworkConfig(architecture="mhn_ranking")
-    assert config.mhn_rule_encoder_type == "fingerprint"
-    assert config.mhn_rule_embedder_type == "gps"
-    assert config.mhn_rule_graph_batch_size == 1024
-    assert config.mhn_rule_graph_schema_version == "1"
-    assert config.mhn_rule_vector_dim is None
-    assert config.mhn_rule_num_conv_layers is None
-    assert config.mhn_rule_heads is None
-    assert config.mhn_rule_attn_type is None
-    assert config.mhn_rule_dropout is None
-    assert config.mhn_rule_attn_dropout is None
-    assert config.mhn_rule_fp_type == "query_cgr"
-    assert config.mhn_rule_fp_schema_version == "1"
+    config = MHNRankingPolicyNetworkConfig()
+    assert config.architecture == "mhn_ranking"
+    assert config.rule_encoder_type == "fingerprint"
+    assert config.rule_embedder.embedder_type == "gps"
+    assert config.rule_graph_batch_size == 1024
+    assert config.rule_graph_schema_version == "1"
+    assert config.rule_embedder.vector_dim is None
+    assert config.rule_embedder.num_conv_layers is None
+    assert config.rule_embedder.heads is None
+    assert config.rule_embedder.attn_type is None
+    assert config.rule_embedder.dropout is None
+    assert config.rule_embedder.attn_dropout is None
+    assert config.rule_fp_type == "query_cgr"
+    assert config.rule_fp_schema_version == "1"
 
-    graph_config = PolicyNetworkConfig(
-        architecture="mhn_ranking",
-        mhn_rule_encoder_type="query_cgr_graph",
-        mhn_rule_embedder_type="gps",
+    graph_config = MHNRankingPolicyNetworkConfig(
+        rule_encoder_type="query_cgr_graph",
+        rule_embedder={"embedder_type": "gps"},
     )
-    assert graph_config.mhn_rule_encoder_type == "query_cgr_graph"
+    assert graph_config.rule_encoder_type == "query_cgr_graph"
 
 
 def test_mhn_network_config_extracts_policy_fields():
-    config = PolicyNetworkConfig(
-        architecture="mhn_ranking",
-        mhn_association_dim=128,
-        mhn_rule_encoder_type="query_cgr_graph",
-        mhn_rule_embedder_type="gps",
-        mhn_rule_vector_dim=64,
-        mhn_rule_num_conv_layers=2,
-        mhn_rule_heads=2,
-        mhn_rule_attn_type="performer",
+    config = MHNRankingPolicyNetworkConfig(
+        association_dim=128,
+        rule_encoder_type="query_cgr_graph",
+        rule_embedder={
+            "embedder_type": "gps",
+            "vector_dim": 64,
+            "num_conv_layers": 2,
+            "heads": 2,
+            "attn_type": "performer",
+        },
     )
 
-    mhn_config = MHNRankingNetworkConfig.from_policy_config(config)
     kwargs = mhn_network_kwargs_from_policy(config)
 
-    assert mhn_config.mhn_association_dim == 128
-    assert mhn_config.mhn_rule_encoder_type == "query_cgr_graph"
-    assert kwargs["mhn_rule_vector_dim"] == 64
-    assert kwargs["mhn_rule_num_conv_layers"] == 2
-    assert kwargs["mhn_rule_heads"] == 2
-    assert kwargs["mhn_rule_attn_type"] == "performer"
+    assert config.association_dim == 128
+    assert config.rule_encoder_type == "query_cgr_graph"
+    assert kwargs["association_dim"] == 128
+    assert kwargs["rule_vector_dim"] == 64
+    assert kwargs["rule_num_conv_layers"] == 2
+    assert kwargs["rule_heads"] == 2
+    assert kwargs["rule_attn_type"] == "performer"
+    assert kwargs["rule_embedder_type"] == "gps"
     assert "embedder_type" not in kwargs
 
 
 @pytest.mark.parametrize(
     "config_kwargs",
     [
-        {"embedder_type": "gcn", "mhn_rule_encoder_type": "fingerprint"},
+        {"embedder_type": "gcn", "rule_encoder_type": "fingerprint"},
         {
             "embedder_type": "gcn",
-            "mhn_rule_encoder_type": "query_cgr_graph",
-            "mhn_rule_embedder_type": "gps",
+            "rule_encoder_type": "query_cgr_graph",
+            "rule_embedder": {"embedder_type": "gps"},
         },
-        {"embedder_type": "gps", "mhn_rule_encoder_type": "fingerprint"},
+        {"embedder_type": "gps", "rule_encoder_type": "fingerprint"},
         {
             "embedder_type": "gps",
-            "mhn_rule_encoder_type": "query_cgr_graph",
-            "mhn_rule_embedder_type": "gps",
+            "rule_encoder_type": "query_cgr_graph",
+            "rule_embedder": {"embedder_type": "gps"},
         },
     ],
 )
 def test_mhn_config_scenarios_product_embedder_and_rule_encoder(config_kwargs):
-    config = PolicyNetworkConfig(architecture="mhn_ranking", **config_kwargs)
+    config = MHNRankingPolicyNetworkConfig(**config_kwargs)
 
     assert config.embedder_type == config_kwargs["embedder_type"]
-    assert config.mhn_rule_encoder_type == config_kwargs["mhn_rule_encoder_type"]
+    assert config.rule_encoder_type == config_kwargs["rule_encoder_type"]
 
 
 def test_mhn_rule_side_dropout_overrides_product_gps_dropout():
@@ -467,15 +468,15 @@ def test_mhn_rule_side_dropout_overrides_product_gps_dropout():
         attn_type="multihead",
         attn_dropout=0.5,
         rule_graphs=rule_graphs,
-        mhn_association_dim=4,
-        mhn_rule_encoder_type="query_cgr_graph",
-        mhn_rule_embedder_type="gps",
-        mhn_rule_vector_dim=6,
-        mhn_rule_num_conv_layers=2,
-        mhn_rule_heads=2,
-        mhn_rule_attn_type="performer",
-        mhn_rule_dropout=0.1,
-        mhn_rule_attn_dropout=0.2,
+        association_dim=4,
+        rule_encoder_type="query_cgr_graph",
+        rule_embedder_type="gps",
+        rule_vector_dim=6,
+        rule_num_conv_layers=2,
+        rule_heads=2,
+        rule_attn_type="performer",
+        rule_dropout=0.1,
+        rule_attn_dropout=0.2,
     )
 
     assert network.molecule_encoder[1].p == pytest.approx(0.3)
@@ -488,12 +489,12 @@ def test_mhn_rule_side_dropout_overrides_product_gps_dropout():
     assert network.rule_embedder.convs[0].dropout == pytest.approx(0.1)
     assert network.rule_embedder.convs[0].attn.dropout.p == pytest.approx(0.2)
     assert network.rule_encoder[0].in_features == 6
-    assert network.hparams["mhn_rule_vector_dim"] == 6
-    assert network.hparams["mhn_rule_num_conv_layers"] == 2
-    assert network.hparams["mhn_rule_heads"] == 2
-    assert network.hparams["mhn_rule_attn_type"] == "performer"
-    assert network.hparams["mhn_rule_dropout"] == pytest.approx(0.1)
-    assert network.hparams["mhn_rule_attn_dropout"] == pytest.approx(0.2)
+    assert network.hparams["rule_vector_dim"] == 6
+    assert network.hparams["rule_num_conv_layers"] == 2
+    assert network.hparams["rule_heads"] == 2
+    assert network.hparams["rule_attn_type"] == "performer"
+    assert network.hparams["rule_dropout"] == pytest.approx(0.1)
+    assert network.hparams["rule_attn_dropout"] == pytest.approx(0.2)
 
 
 def test_graph_embedder_builder_validates_contract():
@@ -590,12 +591,11 @@ def test_mhn_prepares_training_rules_from_policy_mapping(tmp_path):
             policy_data_path=str(policy_data_path),
             _data=SimpleNamespace(y_rules=torch.tensor([0])),
         ),
-        config=PolicyNetworkConfig(
-            architecture="mhn_ranking",
-            mhn_association_dim=4,
-            mhn_rule_fp_size=16,
-            mhn_rule_fp_type="query_cgr",
-            mhn_rule_fp_schema_version="1",
+        config=MHNRankingPolicyNetworkConfig(
+            association_dim=4,
+            rule_fp_size=16,
+            rule_fp_type="query_cgr",
+            rule_fp_schema_version="1",
         ),
         n_rules=1,
         vector_dim=8,
@@ -609,13 +609,13 @@ def test_mhn_prepares_training_rules_from_policy_mapping(tmp_path):
     assert network.n_rules == 2
     assert tuple(network._training_rule_fingerprints.shape) == (2, 16)
     assert network.hparams["n_rules"] == 2
-    assert network.hparams["mhn_rule_representation_digest"] == (
-        network.mhn_rule_representation_digest
+    assert network.hparams["rule_representation_digest"] == (
+        network.rule_representation_digest
     )
-    assert network.mhn_rule_representation_digest is not None
-    assert network.hparams["mhn_rule_encoder_type"] == "fingerprint"
-    assert network.hparams["mhn_rule_fp_type"] == "query_cgr"
-    assert network.hparams["mhn_rule_fp_schema_version"] == "1"
+    assert network.rule_representation_digest is not None
+    assert network.hparams["rule_encoder_type"] == "fingerprint"
+    assert network.hparams["rule_fp_type"] == "query_cgr"
+    assert network.hparams["rule_fp_schema_version"] == "1"
     assert "policy_data_path" not in network.hparams
 
 
@@ -636,12 +636,11 @@ def test_mhn_prepares_training_rule_graphs_from_policy_mapping(tmp_path):
             policy_data_path=str(policy_data_path),
             _data=SimpleNamespace(y_rules=torch.tensor([0])),
         ),
-        config=PolicyNetworkConfig(
-            architecture="mhn_ranking",
-            mhn_association_dim=4,
-            mhn_rule_encoder_type="query_cgr_graph",
-            mhn_rule_embedder_type="gps",
-            mhn_rule_graph_batch_size=1,
+        config=MHNRankingPolicyNetworkConfig(
+            association_dim=4,
+            rule_encoder_type="query_cgr_graph",
+            rule_embedder={"embedder_type": "gps"},
+            rule_graph_batch_size=1,
         ),
         n_rules=1,
         vector_dim=8,
@@ -657,12 +656,12 @@ def test_mhn_prepares_training_rule_graphs_from_policy_mapping(tmp_path):
     assert network.n_rules == 2
     assert len(network._training_rule_graphs) == 2
     assert network._training_rule_fingerprints.numel() == 0
-    assert network.hparams["mhn_rule_encoder_type"] == "query_cgr_graph"
-    assert network.hparams["mhn_rule_embedder_type"] == "gps"
-    assert network.hparams["mhn_rule_representation_digest"] == (
-        network.mhn_rule_representation_digest
+    assert network.hparams["rule_encoder_type"] == "query_cgr_graph"
+    assert network.hparams["rule_embedder_type"] == "gps"
+    assert network.hparams["rule_representation_digest"] == (
+        network.rule_representation_digest
     )
-    assert network.mhn_rule_representation_digest is not None
+    assert network.rule_representation_digest is not None
 
 
 @pytest.mark.parametrize(

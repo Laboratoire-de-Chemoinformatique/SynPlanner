@@ -7,29 +7,31 @@ dropout: 0.4
 num_epoch: 100
 batch_size: 1000
 
-mhn_association_dim: 512
-mhn_beta: 0.05
-mhn_rule_encoder_type: fingerprint
-# To switch from rule fingerprints to QueryCGR rule graphs, use:
-# mhn_rule_encoder_type: query_cgr_graph
-# mhn_rule_embedder_type: gps
-# Optional rule-side overrides; null means use product/global GPS settings.
-# mhn_rule_vector_dim: 128
-# mhn_rule_num_conv_layers: 3
-# mhn_rule_heads: 4
-# mhn_rule_attn_type: performer
-# mhn_rule_dropout: 0.1
-# mhn_rule_attn_dropout: 0.1
-mhn_rule_embedder_type: gps
-mhn_rule_graph_batch_size: 1024
-mhn_rule_graph_schema_version: "1"
-mhn_rule_fp_size: 2048
-mhn_rule_fp_min_radius: 1
-mhn_rule_fp_max_radius: 4
-mhn_rule_fp_active_bits: 2
-mhn_rule_fp_type: query_cgr
-mhn_rule_fp_schema_version: "1"
-mhn_normalize_associations: true
+association_dim: 512
+beta: 0.05
+normalize_associations: true
+rule_encoder_type: fingerprint
+# To switch from rule fingerprints to QueryCGR rule graphs, set
+# rule_encoder_type: query_cgr_graph (rule_embedder.embedder_type must stay gps).
+rule_fp_size: 2048
+rule_fp_min_radius: 1
+rule_fp_max_radius: 4
+rule_fp_active_bits: 2
+rule_fp_type: query_cgr
+rule_fp_schema_version: "1"
+rule_graph_batch_size: 1024
+rule_graph_schema_version: "1"
+
+# Rule-side graph embedder. Omitted fields fall back to the molecule-side
+# GPS settings above.
+rule_embedder:
+  embedder_type: gps
+  # vector_dim: 128
+  # num_conv_layers: 3
+  # heads: 4
+  # attn_type: performer
+  # dropout: 0.1
+  # attn_dropout: 0.1
 
 logger:
   type: csv

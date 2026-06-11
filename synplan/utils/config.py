@@ -7,6 +7,13 @@ import yaml
 from chython import smarts
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from synplan.chem.reaction.rules.representation.config import (
+    RULE_FINGERPRINT_SCHEMA_VERSION,
+    RULE_GRAPH_SCHEMA_VERSION,
+    RuleFingerprintConfig,
+    RuleRepresentationConfig,
+)
+
 
 class BaseConfigModel(BaseModel):
     """Base class for all SynPlanner configuration models.
@@ -288,8 +295,31 @@ class RuleExtractionConfig(BaseConfigModel):
         self.func_groups_list = func_groups_list
 
 
+class GraphEmbedderConfig(BaseConfigModel):
+    """Reusable graph-embedder knobs (``build_graph_embedder`` parameters).
+
+    Used as the MHN ``rule_embedder``; the optional fields fall back to the
+    molecule-side values when left unset (``None``).
+    """
+
+    embedder_type: Literal["gcn", "gcn_concat", "gps"] = "gps"
+    vector_dim: int | None = Field(default=None, gt=0)
+    num_conv_layers: int | None = Field(default=None, gt=0)
+    heads: int | None = Field(default=None, gt=0)
+    attn_type: Literal["performer", "multihead"] | None = None
+    dropout: float | None = Field(default=None, ge=0.0, le=1.0)
+    attn_dropout: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
 class PolicyNetworkConfig(BaseConfigModel):
-    """Configuration class for the policy network.
+    """Architecture-agnostic base config shared by every policy network.
+
+    Holds the training + inference knobs common to all policies. It is the type
+    used at planning time (only the selection knobs matter; the network
+    architecture is read from the checkpoint) and the base for the
+    architecture-specific training configs :class:`LinearPolicyNetworkConfig` and
+    :class:`MHNRankingPolicyNetworkConfig`. ``from_dict``/``from_yaml`` dispatch on
+    the ``architecture`` discriminator and return the matching subclass.
 
     :param vector_dim: Dimension of the input vectors.
     :param batch_size: Number of samples per batch.
@@ -334,51 +364,18 @@ class PolicyNetworkConfig(BaseConfigModel):
     rule_prob_threshold: float = Field(default=0.0, ge=0.0)
     top_rules: int = Field(default=50, gt=0)
 
-    # MHN ranking policy parameters
-    mhn_association_dim: int = Field(default=512, gt=0)
-    mhn_beta: float = Field(default=0.05, gt=0.0)
-    mhn_rule_encoder_type: Literal["fingerprint", "query_cgr_graph"] = "fingerprint"
-    mhn_rule_embedder_type: Literal["gcn", "gcn_concat", "gps"] = "gps"
-    mhn_rule_graph_batch_size: int = Field(default=1024, gt=0)
-    mhn_rule_graph_schema_version: str = Field(default="1", min_length=1)
-    mhn_rule_vector_dim: int | None = Field(default=None, gt=0)
-    mhn_rule_num_conv_layers: int | None = Field(default=None, gt=0)
-    mhn_rule_heads: int | None = Field(default=None, gt=0)
-    mhn_rule_attn_type: Literal["performer", "multihead"] | None = None
-    mhn_rule_dropout: float | None = Field(default=None, ge=0.0, le=1.0)
-    mhn_rule_attn_dropout: float | None = Field(default=None, ge=0.0, le=1.0)
-    mhn_rule_fp_size: int = Field(default=2048, gt=0)
-    mhn_rule_fp_min_radius: int = Field(default=1, gt=0)
-    mhn_rule_fp_max_radius: int = Field(default=4, ge=0)
-    mhn_rule_fp_active_bits: int = Field(default=2, gt=0)
-    mhn_rule_fp_type: Literal["legacy", "query_cgr"] = "query_cgr"
-    mhn_rule_fp_schema_version: str = Field(default="1", min_length=1)
-    mhn_normalize_associations: bool = True
-
     @model_validator(mode="after")
     def _validate_architecture(self) -> "PolicyNetworkConfig":
         if self.architecture == "mhn_ranking" and self.policy_type != "ranking":
             raise ValueError(
                 "architecture='mhn_ranking' requires policy_type='ranking'"
             )
-        if self.mhn_rule_fp_size & (self.mhn_rule_fp_size - 1):
-            raise ValueError("mhn_rule_fp_size must be a positive power of two")
-        if self.mhn_rule_fp_max_radius < self.mhn_rule_fp_min_radius:
-            raise ValueError("mhn_rule_fp_max_radius must be >= mhn_rule_fp_min_radius")
         if self.embedder_type == "gcn_concat" and (
             self.vector_dim % self.num_conv_layers
         ):
             raise ValueError(
                 "embedder_type='gcn_concat' requires vector_dim to be divisible "
                 "by num_conv_layers"
-            )
-        if (
-            self.mhn_rule_encoder_type == "query_cgr_graph"
-            and self.mhn_rule_embedder_type != "gps"
-        ):
-            raise ValueError(
-                "mhn_rule_encoder_type='query_cgr_graph' requires "
-                "mhn_rule_embedder_type='gps'"
             )
         return self
 
@@ -395,6 +392,138 @@ class PolicyNetworkConfig(BaseConfigModel):
                 )
             v["type"] = v["type"].lower()
         return v
+
+    @classmethod
+    def from_dict(cls, config_dict: dict[str, Any]):
+        """Build a policy config, dispatching on ``architecture``.
+
+        Called on the base class it returns the concrete subclass selected by the
+        ``architecture`` key (absent → ``linear``); called on a subclass it parses
+        as that subclass directly.
+        """
+        data = dict(config_dict or {})
+        if cls is PolicyNetworkConfig:
+            cls = _POLICY_CONFIG_BY_ARCHITECTURE.get(
+                data.get("architecture", "linear"), cls
+            )
+        return cls.model_validate(data)
+
+    @classmethod
+    def from_yaml(cls, file_path: str):
+        """Load a policy config from YAML, dispatching on ``architecture``."""
+        with open(file_path, encoding="utf-8") as f:
+            return cls.from_dict(yaml.safe_load(f) or {})
+
+
+class LinearPolicyNetworkConfig(PolicyNetworkConfig):
+    """Fixed-class (linear) policy network training config.
+
+    The standard graph-embedder policy with a fixed reaction-rule output head
+    (filtering or ranking). Pins ``architecture``; an explicit peer of
+    :class:`MHNRankingPolicyNetworkConfig`.
+    """
+
+    architecture: Literal["linear"] = "linear"
+
+
+class MHNRankingPolicyNetworkConfig(PolicyNetworkConfig):
+    """Modern-Hopfield ranking policy network training config.
+
+    Extends the shared policy config with the MHN association knobs and the rule
+    representation. The molecule/product encoder uses the inherited base fields;
+    the rule encoder is configured by ``rule_embedder`` (a reusable
+    :class:`GraphEmbedderConfig` whose unset fields fall back to the molecule
+    side). These fields live ONLY here, never on the base or linear config.
+    """
+
+    architecture: Literal["mhn_ranking"] = "mhn_ranking"
+
+    # MHN association mechanism
+    association_dim: int = Field(default=512, gt=0)
+    beta: float = Field(default=0.05, gt=0.0)
+    normalize_associations: bool = True
+
+    # rule representation
+    rule_encoder_type: Literal["fingerprint", "query_cgr_graph"] = "fingerprint"
+    rule_fp_size: int = Field(default=2048, gt=0)
+    rule_fp_min_radius: int = Field(default=1, gt=0)
+    rule_fp_max_radius: int = Field(default=4, ge=0)
+    rule_fp_active_bits: int = Field(default=2, gt=0)
+    rule_fp_type: Literal["legacy", "query_cgr"] = "query_cgr"
+    rule_fp_schema_version: str = Field(
+        default=RULE_FINGERPRINT_SCHEMA_VERSION, min_length=1
+    )
+    rule_graph_batch_size: int = Field(default=1024, gt=0)
+    rule_graph_schema_version: str = Field(
+        default=RULE_GRAPH_SCHEMA_VERSION, min_length=1
+    )
+    rule_embedder: GraphEmbedderConfig = Field(default_factory=GraphEmbedderConfig)
+
+    def rule_representation_config(self) -> RuleRepresentationConfig:
+        """Map the flat rule knobs onto the canonical frozen chem config.
+
+        Constructing the frozen config runs its ``__post_init__`` checks
+        (power-of-two fingerprint size, radius ordering, the ``query_cgr_graph``
+        → ``gps`` rule), so it doubles as the rule-field validator.
+        """
+        return RuleRepresentationConfig(
+            encoder_type=self.rule_encoder_type,
+            fingerprint_config=RuleFingerprintConfig(
+                fp_size=self.rule_fp_size,
+                min_radius=self.rule_fp_min_radius,
+                max_radius=self.rule_fp_max_radius,
+                active_bits=self.rule_fp_active_bits,
+                fp_type=self.rule_fp_type,
+                schema_version=self.rule_fp_schema_version,
+            ),
+            graph_schema_version=self.rule_graph_schema_version,
+            graph_embedder_type=self.rule_embedder.embedder_type,
+            graph_batch_size=self.rule_graph_batch_size,
+        )
+
+    @model_validator(mode="after")
+    def _validate_rule_representation(self) -> "MHNRankingPolicyNetworkConfig":
+        self.rule_representation_config()
+        return self
+
+
+_POLICY_CONFIG_BY_ARCHITECTURE: dict[str, type[PolicyNetworkConfig]] = {
+    "linear": LinearPolicyNetworkConfig,
+    "mhn_ranking": MHNRankingPolicyNetworkConfig,
+}
+
+
+def mhn_network_kwargs_from_policy(
+    config: "MHNRankingPolicyNetworkConfig",
+) -> dict[str, Any]:
+    """Flatten an MHN policy config into ``MHNRankingPolicyNetwork`` kwargs.
+
+    The nested ``rule_embedder`` is expanded to the flat ``rule_*`` embedder
+    kwargs the network expects (``None`` keeps the molecule-side fallback).
+    """
+    emb = config.rule_embedder
+    return {
+        "architecture": config.architecture,
+        "association_dim": config.association_dim,
+        "beta": config.beta,
+        "normalize_associations": config.normalize_associations,
+        "rule_encoder_type": config.rule_encoder_type,
+        "rule_fp_size": config.rule_fp_size,
+        "rule_fp_min_radius": config.rule_fp_min_radius,
+        "rule_fp_max_radius": config.rule_fp_max_radius,
+        "rule_fp_active_bits": config.rule_fp_active_bits,
+        "rule_fp_type": config.rule_fp_type,
+        "rule_fp_schema_version": config.rule_fp_schema_version,
+        "rule_graph_batch_size": config.rule_graph_batch_size,
+        "rule_graph_schema_version": config.rule_graph_schema_version,
+        "rule_embedder_type": emb.embedder_type,
+        "rule_vector_dim": emb.vector_dim,
+        "rule_num_conv_layers": emb.num_conv_layers,
+        "rule_heads": emb.heads,
+        "rule_attn_type": emb.attn_type,
+        "rule_dropout": emb.dropout,
+        "rule_attn_dropout": emb.attn_dropout,
+    }
 
 
 class ValueNetworkConfig(BaseConfigModel):

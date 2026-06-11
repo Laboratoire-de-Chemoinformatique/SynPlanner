@@ -15,7 +15,7 @@ from torchmetrics.functional.classification import (
     specificity,
 )
 
-from synplan.ml.networks.modules import MCTSNetwork
+from synplan.ml.networks.base import MCTSNetwork
 
 
 class PolicyNetwork(MCTSNetwork, LightningModule, ABC):

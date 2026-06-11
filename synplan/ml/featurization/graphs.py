@@ -1,9 +1,4 @@
-"""Query-CGR graph featurization for MHN rule encoders.
-
-Schema version 1 uses explicit bounded membership channels for set-valued
-QueryCGR atom constraints, with small overflow summaries for values outside
-the supported ranges.
-"""
+"""Query-CGR graph tensorization for MHN rule encoders."""
 
 from __future__ import annotations
 
@@ -16,28 +11,33 @@ from chython import smarts
 from chython.containers import QueryCGRContainer, ReactionContainer
 from torch_geometric.data import Data
 
-from synplan.chem.reaction_rules.fingerprints import query_reaction_atom_labels
-from synplan.chem.utils import _query_cgr_atom_label, _query_cgr_bond_label
-
-RULE_GRAPH_SCHEMA_VERSION = "1"
-
-_SIDES = ("reactants", "reagents", "products")
-_HYBRIDIZATIONS = (1, 2, 3, 4)
-_COUNT_LABELS = tuple(range(17))
-_RING_SIZE_LABELS = tuple(range(3, 17))
-_ORDER_LABELS = (None, 1, 2, 3, 4)
-_CHARGE_OFFSET = 8
-_COUNT_SET_FEATURE_DIM = 1 + len(_COUNT_LABELS) + 3
-_RING_SET_FEATURE_DIM = 1 + len(_RING_SIZE_LABELS) + 3
-_BASE_NODE_FEATURE_DIM = 7 + (2 * _COUNT_SET_FEATURE_DIM) + (2 * len(_HYBRIDIZATIONS))
-_SIDE_NODE_FEATURE_DIM = (
-    5 + (3 * _COUNT_SET_FEATURE_DIM) + len(_HYBRIDIZATIONS) + _RING_SET_FEATURE_DIM
+from synplan.chem.reaction.rules.representation.config import (
+    RULE_GRAPH_CHARGE_OFFSET,
+    RULE_GRAPH_COUNT_LABELS,
+    RULE_GRAPH_EDGE_FEATURE_DIM,
+    RULE_GRAPH_HYBRIDIZATIONS,
+    RULE_GRAPH_NODE_FEATURE_DIM,
+    RULE_GRAPH_ORDER_LABELS,
+    RULE_GRAPH_RING_SIZE_LABELS,
+    RULE_GRAPH_SCHEMA_VERSION,
+    RULE_GRAPH_SIDES,
+)
+from synplan.chem.reaction.rules.representation.morgan import (
+    query_reaction_atom_labels,
+)
+from synplan.chem.reaction.rules.representation.query_cgr import (
+    compress_labels,
+    query_cgr_atom_label,
+    query_cgr_bond_label,
 )
 
-RULE_GRAPH_NODE_FEATURE_DIM = _BASE_NODE_FEATURE_DIM + (
-    len(_SIDES) * _SIDE_NODE_FEATURE_DIM
-)
-RULE_GRAPH_EDGE_FEATURE_DIM = 16
+# Local aliases; canonical definitions live in chem…representation.config.
+_SIDES = RULE_GRAPH_SIDES
+_HYBRIDIZATIONS = RULE_GRAPH_HYBRIDIZATIONS
+_COUNT_LABELS = RULE_GRAPH_COUNT_LABELS
+_RING_SIZE_LABELS = RULE_GRAPH_RING_SIZE_LABELS
+_ORDER_LABELS = RULE_GRAPH_ORDER_LABELS
+_CHARGE_OFFSET = RULE_GRAPH_CHARGE_OFFSET
 
 
 def _numbers(value: Any) -> tuple[float, ...]:
@@ -140,24 +140,16 @@ def _node_order_labels(
     query_cgr: QueryCGRContainer, atom_labels: Mapping[int, Any]
 ) -> dict[int, tuple]:
     return {
-        atom: (_query_cgr_atom_label(query_cgr, atom), atom_labels.get(atom))
+        atom: (query_cgr_atom_label(query_cgr, atom), atom_labels.get(atom))
         for atom in query_cgr._atoms
     }
-
-
-def _compress_labels(labels: Mapping[int, tuple]) -> dict[int, int]:
-    label_to_order = {
-        label: index
-        for index, label in enumerate(sorted(set(labels.values()), key=repr))
-    }
-    return {atom: label_to_order[label] for atom, label in labels.items()}
 
 
 def _canonical_atom_order(
     query_cgr: QueryCGRContainer, atom_labels: Mapping[int, Any]
 ) -> tuple[int, ...]:
     labels = _node_order_labels(query_cgr, atom_labels)
-    colors = _compress_labels(labels)
+    colors = compress_labels(labels)
     atoms = tuple(query_cgr._atoms)
 
     for _ in range(len(atoms)):
@@ -167,7 +159,7 @@ def _canonical_atom_order(
                 sorted(
                     (
                         (
-                            _query_cgr_bond_label(query_cgr, atom, neighbor),
+                            query_cgr_bond_label(query_cgr, atom, neighbor),
                             colors[neighbor],
                         )
                         for neighbor in query_cgr._bonds[atom]
@@ -176,7 +168,7 @@ def _canonical_atom_order(
                 )
             )
             signatures[atom] = (colors[atom], neighborhood)
-        refined = _compress_labels(signatures)
+        refined = compress_labels(signatures)
         if refined == colors:
             break
         colors = refined
@@ -196,7 +188,7 @@ def _node_features(
     atom: int,
     atom_labels: Mapping[int, Any],
 ) -> list[float]:
-    label = _query_cgr_atom_label(query_cgr, atom)
+    label = query_cgr_atom_label(query_cgr, atom)
     features = [
         _first_number(label[0]),
         _first_number(label[2]),
@@ -235,7 +227,7 @@ def _order_features(order: Any) -> list[float]:
 def _edge_features(
     query_cgr: QueryCGRContainer, atom_1: int, atom_2: int
 ) -> list[float]:
-    order, product_order = _query_cgr_bond_label(query_cgr, atom_1, atom_2)
+    order, product_order = query_cgr_bond_label(query_cgr, atom_1, atom_2)
     has_order = order is not None
     has_product_order = product_order is not None
     changed = order != product_order
@@ -300,7 +292,7 @@ def query_cgr_to_pyg(
 def query_cgr_graph_from_rule_query(rule_query: ReactionContainer) -> Data:
     """Build a QueryCGR rule graph from a parsed SMARTS reaction rule."""
     return query_cgr_to_pyg(
-        rule_query.compose(dynamic=True),
+        rule_query.compose(),
         atom_labels=query_reaction_atom_labels(rule_query),
     )
 
@@ -312,7 +304,7 @@ def query_cgr_graphs_from_smarts(
 ) -> list[Data]:
     """Build ordered QueryCGR rule graphs from retrospective rule SMARTS."""
     if not schema_version:
-        raise ValueError("mhn_rule_graph_schema_version must be non-empty")
+        raise ValueError("rule_graph_schema_version must be non-empty")
 
     graphs = []
     for index, rule_smarts_text in enumerate(rule_smarts):

@@ -5,6 +5,61 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **MHN (Modern Hopfield Network) ranking expansion policy** — an alternative
+  ranking policy that keeps SynPlanner's molecular graph embedder but replaces
+  the fixed linear rule head with molecule-rule associations, so a single
+  checkpoint can score reordered or newly supplied runtime rule sets. Select it
+  by training with `architecture: mhn_ranking` (requires `policy_type: ranking`);
+  see `configs/mhn_ranking_policy_training.yaml`. Rules are encoded as query-CGR
+  fingerprints by default, or as labeled query-CGR rule graphs with
+  `mhn_rule_encoder_type: query_cgr_graph`. MHN checkpoints load automatically in
+  search — no extra flags needed. Fine-tune an existing checkpoint with the new
+  `synplan mhn_network_tuning` CLI command. (See also 1.5.2.)
+- New `synplan.ml.featurization` package: the torch-based tensorizers shared by
+  training and inference (`mol_to_pyg`, `rule_fingerprints_from_smarts`,
+  `query_cgr_graphs_from_smarts`).
+- New `synplan.chem.reaction.rules.representation` package: torch-free
+  rule-representation primitives (query-CGR fingerprints/keys and their config).
+
+### Changed
+
+- **Chemistry modules reorganized** under a single `synplan.chem.reaction`
+  package:
+  - `synplan.chem.reaction_rules.*` → `synplan.chem.reaction.rules.*`
+  - `synplan.chem.reaction_routes.*` → `synplan.chem.reaction.routes.*`
+  - the former `synplan.chem.reaction` module is now a package; its public names
+    (`CanonicalRetroReactor`, `Reaction`, `apply_reaction_rule`,
+    `add_small_mols`) still import from `synplan.chem.reaction` unchanged.
+  - route-CGR module renamed: `reaction_routes.route_cgr` → `reaction.routes.representation`.
+- `synplan.ml.networks.modules` was split into `synplan.ml.networks.base`
+  (the `MCTSNetwork` base class) and `synplan.ml.networks.embedders` (the graph
+  embedder zoo).
+- The `synplan` CLI commands, config files, and config fields are unchanged.
+
+### Deprecated
+
+The old import paths below still work but emit a `DeprecationWarning` and will be
+removed in a future release. Migrate to the new paths:
+
+| Deprecated import | New import |
+|---|---|
+| `synplan.chem.reaction_rules` (and submodules: `analysis`, `extraction`, `fingerprints`, `graphs`, `priority`, `representations`, `rule_fingerprints`) | `synplan.chem.reaction.rules.*` |
+| `synplan.chem.reaction_rules.manual` | `synplan.chem.reaction.rules.manual` |
+| `synplan.chem.reaction_routes.{clustering, io, leaving_groups, route_cgr, visualisation}` | `synplan.chem.reaction.routes.*` (`route_cgr` → `representation`) |
+| `synplan.ml.networks.modules` | `synplan.ml.networks.base` + `synplan.ml.networks.embedders` |
+
+Notes:
+- `mol_to_pyg` and its atom/bond featurization helpers (`atom_to_vector`,
+  `bonds_to_vector`, `mol_to_matrix`, `MENDEL_INFO`) moved to
+  `synplan.ml.featurization`, but the old
+  `synplan.ml.training.preprocessing` import path still re-exports them.
+- The public `hardcoded_rules` symbol remains importable from
+  `synplan.chem.reaction_rules.manual`. Direct imports of the inner
+  `...manual.decompositions` / `...manual.transformations` modules now require
+  the new `synplan.chem.reaction.rules.manual.*` path.
+
 ## [1.5.2] - 2026-06-04
 
 ### Added

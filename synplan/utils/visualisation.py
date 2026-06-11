@@ -13,8 +13,8 @@ from chython.algorithms.depict import _graph_svg, _render_config
 from chython.containers.molecule import MoleculeContainer
 from IPython.display import HTML, display
 
-from synplan.chem.reaction_routes.io import make_dict
-from synplan.chem.reaction_routes.visualisation import (
+from synplan.chem.reaction.routes.io import make_dict
+from synplan.chem.reaction.routes.visualisation import (
     cgr_display,
     depict_custom_reaction,
 )

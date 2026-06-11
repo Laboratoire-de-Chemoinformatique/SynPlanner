@@ -11,15 +11,12 @@ from chython.containers import ReactionContainer
 
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor
-from synplan.chem.reaction_rules.graphs import query_cgr_graphs_from_smarts
-from synplan.chem.reaction_rules.representations import (
-    rule_representation_config_from_policy,
+from synplan.chem.reaction.rules.representation import (
     rule_representation_digest,
-)
-from synplan.chem.reaction_rules.rule_fingerprints import (
-    rule_fingerprints_from_smarts,
     rule_smarts_from_reactors,
 )
+from synplan.ml.featurization.fingerprints import rule_fingerprints_from_smarts
+from synplan.ml.featurization.graphs import query_cgr_graphs_from_smarts
 from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.training import mol_to_pyg
 from synplan.utils.config import PolicyNetworkConfig
@@ -289,7 +286,7 @@ class MHNPolicyNetworkFunction(PolicyNetworkFunction):
     ) -> None:
         """Encode runtime rules once for MHN ranking prediction."""
         rule_smarts = rule_smarts_from_reactors(reaction_rules)
-        representation_config = rule_representation_config_from_policy(self.policy_net)
+        representation_config = self.policy_net.rule_representation_config
         representation_digest = rule_representation_digest(
             rule_smarts, representation_config
         )
@@ -514,7 +511,7 @@ class CombinedPolicyNetworkFunction:
                 yield prob, rule_id
 
 
-def _rule_query_pattern(rule) -> ReactionContainer | None:
+def rule_query_pattern(rule) -> ReactionContainer | None:
     """Return the first query pattern stored on a chython :class:`Reactor`.
 
     chython's :class:`Reactor` keeps the LHS query patterns on the private
@@ -528,3 +525,12 @@ def _rule_query_pattern(rule) -> ReactionContainer | None:
         return patterns[0]
 
     return None
+
+
+__all__ = [
+    "CombinedPolicyNetworkFunction",
+    "MHNPolicyNetworkFunction",
+    "PolicyNetworkFunction",
+    "policy_network_function_from_config",
+    "rule_query_pattern",
+]

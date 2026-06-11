@@ -24,7 +24,7 @@ from synplan.ml.training.preprocessing import (
     RankingPolicyDataset,
 )
 from synplan.utils.cache import cache_digest
-from synplan.utils.config import PolicyNetworkConfig
+from synplan.utils.config import MHNRankingPolicyNetworkConfig, PolicyNetworkConfig
 from synplan.utils.logging import DisableLogger, HiddenPrints
 
 warnings.filterwarnings("ignore")
@@ -390,24 +390,38 @@ def run_policy_training(
 def _policy_config_from_mhn_checkpoint(
     network: MHNRankingPolicyNetwork,
     config: PolicyNetworkConfig | None = None,
-) -> PolicyNetworkConfig:
+) -> MHNRankingPolicyNetworkConfig:
     """Recover a training config from an MHN checkpoint or user config."""
     if config is not None:
         values = config.model_dump()
         values["architecture"] = "mhn_ranking"
         values["policy_type"] = "ranking"
-        return PolicyNetworkConfig.model_validate(values)
+        return MHNRankingPolicyNetworkConfig.model_validate(values)
 
     hparams = dict(getattr(network, "hparams", {}) or {})
     values = {}
-    for field in PolicyNetworkConfig.model_fields:
+    for field in MHNRankingPolicyNetworkConfig.model_fields:
+        if field == "rule_embedder":
+            continue  # nested below from the flat network hparams
         if field in hparams:
             values[field] = hparams[field]
         elif hasattr(network, field):
             values[field] = getattr(network, field)
+    embedder_keys = {
+        "embedder_type": "rule_embedder_type",
+        "vector_dim": "rule_vector_dim",
+        "num_conv_layers": "rule_num_conv_layers",
+        "heads": "rule_heads",
+        "attn_type": "rule_attn_type",
+        "dropout": "rule_dropout",
+        "attn_dropout": "rule_attn_dropout",
+    }
+    values["rule_embedder"] = {
+        sub: hparams[flat] for sub, flat in embedder_keys.items() if flat in hparams
+    }
     values["architecture"] = "mhn_ranking"
     values["policy_type"] = "ranking"
-    return PolicyNetworkConfig.model_validate(values)
+    return MHNRankingPolicyNetworkConfig.model_validate(values)
 
 
 def run_mhn_network_tuning(

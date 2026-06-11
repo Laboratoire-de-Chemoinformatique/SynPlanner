@@ -8,9 +8,11 @@ import pytest
 import torch
 
 import synplan.mcts.expansion as expansion
-from synplan.chem.reaction_rules.graphs import RULE_GRAPH_SCHEMA_VERSION
-from synplan.chem.reaction_rules.rule_fingerprints import (
+from synplan.chem.reaction.rules.representation import (
     RULE_FINGERPRINT_SCHEMA_VERSION,
+    RULE_GRAPH_SCHEMA_VERSION,
+    RuleFingerprintConfig,
+    RuleRepresentationConfig,
 )
 
 
@@ -26,23 +28,40 @@ class _MHNPolicy(torch.nn.Module):
     architecture = "mhn_ranking"
     policy_type = "ranking"
     n_rules = 2
-    mhn_rule_encoder_type = "fingerprint"
-    mhn_rule_fp_size = 4
-    mhn_rule_fp_min_radius = 1
-    mhn_rule_fp_max_radius = 2
-    mhn_rule_fp_active_bits = 2
-    mhn_rule_fp_type = "query_cgr"
-    mhn_rule_fp_schema_version = RULE_FINGERPRINT_SCHEMA_VERSION
-    mhn_rule_embedder_type = "gps"
-    mhn_rule_graph_batch_size = 2
-    mhn_rule_graph_schema_version = RULE_GRAPH_SCHEMA_VERSION
+    rule_representation_config = RuleRepresentationConfig(
+        encoder_type="fingerprint",
+        fingerprint_config=RuleFingerprintConfig(
+            fp_size=4,
+            min_radius=1,
+            max_radius=2,
+            active_bits=2,
+            fp_type="query_cgr",
+            schema_version=RULE_FINGERPRINT_SCHEMA_VERSION,
+        ),
+        graph_embedder_type="gps",
+        graph_batch_size=2,
+        graph_schema_version=RULE_GRAPH_SCHEMA_VERSION,
+    )
 
     def encode_rules(self, rule_representations):
         return rule_representations + 1
 
 
 class _MHNGraphPolicy(_MHNPolicy):
-    mhn_rule_encoder_type = "query_cgr_graph"
+    rule_representation_config = RuleRepresentationConfig(
+        encoder_type="query_cgr_graph",
+        fingerprint_config=RuleFingerprintConfig(
+            fp_size=4,
+            min_radius=1,
+            max_radius=2,
+            active_bits=2,
+            fp_type="query_cgr",
+            schema_version=RULE_FINGERPRINT_SCHEMA_VERSION,
+        ),
+        graph_embedder_type="gps",
+        graph_batch_size=2,
+        graph_schema_version=RULE_GRAPH_SCHEMA_VERSION,
+    )
 
     def encode_rules(self, rule_representations):
         return torch.ones((len(rule_representations), 4))

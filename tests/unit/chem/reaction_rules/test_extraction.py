@@ -1,4 +1,4 @@
-"""Tests for synplan.chem.reaction_rules.extraction utilities."""
+"""Tests for synplan.chem.reaction.rules.extraction utilities."""
 
 from __future__ import annotations
 
@@ -15,9 +15,9 @@ from chython.containers import (
     ReactionContainer,
 )
 
-import synplan.chem.reaction_rules.extraction as extraction
+import synplan.chem.reaction.rules.extraction as extraction
 from synplan.chem.data.reaction_result import ExtractedRuleRecord, ExtractionBatchResult
-from synplan.chem.reaction_rules.extraction import (
+from synplan.chem.reaction.rules.extraction import (
     _process_extraction_result,
     add_environment_atoms,
     add_functional_groups,

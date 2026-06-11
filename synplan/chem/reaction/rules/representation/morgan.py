@@ -1,4 +1,4 @@
-"""Query-CGR Morgan fingerprints for reaction-rule graphs."""
+"""Torch-free Query-CGR Morgan fingerprint adapter for reaction-rule graphs."""
 
 from __future__ import annotations
 
@@ -12,7 +12,10 @@ from typing import Any
 from chython.algorithms.fingerprints import MorganFingerprint
 from chython.containers import QueryCGRContainer, ReactionContainer
 
-from synplan.chem.utils import _query_cgr_atom_label, _query_cgr_bond_label
+from synplan.chem.reaction.rules.representation.query_cgr import (
+    query_cgr_atom_label,
+    query_cgr_bond_label,
+)
 
 _QUERY_ATOM_LABEL_FIELDS = (
     "atomic_number",
@@ -113,7 +116,7 @@ class QueryCGRMorganFingerprintAdapter(MorganFingerprint):
         self._bonds = {
             atom: {
                 neighbor: _FingerprintBond(
-                    _stable_hash(_query_cgr_bond_label(query_cgr, atom, neighbor))
+                    _stable_hash(query_cgr_bond_label(query_cgr, atom, neighbor))
                 )
                 for neighbor in neighbors
             }
@@ -125,7 +128,7 @@ class QueryCGRMorganFingerprintAdapter(MorganFingerprint):
         return {
             atom: _stable_hash(
                 (
-                    _query_cgr_atom_label(self._query_cgr, atom),
+                    query_cgr_atom_label(self._query_cgr, atom),
                     self._atom_labels.get(atom),
                 )
             )

@@ -21,8 +21,8 @@ synplan.chem.precursor module
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.reaction module
-----------------------------
+synplan.chem.reaction package
+-----------------------------
 
 .. automodule:: synplan.chem.reaction
    :members:
