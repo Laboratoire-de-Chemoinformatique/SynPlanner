@@ -1,18 +1,16 @@
-"""Base class shared by SynPlanner policy and value neural networks."""
+"""Pure ``nn.Module`` base for SynPlanner policy and value networks."""
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
-from adabelief_pytorch import AdaBelief
-from pytorch_lightning import LightningModule
 from torch import Tensor
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.nn import Module
 from torch_geometric.data.batch import Batch
 
 from synplan.ml.networks.embedders import build_graph_embedder
 
 
-class MCTSNetwork(LightningModule, ABC):
-    """Basic class for policy and value networks."""
+class GraphMCTSNetwork(Module):
+    """Pure ``nn.Module`` base for MCTS graph networks (no training plumbing)."""
 
     def __init__(
         self,
@@ -61,84 +59,8 @@ class MCTSNetwork(LightningModule, ABC):
 
     @abstractmethod
     def forward(self, batch: Batch) -> Tensor:
-        """The forward function takes a batch of input data and performs forward
-        propagation through the neural network.
+        """Run forward propagation on a batch of molecular graphs.
 
         :param batch: The batch of molecular graphs processed together in a single
             forward pass through the neural network.
         """
-
-    @abstractmethod
-    def _get_loss(self, batch: Batch) -> Tensor:
-        """Calculate the loss for a given batch of data.
-
-        :param batch: The batch of input data that is used to compute the loss.
-        """
-
-    def training_step(self, batch: Batch, batch_idx: int) -> Tensor:
-        """Calculates the loss for a given training batch and logs the loss value.
-
-        :param batch: The batch of data that is used for training.
-        :param batch_idx: The index of the batch.
-        :return: The value of the training loss.
-        """
-        metrics = self._get_loss(batch)
-        for name, value in metrics.items():
-            self.log(
-                "train_" + name,
-                value,
-                prog_bar=True,
-                on_step=True,
-                on_epoch=True,
-                batch_size=self.batch_size,
-            )
-        return metrics["loss"]
-
-    def validation_step(self, batch: Batch, batch_idx: int) -> None:
-        """Calculates the loss for a given validation batch and logs the loss value.
-
-        :param batch: The batch of data that is used for validation.
-        :param batch_idx: The index of the batch.
-        """
-        metrics = self._get_loss(batch)
-        for name, value in metrics.items():
-            self.log("val_" + name, value, on_epoch=True, batch_size=self.batch_size)
-
-    def test_step(self, batch: Batch, batch_idx: int) -> None:
-        """Calculates the loss for a given test batch and logs the loss value.
-
-        :param batch: The batch of data that is used for testing.
-        :param batch_idx: The index of the batch.
-        """
-        metrics = self._get_loss(batch)
-        for name, value in metrics.items():
-            self.log("test_" + name, value, on_epoch=True, batch_size=self.batch_size)
-
-    def configure_optimizers(
-        self,
-    ) -> tuple[list[AdaBelief], list[dict[str, bool | str | ReduceLROnPlateau]]]:
-        """Returns an optimizer and a learning rate scheduler for training a model using
-        the AdaBelief optimizer and ReduceLROnPlateau scheduler.
-
-        :return: The optimizer and a scheduler.
-        """
-
-        optimizer = AdaBelief(
-            self.parameters(),
-            lr=self.lr,
-            eps=1e-8,
-            betas=(0.9, 0.999),
-            weight_decouple=True,
-            rectify=True,
-            weight_decay=0.01,
-            print_change_log=False,
-        )
-
-        lr_scheduler = ReduceLROnPlateau(optimizer, patience=3, factor=0.8, min_lr=5e-5)
-        scheduler = {
-            "scheduler": lr_scheduler,
-            "reduce_on_plateau": True,
-            "monitor": "val_loss",
-        }
-
-        return [optimizer], [scheduler]

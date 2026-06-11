@@ -14,9 +14,8 @@ from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
 from synplan.mcts.evaluation import EvaluationStrategy
-from synplan.mcts.expansion import PolicyNetworkFunction, rule_query_pattern
 from synplan.mcts.node import Node
-from synplan.mcts.policy import Policy, TemplateBasedPolicy
+from synplan.mcts.policy import Policy, PriorityPolicy
 from synplan.route_quality.scorer import RouteScorer
 from synplan.utils.config import TreeConfig
 
@@ -101,7 +100,7 @@ class Tree:
         config: TreeConfig,
         reaction_rules: list[CanonicalRetroReactor],
         building_blocks: set[str],
-        expansion_function: PolicyNetworkFunction | Policy,
+        expansion_function: Policy,
         evaluation_function: EvaluationStrategy = None,
         route_scorer: RouteScorer | None = None,
         priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
@@ -154,15 +153,15 @@ class Tree:
                 "config.use_priority=True but no priority_rules were supplied. "
                 "Pass priority_rules={'<name>': [...rules]} or set use_priority=False."
             )
+        # Curated-rule selection is delegated to a PriorityPolicy per source.
+        self._priority_policies: dict[str, PriorityPolicy] = {
+            name: PriorityPolicy(rules) for name, rules in self.priority_rules.items()
+        }
 
         # policy and evaluation services
         assert expansion_function is not None, "Expansion function is required"
-        # Drive node expansion through the Policy seam (delegates straight through).
-        self.expansion_function: Policy = (
-            expansion_function
-            if isinstance(expansion_function, Policy)
-            else TemplateBasedPolicy(expansion_function)
-        )
+        # Node expansion is driven through the Policy seam.
+        self.expansion_function: Policy = expansion_function
 
         assert evaluation_function is not None, "Evaluation function is required"
         self.evaluator = evaluation_function
@@ -373,18 +372,11 @@ class Tree:
         policy rules are *additive*, not gated: both run on every node.
         """
 
-        if self.config.use_priority and self.priority_rules:
-            molecule = curr_node.curr_precursor.molecule
-            for source_name, rules in self.priority_rules.items():
-                for rule_id, rule in enumerate(rules):
-                    pattern = rule_query_pattern(rule)
-                    if pattern is None:
-                        continue
-                    try:
-                        if pattern < molecule:
-                            yield 1.0, rule, rule_id, source_name, None
-                    except TypeError:
-                        continue
+        if self.config.use_priority and self._priority_policies:
+            for source_name, policy in self._priority_policies.items():
+                for rule_id, rule in enumerate(policy.priority_rules):
+                    if policy._rule_applies(rule, curr_node.curr_precursor):
+                        yield 1.0, rule, rule_id, source_name, None
 
         policy_top_rules = self._get_policy_top_rules_limit()
         for policy_rank, (prob, rule, rule_id) in enumerate(
@@ -398,12 +390,9 @@ class Tree:
             yield prob, rule, rule_id, POLICY_SOURCE_NAME, policy_rank
 
     def _get_policy_top_rules_limit(self) -> int | None:
-        """Return the configured policy Top-N limit when exposed by the expansion fn."""
+        """Return the configured policy Top-N limit when exposed by the policy."""
 
-        config = getattr(self.expansion_function, "config", None)
-        top_rules = getattr(config, "top_rules", None)
-        if top_rules is None:
-            top_rules = getattr(self.expansion_function, "top_rules", None)
+        top_rules = getattr(self.expansion_function, "top_rules", None)
         if top_rules is None:
             return None
         return int(top_rules)

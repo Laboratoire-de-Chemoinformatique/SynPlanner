@@ -11,17 +11,25 @@ from collections import defaultdict
 from pathlib import Path
 
 import torch
-from pytorch_lightning import Callback, Trainer
+from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 from torch.utils.data import Subset, random_split
 from torch_geometric.data.lightning import LightningDataset
 
-from synplan.ml.networks.mhn_ranking import MHNRankingPolicyNetwork
-from synplan.ml.networks.policy import PolicyNetwork
+from synplan.ml.networks.checkpoint import load_policy_network_from_checkpoint
+from synplan.ml.networks.mhn_ranking import MHNRankingNetwork
+from synplan.ml.training.lightning import GradNormLogger, LitNetworkTrainer
 from synplan.ml.training.preprocessing import (
     FilteringPolicyDataset,
     RankingPolicyDataset,
+)
+from synplan.ml.training.trainers import (
+    LitFilteringPolicy,
+    LitMHNRanking,
+    LitRankingPolicy,
+    rebind_training_rules,
+    validate_ranking_labels,
 )
 from synplan.utils.cache import cache_digest
 from synplan.utils.config import MHNRankingPolicyNetworkConfig, PolicyNetworkConfig
@@ -30,20 +38,7 @@ from synplan.utils.logging import DisableLogger, HiddenPrints
 warnings.filterwarnings("ignore")
 
 
-class GradNormLogger(Callback):
-    """Logs mean gradient norm per top-level module (e.g. embedder, y_predictor)."""
-
-    def on_before_optimizer_step(self, trainer, pl_module, optimizer):
-        norms = {}
-        for name, p in pl_module.named_parameters():
-            if p.grad is not None:
-                tag = name.split(".")[0]
-                norms.setdefault(tag, []).append(p.grad.norm().item())
-        for tag, vals in norms.items():
-            pl_module.log(f"grad_norm/{tag}", sum(vals) / len(vals))
-
-
-def _stratified_ranking_split(
+def stratified_ranking_split(
     dataset: RankingPolicyDataset,
     min_rule_count: int = 20,
     max_val_fraction: float = 0.1,
@@ -198,7 +193,7 @@ def create_policy_dataset(
         and hasattr(full_dataset, "_product_keys")
         and full_dataset._product_keys is not None
     ):
-        train_indices, val_indices = _stratified_ranking_split(full_dataset)
+        train_indices, val_indices = stratified_ranking_split(full_dataset)
         train_dataset = Subset(full_dataset, train_indices)
         val_dataset = Subset(full_dataset, val_indices)
     else:
@@ -222,7 +217,7 @@ def create_policy_dataset(
     return datamodule
 
 
-def _create_logger(logger_config: dict | None, results_path: Path):
+def create_training_logger(logger_config: dict | None, results_path: Path):
     """Create a PyTorch Lightning logger from a config dict.
 
     :param logger_config: Dict with ``"type"`` and optional logger kwargs, or None.
@@ -275,8 +270,8 @@ def _create_logger(logger_config: dict | None, results_path: Path):
         raise ValueError(f"Unknown logger type: '{logger_type}'")
 
 
-def _fit_policy_network(
-    network: PolicyNetwork | MHNRankingPolicyNetwork,
+def fit_policy_network(
+    trainer_module: LitNetworkTrainer,
     datamodule: LightningDataset,
     config: PolicyNetworkConfig,
     results_path: str,
@@ -286,7 +281,7 @@ def _fit_policy_network(
     devices: list[int] | str | int = "auto",
     silent: bool = False,
 ) -> None:
-    """Fit a prepared policy network and save the best checkpoint."""
+    """Fit a prepared policy trainer and save the best checkpoint."""
     results_path = Path(results_path)
     results_path.mkdir(parents=True, exist_ok=True)
 
@@ -303,7 +298,7 @@ def _fit_policy_network(
         devices=devices,
         max_epochs=config.num_epoch,
         callbacks=callbacks,
-        logger=_create_logger(config.logger, results_path),
+        logger=create_training_logger(config.logger, results_path),
         gradient_clip_val=1.0,
         enable_progress_bar=not silent,
     )
@@ -314,12 +309,32 @@ def _fit_policy_network(
 
     if silent:
         with DisableLogger(), HiddenPrints():
-            trainer.fit(network, datamodule)
+            trainer.fit(trainer_module, datamodule)
     else:
-        trainer.fit(network, datamodule)
+        trainer.fit(trainer_module, datamodule)
 
     ba = round(trainer.logged_metrics["train_balanced_accuracy_y_step"].item(), 3)
     print(f"Policy network balanced accuracy: {ba}")
+
+
+TRAINER_BY_KEY: dict[str, type[LitNetworkTrainer]] = {
+    "mhn_ranking": LitMHNRanking,
+    "ranking": LitRankingPolicy,
+    "filtering": LitFilteringPolicy,
+}
+
+
+def build_policy_trainer(config: PolicyNetworkConfig, dataset) -> LitNetworkTrainer:
+    """Build the pure network + matching Lit trainer for the configured policy."""
+    key = (
+        config.architecture
+        if config.architecture == "mhn_ranking"
+        else config.policy_type
+    )
+    trainer_cls = TRAINER_BY_KEY[key]
+    if key == "mhn_ranking":
+        return trainer_cls.from_config(config, dataset)
+    return trainer_cls.from_config(config, n_rules=dataset.num_classes)
 
 
 def run_policy_training(
@@ -350,33 +365,10 @@ def run_policy_training(
         raise ValueError("architecture='mhn_ranking' requires policy_type='ranking'")
 
     dataset = datamodule.train_dataset.dataset
-    network_kwargs = dict(
-        vector_dim=config.vector_dim,
-        n_rules=dataset.num_classes,
-        batch_size=config.batch_size,
-        dropout=config.dropout,
-        num_conv_layers=config.num_conv_layers,
-        learning_rate=config.learning_rate,
-        policy_type=config.policy_type,
-        embedder_type=config.embedder_type,
-        heads=config.heads,
-        attn_type=config.attn_type,
-        attn_dropout=config.attn_dropout,
-    )
-    if config.architecture == "mhn_ranking":
-        network = MHNRankingPolicyNetwork.for_training(
-            **network_kwargs,
-            dataset=dataset,
-            config=config,
-        )
-    else:
-        network = PolicyNetwork(
-            **network_kwargs,
-            architecture=config.architecture,
-        )
+    trainer_module = build_policy_trainer(config, dataset)
 
-    _fit_policy_network(
-        network,
+    fit_policy_network(
+        trainer_module,
         datamodule,
         config,
         str(results_path),
@@ -387,41 +379,17 @@ def run_policy_training(
     )
 
 
-def _policy_config_from_mhn_checkpoint(
-    network: MHNRankingPolicyNetwork,
-    config: PolicyNetworkConfig | None = None,
+def mhn_tuning_config(
+    network: MHNRankingNetwork,
+    config: PolicyNetworkConfig | None,
 ) -> MHNRankingPolicyNetworkConfig:
-    """Recover a training config from an MHN checkpoint or user config."""
+    """Resolve the tuning config from a user config or the network hparams."""
     if config is not None:
         values = config.model_dump()
         values["architecture"] = "mhn_ranking"
         values["policy_type"] = "ranking"
         return MHNRankingPolicyNetworkConfig.model_validate(values)
-
-    hparams = dict(getattr(network, "hparams", {}) or {})
-    values = {}
-    for field in MHNRankingPolicyNetworkConfig.model_fields:
-        if field == "rule_embedder":
-            continue  # nested below from the flat network hparams
-        if field in hparams:
-            values[field] = hparams[field]
-        elif hasattr(network, field):
-            values[field] = getattr(network, field)
-    embedder_keys = {
-        "embedder_type": "rule_embedder_type",
-        "vector_dim": "rule_vector_dim",
-        "num_conv_layers": "rule_num_conv_layers",
-        "heads": "rule_heads",
-        "attn_type": "rule_attn_type",
-        "dropout": "rule_dropout",
-        "attn_dropout": "rule_attn_dropout",
-    }
-    values["rule_embedder"] = {
-        sub: hparams[flat] for sub, flat in embedder_keys.items() if flat in hparams
-    }
-    values["architecture"] = "mhn_ranking"
-    values["policy_type"] = "ranking"
-    return MHNRankingPolicyNetworkConfig.model_validate(values)
+    return MHNRankingPolicyNetworkConfig.model_validate(network.hparams["config"])
 
 
 def run_mhn_network_tuning(
@@ -438,13 +406,11 @@ def run_mhn_network_tuning(
     silent: bool = False,
 ) -> None:
     """Fine-tune an existing MHN ranking checkpoint on new ranking policy data."""
-    network = MHNRankingPolicyNetwork.load_from_checkpoint(
-        policy_network_path, map_location=torch.device("cpu")
-    )
+    network = load_policy_network_from_checkpoint(policy_network_path, batch_size=1)
     if getattr(network, "architecture", None) != "mhn_ranking":
         raise ValueError("mhn_network_tuning requires an mhn_ranking checkpoint")
 
-    config = _policy_config_from_mhn_checkpoint(network, config)
+    config = mhn_tuning_config(network, config)
     datamodule = create_policy_dataset(
         policy_data_path=new_policy_data_path,
         results_dir=results_path,
@@ -454,17 +420,15 @@ def run_mhn_network_tuning(
         cache=cache,
     )
     dataset = datamodule.train_dataset.dataset
-    network.bind_training_rules_from_policy_data(
-        new_policy_data_path, training_labels=dataset._data.y_rules
-    )
+    rebind_training_rules(network, new_policy_data_path)
+    validate_ranking_labels(dataset._data.y_rules, network.n_rules)
     network.batch_size = config.batch_size
     network.lr = config.learning_rate
-    network.hparams["batch_size"] = config.batch_size
-    network.hparams["learning_rate"] = config.learning_rate
-    network.hparams["num_epoch"] = config.num_epoch
+    network.hparams["config"]["batch_size"] = config.batch_size
+    network.hparams["config"]["learning_rate"] = config.learning_rate
 
-    _fit_policy_network(
-        network,
+    fit_policy_network(
+        LitMHNRanking(network),
         datamodule,
         config,
         results_path,

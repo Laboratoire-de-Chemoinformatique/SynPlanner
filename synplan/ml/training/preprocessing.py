@@ -86,7 +86,7 @@ class ValueNetworkDataset(InMemoryDataset, ABC):
         return data, slices
 
 
-def _convert_ranking_item(item: tuple[str, str]) -> tuple[Data, str] | None:
+def convert_ranking_item(item: tuple[str, str]) -> tuple[Data, str] | None:
     """Convert a (product_smiles, rule_id_str) pair into a labelled PyG graph.
 
     Module-level function so it can be pickled by :class:`ProcessPoolExecutor`.
@@ -145,7 +145,7 @@ def _convert_ranking_batch(
     """
     converted: list[RankingGraphPayload] = []
     for item in batch:
-        result = _convert_ranking_item(item)
+        result = convert_ranking_item(item)
         if result is not None:
             converted.append(_ranking_graph_to_payload(result[0], result[1]))
     return len(batch), converted
@@ -214,7 +214,7 @@ class RankingPolicyDataset(InMemoryDataset):
                 desc="Building policy dataset: ",
                 bar_format="{desc}{n}/{total} [{elapsed}]",
             ):
-                result = _convert_ranking_item(item)
+                result = convert_ranking_item(item)
                 if result is not None:
                     list_of_graphs.append(result[0])
                     product_keys.append(result[1])

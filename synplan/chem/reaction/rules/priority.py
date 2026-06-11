@@ -12,11 +12,29 @@ dialect chython doesn't accept".
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 from synplan.chem.reaction import CanonicalRetroReactor
 
+if TYPE_CHECKING:
+    from chython.containers import ReactionContainer
+
 POLICY_SOURCE_NAME: str = "policy"
 """Reserved ``rule_source`` label for the learned-policy bucket; cannot be reused as a priority set name."""
+
+
+def rule_query_pattern(rule) -> ReactionContainer | None:
+    """Return the first query pattern stored on a chython :class:`Reactor`.
+
+    chython's :class:`Reactor` keeps the LHS query patterns on the private
+    ``_patterns`` tuple — see ``chython/reactor/reactor.py``. We use ``[0]``
+    because the priority-rule applicability check only needs *any* substructure
+    to test ``pattern < molecule`` against the current precursor.
+    """
+    patterns = getattr(rule, "_patterns", None)
+    if patterns:
+        return patterns[0]
+    return None
 
 
 class PrioritySmartsError(ValueError):

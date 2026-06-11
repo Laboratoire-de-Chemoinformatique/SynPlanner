@@ -7,12 +7,17 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-import synplan.mcts.expansion as expansion
 from synplan.chem.reaction.rules.representation import (
     RULE_FINGERPRINT_SCHEMA_VERSION,
     RULE_GRAPH_SCHEMA_VERSION,
     RuleFingerprintConfig,
     RuleRepresentationConfig,
+)
+from synplan.mcts.policy.composite import CompositePolicy
+from synplan.mcts.policy.template_based import (
+    _MAX_RULE_ASSOCIATION_CACHE_SIZE,
+    LinearPolicy,
+    MHNReactPolicy,
 )
 
 
@@ -73,15 +78,12 @@ class _LinearPolicy(torch.nn.Module):
     n_rules = 2
 
 
-def _wrapper(monkeypatch, policy):
-    monkeypatch.setattr(
-        expansion,
-        "load_policy_net",
-        lambda *_args, **_kwargs: policy,
-    )
-    return expansion.policy_network_function_from_config(
-        SimpleNamespace(weights_path="policy.ckpt", priority_rules_fraction=0.5)
-    )
+def _mhn_wrapper(policy):
+    return MHNReactPolicy(policy, top_rules=50, priority_rules_fraction=0.5)
+
+
+def _linear_wrapper(policy):
+    return LinearPolicy(policy, top_rules=50, priority_rules_fraction=0.5)
 
 
 def test_mhn_preparation_caches_encoded_rules(monkeypatch):
@@ -91,15 +93,17 @@ def test_mhn_preparation_caches_encoded_rules(monkeypatch):
         calls.append((tuple(rule_smarts), fingerprint_config))
         return torch.zeros((len(rule_smarts), 4))
 
+    import synplan.mcts.policy.template_based as template_based
+
     monkeypatch.setattr(
-        expansion, "rule_fingerprints_from_smarts", fake_rule_fingerprints
+        template_based, "rule_fingerprints_from_smarts", fake_rule_fingerprints
     )
-    wrapper = _wrapper(monkeypatch, _MHNPolicy())
+    wrapper = _mhn_wrapper(_MHNPolicy())
     rules = [_Rule("A"), _Rule("B")]
 
-    wrapper._prepare_rule_associations(rules)
+    wrapper.prepare_rule_associations(rules)
     first = wrapper._rule_associations
-    wrapper._prepare_rule_associations(rules)
+    wrapper.prepare_rule_associations(rules)
 
     assert len(calls) == 1
     assert calls[0][0] == ("A", "B")
@@ -121,13 +125,17 @@ def test_mhn_preparation_uses_query_cgr_rule_graphs(monkeypatch):
         calls.append((tuple(rule_smarts), schema_version))
         return [SimpleNamespace(rule=text) for text in rule_smarts]
 
-    monkeypatch.setattr(expansion, "query_cgr_graphs_from_smarts", fake_rule_graphs)
-    wrapper = _wrapper(monkeypatch, _MHNGraphPolicy())
+    import synplan.mcts.policy.template_based as template_based
+
+    monkeypatch.setattr(
+        template_based, "query_cgr_graphs_from_smarts", fake_rule_graphs
+    )
+    wrapper = _mhn_wrapper(_MHNGraphPolicy())
     rules = [_Rule("A"), _Rule("B")]
 
-    wrapper._prepare_rule_associations(rules)
+    wrapper.prepare_rule_associations(rules)
     first = wrapper._rule_associations
-    wrapper._prepare_rule_associations(rules)
+    wrapper.prepare_rule_associations(rules)
 
     assert calls == [(("A", "B"), RULE_GRAPH_SCHEMA_VERSION)]
     assert tuple(first.shape) == (2, 4)
@@ -135,46 +143,44 @@ def test_mhn_preparation_uses_query_cgr_rule_graphs(monkeypatch):
 
 
 def test_mhn_association_cache_is_bounded(monkeypatch):
+    import synplan.mcts.policy.template_based as template_based
+
     monkeypatch.setattr(
-        expansion,
+        template_based,
         "rule_fingerprints_from_smarts",
         lambda rule_smarts, _config: torch.zeros((len(rule_smarts), 4)),
     )
-    wrapper = _wrapper(monkeypatch, _MHNPolicy())
+    wrapper = _mhn_wrapper(_MHNPolicy())
 
-    for index in range(expansion._MAX_RULE_ASSOCIATION_CACHE_SIZE + 2):
-        wrapper._prepare_rule_associations([_Rule(f"A{index}")])
+    for index in range(_MAX_RULE_ASSOCIATION_CACHE_SIZE + 2):
+        wrapper.prepare_rule_associations([_Rule(f"A{index}")])
 
-    assert len(wrapper._rule_association_cache) == (
-        expansion._MAX_RULE_ASSOCIATION_CACHE_SIZE
-    )
+    assert len(wrapper._rule_association_cache) == _MAX_RULE_ASSOCIATION_CACHE_SIZE
 
 
-def test_linear_wrapper_has_no_mhn_rule_preparation_state(monkeypatch):
-    wrapper = _wrapper(monkeypatch, _LinearPolicy())
+def test_linear_wrapper_has_no_mhn_rule_preparation_state():
+    wrapper = _linear_wrapper(_LinearPolicy())
 
-    assert not isinstance(wrapper, expansion.MHNPolicyNetworkFunction)
-    assert not hasattr(wrapper, "_prepare_rule_associations")
+    assert not isinstance(wrapper, MHNReactPolicy)
+    assert not hasattr(wrapper, "prepare_rule_associations")
     assert not hasattr(wrapper, "_rule_associations")
 
 
-def test_direct_policy_wrapper_rejects_mhn_checkpoint():
-    with pytest.raises(ValueError, match="policy_network_function_from_config"):
-        expansion.PolicyNetworkFunction(
-            SimpleNamespace(weights_path="policy.ckpt"), policy_net=_MHNPolicy()
-        )
+def test_mhn_wrapper_rejects_non_mhn_network():
+    with pytest.raises(ValueError, match="mhn_ranking"):
+        _mhn_wrapper(_LinearPolicy())
 
 
-def test_mhn_light_prediction_requires_prepared_rule_associations(monkeypatch):
-    wrapper = _wrapper(monkeypatch, _MHNPolicy())
+def test_mhn_light_prediction_requires_prepared_rule_associations():
+    wrapper = _mhn_wrapper(_MHNPolicy())
     wrapper._get_graph = lambda _precursor: SimpleNamespace()
 
     with pytest.raises(ValueError, match="prepared by predict_reaction_rules"):
         list(wrapper.predict_reaction_rules_light(SimpleNamespace(), 2))
 
 
-def test_light_prediction_uses_integer_count_without_preparing_rules(monkeypatch):
-    wrapper = _wrapper(monkeypatch, _MHNPolicy())
+def test_light_prediction_uses_integer_count_without_preparing_rules():
+    wrapper = _mhn_wrapper(_MHNPolicy())
     observed = []
     wrapper._predict_rules_common = lambda _precursor, n_rules: observed.append(n_rules)
 
@@ -185,14 +191,10 @@ def test_light_prediction_uses_integer_count_without_preparing_rules(monkeypatch
 
 def test_combined_prediction_prepares_mhn_rules():
     prepared = []
-    ranking = expansion.MHNPolicyNetworkFunction.__new__(
-        expansion.MHNPolicyNetworkFunction
-    )
-    ranking._prepare_rule_associations = lambda rules: prepared.append(rules)
-    combined = expansion.CombinedPolicyNetworkFunction.__new__(
-        expansion.CombinedPolicyNetworkFunction
-    )
-    combined.ranking_net = ranking
+    ranking = MHNReactPolicy.__new__(MHNReactPolicy)
+    ranking.prepare_rule_associations = lambda rules: prepared.append(rules)
+    combined = CompositePolicy.__new__(CompositePolicy)
+    combined.ranking_policy = ranking
     combined._predict_rules_common = lambda _precursor, _n_rules: None
     rules = [_Rule("A"), _Rule("B")]
 
@@ -203,14 +205,10 @@ def test_combined_prediction_prepares_mhn_rules():
 def test_combined_light_prediction_uses_integer_count_without_preparing_rules():
     prepared = []
     observed = []
-    ranking = expansion.MHNPolicyNetworkFunction.__new__(
-        expansion.MHNPolicyNetworkFunction
-    )
-    ranking._prepare_rule_associations = lambda rules: prepared.append(rules)
-    combined = expansion.CombinedPolicyNetworkFunction.__new__(
-        expansion.CombinedPolicyNetworkFunction
-    )
-    combined.ranking_net = ranking
+    ranking = MHNReactPolicy.__new__(MHNReactPolicy)
+    ranking.prepare_rule_associations = lambda rules: prepared.append(rules)
+    combined = CompositePolicy.__new__(CompositePolicy)
+    combined.ranking_policy = ranking
     combined._predict_rules_common = lambda _precursor, n_rules: observed.append(
         n_rules
     )

@@ -14,7 +14,7 @@ def test_run_policy_training_creates_nested_results_dir(monkeypatch, tmp_path):
     class StopBeforeTraining(RuntimeError):
         pass
 
-    def fake_policy_network(**_kwargs):
+    def fake_build_policy_trainer(config, dataset):
         raise StopBeforeTraining
 
     datamodule = SimpleNamespace(
@@ -22,7 +22,7 @@ def test_run_policy_training_creates_nested_results_dir(monkeypatch, tmp_path):
     )
     results_path = tmp_path / "results" / "run-1"
 
-    monkeypatch.setattr(supervised, "PolicyNetwork", fake_policy_network)
+    monkeypatch.setattr(supervised, "build_policy_trainer", fake_build_policy_trainer)
 
     with pytest.raises(StopBeforeTraining):
         supervised.run_policy_training(
@@ -48,7 +48,7 @@ def test_create_logger_supports_litlogger(monkeypatch, tmp_path):
 
     config = PolicyNetworkConfig(logger={"type": "LitLogger", "name": "ranking-policy"})
 
-    logger = supervised._create_logger(
+    logger = supervised.create_training_logger(
         {**config.logger, "save_logs": False},
         tmp_path,
     )
@@ -62,37 +62,41 @@ def test_run_mhn_network_tuning_rebinds_new_policy_data(monkeypatch, tmp_path):
 
     class FakeNetwork:
         architecture = "mhn_ranking"
+        n_rules = 5
+        batch_size = 2
+        lr = 0.001
 
         def __init__(self):
             self.hparams = {
-                "architecture": "mhn_ranking",
-                "policy_type": "ranking",
-                "vector_dim": 16,
-                "batch_size": 2,
-                "dropout": 0.1,
-                "num_conv_layers": 1,
-                "learning_rate": 0.001,
-                "num_epoch": 1,
+                "config": {
+                    "architecture": "mhn_ranking",
+                    "policy_type": "ranking",
+                    "vector_dim": 16,
+                    "batch_size": 2,
+                    "dropout": 0.1,
+                    "num_conv_layers": 1,
+                    "learning_rate": 0.001,
+                    "num_epoch": 1,
+                },
+                "n_rules": 5,
             }
 
-        def bind_training_rules_from_policy_data(
-            self, policy_data_path, *, training_labels
-        ):
-            observed["bound_policy_data_path"] = policy_data_path
-            observed["bound_training_labels"] = training_labels
+    class FakeLitMHNRanking:
+        def __init__(self, network):
+            self.network = network
 
     fake_network = FakeNetwork()
 
     monkeypatch.setattr(
-        supervised.MHNRankingPolicyNetwork,
-        "load_from_checkpoint",
+        supervised,
+        "load_policy_network_from_checkpoint",
         lambda *args, **kwargs: fake_network,
     )
+    monkeypatch.setattr(supervised, "LitMHNRanking", FakeLitMHNRanking)
 
-    labels = object()
     datamodule = SimpleNamespace(
         train_dataset=SimpleNamespace(
-            dataset=SimpleNamespace(_data=SimpleNamespace(y_rules=labels))
+            dataset=SimpleNamespace(_data=SimpleNamespace(y_rules=None))
         )
     )
 
@@ -100,17 +104,22 @@ def test_run_mhn_network_tuning_rebinds_new_policy_data(monkeypatch, tmp_path):
         observed["dataset_kwargs"] = kwargs
         return datamodule
 
+    def fake_rebind_training_rules(network, policy_data_path):
+        observed["rebind_network"] = network
+        observed["rebind_policy_data_path"] = policy_data_path
+
     def fake_fit_policy_network(
-        network, datamodule_arg, config, results_path, **kwargs
+        lit_module, datamodule_arg, config, results_path, **kwargs
     ):
-        observed["fit_network"] = network
+        observed["fit_lit_module"] = lit_module
         observed["fit_datamodule"] = datamodule_arg
         observed["fit_config"] = config
         observed["fit_results_path"] = results_path
         observed["fit_kwargs"] = kwargs
 
     monkeypatch.setattr(supervised, "create_policy_dataset", fake_create_policy_dataset)
-    monkeypatch.setattr(supervised, "_fit_policy_network", fake_fit_policy_network)
+    monkeypatch.setattr(supervised, "rebind_training_rules", fake_rebind_training_rules)
+    monkeypatch.setattr(supervised, "fit_policy_network", fake_fit_policy_network)
 
     supervised.run_mhn_network_tuning(
         policy_network_path="policy_network.ckpt",
@@ -135,9 +144,9 @@ def test_run_mhn_network_tuning_rebinds_new_policy_data(monkeypatch, tmp_path):
         "num_workers": 2,
         "cache": False,
     }
-    assert observed["bound_policy_data_path"] == "new_reaction_rules_policy_data.tsv"
-    assert observed["bound_training_labels"] is labels
-    assert observed["fit_network"] is fake_network
+    assert observed["rebind_network"] is fake_network
+    assert observed["rebind_policy_data_path"] == "new_reaction_rules_policy_data.tsv"
+    assert observed["fit_lit_module"].network is fake_network
     assert observed["fit_datamodule"] is datamodule
     assert observed["fit_config"].architecture == "mhn_ranking"
     assert observed["fit_config"].num_epoch == 3

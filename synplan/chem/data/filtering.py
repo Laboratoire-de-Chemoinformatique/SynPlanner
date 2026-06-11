@@ -21,6 +21,8 @@ from synplan.chem.data.reaction_result import (
     PipelineSummary,
 )
 from synplan.chem.data.standardizing import (
+    DATA_ERROR_STAGES,
+    DATA_ERROR_TYPES,
     AromaticFormStandardizer,
     KekuleFormStandardizer,
     StandardizationError,
@@ -833,8 +835,6 @@ def _print_filtering_summary(
     error_file_path: Path | None,
 ) -> None:
     """Print a categorized summary of filtering results."""
-    from synplan.chem.data.standardizing import _DATA_ERROR_STAGES, _DATA_ERROR_TYPES
-
     n_rejected = lines_counter - n_filtered
     summary_lines = [
         f"Finished: processed {lines_counter}, kept {n_filtered}, rejected {n_rejected}"
@@ -852,7 +852,7 @@ def _print_filtering_summary(
                 stage, etype = (
                     stage_type.split("/", 1) if "/" in stage_type else (stage_type, "")
                 )
-                if stage in _DATA_ERROR_STAGES or etype in _DATA_ERROR_TYPES:
+                if stage in DATA_ERROR_STAGES or etype in DATA_ERROR_TYPES:
                     data_reasons.append(label)
                 else:
                     pipeline_reasons.append(label)

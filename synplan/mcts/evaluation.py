@@ -10,47 +10,13 @@ import torch
 
 from synplan.chem.precursor import Precursor, compose_precursors
 from synplan.chem.rdkit_utils import RDKitScore
-from synplan.mcts.expansion import PolicyNetworkFunction
+from synplan.ml.networks.checkpoint import load_network_from_checkpoint
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training import mol_to_pyg
 
 if TYPE_CHECKING:
     from synplan.mcts.node import Node
-
-
-class ValueNetworkFunction:
-    """Value function implemented as a value neural network for node evaluation
-    (synthesisability prediction) in tree search."""
-
-    def __init__(self, weights_path: str) -> None:
-        """The value function predicts the probability to synthesize the target molecule
-        with available building blocks starting from a given precursor.
-
-        :param weights_path: The value network weights file path.
-        """
-
-        value_net = ValueNetwork.load_from_checkpoint(
-            weights_path, map_location=torch.device("cpu")
-        )
-        self.value_network = value_net.eval()
-
-    def predict_value(self, precursors: list[Precursor,]) -> float:
-        """Predicts a value based on the given precursors from the node. For prediction,
-        precursors must be composed into a single molecule (product).
-
-        :param precursors: The list of precursors.
-        :return: The predicted float value ("synthesisability") of the node.
-        """
-
-        molecule = compose_precursors(precursors=precursors, exclude_small=True)
-        pyg_graph = mol_to_pyg(molecule)
-        if pyg_graph:
-            with torch.no_grad():
-                value_pred = self.value_network.forward(pyg_graph)[0].item()
-        else:
-            value_pred = -1e6
-
-        return value_pred
+    from synplan.mcts.policy import Policy
 
 
 class RolloutSimulator:
@@ -66,7 +32,7 @@ class RolloutSimulator:
 
     def __init__(
         self,
-        policy_network: PolicyNetworkFunction,
+        policy_network: "Policy",
         reaction_rules,
         building_blocks: set[str],
         min_mol_size: int,
@@ -284,7 +250,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
 
     def __init__(
         self,
-        policy_network: PolicyNetworkFunction,
+        policy_network: "Policy",
         reaction_rules,
         building_blocks: set[str],
         min_mol_size: int,
@@ -338,21 +304,36 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
 class ValueNetworkEvaluationStrategy(EvaluationStrategy):
     """Evaluation strategy using a trained value neural network (GCN).
 
-    Predicts synthesizability using a graph convolutional network.
+    Loads and holds the value network, predicting synthesizability directly.
     """
 
     def __init__(
         self,
-        value_network: ValueNetworkFunction,
+        weights_path: str,
         normalize: bool = False,
     ) -> None:
         """Initialize value network evaluation strategy.
 
-        :param value_network: Trained value network function.
+        :param weights_path: The value network weights file path.
         :param normalize: Whether to normalize scores to [0, 1].
         """
-        self.value_network = value_network
+        self.value_network = load_network_from_checkpoint(
+            ValueNetwork, weights_path, map_location="cpu"
+        )
         self.normalize = normalize
+
+    def predict_value(self, precursors: list[Precursor]) -> float:
+        """Predicts synthesisability for the precursors composed into one molecule.
+
+        :param precursors: The list of precursors.
+        :return: The predicted float value ("synthesisability") of the node.
+        """
+        molecule = compose_precursors(precursors=precursors, exclude_small=True)
+        pyg_graph = mol_to_pyg(molecule)
+        if pyg_graph:
+            with torch.no_grad():
+                return self.value_network.forward(pyg_graph)[0].item()
+        return -1e6
 
     def evaluate_node(
         self,
@@ -361,7 +342,7 @@ class ValueNetworkEvaluationStrategy(EvaluationStrategy):
         nodes: "dict[int, Node]",
     ) -> float:
         """Evaluate node using value network."""
-        score = float(self.value_network.predict_value(node.new_precursors))
+        score = float(self.predict_value(node.new_precursors))
         return self._to_01(score) if self.normalize else score
 
 

@@ -365,7 +365,7 @@ def _standardize_sdf_range(filename: str, start: int, end: int) -> list[str]:
     return out
 
 
-def _standardize_sdf_text(block: str) -> list[str]:
+def standardize_sdf_text(block: str) -> list[str]:
     """Standardize molecules from an SDF text block.
 
     The block may contain one or multiple SDF records, separated by $$$$ lines.
@@ -382,7 +382,7 @@ def _standardize_sdf_text(block: str) -> list[str]:
     return out
 
 
-def _standardize_smiles_batch(batch: list[str]) -> list[str]:
+def standardize_smiles_batch(batch: list[str]) -> list[str]:
     """Standardize a batch of SMILES strings and return valid results."""
     out: list[str] = []
     for smiles_str in batch:

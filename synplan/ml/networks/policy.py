@@ -1,152 +1,72 @@
-"""Module containing main class for policy network."""
+"""Pure linear policy networks: ranking (softmax head) and filtering (sigmoid heads)."""
 
-from abc import ABC
+from typing import Any
 
 import torch
-from pytorch_lightning import LightningModule
 from torch import Tensor
 from torch.nn import Dropout, Linear
-from torch.nn.functional import binary_cross_entropy_with_logits, cross_entropy, one_hot
 from torch_geometric.data.batch import Batch
-from torchmetrics.functional.classification import (
-    f1_score,
-    multiclass_accuracy,
-    recall,
-    specificity,
-)
 
-from synplan.ml.networks.base import MCTSNetwork
+from synplan.ml.networks.base import GraphMCTSNetwork
+from synplan.utils.config import LinearPolicyNetworkConfig
 
 
-class PolicyNetwork(MCTSNetwork, LightningModule, ABC):
-    """Policy network."""
+class LinearPolicyNetwork(GraphMCTSNetwork):
+    """Shared embedder + rule head plumbing for linear policy networks."""
 
-    def __init__(
-        self,
-        *args,
-        n_rules: int,
-        vector_dim: int,
-        policy_type: str = "ranking",
-        architecture: str = "linear",
-        **kwargs,
-    ):
-        """Initializes a policy network with the given number of reaction rules (output
-        dimension) and vector graph embedding dimension, and creates linear layers for
-        predicting the regular and priority reaction rules.
+    architecture = "linear"
+    policy_type: str
+    CONFIG_CLASS = LinearPolicyNetworkConfig
 
-        :param n_rules: The number of reaction rules in the policy network.
-        :param vector_dim: The dimensionality of the input vectors.
+    def __init__(self, config: LinearPolicyNetworkConfig, n_rules: int) -> None:
+        """Build the molecule embedder and the rule-scoring head.
+
+        :param config: Policy network architecture and training config.
+        :param n_rules: The number of reaction rules (output dimension).
         """
-        super().__init__(vector_dim, *args, **kwargs)
-        self.save_hyperparameters()
-        self.policy_type = policy_type
-        self.architecture = architecture
+        super().__init__(
+            config.vector_dim,
+            config.batch_size,
+            dropout=config.dropout,
+            num_conv_layers=config.num_conv_layers,
+            learning_rate=config.learning_rate,
+            embedder_type=config.embedder_type,
+            heads=config.heads,
+            attn_type=config.attn_type,
+            attn_dropout=config.attn_dropout,
+        )
         self.n_rules = n_rules
-        self.head_dropout = Dropout(kwargs.get("dropout", 0.4))
-        self.y_predictor = Linear(vector_dim, n_rules)
+        self.head_dropout = Dropout(config.dropout)
+        self.y_predictor = Linear(config.vector_dim, n_rules)
+        self.hparams: dict[str, Any] = {
+            "config": config.model_dump(),
+            "n_rules": n_rules,
+        }
 
-        if self.policy_type == "filtering":
-            self.priority_predictor = Linear(vector_dim, n_rules)
+
+class RankingPolicyNetwork(LinearPolicyNetwork):
+    """Linear ranking policy: embedder + softmax rule head."""
+
+    policy_type = "ranking"
 
     def forward(self, batch: Batch) -> Tensor:
-        """Takes a molecular graph, applies a graph convolution and sigmoid layers to
-        predict regular and priority reaction rules.
+        """Return softmax rule probabilities for a batch of molecular graphs."""
+        x = self.head_dropout(self.embedder(batch))
+        return torch.softmax(self.y_predictor(x), dim=-1)
 
-        :param batch: The input batch of molecular graphs.
-        :return: Returns the vector of probabilities (given by sigmoid) of successful
-            application of regular and priority reaction rules.
-        """
-        x = self.embedder(batch)
-        x = self.head_dropout(x)
-        y = self.y_predictor(x)
 
-        if self.policy_type == "ranking":
-            y = torch.softmax(y, dim=-1)
-            return y
+class FilteringPolicyNetwork(LinearPolicyNetwork):
+    """Linear filtering policy: embedder + sigmoid rule head + sigmoid priority head."""
 
-        if self.policy_type == "filtering":
-            y = torch.sigmoid(y)
-            priority = torch.sigmoid(self.priority_predictor(x))
-            return y, priority
+    policy_type = "filtering"
 
-    def _get_loss(self, batch: Batch) -> dict[str, Tensor]:
-        """Calculates the loss and various classification metrics for a given batch for
-        reaction rules prediction.
+    def __init__(self, config: LinearPolicyNetworkConfig, n_rules: int) -> None:
+        super().__init__(config, n_rules)
+        self.priority_predictor = Linear(config.vector_dim, n_rules)
 
-        :param batch: The batch of molecular graphs.
-        :return: A dictionary with loss value and balanced accuracy of reaction rules
-            prediction.
-        """
-        true_y = batch.y_rules.long()
-        x = self.embedder(batch)
-        x = self.head_dropout(x)
-        pred_y = self.y_predictor(x)
-
-        if self.policy_type == "ranking":
-            true_one_hot = one_hot(true_y, num_classes=self.n_rules)
-            loss = cross_entropy(pred_y, true_one_hot.float())
-            ba_y = (
-                recall(pred_y, true_y, task="multiclass", num_classes=self.n_rules)
-                + specificity(
-                    pred_y, true_y, task="multiclass", num_classes=self.n_rules
-                )
-            ) / 2
-            f1_y = f1_score(pred_y, true_y, task="multiclass", num_classes=self.n_rules)
-
-            metrics = {"loss": loss, "balanced_accuracy_y": ba_y, "f1_score_y": f1_y}
-
-            for k in (5, 10):
-                if self.n_rules > k:
-                    metrics[f"top{k}_accuracy_y"] = multiclass_accuracy(
-                        pred_y, true_y, num_classes=self.n_rules, top_k=k
-                    )
-
-        elif self.policy_type == "filtering":
-            loss_y = binary_cross_entropy_with_logits(pred_y, true_y.float())
-
-            ba_y = (
-                recall(pred_y, true_y, task="multilabel", num_labels=self.n_rules)
-                + specificity(
-                    pred_y, true_y, task="multilabel", num_labels=self.n_rules
-                )
-            ) / 2
-
-            f1_y = f1_score(pred_y, true_y, task="multilabel", num_labels=self.n_rules)
-
-            true_priority = batch.y_priority.float()
-            pred_priority = self.priority_predictor(x)
-            loss_priority = binary_cross_entropy_with_logits(
-                pred_priority, true_priority
-            )
-
-            loss = loss_y + loss_priority
-
-            true_priority = true_priority.long()
-            ba_priority = (
-                recall(
-                    pred_priority,
-                    true_priority,
-                    task="multilabel",
-                    num_labels=self.n_rules,
-                )
-                + specificity(
-                    pred_priority,
-                    true_priority,
-                    task="multilabel",
-                    num_labels=self.n_rules,
-                )
-            ) / 2
-
-            f1_priority = f1_score(
-                pred_priority, true_priority, task="multilabel", num_labels=self.n_rules
-            )
-
-            metrics = {
-                "loss": loss,
-                "balanced_accuracy_y": ba_y,
-                "f1_score_y": f1_y,
-                "balanced_accuracy_priority": ba_priority,
-                "f1_score_priority": f1_priority,
-            }
-
-        return metrics
+    def forward(self, batch: Batch) -> tuple[Tensor, Tensor]:
+        """Return ``(rule_sigmoid, priority_sigmoid)`` for a batch of graphs."""
+        x = self.head_dropout(self.embedder(batch))
+        y = torch.sigmoid(self.y_predictor(x))
+        priority = torch.sigmoid(self.priority_predictor(x))
+        return y, priority

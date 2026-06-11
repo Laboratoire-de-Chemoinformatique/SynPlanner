@@ -486,44 +486,40 @@ class MHNRankingPolicyNetworkConfig(PolicyNetworkConfig):
         self.rule_representation_config()
         return self
 
+    def network_kwargs(self) -> dict[str, Any]:
+        """Return the MHN association + rule-encoder kwargs for the network.
+
+        The nested ``rule_embedder`` is expanded to the ``rule_*`` embedder kwargs
+        the network expects (``None`` keeps the molecule-side fallback).
+        """
+        emb = self.rule_embedder
+        return {
+            "association_dim": self.association_dim,
+            "beta": self.beta,
+            "normalize_associations": self.normalize_associations,
+            "rule_encoder_type": self.rule_encoder_type,
+            "rule_fp_size": self.rule_fp_size,
+            "rule_fp_min_radius": self.rule_fp_min_radius,
+            "rule_fp_max_radius": self.rule_fp_max_radius,
+            "rule_fp_active_bits": self.rule_fp_active_bits,
+            "rule_fp_type": self.rule_fp_type,
+            "rule_fp_schema_version": self.rule_fp_schema_version,
+            "rule_graph_batch_size": self.rule_graph_batch_size,
+            "rule_graph_schema_version": self.rule_graph_schema_version,
+            "rule_embedder_type": emb.embedder_type,
+            "rule_vector_dim": emb.vector_dim,
+            "rule_num_conv_layers": emb.num_conv_layers,
+            "rule_heads": emb.heads,
+            "rule_attn_type": emb.attn_type,
+            "rule_dropout": emb.dropout,
+            "rule_attn_dropout": emb.attn_dropout,
+        }
+
 
 _POLICY_CONFIG_BY_ARCHITECTURE: dict[str, type[PolicyNetworkConfig]] = {
     "linear": LinearPolicyNetworkConfig,
     "mhn_ranking": MHNRankingPolicyNetworkConfig,
 }
-
-
-def mhn_network_kwargs_from_policy(
-    config: "MHNRankingPolicyNetworkConfig",
-) -> dict[str, Any]:
-    """Flatten an MHN policy config into ``MHNRankingPolicyNetwork`` kwargs.
-
-    The nested ``rule_embedder`` is expanded to the flat ``rule_*`` embedder
-    kwargs the network expects (``None`` keeps the molecule-side fallback).
-    """
-    emb = config.rule_embedder
-    return {
-        "architecture": config.architecture,
-        "association_dim": config.association_dim,
-        "beta": config.beta,
-        "normalize_associations": config.normalize_associations,
-        "rule_encoder_type": config.rule_encoder_type,
-        "rule_fp_size": config.rule_fp_size,
-        "rule_fp_min_radius": config.rule_fp_min_radius,
-        "rule_fp_max_radius": config.rule_fp_max_radius,
-        "rule_fp_active_bits": config.rule_fp_active_bits,
-        "rule_fp_type": config.rule_fp_type,
-        "rule_fp_schema_version": config.rule_fp_schema_version,
-        "rule_graph_batch_size": config.rule_graph_batch_size,
-        "rule_graph_schema_version": config.rule_graph_schema_version,
-        "rule_embedder_type": emb.embedder_type,
-        "rule_vector_dim": emb.vector_dim,
-        "rule_num_conv_layers": emb.num_conv_layers,
-        "rule_heads": emb.heads,
-        "rule_attn_type": emb.attn_type,
-        "rule_dropout": emb.dropout,
-        "rule_attn_dropout": emb.attn_dropout,
-    }
 
 
 class ValueNetworkConfig(BaseConfigModel):
@@ -666,7 +662,7 @@ class RolloutEvaluationConfig(BaseConfigModel):
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    policy_network: Any  # PolicyNetworkFunction - using Any to avoid circular import
+    policy_network: Any  # Policy - using Any to avoid circular import
     reaction_rules: Any  # List[Reactor]
     building_blocks: Any  # Set[str]
     min_mol_size: int = Field(default=0, ge=0)
