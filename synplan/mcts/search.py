@@ -5,6 +5,7 @@ import csv
 import json
 import logging
 import os.path
+from collections.abc import Iterator
 from pathlib import Path
 
 from chython.containers import MoleculeContainer
@@ -17,6 +18,7 @@ from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.tree import Tree, TreeConfig
 from synplan.route_quality.scorer import RouteScorer
 from synplan.utils.config import PolicyNetworkConfig
+from synplan.utils.files import iter_csv_smiles
 from synplan.utils.loading import (
     load_building_blocks,
     load_evaluation_function,
@@ -24,6 +26,24 @@ from synplan.utils.loading import (
     load_reaction_rules,
 )
 from synplan.utils.visualisation import extract_routes, generate_results_html
+
+
+def _iter_target_smiles(targets_path: str) -> Iterator[str]:
+    """Yield target SMILES from a targets file.
+
+    Supports plain SMILES-per-line files and tabular ``.tsv``/``.csv`` files
+    with a SMILES column (read via :func:`iter_csv_smiles`).
+    """
+    suffix = Path(targets_path).suffix.lower()
+    if suffix in (".tsv", ".csv"):
+        delimiter = "\t" if suffix == ".tsv" else ","
+        yield from iter_csv_smiles(targets_path, delimiter=delimiter)
+        return
+    with open(targets_path, encoding="utf-8") as fh:
+        for line in fh:
+            smi = line.strip()
+            if smi:
+                yield smi
 
 
 def extract_tree_stats(
@@ -148,15 +168,12 @@ def run_search(
 
     tree_config = TreeConfig.from_dict(search_config)
     tree_config.silent = True
-    with (
-        open(targets_path, encoding="utf-8") as targets,
-        open(stats_file, "w", encoding="utf-8", newline="\n") as csvfile,
-    ):
+    with open(stats_file, "w", encoding="utf-8", newline="\n") as csvfile:
         statswriter = csv.DictWriter(csvfile, delimiter=",", fieldnames=stats_header)
         statswriter.writeheader()
 
         for ti, target_smi in tqdm(
-            enumerate(targets),
+            enumerate(_iter_target_smiles(targets_path)),
             leave=True,
             desc="Number of target molecules processed: ",
             bar_format="{desc}{n} [{elapsed}]",

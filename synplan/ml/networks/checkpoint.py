@@ -20,6 +20,30 @@ T = TypeVar("T", bound=Module)
 # hparams keys that are not constructor arguments (legacy flat-hparam shape).
 DISCRIMINATOR_KEYS = ("architecture", "policy_type")
 
+# Config fields renamed in the config redesign; lets pre-redesign flat-hparam
+# checkpoints still map onto the current config models.
+LEGACY_FIELD_ALIASES = {
+    "rule_encoder_type": "rule_embedding_type",
+    "encoder_type": "embedding_type",
+}
+
+
+def _config_from_flat_hparams(config_cls, hparams, overrides):
+    """Adapt a pre-redesign flat-hparam dict into a config object.
+
+    Old checkpoints stored constructor args (``vector_dim``, ``dropout``, …)
+    directly in ``hyper_parameters`` instead of under a ``config`` key. Their
+    field names map onto the config model, so we keep the ones it recognises
+    (migrating any renamed fields) and let pydantic fill the rest with defaults.
+    """
+    valid = set(config_cls.model_fields)
+    config_dict = {}
+    for key, val in {**hparams, **overrides}.items():
+        name = LEGACY_FIELD_ALIASES.get(key, key)
+        if name in valid:
+            config_dict[name] = val
+    return config_cls.model_validate(config_dict)
+
 
 def load_network_from_checkpoint(
     model_class: type[T],
@@ -29,41 +53,46 @@ def load_network_from_checkpoint(
 ) -> T:
     """Rebuild a pure network from a Lightning-format checkpoint.
 
-    Supports both the new config-based hparam shape
-    ``{"config": {...}, "n_rules": N}`` and the old flat shape (ValueNetwork).
-    Reads ``hyper_parameters`` to construct ``model_class`` and loads its
-    ``state_dict``.
+    Handles three hparam shapes transparently:
+
+    * new config-based ``{"config": {...}, "n_rules": N}``;
+    * pre-redesign flat policy hparams (``vector_dim``, ``dropout``, …), which
+      are adapted into the network's ``CONFIG_CLASS``;
+    * genuinely flat networks with no config (``ValueNetwork``).
 
     :param model_class: The pure ``nn.Module`` subclass to instantiate.
     :param path: Path to the checkpoint file.
     :param map_location: Device for ``torch.load``.
-    :param overrides: For flat-hparam networks: constructor overrides applied on
-        top of the saved hparams. For config-based networks: scalar fields present
-        in the config dict are updated before construction (e.g. ``batch_size=1``).
+    :param overrides: Scalar overrides applied before construction (e.g.
+        ``batch_size=1``); for config-based networks they update matching config
+        fields, for flat networks they update constructor kwargs.
     :return: The constructed model with weights loaded, in eval mode.
     """
     checkpoint = torch.load(path, map_location=map_location, weights_only=False)
     hparams = dict(checkpoint.get("hyper_parameters", {}))
+    config_cls = getattr(model_class, "CONFIG_CLASS", None)
 
-    if "config" in hparams:
-        # New-style: reconstruct config, apply overrides into config dict.
-        config_cls = getattr(model_class, "CONFIG_CLASS", None)
-        if config_cls is None:
-            raise ValueError(
-                f"{model_class.__name__} has 'config' in hparams but no CONFIG_CLASS"
-            )
-        config_dict = dict(hparams["config"])
-        for key, val in overrides.items():
-            if key in config_dict:
-                config_dict[key] = val
-        config = config_cls.model_validate(config_dict)
-        n_rules = hparams.get("n_rules", 0)
-        model = model_class(config=config, n_rules=n_rules)
+    if "config" in hparams and config_cls is None:
+        raise ValueError(
+            f"{model_class.__name__} has 'config' in hparams but no CONFIG_CLASS"
+        )
+
+    if config_cls is not None:
+        if "config" in hparams:
+            config_dict = dict(hparams["config"])
+            for key, val in overrides.items():
+                if key in config_dict:
+                    config_dict[key] = val
+            config = config_cls.model_validate(config_dict)
+        else:
+            # Pre-redesign flat policy checkpoint: adapt hparams into a config.
+            config = _config_from_flat_hparams(config_cls, hparams, overrides)
+        model = model_class(config=config, n_rules=hparams.get("n_rules", 0))
         digest = hparams.get("rule_representation_digest")
         if digest is not None and hasattr(model, "rule_representation_digest"):
             model.rule_representation_digest = digest
     else:
-        # Legacy flat-hparam shape (ValueNetwork and pre-refactor checkpoints).
+        # Genuinely flat network with no config (e.g. ValueNetwork).
         for key in DISCRIMINATOR_KEYS:
             hparams.pop(key, None)
         hparams.update(overrides)
