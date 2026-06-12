@@ -18,6 +18,7 @@ import torch
 
 from synplan.chem.precursor import Precursor, compose_precursors
 from synplan.chem.rdkit_utils import RDKitScore
+from synplan.chem.reaction_rules.priority import POLICY_SOURCE_NAME
 from synplan.mcts.expansion import PolicyNetworkFunction
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training import mol_to_pyg
@@ -246,7 +247,6 @@ class EvaluationStrategy(ABC):
     Each concrete strategy implements a different evaluation method.
     """
 
-    @abstractmethod
     def evaluate_node(
         self,
         node,
@@ -254,6 +254,9 @@ class EvaluationStrategy(ABC):
         nodes: "dict[int, Node]",
     ) -> float:
         """Evaluate a node and return its score.
+
+        Priority-rule-derived nodes receive the highest score before the
+        configured evaluation method is applied.
 
         :param node: The node to evaluate.
         :param node_id: ID of the node.
@@ -263,6 +266,18 @@ class EvaluationStrategy(ABC):
             ``nodes_depth`` and ``nodes_prob`` parallel-dict parameters.)
         :return: Evaluation score for the node.
         """
+        if node.rule_source is not None and node.rule_source != POLICY_SOURCE_NAME:
+            return 1.0
+        return self._evaluate_node(node=node, node_id=node_id, nodes=nodes)
+
+    @abstractmethod
+    def _evaluate_node(
+        self,
+        node,
+        node_id: int,
+        nodes: "dict[int, Node]",
+    ) -> float:
+        """Evaluate a policy-derived node or the root node."""
         pass
 
     @staticmethod
@@ -322,7 +337,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         )
         self.normalize = normalize
 
-    def evaluate_node(
+    def _evaluate_node(
         self,
         node,
         node_id: int,
@@ -363,7 +378,7 @@ class ValueNetworkEvaluationStrategy(EvaluationStrategy):
         self.value_network = value_network
         self.normalize = normalize
 
-    def evaluate_node(
+    def _evaluate_node(
         self,
         node,
         node_id: int,
@@ -393,7 +408,7 @@ class RDKitEvaluationStrategy(EvaluationStrategy):
         self.scorer = RDKitScore(score_function=score_function)
         self.normalize = normalize
 
-    def evaluate_node(
+    def _evaluate_node(
         self,
         node,
         node_id: int,
@@ -417,7 +432,7 @@ class PolicyEvaluationStrategy(EvaluationStrategy):
         """
         self.normalize = normalize
 
-    def evaluate_node(
+    def _evaluate_node(
         self,
         node,
         node_id: int,
@@ -442,7 +457,7 @@ class RandomEvaluationStrategy(EvaluationStrategy):
         """
         self.normalize = normalize
 
-    def evaluate_node(
+    def _evaluate_node(
         self,
         node,
         node_id: int,
