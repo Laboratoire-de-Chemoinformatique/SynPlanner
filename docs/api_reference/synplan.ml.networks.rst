@@ -4,10 +4,18 @@ synplan.ml.networks package
 Submodules
 ----------
 
-synplan.ml.networks.modules module
-----------------------------------
+synplan.ml.networks.base module
+-------------------------------
 
-.. automodule:: synplan.ml.networks.modules
+.. automodule:: synplan.ml.networks.base
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+synplan.ml.networks.embedders module
+-------------------------------------
+
+.. automodule:: synplan.ml.networks.embedders
    :members:
    :undoc-members:
    :show-inheritance:

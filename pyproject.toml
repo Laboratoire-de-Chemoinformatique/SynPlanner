@@ -1,6 +1,6 @@
 [project]
 name = "SynPlanner"
-version = "1.5.0"
+version = "1.5.1"
 description = "Toolbox for chemical synthesis planning"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
@@ -75,6 +75,7 @@ docs = [
 
 [project.scripts]
 synplan = "synplan.interfaces.cli:synplan"
+release = "scripts.release:main"
 sascore-benchmark = "scripts.sascore_bench.run_benchmark:main"
 sascore-plot = "scripts.sascore_bench.plot_results:main"
 
@@ -139,31 +140,11 @@ name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
-# -- optional bump-my-version compatibility ----------------------------------
-[tool.bumpversion]
-current_version = "1.5.0"
-commit = false
-tag = false
-
-[[tool.bumpversion.files]]
-filename = "pyproject.toml"
-search = 'version = "{current_version}"'
-replace = 'version = "{new_version}"'
-
-# NOTE: docs/_static/switcher.json, docs/get_started/docker_images.rst, and
-# CHANGELOG.md need manual updates for release notes and published image tags.
-
 [tool.ruff]
 line-length = 88
 target-version = "py310"
 extend-exclude = [
-    "synplan/chem/reaction_routes",
-    "synplan/routes/analysis.py",
-    "synplan/routes/route_cgr",
-    "synplan/routes/clustering",
-    "synplan/routes/depiction.py",
-    "synplan/routes/io.py",
-    "synplan/routes/notebook_plots.py",
+    "synplan/chem/reaction_routes",  # back-compat shims (deprecated path)
 ]
 
 [tool.ruff.lint]
@@ -195,6 +176,11 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
+# Back-compat shim modules emit a DeprecationWarning at the top (before the
+# re-exports) via ``deprecated_module(...)``; that call sits ahead of the
+# module-level re-export imports by design, so E402 does not apply here.
+"synplan/chem/reaction_rules/*.py" = ["E402"]
+"synplan/chem/reaction/routes/route_cgr.py" = ["E402"]
 
 # -- ty type checker ---------------------------------------------------------
 # Most chython types are dynamic unions (MoleculeContainer | QueryContainer | ...)

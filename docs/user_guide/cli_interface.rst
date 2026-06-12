@@ -154,6 +154,22 @@ types of policy networks is configured by the same configuration file (see the d
       Optional remote backends require the matching extra, e.g. ``SynPlanner[litlogger]``,
       ``SynPlanner[wandb]``, ``SynPlanner[mlflow]``, or ``SynPlanner[loggers]``.
 
+**MHN ranking policy tuning**
+
+.. code-block:: bash
+
+    synplan mhn_network_tuning --config configs/mhn_ranking_policy_training.yaml --policy_network policy_network.ckpt --new_policy_data new_reaction_rules_policy_data.tsv --results_dir mhn_tuned
+
+**Parameters**:
+    - ``config`` - the path to the policy configuration file. Fine-tuning
+      epochs, batch size, learning rate, logger settings, and Trainer options
+      are read from this YAML file.
+    - ``policy_network`` - the path to an already trained MHN ranking checkpoint.
+    - ``new_policy_data`` - the path to the new ranking policy mapping file (``*_policy_data.tsv``) generated during rule extraction.
+    - ``results_dir`` - the path to the directory where the tuned MHN checkpoint will be stored.
+    - ``--workers`` - CPU workers for ranking dataset preprocessing (0 = auto).
+    - ``--no-cache`` - disable dataset cache reuse.
+
 **Filtering policy network**
 
 .. code-block:: bash

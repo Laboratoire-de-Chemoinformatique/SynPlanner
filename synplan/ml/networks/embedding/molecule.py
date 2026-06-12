@@ -1,14 +1,9 @@
-"""Module containing basic pytorch architectures of policy and value neural networks."""
-
-from abc import ABC, abstractmethod
+"""Graph embedder zoo for SynPlanner policy and value networks."""
 
 import torch
-from adabelief_pytorch import AdaBelief
-from pytorch_lightning import LightningModule
 from torch import Tensor
 from torch.nn import GELU, Dropout, Linear, Module, ModuleDict, ModuleList, Sequential
 from torch.nn.functional import relu
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch_geometric.data.batch import Batch
 from torch_geometric.nn.aggr import VariancePreservingAggregation
 from torch_geometric.nn.conv import GCNConv, GINEConv, GPSConv
@@ -20,7 +15,11 @@ class GraphEmbedding(Module):
     convolution."""
 
     def __init__(
-        self, vector_dim: int = 512, dropout: float = 0.4, num_conv_layers: int = 5
+        self,
+        vector_dim: int = 512,
+        dropout: float = 0.4,
+        num_conv_layers: int = 5,
+        node_dim: int = 11,
     ):
         """Initializes a graph convolutional module. Needed to convert molecule atom
         vectors to the single vector using graph convolution.
@@ -35,7 +34,7 @@ class GraphEmbedding(Module):
         """
 
         super().__init__()
-        self.expansion = Linear(11, vector_dim)
+        self.expansion = Linear(node_dim, vector_dim)
         self.dropout = Dropout(dropout)
         self.gcn_convs = ModuleList(
             [
@@ -68,13 +67,17 @@ class GraphEmbeddingConcat(GraphEmbedding, Module):
     """Needed to concat."""  # TODO for what ?
 
     def __init__(
-        self, vector_dim: int = 512, dropout: float = 0.4, num_conv_layers: int = 8
+        self,
+        vector_dim: int = 512,
+        dropout: float = 0.4,
+        num_conv_layers: int = 8,
+        node_dim: int = 11,
     ):
-        super().__init__()
+        Module.__init__(self)
 
         gcn_dim = vector_dim // num_conv_layers
 
-        self.expansion = Linear(11, gcn_dim)
+        self.expansion = Linear(node_dim, gcn_dim)
         self.dropout = Dropout(dropout)
         self.gcn_convs = ModuleList(
             [
@@ -128,6 +131,7 @@ class GraphEmbeddingGPS(Module):
     def __init__(
         self,
         vector_dim: int = 256,
+        node_dim: int = 11,
         edge_dim: int = 4,
         dropout: float = 0.3,
         num_conv_layers: int = 5,
@@ -136,7 +140,7 @@ class GraphEmbeddingGPS(Module):
         attn_dropout: float = 0.5,
     ):
         super().__init__()
-        self.node_expansion = Linear(11, vector_dim)
+        self.node_expansion = Linear(node_dim, vector_dim)
         self.edge_expansion = Linear(edge_dim, vector_dim)
         self.pool = VariancePreservingAggregation()
 
@@ -175,136 +179,53 @@ class GraphEmbeddingGPS(Module):
         return self.pool(atoms, index=graph.batch)
 
 
-class MCTSNetwork(LightningModule, ABC):
-    """Basic class for policy and value networks."""
-
-    def __init__(
-        self,
-        vector_dim: int,
-        batch_size: int,
-        dropout: float = 0.4,
-        num_conv_layers: int = 5,
-        learning_rate: float = 0.001,
-        gcn_concat: bool = False,
-        embedder_type: str = "gcn",
-        heads: int = 4,
-        attn_type: str = "performer",
-        attn_dropout: float = 0.5,
-    ):
-        """The basic class for MCTS graph convolutional neural networks (policy and
-        value network).
-
-        :param vector_dim: The dimensionality of the hidden layers and output layer of
-            graph convolution module.
-        :param dropout: Dropout is a regularization technique used in neural networks to
-            prevent overfitting.
-        :param num_conv_layers: The number of convolutional layers in a graph
-            convolutional module.
-        :param learning_rate: The learning rate determines how quickly the model learns
-            from the training data.
-        :param gcn_concat: Legacy flag for concat embedder. Use embedder_type instead.
-        :param embedder_type: Embedder architecture: "gcn", "gcn_concat", or "gps".
-        :param heads: Number of attention heads (GPS only).
-        :param attn_type: Attention type: "performer", "multihead", or None (GPS only).
-        :param attn_dropout: Attention dropout probability (GPS only).
-        """
-        super().__init__()
-        if embedder_type == "gps":
-            self.embedder = GraphEmbeddingGPS(
-                vector_dim,
-                dropout=dropout,
-                num_conv_layers=num_conv_layers,
-                heads=heads,
-                attn_type=attn_type,
-                attn_dropout=attn_dropout,
-            )
-        elif gcn_concat or embedder_type == "gcn_concat":
-            self.embedder = GraphEmbeddingConcat(vector_dim, dropout, num_conv_layers)
-        else:
-            self.embedder = GraphEmbedding(vector_dim, dropout, num_conv_layers)
-        self.batch_size = batch_size
-        self.lr = learning_rate
-
-    @abstractmethod
-    def forward(self, batch: Batch) -> Tensor:
-        """The forward function takes a batch of input data and performs forward
-        propagation through the neural network.
-
-        :param batch: The batch of molecular graphs processed together in a single
-            forward pass through the neural network.
-        """
-
-    @abstractmethod
-    def _get_loss(self, batch: Batch) -> Tensor:
-        """Calculate the loss for a given batch of data.
-
-        :param batch: The batch of input data that is used to compute the loss.
-        """
-
-    def training_step(self, batch: Batch, batch_idx: int) -> Tensor:
-        """Calculates the loss for a given training batch and logs the loss value.
-
-        :param batch: The batch of data that is used for training.
-        :param batch_idx: The index of the batch.
-        :return: The value of the training loss.
-        """
-        metrics = self._get_loss(batch)
-        for name, value in metrics.items():
-            self.log(
-                "train_" + name,
-                value,
-                prog_bar=True,
-                on_step=True,
-                on_epoch=True,
-                batch_size=self.batch_size,
-            )
-        return metrics["loss"]
-
-    def validation_step(self, batch: Batch, batch_idx: int) -> None:
-        """Calculates the loss for a given validation batch and logs the loss value.
-
-        :param batch: The batch of data that is used for validation.
-        :param batch_idx: The index of the batch.
-        """
-        metrics = self._get_loss(batch)
-        for name, value in metrics.items():
-            self.log("val_" + name, value, on_epoch=True, batch_size=self.batch_size)
-
-    def test_step(self, batch: Batch, batch_idx: int) -> None:
-        """Calculates the loss for a given test batch and logs the loss value.
-
-        :param batch: The batch of data that is used for testing.
-        :param batch_idx: The index of the batch.
-        """
-        metrics = self._get_loss(batch)
-        for name, value in metrics.items():
-            self.log("test_" + name, value, on_epoch=True, batch_size=self.batch_size)
-
-    def configure_optimizers(
-        self,
-    ) -> tuple[list[AdaBelief], list[dict[str, bool | str | ReduceLROnPlateau]]]:
-        """Returns an optimizer and a learning rate scheduler for training a model using
-        the AdaBelief optimizer and ReduceLROnPlateau scheduler.
-
-        :return: The optimizer and a scheduler.
-        """
-
-        optimizer = AdaBelief(
-            self.parameters(),
-            lr=self.lr,
-            eps=1e-8,
-            betas=(0.9, 0.999),
-            weight_decouple=True,
-            rectify=True,
-            weight_decay=0.01,
-            print_change_log=False,
+def build_graph_embedder(
+    embedder_type: str,
+    vector_dim: int,
+    *,
+    dropout: float = 0.4,
+    num_conv_layers: int = 5,
+    heads: int = 4,
+    attn_type: str = "performer",
+    attn_dropout: float = 0.5,
+    node_dim: int = 11,
+    edge_dim: int = 4,
+) -> Module:
+    """Build a SynPlanner graph embedder for a concrete node/edge schema."""
+    valid_embedder_types = {"gcn", "gcn_concat", "gps"}
+    if embedder_type not in valid_embedder_types:
+        expected = "', '".join(sorted(valid_embedder_types))
+        raise ValueError(f"embedder_type must be one of '{expected}'")
+    if num_conv_layers <= 0:
+        raise ValueError("num_conv_layers must be > 0")
+    if embedder_type == "gps":
+        return GraphEmbeddingGPS(
+            vector_dim,
+            node_dim=node_dim,
+            edge_dim=edge_dim,
+            dropout=dropout,
+            num_conv_layers=num_conv_layers,
+            heads=heads,
+            attn_type=attn_type,
+            attn_dropout=attn_dropout,
         )
-
-        lr_scheduler = ReduceLROnPlateau(optimizer, patience=3, factor=0.8, min_lr=5e-5)
-        scheduler = {
-            "scheduler": lr_scheduler,
-            "reduce_on_plateau": True,
-            "monitor": "val_loss",
-        }
-
-        return [optimizer], [scheduler]
+    if embedder_type == "gcn_concat":
+        if vector_dim % num_conv_layers:
+            raise ValueError(
+                "embedder_type='gcn_concat' requires vector_dim to be divisible "
+                "by num_conv_layers"
+            )
+        return GraphEmbeddingConcat(
+            vector_dim,
+            dropout=dropout,
+            num_conv_layers=num_conv_layers,
+            node_dim=node_dim,
+        )
+    if embedder_type == "gcn":
+        return GraphEmbedding(
+            vector_dim,
+            dropout=dropout,
+            num_conv_layers=num_conv_layers,
+            node_dim=node_dim,
+        )
+    raise AssertionError("unreachable graph embedder type")

@@ -2,6 +2,8 @@
 
 import itertools
 import logging
+import os
+import pickle
 from dataclasses import dataclass, field, fields
 from time import time
 
@@ -10,11 +12,11 @@ from tqdm.auto import tqdm
 
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
-from synplan.chem.reaction_rules import POLICY_SOURCE_NAME
+from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
 from synplan.mcts.evaluation import EvaluationStrategy
-from synplan.mcts.expansion import PolicyNetworkFunction, _rule_query_pattern
 from synplan.mcts.node import Node
-from synplan.routes.quality.scorer import RouteScorer
+from synplan.mcts.policy import Policy, PriorityPolicy
+from synplan.route_quality.scorer import RouteScorer
 from synplan.utils.config import TreeConfig
 
 from .algorithm import (
@@ -98,7 +100,7 @@ class Tree:
         config: TreeConfig,
         reaction_rules: list[CanonicalRetroReactor],
         building_blocks: set[str],
-        expansion_function: PolicyNetworkFunction,
+        expansion_function: Policy,
         evaluation_function: EvaluationStrategy = None,
         route_scorer: RouteScorer | None = None,
         priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
@@ -151,10 +153,15 @@ class Tree:
                 "config.use_priority=True but no priority_rules were supplied. "
                 "Pass priority_rules={'<name>': [...rules]} or set use_priority=False."
             )
+        # Curated-rule selection is delegated to a PriorityPolicy per source.
+        self._priority_policies: dict[str, PriorityPolicy] = {
+            name: PriorityPolicy(rules) for name, rules in self.priority_rules.items()
+        }
 
         # policy and evaluation services
         assert expansion_function is not None, "Expansion function is required"
-        self.expansion_function = expansion_function
+        # Node expansion is driven through the Policy seam.
+        self.expansion_function: Policy = expansion_function
 
         assert evaluation_function is not None, "Evaluation function is required"
         self.evaluator = evaluation_function
@@ -365,18 +372,11 @@ class Tree:
         policy rules are *additive*, not gated: both run on every node.
         """
 
-        if self.config.use_priority and self.priority_rules:
-            molecule = curr_node.curr_precursor.molecule
-            for source_name, rules in self.priority_rules.items():
-                for rule_id, rule in enumerate(rules):
-                    pattern = _rule_query_pattern(rule)
-                    if pattern is None:
-                        continue
-                    try:
-                        if pattern < molecule:
-                            yield 1.0, rule, rule_id, source_name, None
-                    except TypeError:
-                        continue
+        if self.config.use_priority and self._priority_policies:
+            for source_name, policy in self._priority_policies.items():
+                for rule_id, rule in enumerate(policy.priority_rules):
+                    if policy._rule_applies(rule, curr_node.curr_precursor):
+                        yield 1.0, rule, rule_id, source_name, None
 
         policy_top_rules = self._get_policy_top_rules_limit()
         for policy_rank, (prob, rule, rule_id) in enumerate(
@@ -390,12 +390,9 @@ class Tree:
             yield prob, rule, rule_id, POLICY_SOURCE_NAME, policy_rank
 
     def _get_policy_top_rules_limit(self) -> int | None:
-        """Return the configured policy Top-N limit when exposed by the expansion fn."""
+        """Return the configured policy Top-N limit when exposed by the policy."""
 
-        config = getattr(self.expansion_function, "config", None)
-        top_rules = getattr(config, "top_rules", None)
-        if top_rules is None:
-            top_rules = getattr(self.expansion_function, "top_rules", None)
+        top_rules = getattr(self.expansion_function, "top_rules", None)
         if top_rules is None:
             return None
         return int(top_rules)
@@ -975,3 +972,93 @@ class Tree:
                 f"See the {version} CHANGELOG entry."
             )
         raise AttributeError(f"'Tree' object has no attribute {name!r}")
+
+
+def export_tree_to_json(tree: "Tree", file_path: str, route_id=None):
+    """Export a retrosynthetic search tree directly to a JSON file."""
+    from synplan.chem.reaction.routes.io import write_routes_json
+    from synplan.chem.reaction.routes.representation import extract_reactions
+
+    routes_dict = extract_reactions(tree, route_id)
+    if routes_dict is None:
+        raise ValueError("Failed to extract reactions for the specified route_id.")
+    write_routes_json(routes_dict, file_path, tree=tree)
+
+
+def export_tree_to_csv(tree: "Tree", file_path: str = "routes.csv", route_id=None):
+    """Export a retrosynthetic search tree directly to a CSV file."""
+    from synplan.chem.reaction.routes.io import write_routes_csv
+    from synplan.chem.reaction.routes.representation import extract_reactions
+
+    routes_dict = extract_reactions(tree, route_id)
+    if routes_dict is None:
+        raise ValueError("Failed to extract reactions for the specified route_id.")
+    write_routes_csv(routes_dict, file_path)
+
+
+class TreeWrapper:
+    """Pickle wrapper that saves/loads a search :class:`Tree` to/from disk."""
+
+    def __init__(self, tree, mol_id=1, config=1, path="planning_results/forest"):
+        """Initializes the TreeWrapper."""
+        self.tree = tree
+        self.mol_id = mol_id
+        self.config = config
+        self.path = path
+        os.makedirs(self.path, exist_ok=True)
+        self.filename = os.path.join(self.path, f"tree_{mol_id}_{config}.pkl")
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        tree_state = self.tree.__dict__.copy()
+        # Reset non-pickleable attributes (_tqdm, policy_network, value_network).
+        if "_tqdm" in tree_state:
+            tree_state["_tqdm"] = True
+        for attr in ["policy_network", "value_network"]:
+            if attr in tree_state:
+                tree_state[attr] = None
+        state["tree_state"] = tree_state
+        del state["tree"]
+        return state
+
+    def __setstate__(self, state):
+        tree_state = state.pop("tree_state")
+        self.__dict__.update(state)
+        new_tree = Tree.__new__(Tree)
+        new_tree.__dict__.update(tree_state)
+        self.tree = new_tree
+
+    def save_tree(self):
+        """Saves the TreeWrapper instance (including the tree state) to a file."""
+        try:
+            with open(self.filename, "wb") as f:
+                pickle.dump(self, f)
+            print(
+                f"Tree wrapper for mol_id '{self.mol_id}', config '{self.config}' saved to '{self.filename}'."
+            )
+        except Exception as e:
+            print(f"Error saving tree to {self.filename}: {e}")
+
+    @classmethod
+    def load_tree_from_id(cls, mol_id, config=1, path="planning_results/forest"):
+        """Loads a Tree object from a saved file using mol_id and config."""
+        filename = os.path.join(path, f"tree_{mol_id}_{config}.pkl")
+        print(f"Attempting to load tree from: {filename}")
+        try:
+            with open(filename, "rb") as f:
+                loaded_wrapper = pickle.load(f)  # implicitly calls __setstate__
+            print(
+                f"Tree object for mol_id '{mol_id}', config '{config}' successfully loaded from '{filename}'."
+            )
+            return loaded_wrapper.tree
+        except FileNotFoundError:
+            print(f"Error: File not found at {filename}")
+            return None
+        except (pickle.UnpicklingError, EOFError) as e:
+            print(
+                f"Error: Could not unpickle file {filename}. It might be corrupted or empty. Details: {e}"
+            )
+            return None
+        except Exception as e:
+            print(f"An unexpected error occurred loading tree from {filename}: {e}")
+            return None

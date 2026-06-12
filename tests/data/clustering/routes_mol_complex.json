@@ -1,0 +1,1136 @@
+{
+  "4727": {
+    "type": "mol",
+    "smiles": "c1cnccc1C(c2cncs2)(c3cc4c(nc(c(Cc5ccc(cc5)Cl)c4Cl)Cl)cc3)O",
+    "children": [
+      {
+        "type": "reaction",
+        "smiles": "[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2>>[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[C:7]([c:8]2[cH:9][n:10][cH:11][s:12]2)([c:13]3[cH:32][c:17]4[c:16]([n:21][c:20]([c:19]([CH2:23][c:24]5[cH:25][cH:26][c:27]([cH:28][cH:29]5)[Cl:30])[c:18]4[Cl:31])[Cl:22])[cH:15][cH:14]3)[OH:33]",
+        "children": [
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccn1)C(Br)(O)c2cncs2",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1.[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[Mg:38][Br:39]>>[Mg:38][Br:39].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1cnccc1[Mg]Br",
+                    "in_stock": true
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "c1(C(=O)Br)cncs1",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[CH2:55]1[CH2:56][C:57](=[O:44])[N:52]([C:53]1=[O:54])[Br:37].[O:33]=[CH:7][c:8]1[cH:9][n:10][cH:11][s:12]1>>[O:54]=[C:53]1[CH2:55][CH2:56][C:57](=[O:44])[NH:52]1.[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "O=Cc1cncs1",
+                            "in_stock": true
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "C1CC(=O)N(C1=O)Br",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 2,
+                        "tree_node_id": 3203,
+                        "rule_id": 88,
+                        "rule_source": "policy",
+                        "rule_key": "policy:88"
+                      }
+                    ],
+                    "in_stock": false
+                  }
+                ],
+                "step_id": 4,
+                "tree_node_id": 288,
+                "rule_id": 518,
+                "rule_source": "policy",
+                "rule_key": "policy:518"
+              }
+            ],
+            "in_stock": false
+          },
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccc1Cc2c(c3cc(ccc3nc2Cl)B(O)O)Cl)Cl",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[O:43]=[C:42]1[CH2:41][CH2:40][C:50](=[O:51])[N:49]1[Cl:30].[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31]>>[O:51]=[C:50]1[CH2:40][CH2:41][C:42](=[O:43])[NH:49]1.[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30]",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1ccccc1Cc2c(c3cc(ccc3nc2Cl)B(O)O)Cl",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[O:35]([CH3:59])[B:34]([O:60][CH3:61])[O:36][CH3:58].[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:20]([n:21][c:16]3[c:17]([c:18]2[Cl:31])[cH:32][c:13]([cH:14][cH:15]3)[Br:62])[Cl:22]>>[BrH:62].[CH3:61][OH:60].[CH4:58].[CH4:59].[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31]",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "c1ccccc1Cc2c(nc3c(c2Cl)cc(cc3)Br)Cl",
+                            "children": [
+                              {
+                                "type": "reaction",
+                                "smiles": "[O:65]=[C:64]1[CH2:45][CH2:46][C:47](=[O:48])[N:63]1[Cl:31].[cH:26]1[cH:25][c:24]([cH:29][cH:28][cH:27]1)[CH2:23][c:19]2[cH:18][c:17]3[c:16]([n:21][c:20]2[Cl:22])[cH:15][cH:14][c:13]([cH:32]3)[Br:62]>>[O:65]=[C:64]1[CH2:45][CH2:46][C:47](=[O:48])[NH:63]1.[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:20]([n:21][c:16]3[c:17]([c:18]2[Cl:31])[cH:32][c:13]([cH:14][cH:15]3)[Br:62])[Cl:22]",
+                                "children": [
+                                  {
+                                    "type": "mol",
+                                    "smiles": "O=C1CCC(=O)N1Cl",
+                                    "in_stock": true
+                                  },
+                                  {
+                                    "type": "mol",
+                                    "smiles": "c1cc(ccc1)Cc2cc3c(nc2Cl)ccc(c3)Br",
+                                    "in_stock": true
+                                  }
+                                ],
+                                "step_id": 0,
+                                "tree_node_id": 4727,
+                                "rule_id": 145,
+                                "rule_source": "policy",
+                                "rule_key": "policy:145"
+                              }
+                            ],
+                            "in_stock": false
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "O(C)B(OC)OC",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 1,
+                        "tree_node_id": 3205,
+                        "rule_id": 378,
+                        "rule_source": "policy",
+                        "rule_key": "policy:378"
+                      }
+                    ],
+                    "in_stock": false
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "O=C1CCC(=O)N1Cl",
+                    "in_stock": true
+                  }
+                ],
+                "step_id": 3,
+                "tree_node_id": 2263,
+                "rule_id": 145,
+                "rule_source": "policy",
+                "rule_key": "policy:145"
+              }
+            ],
+            "in_stock": false
+          }
+        ],
+        "step_id": 5,
+        "tree_node_id": 9,
+        "rule_id": 826,
+        "rule_source": "policy",
+        "rule_key": "policy:826"
+      }
+    ],
+    "in_stock": false
+  },
+  "8857": {
+    "type": "mol",
+    "smiles": "c1cnccc1C(c2cncs2)(c3cc4c(nc(c(Cc5ccc(cc5)Cl)c4Cl)Cl)cc3)O",
+    "children": [
+      {
+        "type": "reaction",
+        "smiles": "[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2>>[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[C:7]([c:8]2[cH:9][n:10][cH:11][s:12]2)([c:13]3[cH:32][c:17]4[c:16]([n:21][c:20]([c:19]([CH2:23][c:24]5[cH:25][cH:26][c:27]([cH:28][cH:29]5)[Cl:30])[c:18]4[Cl:31])[Cl:22])[cH:15][cH:14]3)[OH:33]",
+        "children": [
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccn1)C(Br)(O)c2cncs2",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1.[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[Mg:38][Br:39]>>[Mg:38][Br:39].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1cnccc1[Mg]Br",
+                    "in_stock": true
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "c1(C(=O)Br)cncs1",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[CH2:54]1[CH2:55][C:56](=[O:44])[N:51]([C:52]1=[O:53])[Br:37].[O:33]=[CH:7][c:8]1[cH:9][n:10][cH:11][s:12]1>>[O:53]=[C:52]1[CH2:54][CH2:55][C:56](=[O:44])[NH:51]1.[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "O=Cc1cncs1",
+                            "in_stock": true
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "C1CC(=O)N(C1=O)Br",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 2,
+                        "tree_node_id": 3203,
+                        "rule_id": 88,
+                        "rule_source": "policy",
+                        "rule_key": "policy:88"
+                      }
+                    ],
+                    "in_stock": false
+                  }
+                ],
+                "step_id": 4,
+                "tree_node_id": 288,
+                "rule_id": 518,
+                "rule_source": "policy",
+                "rule_key": "policy:518"
+              }
+            ],
+            "in_stock": false
+          },
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccc1Cc2c(c3cc(ccc3nc2Cl)B(O)O)Cl)Cl",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[O:43]=[C:42]1[CH2:41][CH2:40][C:49](=[O:50])[N:48]1[Cl:30].[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31]>>[O:50]=[C:49]1[CH2:40][CH2:41][C:42](=[O:43])[NH:48]1.[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30]",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1ccccc1Cc2c(c3cc(ccc3nc2Cl)B(O)O)Cl",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[CH3:64][CH:63]([CH3:45])[O:35][B:34]([O:59][CH:58]([CH3:46])[CH3:47])[O:36][CH:60]([CH3:61])[CH3:62].[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:20]([n:21][c:16]3[c:17]([c:18]2[Cl:31])[cH:32][c:13]([cH:14][cH:15]3)[Br:57])[Cl:22]>>[BrH:57].[CH3:46][CH:58]([CH3:47])[OH:59].[CH3:61][CH2:60][CH3:62].[CH3:64][CH2:63][CH3:45].[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31]",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "c1ccccc1Cc2c(nc3c(c2Cl)cc(cc3)Br)Cl",
+                            "children": [
+                              {
+                                "type": "reaction",
+                                "smiles": "[O:67]=[C:66]1[CH2:68][CH2:69][C:70](=[O:71])[N:65]1[Cl:31].[cH:26]1[cH:25][c:24]([cH:29][cH:28][cH:27]1)[CH2:23][c:19]2[cH:18][c:17]3[c:16]([n:21][c:20]2[Cl:22])[cH:15][cH:14][c:13]([cH:32]3)[Br:57]>>[O:67]=[C:66]1[CH2:68][CH2:69][C:70](=[O:71])[NH:65]1.[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:20]([n:21][c:16]3[c:17]([c:18]2[Cl:31])[cH:32][c:13]([cH:14][cH:15]3)[Br:57])[Cl:22]",
+                                "children": [
+                                  {
+                                    "type": "mol",
+                                    "smiles": "O=C1CCC(=O)N1Cl",
+                                    "in_stock": true
+                                  },
+                                  {
+                                    "type": "mol",
+                                    "smiles": "c1cc(ccc1)Cc2cc3c(nc2Cl)ccc(c3)Br",
+                                    "in_stock": true
+                                  }
+                                ],
+                                "step_id": 0,
+                                "tree_node_id": 8857,
+                                "rule_id": 145,
+                                "rule_source": "policy",
+                                "rule_key": "policy:145"
+                              }
+                            ],
+                            "in_stock": false
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "CC(C)OB(OC(C)C)OC(C)C",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 1,
+                        "tree_node_id": 3207,
+                        "rule_id": 337,
+                        "rule_source": "policy",
+                        "rule_key": "policy:337"
+                      }
+                    ],
+                    "in_stock": false
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "O=C1CCC(=O)N1Cl",
+                    "in_stock": true
+                  }
+                ],
+                "step_id": 3,
+                "tree_node_id": 2263,
+                "rule_id": 145,
+                "rule_source": "policy",
+                "rule_key": "policy:145"
+              }
+            ],
+            "in_stock": false
+          }
+        ],
+        "step_id": 5,
+        "tree_node_id": 9,
+        "rule_id": 826,
+        "rule_source": "policy",
+        "rule_key": "policy:826"
+      }
+    ],
+    "in_stock": false
+  },
+  "9233": {
+    "type": "mol",
+    "smiles": "c1cnccc1C(c2cncs2)(c3cc4c(nc(c(Cc5ccc(cc5)Cl)c4Cl)Cl)cc3)O",
+    "children": [
+      {
+        "type": "reaction",
+        "smiles": "[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2>>[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[C:7]([c:8]2[cH:9][n:10][cH:11][s:12]2)([c:13]3[cH:32][c:17]4[c:16]([n:21][c:20]([c:19]([CH2:23][c:24]5[cH:25][cH:26][c:27]([cH:28][cH:29]5)[Cl:30])[c:18]4[Cl:31])[Cl:22])[cH:15][cH:14]3)[OH:33]",
+        "children": [
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccn1)C(Br)(O)c2cncs2",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1.[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[Mg:38][Br:39]>>[Mg:38][Br:39].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1cnccc1[Mg]Br",
+                    "in_stock": true
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "c1(C(=O)Br)cncs1",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[CH2:52]1[CH2:53][C:54](=[O:44])[N:49]([C:50]1=[O:51])[Br:37].[O:33]=[CH:7][c:8]1[cH:9][n:10][cH:11][s:12]1>>[O:51]=[C:50]1[CH2:52][CH2:53][C:54](=[O:44])[NH:49]1.[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "O=Cc1cncs1",
+                            "in_stock": true
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "C1CC(=O)N(C1=O)Br",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 2,
+                        "tree_node_id": 3227,
+                        "rule_id": 88,
+                        "rule_source": "policy",
+                        "rule_key": "policy:88"
+                      }
+                    ],
+                    "in_stock": false
+                  }
+                ],
+                "step_id": 4,
+                "tree_node_id": 288,
+                "rule_id": 518,
+                "rule_source": "policy",
+                "rule_key": "policy:518"
+              }
+            ],
+            "in_stock": false
+          },
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccc1Cc2c(c3cc(ccc3nc2Cl)B(O)O)Cl)Cl",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[O:43]=[C:42]1[CH2:41][CH2:40][C:47](=[O:48])[N:46]1[Cl:31].[OH:35][B:34]([OH:36])[c:13]1[cH:32][c:17]2[c:16]([cH:15][cH:14]1)[n:21][c:20]([Cl:22])[c:19]([CH2:23][c:24]3[cH:25][cH:26][c:27]([cH:28][cH:29]3)[Cl:30])[cH:18]2>>[O:48]=[C:47]1[CH2:40][CH2:41][C:42](=[O:43])[NH:46]1.[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30]",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "OB(O)c1cc2c(cc1)nc(Cl)c(Cc3ccc(cc3)Cl)c2",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[O:35]([CH3:56])[B:34]([O:57][CH3:58])[O:36][CH3:55].[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:20]([n:21][c:16]3[c:17]([cH:32][c:13]([cH:14][cH:15]3)[Br:59])[cH:18]2)[Cl:22])[Cl:30]>>[BrH:59].[CH3:58][OH:57].[CH4:55].[CH4:56].[OH:35][B:34]([OH:36])[c:13]1[cH:32][c:17]2[c:16]([cH:15][cH:14]1)[n:21][c:20]([Cl:22])[c:19]([CH2:23][c:24]3[cH:25][cH:26][c:27]([cH:28][cH:29]3)[Cl:30])[cH:18]2",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "c1cc(ccc1Cc2c(nc3c(cc(cc3)Br)c2)Cl)Cl",
+                            "children": [
+                              {
+                                "type": "reaction",
+                                "smiles": "[cH:14]1[c:13]([cH:32][c:17]2[c:16]([cH:15]1)[n:21][c:20]([Cl:22])[c:19]([cH:18]2)[CH2:23][Cl:45])[Br:59].[cH:29]1[cH:28][c:27]([cH:26][cH:25][c:24]1[B:60]([OH:61])[OH:62])[Cl:30]>>[ClH:45].[OH:61][BH:60][OH:62].[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:20]([n:21][c:16]3[c:17]([cH:32][c:13]([cH:14][cH:15]3)[Br:59])[cH:18]2)[Cl:22])[Cl:30]",
+                                "children": [
+                                  {
+                                    "type": "mol",
+                                    "smiles": "c1c(cc2c(c1)nc(Cl)c(c2)CCl)Br",
+                                    "in_stock": true
+                                  },
+                                  {
+                                    "type": "mol",
+                                    "smiles": "c1cc(ccc1B(O)O)Cl",
+                                    "in_stock": true
+                                  }
+                                ],
+                                "step_id": 0,
+                                "tree_node_id": 9233,
+                                "rule_id": 1108,
+                                "rule_source": "policy",
+                                "rule_key": "policy:1108"
+                              }
+                            ],
+                            "in_stock": false
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "O(C)B(OC)OC",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 1,
+                        "tree_node_id": 6426,
+                        "rule_id": 378,
+                        "rule_source": "policy",
+                        "rule_key": "policy:378"
+                      }
+                    ],
+                    "in_stock": false
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "O=C1CCC(=O)N1Cl",
+                    "in_stock": true
+                  }
+                ],
+                "step_id": 3,
+                "tree_node_id": 2264,
+                "rule_id": 145,
+                "rule_source": "policy",
+                "rule_key": "policy:145"
+              }
+            ],
+            "in_stock": false
+          }
+        ],
+        "step_id": 5,
+        "tree_node_id": 9,
+        "rule_id": 826,
+        "rule_source": "policy",
+        "rule_key": "policy:826"
+      }
+    ],
+    "in_stock": false
+  },
+  "9284": {
+    "type": "mol",
+    "smiles": "c1cnccc1C(c2cncs2)(c3cc4c(nc(c(Cc5ccc(cc5)Cl)c4Cl)Cl)cc3)O",
+    "children": [
+      {
+        "type": "reaction",
+        "smiles": "[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2>>[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[C:7]([c:8]2[cH:9][n:10][cH:11][s:12]2)([c:13]3[cH:32][c:17]4[c:16]([n:21][c:20]([c:19]([CH2:23][c:24]5[cH:25][cH:26][c:27]([cH:28][cH:29]5)[Cl:30])[c:18]4[Cl:31])[Cl:22])[cH:15][cH:14]3)[OH:33]",
+        "children": [
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccn1)C(Br)(O)c2cncs2",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1.[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[Mg:38][Br:39]>>[Mg:38][Br:39].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1cnccc1[Mg]Br",
+                    "in_stock": true
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "c1(C(=O)Br)cncs1",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[CH2:41]1[CH2:42][C:43](=[O:44])[N:46]([C:47]1=[O:40])[Br:37].[O:33]=[CH:7][c:8]1[cH:9][n:10][cH:11][s:12]1>>[O:40]=[C:47]1[CH2:41][CH2:42][C:43](=[O:44])[NH:46]1.[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "O=Cc1cncs1",
+                            "in_stock": true
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "C1CC(=O)N(C1=O)Br",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 2,
+                        "tree_node_id": 3348,
+                        "rule_id": 88,
+                        "rule_source": "policy",
+                        "rule_key": "policy:88"
+                      }
+                    ],
+                    "in_stock": false
+                  }
+                ],
+                "step_id": 4,
+                "tree_node_id": 288,
+                "rule_id": 518,
+                "rule_source": "policy",
+                "rule_key": "policy:518"
+              }
+            ],
+            "in_stock": false
+          },
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccc1Cc2c(c3cc(ccc3nc2Cl)B(O)O)Cl)Cl",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[C:23]([c:19]2[c:18]([c:17]3[cH:32][c:13]([B:34]([OH:35])[OH:36])[cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[Cl:31])=[O:45])[Cl:30]>>[OH2:45].[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30]",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1cc(ccc1C(c2c(c3cc(B(O)O)ccc3nc2Cl)Cl)=O)Cl",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[O:50]([CH3:51])[B:34]([O:35][CH3:49])[O:36][CH3:48].[cH:26]1[cH:25][c:24]([cH:29][cH:28][c:27]1[Cl:30])[C:23]([c:19]2[c:20]([n:21][c:16]3[cH:15][cH:14][cH:13][cH:32][c:17]3[c:18]2[Cl:31])[Cl:22])=[O:45]>>[CH3:51][OH:50].[CH4:48].[CH4:49].[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[C:23]([c:19]2[c:18]([c:17]3[cH:32][c:13]([B:34]([OH:35])[OH:36])[cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[Cl:31])=[O:45])[Cl:30]",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "c1cc(ccc1Cl)C(c2c(nc3ccccc3c2Cl)Cl)=O",
+                            "children": [
+                              {
+                                "type": "reaction",
+                                "smiles": "[c:18]1([c:17]2[c:16]([cH:15][cH:14][cH:13][cH:32]2)[n:21][c:20]([Cl:22])[cH:19]1)[Cl:31].[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[C:23](=[O:45])[Cl:52])[Cl:30]>>[ClH:52].[cH:26]1[cH:25][c:24]([cH:29][cH:28][c:27]1[Cl:30])[C:23]([c:19]2[c:20]([n:21][c:16]3[cH:15][cH:14][cH:13][cH:32][c:17]3[c:18]2[Cl:31])[Cl:22])=[O:45]",
+                                "children": [
+                                  {
+                                    "type": "mol",
+                                    "smiles": "c1(c2c(cccc2)nc(Cl)c1)Cl",
+                                    "in_stock": true
+                                  },
+                                  {
+                                    "type": "mol",
+                                    "smiles": "c1cc(ccc1C(=O)Cl)Cl",
+                                    "in_stock": true
+                                  }
+                                ],
+                                "step_id": 0,
+                                "tree_node_id": 9284,
+                                "rule_id": 227,
+                                "rule_source": "policy",
+                                "rule_key": "policy:227"
+                              }
+                            ],
+                            "in_stock": false
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "O(C)B(OC)OC",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 1,
+                        "tree_node_id": 6482,
+                        "rule_id": 1185,
+                        "rule_source": "policy",
+                        "rule_key": "policy:1185"
+                      }
+                    ],
+                    "in_stock": false
+                  }
+                ],
+                "step_id": 3,
+                "tree_node_id": 2268,
+                "rule_id": 397,
+                "rule_source": "policy",
+                "rule_key": "policy:397"
+              }
+            ],
+            "in_stock": false
+          }
+        ],
+        "step_id": 5,
+        "tree_node_id": 9,
+        "rule_id": 826,
+        "rule_source": "policy",
+        "rule_key": "policy:826"
+      }
+    ],
+    "in_stock": false
+  },
+  "9295": {
+    "type": "mol",
+    "smiles": "c1cnccc1C(c2cncs2)(c3cc4c(nc(c(Cc5ccc(cc5)Cl)c4Cl)Cl)cc3)O",
+    "children": [
+      {
+        "type": "reaction",
+        "smiles": "[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2>>[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[C:7]([c:8]2[cH:9][n:10][cH:11][s:12]2)([c:13]3[cH:32][c:17]4[c:16]([n:21][c:20]([c:19]([CH2:23][c:24]5[cH:25][cH:26][c:27]([cH:28][cH:29]5)[Cl:30])[c:18]4[Cl:31])[Cl:22])[cH:15][cH:14]3)[OH:33]",
+        "children": [
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccn1)C(Br)(O)c2cncs2",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1.[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[Mg:38][Br:39]>>[Mg:38][Br:39].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1cnccc1[Mg]Br",
+                    "in_stock": true
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "c1(C(=O)Br)cncs1",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[CH2:41]1[CH2:42][C:43](=[O:44])[N:46]([C:47]1=[O:40])[Br:37].[O:33]=[CH:7][c:8]1[cH:9][n:10][cH:11][s:12]1>>[O:40]=[C:47]1[CH2:41][CH2:42][C:43](=[O:44])[NH:46]1.[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "O=Cc1cncs1",
+                            "in_stock": true
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "C1CC(=O)N(C1=O)Br",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 2,
+                        "tree_node_id": 3348,
+                        "rule_id": 88,
+                        "rule_source": "policy",
+                        "rule_key": "policy:88"
+                      }
+                    ],
+                    "in_stock": false
+                  }
+                ],
+                "step_id": 4,
+                "tree_node_id": 288,
+                "rule_id": 518,
+                "rule_source": "policy",
+                "rule_key": "policy:518"
+              }
+            ],
+            "in_stock": false
+          },
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccc1Cc2c(c3cc(ccc3nc2Cl)B(O)O)Cl)Cl",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[C:23]([c:19]2[c:18]([c:17]3[cH:32][c:13]([B:34]([OH:35])[OH:36])[cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[Cl:31])=[O:45])[Cl:30]>>[OH2:45].[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30]",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1cc(ccc1C(c2c(c3cc(B(O)O)ccc3nc2Cl)Cl)=O)Cl",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[O:50]([CH3:51])[B:34]([O:35][CH3:49])[O:36][CH3:48].[cH:26]1[cH:25][c:24]([cH:29][cH:28][c:27]1[Cl:30])[C:23]([c:19]2[c:20]([n:21][c:16]3[cH:15][cH:14][cH:13][cH:32][c:17]3[c:18]2[Cl:31])[Cl:22])=[O:45]>>[CH3:51][OH:50].[CH4:48].[CH4:49].[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[C:23]([c:19]2[c:18]([c:17]3[cH:32][c:13]([B:34]([OH:35])[OH:36])[cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[Cl:31])=[O:45])[Cl:30]",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "c1cc(ccc1Cl)C(c2c(nc3ccccc3c2Cl)Cl)=O",
+                            "children": [
+                              {
+                                "type": "reaction",
+                                "smiles": "[c:18]1([c:17]2[c:16]([cH:15][cH:14][cH:13][cH:32]2)[n:21][c:20]([Cl:22])[cH:19]1)[Cl:31].[cH:26]1[cH:25][c:24]([cH:29][cH:28][c:27]1[Cl:30])[C:23]([OH:52])=[O:45]>>[OH2:52].[cH:26]1[cH:25][c:24]([cH:29][cH:28][c:27]1[Cl:30])[C:23]([c:19]2[c:20]([n:21][c:16]3[cH:15][cH:14][cH:13][cH:32][c:17]3[c:18]2[Cl:31])[Cl:22])=[O:45]",
+                                "children": [
+                                  {
+                                    "type": "mol",
+                                    "smiles": "c1(c2c(cccc2)nc(Cl)c1)Cl",
+                                    "in_stock": true
+                                  },
+                                  {
+                                    "type": "mol",
+                                    "smiles": "c1cc(ccc1Cl)C(O)=O",
+                                    "in_stock": true
+                                  }
+                                ],
+                                "step_id": 0,
+                                "tree_node_id": 9295,
+                                "rule_id": 384,
+                                "rule_source": "policy",
+                                "rule_key": "policy:384"
+                              }
+                            ],
+                            "in_stock": false
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "O(C)B(OC)OC",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 1,
+                        "tree_node_id": 6482,
+                        "rule_id": 1185,
+                        "rule_source": "policy",
+                        "rule_key": "policy:1185"
+                      }
+                    ],
+                    "in_stock": false
+                  }
+                ],
+                "step_id": 3,
+                "tree_node_id": 2268,
+                "rule_id": 397,
+                "rule_source": "policy",
+                "rule_key": "policy:397"
+              }
+            ],
+            "in_stock": false
+          }
+        ],
+        "step_id": 5,
+        "tree_node_id": 9,
+        "rule_id": 826,
+        "rule_source": "policy",
+        "rule_key": "policy:826"
+      }
+    ],
+    "in_stock": false
+  },
+  "9923": {
+    "type": "mol",
+    "smiles": "c1cnccc1C(c2cncs2)(c3cc4c(nc(c(Cc5ccc(cc5)Cl)c4Cl)Cl)cc3)O",
+    "children": [
+      {
+        "type": "reaction",
+        "smiles": "[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2>>[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[C:7]([c:8]2[cH:9][n:10][cH:11][s:12]2)([c:13]3[cH:32][c:17]4[c:16]([n:21][c:20]([c:19]([CH2:23][c:24]5[cH:25][cH:26][c:27]([cH:28][cH:29]5)[Cl:30])[c:18]4[Cl:31])[Cl:22])[cH:15][cH:14]3)[OH:33]",
+        "children": [
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccn1)C(Br)(O)c2cncs2",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1.[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[Mg:38][Br:39]>>[Mg:38][Br:39].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1cnccc1[Mg]Br",
+                    "in_stock": true
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "c1(C(=O)Br)cncs1",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[CH2:53]1[CH2:54][C:55](=[O:44])[N:50]([C:51]1=[O:52])[Br:37].[O:33]=[CH:7][c:8]1[cH:9][n:10][cH:11][s:12]1>>[O:52]=[C:51]1[CH2:53][CH2:54][C:55](=[O:44])[NH:50]1.[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "O=Cc1cncs1",
+                            "in_stock": true
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "C1CC(=O)N(C1=O)Br",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 2,
+                        "tree_node_id": 3203,
+                        "rule_id": 88,
+                        "rule_source": "policy",
+                        "rule_key": "policy:88"
+                      }
+                    ],
+                    "in_stock": false
+                  }
+                ],
+                "step_id": 4,
+                "tree_node_id": 288,
+                "rule_id": 518,
+                "rule_source": "policy",
+                "rule_key": "policy:518"
+              }
+            ],
+            "in_stock": false
+          },
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccc1Cc2c(c3cc(ccc3nc2Cl)B(O)O)Cl)Cl",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[O:43]=[C:42]1[CH2:41][CH2:40][C:48](=[O:49])[N:47]1[Cl:30].[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31]>>[O:49]=[C:48]1[CH2:40][CH2:41][C:42](=[O:43])[NH:47]1.[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30]",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1ccccc1Cc2c(c3cc(ccc3nc2Cl)B(O)O)Cl",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[CH3:45][CH:63]([CH3:46])[O:62][B:34]([O:35][CH:59]([CH3:60])[CH3:61])[O:36][CH:56]([CH3:57])[CH3:58].[cH:26]1[cH:25][c:24]([cH:29][cH:28][cH:27]1)[CH2:23][c:19]2[c:18]([c:17]3[c:16]([n:21][c:20]2[Cl:22])[cH:15][cH:14][cH:13][cH:32]3)[Cl:31]>>[CH3:46][CH:63]([CH3:45])[OH:62].[CH3:57][CH2:56][CH3:58].[CH3:60][CH2:59][CH3:61].[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31]",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "c1cc(ccc1)Cc2c(c3c(nc2Cl)cccc3)Cl",
+                            "children": [
+                              {
+                                "type": "reaction",
+                                "smiles": "[c:18]1([c:17]2[c:16]([cH:15][cH:14][cH:13][cH:32]2)[n:21][c:20]([Cl:22])[cH:19]1)[Cl:31].[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][I:64]>>[IH:64].[cH:26]1[cH:25][c:24]([cH:29][cH:28][cH:27]1)[CH2:23][c:19]2[c:18]([c:17]3[c:16]([n:21][c:20]2[Cl:22])[cH:15][cH:14][cH:13][cH:32]3)[Cl:31]",
+                                "children": [
+                                  {
+                                    "type": "mol",
+                                    "smiles": "c1ccccc1CI",
+                                    "in_stock": true
+                                  },
+                                  {
+                                    "type": "mol",
+                                    "smiles": "c1(c2c(cccc2)nc(Cl)c1)Cl",
+                                    "in_stock": true
+                                  }
+                                ],
+                                "step_id": 0,
+                                "tree_node_id": 9923,
+                                "rule_id": 691,
+                                "rule_source": "policy",
+                                "rule_key": "policy:691"
+                              }
+                            ],
+                            "in_stock": false
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "CC(C)OB(OC(C)C)OC(C)C",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 1,
+                        "tree_node_id": 3208,
+                        "rule_id": 1183,
+                        "rule_source": "policy",
+                        "rule_key": "policy:1183"
+                      }
+                    ],
+                    "in_stock": false
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "O=C1CCC(=O)N1Cl",
+                    "in_stock": true
+                  }
+                ],
+                "step_id": 3,
+                "tree_node_id": 2263,
+                "rule_id": 145,
+                "rule_source": "policy",
+                "rule_key": "policy:145"
+              }
+            ],
+            "in_stock": false
+          }
+        ],
+        "step_id": 5,
+        "tree_node_id": 9,
+        "rule_id": 826,
+        "rule_source": "policy",
+        "rule_key": "policy:826"
+      }
+    ],
+    "in_stock": false
+  },
+  "10805": {
+    "type": "mol",
+    "smiles": "c1cnccc1C(c2cncs2)(c3cc4c(nc(c(Cc5ccc(cc5)Cl)c4Cl)Cl)cc3)O",
+    "children": [
+      {
+        "type": "reaction",
+        "smiles": "[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2>>[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[C:7]([c:8]2[cH:9][n:10][cH:11][s:12]2)([c:13]3[cH:32][c:17]4[c:16]([n:21][c:20]([c:19]([CH2:23][c:24]5[cH:25][cH:26][c:27]([cH:28][cH:29]5)[Cl:30])[c:18]4[Cl:31])[Cl:22])[cH:15][cH:14]3)[OH:33]",
+        "children": [
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccn1)C(Br)(O)c2cncs2",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1.[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[Mg:38][Br:39]>>[Mg:38][Br:39].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1cnccc1[Mg]Br",
+                    "in_stock": true
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "c1(C(=O)Br)cncs1",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[CH2:58]1[CH2:59][C:60](=[O:44])[N:55]([C:56]1=[O:57])[Br:37].[O:33]=[CH:7][c:8]1[cH:9][n:10][cH:11][s:12]1>>[O:57]=[C:56]1[CH2:58][CH2:59][C:60](=[O:44])[NH:55]1.[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "O=Cc1cncs1",
+                            "in_stock": true
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "C1CC(=O)N(C1=O)Br",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 2,
+                        "tree_node_id": 3203,
+                        "rule_id": 88,
+                        "rule_source": "policy",
+                        "rule_key": "policy:88"
+                      }
+                    ],
+                    "in_stock": false
+                  }
+                ],
+                "step_id": 4,
+                "tree_node_id": 288,
+                "rule_id": 518,
+                "rule_source": "policy",
+                "rule_key": "policy:518"
+              }
+            ],
+            "in_stock": false
+          },
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccc1Cc2c(c3cc(ccc3nc2Cl)B(O)O)Cl)Cl",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[O:43]=[C:42]1[CH2:41][CH2:40][C:53](=[O:54])[N:52]1[Cl:30].[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31]>>[O:54]=[C:53]1[CH2:40][CH2:41][C:42](=[O:43])[NH:52]1.[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30]",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1ccccc1Cc2c(c3cc(ccc3nc2Cl)B(O)O)Cl",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[CH2:65]([O:64][B:34]([O:35][CH2:62][CH3:63])[O:36][CH2:61][CH3:67])[CH3:66].[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:20]([n:21][c:16]3[c:17]([c:18]2[Cl:31])[cH:32][c:13]([cH:14][cH:15]3)[Br:68])[Cl:22]>>[BrH:68].[CH3:62][CH3:63].[CH3:66][CH2:65][OH:64].[CH3:67][CH3:61].[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31]",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "C(OB(OCC)OCC)C",
+                            "in_stock": true
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "c1ccccc1Cc2c(nc3c(c2Cl)cc(cc3)Br)Cl",
+                            "children": [
+                              {
+                                "type": "reaction",
+                                "smiles": "[O:47]=[C:46]1[CH2:48][CH2:49][C:50](=[O:51])[N:45]1[Cl:31].[cH:26]1[cH:25][c:24]([cH:29][cH:28][cH:27]1)[CH2:23][c:19]2[cH:18][c:17]3[c:16]([n:21][c:20]2[Cl:22])[cH:15][cH:14][c:13]([cH:32]3)[Br:68]>>[O:51]=[C:50]1[CH2:49][CH2:48][C:46](=[O:47])[NH:45]1.[cH:25]1[cH:26][cH:27][cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:20]([n:21][c:16]3[c:17]([c:18]2[Cl:31])[cH:32][c:13]([cH:14][cH:15]3)[Br:68])[Cl:22]",
+                                "children": [
+                                  {
+                                    "type": "mol",
+                                    "smiles": "c1cc(ccc1)Cc2cc3c(nc2Cl)ccc(c3)Br",
+                                    "in_stock": true
+                                  },
+                                  {
+                                    "type": "mol",
+                                    "smiles": "O=C1CCC(=O)N1Cl",
+                                    "in_stock": true
+                                  }
+                                ],
+                                "step_id": 0,
+                                "tree_node_id": 10805,
+                                "rule_id": 145,
+                                "rule_source": "policy",
+                                "rule_key": "policy:145"
+                              }
+                            ],
+                            "in_stock": false
+                          }
+                        ],
+                        "step_id": 1,
+                        "tree_node_id": 3209,
+                        "rule_id": 2082,
+                        "rule_source": "policy",
+                        "rule_key": "policy:2082"
+                      }
+                    ],
+                    "in_stock": false
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "O=C1CCC(=O)N1Cl",
+                    "in_stock": true
+                  }
+                ],
+                "step_id": 3,
+                "tree_node_id": 2263,
+                "rule_id": 145,
+                "rule_source": "policy",
+                "rule_key": "policy:145"
+              }
+            ],
+            "in_stock": false
+          }
+        ],
+        "step_id": 5,
+        "tree_node_id": 9,
+        "rule_id": 826,
+        "rule_source": "policy",
+        "rule_key": "policy:826"
+      }
+    ],
+    "in_stock": false
+  },
+  "11302": {
+    "type": "mol",
+    "smiles": "c1cnccc1C(c2cncs2)(c3cc4c(nc(c(Cc5ccc(cc5)Cl)c4Cl)Cl)cc3)O",
+    "children": [
+      {
+        "type": "reaction",
+        "smiles": "[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2>>[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[C:7]([c:8]2[cH:9][n:10][cH:11][s:12]2)([c:13]3[cH:32][c:17]4[c:16]([n:21][c:20]([c:19]([CH2:23][c:24]5[cH:25][cH:26][c:27]([cH:28][cH:29]5)[Cl:30])[c:18]4[Cl:31])[Cl:22])[cH:15][cH:14]3)[OH:33]",
+        "children": [
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccn1)C(Br)(O)c2cncs2",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1.[cH:1]1[cH:2][n:3][cH:4][cH:5][c:6]1[Mg:38][Br:39]>>[Mg:38][Br:39].[cH:2]1[cH:1][c:6]([cH:5][cH:4][n:3]1)[C:7]([Br:37])([OH:33])[c:8]2[cH:9][n:10][cH:11][s:12]2",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "c1cnccc1[Mg]Br",
+                    "in_stock": true
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "c1(C(=O)Br)cncs1",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[CH2:54]1[CH2:55][C:56](=[O:44])[N:51]([C:52]1=[O:53])[Br:37].[O:33]=[CH:7][c:8]1[cH:9][n:10][cH:11][s:12]1>>[O:53]=[C:52]1[CH2:54][CH2:55][C:56](=[O:44])[NH:51]1.[c:8]1([C:7](=[O:33])[Br:37])[cH:9][n:10][cH:11][s:12]1",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "O=Cc1cncs1",
+                            "in_stock": true
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "C1CC(=O)N(C1=O)Br",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 2,
+                        "tree_node_id": 3227,
+                        "rule_id": 88,
+                        "rule_source": "policy",
+                        "rule_key": "policy:88"
+                      }
+                    ],
+                    "in_stock": false
+                  }
+                ],
+                "step_id": 4,
+                "tree_node_id": 288,
+                "rule_id": 518,
+                "rule_source": "policy",
+                "rule_key": "policy:518"
+              }
+            ],
+            "in_stock": false
+          },
+          {
+            "type": "mol",
+            "smiles": "c1cc(ccc1Cc2c(c3cc(ccc3nc2Cl)B(O)O)Cl)Cl",
+            "children": [
+              {
+                "type": "reaction",
+                "smiles": "[O:43]=[C:42]1[CH2:41][CH2:40][C:49](=[O:50])[N:48]1[Cl:31].[OH:35][B:34]([OH:36])[c:13]1[cH:32][c:17]2[c:16]([cH:15][cH:14]1)[n:21][c:20]([Cl:22])[c:19]([CH2:23][c:24]3[cH:25][cH:26][c:27]([cH:28][cH:29]3)[Cl:30])[cH:18]2>>[O:50]=[C:49]1[CH2:40][CH2:41][C:42](=[O:43])[NH:48]1.[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:18]([c:17]3[cH:32][c:13]([cH:14][cH:15][c:16]3[n:21][c:20]2[Cl:22])[B:34]([OH:35])[OH:36])[Cl:31])[Cl:30]",
+                "children": [
+                  {
+                    "type": "mol",
+                    "smiles": "OB(O)c1cc2c(cc1)nc(Cl)c(Cc3ccc(cc3)Cl)c2",
+                    "children": [
+                      {
+                        "type": "reaction",
+                        "smiles": "[CH3:64][CH:63]([CH3:45])[O:35][B:34]([O:59][CH:58]([CH3:46])[CH3:47])[O:36][CH:60]([CH3:61])[CH3:62].[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:20]([n:21][c:16]3[c:17]([cH:32][c:13]([cH:14][cH:15]3)[Br:57])[cH:18]2)[Cl:22])[Cl:30]>>[BrH:57].[CH3:46][CH:58]([CH3:47])[OH:59].[CH3:61][CH2:60][CH3:62].[CH3:64][CH2:63][CH3:45].[OH:35][B:34]([OH:36])[c:13]1[cH:32][c:17]2[c:16]([cH:15][cH:14]1)[n:21][c:20]([Cl:22])[c:19]([CH2:23][c:24]3[cH:25][cH:26][c:27]([cH:28][cH:29]3)[Cl:30])[cH:18]2",
+                        "children": [
+                          {
+                            "type": "mol",
+                            "smiles": "c1cc(ccc1Cc2c(nc3c(cc(cc3)Br)c2)Cl)Cl",
+                            "children": [
+                              {
+                                "type": "reaction",
+                                "smiles": "[cH:14]1[c:13]([cH:32][c:17]2[c:16]([cH:15]1)[n:21][c:20]([Cl:22])[c:19]([cH:18]2)[CH2:23][Cl:68])[Br:57].[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[B:65]([OH:66])[OH:67])[Cl:30]>>[ClH:68].[OH:66][BH:65][OH:67].[cH:25]1[cH:26][c:27]([cH:28][cH:29][c:24]1[CH2:23][c:19]2[c:20]([n:21][c:16]3[c:17]([cH:32][c:13]([cH:14][cH:15]3)[Br:57])[cH:18]2)[Cl:22])[Cl:30]",
+                                "children": [
+                                  {
+                                    "type": "mol",
+                                    "smiles": "c1cc(ccc1B(O)O)Cl",
+                                    "in_stock": true
+                                  },
+                                  {
+                                    "type": "mol",
+                                    "smiles": "c1c(cc2c(c1)nc(Cl)c(c2)CCl)Br",
+                                    "in_stock": true
+                                  }
+                                ],
+                                "step_id": 0,
+                                "tree_node_id": 11302,
+                                "rule_id": 1108,
+                                "rule_source": "policy",
+                                "rule_key": "policy:1108"
+                              }
+                            ],
+                            "in_stock": false
+                          },
+                          {
+                            "type": "mol",
+                            "smiles": "CC(C)OB(OC(C)C)OC(C)C",
+                            "in_stock": true
+                          }
+                        ],
+                        "step_id": 1,
+                        "tree_node_id": 6427,
+                        "rule_id": 337,
+                        "rule_source": "policy",
+                        "rule_key": "policy:337"
+                      }
+                    ],
+                    "in_stock": false
+                  },
+                  {
+                    "type": "mol",
+                    "smiles": "O=C1CCC(=O)N1Cl",
+                    "in_stock": true
+                  }
+                ],
+                "step_id": 3,
+                "tree_node_id": 2264,
+                "rule_id": 145,
+                "rule_source": "policy",
+                "rule_key": "policy:145"
+              }
+            ],
+            "in_stock": false
+          }
+        ],
+        "step_id": 5,
+        "tree_node_id": 9,
+        "rule_id": 826,
+        "rule_source": "policy",
+        "rule_key": "policy:826"
+      }
+    ],
+    "in_stock": false
+  }
+}

@@ -1,6 +1,7 @@
 """Module containing classes and functions for manipulating reactions and reaction
 rules."""
 
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -13,6 +14,8 @@ from chython.reactor.base import (
 )
 
 from synplan.chem.utils import validate_and_canonicalize
+
+logger = logging.getLogger(__name__)
 
 
 class Reaction(ReactionContainer):
@@ -260,3 +263,60 @@ def apply_reaction_rule(
 
         if not multirule:
             break
+
+
+def reaction_rules_appliance(
+    molecule: MoleculeContainer, reaction_rules: list[CanonicalRetroReactor]
+) -> tuple[list[int], list[int]]:
+    """Applies each reaction rule from the list of reaction rules to a given molecule
+    and returns the indexes of the successfully applied regular and prioritized reaction
+    rules.
+
+    :param molecule: The input molecule.
+    :param reaction_rules: The list of reaction rules.
+    :return: The two lists of indexes of successfully applied regular reaction rules and
+        priority reaction rules.
+    """
+
+    applied_rules, priority_rules = [], []
+    for i, rule in enumerate(reaction_rules):
+        rule_applied = False
+        rule_prioritized = False
+
+        try:
+            for reaction in rule([molecule]):
+                for prod in reaction.products:
+                    tmp_prod = prod.copy()
+                    tmp_prod.remove_coordinate_bonds(keep_to_terminal=False)
+                    tmp_prod.kekule()
+                    if tmp_prod.check_valence():
+                        break
+                    rule_applied = True
+
+                    # check priority rules
+                    if len(reaction.products) > 1:
+                        # check coupling retro manual
+                        if all(len(mol) > 6 for mol in reaction.products):
+                            if (
+                                sum(len(mol) for mol in reaction.products)
+                                - len(reaction.reactants[0])
+                                < 6
+                            ):
+                                rule_prioritized = True
+                    else:
+                        # check cyclization retro manual
+                        if sum(len(mol.sssr) for mol in reaction.products) < sum(
+                            len(mol.sssr) for mol in reaction.reactants
+                        ):
+                            rule_prioritized = True
+            #
+            if rule_applied:
+                applied_rules.append(i)
+                #
+                if rule_prioritized:
+                    priority_rules.append(i)
+        except Exception as e:
+            logger.debug(e)
+            continue
+
+    return applied_rules, priority_rules

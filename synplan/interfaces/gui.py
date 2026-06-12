@@ -11,6 +11,13 @@ import streamlit as st
 from huggingface_hub.utils import disable_progress_bars
 from streamlit_ketcher import st_ketcher
 
+from synplan.chem.reaction.routes.clustering import *
+from synplan.chem.reaction.routes.io import make_json
+from synplan.chem.reaction.routes.representation import *
+from synplan.chem.reaction.routes.visualisation import (
+    cgr_display,
+    depict_custom_reaction,
+)
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.search import extract_tree_stats
 from synplan.mcts.tree import Tree

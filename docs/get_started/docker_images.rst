@@ -11,9 +11,9 @@ Registry and tags
 
 Set your version once (replace with an existing tag if needed):
 
-.. code-block:: bash
+.. parsed-literal::
 
-   VERSION=1.5.0
+   VERSION=\ |release|
 
 Pull images
 ~~~~~~~~~~~

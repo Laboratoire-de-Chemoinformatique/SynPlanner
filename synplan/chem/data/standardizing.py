@@ -923,7 +923,7 @@ def _make_timeout_result(exc: Exception, items: list[str]) -> BatchResult:
 
 # -- Error taxonomy for categorized summaries --
 # Stages / chython exceptions that represent noisy *data*, not pipeline bugs.
-_DATA_ERROR_STAGES = frozenset(
+DATA_ERROR_STAGES = frozenset(
     {
         "CheckValence",
         "ReactionMapping",
@@ -934,7 +934,7 @@ _DATA_ERROR_STAGES = frozenset(
         "parse",
     }
 )
-_DATA_ERROR_TYPES = frozenset(
+DATA_ERROR_TYPES = frozenset(
     {
         "InvalidAromaticRing",
         "MappingError",
@@ -964,7 +964,7 @@ def _print_error_summary(
         pipeline_errors: list[str] = []
         for (stage, etype), count in error_counts.most_common():
             label = f"{stage}/{etype}={count}"
-            if stage in _DATA_ERROR_STAGES or etype in _DATA_ERROR_TYPES:
+            if stage in DATA_ERROR_STAGES or etype in DATA_ERROR_TYPES:
                 data_errors.append(label)
             else:
                 pipeline_errors.append(label)

@@ -12,12 +12,14 @@ from chython.containers import MoleculeContainer
 from pytorch_lightning import Trainer
 from torch.utils.data import random_split
 from torch_geometric.data.lightning import LightningDataset
+from tqdm.auto import tqdm
 
 from synplan.chem.precursor import compose_precursors
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.mcts.tree import Tree
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training.preprocessing import ValueNetworkDataset
+from synplan.ml.training.trainers import LitValue
 from synplan.utils.config import (
     PolicyNetworkConfig,
     TreeConfig,
@@ -54,7 +56,7 @@ def create_value_network(value_config: ValueNetworkConfig) -> ValueNetwork:
 
     with DisableLogger(), HiddenPrints():
         trainer = Trainer()
-        trainer.strategy.connect(value_network)
+        trainer.strategy.connect(LitValue(value_network))
         trainer.save_checkpoint(weights_path)
 
     return value_network
@@ -240,6 +242,7 @@ def tune_value_network(
 
     current_weights = value_config.weights_path
     value_network = load_value_net(ValueNetwork, current_weights)
+    lit_value = LitValue(value_network)
 
     with DisableLogger(), HiddenPrints():
         trainer = Trainer(
@@ -252,8 +255,8 @@ def tune_value_network(
             enable_progress_bar=False,
         )
 
-        trainer.fit(value_network, datamodule)
-        val_score = trainer.validate(value_network, datamodule.val_dataloader())[0]
+        trainer.fit(lit_value, datamodule)
+        val_score = trainer.validate(lit_value, datamodule.val_dataloader())[0]
         trainer.save_checkpoint(current_weights)
 
     print(f"Value network balanced accuracy: {val_score['val_balanced_accuracy']}")
@@ -299,8 +302,6 @@ def run_planning(
     :param building_blocks_path:
     :param targets_batch_id:
     """
-    from tqdm.auto import tqdm
-
     print(f"\nProcess batch number {targets_batch_id}")
     tree_list = []
     tree_config.silent = False

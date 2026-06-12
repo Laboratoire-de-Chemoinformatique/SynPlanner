@@ -1,35 +1,21 @@
-"""Compatibility wrapper for :mod:`synplan.routes.route_cgr`."""
+"""Back-compat shim; import from `synplan.chem.reaction.routes.representation` instead."""
 
-from typing import TYPE_CHECKING
+from synplan._compat import deprecated_module
 
-from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
-from chython.containers.bonds import DynamicBond
+deprecated_module(__name__, "synplan.chem.reaction.routes.representation")
 
-from synplan.routes.route_cgr import *
-from synplan.routes.route_cgr import __all__ as _route_cgr_all
-from synplan.routes.route_cgr.builder import _bond_key
-
-if TYPE_CHECKING:
-    from synplan.mcts.tree import Tree
-else:
-    # Declared for static export checks; resolved lazily by ``__getattr__``.
-    Tree: object
-
-__all__ = [
-    *_route_cgr_all,
-    "CGRContainer",
-    "DynamicBond",
-    "MoleculeContainer",
-    "ReactionContainer",
-    "Tree",
-    "_bond_key",
-]
-
-
-def __getattr__(name):
-    if name == "Tree":
-        from synplan.mcts.tree import Tree as _Tree
-
-        globals()["Tree"] = _Tree
-        return _Tree
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+from synplan.chem.reaction.routes.representation import *
+from synplan.chem.reaction.routes.representation import (
+    compose_all_route_cgrs as compose_all_route_cgrs,
+    compose_all_sb_cgrs as compose_all_sb_cgrs,
+    compose_route_cgr as compose_route_cgr,
+    compose_sb_cgr as compose_sb_cgr,
+    extract_reactions as extract_reactions,
+    find_next_atom_num as find_next_atom_num,
+    get_clean_mapping as get_clean_mapping,
+    get_leaving_groups as get_leaving_groups,
+    process_first_reaction as process_first_reaction,
+    process_target_blocks as process_target_blocks,
+    update_reaction_dict as update_reaction_dict,
+    validate_molecule_components as validate_molecule_components,
+)

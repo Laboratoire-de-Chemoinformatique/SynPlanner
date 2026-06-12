@@ -45,30 +45,43 @@ Build GUI Docker image
 Bump version
 ------------
 
-Version is managed from ``pyproject.toml`` with ``uv version``.
+The version lives in one place — ``pyproject.toml`` (``[project] version``).
+``synplan.__version__`` and the Sphinx docs derive from it automatically.
+
+Recommended: one command does the bump *and* the dependent edits.
 
 .. code-block:: bash
 
-   # patch: 1.4.3 -> 1.4.4
-   uv version --bump patch --no-sync
+   uv run release patch              # or: minor, major
+   uv run release patch --dry-run    # preview, writes nothing
 
-   # minor: 1.4.4 -> 1.5.0
-   uv version --bump minor --no-sync
+This runs ``uv version --bump`` (updating ``pyproject.toml`` and ``uv.lock``),
+stamps the ``CHANGELOG.md`` ``[Unreleased]`` section with the new version and
+date plus footer links, and rotates ``docs/_static/switcher.json``. The GHCR
+``VERSION`` in ``docs/get_started/docker_images.rst`` renders from Sphinx
+``|release|`` and needs no edit. Review the diff, then commit and tag
+``vX.Y.Z``.
 
-   # major: 1.5.0 -> 2.0.0
-   uv version --bump major --no-sync
+Manual path
+~~~~~~~~~~~
 
-This updates ``pyproject.toml`` and relocks the project without syncing the
-local environment.
+To bump only ``pyproject.toml`` + ``uv.lock`` without the dependent edits:
 
-**Manual steps after bumping:**
+.. code-block:: bash
 
-1. Update ``docs/_static/switcher.json``: add the old version to the list and
-   rename ``(stable)`` to the new version.
-2. Update ``CHANGELOG.md``: move items from ``[Unreleased]`` into a new
-   section and add footer links.
-3. Update ``docs/get_started/docker_images.rst`` so the documented GHCR
-   ``VERSION`` matches the new release.
+   uv version                          # show current, e.g. synplanner 1.5.1
+   uv version --short                  # 1.5.1
+   uv version --bump patch --no-sync   # 1.5.1 -> 1.5.2
+
+``--no-sync`` writes ``pyproject.toml`` and relocks ``uv.lock`` without
+reinstalling the local environment. Use ``--dry-run`` to preview, or
+``--frozen`` to skip the lockfile update entirely.
+
+.. note::
+
+   ``uv version`` only touches ``[project] version``. After a manual bump,
+   update ``CHANGELOG.md`` and ``docs/_static/switcher.json`` yourself — or
+   just use ``uv run release``, which does both.
 
 Publish to GHCR (maintainers)
 -----------------------------

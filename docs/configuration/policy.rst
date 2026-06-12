@@ -10,6 +10,7 @@ Download example configuration
 ------------------------------
 
 - GitHub: `configs/policy_training.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/policy_training.yaml>`_
+- GitHub: `configs/mhn_ranking_policy_training.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/mhn_ranking_policy_training.yaml>`_
 
 Quickstart (CLI)
 ----------------
@@ -37,6 +38,98 @@ Train a policy network using the repository configuration in ``configs/policy_tr
     logger:
       type: csv
 
+MHN ranking policy
+------------------
+
+``architecture: mhn_ranking`` replaces the fixed ranking head with a dense
+molecule-rule association model inspired by
+`MHNreact <https://github.com/ml-jku/mhn-react>`_ and the
+`MHNreact paper <https://doi.org/10.1021/acs.jcim.1c01065>`_. SynPlanner keeps
+its graph embedder for product molecules and can encode rules either from
+Chython fingerprints or from native QueryCGR rule graphs. Rule embeddings are
+encoded lazily on the first prediction and cached for reuse.
+
+.. code-block:: bash
+
+   synplan ranking_policy_training \
+     --config configs/mhn_ranking_policy_training.yaml \
+     --policy_data reaction_rules_policy_data.tsv \
+     --results_dir mhn_ranking_policy_network
+
+The rules TSV is inferred from the extracted policy mapping name:
+``<base>_policy_data.tsv`` uses ``<base>.tsv``. Keep both generated files
+together when training ``mhn_ranking``.
+
+``embedder_type`` controls the product molecule encoder. Use
+``rule_encoder_type: query_cgr_graph`` (with ``rule_embedder.embedder_type: gps``)
+to embed labeled QueryCGR rule graphs instead of Morgan rule fingerprints;
+``rule_fp_*`` fields are used only by ``rule_encoder_type: fingerprint``.
+QueryCGR rule graphs currently require the rule-side GPS embedder because rule
+bond dynamics are encoded as edge attributes. By default, the rule graph GPS
+shares ``vector_dim``, ``num_conv_layers``, ``heads``, and ``attn_type`` with the
+product graph encoder. Set ``rule_embedder.vector_dim``,
+``rule_embedder.num_conv_layers``, ``rule_embedder.heads``, or
+``rule_embedder.attn_type`` when the rule encoder should use a different GPS
+shape. It uses the global ``dropout`` and ``attn_dropout`` values unless
+``rule_embedder.dropout`` or ``rule_embedder.attn_dropout`` are set.
+
+To switch the default rule-fingerprint configuration to QueryCGR rule graphs,
+while keeping product GPS settings at ``vector_dim: 256``,
+``num_conv_layers: 5``, and ``heads: 8`` but using Performer attention for the
+rule GPS:
+
+.. code-block:: yaml
+
+   embedder_type: gps
+   vector_dim: 256
+   num_conv_layers: 5
+   heads: 8
+   attn_type: multihead
+
+   rule_encoder_type: query_cgr_graph
+   rule_embedder:
+     embedder_type: gps
+     attn_type: performer
+
+Common MHN configurations:
+
+.. code-block:: yaml
+
+   # Product GCN + rule fingerprints
+   embedder_type: gcn
+   rule_encoder_type: fingerprint
+
+   # Product GCN + QueryCGR rule graphs
+   embedder_type: gcn
+   rule_encoder_type: query_cgr_graph
+   rule_embedder:
+     embedder_type: gps
+
+   # Product GPS + rule fingerprints
+   embedder_type: gps
+   rule_encoder_type: fingerprint
+
+   # Product GPS + QueryCGR rule graphs
+   embedder_type: gps
+   rule_encoder_type: query_cgr_graph
+   rule_embedder:
+     embedder_type: gps
+
+Standalone MHN ranking checkpoints can score unseen, reordered, or replaced
+runtime rule sets. Combined filtering + MHN ranking policies remain restricted
+to the filtering checkpoint's ordered rule set because filtering heads have a
+fixed output index. SynPlanner validates dimensions; the supplied filtering
+rules must retain their training order.
+
+.. note::
+
+   Dynamic MHN rule associations are prepared by
+   ``predict_reaction_rules(precursor, reaction_rules)``. The lighter
+   ``predict_reaction_rules_light(precursor, reaction_rules_len)`` API receives
+   only an integer count, so it cannot bind a new runtime rule set by itself;
+   use the full prediction path when MHN rules may change, or call the light
+   path only after the same wrapper has already prepared the same rule set.
+
 **Configuration parameters**
 
 .. table::
@@ -51,13 +144,58 @@ Train a policy network using the repository configuration in ``configs/policy_tr
     dropout                            The dropout value
     num_epoch                          The number of training epochs
     batch_size                         The size of the training batch of input molecular graphs
-    embedder_type                      Graph embedder: ``gcn``, ``gcn_concat``, or ``gps``
+    embedder_type                      Graph embedder: ``gcn``, ``gcn_concat``, or ``gps``; ``gcn_concat`` requires ``vector_dim`` divisible by ``num_conv_layers``
+    architecture                       Ranking head: ``linear`` (default) or ``mhn_ranking``
     heads                              Number of attention heads for ``embedder_type: gps``
     attn_type                          GPS attention type: ``multihead``, ``performer``, or ``null``
     attn_dropout                       Attention dropout for GPS layers
     log_grad_norm                      If true, log module-level gradient norms during training
     logger                             Training logger configuration (see below). Set to ``null`` to disable.
+    association_dim                    MHN molecule-rule association dimension
+    beta                               Scale applied to MHN association logits
+    normalize_associations             Apply non-affine LayerNorm after each MHN projection
+    rule_encoder_type                  Rule encoder mode: ``fingerprint`` (default) or ``query_cgr_graph``
+    rule_graph_batch_size              Rule graph batch size used while embedding all rules
+    rule_graph_schema_version          QueryCGR rule graph schema version included in digests and caches
+    rule_fp_size                       Chython Morgan rule fingerprint size; must be a power of two
+    rule_fp_min_radius                 Minimum Chython Morgan fingerprint radius
+    rule_fp_max_radius                 Maximum Chython Morgan fingerprint radius
+    rule_fp_active_bits                Active bits per Chython Morgan fingerprint feature
+    rule_fp_type                       Rule fingerprint source: ``query_cgr`` (default) or ``legacy``
+    rule_fp_schema_version             Rule fingerprint schema version included in digests and caches
+    rule_embedder.embedder_type        Rule graph embedder for ``query_cgr_graph``: ``gps`` (required)
+    rule_embedder.vector_dim           Optional hidden dimension override for the rule graph GPS; defaults to ``vector_dim``
+    rule_embedder.num_conv_layers      Optional layer-count override for the rule graph GPS; defaults to ``num_conv_layers``
+    rule_embedder.heads                Optional attention-head override for the rule graph GPS; defaults to ``heads``
+    rule_embedder.attn_type            Optional attention type override for the rule graph GPS; defaults to ``attn_type``
+    rule_embedder.dropout              Optional dropout override for the rule-side projection and graph embedder; defaults to ``dropout``
+    rule_embedder.attn_dropout         Optional attention-dropout override for the rule-side GPS embedder; defaults to ``attn_dropout``
     ================================== =========================================================================
+
+Benchmark recipe
+----------------
+
+Train the baseline and MHN ranking policies against the same extracted rules and
+``*_policy_data.tsv`` mapping, then compare validation ``balanced_accuracy_y``,
+``top5_accuracy_y``, and ``top10_accuracy_y`` logs. For planning benchmarks, use
+the same targets, building blocks, reaction rules, and tree configuration for
+both checkpoints. Record checkpoint size, first-expansion latency (which
+includes lazy MHN rule binding), warm expansion latency, and the generated
+``tree_search_stats.csv`` summary.
+
+.. code-block:: bash
+
+   synplan ranking_policy_training \
+     --config configs/policy_training.yaml \
+     --policy_data reaction_rules_policy_data.tsv \
+     --results_dir benchmark/linear
+
+   synplan ranking_policy_training \
+     --config configs/mhn_ranking_policy_training.yaml \
+     --policy_data reaction_rules_policy_data.tsv \
+     --results_dir benchmark/mhn_ranking
+
+   du -h benchmark/linear/*.ckpt benchmark/mhn_ranking/*.ckpt
 
 Training logger
 ---------------
