@@ -10,6 +10,7 @@ import torch
 
 from synplan.chem.precursor import Precursor, compose_precursors
 from synplan.chem.rdkit_utils import RDKitScore
+from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
 from synplan.ml.networks.checkpoint import load_network_from_checkpoint
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training import mol_to_pyg
