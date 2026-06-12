@@ -92,6 +92,11 @@ Notes:
 - Tutorial 14 for the MHN workflow.
 
 
+## [1.5.1] - 2026-06-04
+
+### Fixed
+- Fixed score assignment for priority-rule nodes during evaluation.
+
 ## [1.5.0] - 2026-05-16
 
 > Migration guide: see `docs/user_guide/migration.rst`.
@@ -620,8 +625,7 @@ Notes:
 - CLI interface (`synplan` command)
 - Docker images for CLI and GUI
 
-[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.2...HEAD
-[1.5.2]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.0...v1.5.2
+[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.0...HEAD
 [1.5.0]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.4...v1.5.0
 [1.4.4]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.2...v1.4.3

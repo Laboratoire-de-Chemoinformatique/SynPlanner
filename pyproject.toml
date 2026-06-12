@@ -1,6 +1,6 @@
 [project]
 name = "SynPlanner"
-version = "1.5.0"
+version = "1.5.1"
 description = "Toolbox for chemical synthesis planning"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
@@ -74,6 +74,7 @@ docs = [
 
 [project.scripts]
 synplan = "synplan.interfaces.cli:synplan"
+release = "scripts.release:main"
 sascore-benchmark = "scripts.sascore_bench.run_benchmark:main"
 sascore-plot = "scripts.sascore_bench.plot_results:main"
 
@@ -137,20 +138,6 @@ explicit = true
 name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
-
-# -- optional bump-my-version compatibility ----------------------------------
-[tool.bumpversion]
-current_version = "1.5.0"
-commit = false
-tag = false
-
-[[tool.bumpversion.files]]
-filename = "pyproject.toml"
-search = 'version = "{current_version}"'
-replace = 'version = "{new_version}"'
-
-# NOTE: docs/_static/switcher.json, docs/get_started/docker_images.rst, and
-# CHANGELOG.md need manual updates for release notes and published image tags.
 
 [tool.ruff]
 line-length = 88

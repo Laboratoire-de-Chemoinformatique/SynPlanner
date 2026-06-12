@@ -85,6 +85,49 @@ def calc_num_routes_subclusters(subclusters):
     return count
 
 
+def build_route_fixture_clustering(route_fixture_name):
+    """Build clustering data from one generated route fixture."""
+    fixture_path = ROUTE_FIXTURES[route_fixture_name]
+    assert fixture_path.exists(), f"Test data missing: {fixture_path}"
+
+    routes = read_routes_json(fixture_path, to_dict=True)
+    assert routes, "Route fixture should contain at least one route"
+
+    route_cgrs = compose_all_route_cgrs(routes)
+    assert route_cgrs, "Route fixture should compose at least one RouteCGR"
+
+    sb_cgrs = compose_all_sb_cgrs(route_cgrs)
+    assert sb_cgrs, "Route fixture should compose at least one SB-CGR"
+
+    clusters = cluster_routes(sb_cgrs, use_strat=False)
+    assert clusters, "Route fixture should produce at least one cluster"
+
+    subclusters = subcluster_all_clusters(clusters, sb_cgrs, route_cgrs)
+    assert subclusters, "Route fixture should produce at least one subcluster"
+
+    return route_cgrs, sb_cgrs, clusters, subclusters
+
+
+def assert_route_fixture_clustering(
+    route_fixture_name, route_cgrs, sb_cgrs, clusters, subclusters
+):
+    """Assert the clustering invariants for one generated route fixture."""
+    assert set(sb_cgrs).issubset(set(route_cgrs))
+
+    total_routes = sum(cluster["group_size"] for cluster in clusters.values())
+    assert total_routes == len(sb_cgrs), (
+        f"Every SB-CGR route should cluster for {route_fixture_name}"
+    )
+
+    total_subclusters = calc_num_routes_subclusters(subclusters)
+    assert total_subclusters == total_routes, (
+        f"Total subclusters should match total routes for {route_fixture_name}"
+    )
+    assert sorted(subclusters.keys()) == sorted(clusters.keys()), (
+        f"Subcluster keys should match cluster keys for {route_fixture_name}"
+    )
+
+
 @pytest.mark.integration
 def test_route_fixture_clustering_pipeline(
     route_fixture_name,
@@ -94,19 +137,20 @@ def test_route_fixture_clustering_pipeline(
     fixture_subclusters,
 ):
     """Cluster and subcluster fixed routes without running MCTS planning."""
-    assert set(fixture_sb_cgrs).issubset(set(fixture_route_cgrs))
-
-    total_routes = sum(cluster["group_size"] for cluster in fixture_clusters.values())
-    assert total_routes == len(fixture_sb_cgrs), (
-        f"Every SB-CGR route should cluster for {route_fixture_name}"
+    assert_route_fixture_clustering(
+        route_fixture_name,
+        fixture_route_cgrs,
+        fixture_sb_cgrs,
+        fixture_clusters,
+        fixture_subclusters,
     )
 
-    total_subclusters = calc_num_routes_subclusters(fixture_subclusters)
-    assert total_subclusters == total_routes, (
-        f"Total subclusters should match total routes for {route_fixture_name}"
-    )
-    assert sorted(fixture_subclusters.keys()) == sorted(fixture_clusters.keys()), (
-        f"Subcluster keys should match cluster keys for {route_fixture_name}"
+
+@pytest.mark.integration
+def test_complex_molecule_clustering():
+    """Regression: complex target clustering uses a fixed route fixture."""
+    assert_route_fixture_clustering(
+        "complex", *build_route_fixture_clustering("complex")
     )
 
 

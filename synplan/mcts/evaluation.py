@@ -204,7 +204,6 @@ class EvaluationStrategy(ABC):
     Each concrete strategy implements a different evaluation method.
     """
 
-    @abstractmethod
     def evaluate_node(
         self,
         node,
@@ -213,6 +212,9 @@ class EvaluationStrategy(ABC):
     ) -> float:
         """Evaluate a node and return its score.
 
+        Priority-rule-derived nodes receive the highest score before the
+        configured evaluation method is applied.
+
         :param node: The node to evaluate.
         :param node_id: ID of the node.
         :param nodes: The tree's ``Node``-by-id mapping. Implementations read
@@ -220,6 +222,18 @@ class EvaluationStrategy(ABC):
             ``nodes[some_id].prob`` etc.
         :return: Evaluation score for the node.
         """
+        if node.rule_source is not None and node.rule_source != POLICY_SOURCE_NAME:
+            return 1.0
+        return self._evaluate_node(node=node, node_id=node_id, nodes=nodes)
+
+    @abstractmethod
+    def _evaluate_node(
+        self,
+        node,
+        node_id: int,
+        nodes: "dict[int, Node]",
+    ) -> float:
+        """Evaluate a policy-derived node or the root node."""
         pass
 
     @staticmethod
@@ -279,7 +293,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         )
         self.normalize = normalize
 
-    def evaluate_node(
+    def _evaluate_node(
         self,
         node,
         node_id: int,
@@ -365,7 +379,7 @@ class RDKitEvaluationStrategy(EvaluationStrategy):
         self.scorer = RDKitScore(score_function=score_function)
         self.normalize = normalize
 
-    def evaluate_node(
+    def _evaluate_node(
         self,
         node,
         node_id: int,
@@ -389,7 +403,7 @@ class PolicyEvaluationStrategy(EvaluationStrategy):
         """
         self.normalize = normalize
 
-    def evaluate_node(
+    def _evaluate_node(
         self,
         node,
         node_id: int,
@@ -414,7 +428,7 @@ class RandomEvaluationStrategy(EvaluationStrategy):
         """
         self.normalize = normalize
 
-    def evaluate_node(
+    def _evaluate_node(
         self,
         node,
         node_id: int,
