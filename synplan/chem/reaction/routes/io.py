@@ -285,3 +285,15 @@ def export_tree_to_csv(tree: "Tree", file_path: str = "routes.csv", route_id=Non
     if routes_dict is None:
         raise ValueError("Failed to extract reactions for the specified route_id.")
     write_routes_csv(routes_dict, file_path)
+
+
+__all__ = [
+    "export_tree_to_csv",
+    "export_tree_to_json",
+    "make_dict",
+    "make_json",
+    "read_routes_csv",
+    "read_routes_json",
+    "write_routes_csv",
+    "write_routes_json",
+]

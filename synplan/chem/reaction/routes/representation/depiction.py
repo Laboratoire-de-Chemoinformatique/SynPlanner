@@ -12,3 +12,6 @@ def depict_route_cgr(cgr, *args, **kwargs):
 
     with wide_cgr_renderer(cgr.__class__):
         return CGRContainer.depict(cgr, *args, **kwargs)
+
+
+__all__ = ["depict_route_cgr"]

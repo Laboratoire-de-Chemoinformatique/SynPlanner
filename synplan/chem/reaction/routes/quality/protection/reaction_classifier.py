@@ -219,6 +219,8 @@ def classify_reaction_type_detailed(
                         has_ring_closure = True
                         break
             except Exception:
+                # Ring perception (SSSR) is best-effort; if it fails we cannot
+                # confirm a ring closure here, so leave the flag False.
                 pass
         if has_ring_closure:
             break
@@ -230,6 +232,8 @@ def classify_reaction_type_detailed(
                     has_ring_opening = True
                     break
         except Exception:
+            # Ring perception (SSSR) is best-effort; if it fails we cannot
+            # confirm a ring opening here, so leave the flag False.
             pass
         if has_ring_opening:
             break
