@@ -18,7 +18,7 @@ from torch.utils.data import Subset, random_split
 from torch_geometric.data.lightning import LightningDataset
 
 from synplan.ml.networks.checkpoint import load_policy_network_from_checkpoint
-from synplan.ml.networks.mhn_ranking import MHNRankingNetwork
+from synplan.ml.networks.policy.mhnreact import MHNReact
 from synplan.ml.training.lightning import GradNormLogger, LitNetworkTrainer
 from synplan.ml.training.preprocessing import (
     FilteringPolicyDataset,
@@ -380,7 +380,7 @@ def run_policy_training(
 
 
 def mhn_tuning_config(
-    network: MHNRankingNetwork,
+    network: MHNReact,
     config: PolicyNetworkConfig | None,
 ) -> MHNRankingPolicyNetworkConfig:
     """Resolve the tuning config from a user config or the network hparams."""

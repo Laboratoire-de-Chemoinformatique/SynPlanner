@@ -1,4 +1,4 @@
-"""Rule encoders projecting reaction-rule representations into association space."""
+"""Rule embeddings projecting reaction-rule representations into association space."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from synplan.chem.reaction.rules.representation import (
     RULE_GRAPH_EDGE_FEATURE_DIM,
     RULE_GRAPH_NODE_FEATURE_DIM,
 )
-from synplan.ml.networks.embedders import build_graph_embedder
+from synplan.ml.networks.embedding.molecule import build_graph_embedder
 
 
 def _normalization(association_dim: int, normalize: bool) -> Module:
@@ -24,7 +24,7 @@ def _normalization(association_dim: int, normalize: bool) -> Module:
     return Identity()
 
 
-class RuleEncoder(Module):
+class RuleEmbedding(Module):
     """Encode reaction rules into the molecule-rule association space."""
 
     out_dim: int
@@ -38,7 +38,7 @@ class RuleEncoder(Module):
         """
 
 
-class FingerprintRuleEncoder(RuleEncoder):
+class FingerprintRuleEmbedding(RuleEmbedding):
     """Linear projection of fixed-size rule fingerprints."""
 
     def __init__(
@@ -62,7 +62,7 @@ class FingerprintRuleEncoder(RuleEncoder):
         return self.projection(rules.float())
 
 
-class QueryCGRRuleEncoder(RuleEncoder):
+class QueryCGRRuleEmbedding(RuleEmbedding):
     """Graph embedder + linear projection of QueryCGR rule graphs."""
 
     def __init__(

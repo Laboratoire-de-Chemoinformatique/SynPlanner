@@ -430,8 +430,8 @@ class MHNRankingPolicyNetworkConfig(PolicyNetworkConfig):
     """Modern-Hopfield ranking policy network training config.
 
     Extends the shared policy config with the MHN association knobs and the rule
-    representation. The molecule/product encoder uses the inherited base fields;
-    the rule encoder is configured by ``rule_embedder`` (a reusable
+    representation. The molecule/product embedding uses the inherited base fields;
+    the rule embedding is configured by ``rule_embedder`` (a reusable
     :class:`GraphEmbedderConfig` whose unset fields fall back to the molecule
     side). These fields live ONLY here, never on the base or linear config.
     """
@@ -444,7 +444,7 @@ class MHNRankingPolicyNetworkConfig(PolicyNetworkConfig):
     normalize_associations: bool = True
 
     # rule representation
-    rule_encoder_type: Literal["fingerprint", "query_cgr_graph"] = "fingerprint"
+    rule_embedding_type: Literal["fingerprint", "query_cgr_graph"] = "fingerprint"
     rule_fp_size: int = Field(default=2048, gt=0)
     rule_fp_min_radius: int = Field(default=1, gt=0)
     rule_fp_max_radius: int = Field(default=4, ge=0)
@@ -467,7 +467,7 @@ class MHNRankingPolicyNetworkConfig(PolicyNetworkConfig):
         → ``gps`` rule), so it doubles as the rule-field validator.
         """
         return RuleRepresentationConfig(
-            encoder_type=self.rule_encoder_type,
+            embedding_type=self.rule_embedding_type,
             fingerprint_config=RuleFingerprintConfig(
                 fp_size=self.rule_fp_size,
                 min_radius=self.rule_fp_min_radius,
@@ -487,7 +487,7 @@ class MHNRankingPolicyNetworkConfig(PolicyNetworkConfig):
         return self
 
     def network_kwargs(self) -> dict[str, Any]:
-        """Return the MHN association + rule-encoder kwargs for the network.
+        """Return the MHN association + rule-embedding kwargs for the network.
 
         The nested ``rule_embedder`` is expanded to the ``rule_*`` embedder kwargs
         the network expects (``None`` keeps the molecule-side fallback).
@@ -497,7 +497,7 @@ class MHNRankingPolicyNetworkConfig(PolicyNetworkConfig):
             "association_dim": self.association_dim,
             "beta": self.beta,
             "normalize_associations": self.normalize_associations,
-            "rule_encoder_type": self.rule_encoder_type,
+            "rule_embedding_type": self.rule_embedding_type,
             "rule_fp_size": self.rule_fp_size,
             "rule_fp_min_radius": self.rule_fp_min_radius,
             "rule_fp_max_radius": self.rule_fp_max_radius,

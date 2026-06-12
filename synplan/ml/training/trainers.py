@@ -26,11 +26,11 @@ from synplan.chem.reaction.rules.representation import (
 )
 from synplan.ml.featurization.fingerprints import rule_fingerprints_from_smarts
 from synplan.ml.featurization.rules import query_cgr_graphs_from_smarts
-from synplan.ml.networks.mhn_ranking import MHNRankingNetwork
-from synplan.ml.networks.policy import (
+from synplan.ml.networks.policy.linear import (
     FilteringPolicyNetwork,
     RankingPolicyNetwork,
 )
+from synplan.ml.networks.policy.mhnreact import MHNReact
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training.lightning import LitNetworkTrainer
 from synplan.utils.config import (
@@ -159,7 +159,7 @@ class LitFilteringPolicy(LitNetworkTrainer):
 class LitMHNRanking(LitNetworkTrainer):
     """Trains an :class:`MHNRankingNetwork` (softmax cross-entropy + metrics)."""
 
-    def __init__(self, network: MHNRankingNetwork) -> None:
+    def __init__(self, network: MHNReact) -> None:
         super().__init__(
             network, learning_rate=network.lr, batch_size=network.batch_size
         )
@@ -202,7 +202,7 @@ class LitMHNRanking(LitNetworkTrainer):
 def build_mhn_ranking_network(
     config: MHNRankingPolicyNetworkConfig,
     dataset: RankingPolicyDataset,
-) -> MHNRankingNetwork:
+) -> MHNReact:
     """Create an MHN network and attach training rules from policy data.
 
     File IO + rule featurization live here (training-side), not in the network.
@@ -212,12 +212,12 @@ def build_mhn_ranking_network(
     )
     n_rules = len(rule_smarts)
     validate_ranking_labels(dataset._data.y_rules, n_rules)
-    network = MHNRankingNetwork(config=config, n_rules=n_rules)
+    network = MHNReact(config=config, n_rules=n_rules)
     attach_training_rules(network, rule_smarts)
     return network
 
 
-def attach_training_rules(network: MHNRankingNetwork, rule_smarts) -> None:
+def attach_training_rules(network: MHNReact, rule_smarts) -> None:
     """Featurize ``rule_smarts`` and attach them to ``network`` for training."""
     representation_config = network.rule_representation_config
     network.n_rules = len(rule_smarts)
@@ -225,7 +225,7 @@ def attach_training_rules(network: MHNRankingNetwork, rule_smarts) -> None:
     network.rule_representation_digest = digest
     network.hparams["n_rules"] = network.n_rules
     network.hparams["rule_representation_digest"] = digest
-    if representation_config.encoder_type == "fingerprint":
+    if representation_config.embedding_type == "fingerprint":
         network._training_rule_graphs = []
         network.set_training_rule_fingerprints(
             rule_fingerprints_from_smarts(
@@ -244,9 +244,7 @@ def attach_training_rules(network: MHNRankingNetwork, rule_smarts) -> None:
         )
 
 
-def rebind_training_rules(
-    network: MHNRankingNetwork, policy_data_path: str | Path
-) -> None:
+def rebind_training_rules(network: MHNReact, policy_data_path: str | Path) -> None:
     """Re-attach training rules inferred from a new ranking policy mapping."""
     rule_smarts = load_rule_smarts(
         reaction_rules_path_from_policy_data(policy_data_path)

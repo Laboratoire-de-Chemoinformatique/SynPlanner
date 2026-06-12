@@ -35,7 +35,7 @@ class _MHNPolicy(torch.nn.Module):
     policy_type = "ranking"
     n_rules = 2
     rule_representation_config = RuleRepresentationConfig(
-        encoder_type="fingerprint",
+        embedding_type="fingerprint",
         fingerprint_config=RuleFingerprintConfig(
             fp_size=4,
             min_radius=1,
@@ -55,7 +55,7 @@ class _MHNPolicy(torch.nn.Module):
 
 class _MHNGraphPolicy(_MHNPolicy):
     rule_representation_config = RuleRepresentationConfig(
-        encoder_type="query_cgr_graph",
+        embedding_type="query_cgr_graph",
         fingerprint_config=RuleFingerprintConfig(
             fp_size=4,
             min_radius=1,

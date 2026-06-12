@@ -1,4 +1,4 @@
-"""Query-CGR graph tensorization for MHN rule encoders."""
+"""Query-CGR graph tensorization for MHN rule embeddings."""
 
 from __future__ import annotations
 

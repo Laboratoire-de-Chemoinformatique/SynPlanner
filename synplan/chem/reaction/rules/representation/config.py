@@ -36,11 +36,11 @@ RULE_GRAPH_NODE_FEATURE_DIM = _BASE_NODE_FEATURE_DIM + (
 RULE_GRAPH_EDGE_FEATURE_DIM = 16
 
 RuleFingerprintType = Literal["legacy", "query_cgr"]
-RuleEncoderType = Literal["fingerprint", "query_cgr_graph"]
+RuleEmbeddingType = Literal["fingerprint", "query_cgr_graph"]
 RuleGraphEmbedderType = Literal["gcn", "gcn_concat", "gps"]
 
 _RULE_FINGERPRINT_TYPES = {"legacy", "query_cgr"}
-_RULE_ENCODER_TYPES = {"fingerprint", "query_cgr_graph"}
+_RULE_EMBEDDING_TYPES = {"fingerprint", "query_cgr_graph"}
 _RULE_GRAPH_EMBEDDER_TYPES = {"gcn", "gcn_concat", "gps"}
 
 
@@ -122,7 +122,7 @@ def rule_fingerprint_digest(
 class RuleRepresentationConfig:
     """Configuration that fully identifies an MHN rule representation."""
 
-    encoder_type: RuleEncoderType = "fingerprint"
+    embedding_type: RuleEmbeddingType = "fingerprint"
     fingerprint_config: RuleFingerprintConfig = field(
         default_factory=RuleFingerprintConfig
     )
@@ -131,15 +131,18 @@ class RuleRepresentationConfig:
     graph_batch_size: int = 1024
 
     def __post_init__(self) -> None:
-        if self.encoder_type not in _RULE_ENCODER_TYPES:
-            expected = "', '".join(sorted(_RULE_ENCODER_TYPES))
-            raise ValueError(f"rule_encoder_type must be one of '{expected}'")
+        if self.embedding_type not in _RULE_EMBEDDING_TYPES:
+            expected = "', '".join(sorted(_RULE_EMBEDDING_TYPES))
+            raise ValueError(f"rule_embedding_type must be one of '{expected}'")
         if self.graph_embedder_type not in _RULE_GRAPH_EMBEDDER_TYPES:
             expected = "', '".join(sorted(_RULE_GRAPH_EMBEDDER_TYPES))
             raise ValueError(f"rule_embedder.embedder_type must be one of '{expected}'")
-        if self.encoder_type == "query_cgr_graph" and self.graph_embedder_type != "gps":
+        if (
+            self.embedding_type == "query_cgr_graph"
+            and self.graph_embedder_type != "gps"
+        ):
             raise ValueError(
-                "rule_encoder_type='query_cgr_graph' requires "
+                "rule_embedding_type='query_cgr_graph' requires "
                 "rule_embedder.embedder_type='gps' because QueryCGR bond dynamics are "
                 "encoded as edge attributes"
             )
@@ -151,9 +154,9 @@ class RuleRepresentationConfig:
     def to_digest_payload(self) -> dict[str, int | str | dict[str, int | str]]:
         """Return stable serializable values that affect rule representations."""
         payload: dict[str, int | str | dict[str, int | str]] = {
-            "encoder_type": self.encoder_type,
+            "embedding_type": self.embedding_type,
         }
-        if self.encoder_type == "fingerprint":
+        if self.embedding_type == "fingerprint":
             payload["fingerprint_config"] = self.fingerprint_config.to_digest_payload()
         else:
             payload["graph_schema_version"] = self.graph_schema_version
@@ -188,7 +191,7 @@ __all__ = [
     "RULE_GRAPH_RING_SIZE_LABELS",
     "RULE_GRAPH_SCHEMA_VERSION",
     "RULE_GRAPH_SIDES",
-    "RuleEncoderType",
+    "RuleEmbeddingType",
     "RuleFingerprintConfig",
     "RuleFingerprintType",
     "RuleGraphEmbedderType",

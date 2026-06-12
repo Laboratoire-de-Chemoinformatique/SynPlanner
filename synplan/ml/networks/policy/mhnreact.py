@@ -17,14 +17,14 @@ from torch_geometric.data import Data
 from torch_geometric.data.batch import Batch
 
 from synplan.ml.networks.base import GraphMCTSNetwork
-from synplan.ml.networks.rule_encoders import (
-    FingerprintRuleEncoder,
-    QueryCGRRuleEncoder,
+from synplan.ml.networks.embedding.rule import (
+    FingerprintRuleEmbedding,
+    QueryCGRRuleEmbedding,
 )
 from synplan.utils.config import MHNRankingPolicyNetworkConfig
 
 
-class MHNRankingNetwork(GraphMCTSNetwork):
+class MHNReact(GraphMCTSNetwork):
     """Ranking policy associating molecule embeddings with rule embeddings."""
 
     architecture = "mhn_ranking"
@@ -32,7 +32,7 @@ class MHNRankingNetwork(GraphMCTSNetwork):
     CONFIG_CLASS = MHNRankingPolicyNetworkConfig
 
     def __init__(self, config: MHNRankingPolicyNetworkConfig, n_rules: int) -> None:
-        """Build embedder, molecule projection and the rule encoder.
+        """Build embedder, molecule projection and the rule embedding.
 
         File IO and rule featurization live in the loading factory / trainer; the
         network only holds layers and runs forward.
@@ -82,20 +82,20 @@ class MHNRankingNetwork(GraphMCTSNetwork):
                 return LayerNorm(config.association_dim, elementwise_affine=False)
             return Identity()
 
-        self.molecule_encoder = Sequential(
+        self.molecule_embedding = Sequential(
             Linear(config.vector_dim, config.association_dim),
             Dropout(config.dropout),
             _normalization(),
         )
-        if rule_repr_config.encoder_type == "fingerprint":
-            self.rule_encoder = FingerprintRuleEncoder(
+        if rule_repr_config.embedding_type == "fingerprint":
+            self.rule_embedding = FingerprintRuleEmbedding(
                 rule_repr_config.fingerprint_config.fp_size,
                 config.association_dim,
                 rule_dropout,
                 config.normalize_associations,
             )
         else:
-            self.rule_encoder = QueryCGRRuleEncoder(
+            self.rule_embedding = QueryCGRRuleEmbedding(
                 rule_vector_dim,
                 config.association_dim,
                 rule_dropout,
@@ -123,14 +123,14 @@ class MHNRankingNetwork(GraphMCTSNetwork):
 
     @property
     def rule_embedder(self):
-        """Expose the rule-side graph embedder (``None`` for fingerprint encoders)."""
-        return getattr(self.rule_encoder, "embedder", None)
+        """Expose the rule-side graph embedder (``None`` for fingerprint embeddings)."""
+        return getattr(self.rule_embedding, "embedder", None)
 
     def set_training_rule_fingerprints(self, rule_fingerprints: Tensor) -> None:
         """Attach ordered training rule fingerprints without storing them."""
-        if self.rule_representation_config.encoder_type != "fingerprint":
+        if self.rule_representation_config.embedding_type != "fingerprint":
             raise ValueError(
-                "Rule fingerprints require rule_encoder_type='fingerprint'"
+                "Rule fingerprints require rule_embedding_type='fingerprint'"
             )
         expected_shape = (
             self.n_rules,
@@ -145,8 +145,10 @@ class MHNRankingNetwork(GraphMCTSNetwork):
 
     def set_training_rule_graphs(self, rule_graphs: Sequence[Data]) -> None:
         """Attach ordered training rule graphs without storing them in checkpoints."""
-        if self.rule_representation_config.encoder_type != "query_cgr_graph":
-            raise ValueError("Rule graphs require rule_encoder_type='query_cgr_graph'")
+        if self.rule_representation_config.embedding_type != "query_cgr_graph":
+            raise ValueError(
+                "Rule graphs require rule_embedding_type='query_cgr_graph'"
+            )
         if len(rule_graphs) != self.n_rules:
             raise ValueError(
                 f"Expected {self.n_rules} rule graphs, got {len(rule_graphs)}"
@@ -155,19 +157,19 @@ class MHNRankingNetwork(GraphMCTSNetwork):
 
     def encode_rule_graphs(self, rule_graphs: Sequence[Data]) -> Tensor:
         """Embed QueryCGR rule graphs into the association space."""
-        if not isinstance(self.rule_encoder, QueryCGRRuleEncoder):
+        if not isinstance(self.rule_embedding, QueryCGRRuleEmbedding):
             raise ValueError(
-                "Rule graph encoding requires rule_encoder_type='query_cgr_graph'"
+                "Rule graph encoding requires rule_embedding_type='query_cgr_graph'"
             )
-        return self.rule_encoder.encode(rule_graphs)
+        return self.rule_embedding.encode(rule_graphs)
 
     def encode_rules(self, rule_representations: Tensor | Sequence[Data]) -> Tensor:
         """Project raw rule representations into the association space."""
-        return self.rule_encoder.encode(rule_representations)
+        return self.rule_embedding.encode(rule_representations)
 
     def encode_molecules(self, batch: Batch) -> Tensor:
         """Project molecular graph embeddings into the association space."""
-        return self.molecule_encoder(self.embedder(batch))
+        return self.molecule_embedding(self.embedder(batch))
 
     def get_logits(
         self,
@@ -179,7 +181,7 @@ class MHNRankingNetwork(GraphMCTSNetwork):
     ) -> Tensor:
         """Calculate dense molecule-rule association logits."""
         if rule_associations is None:
-            if self.rule_representation_config.encoder_type == "fingerprint":
+            if self.rule_representation_config.embedding_type == "fingerprint":
                 if rule_fingerprints is None:
                     rule_fingerprints = self._training_rule_fingerprints
                 if rule_fingerprints.numel() == 0:

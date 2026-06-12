@@ -24,11 +24,11 @@ if TYPE_CHECKING:
 
     from synplan.chem.precursor import Precursor
     from synplan.chem.reaction import CanonicalRetroReactor
-    from synplan.ml.networks.mhn_ranking import MHNRankingNetwork
-    from synplan.ml.networks.policy import (
+    from synplan.ml.networks.policy.linear import (
         FilteringPolicyNetwork,
         RankingPolicyNetwork,
     )
+    from synplan.ml.networks.policy.mhnreact import MHNReact
 
 _MAX_RULE_ASSOCIATION_CACHE_SIZE = 4
 
@@ -178,7 +178,7 @@ class LinearPolicy(TemplateBasedPolicy):
 class MHNReactPolicy(TemplateBasedPolicy):
     """MHN ranking policy scoring a runtime rule set via cached associations."""
 
-    policy_net: MHNRankingNetwork
+    policy_net: MHNReact
 
     def __init__(self, policy_net, **kwargs) -> None:
         super().__init__(policy_net, **kwargs)
@@ -207,7 +207,7 @@ class MHNReactPolicy(TemplateBasedPolicy):
 
         associations = self._rule_association_cache.get(digest)
         if associations is None:
-            if representation_config.encoder_type == "fingerprint":
+            if representation_config.embedding_type == "fingerprint":
                 rule_representations = rule_fingerprints_from_smarts(
                     rule_smarts, representation_config.fingerprint_config
                 )

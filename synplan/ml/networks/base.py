@@ -6,7 +6,7 @@ from torch import Tensor
 from torch.nn import Module
 from torch_geometric.data.batch import Batch
 
-from synplan.ml.networks.embedders import build_graph_embedder
+from synplan.ml.networks.embedding.molecule import build_graph_embedder
 
 
 class GraphMCTSNetwork(Module):

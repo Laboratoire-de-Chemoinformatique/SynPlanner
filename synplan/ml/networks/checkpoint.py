@@ -8,11 +8,11 @@ from typing import TypeVar
 import torch
 from torch.nn import Module
 
-from synplan.ml.networks.mhn_ranking import MHNRankingNetwork
-from synplan.ml.networks.policy import (
+from synplan.ml.networks.policy.linear import (
     FilteringPolicyNetwork,
     RankingPolicyNetwork,
 )
+from synplan.ml.networks.policy.mhnreact import MHNReact
 from synplan.ml.networks.value import ValueNetwork
 
 T = TypeVar("T", bound=Module)
@@ -90,7 +90,7 @@ def policy_network_class_from_checkpoint(path: str | Path) -> type[Module]:
         policy_type = hparams.get("policy_type", "ranking")
 
     if architecture == "mhn_ranking":
-        return MHNRankingNetwork
+        return MHNReact
     if policy_type == "filtering":
         return FilteringPolicyNetwork
     return RankingPolicyNetwork
