@@ -28,7 +28,7 @@ from synplan.ml.featurization.fingerprints import (
     _side_fingerprint,
     rule_fingerprints_from_smarts,
 )
-from synplan.ml.featurization.graphs import query_cgr_graphs_from_smarts
+from synplan.ml.featurization.rules import query_cgr_graphs_from_smarts
 from synplan.ml.networks.checkpoint import policy_network_class_from_checkpoint
 from synplan.ml.networks.embedders import build_graph_embedder
 from synplan.ml.networks.mhn_ranking import MHNRankingNetwork

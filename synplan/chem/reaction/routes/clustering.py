@@ -229,11 +229,10 @@ def group_routes_by_synthon_detail(data_dict: dict[Any, list]) -> dict[str, dict
                 synthon_reaction,
                 lg_sizes,
             )
+            temp_groups[group_key].append(route_id)
         except TypeError:
             print(f"Warning: Skipping route {route_id} due to unhashable key element.")
             continue
-
-        temp_groups[group_key].append(route_id)
 
     # 2. Sort groups for consistent ordering
     sorted_groups = sorted(temp_groups.items(), key=lambda kv: kv[1])

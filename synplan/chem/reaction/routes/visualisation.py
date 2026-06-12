@@ -813,12 +813,8 @@ def depict_custom_reaction(reaction: ReactionContainer):
                 custom_class_name = (
                     f"TempCustom_{mol.__class__.__name__}_{uuid4().hex}"  # Unique name
                 )
-                # Combine custom depiction with original class methods
-                # Ensure the custom _render_atoms takes precedence
-                new_bases = (CustomDepictMolecule, *original_classes[mol].__bases__)
-                # Filter out DepictMolecule if it's already a base to avoid MRO issues
-                new_bases = tuple(b for b in new_bases if b is not DepictMolecule)
-                # If DepictMolecule wasn't a direct base, ensure its methods are accessible
+                # Combine custom depiction with original class methods so the custom
+                # _render_atoms takes precedence; avoid MRO issues with DepictMolecule.
                 if CustomDepictMolecule not in original_classes[mol].__mro__:
                     # Prioritize CustomDepictMolecule's methods
                     new_bases = (CustomDepictMolecule, original_classes[mol])

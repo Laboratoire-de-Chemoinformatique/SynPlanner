@@ -11,6 +11,8 @@ from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["RuleSet"]
+
 
 class RuleSet:
     """A collection of reaction rules loaded from a TSV file.

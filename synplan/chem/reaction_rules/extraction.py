@@ -12,9 +12,6 @@ from synplan.chem.reaction.rules.extraction import (
     _make_extracted_rule_record as _make_extracted_rule_record,
 )
 from synplan.chem.reaction.rules.extraction import (
-    _process_extraction_result as _process_extraction_result,
-)
-from synplan.chem.reaction.rules.extraction import (
     add_environment_atoms as add_environment_atoms,
 )
 from synplan.chem.reaction.rules.extraction import (
@@ -71,6 +68,8 @@ __all__ = [
     "extract_rules",
     "extract_rules_from_reactions",
     "molecule_substructure_as_query",
+    "print_extraction_summary",
+    "process_extraction_result",
     "sort_rules",
     "validate_rule",
 ]

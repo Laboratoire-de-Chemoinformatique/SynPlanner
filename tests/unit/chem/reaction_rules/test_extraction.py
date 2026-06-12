@@ -15,15 +15,17 @@ from chython.containers import (
     ReactionContainer,
 )
 
-import synplan.chem.reaction.rules.extraction as extraction
 from synplan.chem.data.reaction_result import ExtractedRuleRecord, ExtractionBatchResult
 from synplan.chem.reaction.rules.extraction import (
-    _process_extraction_result,
     add_environment_atoms,
     add_functional_groups,
     add_ring_structures,
     clean_molecules,
+    extract_rules,
+    extract_rules_from_reactions,
     molecule_substructure_as_query,
+    print_extraction_summary,
+    process_extraction_result,
 )
 from synplan.utils.config import RuleExtractionConfig
 
@@ -171,7 +173,9 @@ def test_process_extraction_result_uses_worker_serialized_rule(monkeypatch):
         raise AssertionError("parent parsed worker rule SMARTS")
 
     monkeypatch.setattr(
-        extraction, "parse_smarts", fail_if_parent_parses, raising=False
+        "synplan.chem.reaction.rules.extraction.parse_smarts",
+        fail_if_parent_parses,
+        raising=False,
     )
     result = ExtractionBatchResult(
         rule_records=[
@@ -193,7 +197,7 @@ def test_process_extraction_result_uses_worker_serialized_rule(monkeypatch):
     rules_statistics = defaultdict(list)
     cgr_to_rule = {}
 
-    count = _process_extraction_result(result, rules_statistics, cgr_to_rule)
+    count = process_extraction_result(result, rules_statistics, cgr_to_rule)
 
     assert count == 1
     assert rules_statistics["stable-cgr"] == [7]
@@ -211,7 +215,8 @@ def test_parallel_extraction_timeout_scales_with_batch_size(monkeypatch, tmp_pat
         yield kwargs["on_timeout"](TimeoutError("slow batch"), batch)
 
     monkeypatch.setattr(
-        extraction, "process_pool_map_stream", fake_process_pool_map_stream
+        "synplan.chem.reaction.rules.extraction.process_pool_map_stream",
+        fake_process_pool_map_stream,
     )
 
     input_path = tmp_path / "reactions.smi"
@@ -221,7 +226,7 @@ def test_parallel_extraction_timeout_scales_with_batch_size(monkeypatch, tmp_pat
     )
     error_path = tmp_path / "rules.errors.tsv"
 
-    extraction.extract_rules_from_reactions(
+    extract_rules_from_reactions(
         config=RuleExtractionConfig(worker_timeout_per_reaction=2.5),
         reaction_data_path=str(input_path),
         reaction_rules_path=str(tmp_path / "rules.tsv"),
@@ -263,9 +268,9 @@ def test_ignore_stereo_allows_validation_of_stereo_cleaned_rules():
     }
 
     stereo_cfg = RuleExtractionConfig(**base, ignore_stereo=False)
-    stereo_rules, _ = extraction.extract_rules(stereo_cfg, smiles(rxn_smi))
+    stereo_rules, _ = extract_rules(stereo_cfg, smiles(rxn_smi))
     no_stereo_cfg = RuleExtractionConfig(**base, ignore_stereo=True)
-    no_stereo_rules, _ = extraction.extract_rules(no_stereo_cfg, smiles(rxn_smi))
+    no_stereo_rules, _ = extract_rules(no_stereo_cfg, smiles(rxn_smi))
 
     assert stereo_rules[0].meta["reactor_validation"] == "failed"
     assert no_stereo_rules[0].meta["reactor_validation"] == "passed"
@@ -279,7 +284,7 @@ def test_print_extraction_summary_includes_error_count(capsys):
         reactor_validation="passed",
     )
 
-    extraction._print_extraction_summary(
+    print_extraction_summary(
         n_processed=10,
         sorted_rules=[(record, [1, 2, 3])],
         filter_stats={},

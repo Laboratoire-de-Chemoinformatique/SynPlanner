@@ -157,6 +157,7 @@ def make_json(
                         prod.implicify_hydrogens()
                         prod.thiele()
                     except InvalidAromaticRing:
+                        # Aromatization is best-effort; fall back to the raw form.
                         pass
                     s = str(prod)
                     prod_map.setdefault(s, []).append(sid)
@@ -170,6 +171,7 @@ def make_json(
                 mol.implicify_hydrogens()
                 mol.thiele()
             except InvalidAromaticRing:
+                # Aromatization is best-effort; fall back to the raw form.
                 pass
             return str(mol)
 

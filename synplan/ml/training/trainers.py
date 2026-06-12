@@ -25,7 +25,7 @@ from synplan.chem.reaction.rules.representation import (
     rule_representation_digest,
 )
 from synplan.ml.featurization.fingerprints import rule_fingerprints_from_smarts
-from synplan.ml.featurization.graphs import query_cgr_graphs_from_smarts
+from synplan.ml.featurization.rules import query_cgr_graphs_from_smarts
 from synplan.ml.networks.mhn_ranking import MHNRankingNetwork
 from synplan.ml.networks.policy import (
     FilteringPolicyNetwork,

@@ -70,15 +70,21 @@ class MarkedAt(Marked, At):
     def __str__(self):
         return f"X({self.isotope})"
 
-    def __hash__(self):
-        return hash(
-            (
-                self.isotope,
-                getattr(self, "atomic_number", 0),
-                getattr(self, "charge", 0),
-                getattr(self, "is_radical", False),
-            )
+    def _identity(self):
+        return (
+            self.isotope,
+            getattr(self, "atomic_number", 0),
+            getattr(self, "charge", 0),
+            getattr(self, "is_radical", False),
         )
+
+    def __eq__(self, other):
+        if not isinstance(other, MarkedAt):
+            return NotImplemented
+        return self._identity() == other._identity()
+
+    def __hash__(self):
+        return hash(self._identity())
 
 
 class DynamicX(DynamicElement):

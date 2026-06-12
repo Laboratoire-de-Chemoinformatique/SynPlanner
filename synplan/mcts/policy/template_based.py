@@ -16,8 +16,8 @@ from synplan.chem.reaction.rules.representation import (
 )
 from synplan.mcts.policy.base import Policy
 from synplan.ml.featurization.fingerprints import rule_fingerprints_from_smarts
-from synplan.ml.featurization.graphs import query_cgr_graphs_from_smarts
 from synplan.ml.featurization.molecules import mol_to_pyg
+from synplan.ml.featurization.rules import query_cgr_graphs_from_smarts
 
 if TYPE_CHECKING:
     import torch_geometric

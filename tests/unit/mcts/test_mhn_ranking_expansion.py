@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 
+import synplan.mcts.policy.template_based as template_based
 from synplan.chem.reaction.rules.representation import (
     RULE_FINGERPRINT_SCHEMA_VERSION,
     RULE_GRAPH_SCHEMA_VERSION,
@@ -93,8 +94,6 @@ def test_mhn_preparation_caches_encoded_rules(monkeypatch):
         calls.append((tuple(rule_smarts), fingerprint_config))
         return torch.zeros((len(rule_smarts), 4))
 
-    import synplan.mcts.policy.template_based as template_based
-
     monkeypatch.setattr(
         template_based, "rule_fingerprints_from_smarts", fake_rule_fingerprints
     )
@@ -125,8 +124,6 @@ def test_mhn_preparation_uses_query_cgr_rule_graphs(monkeypatch):
         calls.append((tuple(rule_smarts), schema_version))
         return [SimpleNamespace(rule=text) for text in rule_smarts]
 
-    import synplan.mcts.policy.template_based as template_based
-
     monkeypatch.setattr(
         template_based, "query_cgr_graphs_from_smarts", fake_rule_graphs
     )
@@ -143,8 +140,6 @@ def test_mhn_preparation_uses_query_cgr_rule_graphs(monkeypatch):
 
 
 def test_mhn_association_cache_is_bounded(monkeypatch):
-    import synplan.mcts.policy.template_based as template_based
-
     monkeypatch.setattr(
         template_based,
         "rule_fingerprints_from_smarts",

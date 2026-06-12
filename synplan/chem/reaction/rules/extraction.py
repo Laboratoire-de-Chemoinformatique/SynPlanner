@@ -826,7 +826,7 @@ def _update_rules_statistics(
             cgr_to_rule[rule_record.cgr_key] = rule_record
 
 
-def _process_extraction_result(
+def process_extraction_result(
     result: ExtractionBatchResult,
     rules_statistics: dict,
     cgr_to_rule: dict,
@@ -1173,7 +1173,7 @@ def _extract_rules_serial(
     return n_processed, n_multi_product
 
 
-def _print_extraction_summary(
+def print_extraction_summary(
     n_processed: int,
     sorted_rules: list[tuple[ExtractedRuleRecord, list[int]]],
     filter_stats: dict[str, int],
@@ -1394,7 +1394,7 @@ def extract_rules_from_reactions(
                     if stop.is_set():
                         break
 
-                    batch_count = _process_extraction_result(
+                    batch_count = process_extraction_result(
                         result,
                         extracted_rules_and_statistics,
                         cgr_to_rule,
@@ -1454,7 +1454,7 @@ def extract_rules_from_reactions(
                 f"{rule.rule_smarts}\t{len(indices)}\t{','.join(map(str, indices))}\n"
             )
 
-    _print_extraction_summary(
+    print_extraction_summary(
         n_processed,
         sorted_rules,
         filter_stats,
