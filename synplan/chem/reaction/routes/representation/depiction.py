@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from chython.containers import CGRContainer
 
-from synplan.routes.depiction import wide_cgr_renderer
+from synplan.chem.reaction.routes.visualisation import wide_cgr_renderer
 
 
 def depict_route_cgr(cgr, *args, **kwargs):

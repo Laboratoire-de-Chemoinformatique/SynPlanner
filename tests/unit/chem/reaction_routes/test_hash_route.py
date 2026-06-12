@@ -1,7 +1,7 @@
 from chython import smiles
 
-from synplan.routes.route_cgr import compose_route_cgr
-from synplan.routes.route_cgr.hash import (
+from synplan.chem.reaction.routes.representation import compose_route_cgr
+from synplan.chem.reaction.routes.representation.hash import (
     HASH_SCHEMA,
     compare_route_cgr_dicts,
     hash_route_cgrs,

@@ -1,102 +1,16 @@
-import pickle
-import re
 from collections import defaultdict
-from pathlib import Path
 
 from chython.containers import CGRContainer
 
-from synplan.routes.io import (
+from synplan.chem.reaction.routes.io import (
     make_dict,
-    make_json,
     read_routes_csv,
     read_routes_json,
 )
-from synplan.routes.route_cgr import compose_all_route_cgrs, compose_all_sb_cgrs
-from synplan.utils.visualisation import routes_clustering_report
-
-
-def run_cluster_cli(
-    routes_file: str,
-    cluster_results_dir: str,
-    perform_subcluster: bool = False,
-    subcluster_results_dir: Path = None,
-):
-    """
-    Read routes from a CSV or JSON file, perform clustering, and optionally subclustering.
-
-    Args:
-        routes_file: Path to the input routes file (.csv or .json).
-        cluster_results_dir: Directory where clustering results are stored.
-        perform_subcluster: Whether to run subclustering on each cluster.
-        subcluster_results_dir: Subdirectory for subclustering results (if enabled).
-    """
-    import click
-
-    routes_file = Path(routes_file)
-    match = re.search(r"_(\d+)\.", routes_file.name)
-    if not match:
-        raise ValueError(f"Could not extract index from filename: {routes_file.name}")
-    file_index = int(match.group(1))
-    ext = routes_file.suffix.lower()
-    if ext == ".csv":
-        routes_dict = read_routes_csv(str(routes_file))
-        routes_json = make_json(routes_dict)
-    elif ext == ".json":
-        routes_json = read_routes_json(str(routes_file))
-        routes_dict = make_dict(routes_json)
-    else:
-        raise ValueError(f"Unsupported file type: {ext}")
-
-    # Compose condensed graph representations
-    route_cgrs = compose_all_route_cgrs(routes_dict)
-    click.echo("Generating RouteCGR")
-    sb_cgrs = compose_all_sb_cgrs(route_cgrs)
-    click.echo("Generating SB-CGR")
-
-    # Perform clustering
-    click.echo("\nClustering")
-    clusters = cluster_routes(sb_cgrs, use_strat=False)
-
-    click.echo(f"Total number of routes: {len(routes_dict)}")
-    click.echo(f"Found number of clusters: {len(clusters)} ({list(clusters.keys())})")
-
-    # Ensure output directory exists
-    cluster_results_dir = Path(cluster_results_dir)
-    cluster_results_dir.mkdir(parents=True, exist_ok=True)
-
-    # Save clusters to pickle
-    with open(cluster_results_dir / f"clusters_{file_index}.pickle", "wb") as f:
-        pickle.dump(clusters, f)
-
-    # Generate HTML reports for each cluster
-    for idx in clusters:
-        report_path = cluster_results_dir / f"{file_index}_cluster_{idx}.html"
-        routes_clustering_report(
-            routes_json, clusters, idx, sb_cgrs, html_path=str(report_path)
-        )
-
-    # Optional subclustering
-    if perform_subcluster and subcluster_results_dir:
-        from synplan.routes.clustering.subclustering import subcluster_all_clusters
-        from synplan.utils.visualisation import routes_subclustering_report
-
-        click.echo("\nSubClustering")
-        sub_dir = cluster_results_dir / subcluster_results_dir
-        sub_dir.mkdir(parents=True, exist_ok=True)
-
-        subclusters = subcluster_all_clusters(clusters, sb_cgrs, route_cgrs)
-        for cluster_idx, sub in subclusters.items():
-            click.echo(f"Cluster {cluster_idx} has {len(sub)} subclusters")
-            for sub_idx, subcluster in sub.items():
-                subreport_path = (
-                    sub_dir / f"{file_index}_subcluster_{cluster_idx}.{sub_idx}.html"
-                )
-                routes_subclustering_report(
-                    routes_json,
-                    subcluster,
-                    aam=False,
-                    html_path=str(subreport_path),
-                )
+from synplan.chem.reaction.routes.representation import (
+    compose_all_route_cgrs,
+    compose_all_sb_cgrs,
+)
 
 
 def cluster_route_from_csv(routes_file: str):
@@ -208,25 +122,25 @@ def cluster_routes(sb_cgrs: dict, use_strat=False):
     # 1. Initial grouping based on the content of strategic bonds
     for route_id, sb_cgr in sb_cgrs.items():
         strat_bonds_list = extract_strat_bonds(sb_cgr)
-        if use_strat == True:
+        if use_strat:
             group_key = tuple(strat_bonds_list)
         else:
             group_key = str(sb_cgr)
 
         if not temp_groups[group_key]["route_ids"]:  # First time seeing this group
-            temp_groups[group_key][
-                "sb_cgr"
-            ] = sb_cgr  # Store the first CGR as representative
-            temp_groups[group_key][
-                "strat_bonds"
-            ] = strat_bonds_list  # Store the actual list
+            temp_groups[group_key]["sb_cgr"] = (
+                sb_cgr  # Store the first CGR as representative
+            )
+            temp_groups[group_key]["strat_bonds"] = (
+                strat_bonds_list  # Store the actual list
+            )
 
         temp_groups[group_key]["route_ids"].append(route_id)
         temp_groups[group_key][
             "route_ids"
         ].sort()  # Keep route_ids sorted for consistency
 
-    for group_key in temp_groups.keys():
+    for group_key in temp_groups:
         temp_groups[group_key]["group_size"] = len(temp_groups[group_key]["route_ids"])
 
     # 2. Format the output dictionary with desired keys '{length}.{index}'
@@ -239,7 +153,7 @@ def cluster_routes(sb_cgrs: dict, use_strat=False):
         temp_groups.items(), key=lambda item: (len(item[0]), item[0])
     )
 
-    for group_key, group_data in sorted_groups:
+    for _group_key, group_data in sorted_groups:
         num_bonds = len(group_data["strat_bonds"])
         group_indices[num_bonds] += 1  # Increment index for this length (1-based)
         final_key = f"{num_bonds}.{group_indices[num_bonds]}"

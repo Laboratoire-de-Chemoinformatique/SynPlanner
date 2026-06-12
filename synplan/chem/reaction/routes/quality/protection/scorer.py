@@ -19,7 +19,10 @@ many functional groups that each trigger a matrix lookup.
 
 from chython.containers import ReactionContainer
 
-from synplan.routes.quality.protection.scanner import CompetingInteraction, RouteScanner
+from synplan.chem.reaction.routes.quality.protection.scanner import (
+    CompetingInteraction,
+    RouteScanner,
+)
 
 
 class CompetingSitesScore:

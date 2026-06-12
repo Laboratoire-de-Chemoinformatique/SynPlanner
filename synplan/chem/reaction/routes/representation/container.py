@@ -18,7 +18,9 @@ class RouteCGRContainer(CGRContainer):
     __slots__ = ()
 
     def depict(self, *args, **kwargs):
-        from synplan.routes.route_cgr.depiction import depict_route_cgr
+        from synplan.chem.reaction.routes.representation.depiction import (
+            depict_route_cgr,
+        )
 
         return depict_route_cgr(self, *args, **kwargs)
 

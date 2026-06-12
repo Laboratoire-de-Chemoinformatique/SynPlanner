@@ -2,13 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from synplan.chem.utils import mol_from_smiles
-from synplan.mcts.tree import Tree
-from synplan.routes.clustering import (
+from synplan.chem.reaction.routes.clustering import (
     cluster_routes,
     subcluster_all_clusters,
 )
-from synplan.routes.route_cgr import (
+from synplan.chem.reaction.routes.io import read_routes_json
+from synplan.chem.reaction.routes.representation import (
     compose_all_route_cgrs,
     compose_all_sb_cgrs,
 )

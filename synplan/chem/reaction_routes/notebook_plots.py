@@ -1,6 +1,6 @@
-"""Compatibility wrapper for :mod:`synplan.routes.notebook_plots`."""
+"""Compatibility wrapper for :mod:`synplan.chem.reaction.routes.notebook_plots`."""
 
-from synplan.routes.notebook_plots import (
+from synplan.chem.reaction.routes.notebook_plots import (
     plot_sb_cgr_cluster_venn,
     plot_top_real_bbs,
     plot_top_real_bbs_with_chython_svg,

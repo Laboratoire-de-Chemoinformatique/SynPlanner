@@ -1,6 +1,6 @@
-"""Compatibility wrapper for :mod:`synplan.routes.route_cgr.hash`."""
+"""Compatibility wrapper for :mod:`synplan.chem.reaction.routes.representation.hash`."""
 
-from synplan.routes.route_cgr.hash import (
+from synplan.chem.reaction.routes.representation.hash import (
     BUCKET_HASH_SCHEMA,
     HASH_EXCLUDES,
     HASH_INCLUDES,

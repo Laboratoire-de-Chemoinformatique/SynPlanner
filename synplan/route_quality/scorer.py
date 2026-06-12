@@ -1,9 +1,12 @@
-"""Compatibility wrapper for :mod:`synplan.routes.quality.scorer`."""
+"""Compatibility wrapper for :mod:`synplan.chem.reaction.routes.quality.scorer`."""
 
 from chython.containers import ReactionContainer
 
-from synplan.routes.quality.protection.scorer import CompetingSitesScore
-from synplan.routes.quality.scorer import ProtectionRouteScorer, RouteScorer
+from synplan.chem.reaction.routes.quality.protection.scorer import CompetingSitesScore
+from synplan.chem.reaction.routes.quality.scorer import (
+    ProtectionRouteScorer,
+    RouteScorer,
+)
 
 __all__ = [
     "CompetingSitesScore",

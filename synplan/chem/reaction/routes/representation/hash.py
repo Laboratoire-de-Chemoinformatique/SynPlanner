@@ -11,14 +11,12 @@ from dataclasses import dataclass
 from itertools import permutations, product
 from typing import Any
 
-from synplan.routes.route_cgr.builder import _bond_key
+from synplan.chem.reaction.routes.representation.route_cgr import _bond_key
 
 HASH_SCHEMA = "route-cgr-exact-v2"
 BUCKET_HASH_SCHEMA = "route-cgr-wl-bucket-v2"
 ROUTE_ORDER_AGNOSTIC_HASH_SCHEMA = "route-cgr-exact-without-route-order-v2"
-ROUTE_ORDER_AGNOSTIC_BUCKET_HASH_SCHEMA = (
-    "route-cgr-wl-bucket-without-route-order-v2"
-)
+ROUTE_ORDER_AGNOSTIC_BUCKET_HASH_SCHEMA = "route-cgr-wl-bucket-without-route-order-v2"
 HASH_INCLUDES = (
     "atom element, isotope, charge, radical state",
     "dynamic atom product charge and radical state",
@@ -143,12 +141,8 @@ def atom_label(
             "atomic_number": atom.atomic_number,
             "isotope": atom.isotope,
             "charge": _atom_state(route_cgr, "_charges", atom_id, atom.charge),
-            "p_charge": _atom_state(
-                route_cgr, "_p_charges", atom_id, atom.p_charge
-            ),
-            "is_radical": _atom_state(
-                route_cgr, "_radicals", atom_id, atom.is_radical
-            ),
+            "p_charge": _atom_state(route_cgr, "_p_charges", atom_id, atom.p_charge),
+            "is_radical": _atom_state(route_cgr, "_radicals", atom_id, atom.is_radical),
             "p_is_radical": _atom_state(
                 route_cgr, "_p_radicals", atom_id, atom.p_is_radical
             ),
@@ -513,9 +507,7 @@ class _RouteCGRHashCache:
     def __init__(self, *, include_route_order: bool = True) -> None:
         self.include_route_order = include_route_order
         self.hash_schema = (
-            HASH_SCHEMA
-            if include_route_order
-            else ROUTE_ORDER_AGNOSTIC_HASH_SCHEMA
+            HASH_SCHEMA if include_route_order else ROUTE_ORDER_AGNOSTIC_HASH_SCHEMA
         )
         self.bucket_hash_schema = (
             BUCKET_HASH_SCHEMA
@@ -613,10 +605,9 @@ def route_cgrs_equal(left: Any, right: Any) -> bool:
         left_prepared
     ) != _route_cgr_bucket_hash_from_prepared(right_prepared):
         return False
-    return (
-        _route_cgr_hash_from_prepared(left_prepared)
-        == _route_cgr_hash_from_prepared(right_prepared)
-    )
+    return _route_cgr_hash_from_prepared(
+        left_prepared
+    ) == _route_cgr_hash_from_prepared(right_prepared)
 
 
 def route_cgr_metadata(route_cgr: Any) -> dict[str, Any]:
@@ -630,9 +621,7 @@ def route_cgr_metadata(route_cgr: Any) -> dict[str, Any]:
             "order": bond.order,
             "p_order": bond.p_order,
             "route_orders": _route_orders(getattr(bond, "route_order", None)),
-            "route_step_orders": _route_orders(
-                getattr(bond, "route_step_order", None)
-            ),
+            "route_step_orders": _route_orders(getattr(bond, "route_step_order", None)),
         }
         if bond.order is None and bond.p_order is None:
             transient_bonds.append(bond_info)
@@ -643,9 +632,7 @@ def route_cgr_metadata(route_cgr: Any) -> dict[str, Any]:
         {
             "atom": atom_id,
             "route_orders": route_orders,
-            "route_step_orders": _route_orders(
-                getattr(atom, "route_step_order", None)
-            ),
+            "route_step_orders": _route_orders(getattr(atom, "route_step_order", None)),
         }
         for atom_id, atom in route_cgr.atoms()
         if (route_orders := _route_orders(getattr(atom, "route_order", None)))
@@ -826,12 +813,10 @@ def compare_route_cgr_dicts(
     unique_hashes_1 = sorted(hashes_1 - hashes_2)
     unique_hashes_2 = sorted(hashes_2 - hashes_1)
     route_ids_unique_1_by_exact_hash = {
-        route_hash: route_ids_by_hash_1[route_hash]
-        for route_hash in unique_hashes_1
+        route_hash: route_ids_by_hash_1[route_hash] for route_hash in unique_hashes_1
     }
     route_ids_unique_2_by_exact_hash = {
-        route_hash: route_ids_by_hash_2[route_hash]
-        for route_hash in unique_hashes_2
+        route_hash: route_ids_by_hash_2[route_hash] for route_hash in unique_hashes_2
     }
     route_ids_unique_1_by_bucket_hash = {
         bucket_hash: route_ids_by_bucket_1[bucket_hash]

@@ -5,19 +5,19 @@ from chython import smiles
 from chython.containers import CGRContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
 
-from synplan.routes.io import (
+from synplan.chem.reaction.routes.io import (
     make_dict,
     read_routes_csv,
     read_routes_json,
 )
-from synplan.routes.route_cgr import (
+from synplan.chem.reaction.routes.representation import (
     compose_all_route_cgrs,
     compose_route_cgr,
     compose_sb_cgr,
     get_clean_mapping,
 )
-from synplan.routes.route_cgr.container import RouteCGRContainer
-from synplan.routes.route_cgr.state import RouteDynamicBond
+from synplan.chem.reaction.routes.representation.container import RouteCGRContainer
+from synplan.chem.reaction.routes.representation.state import RouteDynamicBond
 
 
 class _MockRouteTree:

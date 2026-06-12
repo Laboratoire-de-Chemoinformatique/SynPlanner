@@ -1,6 +1,6 @@
 from chython import smiles
 
-from synplan.routes.analysis import (
+from synplan.chem.reaction.routes.analysis import (
     collect_bb_usage_stats,
     compare_sb_cgr_clusters,
     flatten_route_id_groups,
@@ -8,8 +8,8 @@ from synplan.routes.analysis import (
     route_cgr_subset,
     route_ids_with_exact_bb,
 )
-from synplan.routes.notebook_plots import top_bb_usage_rows
-from synplan.routes.route_cgr import compose_route_cgr
+from synplan.chem.reaction.routes.notebook_plots import top_bb_usage_rows
+from synplan.chem.reaction.routes.representation import compose_route_cgr
 
 
 def _route_cgr():

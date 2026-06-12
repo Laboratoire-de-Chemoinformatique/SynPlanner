@@ -17,11 +17,11 @@ import logging
 from chython.containers import ReactionContainer
 from pydantic import BaseModel, ConfigDict
 
-from synplan.routes.quality.protection.functional_groups import (
+from synplan.chem.reaction.routes.quality.protection.functional_groups import (
     FunctionalGroupDetector,
     HalogenDetector,
 )
-from synplan.routes.quality.protection.reaction_classifier import (
+from synplan.chem.reaction.routes.quality.protection.reaction_classifier import (
     get_reaction_center_atoms,
 )
 
@@ -136,7 +136,7 @@ class RouteScanner:
 
         :param route: A dict mapping step_id -> ReactionContainer, as
             returned by ``extract_reactions()`` in
-            ``synplan.routes.route_cgr``.
+            ``synplan.chem.reaction.routes.representation``.
         :return: Tuple of (interactions, halogen_count) where interactions
             is a list of CompetingInteraction objects and halogen_count is
             the total number of same-family competing halogen sites.

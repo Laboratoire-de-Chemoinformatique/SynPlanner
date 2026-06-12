@@ -1,7 +1,7 @@
-"""Compatibility wrapper for :mod:`synplan.routes.route_cgr.state`."""
+"""Compatibility wrapper for :mod:`synplan.chem.reaction.routes.representation.state`."""
 
-from synplan.routes.route_cgr import state as _state
-from synplan.routes.route_cgr.state import *
+from synplan.chem.reaction.routes.representation import state as _state
+from synplan.chem.reaction.routes.representation.state import *
 
 
 def __getattr__(name):

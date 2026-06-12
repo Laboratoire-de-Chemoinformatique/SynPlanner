@@ -1,6 +1,6 @@
-"""Compatibility wrapper for :mod:`synplan.routes.quality.protection.reaction_classifier`."""
+"""Compatibility wrapper for :mod:`synplan.chem.reaction.routes.quality.protection.reaction_classifier`."""
 
-from synplan.routes.quality.protection.reaction_classifier import (
+from synplan.chem.reaction.routes.quality.protection.reaction_classifier import (
     classify_reaction_type,
     classify_reaction_type_broad,
     classify_reaction_type_detailed,

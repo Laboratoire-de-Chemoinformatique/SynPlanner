@@ -1,8 +1,8 @@
 from chython import smiles
 from chython.containers import MoleculeContainer
 
-from synplan.routes.clustering.leaving_groups import DynamicX, MarkedAt, MarkedY
-from synplan.routes.clustering.subclustering import lg_process_reset
+from synplan.chem.reaction.routes.clustering.subclustering import lg_process_reset
+from synplan.chem.reaction.routes.leaving_groups import DynamicX, MarkedAt, MarkedY
 
 
 def _one_atom_smiles(atom):

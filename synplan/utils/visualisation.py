@@ -1,11 +1,13 @@
 """Module containing functions for analysis and visualization of the built tree."""
 
+from __future__ import annotations
+
 import base64
 import contextlib
 from collections import deque
 from datetime import datetime
 from itertools import count, islice, pairwise
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from chython import depict_settings
 from chython import smiles as read_smiles
@@ -18,7 +20,9 @@ from synplan.chem.reaction.routes.visualisation import (
     cgr_display,
     depict_custom_reaction,
 )
-from synplan.routes.io import make_dict
+
+if TYPE_CHECKING:
+    from synplan.mcts.tree import Tree
 
 
 def get_child_nodes(

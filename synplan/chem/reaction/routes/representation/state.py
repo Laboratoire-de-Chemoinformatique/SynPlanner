@@ -80,9 +80,7 @@ def _route_atom_class_from_class(atom_class, symbol):
         copy._p_charge = self.p_charge
         copy._xy = self._xy.__class__(self._xy.x, self._xy.y)
         copy.route_order = _metadata_set(getattr(self, "route_order", None))
-        copy.route_step_order = _metadata_set(
-            getattr(self, "route_step_order", None)
-        )
+        copy.route_step_order = _metadata_set(getattr(self, "route_step_order", None))
         return copy
 
     route_atom_class = type(
@@ -136,9 +134,7 @@ def route_atom(atom, route_orders, route_step_orders=None):
     new_atom._xy = atom._xy.__class__(atom._xy.x, atom._xy.y)
     new_atom.route_order = _metadata_set(getattr(atom, "route_order", None))
     new_atom.route_order.update(route_orders)
-    new_atom.route_step_order = _metadata_set(
-        getattr(atom, "route_step_order", None)
-    )
+    new_atom.route_step_order = _metadata_set(getattr(atom, "route_step_order", None))
     new_atom.route_step_order.update(route_step_orders)
     return new_atom
 

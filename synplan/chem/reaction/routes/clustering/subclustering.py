@@ -5,8 +5,8 @@ from typing import Any
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
 
-from synplan.routes.analysis import route_cgr_pseudo_reactants_by_role
-from synplan.routes.clustering.leaving_groups import DynamicX, MarkedAt, MarkedY
+from synplan.chem.reaction.routes.analysis import route_cgr_pseudo_reactants_by_role
+from synplan.chem.reaction.routes.leaving_groups import DynamicX, MarkedAt, MarkedY
 
 
 def lg_process_reset(lg_cgr: CGRContainer, atom_num: int):

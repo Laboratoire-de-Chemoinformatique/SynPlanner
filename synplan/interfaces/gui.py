@@ -13,6 +13,7 @@ from streamlit_ketcher import st_ketcher
 
 from synplan.chem.reaction.routes.clustering import *
 from synplan.chem.reaction.routes.io import make_json
+from synplan.chem.reaction.routes.quality.scorer import ProtectionRouteScorer
 from synplan.chem.reaction.routes.representation import *
 from synplan.chem.reaction.routes.visualisation import (
     cgr_display,
@@ -21,11 +22,6 @@ from synplan.chem.reaction.routes.visualisation import (
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.search import extract_tree_stats
 from synplan.mcts.tree import Tree
-from synplan.routes.clustering import *
-from synplan.routes.depiction import cgr_display, depict_custom_reaction
-from synplan.routes.io import make_json
-from synplan.routes.quality.scorer import ProtectionRouteScorer
-from synplan.routes.route_cgr import *
 from synplan.utils.config import TreeConfig
 from synplan.utils.loading import (
     download_preset,

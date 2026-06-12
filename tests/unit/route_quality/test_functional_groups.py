@@ -4,8 +4,8 @@ import pytest
 from chython import smiles
 from pydantic import ValidationError
 
-from synplan.routes.quality.protection.config import ProtectionConfig
-from synplan.routes.quality.protection.functional_groups import (
+from synplan.chem.reaction.routes.quality.protection.config import ProtectionConfig
+from synplan.chem.reaction.routes.quality.protection.functional_groups import (
     FunctionalGroupDetector,
     FunctionalGroupMatch,
     HalogenDetector,

@@ -1,6 +1,6 @@
-"""Compatibility wrapper for :mod:`synplan.routes.quality.protection.functional_groups`."""
+"""Compatibility wrapper for :mod:`synplan.chem.reaction.routes.quality.protection.functional_groups`."""
 
-from synplan.routes.quality.protection.functional_groups import (
+from synplan.chem.reaction.routes.quality.protection.functional_groups import (
     FunctionalGroupDetector,
     FunctionalGroupMatch,
     HalogenDetector,

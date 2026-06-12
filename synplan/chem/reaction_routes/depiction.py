@@ -1,3 +1,3 @@
-"""Compatibility wrapper for :mod:`synplan.routes.depiction`."""
+"""Compatibility wrapper for :mod:`synplan.chem.reaction.routes.visualisation`."""
 
-from synplan.routes.depiction import *
+from synplan.chem.reaction.routes.visualisation import *

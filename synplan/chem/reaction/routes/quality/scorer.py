@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 
 from chython.containers import ReactionContainer
 
-from synplan.routes.quality.protection.scorer import CompetingSitesScore
+from synplan.chem.reaction.routes.quality.protection.scorer import CompetingSitesScore
 
 
 class RouteScorer(ABC):
@@ -73,12 +73,14 @@ class ProtectionRouteScorer(RouteScorer):
         :param weight: Protection penalty weight.
         :return: Configured ProtectionRouteScorer.
         """
-        from synplan.routes.quality.protection.config import ProtectionConfig
-        from synplan.routes.quality.protection.functional_groups import (
+        from synplan.chem.reaction.routes.quality.protection.config import (
+            ProtectionConfig,
+        )
+        from synplan.chem.reaction.routes.quality.protection.functional_groups import (
             FunctionalGroupDetector,
             HalogenDetector,
         )
-        from synplan.routes.quality.protection.scanner import (
+        from synplan.chem.reaction.routes.quality.protection.scanner import (
             IncompatibilityMatrix,
             RouteScanner,
         )

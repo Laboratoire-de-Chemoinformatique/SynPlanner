@@ -1,25 +1,24 @@
-"""Route quality assessment and re-ranking."""
+"""Protection-strategy route quality scoring."""
 
-from synplan.routes.quality.protection.config import ProtectionConfig
-from synplan.routes.quality.protection.functional_groups import (
+from synplan.chem.reaction.routes.quality.protection.config import ProtectionConfig
+from synplan.chem.reaction.routes.quality.protection.functional_groups import (
     FunctionalGroupDetector,
     FunctionalGroupMatch,
     HalogenDetector,
     HalogenMatch,
 )
-from synplan.routes.quality.protection.reaction_classifier import (
+from synplan.chem.reaction.routes.quality.protection.reaction_classifier import (
     classify_reaction_type,
     classify_reaction_type_broad,
     classify_reaction_type_detailed,
     get_reaction_center_atoms,
 )
-from synplan.routes.quality.protection.scanner import (
+from synplan.chem.reaction.routes.quality.protection.scanner import (
     CompetingInteraction,
     IncompatibilityMatrix,
     RouteScanner,
 )
-from synplan.routes.quality.protection.scorer import CompetingSitesScore
-from synplan.routes.quality.scorer import ProtectionRouteScorer, RouteScorer
+from synplan.chem.reaction.routes.quality.protection.scorer import CompetingSitesScore
 
 __all__ = [
     "CompetingInteraction",
@@ -30,9 +29,7 @@ __all__ = [
     "HalogenMatch",
     "IncompatibilityMatrix",
     "ProtectionConfig",
-    "ProtectionRouteScorer",
     "RouteScanner",
-    "RouteScorer",
     "classify_reaction_type",
     "classify_reaction_type_broad",
     "classify_reaction_type_detailed",

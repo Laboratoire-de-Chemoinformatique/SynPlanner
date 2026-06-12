@@ -1,13 +1,12 @@
 """Route clustering and subclustering helpers."""
 
-from synplan.routes.clustering.core import (
+from synplan.chem.reaction.routes.clustering.core import (
     cluster_route_from_csv,
     cluster_route_from_json,
     cluster_routes,
     extract_strat_bonds,
-    run_cluster_cli,
 )
-from synplan.routes.clustering.subclustering import (
+from synplan.chem.reaction.routes.clustering.subclustering import (
     SubclusterError,
     all_lg_collect,
     group_by_identical_values,
@@ -42,7 +41,6 @@ __all__ = [
     "remove_and_shift",
     "replace_leaving_groups_in_synthon",
     "replace_supporting_reactants_with_y",
-    "run_cluster_cli",
     "subcluster_all_clusters",
     "subcluster_one_cluster",
     "supporting_groups_from_route_cgr",

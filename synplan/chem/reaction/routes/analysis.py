@@ -13,9 +13,7 @@ def flatten_route_id_groups(route_id_groups: Mapping[Any, Iterable[int]]) -> lis
     """Flatten a mapping of identity keys to route-id iterables."""
 
     return sorted(
-        route_id
-        for route_ids in route_id_groups.values()
-        for route_id in route_ids
+        route_id for route_ids in route_id_groups.values() for route_id in route_ids
     )
 
 
@@ -25,7 +23,9 @@ def route_cgr_subset(route_cgrs: Mapping[int, Any], route_ids: Iterable[int]) ->
     return {route_id: route_cgrs[route_id] for route_id in route_ids}
 
 
-def route_cgr_overlap_rows(comparison_result: Mapping[str, Any]) -> list[dict[str, Any]]:
+def route_cgr_overlap_rows(
+    comparison_result: Mapping[str, Any],
+) -> list[dict[str, Any]]:
     """Return one named row per exact RouteCGR overlap identity.
 
     `compare_route_cgr_dicts` stores overlap route IDs grouped by exact RouteCGR

@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-from synplan.routes.io import read_routes_json, write_routes_json
+from synplan.chem.reaction.routes.io import read_routes_json, write_routes_json
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ROUTES_JSON_FIXTURE = REPO_ROOT / "tests" / "data" / "routes_mol_1.json"

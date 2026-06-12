@@ -1,24 +1,11 @@
 """Route-level condensed graph of reaction helpers."""
 
-from synplan.routes.route_cgr.builder import (
-    compose_all_route_cgrs,
-    compose_all_sb_cgrs,
-    compose_route_cgr,
-    compose_sb_cgr,
-    extract_reactions,
-    get_clean_mapping,
-    get_leaving_groups,
-    process_first_reaction,
-    process_target_blocks,
-    update_reaction_dict,
-    validate_molecule_components,
-)
-from synplan.routes.route_cgr.container import (
+from synplan.chem.reaction.routes.representation.container import (
     RouteCGRContainer,
     enable_route_cgr_container,
 )
-from synplan.routes.route_cgr.depiction import depict_route_cgr
-from synplan.routes.route_cgr.hash import (
+from synplan.chem.reaction.routes.representation.depiction import depict_route_cgr
+from synplan.chem.reaction.routes.representation.hash import (
     RouteCGRGraph,
     atom_label,
     bond_label,
@@ -35,7 +22,23 @@ from synplan.routes.route_cgr.hash import (
     route_cgrs_equal,
     route_order_variant_sets,
 )
-from synplan.routes.route_cgr.state import (
+from synplan.chem.reaction.routes.representation.route_cgr import (
+    compose_all_route_cgrs,
+    compose_route_cgr,
+    extract_reactions,
+    find_next_atom_num,
+    get_clean_mapping,
+    get_leaving_groups,
+    process_first_reaction,
+    process_target_blocks,
+    update_reaction_dict,
+    validate_molecule_components,
+)
+from synplan.chem.reaction.routes.representation.sb_cgr import (
+    compose_all_sb_cgrs,
+    compose_sb_cgr,
+)
+from synplan.chem.reaction.routes.representation.state import (
     RouteDynamicBond,
     remove_transient_bonds,
     route_atom,
@@ -56,6 +59,7 @@ __all__ = [
     "depict_route_cgr",
     "enable_route_cgr_container",
     "extract_reactions",
+    "find_next_atom_num",
     "get_clean_mapping",
     "get_leaving_groups",
     "hash_route_cgrs",

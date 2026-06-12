@@ -1,6 +1,6 @@
-"""Compatibility wrapper for :mod:`synplan.routes.analysis`."""
+"""Compatibility wrapper for :mod:`synplan.chem.reaction.routes.analysis`."""
 
-import synplan.routes.analysis as _analysis
+import synplan.chem.reaction.routes.analysis as _analysis
 
 __all__ = [name for name in vars(_analysis) if not name.startswith("_")]
 

@@ -1,9 +1,9 @@
-"""Compatibility wrapper for :mod:`synplan.routes.quality.protection`.
+"""Compatibility wrapper for :mod:`synplan.chem.reaction.routes.quality.protection`.
 
-Import from ``synplan.routes.quality.protection`` in new code.
+Import from ``synplan.chem.reaction.routes.quality.protection`` in new code.
 """
 
-from synplan.routes.quality.protection import (
+from synplan.chem.reaction.routes.quality.protection import (
     CompetingInteraction,
     CompetingSitesScore,
     FunctionalGroupDetector,

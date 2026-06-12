@@ -4,19 +4,19 @@ import sys
 
 def test_legacy_hash_route_exports_constants_and_functions():
     import synplan.chem.reaction_routes.hash_route as legacy_hash_route
-    from synplan.routes.route_cgr.hash import (
+    from synplan.chem.reaction.routes.representation.hash import (
         BUCKET_HASH_SCHEMA as NEW_BUCKET_HASH_SCHEMA,
     )
-    from synplan.routes.route_cgr.hash import (
+    from synplan.chem.reaction.routes.representation.hash import (
         HASH_EXCLUDES as NEW_HASH_EXCLUDES,
     )
-    from synplan.routes.route_cgr.hash import (
+    from synplan.chem.reaction.routes.representation.hash import (
         HASH_INCLUDES as NEW_HASH_INCLUDES,
     )
-    from synplan.routes.route_cgr.hash import (
+    from synplan.chem.reaction.routes.representation.hash import (
         HASH_SCHEMA as NEW_HASH_SCHEMA,
     )
-    from synplan.routes.route_cgr.hash import (
+    from synplan.chem.reaction.routes.representation.hash import (
         route_cgr_hash as new_route_cgr_hash,
     )
 
@@ -31,11 +31,15 @@ def test_legacy_hash_route_exports_constants_and_functions():
 
 def test_legacy_clustering_exports_old_module_level_helpers():
     import synplan.chem.reaction_routes.clustering as legacy_clustering
-    from synplan.routes.clustering import cluster_routes as new_cluster_routes
-    from synplan.routes.clustering.leaving_groups import DynamicX as NewDynamicX
-    from synplan.routes.depiction import cgr_display as new_cgr_display
-    from synplan.routes.route_cgr import (
+    from synplan.chem.reaction.routes.clustering import (
+        cluster_routes as new_cluster_routes,
+    )
+    from synplan.chem.reaction.routes.leaving_groups import DynamicX as NewDynamicX
+    from synplan.chem.reaction.routes.representation import (
         compose_all_route_cgrs as new_compose_all_route_cgrs,
+    )
+    from synplan.chem.reaction.routes.visualisation import (
+        cgr_display as new_cgr_display,
     )
 
     assert legacy_clustering.DynamicX is NewDynamicX
@@ -54,6 +58,21 @@ def test_legacy_clustering_exports_old_module_level_helpers():
 def test_legacy_route_quality_exports_old_meaningful_helpers():
     from chython.containers import ReactionContainer as NewReactionContainer
 
+    from synplan.chem.reaction.routes.quality.protection.config import (
+        ProtectionConfig as NewProtectionConfig,
+    )
+    from synplan.chem.reaction.routes.quality.protection.functional_groups import (
+        FunctionalGroupDetector as NewFunctionalGroupDetector,
+    )
+    from synplan.chem.reaction.routes.quality.protection.functional_groups import (
+        HalogenDetector as NewHalogenDetector,
+    )
+    from synplan.chem.reaction.routes.quality.protection.scorer import (
+        CompetingSitesScore as NewCompetingSitesScore,
+    )
+    from synplan.chem.reaction.routes.quality.scorer import (
+        RouteScorer as NewRouteScorer,
+    )
     from synplan.route_quality import ProtectionConfig, RouteScorer
     from synplan.route_quality.protection.scanner import (
         FunctionalGroupDetector,
@@ -63,19 +82,6 @@ def test_legacy_route_quality_exports_old_meaningful_helpers():
         CompetingSitesScore,
         ReactionContainer,
     )
-    from synplan.routes.quality.protection.config import (
-        ProtectionConfig as NewProtectionConfig,
-    )
-    from synplan.routes.quality.protection.functional_groups import (
-        FunctionalGroupDetector as NewFunctionalGroupDetector,
-    )
-    from synplan.routes.quality.protection.functional_groups import (
-        HalogenDetector as NewHalogenDetector,
-    )
-    from synplan.routes.quality.protection.scorer import (
-        CompetingSitesScore as NewCompetingSitesScore,
-    )
-    from synplan.routes.quality.scorer import RouteScorer as NewRouteScorer
 
     assert CompetingSitesScore is NewCompetingSitesScore
     assert ReactionContainer is NewReactionContainer
@@ -86,31 +92,29 @@ def test_legacy_route_quality_exports_old_meaningful_helpers():
 
 
 def test_legacy_route_cgr_exports_old_meaningful_helpers():
-    from chython.containers import (
-        CGRContainer as NewCGRContainer,
+    from synplan.chem.reaction.routes.representation import (
+        compose_all_route_cgrs as new_compose_all_route_cgrs,
     )
-    from chython.containers import (
-        MoleculeContainer as NewMoleculeContainer,
+    from synplan.chem.reaction.routes.representation import (
+        compose_route_cgr as new_compose_route_cgr,
     )
-    from chython.containers import (
-        ReactionContainer as NewReactionContainer,
+    from synplan.chem.reaction.routes.representation import (
+        compose_sb_cgr as new_compose_sb_cgr,
     )
-    from chython.containers.bonds import DynamicBond as NewDynamicBond
-
+    from synplan.chem.reaction.routes.representation import (
+        extract_reactions as new_extract_reactions,
+    )
     from synplan.chem.reaction_routes.route_cgr import (
-        CGRContainer,
-        DynamicBond,
-        MoleculeContainer,
-        ReactionContainer,
-        Tree,
+        compose_all_route_cgrs,
+        compose_route_cgr,
+        compose_sb_cgr,
+        extract_reactions,
     )
-    from synplan.mcts.tree import Tree as NewTree
 
-    assert CGRContainer is NewCGRContainer
-    assert DynamicBond is NewDynamicBond
-    assert MoleculeContainer is NewMoleculeContainer
-    assert ReactionContainer is NewReactionContainer
-    assert Tree is NewTree
+    assert compose_route_cgr is new_compose_route_cgr
+    assert compose_sb_cgr is new_compose_sb_cgr
+    assert compose_all_route_cgrs is new_compose_all_route_cgrs
+    assert extract_reactions is new_extract_reactions
 
 
 def test_legacy_reaction_routes_package_root_is_lightweight():

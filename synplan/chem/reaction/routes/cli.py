@@ -1,4 +1,4 @@
-"""Command-line entry point for route clustering."""
+"""Command-line entry point for route clustering and subclustering."""
 
 import pickle
 import re
@@ -6,8 +6,8 @@ from pathlib import Path
 
 import click
 
-from synplan.chem.reaction.routes.clustering import (
-    cluster_routes,
+from synplan.chem.reaction.routes.clustering.core import cluster_routes
+from synplan.chem.reaction.routes.clustering.subclustering import (
     subcluster_all_clusters,
 )
 from synplan.chem.reaction.routes.io import (
@@ -41,7 +41,6 @@ def run_cluster_cli(
         perform_subcluster: Whether to run subclustering on each cluster.
         subcluster_results_dir: Subdirectory for subclustering results (if enabled).
     """
-
     routes_file = Path(routes_file)
     match = re.search(r"_(\d+)\.", routes_file.name)
     if not match:
@@ -85,7 +84,7 @@ def run_cluster_cli(
             routes_json, clusters, idx, sb_cgrs, html_path=str(report_path)
         )
 
-    # Optional subclustering (Under development)
+    # Optional subclustering
     if perform_subcluster and subcluster_results_dir:
         click.echo("\nSubClustering")
         sub_dir = cluster_results_dir / subcluster_results_dir
@@ -101,9 +100,6 @@ def run_cluster_cli(
                 routes_subclustering_report(
                     routes_json,
                     subcluster,
-                    cluster_idx,
-                    sub_idx,
-                    sb_cgrs,
                     aam=False,
                     html_path=str(subreport_path),
                 )

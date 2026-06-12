@@ -19,8 +19,8 @@ def test_mcts_imports_do_not_depend_on_route_import_order():
         "from synplan.mcts import Tree; assert Tree.__name__ == 'Tree'",
         "import synplan.mcts.tree",
         "import synplan.mcts.search",
-        "from synplan.routes.quality.scorer import RouteScorer",
-        "import synplan.routes",
+        "from synplan.chem.reaction.routes.quality.scorer import RouteScorer",
+        "import synplan.chem.reaction.routes",
     ]
 
     for snippet in snippets:
@@ -29,7 +29,7 @@ def test_mcts_imports_do_not_depend_on_route_import_order():
 
 def test_route_quality_imports_stay_lightweight():
     for import_line in (
-        "from synplan.routes.quality.scorer import RouteScorer",
+        "from synplan.chem.reaction.routes.quality.scorer import RouteScorer",
         "from synplan.route_quality.scorer import RouteScorer",
     ):
         code = f"""
@@ -42,8 +42,8 @@ unexpected = [
     for name in (
         'matplotlib',
         'synplan.utils.visualisation',
-        'synplan.routes.clustering.core',
-        'synplan.routes.clustering.subclustering',
+        'synplan.chem.reaction.routes.clustering.core',
+        'synplan.chem.reaction.routes.clustering.subclustering',
         'synplan.mcts.tree',
     )
     if name in sys.modules
@@ -54,7 +54,10 @@ assert unexpected == [], unexpected
 
 
 def test_route_package_roots_stay_lightweight():
-    for snippet in ("import synplan.routes", "import synplan.route_quality"):
+    for snippet in (
+        "import synplan.chem.reaction.routes",
+        "import synplan.route_quality",
+    ):
         code = f"""
 import sys
 {snippet}
@@ -64,8 +67,8 @@ unexpected = [
     for name in (
         'matplotlib',
         'synplan.utils.visualisation',
-        'synplan.routes.clustering.core',
-        'synplan.routes.clustering.subclustering',
+        'synplan.chem.reaction.routes.clustering.core',
+        'synplan.chem.reaction.routes.clustering.subclustering',
         'synplan.mcts.tree',
     )
     if name in sys.modules
@@ -77,7 +80,7 @@ assert unexpected == [], unexpected
 
 def test_synplan_routes_lazy_root_exports_still_work():
     code = """
-from synplan.routes import RouteScorer, compose_route_cgr
+from synplan.chem.reaction.routes import RouteScorer, compose_route_cgr
 
 assert RouteScorer.__name__ == 'RouteScorer'
 assert compose_route_cgr.__name__ == 'compose_route_cgr'

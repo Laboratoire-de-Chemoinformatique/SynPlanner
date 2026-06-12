@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import csv
 import json
 from typing import TYPE_CHECKING, Any
@@ -7,17 +5,25 @@ from typing import TYPE_CHECKING, Any
 from chython import smiles as read_smiles
 from chython.exceptions import InvalidAromaticRing
 
-from synplan.chem.reaction.routes.representation import (
-    compose_all_route_cgrs,
-    compose_all_sb_cgrs,
-)
-
 if TYPE_CHECKING:
     from synplan.mcts.tree import Tree
 
 
+def _route_molecule_smiles(mol) -> str:
+    """Return the route-IO molecule string using the existing preparation flow."""
+    try:
+        mol.kekule()
+        mol.implicify_hydrogens()
+        mol.thiele()
+    except InvalidAromaticRing:
+        # Keep serializing the original molecule string when aromatic
+        # preparation fails; route export should remain best-effort.
+        pass
+    return str(mol)
+
+
 def _route_step_metadata_from_tree(
-    tree: Tree, route_id: int
+    tree: "Tree", route_id: int
 ) -> dict[int, dict[str, Any]]:
     """Map route step ids from ``extract_reactions`` to tree rule metadata."""
     details = tree.route_details(route_id)
@@ -91,11 +97,12 @@ def read_routes_json(file_path="routes.json", to_dict=False):
 
 
 def read_routes_csv(file_path="routes.csv"):
-    """
-    Read a CSV with columns: route_id, step_id, smiles, meta
-    and return a nested dict mapping
-        route_id (int) -> step_id (int) -> ReactionContainer
-    (ignoring meta for now, but you could extract it if needed).
+    """Read route reactions from a CSV file.
+
+    The input CSV is expected to contain ``route_id``, ``step_id``, ``smiles``,
+    and ``meta`` columns. The ``meta`` value is currently ignored.
+
+    Returns a nested dictionary: ``route_id -> step_id -> ReactionContainer``.
     """
     routes_dict = {}
     with open(file_path, newline="") as csvfile:
@@ -113,7 +120,7 @@ def read_routes_csv(file_path="routes.csv"):
 def make_json(
     routes_dict,
     keep_ids=True,
-    tree: Tree | None = None,
+    tree: "Tree | None" = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
 ):
     """
@@ -152,35 +159,18 @@ def make_json(
             prod_map = {}  # smiles -> list of step_ids
             for sid, rxn in steps.items():
                 for prod in rxn.products:
-                    try:
-                        prod.kekule()
-                        prod.implicify_hydrogens()
-                        prod.thiele()
-                    except InvalidAromaticRing:
-                        # Aromatization is best-effort; fall back to the raw form.
-                        pass
-                    s = str(prod)
+                    s = _route_molecule_smiles(prod)
                     prod_map.setdefault(s, []).append(sid)
         except Exception as e:
             print(f"Error processing route {route_id}: {e}")
             continue
-
-        def transform(mol):
-            try:
-                mol.kekule()
-                mol.implicify_hydrogens()
-                mol.thiele()
-            except InvalidAromaticRing:
-                # Aromatization is best-effort; fall back to the raw form.
-                pass
-            return str(mol)
 
         def build_mol_node(sid, _steps=steps, _atom_nums=atom_nums):
             """Find the product with any overlap to target atoms and recurse into its reaction."""
             rxn = _steps[sid]
             for p in rxn.products:
                 if _atom_nums & set(p._atoms.keys()):
-                    smiles = str(p)
+                    smiles = _route_molecule_smiles(p)
                     return {
                         "type": "mol",
                         "smiles": smiles,
@@ -203,7 +193,7 @@ def make_json(
                 node.update(_route_step_metadata[sid])
 
             for react in rxn.reactants:
-                r_smi = transform(react)
+                r_smi = _route_molecule_smiles(react)
                 # Look up any prior step producing this reactant
                 prior = [ps for ps in _prod_map.get(r_smi, []) if ps < sid]
                 if prior:
@@ -228,7 +218,7 @@ def make_json(
 def write_routes_json(
     routes_dict,
     file_path,
-    tree: Tree | None = None,
+    tree: "Tree | None" = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
 ):
     """Serialize reaction routes to a JSON file."""
@@ -242,11 +232,12 @@ def write_routes_json(
 
 
 def write_routes_csv(routes_dict, file_path="routes.csv"):
-    """
-    Write out a nested routes_dict of the form
-        { route_id: { step_id: reaction_obj, ... }, ... }
-    to a CSV with columns: route_id, step_id, smiles, meta
-    where smiles is format(reaction, 'm') and meta is left blank.
+    """Write route reactions to a CSV file.
+
+    ``routes_dict`` is a nested ``route_id -> step_id -> reaction`` mapping. The
+    output file contains ``route_id``, ``step_id``, ``smiles``, and ``meta``
+    columns; ``smiles`` is written with ``format(reaction, "m")`` and ``meta``
+    is left blank.
     """
     with open(file_path, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -262,61 +253,35 @@ def write_routes_csv(routes_dict, file_path="routes.csv"):
                 writer.writerow([route_id, step_id, smiles, meta])
 
 
-def cluster_route_from_csv(routes_file: str):
+def export_tree_to_json(tree: "Tree", file_path: str, route_id=None):
     """
-    Reads retrosynthetic routes from a CSV file, processes them, and performs clustering.
-
-    This function orchestrates the process of loading retrosynthetic route data
-    from a specified CSV file, converting the routes into Condensed Graph of
-    Reactions (CGRs), reducing these CGRs to a simplified form (SB-CGRs),
-    and finally clustering the routes based on these reduced representations.
-    It uses strategic bonds for clustering by default (as indicated by `use_strat=False`
-    in `cluster_routes`, which implies clustering based on the graph structure
-    derived from the reduced CGRs, which often highlight strategic bonds).
+    Export a retrosynthetic search tree directly to a JSON file.
 
     Args:
-        routes_file (str): The path to the CSV file containing the retrosynthetic
-                           route data.
-
-    Returns:
-        object: The result of the clustering process, typically a data structure
-                representing the identified clusters. The exact type depends on
-                the implementation of the `cluster_routes` function.
+        tree: synplan.mcts.tree.Tree instance.
+        file_path: Output JSON path.
+        route_id: If provided, export only this specific route (node id).
     """
-    from synplan.chem.reaction.routes.clustering import cluster_routes
+    from synplan.chem.reaction.routes.representation import extract_reactions
 
-    routes_dict = read_routes_csv(routes_file)
-    route_cgrs_dict = compose_all_route_cgrs(routes_dict)
-    sb_cgrs_dict = compose_all_sb_cgrs(route_cgrs_dict)
-    clusters = cluster_routes(sb_cgrs_dict, use_strat=False)
-    return clusters
+    routes_dict = extract_reactions(tree, route_id)
+    if routes_dict is None:
+        raise ValueError("Failed to extract reactions for the specified route_id.")
+    write_routes_json(routes_dict, file_path, tree=tree)
 
 
-def cluster_route_from_json(routes_file: str):
+def export_tree_to_csv(tree: "Tree", file_path: str = "routes.csv", route_id=None):
     """
-    Reads retrosynthetic routes from a JSON file, processes them, and performs clustering.
-
-    This function is similar to `cluster_route_from_csv` but loads the
-    retrosynthetic route data from a specified JSON file. It reads the JSON,
-    converts it into a suitable dictionary format, composes and reduces the
-    Condensed Graph of Reactions (CGRs) for each route, and then clusters
-    the routes based on these reduced representations, typically using
-    strategic bonds as the basis for clustering.
+    Export a retrosynthetic search tree directly to a CSV file.
 
     Args:
-        routes_file (str): The path to the JSON file containing the retrosynthetic
-                           route data.
-
-    Returns:
-        object: The result of the clustering process, typically a data structure
-                representing the identified clusters. The exact type depends on
-                the implementation of the `cluster_routes` function.
+        tree: synplan.mcts.tree.Tree instance.
+        file_path: Output CSV path.
+        route_id: If provided, export only this specific route (node id).
     """
-    from synplan.chem.reaction.routes.clustering import cluster_routes
+    from synplan.chem.reaction.routes.representation import extract_reactions
 
-    routes_json = read_routes_json(routes_file)
-    routes_dict = make_dict(routes_json)
-    route_cgrs_dict = compose_all_route_cgrs(routes_dict)
-    sb_cgrs_dict = compose_all_sb_cgrs(route_cgrs_dict)
-    clusters = cluster_routes(sb_cgrs_dict, use_strat=False)
-    return clusters
+    routes_dict = extract_reactions(tree, route_id)
+    if routes_dict is None:
+        raise ValueError("Failed to extract reactions for the specified route_id.")
+    write_routes_csv(routes_dict, file_path)
