@@ -11,6 +11,7 @@ from synplan.routes.quality.protection.functional_groups import (
 )
 from synplan.routes.quality.protection.scanner import (
     CompetingInteraction,
+    CompetingScanResult,
     IncompatibilityMatrix,
     RouteScanner,
 )
@@ -180,6 +181,79 @@ def test_scan_route_reacting_fg_field(scanner):
     for inter in interactions:
         # reacting_fg should be a string or None
         assert inter.reacting_fg is None or isinstance(inter.reacting_fg, str)
+
+
+def test_scan_route_detailed_preserves_default_contract(scanner):
+    """Detailed scans are opt-in; default scans keep the historical tuple API."""
+    rxn = smiles(
+        "[CH3:1][C:2](=[O:3])[OH:4].[OH:5][CH2:6][CH2:7][OH:8]>>"
+        "[CH3:1][C:2](=[O:3])[O:5][CH2:6][CH2:7][OH:8].[OH2:4]"
+    )
+    route = {0: rxn}
+
+    default = scanner.scan_route(route)
+    detailed = scanner.scan_route(route, detailed=True)
+
+    assert isinstance(default, tuple)
+    assert isinstance(detailed, CompetingScanResult)
+    assert default[0] == detailed.interactions
+    assert default[1] == detailed.halogen_count
+
+
+def test_scan_route_detailed_atom_mapped_site_fields(scanner):
+    """Detailed scans should expose stable atom-map handles for revision."""
+    rxn = smiles(
+        "[CH3:1][C:2](=[O:3])[OH:4].[OH:5][CH2:6][CH2:7][OH:8]>>"
+        "[CH3:1][C:2](=[O:3])[O:5][CH2:6][CH2:7][OH:8].[OH2:4]"
+    )
+    result = scanner.scan_route({0: rxn}, detailed=True)
+
+    alcohol = next(
+        inter
+        for inter in result.interactions
+        if inter.fg_name == "PrimaryAlcoholAliphatic" and inter.fg_atoms == (8,)
+    )
+    assert alcohol.anchor_atom == 8
+    assert alcohol.center_atoms == (2, 4, 5)
+    assert alcohol.reacting_fg == "Acid_SaturatedAliphatic"
+    assert alcohol.reacting_fg_atoms == (4,)
+    assert alcohol.site_key == "0:PrimaryAlcoholAliphatic:8:8"
+
+
+def test_scan_route_detailed_bypasses_structure_cache_for_atom_maps(scanner):
+    """Detailed route scans should not reuse atom ids from equivalent molecules."""
+    route = {
+        0: smiles(
+            "[CH3:1][C:2](=[O:3])[OH:4].[OH:5][CH2:6][CH2:7][OH:8]>>"
+            "[CH3:1][C:2](=[O:3])[O:5][CH2:6][CH2:7][OH:8].[OH2:4]"
+        ),
+        1: smiles(
+            "[CH3:101][C:102](=[O:103])[OH:104].[OH:105][CH2:106]"
+            "[CH2:107][OH:108]>>[CH3:101][C:102](=[O:103])[O:105]"
+            "[CH2:106][CH2:107][OH:108].[OH2:104]"
+        ),
+    }
+
+    result = scanner.scan_route(route, detailed=True)
+
+    step_0 = next(
+        interaction
+        for interaction in result.interactions
+        if interaction.step_id == 0
+        and interaction.fg_name == "PrimaryAlcoholAliphatic"
+        and interaction.anchor_atom == 8
+    )
+    step_1 = next(
+        interaction
+        for interaction in result.interactions
+        if interaction.step_id == 1
+        and interaction.fg_name == "PrimaryAlcoholAliphatic"
+    )
+    assert step_0.fg_atoms == (8,)
+    assert step_0.site_key == "0:PrimaryAlcoholAliphatic:8:8"
+    assert step_1.fg_atoms == (108,)
+    assert step_1.anchor_atom == 108
+    assert step_1.site_key == "1:PrimaryAlcoholAliphatic:108:108"
 
 
 def test_scan_route_severity_depends_on_reacting_fg(scanner):

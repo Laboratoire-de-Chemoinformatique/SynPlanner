@@ -48,6 +48,29 @@ class CompetingInteraction(BaseModel):
     fg_atoms: tuple[int, ...]
     reacting_fg: str | None
     severity: str
+    anchor_atom: int | None = None
+    center_atoms: tuple[int, ...] = ()
+    reacting_fg_atoms: tuple[int, ...] = ()
+    product_index: int = 0
+    modification_type: str | None = None
+    template_smarts: str | None = None
+    site_key: str | None = None
+
+
+class CompetingScanResult(BaseModel):
+    """Detailed competing-site scan output.
+
+    The default ``scan_route`` return shape is kept for scoring callers.  This
+    model is returned only when ``detailed=True`` and carries atom-mapped handles
+    needed by deterministic protection revision.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    interactions: list[CompetingInteraction]
+    halogen_count: int
+    processed_steps: tuple[int, ...]
+    skipped_steps: tuple[int, ...]
 
 
 class IncompatibilityMatrix:
@@ -119,8 +142,10 @@ class RouteScanner:
         self.last_processed_steps: set[int] = set()
 
     def scan_route(
-        self, route: dict[int, ReactionContainer]
-    ) -> tuple[list[CompetingInteraction], int]:
+        self,
+        route: dict[int, ReactionContainer],
+        detailed: bool = False,
+    ) -> tuple[list[CompetingInteraction], int] | CompetingScanResult:
         """Walk a route step-by-step and collect competing interactions.
 
         For each step the scanner:
@@ -137,13 +162,19 @@ class RouteScanner:
         :param route: A dict mapping step_id -> ReactionContainer, as
             returned by ``extract_reactions()`` in
             ``synplan.routes.route_cgr``.
-        :return: Tuple of (interactions, halogen_count) where interactions
-            is a list of CompetingInteraction objects and halogen_count is
-            the total number of same-family competing halogen sites.
+        :param detailed: If True, return a :class:`CompetingScanResult` with
+            processed/skipped step ids and atom-mapped site metadata.  If False,
+            preserve the historical ``(interactions, halogen_count)`` return.
+        :return: Tuple of (interactions, halogen_count) or detailed scan result.
         """
         interactions: list[CompetingInteraction] = []
         total_halogen_count = 0
         processed_steps: set[int] = set()
+        skipped_steps: set[int] = set()
+        # Detailed scans expose atom ids as route-mutation handles.  Bypass the
+        # detector's structure-keyed cache so those ids always belong to the
+        # current atom-mapped route molecule.
+        use_detector_cache = not detailed
 
         for step_id in sorted(route):
             reaction = route[step_id]
@@ -151,6 +182,7 @@ class RouteScanner:
             # 1. Get the product molecule (first product)
             products = list(reaction.products)
             if not products:
+                skipped_steps.add(step_id)
                 continue
             product = products[0]
 
@@ -159,6 +191,7 @@ class RouteScanner:
                 cgr = ~reaction
             except Exception:
                 logger.warning("Could not compose CGR for step %d, skipping.", step_id)
+                skipped_steps.add(step_id)
                 continue
             processed_steps.add(step_id)
 
@@ -169,25 +202,38 @@ class RouteScanner:
             #    Try the REACTANT side first (the consumed FG, per the paper),
             #    then fall back to the PRODUCT side (the formed FG).
             reacting_fg_name = None
+            reacting_fg_atoms: tuple[int, ...] = ()
             best_overlap = 0
             for reactant in reaction.reactants:
                 reacting_match = self._fg_detector.detect_reacting(
-                    reactant, center_atoms
+                    reactant,
+                    center_atoms,
+                    use_cache=use_detector_cache,
                 )
                 if reacting_match is not None:
                     overlap = len(set(reacting_match.atom_indices) & center_atoms)
                     if overlap > best_overlap:
                         best_overlap = overlap
                         reacting_fg_name = reacting_match.name
+                        reacting_fg_atoms = reacting_match.atom_indices
 
             # Fallback: check the product side if no reactant FG found
             if reacting_fg_name is None:
-                product_match = self._fg_detector.detect_reacting(product, center_atoms)
+                product_match = self._fg_detector.detect_reacting(
+                    product,
+                    center_atoms,
+                    use_cache=use_detector_cache,
+                )
                 if product_match is not None:
                     reacting_fg_name = product_match.name
+                    reacting_fg_atoms = product_match.atom_indices
 
             # 5. Detect competing FGs on product (not overlapping reaction center)
-            competing_fgs = self._fg_detector.detect_competing(product, center_atoms)
+            competing_fgs = self._fg_detector.detect_competing(
+                product,
+                center_atoms,
+                use_cache=use_detector_cache,
+            )
 
             # 6. Look up severity for each competing FG against reacting FG.
             #    If no reacting FG could be identified (reaction type not
@@ -198,6 +244,7 @@ class RouteScanner:
                     severity = self._incompatibility.lookup(fg.name, reacting_fg_name)
                 else:
                     severity = "compatible"
+                site_key = self._site_key(step_id, fg.name, fg.atom_indices, fg.anchor_atom)
                 interactions.append(
                     CompetingInteraction(
                         step_id=step_id,
@@ -205,6 +252,13 @@ class RouteScanner:
                         fg_atoms=fg.atom_indices,
                         reacting_fg=reacting_fg_name,
                         severity=severity,
+                        anchor_atom=fg.anchor_atom,
+                        center_atoms=tuple(sorted(center_atoms)),
+                        reacting_fg_atoms=reacting_fg_atoms,
+                        product_index=0,
+                        modification_type=fg.modification_type,
+                        template_smarts=fg.template_smarts,
+                        site_key=site_key,
                     )
                 )
 
@@ -217,7 +271,25 @@ class RouteScanner:
                 )
 
         self.last_processed_steps = processed_steps
+        if detailed:
+            return CompetingScanResult(
+                interactions=interactions,
+                halogen_count=total_halogen_count,
+                processed_steps=tuple(sorted(processed_steps)),
+                skipped_steps=tuple(sorted(skipped_steps)),
+            )
         return interactions, total_halogen_count
+
+    @staticmethod
+    def _site_key(
+        step_id: int,
+        fg_name: str,
+        fg_atoms: tuple[int, ...],
+        anchor_atom: int | None,
+    ) -> str:
+        atoms = ",".join(str(atom) for atom in fg_atoms)
+        anchor = "" if anchor_atom is None else str(anchor_atom)
+        return f"{step_id}:{fg_name}:{atoms}:{anchor}"
 
     @staticmethod
     def classify_interactions(

@@ -29,6 +29,9 @@ class FunctionalGroupMatch(BaseModel):
     name: str
     category: str
     atom_indices: tuple[int, ...]
+    template_smarts: str | None = None
+    modification_type: str | None = None
+    anchor_atom: int | None = None
 
 
 class FunctionalGroupDetector:
@@ -68,11 +71,26 @@ class FunctionalGroupDetector:
                         exc,
                     )
                     continue
+                template_smarts = entry.get("template_smarts")
+                template_query = None
+                if template_smarts:
+                    try:
+                        template_query = smarts(template_smarts)
+                    except Exception as exc:
+                        logger.warning(
+                            "Could not parse template SMARTS for %s (%s): %s",
+                            name,
+                            template_smarts,
+                            exc,
+                        )
                 self._patterns.append(
                     {
                         "name": name,
                         "category": category,
                         "query": query,
+                        "template_smarts": template_smarts,
+                        "template_query": template_query,
+                        "modification_type": entry.get("modification_type"),
                     }
                 )
 
@@ -80,7 +98,11 @@ class FunctionalGroupDetector:
         """Return a canonical SMILES string suitable as a cache key."""
         return format(molecule, "h")
 
-    def detect_all(self, molecule: MoleculeContainer) -> list[FunctionalGroupMatch]:
+    def detect_all(
+        self,
+        molecule: MoleculeContainer,
+        use_cache: bool = True,
+    ) -> list[FunctionalGroupMatch]:
         """Detect all functional group matches in a molecule.
 
         Applies every loaded SMARTS pattern and returns deduplicated
@@ -89,12 +111,17 @@ class FunctionalGroupDetector:
         re-scanned.
 
         :param molecule: A chython MoleculeContainer to search.
+        :param use_cache: If False, bypass the structural cache.  This is
+            required when returned atom ids will be used as route-instance
+            mutation handles, because canonical SMILES does not encode atom
+            mapping identity.
         :return: List of FunctionalGroupMatch objects.
         """
-        key = self._cache_key(molecule)
-        cached = self._cache.get(key)
-        if cached is not None:
-            return cached
+        key = self._cache_key(molecule) if use_cache else None
+        if key is not None:
+            cached = self._cache.get(key)
+            if cached is not None:
+                return cached
 
         matches: list[FunctionalGroupMatch] = []
         seen: set[tuple[str, tuple[int, ...]]] = set()
@@ -107,21 +134,55 @@ class FunctionalGroupDetector:
                 if dedup_key in seen:
                     continue
                 seen.add(dedup_key)
+                anchor_atom = self._anchor_from_template_mapping(
+                    molecule,
+                    set(atom_indices),
+                    pat.get("template_query"),
+                )
                 matches.append(
                     FunctionalGroupMatch(
                         name=pat["name"],
                         category=pat["category"],
                         atom_indices=atom_indices,
+                        template_smarts=pat.get("template_smarts"),
+                        modification_type=pat.get("modification_type"),
+                        anchor_atom=anchor_atom,
                     )
                 )
 
-        self._cache[key] = matches
+        if key is not None:
+            self._cache[key] = matches
         return matches
+
+    @staticmethod
+    def _anchor_from_template_mapping(
+        molecule: MoleculeContainer,
+        atom_indices: set[int],
+        template_query,
+    ) -> int | None:
+        """Return the molecule atom matched by ``:1`` in ``template_smarts``.
+
+        chython stores SMARTS atom-map labels as query atom numbers, so the
+        protection anchor is the target atom mapped from query atom ``1``.
+        """
+        if template_query is None:
+            return None
+
+        anchors: set[int] = set()
+        for mapping in template_query.get_mapping(molecule):
+            anchor = mapping.get(1)
+            if anchor is not None and anchor in atom_indices:
+                anchors.add(anchor)
+
+        if len(anchors) == 1:
+            return next(iter(anchors))
+        return None
 
     def detect_competing(
         self,
         molecule: MoleculeContainer,
         reaction_center_atoms: set[int],
+        use_cache: bool = True,
     ) -> list[FunctionalGroupMatch]:
         """Detect functional groups NOT overlapping with the reaction center.
 
@@ -130,9 +191,10 @@ class FunctionalGroupDetector:
 
         :param molecule: A chython MoleculeContainer to search.
         :param reaction_center_atoms: Atom indices of the reaction center.
+        :param use_cache: Passed through to :meth:`detect_all`.
         :return: List of FunctionalGroupMatch objects for competing FGs.
         """
-        all_matches = self.detect_all(molecule)
+        all_matches = self.detect_all(molecule, use_cache=use_cache)
         return [
             m for m in all_matches if not set(m.atom_indices) & reaction_center_atoms
         ]
@@ -141,6 +203,7 @@ class FunctionalGroupDetector:
         self,
         molecule: MoleculeContainer,
         reaction_center_atoms: set[int],
+        use_cache: bool = True,
     ) -> FunctionalGroupMatch | None:
         """Detect the functional group at the reaction center.
 
@@ -149,9 +212,10 @@ class FunctionalGroupDetector:
 
         :param molecule: A chython MoleculeContainer to search.
         :param reaction_center_atoms: Atom indices of the reaction center.
+        :param use_cache: Passed through to :meth:`detect_all`.
         :return: The FunctionalGroupMatch at the reaction center, or None.
         """
-        all_matches = self.detect_all(molecule)
+        all_matches = self.detect_all(molecule, use_cache=use_cache)
         for m in all_matches:
             if set(m.atom_indices) & reaction_center_atoms:
                 return m

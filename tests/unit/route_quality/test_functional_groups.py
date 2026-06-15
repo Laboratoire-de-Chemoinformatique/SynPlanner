@@ -183,6 +183,21 @@ def test_caching(detector):
     assert result1 is result2  # same object from cache
 
 
+def test_detect_all_can_bypass_cache_for_atom_mapped_handles(detector):
+    """Uncached detection should return atom ids from the current molecule."""
+    first = smiles("[CH3:1][CH2:2][OH:3]")
+    second = smiles("[CH3:10][CH2:20][OH:30]")
+
+    detector.detect_all(first)
+    uncached = detector.detect_all(second, use_cache=False)
+
+    alcohol = next(
+        match for match in uncached if match.name == "PrimaryAlcoholAliphatic"
+    )
+    assert alcohol.atom_indices == (30,)
+    assert alcohol.anchor_atom == 30
+
+
 def test_clear_cache(detector):
     """clear_cache should invalidate the cache."""
     mol = smiles("CCO")
