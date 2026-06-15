@@ -199,9 +199,14 @@ def make_json(
                 if prior:
                     node["children"].append(build_mol_node(max(prior)))
                 else:
-                    node["children"].append(
-                        {"type": "mol", "smiles": r_smi, "in_stock": True}
-                    )
+                    mol_node = {
+                        "type": "mol",
+                        "smiles": r_smi,
+                        "in_stock": True,
+                    }
+                    if react.meta.get("added_protecting_group"):
+                        mol_node["added_protecting_group"] = True
+                    node["children"].append(mol_node)
 
             return node
 

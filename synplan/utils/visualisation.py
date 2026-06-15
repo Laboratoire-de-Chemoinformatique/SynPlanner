@@ -308,6 +308,7 @@ def _route_box_colors() -> dict[str, str]:
         "target": "#98EEFF",
         "mulecule": "#F0AB90",
         "instock": "#9BFAB3",
+        "protecting_group": "#FFA500",
     }
 
 
@@ -558,6 +559,8 @@ def _prepare_json_route_svg_inputs(
             container = read_smiles(mol["smiles"])
             if depth == 0:
                 container.meta["status"] = "target"
+            elif mol.get("added_protecting_group"):
+                container.meta["status"] = "protecting_group"
             else:
                 container.meta["status"] = (
                     "instock" if mol.get("in_stock") else "mulecule"
@@ -595,6 +598,16 @@ def get_route_svg_from_json(
         routes_json, route_id, labeled=labeled
     )
     return _render_route_svg(columns, pred, labeled=labeled)
+
+
+def get_route_svg_json(
+    routes_json: dict,
+    route_id: int,
+    labeled: bool = False,
+) -> str:
+    """Compatibility alias for :func:`get_route_svg_from_json`."""
+
+    return get_route_svg_from_json(routes_json, route_id, labeled=labeled)
 
 
 def generate_results_html(
@@ -1012,6 +1025,7 @@ def routes_clustering_report(
             <span>{box_mark.replace("rgb()", "rgb(152, 238, 255)")} Target Molecule</span>
             <span>{box_mark.replace("rgb()", "rgb(240, 171, 144)")} Molecule Not In Stock</span>
             <span>{box_mark.replace("rgb()", "rgb(155, 250, 179)")} Molecule In Stock</span>
+            <span>{box_mark.replace("rgb()", "rgb(255, 165, 0)")} Added Protecting Group</span>
         </div>
     </td></tr>
     """
@@ -1612,6 +1626,7 @@ def routes_subclustering_report(
             <span>{box_mark.replace("rgb()", "rgb(152, 238, 255)")} Target Molecule</span>
             <span>{box_mark.replace("rgb()", "rgb(240, 171, 144)")} Molecule Not In Stock</span>
             <span>{box_mark.replace("rgb()", "rgb(155, 250, 179)")} Molecule In Stock</span>
+            <span>{box_mark.replace("rgb()", "rgb(255, 165, 0)")} Added Protecting Group</span>
         </div>
     </td></tr>
     """

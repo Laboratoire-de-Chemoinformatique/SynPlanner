@@ -4,7 +4,11 @@ from chython.containers import MoleculeContainer
 from synplan.chem.precursor import Precursor
 from synplan.mcts.node import Node
 from synplan.routes.io import make_json
-from synplan.utils.visualisation import get_route_svg, get_route_svg_from_json
+from synplan.utils.visualisation import (
+    get_route_svg,
+    get_route_svg_from_json,
+    get_route_svg_json,
+)
 
 
 def make_mol(n: int) -> MoleculeContainer:
@@ -114,3 +118,31 @@ def test_get_route_svg_from_json_can_render_rule_labels():
     assert "<svg" in svg
     assert "policy:42" in svg
     assert "priority:0" in svg
+
+
+def test_get_route_svg_json_colors_added_protecting_group_orange():
+    routes_json = {
+        0: {
+            "type": "mol",
+            "smiles": "CO",
+            "in_stock": False,
+            "children": [
+                {
+                    "type": "reaction",
+                    "children": [
+                        {
+                            "type": "mol",
+                            "smiles": "CCl",
+                            "in_stock": True,
+                            "added_protecting_group": True,
+                        }
+                    ],
+                }
+            ],
+        }
+    }
+
+    svg = get_route_svg_json(routes_json, 0)
+
+    assert "<svg" in svg
+    assert '#FFA500" fill-opacity="0.30"' in svg
