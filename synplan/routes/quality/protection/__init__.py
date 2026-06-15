@@ -1,6 +1,9 @@
 """Protection-strategy route quality scoring."""
 
-from synplan.routes.quality.protection.config import ProtectionConfig
+from synplan.routes.quality.protection.config import (
+    ProtectionConfig,
+    ProtectionRevisionConfig,
+)
 from synplan.routes.quality.protection.functional_groups import (
     FunctionalGroupDetector,
     FunctionalGroupMatch,
@@ -15,12 +18,21 @@ from synplan.routes.quality.protection.reaction_classifier import (
 )
 from synplan.routes.quality.protection.scanner import (
     CompetingInteraction,
+    CompetingScanResult,
     IncompatibilityMatrix,
     RouteScanner,
 )
 from synplan.routes.quality.protection.scorer import CompetingSitesScore
+from synplan.routes.quality.protection.revision import (
+    ProtectionAction,
+    ProtectionFragmentCatalog,
+    ProtectionRouteReviser,
+    ProtectionRevisionDiagnostic,
+    RevisedRoute,
+)
 
 __all__ = [
+    "CompetingScanResult",
     "CompetingInteraction",
     "CompetingSitesScore",
     "FunctionalGroupDetector",
@@ -28,7 +40,13 @@ __all__ = [
     "HalogenDetector",
     "HalogenMatch",
     "IncompatibilityMatrix",
+    "ProtectionAction",
     "ProtectionConfig",
+    "ProtectionFragmentCatalog",
+    "ProtectionRevisionConfig",
+    "ProtectionRevisionDiagnostic",
+    "ProtectionRouteReviser",
+    "RevisedRoute",
     "RouteScanner",
     "classify_reaction_type",
     "classify_reaction_type_broad",

@@ -11,12 +11,14 @@ from synplan.routes.quality.protection.reaction_classifier import (
 )
 from synplan.routes.quality.protection.scanner import (
     CompetingInteraction,
+    CompetingScanResult,
     IncompatibilityMatrix,
     RouteScanner,
 )
 
 __all__ = [
     "CompetingInteraction",
+    "CompetingScanResult",
     "FunctionalGroupDetector",
     "HalogenDetector",
     "IncompatibilityMatrix",

@@ -10,6 +10,10 @@ _LAZY_EXPORTS = {
         "synplan.routes.quality.protection.scanner",
         "CompetingInteraction",
     ),
+    "CompetingScanResult": (
+        "synplan.routes.quality.protection.scanner",
+        "CompetingScanResult",
+    ),
     "CompetingSitesScore": (
         "synplan.routes.quality.protection.scorer",
         "CompetingSitesScore",
@@ -38,6 +42,14 @@ _LAZY_EXPORTS = {
         "synplan.routes.quality.protection.config",
         "ProtectionConfig",
     ),
+    "ProtectionRevisionConfig": (
+        "synplan.routes.quality.protection.config",
+        "ProtectionRevisionConfig",
+    ),
+    "ProtectionRouteReviser": (
+        "synplan.routes.quality.protection.revision",
+        "ProtectionRouteReviser",
+    ),
     "ProtectionRouteScorer": (
         "synplan.routes.quality.scorer",
         "ProtectionRouteScorer",
@@ -64,6 +76,7 @@ _LAZY_EXPORTS = {
 
 __all__ = [
     "CompetingInteraction",
+    "CompetingScanResult",
     "CompetingSitesScore",
     "FunctionalGroupDetector",
     "FunctionalGroupMatch",
@@ -71,7 +84,9 @@ __all__ = [
     "HalogenMatch",
     "IncompatibilityMatrix",
     "ProtectionConfig",
+    "ProtectionRevisionConfig",
     "ProtectionRouteScorer",
+    "ProtectionRouteReviser",
     "RouteScanner",
     "RouteScorer",
     "classify_reaction_type",

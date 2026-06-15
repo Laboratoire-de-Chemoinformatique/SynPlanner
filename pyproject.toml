@@ -87,7 +87,15 @@ allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["synplan", "scripts"]
-artifacts = ["*.tsv", "*.csv", "*.yaml", "*.json"]
+artifacts = [
+  "*.tsv",
+  "*.csv",
+  "*.yaml",
+  "*.json",
+  "synplan/routes/quality/protection/data/*.md",
+  "THIRD_PARTY_NOTICES.md",
+  "licenses/*.txt",
+]
 
 [tool.uv]
 # Supply-chain hardening. Use an explicit UTC timestamp so `uv --locked`

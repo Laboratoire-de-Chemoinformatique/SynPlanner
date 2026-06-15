@@ -27,5 +27,22 @@ class ProtectionConfig(BaseConfigModel):
     competing_groups_path: str = str(_DATA_DIR / "competing_groups.yaml")
     incompatibility_path: str = str(_DATA_DIR / "incompatibility_matrix.tsv")
     halogen_groups_path: str = str(_DATA_DIR / "halogen_groups.yaml")
+    protection_group_templates_path: str = str(
+        _DATA_DIR / "protection_group_templates.csv"
+    )
+    reactive_function_label_mapping_path: str = str(
+        _DATA_DIR / "reactive_function_label_mapping.json"
+    )
     score_weight: float = Field(default=0.5, ge=0.0, le=1.0)
     enable_reranking: bool = True
+
+
+class ProtectionRevisionConfig(ProtectionConfig):
+    """Configuration for deterministic protection/deprotection route revision."""
+
+    max_revisions_per_route: int = Field(default=5, ge=0)
+    min_score_improvement: float = Field(default=1e-6, ge=0.0)
+    candidate_severities: tuple[str, ...] = ("incompatible", "competing")
+    supported_modification_types: tuple[str, ...] = ("label", "clip")
+    validate_route_cgr: bool = True
+    preserve_transient_bonds: bool = True

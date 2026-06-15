@@ -9,6 +9,10 @@ from importlib import import_module
 
 _LAZY_EXPORTS = {
     "ProtectionRouteScorer": ("synplan.routes.quality.scorer", "ProtectionRouteScorer"),
+    "ProtectionRouteReviser": (
+        "synplan.routes.quality.protection.revision",
+        "ProtectionRouteReviser",
+    ),
     "RouteCGRContainer": ("synplan.routes.route_cgr", "RouteCGRContainer"),
     "RouteDynamicBond": ("synplan.routes.route_cgr", "RouteDynamicBond"),
     "RouteScorer": ("synplan.routes.quality.scorer", "RouteScorer"),
