@@ -2,17 +2,20 @@
 molecules."""
 
 import csv
+import gzip
 import json
 import logging
 import os.path
 from collections.abc import Iterator
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from chython.containers import MoleculeContainer
+from rdkit import Chem
 from tqdm.auto import tqdm
 
 from synplan.chem.reaction import CanonicalRetroReactor
-from synplan.chem.reaction.routes.io import write_routes_csv, write_routes_json
+from synplan.chem.reaction.routes.io import make_json, write_routes_csv, write_routes_json
 from synplan.chem.reaction.routes.quality.scorer import RouteScorer
 from synplan.chem.reaction.routes.representation import extract_reactions
 from synplan.chem.utils import mol_from_smiles
@@ -26,6 +29,30 @@ from synplan.utils.loading import (
     load_reaction_rules,
 )
 from synplan.utils.visualisation import extract_routes, generate_results_html
+
+#: Versioned identifier for the public route-export contract emitted by
+#: :func:`export_routes_artifact`. Bump when the envelope/manifest shape changes.
+ROUTE_EXPORT_SCHEMA_VERSION = "synplan-routes/1"
+
+
+def _canonical_target_key(smiles: str) -> str:
+    """Canonical SMILES key for the route-export artifact.
+
+    Mirrors retrocast's ``canonicalize_smiles`` default flags so keys match
+    ``retrocast.curation...Target.smiles`` byte-for-byte: RDKit
+    ``MolFromSmiles`` (sanitize=True) then ``MolToSmiles(canonical=True,
+    isomericSmiles=True)``, with atom mapping left intact. Falls back to the raw
+    string (with a warning) when RDKit cannot parse the input.
+    """
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        logging.warning(
+            "Could not RDKit-canonicalize target SMILES %r for route export; "
+            "keying by the raw string.",
+            smiles,
+        )
+        return smiles
+    return Chem.MolToSmiles(mol, canonical=True, isomericSmiles=True)
 
 
 def _iter_target_smiles(targets_path: str) -> Iterator[str]:
@@ -69,6 +96,89 @@ def extract_tree_stats(
     return stats
 
 
+def _resolve_synplan_version() -> str | None:
+    """Best-effort resolution of the installed SynPlanner version."""
+    try:
+        return version("synplanner")
+    except PackageNotFoundError:
+        pass
+    try:
+        import synplan
+
+        return getattr(synplan, "__version__", None)
+    except Exception:
+        return None
+
+
+def build_target_routes(tree, reactions: dict | None = None) -> list[dict]:
+    """Public per-target route shape for the route-export contract.
+
+    Returns the list of route-tree dicts for one solved target. Each route tree
+    is a recursive bipartite structure of ``{"type": "mol", ...}`` and
+    ``{"type": "reaction", ...}`` nodes whose format is exactly the output of
+    :func:`synplan.chem.reaction.routes.io.make_json` (node shape is not
+    reshaped). Returns ``[]`` when the tree has no winning nodes.
+
+    :param tree: A completed :class:`~synplan.mcts.tree.Tree`.
+    :param reactions: Optional precomputed ``extract_reactions(tree)`` result to
+        avoid a second tree traversal. When ``None`` it is computed here.
+    """
+    if not bool(tree.winning_nodes):
+        return []
+    if reactions is None:
+        reactions = extract_reactions(tree)
+    return list(make_json(reactions, keep_ids=True).values())
+
+
+def export_routes_artifact(
+    results: dict,
+    results_root,
+    *,
+    filename: str = "results.json.gz",
+    write_manifest: bool = True,
+    schema_version: str = ROUTE_EXPORT_SCHEMA_VERSION,
+    synplan_version: str | None = None,
+) -> Path:
+    """Write the target-keyed route-export artifact (public contract).
+
+    Gzip-writes ``results`` as JSON to ``results_root/filename``. ``results`` is
+    the public envelope: a top-level dict keyed by the RDKit-canonical target
+    SMILES (matching retrocast's ``Target.smiles``; see
+    :func:`_canonical_target_key`) mapping to ``[route_tree, ...]`` with ``[]``
+    for unsolved targets, where each ``route_tree`` is a
+    :func:`build_target_routes` / ``make_json`` node tree.
+
+    When ``write_manifest`` is true, also writes ``results_root/manifest.json``
+    with a top-level ``directives`` dict
+    (``{"adapter": "synplanner", "raw_results_filename": filename}``) plus
+    top-level ``schema_version`` and ``synplan_version`` keys.
+
+    :return: Path to the written gzipped results file.
+    """
+    results_root = Path(results_root)
+    results_root.mkdir(parents=True, exist_ok=True)
+
+    results_path = results_root.joinpath(filename)
+    with gzip.open(results_path, "wt", encoding="utf-8") as fh:
+        json.dump(results, fh)
+
+    if write_manifest:
+        manifest = {
+            "schema_version": schema_version,
+            "synplan_version": synplan_version,
+            "directives": {
+                "adapter": "synplanner",
+                "raw_results_filename": filename,
+            },
+        }
+        with open(
+            results_root.joinpath("manifest.json"), "w", encoding="utf-8"
+        ) as fh:
+            json.dump(manifest, fh, indent=2)
+
+    return results_path
+
+
 def run_search(
     targets_path: str,
     search_config: dict,
@@ -80,6 +190,8 @@ def run_search(
     route_scorer: RouteScorer | None = None,
     priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
     reconcile_atom_mapping: bool = False,
+    export_routes: bool = False,
+    routes_filename: str = "results.json.gz",
 ) -> None:
     """Performs a tree search on a set of target molecules using specified configuration
     and reaction rules, logging the results and statistics.
@@ -106,6 +218,13 @@ def run_search(
         routes_dict directly from the tree (fast path, per-step-local atom
         numbering). If True, use the slower ``compose_route_cgr`` path to give
         cross-step-reconciled atom-map numbering in the exported reactions.
+    :param export_routes: When True, additionally emit the public route-export
+        artifact (``routes_filename`` + ``manifest.json``) keyed by the
+        RDKit-canonical target SMILES (matching retrocast's ``Target.smiles``;
+        ``[]`` for unsolved targets), for downstream consumers. Defaults to
+        False, leaving the existing outputs byte-identical.
+    :param routes_filename: Filename (under ``results_root``) for the gzipped
+        target-keyed routes artifact. Only used when ``export_routes`` is True.
     :return: None.
     """
 
@@ -170,6 +289,9 @@ def run_search(
     # run search
     n_solved = 0
     extracted_routes = []
+    # Public route-export accumulator keyed by RDKit-canonical target SMILES:
+    # {canonical_target_smiles: [route_tree, ...]}.
+    exported_routes: dict[str, list[dict]] = {}
 
     tree_config = TreeConfig.from_dict(search_config)
     tree_config.silent = True
@@ -184,6 +306,10 @@ def run_search(
             bar_format="{desc}{n} [{elapsed}]",
         ):
             target_smi = target_smi.strip()
+            # Key the export dict by the RDKit-canonical target SMILES so keys
+            # match retrocast's Target.smiles byte-for-byte (see
+            # _canonical_target_key). Computed only on the export path.
+            export_key = _canonical_target_key(target_smi) if export_routes else None
             try:
                 target_mol = mol_from_smiles(target_smi)
                 # run search
@@ -214,6 +340,8 @@ def run_search(
                 logging.warning(
                     f"Retrosynthetic_planning {target_smi} failed with the following error: {e}"
                 )
+                if export_routes:
+                    exported_routes[export_key] = []
 
                 continue
 
@@ -247,8 +375,24 @@ def run_search(
                     routes_dict, os.path.join(routes_folder, f"mapped_routes_{ti}.json")
                 )
 
+                # public route export (reuse extract_reactions result)
+                if export_routes:
+                    exported_routes[export_key] = build_target_routes(
+                        tree, reactions=routes_dict
+                    )
+            elif export_routes:
+                exported_routes[export_key] = []
+
             # save stats
             statswriter.writerow(extract_tree_stats(tree, target_smi))
             csvfile.flush()
+
+    if export_routes:
+        export_routes_artifact(
+            exported_routes,
+            results_root,
+            filename=routes_filename,
+            synplan_version=_resolve_synplan_version(),
+        )
 
     print(f"Number of solved target molecules: {n_solved}")

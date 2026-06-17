@@ -783,6 +783,15 @@ def value_network_tuning_cli(
         "per-step-local atom numbering, which is ~4x faster."
     ),
 )
+@click.option(
+    "--export_routes",
+    "--export-routes",
+    "export_routes",
+    is_flag=True,
+    default=False,
+    help="Also emit a consumable target-keyed routes artifact (results.json.gz) "
+    "plus manifest.json for downstream consumers.",
+)
 def planning_cli(
     config_path: str,
     targets: str,
@@ -792,6 +801,7 @@ def planning_cli(
     value_network: str,
     results_dir: str,
     reconcile_mapping: bool,
+    export_routes: bool,
 ):
     """Retrosynthetic planning."""
 
@@ -856,6 +866,7 @@ def planning_cli(
         building_blocks_path=building_blocks,
         results_root=results_dir,
         reconcile_atom_mapping=reconcile_mapping,
+        export_routes=export_routes,
     )
 
 
