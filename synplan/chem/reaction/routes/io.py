@@ -183,9 +183,29 @@ def make_json(
             logger.warning("Error processing route %s: %s", route_id, e)
             continue
 
-        def build_mol_node(sid, _steps=steps, _atom_nums=atom_nums):
-            """Find the product with any overlap to target atoms and recurse into its reaction."""
+        def build_mol_node(sid, want_react=None, _steps=steps, _atom_nums=atom_nums):
+            """Select the product fragment of step ``sid`` and recurse into its reaction.
+
+            ``want_react`` is the consuming reactant of the next step (set by
+            ``build_reaction_node``). Selection is structural first: pick the
+            product fragment that *is* the consuming reactant by chython
+            structural equality. This recovers routes whose per-step atom-number
+            chaining leaves the relevant fragment numbered disjoint from the
+            target. When no reactant context is available (the route root), or
+            no fragment matches structurally, fall back to atom-number overlap
+            with the target.
+            """
             rxn = _steps[sid]
+            if want_react is not None:
+                for p in rxn.products:
+                    if p == want_react:
+                        smiles = _route_molecule_smiles(p)
+                        return {
+                            "type": "mol",
+                            "smiles": smiles,
+                            "children": [build_reaction_node(sid)],
+                            "in_stock": False,
+                        }
             for p in rxn.products:
                 if _atom_nums & set(p._atoms.keys()):
                     smiles = _route_molecule_smiles(p)
@@ -195,7 +215,8 @@ def make_json(
                         "children": [build_reaction_node(sid)],
                         "in_stock": False,
                     }
-            # Shouldn't reach here if tree is consistent
+            # Neither structural identity nor atom-number overlap matched: route
+            # is genuinely unrecoverable; the drop guard in make_json handles it.
             return None
 
         def build_reaction_node(
@@ -215,7 +236,7 @@ def make_json(
                 # Look up any prior step producing this reactant
                 prior = [ps for ps in _prod_map.get(r_smi, []) if ps < sid]
                 if prior:
-                    node["children"].append(build_mol_node(max(prior)))
+                    node["children"].append(build_mol_node(max(prior), want_react=react))
                 else:
                     node["children"].append(
                         {"type": "mol", "smiles": r_smi, "in_stock": True}

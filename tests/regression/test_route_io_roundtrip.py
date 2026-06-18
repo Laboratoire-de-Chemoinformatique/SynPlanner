@@ -90,3 +90,15 @@ def test_write_then_read_routes_json_is_lossless(tmp_path: Path):
         f"{rt_ids - orig_ids}. Likely cause: make_json's broad-except clause "
         "is silently dropping routes whose serialization raises."
     )
+
+    # Stronger invariant: a second write of the round-tripped dict must be
+    # byte-identical to the first. make_json is deterministic, so any change to
+    # node selection (e.g. structural vs atom-number precursor matching) that
+    # silently rewrites a valid route's connectivity would surface here.
+    routes_dict_2 = read_routes_json(str(out_path), to_dict=True)
+    out_path_2 = tmp_path / "rt2.json"
+    write_routes_json(routes_dict_2, str(out_path_2))
+    assert out_path_2.read_bytes() == out_path.read_bytes(), (
+        "write->read->write is not byte-stable: make_json changed a valid "
+        "route's serialized form across an identity round-trip."
+    )
