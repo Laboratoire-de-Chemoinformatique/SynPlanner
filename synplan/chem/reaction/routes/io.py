@@ -1,5 +1,6 @@
 import csv
 import json
+import logging
 from typing import TYPE_CHECKING, Any
 
 from chython import smiles as read_smiles
@@ -7,6 +8,23 @@ from chython.exceptions import InvalidAromaticRing
 
 if TYPE_CHECKING:
     from synplan.mcts.tree import Tree
+
+logger = logging.getLogger(__name__)
+
+
+def _route_tree_has_null_node(node) -> bool:
+    """Return True if the assembled route tree contains a ``None`` node.
+
+    ``build_mol_node`` returns ``None`` when a route is malformed (e.g. a node
+    holding more than one molecule). Such a ``None`` ends up either as the route
+    root or nested in a ``children`` list, which would serialize to a JSON
+    ``null`` child and corrupt the route.
+    """
+    if node is None:
+        return True
+    if isinstance(node, dict):
+        return any(_route_tree_has_null_node(child) for child in node.get("children", []) or [])
+    return False
 
 
 def _route_molecule_smiles(mol) -> str:
@@ -83,7 +101,7 @@ def make_dict(routes_json):
         try:
             routes_dict[int(route_idx)] = _collect_reactions(tree)
         except Exception as e:
-            print(f"Error processing route {route_idx}: {e}")
+            logger.warning("Error processing route %s: %s", route_idx, e)
 
     return routes_dict
 
@@ -162,7 +180,7 @@ def make_json(
                     s = _route_molecule_smiles(prod)
                     prod_map.setdefault(s, []).append(sid)
         except Exception as e:
-            print(f"Error processing route {route_id}: {e}")
+            logger.warning("Error processing route %s: %s", route_id, e)
             continue
 
         def build_mol_node(sid, _steps=steps, _atom_nums=atom_nums):
@@ -207,6 +225,13 @@ def make_json(
 
         # Build route tree and store
         route_tree = build_mol_node(final_step)
+        if _route_tree_has_null_node(route_tree):
+            logger.warning(
+                "Dropping malformed route %s from export: route tree contains a "
+                "null node (multiple molecules in one node / malformed route node).",
+                route_id,
+            )
+            continue
         if keep_ids:
             all_routes[int(route_id)] = route_tree
         else:

@@ -1,3 +1,4 @@
+import logging
 from typing import TYPE_CHECKING
 
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
@@ -13,6 +14,8 @@ from synplan.chem.reaction.routes.representation.state import (
 
 if TYPE_CHECKING:
     from synplan.mcts.tree import Tree
+
+logger = logging.getLogger(__name__)
 
 
 def _next_atom_number(*containers):
@@ -224,7 +227,9 @@ def validate_molecule_components(curr_mol: MoleculeContainer, route_id: int):
     """
     new_rmol = [curr_mol.substructure(c) for c in curr_mol.connected_components]
     if len(new_rmol) > 1:
-        print(f"Error tree {route_id}: We have more than one molecule in one node")
+        logger.warning(
+            "Route %s: more than one molecule in one node", route_id
+        )
         return 0
 
     return 1
@@ -676,7 +681,7 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
         return {"cgr": accum_cgr, "reactions_dict": reactions_dict}
 
     except Exception as e:
-        print(f"Error processing route {route_id}: {e}")
+        logger.warning("Error processing route %s: %s", route_id, e)
         return None
 
 
