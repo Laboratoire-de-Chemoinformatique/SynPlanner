@@ -772,6 +772,17 @@ def value_network_tuning_cli(
     type=click.Path(exists=False),
     help="Path to the file where retrosynthetic planning results will be stored.",
 )
+@click.option(
+    "--reconcile-mapping",
+    "reconcile_mapping",
+    is_flag=True,
+    default=False,
+    help=(
+        "Reconcile atom-map numbering across steps in exported routes (slow). "
+        "By default the export skips the route CGR composition and uses "
+        "per-step-local atom numbering, which is ~4x faster."
+    ),
+)
 def planning_cli(
     config_path: str,
     targets: str,
@@ -780,6 +791,7 @@ def planning_cli(
     policy_network: str,
     value_network: str,
     results_dir: str,
+    reconcile_mapping: bool,
 ):
     """Retrosynthetic planning."""
 
@@ -843,6 +855,7 @@ def planning_cli(
         reaction_rules_path=reaction_rules,
         building_blocks_path=building_blocks,
         results_root=results_dir,
+        reconcile_atom_mapping=reconcile_mapping,
     )
 
 

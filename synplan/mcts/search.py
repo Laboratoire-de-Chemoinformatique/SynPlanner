@@ -79,6 +79,7 @@ def run_search(
     results_root: str = "search_results",
     route_scorer: RouteScorer | None = None,
     priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
+    reconcile_atom_mapping: bool = False,
 ) -> None:
     """Performs a tree search on a set of target molecules using specified configuration
     and reaction rules, logging the results and statistics.
@@ -101,6 +102,10 @@ def run_search(
         When supplied, set ``search_config["use_priority"] = True`` (or pass
         a :class:`TreeConfig` with ``use_priority=True``); otherwise the rules
         are accepted but never tried.
+    :param reconcile_atom_mapping: If False (default), build the exported
+        routes_dict directly from the tree (fast path, per-step-local atom
+        numbering). If True, use the slower ``compose_route_cgr`` path to give
+        cross-step-reconciled atom-map numbering in the exported reactions.
     :return: None.
     """
 
@@ -230,7 +235,9 @@ def run_search(
                     json.dump(extracted_routes, f)
 
                 # Save mapped reactions (CSV)
-                routes_dict = extract_reactions(tree)
+                routes_dict = extract_reactions(
+                    tree, reconcile_atom_mapping=reconcile_atom_mapping
+                )
                 write_routes_csv(
                     routes_dict, os.path.join(routes_folder, f"mapped_routes_{ti}.csv")
                 )

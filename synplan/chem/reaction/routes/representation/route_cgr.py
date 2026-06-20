@@ -900,31 +900,72 @@ def compose_all_route_cgrs(
     return route_cgrs
 
 
-def extract_reactions(tree: "Tree", route_id=None, preserve_transient_bonds=True):
+def _reactions_dict_from_tree(tree: "Tree", route_id) -> dict:
+    """Build a ``{step_id: ReactionContainer}`` map straight from the tree.
+
+    Mirrors the shape returned by ``compose_route_cgr``'s ``reactions_dict``
+    (step ids ``0..n-1`` in chronological order, reactants -> product
+    orientation) but keeps each step's own atom numbering instead of the
+    cross-step-reconciled numbering. ``make_json``/``write_routes_csv`` only
+    consume per-step structure and ``format(rxn, "m")``, so the per-step-local
+    numbering is sufficient and avoids the expensive route CGR composition.
+    """
+    reactions = tree.synthesis_route(route_id)
+    return {step: reaction for step, reaction in enumerate(reactions)}
+
+
+def extract_reactions(
+    tree: "Tree",
+    route_id=None,
+    preserve_transient_bonds=True,
+    reconcile_atom_mapping: bool = False,
+):
     """
     Collect mapped reaction sequences from a synthesis tree (basically routes_dict, which might be later converted to routes_json).
 
-    Traverses either a single branch (if `route_id` is given) or all winning nodes,
-    composing CGR-based reactions for each, and returns a dict of reaction mappings.
-    Ensures that in every extracted reaction, atom indices are uniquely mapped (no overlaps)
+    Traverses either a single branch (if `route_id` is given) or all winning nodes
+    and returns a dict of reaction mappings.
+
+    By default (``reconcile_atom_mapping=False``) the reactions are taken
+    directly from ``tree.synthesis_route`` with per-step-local atom numbering,
+    skipping the expensive ``compose_route_cgr`` route-CGR composition. This is
+    the fast path and is sufficient for JSON/CSV export, which links steps by
+    molecule identity rather than by atom numbering.
+
+    Set ``reconcile_atom_mapping=True`` to use the legacy ``compose_route_cgr``
+    path, which renumbers atoms consistently across steps (cross-step atom-map
+    continuity) at a substantial cost.
 
     Parameters
     ----------
     tree : ReactionTree
         A retrosynthetic tree object with a `.winning_nodes` attribute and
-        supporting `compose_route_cgr(...)`.
+        supporting `synthesis_route(...)` / `compose_route_cgr(...)`.
     route_id : hashable, optional
         If provided, only extract reactions for this specific route/route.
     preserve_transient_bonds : bool
-        Forwarded to ``compose_route_cgr``. The default is True.
+        Forwarded to ``compose_route_cgr`` (only used when
+        ``reconcile_atom_mapping=True``). The default is True.
+    reconcile_atom_mapping : bool
+        If False (default), use the fast ``tree.synthesis_route`` path with
+        per-step-local atom numbering. If True, use ``compose_route_cgr`` to
+        produce cross-step-reconciled atom numbering.
 
     Returns
     -------
     dict[route_id, dict]
-        Maps each route terminal route ID to its `reactions_dict` (as returned
-        by `compose_route_cgr`). Returns `None` if the specified `route_id` fails
-        to produce valid reactions.
+        Maps each route terminal route ID to its `reactions_dict`. Returns
+        `None` if the specified `route_id` fails to produce valid reactions
+        (reconciled path only; the fast path always yields a dict).
     """
+    if not reconcile_atom_mapping:
+        if route_id is not None:
+            return {route_id: _reactions_dict_from_tree(tree, route_id)}
+        return {
+            rid: _reactions_dict_from_tree(tree, rid)
+            for rid in sorted(set(tree.winning_nodes))
+        }
+
     react_dict = {}
     if route_id is not None:
         result = build_route_cgr(
