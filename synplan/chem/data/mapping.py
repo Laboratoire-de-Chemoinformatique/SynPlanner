@@ -89,6 +89,16 @@ def _map_and_format(args):
         return None, f"mapping: {e}"
 
 
+def _append_smi_source_fields(mapped_smiles: str, raw_item: str, fmt: str) -> str:
+    """Restore original tab-separated source columns for mapped SMI records."""
+    if fmt != "smi" or not isinstance(raw_item, str):
+        return mapped_smiles
+    parts = raw_item.split("\t", 1)
+    if len(parts) == 1:
+        return mapped_smiles
+    return f"{mapped_smiles}\t{parts[1]}"
+
+
 def _fix_dupes(molecules, counter):
     """Remap atoms if indices collide across *molecules*."""
     atoms = [n for m in molecules for n in m]
@@ -437,7 +447,9 @@ def map_reactions_from_file(
                 for ri, (smi, err) in enumerate(results):
                     ci = idx[ri]
                     if smi is not None:
-                        out.write(smi + "\n")
+                        out.write(
+                            _append_smi_source_fields(smi, raw_items[ci], fmt) + "\n"
+                        )
                         n_ok += 1
                     else:
                         fails.append((ci, raw_items[ci], err))

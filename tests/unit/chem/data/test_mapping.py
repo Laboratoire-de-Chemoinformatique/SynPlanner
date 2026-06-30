@@ -9,7 +9,7 @@ import yaml
 from click.testing import CliRunner
 from pydantic import ValidationError
 
-from synplan.chem.data.mapping import MappingConfig
+from synplan.chem.data.mapping import MappingConfig, _append_smi_source_fields
 from synplan.interfaces.cli import synplan
 from synplan.utils.files import init_parse_worker, parse_one
 
@@ -55,6 +55,32 @@ class TestMappingConfig:
         cfg = MappingConfig.from_yaml(str(yaml_path))
         assert cfg.batch_size == 128
         assert cfg.chunk_size == 5000
+
+
+class TestMappingOutputMetadata:
+    def test_smi_source_columns_are_restored(self):
+        assert (
+            _append_smi_source_fields(
+                "mapped>>reaction",
+                "original>>reaction\trow-42\tpatent-1,patent-2",
+                "smi",
+            )
+            == "mapped>>reaction\trow-42\tpatent-1,patent-2"
+        )
+
+    def test_no_source_columns_or_non_smi_are_unchanged(self):
+        assert (
+            _append_smi_source_fields(
+                "mapped>>reaction", "original>>reaction", "smi"
+            )
+            == "mapped>>reaction"
+        )
+        assert (
+            _append_smi_source_fields(
+                "mapped>>reaction", "original>>reaction\trow-42", "rdf"
+            )
+            == "mapped>>reaction"
+        )
 
 
 class TestParseOne:
