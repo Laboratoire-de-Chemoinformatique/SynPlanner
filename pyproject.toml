@@ -143,10 +143,6 @@ explicit = true
 [tool.ruff]
 line-length = 88
 target-version = "py310"
-extend-exclude = [
-    "synplan/chem/reaction_routes",  # back-compat shims (deprecated path)
-]
-
 [tool.ruff.lint]
 select = [
     "F",      # pyflakes

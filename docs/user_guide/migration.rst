@@ -15,45 +15,45 @@ For the full per-release log, see :doc:`/release_notes`.
 1.5.3
 =====
 
-Route post-processing moved to ``synplan.routes``
--------------------------------------------------
+Route post-processing moved to ``synplan.chem.reaction.routes``
+----------------------------------------------------------------
 
-Route-level post-processing now lives in ``synplan.routes``. This includes
+Route-level post-processing now lives in ``synplan.chem.reaction.routes``. This includes
 RouteCGR construction and hashing, route IO, route clustering, route analysis,
 depiction, notebook plotting helpers, and route-quality scoring.
 
-The old ``synplan.chem.reaction_routes`` and ``synplan.route_quality`` import
-paths remain available as compatibility wrappers in 1.5.3. New code should use
-the ``synplan.routes`` paths below.
+The interim ``synplan.routes`` package and the older ``synplan.chem.reaction_routes``
+and ``synplan.route_quality`` compatibility namespaces were removed. Update imports
+to the canonical paths below.
 
 .. list-table::
    :header-rows: 1
    :widths: 45 55
 
-   * - Old path
+   * - Removed path
      - New path
-   * - ``synplan.chem.reaction_routes.analysis``
-     - ``synplan.routes.analysis``
-   * - ``synplan.chem.reaction_routes.clustering``
-     - ``synplan.routes.clustering``
-   * - ``synplan.chem.reaction_routes.depiction``
-     - ``synplan.routes.depiction``
-   * - ``synplan.chem.reaction_routes.hash_route``
-     - ``synplan.routes.route_cgr.hash``
-   * - ``synplan.chem.reaction_routes.io``
-     - ``synplan.routes.io``
-   * - ``synplan.chem.reaction_routes.leaving_groups``
-     - ``synplan.routes.clustering.leaving_groups``
-   * - ``synplan.chem.reaction_routes.notebook_plots``
-     - ``synplan.routes.notebook_plots``
-   * - ``synplan.chem.reaction_routes.route_cgr``
-     - ``synplan.routes.route_cgr``
+   * - ``synplan.routes.analysis``
+     - ``synplan.chem.reaction.routes.analysis``
+   * - ``synplan.routes.clustering``
+     - ``synplan.chem.reaction.routes.clustering``
+   * - ``synplan.routes.depiction``
+     - ``synplan.chem.reaction.routes.visualisation``
+   * - ``synplan.routes.io``
+     - ``synplan.chem.reaction.routes.io``
+   * - ``synplan.routes.notebook_plots``
+     - ``synplan.chem.reaction.routes.notebook_plots``
+   * - ``synplan.routes.route_cgr``
+     - ``synplan.chem.reaction.routes.representation``
+   * - ``synplan.routes.route_cgr.hash``
+     - ``synplan.chem.reaction.routes.representation.hash``
+   * - ``synplan.routes.quality``
+     - ``synplan.chem.reaction.routes.quality``
+   * - ``synplan.routes.quality.protection``
+     - ``synplan.chem.reaction.routes.quality.protection``
    * - ``synplan.route_quality``
-     - ``synplan.routes.quality``
-   * - ``synplan.route_quality.protection``
-     - ``synplan.routes.quality.protection``
-   * - ``synplan.route_quality.scorer``
-     - ``synplan.routes.quality.scorer``
+     - ``synplan.chem.reaction.routes.quality``
+   * - ``synplan.chem.reaction_routes``
+     - ``synplan.chem.reaction.routes``
 
 1.5.0
 =====

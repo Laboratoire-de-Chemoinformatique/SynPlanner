@@ -7,46 +7,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Added `synplan.routes` as the public route post-processing layer for route
+- Added `synplan.chem.reaction.routes` as the public route post-processing layer for route
   clustering, route quality, RouteCGR utilities, route I/O, analysis, depiction,
   and notebook plotting.
-- Added `synplan.routes.route_cgr` to group RouteCGR builder, container,
+- Added `synplan.chem.reaction.routes.representation` to group RouteCGR builder, container,
   depiction, state, and hashing helpers.
 - Added route-aware RouteCGR composition with `route_order` metadata on dynamic
   atoms and bonds, plus transient bonds for bonds formed and later removed
   during a synthetic route.
-- Added exact RouteCGR hashing in `synplan.routes.route_cgr.hash`, including a
+- Added exact RouteCGR hashing in `synplan.chem.reaction.routes.representation.hash`, including a
   fast WL bucket hash followed by exact canonical confirmation for shared
   buckets.
 - Added RouteCGR comparison helpers for identifying overlapping and unique route
   IDs across route dictionaries whose route IDs do not need to match.
 - Added RouteCGR analysis helpers for selected building-block lookup and real
   versus supporting pseudo-reactant usage statistics.
-- Added `synplan.routes.clustering` as a package, with clustering logic in
-  `synplan.routes.clustering.core` and route marker helpers in
-  `synplan.routes.clustering.leaving_groups`.
-- Added API documentation for `synplan.routes`.
+- Added `synplan.chem.reaction.routes.clustering` as a package, with clustering logic in
+  `synplan.chem.reaction.routes.clustering.core` and route marker helpers in
+  `synplan.chem.reaction.routes.leaving_groups`.
+- Added API documentation for `synplan.chem.reaction.routes`.
 
 ### Changed
 
 - Moved route clustering, route analysis, route depiction, route I/O, notebook
-  plotting, and RouteCGR implementation from `synplan.chem.reaction_routes` to
-  `synplan.routes`.
-- Moved route-quality and protection implementation from `synplan.route_quality`
-  to `synplan.routes.quality`.
-- Updated internal imports, tests, and documentation to use `synplan.routes` for
-  route post-processing.
-- Kept `synplan.chem.reaction_routes.*` and `synplan.route_quality.*` as
-  compatibility wrappers for existing user imports. New code should import from
-  `synplan.routes`.
+  plotting, route-quality scoring, and RouteCGR implementation to
+  `synplan.chem.reaction.routes`.
+- Updated internal imports, tests, tutorials, and documentation to use
+  `synplan.chem.reaction.routes` for route post-processing.
 
-### Fixed
+### Removed
 
-- Preserved legacy route compatibility exports, including hash schema constants
-  from `synplan.chem.reaction_routes.hash_route` and clustering helpers such as
-  `DynamicX`, `cgr_display`, `cluster_routes`, and `compose_all_route_cgrs`.
-- Avoided importing the full route post-processing stack when importing the
-  legacy `synplan.chem.reaction_routes` package root.
+- Removed deprecated route compatibility namespaces: `synplan.routes`,
+  `synplan.routes.quality`, `synplan.route_quality`, and
+  `synplan.chem.reaction_routes`.
 
 ## [1.5.0] - 2026-05-16
 
@@ -301,7 +294,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 #### Protection Strategy Scoring (NEW MODULE)
-- New `synplan/route_quality/` module implementing the competing-sites scoring framework
+- New `synplan/chem/reaction/routes/quality/` module implementing the competing-sites scoring framework
   from Westerlund et al. (ChemRxiv, 2025)
 - `FunctionalGroupDetector` with 102 SMARTS patterns across 18 reactivity categories
 - `HalogenDetector` with 140 SMARTS patterns across 5 halogen families
@@ -360,7 +353,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Tutorial 07: Protection Scoring (end-to-end with capivasertib, 128 routes)
 - Tutorial 08: Combined Ranking Filtering Policy (dual policy tuning)
 - Tutorial 09: NMCS Algorithms (Nested Monte Carlo Search guide)
-- API docs for `synplan.route_quality` module
+- API docs for `synplan.chem.reaction.routes.quality` module
 - 5 new user guide pages linked from docs index
 
 #### Configs

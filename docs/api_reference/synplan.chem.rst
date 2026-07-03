@@ -8,7 +8,7 @@ Subpackages
    :maxdepth: 4
 
    synplan.chem.data
-   synplan.chem.reaction_routes
+   synplan.chem.reaction.routes
    synplan.chem.reaction_rules
 
 Submodules

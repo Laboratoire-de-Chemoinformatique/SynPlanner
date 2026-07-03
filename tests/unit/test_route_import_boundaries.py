@@ -28,13 +28,9 @@ def test_mcts_imports_do_not_depend_on_route_import_order():
 
 
 def test_route_quality_imports_stay_lightweight():
-    for import_line in (
-        "from synplan.chem.reaction.routes.quality.scorer import RouteScorer",
-        "from synplan.route_quality.scorer import RouteScorer",
-    ):
-        code = f"""
+    code = """
 import sys
-{import_line}
+from synplan.chem.reaction.routes.quality.scorer import RouteScorer
 
 assert RouteScorer.__name__ == 'RouteScorer'
 unexpected = [
@@ -50,17 +46,13 @@ unexpected = [
 ]
 assert unexpected == [], unexpected
 """
-        _run_fresh_process(code)
+    _run_fresh_process(code)
 
 
-def test_route_package_roots_stay_lightweight():
-    for snippet in (
-        "import synplan.chem.reaction.routes",
-        "import synplan.route_quality",
-    ):
-        code = f"""
+def test_route_package_root_stays_lightweight():
+    code = """
 import sys
-{snippet}
+import synplan.chem.reaction.routes
 
 unexpected = [
     name
@@ -75,10 +67,10 @@ unexpected = [
 ]
 assert unexpected == [], unexpected
 """
-        _run_fresh_process(code)
+    _run_fresh_process(code)
 
 
-def test_synplan_routes_lazy_root_exports_still_work():
+def test_route_package_lazy_root_exports_still_work():
     code = """
 from synplan.chem.reaction.routes import RouteScorer, compose_route_cgr
 
