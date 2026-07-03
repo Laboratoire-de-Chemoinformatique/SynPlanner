@@ -15,6 +15,9 @@ from synplan.chem.reaction.routes.representation import (
     compose_route_cgr,
     compose_sb_cgr,
     get_clean_mapping,
+    prepare_route_cgr_reconstruction,
+    routes_dict_from_route_cgrs,
+    route_json_from_route_cgrs,
 )
 from synplan.chem.reaction.routes.representation.container import RouteCGRContainer
 from synplan.chem.reaction.routes.representation.state import RouteDynamicBond
@@ -306,3 +309,28 @@ def test_compose_sb_cgr_preserves_unchanged_charged_atoms_with_charge_delta():
     assert sb_cgr._charges[3] == 0
     assert sb_cgr._p_charges[3] == 1
     assert "O0>-" not in str(sb_cgr)
+
+
+def test_route_cgr_restores_composed_route_json(routes_data_csv_to_dict):
+    from synplan.chem.reaction.routes.io import make_json
+
+    composed = compose_route_cgr(
+        routes_data_csv_to_dict,
+        38,
+        preserve_transient_bonds=True,
+    )
+
+    route_cgr = prepare_route_cgr_reconstruction(
+        composed["cgr"], composed["reactions_dict"], 38
+    )
+    restored_routes = routes_dict_from_route_cgrs({38: route_cgr})
+    restored_json = route_json_from_route_cgrs({38: route_cgr})
+
+    assert set(composed) == {"cgr", "reactions_dict"}
+    assert make_json({38: composed["reactions_dict"]}) == make_json(restored_routes)
+    assert {38: getattr(route_cgr, "route_json")} == restored_json
+    assert all(
+        format(composed["reactions_dict"][step_id], "m")
+        == format(restored_routes[38][step_id], "m")
+        for step_id in composed["reactions_dict"]
+    )
