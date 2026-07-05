@@ -97,6 +97,31 @@ def _record_route_orders(
         atom_route_step_orders.setdefault(atom2, set()).add(route_step_order)
 
 
+def _atom_step_state(atom):
+    return (atom.charge, atom.p_charge, atom.is_radical, atom.p_is_radical)
+
+
+def _bond_step_state(bond):
+    return (bond.order, bond.p_order)
+
+
+def _record_deconvolution_labels(
+    cgr,
+    route_step_order,
+    atom_step_states,
+    bond_step_states,
+):
+    """Collect per-step CGR states needed for native RouteCGR deconvolution."""
+
+    for atom_num, atom in cgr._atoms.items():
+        atom_step_states.setdefault(atom_num, {})[route_step_order] = _atom_step_state(atom)
+
+    for atom1, atom2, bond in cgr.bonds():
+        bond_step_states.setdefault(_bond_key(atom1, atom2), {})[
+            route_step_order
+        ] = _bond_step_state(bond)
+
+
 def _set_bond(cgr, atom1, atom2, bond):
     cgr._bonds[atom1][atom2] = cgr._bonds[atom2][atom1] = bond
 
@@ -107,11 +132,20 @@ def _apply_route_orders(
     atom_route_orders,
     bond_route_step_orders,
     atom_route_step_orders,
+    atom_step_states,
+    bond_step_states,
+    preserve_transient_bonds,
 ):
+    if preserve_transient_bonds:
+        for atom1, atom2 in sorted(
+            set(bond_step_states) - {_bond_key(a1, a2) for a1, a2, _ in cgr.bonds()}
+        ):
+            if atom1 in cgr._atoms and atom2 in cgr._atoms:
+                cgr.add_bond(atom1, atom2, transient_bond())
+
     for atom1, atom2, bond in list(cgr.bonds()):
-        if bond.order == bond.p_order and bond.order is not None:
-            continue
         key = _bond_key(atom1, atom2)
+        has_step_states = key in bond_step_states
         route_orders = bond_route_orders.get(key)
         if not route_orders:
             atom1_orders = atom_route_orders.get(atom1, set())
@@ -126,30 +160,32 @@ def _apply_route_orders(
             route_step_orders = (atom1_steps & atom2_steps) or (
                 atom1_steps | atom2_steps
             )
-        if not route_orders and not route_step_orders:
+        if not route_orders and not route_step_orders and not has_step_states:
             continue
         route_order = min(route_orders) if route_orders else None
         if isinstance(bond, RouteDynamicBond):
             bond.route_order = route_order
             bond.route_step_order = set(route_step_orders)
         else:
-            _set_bond(
-                cgr,
-                atom1,
-                atom2,
-                RouteDynamicBond.from_bond(
-                    bond,
-                    route_order,
-                    route_step_orders,
-                ),
+            bond = RouteDynamicBond.from_bond(
+                bond,
+                route_order,
+                route_step_orders,
             )
+            _set_bond(cgr, atom1, atom2, bond)
+        bond.route_bond_step_states = dict(bond_step_states.get(key, {}))
 
-    for atom_num in sorted(set(atom_route_orders) | set(atom_route_step_orders)):
+    for atom_num in sorted(
+        set(atom_route_orders) | set(atom_route_step_orders) | set(atom_step_states)
+    ):
         if atom_num in cgr._atoms:
             cgr._atoms[atom_num] = route_atom(
                 cgr._atoms[atom_num],
                 atom_route_orders.get(atom_num, set()),
                 atom_route_step_orders.get(atom_num, set()),
+            )
+            cgr._atoms[atom_num].route_atom_step_states = dict(
+                atom_step_states.get(atom_num, {})
             )
 
     cgr.flush_cache()
@@ -434,7 +470,12 @@ def _compose_cgrs(
     return composed_cgr
 
 
-def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
+def compose_route_cgr(
+    tree_or_routes,
+    route_id,
+    preserve_transient_bonds=True,
+    return_reactions_dict=False,
+):
     """
     Process a single synthesis route maintaining consistent state.
 
@@ -449,11 +490,16 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
         step and broken in a later step as DynamicBond(None, None). The default
         is True because RouteCGR hashing and comparison include transient route
         history by default.
+    return_reactions_dict : bool
+        If True, also return a debug/compatibility ``reactions_dict``. The
+        default keeps composition fast; use ``routes_dict_from_route_cgrs`` to
+        deconvolute reactions from the returned RouteCGR when needed.
 
     Returns
     -------
     dict or None
-      - if successful: { 'cgr': <RouteCGRContainer>, 'reactions_dict': {step: ReactionContainer,…} }
+      - if successful: { 'cgr': <RouteCGRContainer> }
+      - if return_reactions_dict: also includes {step: ReactionContainer, ...}
       - on error: None
     """
 
@@ -518,6 +564,14 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
         atom_route_orders = {}
         bond_route_step_orders = {}
         atom_route_step_orders = {}
+        atom_step_states = {}
+        bond_step_states = {}
+        _record_deconvolution_labels(
+            cgrs[-1],
+            route_step_orders[-1],
+            atom_step_states,
+            bond_step_states,
+        )
         _record_route_orders(
             cgrs[-1],
             route_orders[-1],
@@ -530,13 +584,23 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
 
         # start from the last (final) reaction
         accum_cgr = cgrs[-1]
-        reactions_dict = {len(reactions) - 1: ReactionContainer.from_cgr(cgrs[-1])}
+        reactions_dict = (
+            {len(reactions) - 1: ReactionContainer.from_cgr(cgrs[-1])}
+            if return_reactions_dict
+            else None
+        )
         max_num = _next_atom_number(*cgrs)
         # now fold backwards through the earlier steps
         for idx in range(len(reactions) - 2, -1, -1):
             curr_cgr = cgrs[idx]
             curr_cgr, max_num, _ = remap_composition_conflicts(
                 curr_cgr, accum_cgr, max_num
+            )
+            _record_deconvolution_labels(
+                curr_cgr,
+                route_step_orders[idx],
+                atom_step_states,
+                bond_step_states,
             )
             _record_route_orders(
                 curr_cgr,
@@ -548,7 +612,8 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
                 atom_route_step_orders,
             )
             accum_cgr = _compose_cgrs(curr_cgr, accum_cgr, preserve_transient_bonds)
-            reactions_dict[idx] = ReactionContainer.from_cgr(curr_cgr)
+            if return_reactions_dict:
+                reactions_dict[idx] = ReactionContainer.from_cgr(curr_cgr)
 
         _apply_route_orders(
             accum_cgr,
@@ -556,9 +621,15 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
             atom_route_orders,
             bond_route_step_orders,
             atom_route_step_orders,
+            atom_step_states,
+            bond_step_states,
+            preserve_transient_bonds,
         )
         accum_cgr = enable_route_cgr_container(accum_cgr)
-        return {"cgr": accum_cgr, "reactions_dict": reactions_dict}
+        result = {"cgr": accum_cgr}
+        if return_reactions_dict:
+            result["reactions_dict"] = reactions_dict
+        return result
 
     # ----------- tree-based route ------------
     tree = tree_or_routes
@@ -574,6 +645,14 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
         atom_route_orders = {}
         bond_route_step_orders = {}
         atom_route_step_orders = {}
+        atom_step_states = {}
+        bond_step_states = {}
+        _record_deconvolution_labels(
+            cgrs[-1],
+            route_step_orders[-1],
+            atom_step_states,
+            bond_step_states,
+        )
         _record_route_orders(
             cgrs[-1],
             route_orders[-1],
@@ -585,7 +664,11 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
         )
 
         first_react = reactions[-1]
-        reactions_dict = {len(reactions) - 1: ReactionContainer.from_cgr(cgrs[-1])}
+        reactions_dict = (
+            {len(reactions) - 1: ReactionContainer.from_cgr(cgrs[-1])}
+            if return_reactions_dict
+            else None
+        )
 
         accum_cgr = cgrs[-1]
         bb_set = process_first_reaction(first_react, tree, route_id)
@@ -652,6 +735,12 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
                 curr_cgr, accum_cgr, max_num
             )
             update_react_remaps_for_conflicts(react_dict, reaction, conflict_mapping)
+            _record_deconvolution_labels(
+                curr_cgr,
+                route_step_orders[step],
+                atom_step_states,
+                bond_step_states,
+            )
             _record_route_orders(
                 curr_cgr,
                 route_orders[step],
@@ -662,7 +751,8 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
                 atom_route_step_orders,
             )
 
-            reactions_dict[step] = ReactionContainer.from_cgr(curr_cgr)
+            if return_reactions_dict:
+                reactions_dict[step] = ReactionContainer.from_cgr(curr_cgr)
             accum_cgr = _compose_cgrs(curr_cgr, accum_cgr, preserve_transient_bonds)
 
         _apply_route_orders(
@@ -671,9 +761,15 @@ def compose_route_cgr(tree_or_routes, route_id, preserve_transient_bonds=True):
             atom_route_orders,
             bond_route_step_orders,
             atom_route_step_orders,
+            atom_step_states,
+            bond_step_states,
+            preserve_transient_bonds,
         )
         accum_cgr = enable_route_cgr_container(accum_cgr)
-        return {"cgr": accum_cgr, "reactions_dict": reactions_dict}
+        result = {"cgr": accum_cgr}
+        if return_reactions_dict:
+            result["reactions_dict"] = reactions_dict
+        return result
 
     except Exception as e:
         print(f"Error processing route {route_id}: {e}")
@@ -714,6 +810,7 @@ def compose_all_route_cgrs(
                 routes_dict,
                 route_id,
                 preserve_transient_bonds=preserve_transient_bonds,
+                return_reactions_dict=False,
             )
             return res["cgr"] if res else None
 
@@ -735,6 +832,7 @@ def compose_all_route_cgrs(
             tree,
             route_id,
             preserve_transient_bonds=preserve_transient_bonds,
+            return_reactions_dict=False,
         )
         if res:
             route_cgrs[route_id] = res["cgr"]
@@ -747,6 +845,7 @@ def compose_all_route_cgrs(
             tree,
             route_id,
             preserve_transient_bonds=preserve_transient_bonds,
+            return_reactions_dict=False,
         )
         if res:
             route_cgrs[route_id] = res["cgr"]
@@ -785,6 +884,7 @@ def extract_reactions(tree: "Tree", route_id=None, preserve_transient_bonds=True
             tree,
             route_id,
             preserve_transient_bonds=preserve_transient_bonds,
+            return_reactions_dict=True,
         )
         if result:
             react_dict[route_id] = result["reactions_dict"]
@@ -797,6 +897,7 @@ def extract_reactions(tree: "Tree", route_id=None, preserve_transient_bonds=True
             tree,
             route_id,
             preserve_transient_bonds=preserve_transient_bonds,
+            return_reactions_dict=True,
         )
         if result:
             react_dict[route_id] = result["reactions_dict"]

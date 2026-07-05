@@ -15,9 +15,7 @@ from synplan.chem.reaction.routes.representation import (
     compose_route_cgr,
     compose_sb_cgr,
     get_clean_mapping,
-    prepare_route_cgr_reconstruction,
     routes_dict_from_route_cgrs,
-    route_json_from_route_cgrs,
 )
 from synplan.chem.reaction.routes.representation.container import RouteCGRContainer
 from synplan.chem.reaction.routes.representation.state import RouteDynamicBond
@@ -88,13 +86,19 @@ def test_compose_route_cgr_dict_based_single_route(routes_fixture, request):
     result = compose_route_cgr(data, route_id)
 
     assert result is not None
-    assert "cgr" in result and "reactions_dict" in result
+    assert set(result) == {"cgr"}
     assert isinstance(result["cgr"], CGRContainer)
     assert isinstance(result["cgr"], RouteCGRContainer)
-    assert isinstance(result["reactions_dict"], dict)
+
+    restored_routes = routes_dict_from_route_cgrs({route_id: result["cgr"]})
+    assert set(restored_routes[route_id]) == set(data[route_id])
+
+    compat_result = compose_route_cgr(data, route_id, return_reactions_dict=True)
+    assert "cgr" in compat_result and "reactions_dict" in compat_result
+    assert isinstance(compat_result["reactions_dict"], dict)
     # Ensure all steps are present
-    assert len(result["reactions_dict"]) == len(data[route_id])
-    for rxn in result["reactions_dict"].values():
+    assert len(compat_result["reactions_dict"]) == len(data[route_id])
+    for rxn in compat_result["reactions_dict"].values():
         assert isinstance(rxn, ReactionContainer)
 
 
@@ -125,11 +129,16 @@ def test_compose_route_cgr_tree_based_single_route(routes_data_tree):
     result = compose_route_cgr(routes_data_tree, route_id_to_test)
 
     assert result is not None
-    assert "cgr" in result
-    assert "reactions_dict" in result
+    assert set(result) == {"cgr"}
     assert isinstance(result["cgr"], CGRContainer)
     assert isinstance(result["cgr"], RouteCGRContainer)
-    assert isinstance(result["reactions_dict"], dict)
+
+    compat_result = compose_route_cgr(
+        routes_data_tree,
+        route_id_to_test,
+        return_reactions_dict=True,
+    )
+    assert isinstance(compat_result["reactions_dict"], dict)
 
 
 def test_compose_route_cgr_tree_based_invalid_route_id(routes_data_tree):
@@ -311,26 +320,111 @@ def test_compose_sb_cgr_preserves_unchanged_charged_atoms_with_charge_delta():
     assert "O0>-" not in str(sb_cgr)
 
 
-def test_route_cgr_restores_composed_route_json(routes_data_csv_to_dict):
-    from synplan.chem.reaction.routes.io import make_json
 
+def _reaction_atom_maps(reaction):
+    return {
+        "reactants": sorted(sorted(molecule._atoms) for molecule in reaction.reactants),
+        "products": sorted(sorted(molecule._atoms) for molecule in reaction.products),
+    }
+
+
+def test_route_cgr_has_native_deconvolution_labels_without_payload_attributes():
+    routes = {
+        1: {
+            0: smiles("[CH3:1].[CH3:2][Cl:3]>>[CH3:1][CH3:2].[ClH:3]"),
+        }
+    }
+
+    route_cgr = compose_route_cgr(routes, 1)["cgr"]
+
+    assert not hasattr(route_cgr, "route_reconstruction_schema")
+    assert not hasattr(route_cgr, "route_reaction_smiles")
+    assert not hasattr(route_cgr, "route_reaction_metadata")
+    assert not hasattr(route_cgr, "route_json")
+    assert any(
+        getattr(atom, "route_atom_step_states", None)
+        for atom in route_cgr._atoms.values()
+    )
+    assert any(
+        getattr(bond, "route_bond_step_states", None)
+        for _, _, bond in route_cgr.bonds()
+    )
+
+
+def test_single_step_route_cgr_deconvolves_to_mapped_reaction():
+    reaction = smiles("[CH3:1].[CH3:2][Cl:3]>>[CH3:1][CH3:2].[ClH:3]")
+    routes = {1: {0: reaction}}
+
+    route_cgr = compose_route_cgr(routes, 1)["cgr"]
+    restored = routes_dict_from_route_cgrs({1: route_cgr})
+
+    expected = ReactionContainer.from_cgr(reaction.compose())
+    assert set(restored[1]) == {0}
+    assert _reaction_atom_maps(restored[1][0]) == _reaction_atom_maps(expected)
+
+
+def test_multi_step_route_cgr_deconvolves_composed_reaction_atom_maps(
+    routes_data_csv_to_dict,
+):
     composed = compose_route_cgr(
         routes_data_csv_to_dict,
         38,
         preserve_transient_bonds=True,
+        return_reactions_dict=True,
     )
 
-    route_cgr = prepare_route_cgr_reconstruction(
-        composed["cgr"], composed["reactions_dict"], 38
-    )
-    restored_routes = routes_dict_from_route_cgrs({38: route_cgr})
-    restored_json = route_json_from_route_cgrs({38: route_cgr})
+    restored_routes = routes_dict_from_route_cgrs({38: composed["cgr"]})
 
-    assert set(composed) == {"cgr", "reactions_dict"}
-    assert make_json({38: composed["reactions_dict"]}) == make_json(restored_routes)
-    assert {38: getattr(route_cgr, "route_json")} == restored_json
+    assert set(restored_routes[38]) == set(composed["reactions_dict"])
     assert all(
-        format(composed["reactions_dict"][step_id], "m")
-        == format(restored_routes[38][step_id], "m")
+        _reaction_atom_maps(composed["reactions_dict"][step_id])
+        == _reaction_atom_maps(restored_routes[38][step_id])
+        for step_id in composed["reactions_dict"]
+    )
+
+
+def test_transient_route_cgr_deconvolves_formed_then_broken_bond():
+    routes = {
+        1: {
+            0: smiles("[CH3:1].[CH3:2][Cl:3]>>[CH3:1][CH3:2].[ClH:3]"),
+            1: smiles("[CH3:1][CH3:2]>>[CH4:1]"),
+        }
+    }
+
+    composed = compose_route_cgr(
+        routes,
+        1,
+        preserve_transient_bonds=True,
+        return_reactions_dict=True,
+    )
+    restored_routes = routes_dict_from_route_cgrs({1: composed["cgr"]})
+
+    assert set(restored_routes[1]) == {0, 1}
+    assert all(
+        _reaction_atom_maps(composed["reactions_dict"][step_id])
+        == _reaction_atom_maps(restored_routes[1][step_id])
+        for step_id in composed["reactions_dict"]
+    )
+
+
+def test_convergent_route_cgr_deconvolution_preserves_chronological_steps():
+    routes = {
+        1: {
+            0: smiles("[CH3:1].[CH3:2][Cl:10]>>[CH3:1][CH3:2].[ClH:10]"),
+            1: smiles("[CH3:3].[CH3:4][Cl:11]>>[CH3:3][CH3:4].[ClH:11]"),
+            2: smiles(
+                "[CH3:1][CH3:2].[CH3:3][CH3:4][Cl:12]>>"
+                "[CH3:1][CH2:2][CH2:3][CH3:4].[ClH:12]"
+            ),
+        }
+    }
+
+    composed = compose_route_cgr(routes, 1, return_reactions_dict=True)
+    restored_routes = routes_dict_from_route_cgrs({1: composed["cgr"]})
+
+    assert list(restored_routes[1]) == [0, 1, 2]
+    assert all(
+        _reaction_atom_maps(composed["reactions_dict"][step_id])
+        == _reaction_atom_maps(restored_routes[1][step_id])
         for step_id in composed["reactions_dict"]
     )

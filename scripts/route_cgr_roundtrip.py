@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate routes, compose RouteCGRs, and verify RouteCGR -> route JSON restore."""
+"""Generate routes, compose RouteCGRs, and verify native RouteCGR deconvolution."""
 
 from __future__ import annotations
 
@@ -11,8 +11,6 @@ from typing import Any
 
 from synplan.chem.reaction.routes.representation import (
     compose_route_cgr,
-    prepare_route_cgr_reconstruction,
-    route_json_from_route_cgrs,
     routes_dict_from_route_cgrs,
 )
 from synplan.chem.utils import mol_from_smiles
@@ -127,10 +125,6 @@ def build_tree(target_smiles, reaction_rules, building_blocks, policy_function, 
     return tree, solved
 
 
-def canonical_json(data):
-    return json.dumps(data, sort_keys=True, separators=(",", ":"))
-
-
 def reaction_atom_maps(reaction):
     """Return side-wise atom-map numbers, ignoring molecule ordering."""
 
@@ -147,37 +141,25 @@ def verify_tree_routes(tree: Tree) -> list[dict[str, Any]]:
             tree,
             route_id,
             preserve_transient_bonds=True,
+            return_reactions_dict=True,
         )
         if not composed:
             rows.append({"route_id": route_id, "status": "compose_failed"})
             continue
 
-        route_cgr = prepare_route_cgr_reconstruction(
-            composed["cgr"],
-            composed["reactions_dict"],
-            route_id,
-            tree=tree,
-        )
+        route_cgr = composed["cgr"]
         restored_routes = routes_dict_from_route_cgrs({route_id: route_cgr})
-        expected_json = {route_id: getattr(route_cgr, "route_json", None)}
-        restored_json = route_json_from_route_cgrs({route_id: route_cgr})
-        json_matches = canonical_json(expected_json) == canonical_json(restored_json)
         reaction_atom_maps_match = all(
             reaction_atom_maps(composed["reactions_dict"][step_id])
             == reaction_atom_maps(restored_routes[route_id][step_id])
             for step_id in composed["reactions_dict"]
         )
-        matches = json_matches and reaction_atom_maps_match
         rows.append(
             {
                 "route_id": route_id,
-                "status": "ok" if matches else "mismatch",
+                "status": "ok" if reaction_atom_maps_match else "mismatch",
                 "n_steps": len(composed["reactions_dict"]),
-                "schema": getattr(route_cgr, "route_reconstruction_schema", None),
-                "json_matches": json_matches,
                 "reaction_atom_maps_match": reaction_atom_maps_match,
-                "expected_json": expected_json,
-                "restored_json": restored_json,
             }
         )
     return rows

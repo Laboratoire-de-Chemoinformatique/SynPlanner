@@ -1,93 +1,89 @@
-"""Reconstruct route reaction dictionaries from RouteCGR metadata."""
+"""Reconstruct route reaction dictionaries from native RouteCGR labels."""
 
 from __future__ import annotations
 
-from typing import Any
-
-from chython import smiles as read_smiles
 from chython.containers import CGRContainer, ReactionContainer
 
-from synplan.chem.reaction.routes.io import make_json
-
-ROUTE_RECONSTRUCTION_SCHEMA = "route-cgr-reactions-v1"
+from synplan.chem.reaction.routes.representation.state import RouteDynamicBond
 
 
-def attach_route_reconstruction_metadata(
-    route_cgr: CGRContainer,
-    reactions_dict: dict[int, ReactionContainer],
-    *,
-    route_metadata: dict[int, dict[str, Any]] | None = None,
-    route_json: dict[str, Any] | None = None,
-) -> CGRContainer:
-    """Attach exact route-step reactions to a RouteCGR.
-
-    Route-order and step-order labels encode where dynamics occurred in the
-    composed graph, but they are not sufficient to recover every full per-step
-    molecule context losslessly. The exact mapped reactions produced during
-    composition are therefore stored on the RouteCGR itself so a downstream
-    analysis can reconstruct the same tree JSON without keeping the source
-    ``Tree`` object.
-    """
-
-    route_cgr.route_reconstruction_schema = ROUTE_RECONSTRUCTION_SCHEMA
-    route_cgr.route_reaction_smiles = {
-        int(step_id): format(reaction, "m")
-        for step_id, reaction in sorted(reactions_dict.items())
-    }
-    route_cgr.route_reaction_metadata = route_metadata or {}
-    route_cgr.route_json = route_json
-    return route_cgr
+def _bond_key(atom1: int, atom2: int) -> tuple[int, int]:
+    return tuple(sorted((atom1, atom2)))
 
 
-def prepare_route_cgr_reconstruction(
-    route_cgr: CGRContainer,
-    reactions_dict: dict[int, ReactionContainer],
-    route_id: int,
-    *,
-    tree: Any | None = None,
-    route_metadata: dict[int, dict[str, Any]] | None = None,
-) -> CGRContainer:
-    """Attach reconstruction metadata to an already composed RouteCGR.
+def _step_ids(route_cgr: CGRContainer) -> list[int]:
+    steps = set()
+    for atom in route_cgr._atoms.values():
+        steps.update(getattr(atom, "route_atom_step_states", {}))
+    for _, _, bond in route_cgr.bonds():
+        steps.update(getattr(bond, "route_bond_step_states", {}))
+    if not steps:
+        raise ValueError(
+            "RouteCGR does not carry native deconvolution labels. "
+            "Build it with compose_route_cgr(..., preserve_transient_bonds=True)."
+        )
+    return sorted(int(step) for step in steps)
 
-    This keeps RouteCGR composition independent from JSON round-trip
-    bookkeeping. Call this only in workflows that need to deconvolute a
-    composed RouteCGR back into its exact route representation.
-    """
 
-    routes_json = make_json({int(route_id): reactions_dict}, tree=tree)
-    return attach_route_reconstruction_metadata(
-        route_cgr,
-        reactions_dict,
-        route_metadata=route_metadata,
-        route_json=routes_json[int(route_id)],
-    )
+def _set_atom_state(cgr: CGRContainer, atom_num: int, state: tuple[int, int, bool, bool]) -> None:
+    charge, p_charge, is_radical, p_is_radical = state
+    atom = cgr._atoms[atom_num]
+    atom._charge = charge
+    atom._p_charge = p_charge
+    atom._is_radical = is_radical
+    atom._p_is_radical = p_is_radical
+    cgr._charges[atom_num] = charge
+    cgr._p_charges[atom_num] = p_charge
+    cgr._radicals[atom_num] = is_radical
+    cgr._p_radicals[atom_num] = p_is_radical
+
+
+def _set_bond(cgr: CGRContainer, atom1: int, atom2: int, bond: RouteDynamicBond) -> None:
+    cgr._bonds.setdefault(atom1, {})[atom2] = bond
+    cgr._bonds.setdefault(atom2, {})[atom1] = bond
+
+
+def _step_cgr(route_cgr: CGRContainer, step: int) -> CGRContainer:
+    atom_nums = [
+        atom_num
+        for atom_num, atom in route_cgr._atoms.items()
+        if step in getattr(atom, "route_atom_step_states", {})
+    ]
+    if not atom_nums:
+        raise ValueError(f"RouteCGR deconvolution labels have no atoms for step {step}")
+
+    step_cgr = route_cgr.substructure(atom_nums)
+
+    for atom_num in atom_nums:
+        state = route_cgr._atoms[atom_num].route_atom_step_states[step]
+        _set_atom_state(step_cgr, atom_num, state)
+
+    step_bonds = {}
+    for atom1, atom2, bond in route_cgr.bonds():
+        states = getattr(bond, "route_bond_step_states", {})
+        if step in states:
+            step_bonds[_bond_key(atom1, atom2)] = states[step]
+
+    for atom1, atom2, _ in list(step_cgr.bonds()):
+        if _bond_key(atom1, atom2) not in step_bonds:
+            step_cgr.delete_bond(atom1, atom2)
+
+    for atom1, atom2 in sorted(step_bonds):
+        order, p_order = step_bonds[(atom1, atom2)]
+        if order is None and p_order is None:
+            continue
+        _set_bond(step_cgr, atom1, atom2, RouteDynamicBond(order, p_order))
+
+    step_cgr.flush_cache()
+    return step_cgr
 
 
 def reactions_from_route_cgr(route_cgr: CGRContainer) -> dict[int, ReactionContainer]:
-    """Return the mapped reaction sequence embedded in a RouteCGR.
-
-    Raises
-    ------
-    ValueError
-        If the RouteCGR was not produced by a composer that stores exact
-        reconstruction metadata.
-    """
-
-    schema = getattr(route_cgr, "route_reconstruction_schema", None)
-    if schema != ROUTE_RECONSTRUCTION_SCHEMA:
-        raise ValueError(
-            "RouteCGR does not carry exact reconstruction metadata. "
-            "Recompose it with compose_route_cgr(..., preserve_transient_bonds=True) "
-            "from a SynPlanner version that stores route reconstruction metadata."
-        )
-
-    reaction_smiles = getattr(route_cgr, "route_reaction_smiles", None)
-    if not isinstance(reaction_smiles, dict) or not reaction_smiles:
-        raise ValueError("RouteCGR reconstruction metadata has no reactions")
+    """Reconstruct mapped reaction steps from native RouteCGR labels."""
 
     return {
-        int(step_id): read_smiles(smiles)
-        for step_id, smiles in sorted(reaction_smiles.items(), key=lambda item: int(item[0]))
+        step - 1: ReactionContainer.from_cgr(_step_cgr(route_cgr, step))
+        for step in _step_ids(route_cgr)
     }
 
 
@@ -100,25 +96,3 @@ def routes_dict_from_route_cgrs(
         int(route_id): reactions_from_route_cgr(route_cgr)
         for route_id, route_cgr in sorted(route_cgrs.items())
     }
-
-def route_json_from_route_cgrs(route_cgrs: dict[int, CGRContainer]) -> dict[int, Any]:
-    """Return exact route JSON trees embedded during RouteCGR composition.
-
-    This preserves sibling order and route metadata for exact JSON round-trips.
-    Use :func:`routes_dict_from_route_cgrs` when ReactionContainer objects are
-    needed instead.
-    """
-
-    routes_json = {}
-    for route_id, route_cgr in sorted(route_cgrs.items()):
-        schema = getattr(route_cgr, "route_reconstruction_schema", None)
-        if schema != ROUTE_RECONSTRUCTION_SCHEMA:
-            raise ValueError(
-                "RouteCGR does not carry exact reconstruction metadata. "
-                "Recompose it with compose_route_cgr(..., preserve_transient_bonds=True)."
-            )
-        route_json = getattr(route_cgr, "route_json", None)
-        if route_json is None:
-            raise ValueError("RouteCGR reconstruction metadata has no route JSON")
-        routes_json[int(route_id)] = route_json
-    return routes_json

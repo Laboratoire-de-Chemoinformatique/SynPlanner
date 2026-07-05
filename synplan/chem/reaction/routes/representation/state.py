@@ -14,9 +14,9 @@ __all__ = [
 
 
 class RouteDynamicBond(DynamicBond):
-    """DynamicBond carrying RouteCGR route-order and step-order metadata."""
+    """DynamicBond carrying RouteCGR route-order and deconvolution metadata."""
 
-    __slots__ = ("route_order", "route_step_order")
+    __slots__ = ("route_order", "route_step_order", "route_bond_step_states")
 
     def __init__(
         self,
@@ -31,6 +31,7 @@ class RouteDynamicBond(DynamicBond):
             super().__init__(order, p_order)
         self.route_order = route_order
         self.route_step_order = _metadata_set(route_step_order)
+        self.route_bond_step_states = {}
 
     @classmethod
     def from_bond(cls, bond: DynamicBond, route_order=None, route_step_order=None):
@@ -44,6 +45,9 @@ class RouteDynamicBond(DynamicBond):
             getattr(bond, "route_step_order", None)
             if route_step_order is None
             else route_step_order
+        )
+        copy.route_bond_step_states = dict(
+            getattr(bond, "route_bond_step_states", {})
         )
         return copy
 
@@ -81,6 +85,9 @@ def _route_atom_class_from_class(atom_class, symbol):
         copy._xy = self._xy.__class__(self._xy.x, self._xy.y)
         copy.route_order = _metadata_set(getattr(self, "route_order", None))
         copy.route_step_order = _metadata_set(getattr(self, "route_step_order", None))
+        copy.route_atom_step_states = dict(
+            getattr(self, "route_atom_step_states", {})
+        )
         return copy
 
     route_atom_class = type(
@@ -88,7 +95,11 @@ def _route_atom_class_from_class(atom_class, symbol):
         (atom_class,),
         {
             "__module__": __name__,
-            "__slots__": ("route_order", "route_step_order"),
+            "__slots__": (
+                "route_order",
+                "route_step_order",
+                "route_atom_step_states",
+            ),
             "atomic_symbol": property(atomic_symbol),
             "copy": copy,
         },
@@ -122,6 +133,8 @@ def route_atom(atom, route_orders, route_step_orders=None):
     if hasattr(atom, "route_order") and hasattr(atom, "route_step_order"):
         atom.route_order.update(route_orders)
         atom.route_step_order.update(route_step_orders)
+        if not hasattr(atom, "route_atom_step_states"):
+            atom.route_atom_step_states = {}
         return atom
 
     route_atom_class = _route_atom_class(atom)
@@ -136,6 +149,9 @@ def route_atom(atom, route_orders, route_step_orders=None):
     new_atom.route_order.update(route_orders)
     new_atom.route_step_order = _metadata_set(getattr(atom, "route_step_order", None))
     new_atom.route_step_order.update(route_step_orders)
+    new_atom.route_atom_step_states = dict(
+        getattr(atom, "route_atom_step_states", {})
+    )
     return new_atom
 
 
@@ -151,6 +167,7 @@ def transient_bond():
     bond._order = bond._p_order = None
     bond.route_order = None
     bond.route_step_order = set()
+    bond.route_bond_step_states = {}
     return bond
 
 
