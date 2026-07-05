@@ -70,9 +70,7 @@ class TestMappingOutputMetadata:
 
     def test_no_source_columns_or_non_smi_are_unchanged(self):
         assert (
-            _append_smi_source_fields(
-                "mapped>>reaction", "original>>reaction", "smi"
-            )
+            _append_smi_source_fields("mapped>>reaction", "original>>reaction", "smi")
             == "mapped>>reaction"
         )
         assert (

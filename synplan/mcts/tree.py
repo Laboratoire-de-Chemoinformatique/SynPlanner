@@ -12,11 +12,11 @@ from tqdm.auto import tqdm
 
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
+from synplan.chem.reaction.routes.quality.scorer import RouteScorer
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
 from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.node import Node
 from synplan.mcts.policy import Policy, PriorityPolicy
-from synplan.chem.reaction.routes.quality.scorer import RouteScorer
 from synplan.utils.config import TreeConfig
 
 from .algorithm import (

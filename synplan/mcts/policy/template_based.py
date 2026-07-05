@@ -21,6 +21,7 @@ from synplan.ml.featurization.rules import query_cgr_graphs_from_smarts
 
 if TYPE_CHECKING:
     import torch_geometric
+    import torch_geometric.data
 
     from synplan.chem.precursor import Precursor
     from synplan.chem.reaction import CanonicalRetroReactor
