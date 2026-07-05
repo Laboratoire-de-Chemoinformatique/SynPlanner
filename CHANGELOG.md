@@ -3,7 +3,7 @@
 All notable changes to SynPlanner are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.5.3] - 2026-06-04
+## [1.5.2] - 2026-06-04
 
 ### Added
 
@@ -24,8 +24,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added RouteCGR analysis helpers for selected building-block lookup and real
   versus supporting pseudo-reactant usage statistics.
 - Added native RouteCGR deconvolution APIs (`routes_dict_from_route_cgrs()` and
-  `reactions_from_route_cgr()`) plus a `scripts/route_cgr_roundtrip.py` helper
-  for route composition/deconvolution checks.
+  `reactions_from_route_cgr()`).
 - Added `synplan.chem.reaction.routes.clustering` as a package, with clustering logic in
   `synplan.chem.reaction.routes.clustering.core` and route marker helpers in
   `synplan.chem.reaction.routes.leaving_groups`.
@@ -73,11 +72,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   structurally identical to the consuming reactant even when atom-number overlap
   with the final target is absent, and drops malformed routes instead of emitting
   JSON `null` children.
-- RouteCGR deconvolution now reconstructs mapped reaction steps from native
-  RouteCGR atom/bond labels instead of replaying stored route JSON or mapped
-  reaction strings.
-- RouteCGR composition avoids eager reaction reconstruction in the hot path while
-  preserving deconvolution labels for every composed RouteCGR.
 - QueryCGR rule fingerprints and QueryCGR rule graphs preserve important query
   constraints, including degree, hydrogen-count, ring-size, set-valued atom
   labels, and dynamic bond semantics.
@@ -91,9 +85,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `synplan.chem.reaction_routes`.
 - Removed the old flat `synplan.mcts.expansion` and `synplan.ml.networks.policy`
   modules in favor of the new policy/network package layout.
-- Removed RouteCGR reconstruction metadata replay helpers and CGR-level payloads
-  such as stored route JSON or mapped reaction strings; deconvolution is now
-  RouteCGR-native.
 
 ## [1.5.0] - 2026-05-16
 
