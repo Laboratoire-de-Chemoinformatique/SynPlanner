@@ -3,8 +3,17 @@ import sys
 
 
 def _run_fresh_process(code: str) -> str:
+    wrapped_code = f"""
+import os
+import sys
+
+exec({code!r})
+sys.stdout.flush()
+sys.stderr.flush()
+os._exit(0)
+"""
     result = subprocess.run(
-        [sys.executable, "-B", "-c", code],
+        [sys.executable, "-B", "-c", wrapped_code],
         check=False,
         capture_output=True,
         text=True,
