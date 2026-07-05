@@ -170,3 +170,6 @@ local/
 synplanner_app/frontend/node_modules/
 synplanner_app/frontend/dist/
 .tmp*
+# Local benchmark/developer route round-trip artifacts
+route_cgr_roundtrip_results*/
+synplan_data/benchmarks/
