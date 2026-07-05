@@ -12,7 +12,7 @@ For the full per-release log, see :doc:`/release_notes`.
    :local:
    :depth: 2
 
-1.5.3
+1.5.2
 =====
 
 Route post-processing moved to ``synplan.chem.reaction.routes``

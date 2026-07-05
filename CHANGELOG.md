@@ -3,7 +3,9 @@
 All notable changes to SynPlanner are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.5.2] - 2026-06-04
+## [Unreleased]
+
+## [1.5.2] - 2026-06-05
 
 ### Added
 
@@ -85,6 +87,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `synplan.chem.reaction_routes`.
 - Removed the old flat `synplan.mcts.expansion` and `synplan.ml.networks.policy`
   modules in favor of the new policy/network package layout.
+
+## [1.5.1] - 2026-06-04
+
+### Fixed
+
+- Fixed score assignment for priority-rule nodes during evaluation.
 
 ## [1.5.0] - 2026-05-16
 
@@ -614,7 +622,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CLI interface (`synplan` command)
 - Docker images for CLI and GUI
 
-[1.5.3]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.2...HEAD
+[1.5.2]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.1...v1.5.2
+[1.5.1]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.4...v1.5.0
 [1.4.4]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.2...v1.4.3

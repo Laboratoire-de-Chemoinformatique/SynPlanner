@@ -61,6 +61,8 @@ some advanced explanations and configurations, that can be used for both demonst
 - `Rule Analysis`_ - demonstrates how to analyze and visualize reaction rules.
 - `Priority Rules`_ - demonstrates how to create custom retrosynthetic planner with user defined retrosynthetic SMARTS.
 - `MHN Ranking Training`_ - demonstrates how to train and fine-tune the MHN ranking policy architecture.
+- `Routes Compare`_ - demonstrates how to compare route sets with RouteCGRs.
+- `Building Block Search`_ - demonstrates building-block search utilities.
 
 .. _Welcome to Chython: 00_Welcome_to_Chython.ipynb
 .. _Coming from RDKit: 01_Coming_from_RDKit.ipynb
@@ -78,6 +80,8 @@ some advanced explanations and configurations, that can be used for both demonst
 .. _Rule Analysis: 12_Rule_Analysis.ipynb
 .. _Priority Rules: 13_Priority_Rules.ipynb
 .. _MHN Ranking Training: 14_MHN_Ranking_Training.ipynb
+.. _Routes Compare: 15_Routes_compare.ipynb
+.. _Building Block Search: 16_Building_block_search.ipynb
 
 .. toctree::
    :hidden:
@@ -102,5 +106,7 @@ some advanced explanations and configurations, that can be used for both demonst
    12_Rule_Analysis
    13_Priority_Rules
    14_MHN_Ranking_Training
+   15_Routes_compare
+   16_Building_block_search
    ../configuration/configuration
    ../methods/methods
