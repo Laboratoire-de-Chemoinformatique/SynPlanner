@@ -11,10 +11,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   clustering, route quality, RouteCGR utilities, route I/O, analysis, depiction,
   and notebook plotting.
 - Added `synplan.chem.reaction.routes.representation` to group RouteCGR builder, container,
-  depiction, state, and hashing helpers.
+  depiction, state, hashing, and native deconvolution helpers.
 - Added route-aware RouteCGR composition with `route_order` metadata on dynamic
-  atoms and bonds, plus transient bonds for bonds formed and later removed
-  during a synthetic route.
+  atoms and bonds, transient bonds for bonds formed and later removed during a
+  synthetic route, and compact per-step labels for reconstructing mapped route
+  reactions from the RouteCGR itself.
 - Added exact RouteCGR hashing in `synplan.chem.reaction.routes.representation.hash`, including a
   fast WL bucket hash followed by exact canonical confirmation for shared
   buckets.
@@ -22,9 +23,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   IDs across route dictionaries whose route IDs do not need to match.
 - Added RouteCGR analysis helpers for selected building-block lookup and real
   versus supporting pseudo-reactant usage statistics.
+- Added native RouteCGR deconvolution APIs (`routes_dict_from_route_cgrs()` and
+  `reactions_from_route_cgr()`) plus a `scripts/route_cgr_roundtrip.py` helper
+  for route composition/deconvolution checks.
 - Added `synplan.chem.reaction.routes.clustering` as a package, with clustering logic in
   `synplan.chem.reaction.routes.clustering.core` and route marker helpers in
   `synplan.chem.reaction.routes.leaving_groups`.
+- Added `synplan.chem.reaction.rules` and `synplan.chem.reaction.rules.representation`
+  as the public homes for rule analysis, extraction, priority rules, and Chython
+  QueryCGR/Morgan rule representations.
+- Added MHN ranking policy support (`architecture: mhn_ranking`) with QueryCGR
+  rule fingerprints by default, optional QueryCGR rule-graph encoding with GPS,
+  bounded runtime rule-association caches, dynamic runtime rule-set scoring, and
+  checkpoint migration for the redesigned policy networks.
+- Added `synplan mhn_network_tuning` for fine-tuning an already trained MHN
+  ranking checkpoint on new rule policy data.
+- Added policy/network modules for pure policy wrappers, graph embedders,
+  checkpoint loading, featurization caches, and Lightning-based supervised
+  training utilities.
+- Added MHN ranking configuration, policy documentation, CLI documentation, and
+  Tutorial 14 for MHN training/tuning workflows.
 - Added API documentation for `synplan.chem.reaction.routes`.
 
 ### Changed
@@ -32,14 +50,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Moved route clustering, route analysis, route depiction, route I/O, notebook
   plotting, route-quality scoring, and RouteCGR implementation to
   `synplan.chem.reaction.routes`.
-- Updated internal imports, tests, tutorials, and documentation to use
-  `synplan.chem.reaction.routes` for route post-processing.
+- Moved reaction-rule analysis, extraction, priority-rule parsing, and rule
+  representation helpers under `synplan.chem.reaction.rules`.
+- Moved MCTS expansion wrappers into `synplan.mcts.policy`, separating generic
+  policy selection from MHN-specific dynamic rule-association preparation.
+- Split ML graph embedders, policy networks, checkpoint loading, featurization,
+  and training helpers into focused submodules under `synplan.ml`.
+- Updated internal imports, tests, tutorials, Colab notebooks, API docs, and
+  migration notes to use the new route, rule, policy, and ML module layout.
+- `compose_route_cgr()` now uses a fast default path that returns the RouteCGR
+  without eagerly reconstructing reactions; callers that need the debug
+  `reactions_dict` can request it explicitly or deconvolute from the RouteCGR.
+- RouteCGR composition now assumes route-level atom mapping: the same atom-map
+  number must identify the same atom throughout a route, while independently
+  mapped local reaction steps are outside the supported input contract.
+- MHN light prediction keeps the rollout-friendly integer rule-count API; dynamic
+  MHN rule associations are prepared by the full `predict_reaction_rules()` path.
+
+### Fixed
+
+- Route JSON export now recovers precursor nodes whose producing fragment is
+  structurally identical to the consuming reactant even when atom-number overlap
+  with the final target is absent, and drops malformed routes instead of emitting
+  JSON `null` children.
+- RouteCGR deconvolution now reconstructs mapped reaction steps from native
+  RouteCGR atom/bond labels instead of replaying stored route JSON or mapped
+  reaction strings.
+- RouteCGR composition avoids eager reaction reconstruction in the hot path while
+  preserving deconvolution labels for every composed RouteCGR.
+- QueryCGR rule fingerprints and QueryCGR rule graphs preserve important query
+  constraints, including degree, hydrogen-count, ring-size, set-valued atom
+  labels, and dynamic bond semantics.
+- Runtime MHN rule-association caches are bounded and keyed by the ordered rule
+  SMARTS plus the rule representation contract.
 
 ### Removed
 
 - Removed deprecated route compatibility namespaces: `synplan.routes`,
   `synplan.routes.quality`, `synplan.route_quality`, and
   `synplan.chem.reaction_routes`.
+- Removed the old flat `synplan.mcts.expansion` and `synplan.ml.networks.policy`
+  modules in favor of the new policy/network package layout.
+- Removed RouteCGR reconstruction metadata replay helpers and CGR-level payloads
+  such as stored route JSON or mapped reaction strings; deconvolution is now
+  RouteCGR-native.
 
 ## [1.5.0] - 2026-05-16
 
