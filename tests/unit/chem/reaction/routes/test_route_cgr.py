@@ -320,7 +320,6 @@ def test_compose_sb_cgr_preserves_unchanged_charged_atoms_with_charge_delta():
     assert "O0>-" not in str(sb_cgr)
 
 
-
 def _reaction_atom_maps(reaction):
     return {
         "reactants": sorted(sorted(molecule._atoms) for molecule in reaction.reactants),

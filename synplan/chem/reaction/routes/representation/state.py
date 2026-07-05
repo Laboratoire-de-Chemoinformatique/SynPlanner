@@ -16,7 +16,7 @@ __all__ = [
 class RouteDynamicBond(DynamicBond):
     """DynamicBond carrying RouteCGR route-order and deconvolution metadata."""
 
-    __slots__ = ("route_order", "route_step_order", "route_bond_step_states")
+    __slots__ = ("route_bond_step_states", "route_order", "route_step_order")
 
     def __init__(
         self,
@@ -46,9 +46,7 @@ class RouteDynamicBond(DynamicBond):
             if route_step_order is None
             else route_step_order
         )
-        copy.route_bond_step_states = dict(
-            getattr(bond, "route_bond_step_states", {})
-        )
+        copy.route_bond_step_states = dict(getattr(bond, "route_bond_step_states", {}))
         return copy
 
     def copy(self, *args, **kwargs):
@@ -85,9 +83,7 @@ def _route_atom_class_from_class(atom_class, symbol):
         copy._xy = self._xy.__class__(self._xy.x, self._xy.y)
         copy.route_order = _metadata_set(getattr(self, "route_order", None))
         copy.route_step_order = _metadata_set(getattr(self, "route_step_order", None))
-        copy.route_atom_step_states = dict(
-            getattr(self, "route_atom_step_states", {})
-        )
+        copy.route_atom_step_states = dict(getattr(self, "route_atom_step_states", {}))
         return copy
 
     route_atom_class = type(
@@ -149,9 +145,7 @@ def route_atom(atom, route_orders, route_step_orders=None):
     new_atom.route_order.update(route_orders)
     new_atom.route_step_order = _metadata_set(getattr(atom, "route_step_order", None))
     new_atom.route_step_order.update(route_step_orders)
-    new_atom.route_atom_step_states = dict(
-        getattr(atom, "route_atom_step_states", {})
-    )
+    new_atom.route_atom_step_states = dict(getattr(atom, "route_atom_step_states", {}))
     return new_atom
 
 

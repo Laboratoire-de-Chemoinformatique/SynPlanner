@@ -25,7 +25,9 @@ def _step_ids(route_cgr: CGRContainer) -> list[int]:
     return sorted(int(step) for step in steps)
 
 
-def _set_atom_state(cgr: CGRContainer, atom_num: int, state: tuple[int, int, bool, bool]) -> None:
+def _set_atom_state(
+    cgr: CGRContainer, atom_num: int, state: tuple[int, int, bool, bool]
+) -> None:
     charge, p_charge, is_radical, p_is_radical = state
     atom = cgr._atoms[atom_num]
     atom._charge = charge
@@ -38,7 +40,9 @@ def _set_atom_state(cgr: CGRContainer, atom_num: int, state: tuple[int, int, boo
     cgr._p_radicals[atom_num] = p_is_radical
 
 
-def _set_bond(cgr: CGRContainer, atom1: int, atom2: int, bond: RouteDynamicBond) -> None:
+def _set_bond(
+    cgr: CGRContainer, atom1: int, atom2: int, bond: RouteDynamicBond
+) -> None:
     cgr._bonds.setdefault(atom1, {})[atom2] = bond
     cgr._bonds.setdefault(atom2, {})[atom1] = bond
 

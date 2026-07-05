@@ -23,7 +23,9 @@ def _route_tree_has_null_node(node) -> bool:
     if node is None:
         return True
     if isinstance(node, dict):
-        return any(_route_tree_has_null_node(child) for child in node.get("children", []) or [])
+        return any(
+            _route_tree_has_null_node(child) for child in node.get("children", []) or []
+        )
     return False
 
 
@@ -236,7 +238,9 @@ def make_json(
                 # Look up any prior step producing this reactant
                 prior = [ps for ps in _prod_map.get(r_smi, []) if ps < sid]
                 if prior:
-                    node["children"].append(build_mol_node(max(prior), want_react=react))
+                    node["children"].append(
+                        build_mol_node(max(prior), want_react=react)
+                    )
                 else:
                     node["children"].append(
                         {"type": "mol", "smiles": r_smi, "in_stock": True}

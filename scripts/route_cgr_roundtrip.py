@@ -24,7 +24,6 @@ from synplan.utils.loading import (
     load_reaction_rules,
 )
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA_DIR = PROJECT_ROOT / "synplan_data"
 DEFAULT_TARGET_DIR = DEFAULT_DATA_DIR / "benchmarks/sascore/subset_100"
@@ -82,7 +81,9 @@ def iter_targets(target_dir: Path, targets_per_bin: int | None = None):
                     }
 
 
-def resolve_preset_paths(data_dir: Path, preset: str, *, download: bool) -> dict[str, Path]:
+def resolve_preset_paths(
+    data_dir: Path, preset: str, *, download: bool
+) -> dict[str, Path]:
     if download:
         return download_preset(preset_name=preset, save_to=data_dir)
 
@@ -94,7 +95,9 @@ def resolve_preset_paths(data_dir: Path, preset: str, *, download: bool) -> dict
 
     with preset_path.open(encoding="utf-8") as f:
         preset_data = yaml.safe_load(f)
-    return {key: data_dir / repo_path for key, repo_path in preset_data["files"].items()}
+    return {
+        key: data_dir / repo_path for key, repo_path in preset_data["files"].items()
+    }
 
 
 def build_tree(target_smiles, reaction_rules, building_blocks, policy_function, config):
@@ -169,7 +172,9 @@ def main() -> int:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    paths = resolve_preset_paths(args.data_dir, args.preset, download=args.download_preset)
+    paths = resolve_preset_paths(
+        args.data_dir, args.preset, download=args.download_preset
+    )
     reaction_rules = load_reaction_rules(paths["reaction_rules"])
     building_blocks = load_building_blocks(
         paths["building_blocks"], standardize=False, silent=True
@@ -187,17 +192,17 @@ def main() -> int:
     )
 
     summary_rows = []
-    checked_targets = 0
     solved_targets = 0
-    for target in iter_targets(args.target_dir, targets_per_bin=args.targets_per_bin):
-        if checked_targets >= args.max_targets:
+    for checked_targets, target in enumerate(
+        iter_targets(args.target_dir, targets_per_bin=args.targets_per_bin), start=1
+    ):
+        if checked_targets > args.max_targets:
             break
         if (
             args.required_solved_targets is not None
             and solved_targets >= args.required_solved_targets
         ):
             break
-        checked_targets += 1
         print(
             f"[{checked_targets}/{args.max_targets}] "
             f"solved={solved_targets}/{args.required_solved_targets or 'any'} "
@@ -206,10 +211,18 @@ def main() -> int:
         )
         try:
             tree, solved = build_tree(
-                target["smiles"], reaction_rules, building_blocks, policy_function, config
+                target["smiles"],
+                reaction_rules,
+                building_blocks,
+                policy_function,
+                config,
             )
-            route_rows = verify_tree_routes(tree) if solved and tree.winning_nodes else []
-            all_match = bool(route_rows) and all(row["status"] == "ok" for row in route_rows)
+            route_rows = (
+                verify_tree_routes(tree) if solved and tree.winning_nodes else []
+            )
+            all_match = bool(route_rows) and all(
+                row["status"] == "ok" for row in route_rows
+            )
             if solved and all_match:
                 solved_targets += 1
             summary_rows.append(
@@ -222,7 +235,9 @@ def main() -> int:
                 }
             )
             args.output_dir.mkdir(parents=True, exist_ok=True)
-            route_out = args.output_dir / f"{checked_targets:03d}_{target['id']}_routes.json"
+            route_out = (
+                args.output_dir / f"{checked_targets:03d}_{target['id']}_routes.json"
+            )
             route_out.write_text(
                 json.dumps(route_rows, indent=2, default=str), encoding="utf-8"
             )
@@ -246,7 +261,9 @@ def main() -> int:
         writer.writeheader()
         writer.writerows(summary_rows)
 
-    failures = [row for row in summary_rows if row.get("solved") and not row.get("roundtrip_ok")]
+    failures = [
+        row for row in summary_rows if row.get("solved") and not row.get("roundtrip_ok")
+    ]
     solved_count = sum(bool(row.get("solved")) for row in summary_rows)
     print(f"Wrote {summary_path}")
     if args.require_solved and solved_count == 0:

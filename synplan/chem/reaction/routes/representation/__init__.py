@@ -4,11 +4,11 @@ from synplan.chem.reaction.routes.representation.container import (
     RouteCGRContainer,
     enable_route_cgr_container,
 )
-from synplan.chem.reaction.routes.representation.depiction import depict_route_cgr
 from synplan.chem.reaction.routes.representation.deconvolution import (
     reactions_from_route_cgr,
     routes_dict_from_route_cgrs,
 )
+from synplan.chem.reaction.routes.representation.depiction import depict_route_cgr
 from synplan.chem.reaction.routes.representation.hash import (
     RouteCGRGraph,
     atom_label,
@@ -70,7 +70,6 @@ __all__ = [
     "process_first_reaction",
     "process_target_blocks",
     "reactions_from_route_cgr",
-    "routes_dict_from_route_cgrs",
     "remove_transient_bonds",
     "route_atom",
     "route_cgr_bucket_fingerprint",
@@ -83,6 +82,7 @@ __all__ = [
     "route_cgr_metadata",
     "route_cgrs_equal",
     "route_order_variant_sets",
+    "routes_dict_from_route_cgrs",
     "transient_bond",
     "update_reaction_dict",
     "validate_molecule_components",

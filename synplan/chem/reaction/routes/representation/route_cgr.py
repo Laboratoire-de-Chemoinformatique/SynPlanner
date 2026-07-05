@@ -117,12 +117,14 @@ def _record_deconvolution_labels(
     """Collect per-step CGR states needed for native RouteCGR deconvolution."""
 
     for atom_num, atom in cgr._atoms.items():
-        atom_step_states.setdefault(atom_num, {})[route_step_order] = _atom_step_state(atom)
+        atom_step_states.setdefault(atom_num, {})[route_step_order] = _atom_step_state(
+            atom
+        )
 
     for atom1, atom2, bond in cgr.bonds():
-        bond_step_states.setdefault(_bond_key(atom1, atom2), {})[
-            route_step_order
-        ] = _bond_step_state(bond)
+        bond_step_states.setdefault(_bond_key(atom1, atom2), {})[route_step_order] = (
+            _bond_step_state(bond)
+        )
 
 
 def _set_bond(cgr, atom1, atom2, bond):
@@ -263,9 +265,7 @@ def validate_molecule_components(curr_mol: MoleculeContainer, route_id: int):
     """
     new_rmol = [curr_mol.substructure(c) for c in curr_mol.connected_components]
     if len(new_rmol) > 1:
-        logger.warning(
-            "Route %s: more than one molecule in one node", route_id
-        )
+        logger.warning("Route %s: more than one molecule in one node", route_id)
         return 0
 
     return 1
