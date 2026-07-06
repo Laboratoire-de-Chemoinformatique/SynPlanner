@@ -4,7 +4,6 @@ from synplan._compat import deprecated_module
 
 deprecated_module(__name__, "synplan.chem.reaction.rules")
 
-from synplan.chem.reaction.rules import *
 from synplan.chem.reaction.rules import (
     POLICY_SOURCE_NAME as POLICY_SOURCE_NAME,
 )
