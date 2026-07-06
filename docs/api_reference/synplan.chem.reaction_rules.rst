@@ -36,6 +36,14 @@ synplan.chem.reaction.rules.graphs module
    :undoc-members:
    :show-inheritance:
 
+synplan.chem.reaction.rules.symmetry module
+-------------------------------------------
+
+.. automodule:: synplan.chem.reaction.rules.symmetry
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 synplan.chem.reaction.rules.representation package
 --------------------------------------------------
 
