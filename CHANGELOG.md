@@ -9,6 +9,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added `synplan.chem.reaction.rules.symmetry` with
+  `needs_decollapsed_matches()` for detecting reaction SMARTS where a
+  non-identity left-hand-side automorphism changes the right-hand-side product
+  rule patch.
+
+### Changed
+
+- `load_reaction_rules()` now parses TSV SMARTS once and, by default, disables
+  Chython's `automorphism_filter` only for rules that need decollapsed symmetric
+  matches. Callers can opt out with `decollapse_symmetric_matches=False`.
+- TSV rule loading now builds `CanonicalRetroReactor` instances directly from the
+  parsed reactant and product query patterns, preserving the existing pickle
+  loading behavior unchanged.
+
+### Fixed
+
+- Fixed symmetric SMARTS rule loading so valid precursor orientations are
+  retained when symmetric target-atom matches produce different product-side
+  results, including external-fragment differences, target-target bond changes,
+  and target atom-state changes.
+
+## [1.5.2] - 2026-06-05
+
+### Added
+
 - Added `synplan.chem.reaction.routes` as the public route post-processing layer for route
   clustering, route quality, RouteCGR utilities, route I/O, analysis, depiction,
   and notebook plotting.
