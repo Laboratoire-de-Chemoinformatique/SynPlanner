@@ -205,6 +205,32 @@ def assert_reaction_atom_mapped(
         warnings.warn(message, stacklevel=2)
 
 
+def _clean_molecule(
+    molecule: MoleculeContainer,
+    *,
+    standardize: bool = True,
+    clean_stereo: bool = True,
+    clean2d: bool = True,
+) -> MoleculeContainer:
+    """Clean a Chython molecule on a copy while preserving failure semantics."""
+
+    tmp = molecule.copy()
+    try:
+        tmp.remove_coordinate_bonds(keep_to_terminal=False)
+        if standardize:
+            tmp.canonicalize()
+        if clean_stereo:
+            tmp.clean_stereo()
+        if clean2d:
+            tmp.clean2d()
+        return tmp
+    except InvalidAromaticRing:
+        logging.warning(
+            "chython was not able to standardize molecule due to invalid aromatic ring"
+        )
+        return molecule
+
+
 def mol_from_smiles(
     smiles: str,
     standardize: bool = True,
@@ -226,21 +252,12 @@ def mol_from_smiles(
     if not isinstance(molecule, MoleculeContainer):
         raise ValueError("SMILES string was not processed by chython")
 
-    tmp = molecule.copy()
-    try:
-        tmp.remove_coordinate_bonds(keep_to_terminal=False)
-        if standardize:
-            tmp.canonicalize()
-        if clean_stereo:
-            tmp.clean_stereo()
-        if clean2d:
-            tmp.clean2d()
-        molecule = tmp
-    except InvalidAromaticRing:
-        logging.warning(
-            "chython was not able to standardize molecule due to invalid aromatic ring"
-        )
-    return molecule
+    return _clean_molecule(
+        molecule,
+        standardize=standardize,
+        clean_stereo=clean_stereo,
+        clean2d=clean2d,
+    )
 
 
 def unite_molecules(molecules: Iterable[MoleculeContainer]) -> MoleculeContainer:

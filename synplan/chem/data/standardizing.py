@@ -17,6 +17,7 @@ from chython.containers import MoleculeContainer, ReactionContainer
 from pydantic import Field
 from tqdm.auto import tqdm
 
+from synplan.chem.data.config import SmallMoleculesConfig
 from synplan.chem.data.pipeline import (
     build_batch_result,
     reaction_cgr_key,
@@ -476,10 +477,6 @@ class UnchangedPartsStandardizer(BaseStandardizer):
         )
         new_reaction.name = rxn.name
         return new_reaction
-
-
-class SmallMoleculesConfig(BaseConfigModel):
-    mol_max_size: int = Field(default=6, ge=1)
 
 
 class SmallMoleculesStandardizer(BaseStandardizer):

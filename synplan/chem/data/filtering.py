@@ -13,6 +13,7 @@ from chython.containers import CGRContainer, MoleculeContainer, ReactionContaine
 from pydantic import Field, model_validator
 from tqdm.auto import tqdm
 
+from synplan.chem.data.config import SmallMoleculesConfig
 from synplan.chem.data.pipeline import build_batch_result, write_batch_results
 from synplan.chem.data.reaction_result import (
     BatchResult,
@@ -134,10 +135,6 @@ class DynamicBondsFilter:
         return not (
             self.min_bonds_number <= len(cgr.center_bonds) <= self.max_bonds_number
         )
-
-
-class SmallMoleculesConfig(BaseConfigModel):
-    mol_max_size: int = Field(default=6, ge=1)
 
 
 class SmallMoleculesFilter:
