@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 import torch
 from chython import smarts
@@ -69,6 +71,50 @@ def _fp_config(
     return RuleFingerprintConfig(
         fp_size=fp_size, fp_type=fp_type, schema_version=schema_version
     )
+
+
+def _mhnreact_reference_rdk_fragment(fragment_smarts: str, fp_size: int) -> torch.Tensor:
+    from rdkit import Chem, DataStructs
+    from rdkit.Chem.rdmolops import FastFindRings
+
+    mol = Chem.MolFromSmarts(str(fragment_smarts), mergeHs=False)
+    if mol is None:
+        raise ValueError(fragment_smarts)
+    Chem.SanitizeMol(mol, catchErrors=True)
+    FastFindRings(mol)
+    mol.UpdatePropertyCache(strict=False)
+    bit_vector = Chem.RDKFingerprint(mol, fpSize=fp_size, maxPath=6)
+    array = np.zeros((fp_size,), dtype=np.float32)
+    DataStructs.ConvertToNumpyArray(bit_vector, array)
+    return torch.from_numpy(array)
+
+
+def _mhnreact_reference_rdk_side(side_smarts: str, fp_size: int) -> torch.Tensor:
+    fragments = [fragment for fragment in str(side_smarts).split(".") if fragment]
+    if not fragments:
+        return torch.zeros(fp_size, dtype=torch.float)
+    return torch.stack(
+        [_mhnreact_reference_rdk_fragment(fragment, fp_size) for fragment in fragments]
+    ).amax(dim=0)
+
+
+def _mhnreact_reference_template_fp(rule_smarts: str, fp_size: int) -> torch.Tensor:
+    parts = str(rule_smarts).split(">")
+    return _mhnreact_reference_rdk_side(
+        parts[0], fp_size
+    ) - 0.5 * _mhnreact_reference_rdk_side(parts[-1], fp_size)
+
+
+def _load_rules_like_mhnreact_converter(rules_tsv: Path) -> list[str]:
+    rules: list[str] = []
+    with rules_tsv.open(encoding="utf-8") as f:
+        header = f.readline()
+        if "rule_smarts" not in header:
+            raise ValueError(f"unexpected header in {rules_tsv}: {header!r}")
+        for line in f:
+            if line.strip():
+                rules.append(line.split("\t", 1)[0].strip())
+    return rules
 
 
 def _graph_batch() -> Batch:
@@ -157,6 +203,59 @@ def test_legacy_rule_fingerprints_drop_query_labels():
     assert torch.equal(legacy_rule_fingerprints[0], legacy_rule_fingerprints[1])
 
 
+def test_mhnreact_rdkit_rule_fingerprints_match_native_rdk_reference():
+    config = _fp_config(fp_size=2048, fp_type="mhnreact_rdkit")
+    fingerprints = rule_fingerprints_from_smarts((RULE_A, RULE_B), config)
+    expected = torch.stack(
+        [
+            _mhnreact_reference_template_fp(RULE_A, config.fp_size),
+            _mhnreact_reference_template_fp(RULE_B, config.fp_size),
+        ]
+    )
+
+    assert tuple(fingerprints.shape) == (2, 2048)
+    assert torch.equal(fingerprints, expected)
+    assert fingerprints.abs().sum() > 0
+
+
+def test_mhnreact_rdkit_rule_fingerprints_are_deterministic_and_directional():
+    config = _fp_config(fp_size=2048, fp_type="mhnreact_rdkit")
+    fingerprints_1 = rule_fingerprints_from_smarts((RULE_B, RULE_FORMED), config)
+    fingerprints_2 = rule_fingerprints_from_smarts((RULE_B, RULE_FORMED), config)
+
+    assert torch.equal(fingerprints_1, fingerprints_2)
+    assert not torch.equal(fingerprints_1[0], fingerprints_1[1])
+
+
+def test_mhnreact_rdkit_fingerprint_error_identifies_unparseable_fragment():
+    with pytest.raises(ValueError, match=r"index 0") as exc_info:
+        rule_fingerprints_from_smarts(
+            ("[C:1]>>[C",), _fp_config(fp_size=2048, fp_type="mhnreact_rdkit")
+        )
+
+    message = str(exc_info.value)
+    assert "SMARTS: [C:1]>>[C" in message
+    assert "reactant SMARTS fragment" in message
+
+
+def test_mhnreact_converter_style_rule_order_is_preserved(tmp_path):
+    rules_path = tmp_path / "reaction_rules.tsv"
+    rules_path.write_text(
+        f"rule_smarts\tpopularity\treaction_indices\n{RULE_A}\t1\t0\n{RULE_B}\t1\t1\n",
+        encoding="utf-8",
+    )
+
+    rules = _load_rules_like_mhnreact_converter(rules_path)
+    fingerprints = rule_fingerprints_from_smarts(
+        rules, _fp_config(fp_size=2048, fp_type="mhnreact_rdkit")
+    )
+
+    assert rules == [RULE_A, RULE_B]
+    assert tuple(fingerprints.shape) == (2, 2048)
+    assert torch.equal(fingerprints[0], _mhnreact_reference_template_fp(RULE_A, 2048))
+    assert torch.equal(fingerprints[1], _mhnreact_reference_template_fp(RULE_B, 2048))
+
+
 @pytest.mark.parametrize(
     ("left_rule", "right_rule"),
     [
@@ -243,6 +342,9 @@ def test_query_cgr_rule_graphs_are_stable_under_atom_remapping():
 
 def test_rule_fingerprint_digest_includes_fingerprint_config():
     legacy_digest = rule_fingerprint_digest((RULE_A,), _fp_config(fp_type="legacy"))
+    mhnreact_digest = rule_fingerprint_digest(
+        (RULE_A,), _fp_config(fp_type="mhnreact_rdkit")
+    )
     query_cgr_digest = rule_fingerprint_digest(
         (RULE_A,), _fp_config(fp_type="query_cgr")
     )
@@ -250,7 +352,8 @@ def test_rule_fingerprint_digest_includes_fingerprint_config():
         (RULE_A,), _fp_config(fp_type="query_cgr", schema_version="2")
     )
 
-    assert legacy_digest != query_cgr_digest
+    assert legacy_digest != mhnreact_digest
+    assert mhnreact_digest != query_cgr_digest
     assert query_cgr_digest != schema_digest
 
 
@@ -397,6 +500,13 @@ def test_mhn_config_validation():
     assert config.rule_embedder.attn_dropout is None
     assert config.rule_fp_type == "query_cgr"
     assert config.rule_fp_schema_version == "1"
+
+    mhnreact_config = MHNRankingPolicyNetworkConfig(rule_fp_type="mhnreact_rdkit")
+    assert mhnreact_config.rule_fp_type == "mhnreact_rdkit"
+    assert (
+        mhnreact_config.rule_representation_config().fingerprint_config.fp_type
+        == "mhnreact_rdkit"
+    )
 
     graph_config = MHNRankingPolicyNetworkConfig(
         rule_embedding_type="query_cgr_graph",

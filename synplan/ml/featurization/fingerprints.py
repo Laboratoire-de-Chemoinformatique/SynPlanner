@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Sequence
 
+import numpy as np
 import torch
 from chython import smarts
 from chython.containers import MoleculeContainer, ReactionContainer
@@ -74,16 +75,84 @@ def _query_cgr_rule_fingerprint(
     )
 
 
+def _mhnreact_rdkit_fragment_fingerprint(
+    fragment_smarts: str,
+    fingerprint_config: RuleFingerprintConfig,
+    *,
+    side: str,
+) -> torch.Tensor:
+    """Return the original MHNreact RDKit RDK fingerprint for one SMARTS part."""
+    from rdkit import Chem, DataStructs
+    from rdkit.Chem.rdmolops import FastFindRings
+
+    mol = Chem.MolFromSmarts(str(fragment_smarts), mergeHs=False)
+    if mol is None:
+        raise ValueError(
+            f"RDKit could not parse {side} SMARTS fragment: {fragment_smarts!r}"
+        )
+    Chem.SanitizeMol(mol, catchErrors=True)
+    FastFindRings(mol)
+    mol.UpdatePropertyCache(strict=False)
+    bit_vector = Chem.RDKFingerprint(
+        mol, fpSize=fingerprint_config.fp_size, maxPath=6
+    )
+    array = np.zeros((fingerprint_config.fp_size,), dtype=np.float32)
+    DataStructs.ConvertToNumpyArray(bit_vector, array)
+    return torch.from_numpy(array)
+
+
+def _mhnreact_rdkit_side_fingerprint(
+    side_smarts: str,
+    fingerprint_config: RuleFingerprintConfig,
+    *,
+    side: str,
+) -> torch.Tensor:
+    """Max-pool original MHNreact RDKit fingerprints over one template side."""
+    fragments = [fragment for fragment in str(side_smarts).split(".") if fragment]
+    if not fragments:
+        return torch.zeros(fingerprint_config.fp_size, dtype=torch.float)
+    fingerprints = [
+        _mhnreact_rdkit_fragment_fingerprint(
+            fragment, fingerprint_config, side=side
+        )
+        for fragment in fragments
+    ]
+    return torch.stack(fingerprints).amax(dim=0)
+
+
+def _mhnreact_rdkit_rule_fingerprint(
+    rule_smarts_text: str, fingerprint_config: RuleFingerprintConfig
+) -> torch.Tensor:
+    """Original MHNreact template encoding: left side minus half right side."""
+    parts = str(rule_smarts_text).split(">")
+    if len(parts) < 3:
+        raise ValueError(
+            "mhnreact_rdkit expects reaction SMARTS with '>' separators"
+        )
+    product_side = parts[0]
+    reactant_side = parts[-1]
+    product = _mhnreact_rdkit_side_fingerprint(
+        product_side, fingerprint_config, side="product"
+    )
+    reactants = _mhnreact_rdkit_side_fingerprint(
+        reactant_side, fingerprint_config, side="reactant"
+    )
+    return product - 0.5 * reactants
+
+
 def rule_fingerprints_from_smarts(
     rule_smarts: Sequence[str],
     fingerprint_config: RuleFingerprintConfig | None = None,
 ) -> torch.Tensor:
     """Build ordered rule fingerprints for retrospective reaction SMARTS.
 
-    ``legacy`` uses the MHN-react-style side delta, ``target - 0.5 * precursors``,
-    after converting query rules to ordinary reaction containers. ``query_cgr``
-    fingerprints Chython ``QueryCGRContainer`` objects with original query-side
-    atom labels so constraints such as hydrogen count and ring size are retained.
+    ``legacy`` uses the Chython side delta, ``target - 0.5 * precursors``,
+    after converting query rules to ordinary reaction containers.
+    ``mhnreact_rdkit`` reproduces original MHNreact's RDKit SMARTS template
+    encoding, ``left_side - 0.5 * right_side`` with RDK path fingerprints.
+    ``query_cgr`` fingerprints Chython ``QueryCGRContainer`` objects with
+    original query-side atom labels so constraints such as hydrogen count and
+    ring size are retained.
     """
     fingerprint_config = fingerprint_config or RuleFingerprintConfig()
     rules = tuple(rule_smarts)
@@ -95,13 +164,20 @@ def rule_fingerprints_from_smarts(
     fingerprints = []
     for index, rule_smarts_text in enumerate(rules):
         try:
-            rule_query = smarts(rule_smarts_text)
-            if fingerprint_config.fp_type == "legacy":
-                fingerprint = _legacy_rule_fingerprint(rule_query, fingerprint_config)
-            else:
-                fingerprint = _query_cgr_rule_fingerprint(
-                    rule_query, fingerprint_config
+            if fingerprint_config.fp_type == "mhnreact_rdkit":
+                fingerprint = _mhnreact_rdkit_rule_fingerprint(
+                    rule_smarts_text, fingerprint_config
                 )
+            else:
+                rule_query = smarts(rule_smarts_text)
+                if fingerprint_config.fp_type == "legacy":
+                    fingerprint = _legacy_rule_fingerprint(
+                        rule_query, fingerprint_config
+                    )
+                else:
+                    fingerprint = _query_cgr_rule_fingerprint(
+                        rule_query, fingerprint_config
+                    )
             fingerprints.append(fingerprint)
         except Exception as err:
             raise ValueError(

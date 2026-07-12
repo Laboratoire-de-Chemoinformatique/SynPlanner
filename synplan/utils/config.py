@@ -449,7 +449,7 @@ class MHNRankingPolicyNetworkConfig(PolicyNetworkConfig):
     rule_fp_min_radius: int = Field(default=1, gt=0)
     rule_fp_max_radius: int = Field(default=4, ge=0)
     rule_fp_active_bits: int = Field(default=2, gt=0)
-    rule_fp_type: Literal["legacy", "query_cgr"] = "query_cgr"
+    rule_fp_type: Literal["legacy", "mhnreact_rdkit", "query_cgr"] = "query_cgr"
     rule_fp_schema_version: str = Field(
         default=RULE_FINGERPRINT_SCHEMA_VERSION, min_length=1
     )

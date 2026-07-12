@@ -73,6 +73,23 @@ class _MHNGraphPolicy(_MHNPolicy):
         return torch.ones((len(rule_representations), 4))
 
 
+class _MHNRDKitPolicy(_MHNPolicy):
+    rule_representation_config = RuleRepresentationConfig(
+        embedding_type="fingerprint",
+        fingerprint_config=RuleFingerprintConfig(
+            fp_size=4,
+            min_radius=1,
+            max_radius=2,
+            active_bits=2,
+            fp_type="mhnreact_rdkit",
+            schema_version=RULE_FINGERPRINT_SCHEMA_VERSION,
+        ),
+        graph_embedder_type="gps",
+        graph_batch_size=2,
+        graph_schema_version=RULE_GRAPH_SCHEMA_VERSION,
+    )
+
+
 class _LinearPolicy(torch.nn.Module):
     architecture = "linear"
     policy_type = "filtering"
@@ -89,11 +106,18 @@ def _linear_wrapper(policy):
 
 def test_mhn_preparation_caches_encoded_rules(monkeypatch):
     calls = []
+    smarts_calls = []
+
+    def fake_rule_smarts(rules):
+        smarts = tuple(str(rule) for rule in rules)
+        smarts_calls.append(smarts)
+        return smarts
 
     def fake_rule_fingerprints(rule_smarts, fingerprint_config):
         calls.append((tuple(rule_smarts), fingerprint_config))
         return torch.zeros((len(rule_smarts), 4))
 
+    monkeypatch.setattr(template_based, "rule_smarts_from_reactors", fake_rule_smarts)
     monkeypatch.setattr(
         template_based, "rule_fingerprints_from_smarts", fake_rule_fingerprints
     )
@@ -104,6 +128,7 @@ def test_mhn_preparation_caches_encoded_rules(monkeypatch):
     first = wrapper._rule_associations
     wrapper.prepare_rule_associations(rules)
 
+    assert smarts_calls == [("A", "B")]
     assert len(calls) == 1
     assert calls[0][0] == ("A", "B")
     fingerprint_config = calls[0][1]
@@ -115,6 +140,49 @@ def test_mhn_preparation_caches_encoded_rules(monkeypatch):
     assert fingerprint_config.schema_version == RULE_FINGERPRINT_SCHEMA_VERSION
     assert wrapper._rule_associations is first
     assert wrapper.n_rules == 2
+
+
+def test_mhn_preparation_rebinds_new_rule_sequence(monkeypatch):
+    calls = []
+
+    def fake_rule_fingerprints(rule_smarts, _fingerprint_config):
+        calls.append(tuple(rule_smarts))
+        return torch.full((len(rule_smarts), 4), float(len(calls)))
+
+    monkeypatch.setattr(
+        template_based, "rule_fingerprints_from_smarts", fake_rule_fingerprints
+    )
+    wrapper = _mhn_wrapper(_MHNPolicy())
+    first_rules = [_Rule("A"), _Rule("B")]
+    second_rules = [_Rule("C"), _Rule("D")]
+
+    wrapper.prepare_rule_associations(first_rules)
+    first = wrapper._rule_associations
+    wrapper.prepare_rule_associations(second_rules)
+
+    assert calls == [("A", "B"), ("C", "D")]
+    assert wrapper._rule_associations is not first
+    assert wrapper._bound_reaction_rules is second_rules
+    assert wrapper._bound_reaction_rules_len == len(second_rules)
+
+
+def test_mhn_preparation_passes_mhnreact_rdkit_fingerprint_config(monkeypatch):
+    calls = []
+
+    def fake_rule_fingerprints(rule_smarts, fingerprint_config):
+        calls.append((tuple(rule_smarts), fingerprint_config))
+        return torch.zeros((len(rule_smarts), 4))
+
+    monkeypatch.setattr(
+        template_based, "rule_fingerprints_from_smarts", fake_rule_fingerprints
+    )
+    wrapper = _mhn_wrapper(_MHNRDKitPolicy())
+
+    wrapper.prepare_rule_associations([_Rule("A"), _Rule("B")])
+
+    assert len(calls) == 1
+    assert calls[0][0] == ("A", "B")
+    assert calls[0][1].fp_type == "mhnreact_rdkit"
 
 
 def test_mhn_preparation_uses_query_cgr_rule_graphs(monkeypatch):
