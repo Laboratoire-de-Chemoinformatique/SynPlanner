@@ -3,11 +3,17 @@ from typing import TYPE_CHECKING
 
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 
+from synplan.chem.reaction.routes.contracts import (
+    RouteCGRBuildResult,
+    RouteDiagnostic,
+)
 from synplan.chem.reaction.routes.representation.container import (
     enable_route_cgr_container,
 )
 from synplan.chem.reaction.routes.representation.state import (
     RouteDynamicBond,
+    _set_symmetric_bond,
+    bond_key,
     route_atom,
     transient_bond,
 )
@@ -34,10 +40,6 @@ def find_next_atom_num(reactions: list):
     atom index seen, mirroring the historical ``find_next_atom_num`` API.
     """
     return _next_atom_number(*(reaction.compose() for reaction in reactions))
-
-
-def _bond_key(atom1, atom2):
-    return tuple(sorted((atom1, atom2)))
 
 
 def _route_order_depths(reactions):
@@ -91,7 +93,7 @@ def _record_route_orders(
     for atom1, atom2, bond in cgr.bonds():
         if bond.order == bond.p_order:
             continue
-        key = _bond_key(atom1, atom2)
+        key = bond_key(atom1, atom2)
         bond_route_orders.setdefault(key, set()).add(route_order)
         bond_route_step_orders.setdefault(key, set()).add(route_step_order)
         atom_route_orders.setdefault(atom1, set()).add(route_order)
@@ -122,13 +124,9 @@ def _record_deconvolution_labels(
         )
 
     for atom1, atom2, bond in cgr.bonds():
-        bond_step_states.setdefault(_bond_key(atom1, atom2), {})[route_step_order] = (
+        bond_step_states.setdefault(bond_key(atom1, atom2), {})[route_step_order] = (
             _bond_step_state(bond)
         )
-
-
-def _set_bond(cgr, atom1, atom2, bond):
-    cgr._bonds[atom1][atom2] = cgr._bonds[atom2][atom1] = bond
 
 
 def _apply_route_orders(
@@ -143,13 +141,13 @@ def _apply_route_orders(
 ):
     if preserve_transient_bonds:
         for atom1, atom2 in sorted(
-            set(bond_step_states) - {_bond_key(a1, a2) for a1, a2, _ in cgr.bonds()}
+            set(bond_step_states) - {bond_key(a1, a2) for a1, a2, _ in cgr.bonds()}
         ):
             if atom1 in cgr._atoms and atom2 in cgr._atoms:
                 cgr.add_bond(atom1, atom2, transient_bond())
 
     for atom1, atom2, bond in list(cgr.bonds()):
-        key = _bond_key(atom1, atom2)
+        key = bond_key(atom1, atom2)
         has_step_states = key in bond_step_states
         route_orders = bond_route_orders.get(key)
         if not route_orders:
@@ -177,7 +175,7 @@ def _apply_route_orders(
                 route_order,
                 route_step_orders,
             )
-            _set_bond(cgr, atom1, atom2, bond)
+            _set_symmetric_bond(cgr, atom1, atom2, bond)
         bond.route_bond_step_states = dict(bond_step_states.get(key, {}))
 
     for atom_num in sorted(
@@ -475,7 +473,7 @@ def _compose_cgrs(
     return composed_cgr
 
 
-def compose_route_cgr(
+def _compose_route_cgr_legacy(
     tree_or_routes,
     route_id,
     preserve_transient_bonds=True,
@@ -781,6 +779,53 @@ def compose_route_cgr(
         return None
 
 
+def build_route_cgr(
+    tree_or_routes,
+    route_id,
+    preserve_transient_bonds: bool = True,
+    *,
+    include_reactions: bool = False,
+) -> RouteCGRBuildResult:
+    """Build a RouteCGR and report recoverable composition failures explicitly."""
+
+    result = _compose_route_cgr_legacy(
+        tree_or_routes,
+        route_id,
+        preserve_transient_bonds=preserve_transient_bonds,
+        return_reactions_dict=include_reactions,
+    )
+    if result is None:
+        return RouteCGRBuildResult(
+            route_id=route_id,
+            diagnostic=RouteDiagnostic(
+                route_id=route_id,
+                stage="route_cgr_composition",
+                message="RouteCGR composition did not produce a valid route",
+            ),
+        )
+    return RouteCGRBuildResult(
+        route_id=route_id,
+        cgr=result["cgr"],
+        reactions_dict=result.get("reactions_dict"),
+    )
+
+
+def compose_route_cgr(
+    tree_or_routes,
+    route_id,
+    preserve_transient_bonds: bool = True,
+    return_reactions_dict: bool = False,
+):
+    """Compatibility adapter returning the historical RouteCGR result mapping."""
+
+    return build_route_cgr(
+        tree_or_routes,
+        route_id,
+        preserve_transient_bonds,
+        include_reactions=return_reactions_dict,
+    ).as_legacy_dict(include_reactions=return_reactions_dict)
+
+
 def compose_all_route_cgrs(
     tree_or_routes,
     route_id=None,
@@ -811,13 +856,12 @@ def compose_all_route_cgrs(
         routes_dict = tree_or_routes
 
         def _single(route_id):
-            res = compose_route_cgr(
+            result = build_route_cgr(
                 routes_dict,
                 route_id,
                 preserve_transient_bonds=preserve_transient_bonds,
-                return_reactions_dict=False,
             )
-            return res["cgr"] if res else None
+            return result.cgr if result.ok else None
 
         if route_id is not None:
             if route_id not in routes_dict:
@@ -833,27 +877,25 @@ def compose_all_route_cgrs(
     route_cgrs = {}
 
     if route_id is not None:
-        res = compose_route_cgr(
+        result = build_route_cgr(
             tree,
             route_id,
             preserve_transient_bonds=preserve_transient_bonds,
-            return_reactions_dict=False,
         )
-        if res:
-            route_cgrs[route_id] = res["cgr"]
+        if result.ok:
+            route_cgrs[route_id] = result.cgr
         else:
             return None
         return route_cgrs
 
     for route_id in sorted(set(tree.winning_nodes)):
-        res = compose_route_cgr(
+        result = build_route_cgr(
             tree,
             route_id,
             preserve_transient_bonds=preserve_transient_bonds,
-            return_reactions_dict=False,
         )
-        if res:
-            route_cgrs[route_id] = res["cgr"]
+        if result.ok:
+            route_cgrs[route_id] = result.cgr
 
     return route_cgrs
 
@@ -885,26 +927,26 @@ def extract_reactions(tree: "Tree", route_id=None, preserve_transient_bonds=True
     """
     react_dict = {}
     if route_id is not None:
-        result = compose_route_cgr(
+        result = build_route_cgr(
             tree,
             route_id,
             preserve_transient_bonds=preserve_transient_bonds,
-            return_reactions_dict=True,
+            include_reactions=True,
         )
-        if result:
-            react_dict[route_id] = result["reactions_dict"]
+        if result.ok and result.reactions_dict is not None:
+            react_dict[route_id] = result.reactions_dict
         else:
             return None
         return react_dict
 
     for route_id in set(tree.winning_nodes):
-        result = compose_route_cgr(
+        result = build_route_cgr(
             tree,
             route_id,
             preserve_transient_bonds=preserve_transient_bonds,
-            return_reactions_dict=True,
+            include_reactions=True,
         )
-        if result:
-            react_dict[route_id] = result["reactions_dict"]
+        if result.ok and result.reactions_dict is not None:
+            react_dict[route_id] = result.reactions_dict
 
     return dict(sorted(react_dict.items()))

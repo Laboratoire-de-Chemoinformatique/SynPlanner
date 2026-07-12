@@ -88,3 +88,26 @@ assert RouteScorer.__name__ == 'RouteScorer'
 assert compose_route_cgr.__name__ == 'compose_route_cgr'
 """
     _run_fresh_process(code)
+
+
+def test_representation_import_does_not_load_route_visualisation():
+    code = """
+import sys
+import synplan.chem.reaction.routes.representation
+
+assert 'synplan.chem.reaction.routes.visualisation' not in sys.modules
+"""
+    _run_fresh_process(code)
+
+
+def test_representation_depiction_is_canonical_and_visualisation_stays_compatible():
+    code = """
+from synplan.chem.reaction.routes.representation.depiction import depict_route_cgr
+from synplan.chem.reaction.routes.visualisation import (
+    depict_route_cgr as facade_depict_route_cgr,
+)
+
+assert callable(depict_route_cgr)
+assert facade_depict_route_cgr is depict_route_cgr
+"""
+    _run_fresh_process(code)

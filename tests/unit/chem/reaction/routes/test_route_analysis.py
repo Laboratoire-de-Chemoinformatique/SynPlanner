@@ -7,6 +7,7 @@ from synplan.chem.reaction.routes.analysis import (
     route_cgr_overlap_rows,
     route_cgr_subset,
     route_ids_with_exact_bb,
+    sb_cgr_identity_to_cluster_id,
 )
 from synplan.chem.reaction.routes.notebook_plots import top_bb_usage_rows
 from synplan.chem.reaction.routes.representation import compose_route_cgr
@@ -108,3 +109,21 @@ def test_top_bb_usage_rows_filters_and_sorts():
         ("CCCO", 3, 3),
         ("CCCC", 2, 4),
     ]
+
+
+def test_analysis_accepts_legacy_route_cgr_wrappers_and_molecule_inputs():
+    route_cgr = _route_cgr()
+    wrapped = {"cgr": route_cgr}
+
+    assert route_ids_with_exact_bb(smiles("ClC"), {7: wrapped}) == [7]
+    stats = collect_bb_usage_stats({7: wrapped})
+    assert stats["real_bb"]["ClC"]["route_ids"] == [7]
+
+
+def test_cluster_identity_accepts_missing_keys_and_attribute_records():
+    class Cluster:
+        sb_cgr = "A"
+
+    assert sb_cgr_identity_to_cluster_id(
+        {"missing": {}, "object": Cluster()}
+    ) == {"A": "object"}

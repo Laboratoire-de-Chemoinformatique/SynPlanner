@@ -3,10 +3,48 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable, Mapping
-from typing import Any
+from collections.abc import Hashable, Iterable, Mapping
+from typing import Any, TypeAlias
 
 from chython import smiles as chython_smiles
+
+from synplan.chem.reaction.routes.representation.components import (
+    route_cgr_pseudo_reactants_by_role,
+)
+
+RouteId: TypeAlias = Hashable
+
+__all__ = [
+    "collect_bb_usage_stats",
+    "compare_sb_cgr_clusters",
+    "flatten_route_id_groups",
+    "route_cgr_overlap_rows",
+    "route_cgr_pseudo_reactants_by_role",
+    "route_cgr_subset",
+    "route_ids_with_exact_bb",
+    "sb_cgr_identity_to_cluster_id",
+]
+
+_MISSING = object()
+
+
+def _unwrap_route_cgr(value: Any) -> Any:
+    """Accept raw RouteCGRs and historical composition result wrappers."""
+
+    if value is None:
+        return None
+    if isinstance(value, Mapping) and "cgr" in value:
+        return value["cgr"]
+    cgr = getattr(value, "cgr", _MISSING)
+    return value if cgr is _MISSING else cgr
+
+
+def _cluster_sb_cgr(cluster: Any) -> Any:
+    if isinstance(cluster, Mapping):
+        return cluster.get("sb_cgr")
+    return getattr(cluster, "sb_cgr", None)
+
+
 
 
 def flatten_route_id_groups(route_id_groups: Mapping[Any, Iterable[int]]) -> list[int]:
@@ -57,9 +95,9 @@ def sb_cgr_identity_to_cluster_id(clusters: Mapping[Any, Mapping[str, Any]]) -> 
     """Map SB-CGR string identity to its cluster ID."""
 
     return {
-        str(cluster["sb_cgr"]): cluster_id
+        str(sb_cgr): cluster_id
         for cluster_id, cluster in clusters.items()
-        if cluster.get("sb_cgr") is not None
+        if (sb_cgr := _cluster_sb_cgr(cluster)) is not None
     }
 
 
@@ -89,36 +127,6 @@ def compare_sb_cgr_clusters(
     }
 
 
-def _target_atoms_from_pseudo_products(pseudo_products: Any) -> set[int]:
-    products = pseudo_products.split()
-    if not products:
-        return set()
-    target_product = min(products, key=lambda mol: min(mol._atoms))
-    return set(target_product._atoms)
-
-
-def route_cgr_pseudo_reactants_by_role(route_cgr: Any) -> dict[str, list[Any]]:
-    """Split decomposed RouteCGR pseudo-reactants into real and supporting parts.
-
-    Real pseudo-reactants contain atoms that survive into the target product
-    projection. Supporting pseudo-reactants have no target-product atom overlap
-    and usually correspond to PG/FGI/support fragments.
-    """
-
-    pseudo_reactants, pseudo_products = route_cgr.decompose()
-    target_atoms = _target_atoms_from_pseudo_products(pseudo_products)
-
-    result = {"real_bb": [], "supporting": []}
-    if not target_atoms:
-        return result
-
-    for mol in pseudo_reactants.split():
-        kind = "real_bb" if set(mol._atoms) & target_atoms else "supporting"
-        result[kind].append(mol)
-
-    return result
-
-
 def route_ids_with_exact_bb(
     bb_smi: str,
     all_route_cgrs: Mapping[int, Any],
@@ -141,10 +149,11 @@ def route_ids_with_exact_bb(
     if kind not in {"any", "real", "supporting"}:
         raise ValueError("kind must be one of: 'any', 'real', 'supporting'")
 
-    bb_key = str(chython_smiles(bb_smi))
+    bb_key = str(chython_smiles(bb_smi)) if isinstance(bb_smi, str) else str(bb_smi)
     hits = []
 
-    for route_id, route_cgr in all_route_cgrs.items():
+    for route_id, route_cgr_value in all_route_cgrs.items():
+        route_cgr = _unwrap_route_cgr(route_cgr_value)
         if route_cgr is None:
             continue
 
@@ -181,7 +190,8 @@ def collect_bb_usage_stats(all_route_cgrs: Mapping[int, Any]) -> dict[str, Any]:
         "by_route": {},
     }
 
-    for route_id, route_cgr in all_route_cgrs.items():
+    for route_id, route_cgr_value in all_route_cgrs.items():
+        route_cgr = _unwrap_route_cgr(route_cgr_value)
         if route_cgr is None:
             continue
 

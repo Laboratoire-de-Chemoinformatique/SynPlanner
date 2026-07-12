@@ -11,11 +11,20 @@ import streamlit as st
 from huggingface_hub.utils import disable_progress_bars
 from streamlit_ketcher import st_ketcher
 
-from synplan.chem.reaction.routes.clustering import *
+from synplan.chem.reaction.routes.clustering import (
+    cluster_routes,
+    group_by_identical_values,
+    post_process_subgroup,
+    subcluster_all_clusters,
+)
 from synplan.chem.reaction.routes.io import make_json
 from synplan.chem.reaction.routes.quality.scorer import ProtectionRouteScorer
-from synplan.chem.reaction.routes.representation import *
-from synplan.chem.reaction.routes.visualisation import (
+from synplan.chem.reaction.routes.representation import (
+    compose_all_route_cgrs,
+    compose_all_sb_cgrs,
+    extract_reactions,
+)
+from synplan.chem.reaction.routes.representation.depiction import (
     cgr_display,
     depict_custom_reaction,
 )

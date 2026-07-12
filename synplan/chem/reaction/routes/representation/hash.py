@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from itertools import permutations, product
 from typing import Any
 
-from synplan.chem.reaction.routes.representation.route_cgr import _bond_key
+from synplan.chem.reaction.routes.representation.state import bond_key
 
 HASH_SCHEMA = "route-cgr-exact-v2"
 BUCKET_HASH_SCHEMA = "route-cgr-wl-bucket-v2"
@@ -206,7 +206,7 @@ def route_cgr_graph(
 
     for atom1, atom2, bond in route_cgr.bonds():
         label = bond_label(bond, include_route_order=include_route_order)
-        edge_labels[_bond_key(atom1, atom2)] = label
+        edge_labels[bond_key(atom1, atom2)] = label
         adjacency[atom1].append((atom2, label))
         adjacency[atom2].append((atom1, label))
 

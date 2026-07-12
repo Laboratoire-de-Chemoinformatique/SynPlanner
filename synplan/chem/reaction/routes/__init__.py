@@ -3,10 +3,9 @@
 Modules / subpackages:
     representation   route-CGR + strategic-bond CGR representations (route_cgr,
                      sb_cgr) plus container/state/hash/depiction helpers
-    clustering       cluster / subcluster logic (core, subclustering)
+    clustering       cluster / subcluster logic and pseudo-atom primitives
     quality          route quality scoring (scorer + protection subsystem)
     io               csv/json route loaders + writers, tree export
-    leaving_groups   chython leaving-group atom primitives
     cli              ``run_cluster_cli`` command-line entry point
     visualisation    CGR / reaction depiction helpers
 
@@ -18,6 +17,7 @@ planning path light and prevents import cycles through the back-compat shims.
 """
 
 import importlib
+import warnings
 
 # public name -> submodule (relative to this package) that defines it
 _EXPORTS = {
@@ -47,24 +47,26 @@ _EXPORTS = {
     "export_tree_to_csv": "io",
     "export_tree_to_json": "io",
     "make_dict": "io",
+    "build_route_trees": "io",
     "make_json": "io",
     "read_routes_csv": "io",
     "read_routes_json": "io",
     "write_routes_csv": "io",
     "write_routes_json": "io",
-    # leaving_groups (atom primitives)
-    "DynamicX": "leaving_groups",
-    "Marked": "leaving_groups",
-    "MarkedAt": "leaving_groups",
-    "MarkedY": "leaving_groups",
+    # pseudo_atoms (clustering atom primitives)
+    "DynamicX": "clustering.pseudo_atoms",
+    "Marked": "clustering.pseudo_atoms",
+    "MarkedAt": "clustering.pseudo_atoms",
+    "MarkedY": "clustering.pseudo_atoms",
     # representation (route_cgr + sb_cgr + container/state/hash/depiction)
     "RouteCGRContainer": "representation",
     "RouteDynamicBond": "representation",
+    "build_route_cgr": "representation",
     "compose_all_route_cgrs": "representation",
     "compose_all_sb_cgrs": "representation",
     "compose_route_cgr": "representation",
     "compose_sb_cgr": "representation",
-    "depict_route_cgr": "representation",
+    "depict_route_cgr": "representation.depiction",
     "enable_route_cgr_container": "representation",
     "extract_reactions": "representation",
     "find_next_atom_num": "representation",
@@ -80,14 +82,36 @@ _EXPORTS = {
     "update_reaction_dict": "representation",
     "validate_molecule_components": "representation",
     # visualisation
-    "WideBondDepictCGR": "visualisation",
-    "cgr_display": "visualisation",
-    "depict_custom_reaction": "visualisation",
-    "wide_cgr_renderer": "visualisation",
+    "WideBondDepictCGR": "representation.depiction",
+    "cgr_display": "representation.depiction",
+    "depict_custom_reaction": "representation.depiction",
+    "wide_cgr_renderer": "representation.depiction",
     # quality
     "ProtectionRouteScorer": "quality.scorer",
     "RouteScorer": "quality.scorer",
 }
+
+_LEGACY_EXPORTS = frozenset(
+    {
+        "all_lg_collect",
+        "find_next_atom_num",
+        "get_clean_mapping",
+        "get_leaving_groups",
+        "group_by_identical_values",
+        "lg_process_reset",
+        "lg_reaction_replacer",
+        "new_lg_reaction_replacer",
+        "process_first_reaction",
+        "process_target_blocks",
+        "remove_and_shift",
+        "replace_leaving_groups_in_synthon",
+        "replace_supporting_reactants_with_y",
+        "supporting_groups_from_route_cgr",
+        "transient_bond",
+        "update_reaction_dict",
+        "validate_molecule_components",
+    }
+)
 
 __all__ = sorted(_EXPORTS)
 
@@ -96,6 +120,12 @@ def __getattr__(name: str):
     submodule = _EXPORTS.get(name)
     if submodule is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    if name in _LEGACY_EXPORTS:
+        warnings.warn(
+            f"{name} is a legacy route helper; import from its concrete module instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     value = getattr(importlib.import_module(f"{__name__}.{submodule}"), name)
     globals()[name] = value  # cache so __getattr__ runs at most once per name
     return value

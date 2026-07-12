@@ -7,10 +7,24 @@ from chython.periodictable import DynamicElement
 
 __all__ = [
     "RouteDynamicBond",
+    "bond_key",
     "remove_transient_bonds",
     "route_atom",
     "transient_bond",
 ]
+
+
+def bond_key(atom1: int, atom2: int) -> tuple[int, int]:
+    """Return the canonical key for an undirected atom pair."""
+
+    return (atom1, atom2) if atom1 <= atom2 else (atom2, atom1)
+
+
+def _set_symmetric_bond(cgr, atom1, atom2, bond):
+    """Store one bond object in both directions of a CGR adjacency map."""
+
+    cgr._bonds.setdefault(atom1, {})[atom2] = bond
+    cgr._bonds.setdefault(atom2, {})[atom1] = bond
 
 
 class RouteDynamicBond(DynamicBond):

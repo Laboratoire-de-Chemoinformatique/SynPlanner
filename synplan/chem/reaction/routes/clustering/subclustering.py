@@ -5,8 +5,15 @@ from typing import Any
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
 
-from synplan.chem.reaction.routes.analysis import route_cgr_pseudo_reactants_by_role
-from synplan.chem.reaction.routes.leaving_groups import DynamicX, MarkedAt, MarkedY
+from synplan.chem.reaction.routes.clustering.pseudo_atoms import (
+    DynamicX,
+    MarkedAt,
+    MarkedY,
+)
+from synplan.chem.reaction.routes.contracts import SubclusterRouteData
+from synplan.chem.reaction.routes.representation.components import (
+    route_cgr_pseudo_reactants_by_role,
+)
 
 
 def lg_process_reset(lg_cgr: CGRContainer, atom_num: int):
@@ -241,7 +248,7 @@ class SubclusterError(Exception):
     """Raised when subcluster_one_cluster cannot complete successfully."""
 
 
-def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
+def _build_subcluster_route_data(group, sb_cgrs_dict, route_cgrs_dict):
     """
     Generate synthon data for each route in a single cluster.
 
@@ -309,17 +316,34 @@ def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
                 f"Leaving group (X) reaction replacement failed for route {route_id}"
             ) from e
 
-        result[route_id] = (
-            sb_cgr,
-            ReactionContainer(reactants=old_reactants, products=[target_mol]),
-            synthon_cgr,
-            new_rxn,
-            lg_groups,
-            lg_sizes,
-            supporting_groups,
+        result[route_id] = SubclusterRouteData(
+            sb_cgr=sb_cgr,
+            unlabeled_reaction=ReactionContainer(
+                reactants=old_reactants, products=[target_mol]
+            ),
+            synthon_cgr=synthon_cgr,
+            synthon_reaction=new_rxn,
+            leaving_groups=lg_groups,
+            leaving_group_count=lg_sizes,
+            supporting_groups=supporting_groups,
         )
 
     return result
+
+
+def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
+    """Compatibility adapter returning historical per-route seven-item tuples."""
+
+    return {
+        route_id: route_data.as_legacy_tuple()
+        for route_id, route_data in _build_subcluster_route_data(
+            group, sb_cgrs_dict, route_cgrs_dict
+        ).items()
+    }
+
+
+def _subcluster_values(value):
+    return value.as_legacy_tuple() if isinstance(value, SubclusterRouteData) else value
 
 
 def group_routes_by_synthon_detail(
@@ -337,9 +361,10 @@ def group_routes_by_synthon_detail(
     temp_groups = defaultdict(list)
     for route_id, result_list in data_dict.items():
         # unpack values with defaults
-        sb_cgr = result_list[0] if len(result_list) > 0 else None
-        synthon_reaction = result_list[3] if len(result_list) > 3 else None
-        lg_sizes = result_list[5] if len(result_list) > 5 else None
+        result_values = _subcluster_values(result_list)
+        sb_cgr = result_values[0] if len(result_values) > 0 else None
+        synthon_reaction = result_values[3] if len(result_values) > 3 else None
+        lg_sizes = result_values[5] if len(result_values) > 5 else None
 
         group_key = (str(sb_cgr), str(synthon_reaction), lg_sizes)
 
@@ -364,11 +389,11 @@ def group_routes_by_synthon_detail(
         routes_data = {}
         supporting_data = {}
         for rid in sorted(route_ids):
-            orig = data_dict.get(rid, [])
+            orig = _subcluster_values(data_dict.get(rid, []))
             routes_data[rid] = orig[4] if len(orig) > 4 else None
             supporting_data[rid] = orig[6] if len(orig) > 6 else {}
 
-        representative = data_dict[route_ids[0]]
+        representative = _subcluster_values(data_dict[route_ids[0]])
 
         final_groups[group_index] = {
             "cluster_id": cluster_id,
@@ -411,7 +436,9 @@ def subcluster_all_clusters(groups, sb_cgrs_dict, route_cgrs_dict):
     """
     all_subgroups = {}
     for group_index, group in groups.items():
-        group_synthons = subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict)
+        group_synthons = _build_subcluster_route_data(
+            group, sb_cgrs_dict, route_cgrs_dict
+        )
         if group_synthons is None:
             return None
         all_subgroups[group_index] = group_routes_by_synthon_detail(
@@ -590,7 +617,7 @@ def remove_and_shift(nested_dict, to_remove):
     return result
 
 
-def post_process_subgroup(subgroup):
+def _post_process_subgroup_in_place(subgroup):
     """
     Drop leaving-groups common to all pathways and rebuild a minimal synthon.
 
@@ -637,6 +664,25 @@ def post_process_subgroup(subgroup):
         subgroup["group_supporting"] = group_by_identical_values(
             subgroup["supporting_data"]
         )
+    return subgroup
+
+
+def post_process_subcluster(subgroup):
+    """Return post-processed subgroup data without mutating the caller's mapping."""
+
+    result = dict(subgroup)
+    synthon_cgr = result.get("synthon_cgr")
+    if synthon_cgr is not None:
+        result["synthon_cgr"] = synthon_cgr.copy()
+    return _post_process_subgroup_in_place(result)
+
+
+def post_process_subgroup(subgroup):
+    """Compatibility adapter retaining historical in-place subgroup mutation."""
+
+    result = post_process_subcluster(subgroup)
+    subgroup.clear()
+    subgroup.update(result)
     return subgroup
 
 

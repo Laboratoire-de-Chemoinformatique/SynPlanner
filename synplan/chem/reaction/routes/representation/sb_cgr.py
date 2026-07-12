@@ -3,7 +3,10 @@
 from chython.containers import CGRContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
 
-from synplan.chem.reaction.routes.representation.state import remove_transient_bonds
+from synplan.chem.reaction.routes.representation.state import (
+    bond_key,
+    remove_transient_bonds,
+)
 
 
 def compose_sb_cgr(route_cgr: CGRContainer):
@@ -42,10 +45,10 @@ def compose_sb_cgr(route_cgr: CGRContainer):
     for atom1, bond_set in bond_items:
         bond_set_items = list(bond_set.items())
         for atom2, bond in bond_set_items:
-            bond_key = tuple(sorted((atom1, atom2)))
-            if bond_key in checked_bonds:
+            current_bond_key = bond_key(atom1, atom2)
+            if current_bond_key in checked_bonds:
                 continue
-            checked_bonds.add(bond_key)
+            checked_bonds.add(current_bond_key)
 
             # Removing bonds corresponding to leaving groups:
             # If product bond order is None (indicating a leaving group) but an original bond order exists,

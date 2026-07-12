@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from chython.containers import CGRContainer, ReactionContainer
 
-from synplan.chem.reaction.routes.representation.state import RouteDynamicBond
-
-
-def _bond_key(atom1: int, atom2: int) -> tuple[int, int]:
-    return tuple(sorted((atom1, atom2)))
+from synplan.chem.reaction.routes.representation.state import (
+    RouteDynamicBond,
+    _set_symmetric_bond,
+    bond_key,
+)
 
 
 def _step_ids(route_cgr: CGRContainer) -> list[int]:
@@ -40,13 +40,6 @@ def _set_atom_state(
     cgr._p_radicals[atom_num] = p_is_radical
 
 
-def _set_bond(
-    cgr: CGRContainer, atom1: int, atom2: int, bond: RouteDynamicBond
-) -> None:
-    cgr._bonds.setdefault(atom1, {})[atom2] = bond
-    cgr._bonds.setdefault(atom2, {})[atom1] = bond
-
-
 def _step_cgr(route_cgr: CGRContainer, step: int) -> CGRContainer:
     atom_nums = [
         atom_num
@@ -66,17 +59,19 @@ def _step_cgr(route_cgr: CGRContainer, step: int) -> CGRContainer:
     for atom1, atom2, bond in route_cgr.bonds():
         states = getattr(bond, "route_bond_step_states", {})
         if step in states:
-            step_bonds[_bond_key(atom1, atom2)] = states[step]
+            step_bonds[bond_key(atom1, atom2)] = states[step]
 
     for atom1, atom2, _ in list(step_cgr.bonds()):
-        if _bond_key(atom1, atom2) not in step_bonds:
+        if bond_key(atom1, atom2) not in step_bonds:
             step_cgr.delete_bond(atom1, atom2)
 
     for atom1, atom2 in sorted(step_bonds):
         order, p_order = step_bonds[(atom1, atom2)]
         if order is None and p_order is None:
             continue
-        _set_bond(step_cgr, atom1, atom2, RouteDynamicBond(order, p_order))
+        _set_symmetric_bond(
+            step_cgr, atom1, atom2, RouteDynamicBond(order, p_order)
+        )
 
     step_cgr.flush_cache()
     return step_cgr

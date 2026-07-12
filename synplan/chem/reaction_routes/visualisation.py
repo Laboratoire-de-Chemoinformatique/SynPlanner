@@ -1,6 +1,6 @@
-"""Compatibility facade for route SVG depiction helpers."""
+"""Compatibility exports for the main-branch route visualisation API."""
 
-from synplan.chem.reaction.routes.representation.depiction import (
+from synplan.chem.reaction.routes.visualisation import (
     WideBondDepictCGR,
     cgr_display,
     depict_custom_reaction,
