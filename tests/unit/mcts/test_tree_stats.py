@@ -267,8 +267,15 @@ def test_iter_rules_returns_typed_candidates_in_priority_then_policy_order():
 
     candidates = list(tree._iter_rules(tree.nodes[1]))
 
-    assert [(candidate.probability, candidate.rule_id, candidate.rule_source,
-              candidate.policy_rank) for candidate in candidates] == [
+    assert [
+        (
+            candidate.probability,
+            candidate.rule_id,
+            candidate.rule_source,
+            candidate.policy_rank,
+        )
+        for candidate in candidates
+    ] == [
         (1.0, 0, "priority", None),
         (0.7, 9, "policy", 1),
     ]
