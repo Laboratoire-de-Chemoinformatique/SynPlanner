@@ -78,6 +78,7 @@ synplan = "synplan.interfaces.cli:synplan"
 release = "scripts.release:main"
 sascore-benchmark = "scripts.sascore_bench.run_benchmark:main"
 sascore-plot = "scripts.sascore_bench.plot_results:main"
+synplan-convert-protection-data = "scripts.convert_protection_source_data:main"
 
 [build-system]
 requires = ["hatchling>=1.26"]
