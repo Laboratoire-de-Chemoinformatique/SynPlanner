@@ -93,9 +93,7 @@ def _mhnreact_rdkit_fragment_fingerprint(
     Chem.SanitizeMol(mol, catchErrors=True)
     FastFindRings(mol)
     mol.UpdatePropertyCache(strict=False)
-    bit_vector = Chem.RDKFingerprint(
-        mol, fpSize=fingerprint_config.fp_size, maxPath=6
-    )
+    bit_vector = Chem.RDKFingerprint(mol, fpSize=fingerprint_config.fp_size, maxPath=6)
     array = np.zeros((fingerprint_config.fp_size,), dtype=np.float32)
     DataStructs.ConvertToNumpyArray(bit_vector, array)
     return torch.from_numpy(array)
@@ -112,9 +110,7 @@ def _mhnreact_rdkit_side_fingerprint(
     if not fragments:
         return torch.zeros(fingerprint_config.fp_size, dtype=torch.float)
     fingerprints = [
-        _mhnreact_rdkit_fragment_fingerprint(
-            fragment, fingerprint_config, side=side
-        )
+        _mhnreact_rdkit_fragment_fingerprint(fragment, fingerprint_config, side=side)
         for fragment in fragments
     ]
     return torch.stack(fingerprints).amax(dim=0)
@@ -123,14 +119,18 @@ def _mhnreact_rdkit_side_fingerprint(
 def _mhnreact_rdkit_rule_fingerprint(
     rule_smarts_text: str, fingerprint_config: RuleFingerprintConfig
 ) -> torch.Tensor:
-    """Original MHNreact template encoding: left side minus half right side."""
+    """Original MHNreact encoding for ``product>>reactants`` templates."""
     parts = str(rule_smarts_text).split(">")
-    if len(parts) < 3:
+    if len(parts) != 3:
         raise ValueError(
-            "mhnreact_rdkit expects reaction SMARTS with '>' separators"
+            "mhnreact_rdkit expects exactly three reaction SMARTS fields "
+            "in product>>reactants or product>reagents>reactants form"
         )
-    product_side = parts[0]
-    reactant_side = parts[-1]
+    product_side, _reagent_side, reactant_side = parts
+    if not product_side or not reactant_side:
+        raise ValueError(
+            "mhnreact_rdkit requires non-empty product and reactant SMARTS sides"
+        )
     product = _mhnreact_rdkit_side_fingerprint(
         product_side, fingerprint_config, side="product"
     )

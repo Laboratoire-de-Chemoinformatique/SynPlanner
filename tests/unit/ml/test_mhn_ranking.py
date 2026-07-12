@@ -73,7 +73,9 @@ def _fp_config(
     )
 
 
-def _mhnreact_reference_rdk_fragment(fragment_smarts: str, fp_size: int) -> torch.Tensor:
+def _mhnreact_reference_rdk_fragment(
+    fragment_smarts: str, fp_size: int
+) -> torch.Tensor:
     from rdkit import Chem, DataStructs
     from rdkit.Chem.rdmolops import FastFindRings
 
@@ -225,6 +227,38 @@ def test_mhnreact_rdkit_rule_fingerprints_are_deterministic_and_directional():
 
     assert torch.equal(fingerprints_1, fingerprints_2)
     assert not torch.equal(fingerprints_1[0], fingerprints_1[1])
+
+
+def test_mhnreact_rdkit_accepts_two_sided_double_arrow_rules():
+    config = _fp_config(fp_size=2048, fp_type="mhnreact_rdkit")
+    rule = "[C:1]>>[O:2]"
+
+    fingerprints = rule_fingerprints_from_smarts((rule,), config)
+
+    assert torch.equal(
+        fingerprints[0], _mhnreact_reference_template_fp(rule, config.fp_size)
+    )
+
+
+@pytest.mark.parametrize(
+    "rule",
+    [
+        "[C:1]>[O:2]",
+        "[C:1]>[O:2]>[N:3]>[Cl:4]",
+    ],
+)
+def test_mhnreact_rdkit_rejects_wrong_reaction_side_count(rule):
+    with pytest.raises(ValueError, match="exactly three"):
+        rule_fingerprints_from_smarts(
+            (rule,), _fp_config(fp_size=2048, fp_type="mhnreact_rdkit")
+        )
+
+
+def test_mhnreact_rdkit_rejects_empty_double_arrow_rule():
+    with pytest.raises(ValueError, match="non-empty"):
+        rule_fingerprints_from_smarts(
+            (">>",), _fp_config(fp_size=2048, fp_type="mhnreact_rdkit")
+        )
 
 
 def test_mhnreact_rdkit_fingerprint_error_identifies_unparseable_fragment():
