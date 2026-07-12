@@ -5,13 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [1.5.2] - 2026-06-05
+## [1.5.2] - 2026-07-13
 
 ### Added
 
 - Added `synplan.chem.reaction.routes` as the public route post-processing layer for route
   clustering, route quality, RouteCGR utilities, route I/O, analysis, depiction,
   and notebook plotting.
+- Added typed RouteCGR and route-export contracts, including
+  `RouteCGRBuildResult`, `RouteExportResult`, route diagnostics, and strict
+  export failure handling while preserving the existing JSON and CSV shapes.
 - Added `synplan.chem.reaction.routes.representation` to group RouteCGR builder, container,
   depiction, state, hashing, and native deconvolution helpers.
 - Added route-aware RouteCGR composition with `route_order` metadata on dynamic
@@ -44,6 +47,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   training utilities.
 - Added MHN ranking configuration, policy documentation, CLI documentation, and
   Tutorial 14 for MHN training/tuning workflows.
+- Added strict Chython-to-RDKit SMARTS conversion with reverse diagnostics and
+  semantic-loss reporting for strict round-trip validation.
+- Added the `mhnreact_rdkit` rule-fingerprint mode for MHN ranking, using the
+  original RDKit path-fingerprint template encoding.
+- Added `Tree.save_pickle(path)` for direct tree persistence and the
+  `synplan-convert-protection-data` command for protection source-data conversion.
 - Added API documentation for `synplan.chem.reaction.routes`.
 
 ### Changed
@@ -59,6 +68,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and training helpers into focused submodules under `synplan.ml`.
 - Updated internal imports, tests, tutorials, Colab notebooks, API docs, and
   migration notes to use the new route, rule, policy, and ML module layout.
+- Centralized route parent-chain traversal for tree, visualisation, and RDKit
+  route conversion while preserving their existing output formats.
 - `compose_route_cgr()` now uses a fast default path that returns the RouteCGR
   without eagerly reconstructing reactions; callers that need the debug
   `reactions_dict` can request it explicitly or deconvolute from the RouteCGR.
@@ -86,6 +97,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `synplan.routes.quality`, and `synplan.route_quality`.
 - Retained `synplan.chem.reaction_routes` as a deprecated forwarding namespace
   for the historical `main`-branch route module paths.
+- Removed `TreeWrapper`; use `Tree.save_pickle(path)` instead.
 - Removed the old flat `synplan.mcts.expansion` and `synplan.ml.networks.policy`
   modules in favor of the new policy/network package layout.
 
