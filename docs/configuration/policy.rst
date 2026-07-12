@@ -161,7 +161,7 @@ rules must retain their training order.
     rule_fp_min_radius                 Minimum Chython Morgan fingerprint radius
     rule_fp_max_radius                 Maximum Chython Morgan fingerprint radius
     rule_fp_active_bits                Active bits per Chython Morgan fingerprint feature
-    rule_fp_type                       Rule fingerprint source: ``query_cgr`` (default) or ``legacy``
+    rule_fp_type                       Rule fingerprint source: ``query_cgr`` (default), ``legacy``, or ``mhnreact_rdkit`` (RDKit MHNreact-compatible)
     rule_fp_schema_version             Rule fingerprint schema version included in digests and caches
     rule_embedder.embedder_type        Rule graph embedder for ``query_cgr_graph``: ``gps`` (required)
     rule_embedder.vector_dim           Optional hidden dimension override for the rule graph GPS; defaults to ``vector_dim``
