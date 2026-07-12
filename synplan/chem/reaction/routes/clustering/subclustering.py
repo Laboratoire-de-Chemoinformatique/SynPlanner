@@ -517,6 +517,9 @@ def replace_leaving_groups_in_synthon(subgroup, to_remove):
             continue
 
         current_mark = atom_obj.mark
+        if current_mark is None:
+            continue
+
         if current_mark in to_remove:
             # Remove old LG (X): delete bond and atom
             neighbors = list(updated_cgr._bonds[atom_idx].keys())
@@ -540,8 +543,9 @@ def replace_leaving_groups_in_synthon(subgroup, to_remove):
             removed_count += 1
         else:
             # Adjust the marks of remaining LGs to account for removed ones
-            atom_obj.mark -= removed_count
-            new_lgs[atom_obj.mark] = atom_idx
+            adjusted_mark = current_mark - removed_count
+            atom_obj.mark = adjusted_mark
+            new_lgs[adjusted_mark] = atom_idx
 
     # Reorder atoms dict and update 2D coordinates for depiction
     updated_cgr._atoms = dict(sorted(updated_cgr._atoms.items()))

@@ -1,12 +1,15 @@
 from chython import smiles
-from chython.containers import MoleculeContainer
+from chython.containers import CGRContainer, MoleculeContainer
 
 from synplan.chem.reaction.routes.clustering.pseudo_atoms import (
     DynamicX,
     MarkedAt,
     MarkedY,
 )
-from synplan.chem.reaction.routes.clustering.subclustering import lg_process_reset
+from synplan.chem.reaction.routes.clustering.subclustering import (
+    lg_process_reset,
+    replace_leaving_groups_in_synthon,
+)
 
 
 def _one_atom_smiles(atom):
@@ -62,6 +65,17 @@ def test_dynamic_x_keeps_route_marker_representation():
     assert repr(x) == str(x) == "DynamicX()"
     assert x.mark == 3
     assert x.isotope == 3
+
+
+def test_unmarked_dynamic_x_is_ignored_during_leaving_group_replacement():
+    cgr = CGRContainer()
+    cgr.add_atom(DynamicX(), 1)
+    subgroup = {"synthon_cgr": cgr, "routes_data": {1: {}}}
+
+    updated_cgr, new_lgs = replace_leaving_groups_in_synthon(subgroup, [])
+
+    assert updated_cgr._atoms[1].mark is None
+    assert new_lgs == {}
 
 
 def test_lg_process_reset_syncs_radical_state_to_atom_object():
