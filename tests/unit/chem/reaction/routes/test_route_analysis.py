@@ -124,6 +124,6 @@ def test_cluster_identity_accepts_missing_keys_and_attribute_records():
     class Cluster:
         sb_cgr = "A"
 
-    assert sb_cgr_identity_to_cluster_id(
-        {"missing": {}, "object": Cluster()}
-    ) == {"A": "object"}
+    assert sb_cgr_identity_to_cluster_id({"missing": {}, "object": Cluster()}) == {
+        "A": "object"
+    }

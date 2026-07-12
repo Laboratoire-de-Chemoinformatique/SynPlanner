@@ -151,9 +151,7 @@ def wide_cgr_renderer(container_cls=CGRContainer):
         yield
 
 
-def depict_route_cgr(
-    cgr: CGRContainer | Mapping[str, Any], *args, **kwargs
-) -> str:
+def depict_route_cgr(cgr: CGRContainer | Mapping[str, Any], *args, **kwargs) -> str:
     """Render a RouteCGR with SynPlanner's wider transient-bond style.
 
     Raw CGRs and historical {"cgr": ...}/typed result wrappers are accepted

@@ -15,6 +15,7 @@ def test_main_branch_leaving_groups_path_reexports_pseudo_atoms():
 
     assert LegacyDynamicX is CanonicalDynamicX
 
+
 def test_main_branch_visualisation_path_reexports_helpers():
     from synplan.chem.reaction.routes.visualisation import (
         WideBondDepictCGR as CanonicalWideBondDepictCGR,

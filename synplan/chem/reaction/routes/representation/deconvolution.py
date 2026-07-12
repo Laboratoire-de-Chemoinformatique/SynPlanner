@@ -69,9 +69,7 @@ def _step_cgr(route_cgr: CGRContainer, step: int) -> CGRContainer:
         order, p_order = step_bonds[(atom1, atom2)]
         if order is None and p_order is None:
             continue
-        _set_symmetric_bond(
-            step_cgr, atom1, atom2, RouteDynamicBond(order, p_order)
-        )
+        _set_symmetric_bond(step_cgr, atom1, atom2, RouteDynamicBond(order, p_order))
 
     step_cgr.flush_cache()
     return step_cgr

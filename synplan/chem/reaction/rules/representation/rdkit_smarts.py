@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 import re
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from chython import smarts
-
 
 _CXSMARTS_BLOCK_RE = re.compile(r"\s*\|([^|]*)\|")
 _RADICAL_CXSMARTS_FIELD_RE = re.compile(r"^\^\d+:[^,|]+$")
@@ -569,7 +568,7 @@ def _rdkit_sides_from_smarts(
     parts = reaction_smarts.split(">")
     if len(parts) != 3:
         errors.append("reaction SMARTS must contain exactly three '>'-separated sides")
-        parts = (parts + ["", "", ""])[:3]
+        parts = [*parts, "", "", ""][:3]
     side_names = ["reactants", "reagents", "products"]
     return [
         _parse_rdkit_side(text, side=side, errors=errors)
@@ -586,7 +585,7 @@ def _validate_rdkit_reaction_smarts(reaction_smarts: str, errors: list[str]) -> 
             errors.append("RDKit could not parse full reaction SMARTS")
         else:
             rdkit_reaction.Initialize()
-    except Exception as exc:  # noqa: BLE001 - diagnostic conversion result
+    except Exception as exc:
         errors.append(f"RDKit full reaction parse failed: {type(exc).__name__}: {exc}")
 
 
@@ -603,7 +602,7 @@ def chython_rule_smarts_to_rdkit_smarts(
     """
     try:
         reaction = smarts(rule_smarts)
-    except Exception as exc:  # noqa: BLE001 - diagnostic conversion result
+    except Exception as exc:
         return _result(
             rule_smarts,
             parse_status="chython_parse_failed",
@@ -691,12 +690,12 @@ def rdkit_rule_smarts_to_chython_smarts(
 
     try:
         reaction = smarts(normalized_rdkit_smarts)
-    except Exception as exc:  # noqa: BLE001 - diagnostic conversion result
+    except Exception as exc:
         return _chython_result(
             normalized_rdkit_smarts,
             rdkit_parse_status=rdkit_parse_status,
             chython_parse_status="chython_parse_failed",
-            errors=errors + [f"{type(exc).__name__}: {exc}"],
+            errors=[*errors, f"{type(exc).__name__}: {exc}"],
             strict=strict,
             expected_chython_smarts=expected_chython_smarts,
         )

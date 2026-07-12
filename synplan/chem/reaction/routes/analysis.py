@@ -45,8 +45,6 @@ def _cluster_sb_cgr(cluster: Any) -> Any:
     return getattr(cluster, "sb_cgr", None)
 
 
-
-
 def flatten_route_id_groups(route_id_groups: Mapping[Any, Iterable[int]]) -> list[int]:
     """Flatten a mapping of identity keys to route-id iterables."""
 

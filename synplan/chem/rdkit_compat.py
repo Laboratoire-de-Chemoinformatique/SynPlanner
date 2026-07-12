@@ -83,7 +83,6 @@ def route_to_rdkit(tree, node_id: int, keep_mapping: bool = True) -> list[dict]:
     """
     steps = []
     for before_node, after_node in iter_route_steps(tree, node_id):
-
         target_mol = before_node.curr_precursor.molecule.to_rdkit(
             keep_mapping=keep_mapping
         )
