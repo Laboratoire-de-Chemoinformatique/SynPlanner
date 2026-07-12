@@ -5,6 +5,7 @@ from collections.abc import Callable
 import pytest
 from chython.containers import MoleculeContainer
 
+from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.tree import Tree, TreeStats
 from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import load_evaluation_function
@@ -50,6 +51,11 @@ class FakePriorityReactor(FakeReactor):
         self._patterns = (_AlwaysMatches(),)
 
 
+class FixedEvaluationStrategy(EvaluationStrategy):
+    def _evaluate_node(self, node, node_id, nodes) -> float:
+        return 0.0
+
+
 class FakePolicy:
     def __init__(self, rules, expand_deeper=False):
         self.rules = rules
@@ -61,31 +67,44 @@ class FakePolicy:
         yield from self.rules
 
 
+class PreparingPolicy(FakePolicy):
+    def __init__(self, rules, expand_deeper=False):
+        super().__init__(rules, expand_deeper=expand_deeper)
+        self.prepared = []
+
+    def prepare_rule_associations(self, reaction_rules):
+        self.prepared.append(reaction_rules)
+
+
 def build_tree(algorithm="breadth_first", rules=None, **kwargs):
     if rules is None:
         rules = [(0.5, FakeReactor(lambda: [make_mol(5)]), 0)]
     expand_deeper = kwargs.pop("expand_deeper", False)
     max_iterations = kwargs.pop("max_iterations", 20)
     priority_rules = kwargs.pop("priority_rules", None)
+    evaluator = kwargs.pop("evaluator", None)
+    policy_cls = kwargs.pop("policy_cls", FakePolicy)
+    search_strategy = kwargs.pop("search_strategy", "expansion_first")
     cfg = TreeConfig(
         algorithm=algorithm,
         max_iterations=max_iterations,
         max_tree_size=200,
         max_time=10,
         max_depth=4,
-        search_strategy="expansion_first",
+        search_strategy=search_strategy,
         min_mol_size=6,
         silent=True,
         enable_pruning=False,
         **kwargs,
     )
     target = make_mol(7)
-    fake_policy = FakePolicy(rules, expand_deeper=expand_deeper)
+    fake_policy = policy_cls(rules, expand_deeper=expand_deeper)
     reactors = [r for _, r, _ in rules]
-    eval_config = RolloutEvaluationConfig(
-        policy_network=fake_policy, reaction_rules=reactors, building_blocks=set()
-    )
-    evaluator = load_evaluation_function(eval_config)
+    if evaluator is None:
+        eval_config = RolloutEvaluationConfig(
+            policy_network=fake_policy, reaction_rules=reactors, building_blocks=set()
+        )
+        evaluator = load_evaluation_function(eval_config)
     return Tree(
         target=target,
         config=cfg,
@@ -98,6 +117,16 @@ def build_tree(algorithm="breadth_first", rules=None, **kwargs):
 
 
 # -- Task 1: Stats dict exists --
+
+
+def test_tree_constructor_prepares_dynamic_expansion_policy_once():
+    tree = build_tree(
+        policy_cls=PreparingPolicy,
+        evaluator=FixedEvaluationStrategy(),
+    )
+
+    assert len(tree.expansion_function.prepared) == 1
+    assert tree.expansion_function.prepared[0] is tree.reaction_rules
 
 
 def test_stats_dict_exists_on_new_tree():
@@ -224,6 +253,27 @@ def test_winning_rule_ranks():
             assert step["rank"] >= 1
             assert step["rule_source"] == "policy"
             assert step["rule_key"] == f"policy:{step['rule_id']}"
+
+
+def test_iter_rules_returns_typed_candidates_in_priority_then_policy_order():
+    priority_rule = FakePriorityReactor(lambda: [make_mol(5)])
+    policy_rule = FakeReactor(lambda: [make_mol(10)])
+    tree = build_tree(
+        "breadth_first",
+        rules=[(0.7, policy_rule, 9)],
+        priority_rules={"priority": [priority_rule]},
+        use_priority=True,
+    )
+
+    candidates = list(tree._iter_rules(tree.nodes[1]))
+
+    assert [(candidate.probability, candidate.rule_id, candidate.rule_source,
+              candidate.policy_rank) for candidate in candidates] == [
+        (1.0, 0, "priority", None),
+        (0.7, 9, "policy", 1),
+    ]
+    assert candidates[0].rule is priority_rule
+    assert candidates[1].rule is policy_rule
 
 
 def test_priority_rule_metadata_and_counters():

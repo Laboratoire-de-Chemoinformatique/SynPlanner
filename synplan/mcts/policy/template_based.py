@@ -188,6 +188,8 @@ class MHNReactPolicy(TemplateBasedPolicy):
         self._rule_representation_digest: str | None = None
         self._rule_associations: torch.Tensor | None = None
         self._rule_association_cache: OrderedDict[str, torch.Tensor] = OrderedDict()
+        self._bound_reaction_rules: Sequence[CanonicalRetroReactor] | None = None
+        self._bound_reaction_rules_len: int | None = None
 
     @property
     def n_rules(self) -> int:
@@ -200,10 +202,19 @@ class MHNReactPolicy(TemplateBasedPolicy):
         self, reaction_rules: Sequence[CanonicalRetroReactor]
     ) -> None:
         """Encode a runtime rule set once for MHN ranking prediction."""
+        if (
+            self._rule_associations is not None
+            and self._bound_reaction_rules is reaction_rules
+            and self._bound_reaction_rules_len == len(reaction_rules)
+        ):
+            return
+
         rule_smarts = rule_smarts_from_reactors(reaction_rules)
         representation_config = self.policy_net.rule_representation_config
         digest = rule_representation_digest(rule_smarts, representation_config)
         if self._rule_representation_digest == digest:
+            self._bound_reaction_rules = reaction_rules
+            self._bound_reaction_rules_len = len(reaction_rules)
             return
 
         associations = self._rule_association_cache.get(digest)
@@ -229,6 +240,8 @@ class MHNReactPolicy(TemplateBasedPolicy):
             self._rule_association_cache.move_to_end(digest)
         self._rule_associations = associations
         self._rule_representation_digest = digest
+        self._bound_reaction_rules = reaction_rules
+        self._bound_reaction_rules_len = len(reaction_rules)
 
     def get_logits(self, precursor: Precursor) -> torch.Tensor | None:
         """Return MHN logits for the currently prepared rule associations."""

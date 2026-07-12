@@ -1,10 +1,9 @@
 """Module containing a class Tree that used for tree search of retrosynthetic routes."""
 
-import itertools
 import logging
-import os
 import pickle
 from dataclasses import dataclass, field, fields
+from os import PathLike
 from time import time
 
 from chython.containers import MoleculeContainer
@@ -13,6 +12,11 @@ from tqdm.auto import tqdm
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
 from synplan.chem.reaction.routes.quality.scorer import RouteScorer
+from synplan.chem.reaction.routes.traversal import (
+    iter_route_nodes,
+    iter_route_steps,
+    route_node_ids,
+)
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
 from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.node import Node
@@ -79,6 +83,27 @@ class TreeStats:
                 f"Use tree.stats.{key} instead of tree.stats[{key!r}]."
             )
         raise KeyError(key)
+
+
+@dataclass(slots=True)
+class _ExpansionContext:
+    """State shared by all candidate rules during one node expansion."""
+
+    node_id: int
+    parent: Node
+    previous_precursors: list[Precursor]
+    seen_products: set
+
+
+@dataclass(frozen=True, slots=True)
+class _RuleCandidate:
+    """Reaction rule and provenance yielded by :meth:`Tree._iter_rules`."""
+
+    probability: float
+    rule: CanonicalRetroReactor
+    rule_id: int
+    rule_source: str
+    policy_rank: int | None
 
 
 _REMOVED_NODE_ATTRS: dict[str, tuple[str, str]] = {
@@ -162,6 +187,11 @@ class Tree:
         assert expansion_function is not None, "Expansion function is required"
         # Node expansion is driven through the Policy seam.
         self.expansion_function: Policy = expansion_function
+        prepare_rules = getattr(
+            self.expansion_function, "prepare_rule_associations", None
+        )
+        if prepare_rules is not None:
+            prepare_rules(self.reaction_rules)
 
         assert evaluation_function is not None, "Evaluation function is required"
         self.evaluator = evaluation_function
@@ -225,6 +255,13 @@ class Tree:
             f"search_strategy={config.search_strategy}, "
             f"normalize_scores={config.normalize_scores}, "
         )
+
+    def save_pickle(self, file_path: str | PathLike[str]) -> None:
+        """Save this tree directly as a pickle after disabling tqdm."""
+
+        self._tqdm = None
+        with open(file_path, "wb") as file:
+            pickle.dump(self, file)
 
     def __len__(self) -> int:
         """Returns the current size (the number of nodes) in the tree."""
@@ -304,47 +341,39 @@ class Tree:
         :param node_id: The id of the node to be expanded.
         :return: None.
         """
-        total_expanded = 0
         curr_node = self.nodes[node_id]
         prev_precursor = curr_node.curr_precursor.prev_precursors
 
         # Track raw product molecules to avoid repeating equivalent expansions
         tmp_products = set()
+        context = _ExpansionContext(
+            node_id=node_id,
+            parent=curr_node,
+            previous_precursors=prev_precursor,
+            seen_products=tmp_products,
+        )
         expanded = False
-        for prob, rule, rule_id, rule_source, policy_rank in self._iter_rules(
-            curr_node
-        ):
-            self._increment_rule_stats(rule_source, tried=1)
+        for candidate in self._iter_rules(curr_node):
+            self._increment_rule_stats(candidate.rule_source, tried=1)
             rule_produced = False
             # Multi-application fires for any priority source (every source
             # other than "policy"); the configured boolean is a global switch.
             enable_multirule = bool(
-                rule_source != POLICY_SOURCE_NAME
+                candidate.rule_source != POLICY_SOURCE_NAME
                 and self.config.priority_rule_multiapplication
             )
             for products in apply_reaction_rule(
                 curr_node.curr_precursor.molecule,
-                rule,
+                candidate.rule,
                 multirule=enable_multirule,
                 rm_dup=enable_multirule,
             ):
-                if self._add_child_if_new(
-                    node_id=node_id,
-                    curr_node=curr_node,
-                    prev_precursor=prev_precursor,
-                    products=products,
-                    prob=prob,
-                    rule_id=rule_id,
-                    policy_rank=policy_rank,
-                    tmp_products=tmp_products,
-                    rule_source=rule_source,
-                ):
+                if self._add_child_if_new(context, products, candidate):
                     rule_produced = True
-                    total_expanded += 1
                     expanded = True
 
             if rule_produced:
-                self._increment_rule_stats(rule_source, succeeded=1)
+                self._increment_rule_stats(candidate.rule_source, succeeded=1)
 
         # update statistics
         self.stats.expansion_calls += 1
@@ -376,7 +405,13 @@ class Tree:
             for source_name, policy in self._priority_policies.items():
                 for rule_id, rule in enumerate(policy.priority_rules):
                     if policy._rule_applies(rule, curr_node.curr_precursor):
-                        yield 1.0, rule, rule_id, source_name, None
+                        yield _RuleCandidate(
+                            probability=1.0,
+                            rule=rule,
+                            rule_id=rule_id,
+                            rule_source=source_name,
+                            policy_rank=None,
+                        )
 
         policy_top_rules = self._get_policy_top_rules_limit()
         for policy_rank, (prob, rule, rule_id) in enumerate(
@@ -387,7 +422,13 @@ class Tree:
         ):
             if policy_top_rules is not None and policy_rank > policy_top_rules:
                 break
-            yield prob, rule, rule_id, POLICY_SOURCE_NAME, policy_rank
+            yield _RuleCandidate(
+                probability=prob,
+                rule=rule,
+                rule_id=rule_id,
+                rule_source=POLICY_SOURCE_NAME,
+                policy_rank=policy_rank,
+            )
 
     def _get_policy_top_rules_limit(self) -> int | None:
         """Return the configured policy Top-N limit when exposed by the policy."""
@@ -399,17 +440,20 @@ class Tree:
 
     def _add_child_if_new(
         self,
-        node_id: int,
-        curr_node: Node,
-        prev_precursor,
+        context: _ExpansionContext,
         products,
-        prob: float,
-        rule_id: int,
-        policy_rank: int | None,
-        tmp_products: set,
-        rule_source: str,
+        candidate: _RuleCandidate,
     ) -> bool:
         """Add a child node if the generated products form a new valid state."""
+
+        node_id = context.node_id
+        curr_node = context.parent
+        prev_precursor = context.previous_precursors
+        tmp_products = context.seen_products
+        prob = candidate.probability
+        rule_id = candidate.rule_id
+        policy_rank = candidate.policy_rank
+        rule_source = candidate.rule_source
 
         if not products or not (set(products) - tmp_products):
             return False
@@ -645,12 +689,9 @@ class Tree:
         :return: The route score.
         """
 
-        cumulated_nodes_value, route_length = 0, 0
-        nid = node_id
-        while nid:
-            route_length += 1
-            cumulated_nodes_value += self.nodes[nid].total_value
-            nid = self.parents[nid]
+        route_nodes = tuple(iter_route_nodes(self, node_id))
+        route_length = len(route_nodes)
+        cumulated_nodes_value = sum(node.total_value for node in route_nodes)
 
         original = cumulated_nodes_value / (route_length**2)
 
@@ -670,11 +711,7 @@ class Tree:
         :return: The list of nodes.
         """
 
-        nodes = []
-        while node_id:
-            nodes.append(node_id)
-            node_id = self.parents[node_id]
-        return [self.nodes[node_id] for node_id in reversed(nodes)]
+        return list(iter_route_nodes(self, node_id))
 
     def synthesis_route(self, node_id: int) -> tuple[Reaction,]:
         """Given a node_id, return a tuple of reactions that represent the
@@ -684,14 +721,12 @@ class Tree:
         :return: The tuple of extracted reactions representing the synthesis route.
         """
 
-        nodes = self.route_to_node(node_id)
-
         reaction_sequence = [
             Reaction(
                 [x.molecule for x in after.new_precursors],
                 [before.curr_precursor.molecule],
             )
-            for before, after in itertools.pairwise(nodes)
+            for before, after in iter_route_steps(self, node_id)
         ]
 
         for r in reaction_sequence:
@@ -844,14 +879,13 @@ class Tree:
         :param node_id: The id of the terminal (winning) node.
         :return: Dict with route_score, route_length, and per-step details.
         """
+        route_ids = route_node_ids(self.parents, node_id)
         steps = []
-        nid = node_id
-        while nid and nid != 1:
-            parent_id = self.parents[nid]
-            node = self.nodes[nid]
+        for route_node_id in route_ids[1:]:
+            node = self.nodes[route_node_id]
             steps.append(
                 {
-                    "node_id": nid,
+                    "node_id": route_node_id,
                     "depth": node.depth,
                     "rule_id": node.rule_id,
                     "rule_source": node.rule_source,
@@ -865,13 +899,12 @@ class Tree:
                     "n_precursors": len(node.new_precursors),
                 }
             )
-            nid = parent_id
 
         return {
             "node_id": node_id,
             "route_score": round(self.route_score(node_id), 6),
             "route_length": len(steps),
-            "steps": list(reversed(steps)),
+            "steps": steps,
         }
 
     def to_stats_dict(self) -> dict:
@@ -972,93 +1005,3 @@ class Tree:
                 f"See the {version} CHANGELOG entry."
             )
         raise AttributeError(f"'Tree' object has no attribute {name!r}")
-
-
-def export_tree_to_json(tree: "Tree", file_path: str, route_id=None):
-    """Export a retrosynthetic search tree directly to a JSON file."""
-    from synplan.chem.reaction.routes.io import write_routes_json
-    from synplan.chem.reaction.routes.representation import extract_reactions
-
-    routes_dict = extract_reactions(tree, route_id)
-    if routes_dict is None:
-        raise ValueError("Failed to extract reactions for the specified route_id.")
-    write_routes_json(routes_dict, file_path, tree=tree)
-
-
-def export_tree_to_csv(tree: "Tree", file_path: str = "routes.csv", route_id=None):
-    """Export a retrosynthetic search tree directly to a CSV file."""
-    from synplan.chem.reaction.routes.io import write_routes_csv
-    from synplan.chem.reaction.routes.representation import extract_reactions
-
-    routes_dict = extract_reactions(tree, route_id)
-    if routes_dict is None:
-        raise ValueError("Failed to extract reactions for the specified route_id.")
-    write_routes_csv(routes_dict, file_path)
-
-
-class TreeWrapper:
-    """Pickle wrapper that saves/loads a search :class:`Tree` to/from disk."""
-
-    def __init__(self, tree, mol_id=1, config=1, path="planning_results/forest"):
-        """Initializes the TreeWrapper."""
-        self.tree = tree
-        self.mol_id = mol_id
-        self.config = config
-        self.path = path
-        os.makedirs(self.path, exist_ok=True)
-        self.filename = os.path.join(self.path, f"tree_{mol_id}_{config}.pkl")
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        tree_state = self.tree.__dict__.copy()
-        # Reset non-pickleable attributes (_tqdm, policy_network, value_network).
-        if "_tqdm" in tree_state:
-            tree_state["_tqdm"] = True
-        for attr in ["policy_network", "value_network"]:
-            if attr in tree_state:
-                tree_state[attr] = None
-        state["tree_state"] = tree_state
-        del state["tree"]
-        return state
-
-    def __setstate__(self, state):
-        tree_state = state.pop("tree_state")
-        self.__dict__.update(state)
-        new_tree = Tree.__new__(Tree)
-        new_tree.__dict__.update(tree_state)
-        self.tree = new_tree
-
-    def save_tree(self):
-        """Saves the TreeWrapper instance (including the tree state) to a file."""
-        try:
-            with open(self.filename, "wb") as f:
-                pickle.dump(self, f)
-            print(
-                f"Tree wrapper for mol_id '{self.mol_id}', config '{self.config}' saved to '{self.filename}'."
-            )
-        except Exception as e:
-            print(f"Error saving tree to {self.filename}: {e}")
-
-    @classmethod
-    def load_tree_from_id(cls, mol_id, config=1, path="planning_results/forest"):
-        """Loads a Tree object from a saved file using mol_id and config."""
-        filename = os.path.join(path, f"tree_{mol_id}_{config}.pkl")
-        print(f"Attempting to load tree from: {filename}")
-        try:
-            with open(filename, "rb") as f:
-                loaded_wrapper = pickle.load(f)  # implicitly calls __setstate__
-            print(
-                f"Tree object for mol_id '{mol_id}', config '{config}' successfully loaded from '{filename}'."
-            )
-            return loaded_wrapper.tree
-        except FileNotFoundError:
-            print(f"Error: File not found at {filename}")
-            return None
-        except (pickle.UnpicklingError, EOFError) as e:
-            print(
-                f"Error: Could not unpickle file {filename}. It might be corrupted or empty. Details: {e}"
-            )
-            return None
-        except Exception as e:
-            print(f"An unexpected error occurred loading tree from {filename}: {e}")
-            return None

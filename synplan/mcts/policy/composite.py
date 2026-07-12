@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 import torch
 
 from synplan.mcts.policy.base import Policy
-from synplan.mcts.policy.template_based import MHNReactPolicy
 
 if TYPE_CHECKING:
     from synplan.chem.precursor import Precursor
@@ -68,6 +67,14 @@ class CompositePolicy(Policy):
                 "same set of reaction rules."
             )
 
+    def prepare_rule_associations(
+        self, reaction_rules: Sequence[CanonicalRetroReactor]
+    ) -> None:
+        """Prepare dynamic ranking-side rule associations when needed."""
+        prepare_rules = getattr(self.ranking_policy, "prepare_rule_associations", None)
+        if prepare_rules is not None:
+            prepare_rules(reaction_rules)
+
     def _get_combined_probs(self, precursor: Precursor) -> torch.Tensor | None:
         """Weighted-logit softmax merge of the two policies, or ``None``."""
         filtering_logits = self.filtering_policy.get_logits(precursor)
@@ -96,8 +103,7 @@ class CompositePolicy(Policy):
         reaction_rules: Sequence[CanonicalRetroReactor],
     ) -> Iterator[tuple[float, CanonicalRetroReactor, int]]:
         """Merge the two policies and yield ranked rules above the threshold."""
-        if isinstance(self.ranking_policy, MHNReactPolicy):
-            self.ranking_policy.prepare_rule_associations(reaction_rules)
+        self.prepare_rule_associations(reaction_rules)
         result = self._predict_rules_common(precursor, len(reaction_rules))
         if result is None:
             return
