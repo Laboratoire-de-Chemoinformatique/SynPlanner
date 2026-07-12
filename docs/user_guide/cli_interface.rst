@@ -20,6 +20,28 @@ Download a ready-to-use data preset from HuggingFace with all components needed 
     - ``preset`` - preset name (default: ``synplanner-gps``).
     - ``save_to`` - the directory where downloaded data will be stored.
 
+Protection source-data conversion
+---------------------------------
+Convert the Westerlund protection-strategy source dataset into the YAML and
+TSV files consumed by SynPlanner's protection configuration. The source
+directory must contain ``protection_reactive_function_SMARTS.txt``,
+``halogen_reactive_function_SMARTS.txt``, and
+``protection_SMARTS_incompatibility.csv``. Supporting template and label
+mapping files are copied when present.
+
+Use an explicit output directory so generated files are written to a known
+location:
+
+.. code-block:: bash
+
+    synplan-convert-protection-data /path/to/protection-source \
+        --output-dir synplan_data/protection
+
+The command writes ``competing_groups.yaml``, ``halogen_groups.yaml``, and
+``incompatibility_matrix.tsv``, together with any supporting files copied from
+the source directory. Without ``--output-dir``, output is written relative to
+the installed converter script.
+
 ORD conversion
 ---------------------------
 ORD ``.pb`` datasets can be converted to SynPlanner-compatible reaction SMILES:

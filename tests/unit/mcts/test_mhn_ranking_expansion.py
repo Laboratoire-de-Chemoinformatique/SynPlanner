@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 import torch
+from torch import nn
 
 import synplan.mcts.policy.template_based as template_based
 from synplan.chem.reaction.rules.representation import (
@@ -30,7 +31,7 @@ class _Rule:
         return self.text
 
 
-class _MHNPolicy(torch.nn.Module):
+class _MHNPolicy(nn.Module):
     architecture = "mhn_ranking"
     policy_type = "ranking"
     n_rules = 2
@@ -90,7 +91,7 @@ class _MHNRDKitPolicy(_MHNPolicy):
     )
 
 
-class _LinearPolicy(torch.nn.Module):
+class _LinearPolicy(nn.Module):
     architecture = "linear"
     policy_type = "filtering"
     n_rules = 2
