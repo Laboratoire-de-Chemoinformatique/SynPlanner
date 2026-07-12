@@ -83,8 +83,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Removed
 
 - Removed deprecated route compatibility namespaces: `synplan.routes`,
-  `synplan.routes.quality`, `synplan.route_quality`, and
-  `synplan.chem.reaction_routes`.
+  `synplan.routes.quality`, and `synplan.route_quality`.
+- Retained `synplan.chem.reaction_routes` as a deprecated forwarding namespace
+  for the historical `main`-branch route module paths.
 - Removed the old flat `synplan.mcts.expansion` and `synplan.ml.networks.policy`
   modules in favor of the new policy/network package layout.
 

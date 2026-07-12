@@ -20,11 +20,13 @@ Route post-processing moved to ``synplan.chem.reaction.routes``
 
 Route-level post-processing now lives in ``synplan.chem.reaction.routes``. This includes
 RouteCGR construction and hashing, route IO, route clustering, route analysis,
-depiction, notebook plotting helpers, and route-quality scoring.
+depiction, route-quality scoring, and related route analysis helpers. Notebook plotting helpers now live in ``synplan.chem.reaction.routes.notebook_plots``.
 
-The interim ``synplan.routes`` package and the older ``synplan.chem.reaction_routes``
-and ``synplan.route_quality`` compatibility namespaces were removed. Update imports
-to the canonical paths below.
+The interim ``synplan.routes`` package and the older ``synplan.route_quality``
+compatibility namespace were removed. The ``synplan.chem.reaction_routes`` namespace
+remains as a deprecated compatibility layer for the ``main``-branch module paths
+``io``, ``route_cgr``, ``clustering``, ``leaving_groups``, and ``visualisation``.
+New code should use the canonical paths below.
 
 .. list-table::
    :header-rows: 1
@@ -37,7 +39,7 @@ to the canonical paths below.
    * - ``synplan.routes.clustering``
      - ``synplan.chem.reaction.routes.clustering``
    * - ``synplan.routes.depiction``
-     - ``synplan.chem.reaction.routes.visualisation``
+     - ``synplan.chem.reaction.routes.representation.depiction``
    * - ``synplan.routes.io``
      - ``synplan.chem.reaction.routes.io``
    * - ``synplan.routes.notebook_plots``
@@ -52,8 +54,16 @@ to the canonical paths below.
      - ``synplan.chem.reaction.routes.quality.protection``
    * - ``synplan.route_quality``
      - ``synplan.chem.reaction.routes.quality``
-   * - ``synplan.chem.reaction_routes``
-     - ``synplan.chem.reaction.routes``
+
+Tree persistence and route exports
+----------------------------------
+
+``TreeWrapper`` was removed. Save a tree directly with
+``tree.save_pickle(path)`` and load it with ``pickle.load()``; the saved tree
+has ``_tqdm`` disabled. Route JSON and CSV exports now live in
+``synplan.chem.reaction.routes.io``. Update imports from
+``synplan.mcts.tree.export_tree_to_json`` and
+``synplan.mcts.tree.export_tree_to_csv`` to the canonical route-I/O module.
 
 1.5.0
 =====
