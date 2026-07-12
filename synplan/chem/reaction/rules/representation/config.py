@@ -35,11 +35,11 @@ RULE_GRAPH_NODE_FEATURE_DIM = _BASE_NODE_FEATURE_DIM + (
 )
 RULE_GRAPH_EDGE_FEATURE_DIM = 16
 
-RuleFingerprintType = Literal["legacy", "query_cgr"]
+RuleFingerprintType = Literal["legacy", "mhnreact_rdkit", "query_cgr"]
 RuleEmbeddingType = Literal["fingerprint", "query_cgr_graph"]
 RuleGraphEmbedderType = Literal["gcn", "gcn_concat", "gps"]
 
-_RULE_FINGERPRINT_TYPES = {"legacy", "query_cgr"}
+_RULE_FINGERPRINT_TYPES = {"legacy", "mhnreact_rdkit", "query_cgr"}
 _RULE_EMBEDDING_TYPES = {"fingerprint", "query_cgr_graph"}
 _RULE_GRAPH_EMBEDDER_TYPES = {"gcn", "gcn_concat", "gps"}
 
