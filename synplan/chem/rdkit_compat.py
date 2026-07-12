@@ -7,16 +7,12 @@ output (route molecules) without working with chython directly.
 Requires rdkit to be installed.
 """
 
-import itertools
-import logging
 from collections.abc import Iterable
 
 from chython.containers import MoleculeContainer
-from chython.exceptions import InvalidAromaticRing
 
-from synplan.chem.utils import safe_canonicalization
-
-logger = logging.getLogger(__name__)
+from synplan.chem.reaction.routes.traversal import iter_route_steps
+from synplan.chem.utils import _clean_molecule, safe_canonicalization
 
 
 def target_from_rdkit(
@@ -38,21 +34,12 @@ def target_from_rdkit(
     :return: A standardized MoleculeContainer ready for Tree search.
     """
     molecule = MoleculeContainer.from_rdkit(rdkit_mol)
-    tmp = molecule.copy()
-    try:
-        tmp.remove_coordinate_bonds(keep_to_terminal=False)
-        if standardize:
-            tmp.canonicalize()
-        if clean_stereo:
-            tmp.clean_stereo()
-        if clean2d:
-            tmp.clean2d()
-        molecule = tmp
-    except InvalidAromaticRing:
-        logging.warning(
-            "chython was not able to standardize molecule due to invalid aromatic ring"
-        )
-    return molecule
+    return _clean_molecule(
+        molecule,
+        standardize=standardize,
+        clean_stereo=clean_stereo,
+        clean2d=clean2d,
+    )
 
 
 def building_blocks_from_rdkit(rdkit_mols: Iterable) -> frozenset[str]:
@@ -94,18 +81,8 @@ def route_to_rdkit(tree, node_id: int, keep_mapping: bool = True) -> list[dict]:
         to build atom-mapped RDKit ChemicalReaction objects from the molecules.
     :return: List of step dicts ordered from target to building blocks.
     """
-    # collect node IDs along the path (root → winning node)
-    path_ids: list[int] = []
-    nid = node_id
-    while nid:
-        path_ids.append(nid)
-        nid = tree.parents[nid]
-    path_ids.reverse()
-
     steps = []
-    for before_id, after_id in itertools.pairwise(path_ids):
-        before_node = tree.nodes[before_id]
-        after_node = tree.nodes[after_id]
+    for before_node, after_node in iter_route_steps(tree, node_id):
 
         target_mol = before_node.curr_precursor.molecule.to_rdkit(
             keep_mapping=keep_mapping
@@ -180,16 +157,8 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
         graph: dict[MoleculeContainer, dict[str, object]] = {}
         mol_cache: dict[int, object] = {}  # id(MoleculeContainer) → RDKit Mol
 
-        path_ids: list[int] = []
-        nid = winning_node
-        while nid:
-            path_ids.append(nid)
-            nid = tree.parents[nid]
-        path_ids.reverse()
-
-        for before_id, after_id in itertools.pairwise(path_ids):
-            before_mol = tree.nodes[before_id].curr_precursor.molecule
-            after_node = tree.nodes[after_id]
+        for before_node, after_node in iter_route_steps(tree, winning_node):
+            before_mol = before_node.curr_precursor.molecule
             after_mols = [x.molecule for x in after_node.new_precursors]
             graph[before_mol] = {
                 "children": after_mols,

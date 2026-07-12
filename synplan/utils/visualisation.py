@@ -6,7 +6,7 @@ import base64
 import contextlib
 from collections import deque
 from datetime import datetime
-from itertools import count, islice, pairwise
+from itertools import count, islice
 from typing import TYPE_CHECKING, Any
 
 from chython import depict_settings
@@ -16,10 +16,11 @@ from chython.containers.molecule import MoleculeContainer
 from IPython.display import HTML, display
 
 from synplan.chem.reaction.routes.io import make_dict
-from synplan.chem.reaction.routes.visualisation import (
+from synplan.chem.reaction.routes.representation.depiction import (
     cgr_display,
     depict_custom_reaction,
 )
+from synplan.chem.reaction.routes.traversal import iter_route_steps
 
 if TYPE_CHECKING:
     from synplan.mcts.tree import Tree
@@ -95,16 +96,9 @@ def extract_routes(
         for winning_node in winning_nodes:
             # Create graph for route
             graph = {}
-            path_ids = []
-            nid = winning_node
-            while nid:
-                path_ids.append(nid)
-                nid = tree.parents[nid]
-            path_ids.reverse()
 
-            for before_id, after_id in pairwise(path_ids):
-                before = tree.nodes[before_id].curr_precursor.molecule
-                after_node = tree.nodes[after_id]
+            for before_node, after_node in iter_route_steps(tree, winning_node):
+                before = before_node.curr_precursor.molecule
                 graph[before] = {
                     "children": [
                         precursor.molecule for precursor in after_node.new_precursors
