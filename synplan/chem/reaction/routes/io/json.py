@@ -1,10 +1,21 @@
-import csv
 import json
 import logging
 from typing import TYPE_CHECKING, Any
 
 from chython import smiles as read_smiles
 from chython.exceptions import InvalidAromaticRing
+
+from synplan.chem.reaction.routes.contracts import (
+    RouteDiagnostic,
+    RouteExportError,
+    RouteExportResult,
+)
+from synplan.chem.reaction.routes.io.metadata import (
+    reaction_metadata as _reaction_metadata,
+)
+from synplan.chem.reaction.routes.io.metadata import (
+    restore_reaction_metadata as _restore_reaction_metadata,
+)
 
 if TYPE_CHECKING:
     from synplan.mcts.tree import Tree
@@ -77,7 +88,9 @@ def _collect_reactions(tree):
         for child in node.get("children", []) or []:
             recurse(child)
         if node.get("type") == "reaction":
-            rxn_list.append(read_smiles(node["smiles"]))
+            reaction = read_smiles(node["smiles"])
+            _restore_reaction_metadata(reaction, node.get("meta"))
+            rxn_list.append(reaction)
 
     recurse(tree)
     return {i: rxn for i, rxn in enumerate(rxn_list)}
@@ -116,28 +129,7 @@ def read_routes_json(file_path="routes.json", to_dict=False):
     return routes_json
 
 
-def read_routes_csv(file_path="routes.csv"):
-    """Read route reactions from a CSV file.
-
-    The input CSV is expected to contain ``route_id``, ``step_id``, ``smiles``,
-    and ``meta`` columns. The ``meta`` value is currently ignored.
-
-    Returns a nested dictionary: ``route_id -> step_id -> ReactionContainer``.
-    """
-    routes_dict = {}
-    with open(file_path, newline="") as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            route_id = int(row["route_id"])
-            step_id = int(row["step_id"])
-            smiles = row["smiles"]
-            # adjust this constructor to your actual API
-            reaction = read_smiles(smiles)
-            routes_dict.setdefault(route_id, {})[step_id] = reaction
-    return routes_dict
-
-
-def make_json(
+def _make_json_v1(
     routes_dict,
     keep_ids=True,
     tree: "Tree | None" = None,
@@ -148,7 +140,7 @@ def make_json(
 
     Args:
         routes_dict (dict[int, dict[int, Reaction]]): Mapping route IDs to steps (step_id -> Reaction).
-        keep_ids (bool): If True, returns a list of route trees; otherwise returns a dict mapping route IDs to trees.
+        keep_ids (bool): If True, returns a dict mapping route IDs to trees; otherwise returns a list.
         tree (Tree | None): Optional source tree used to attach rule metadata to
             reaction nodes.
         route_metadata (dict | None): Optional per-route metadata mapping
@@ -230,6 +222,9 @@ def make_json(
             """Build reaction node and recurse into reactant molecule nodes."""
             rxn = _steps[sid]
             node = {"type": "reaction", "smiles": format(rxn, "m"), "children": []}
+            reaction_metadata = _reaction_metadata(rxn)
+            if reaction_metadata:
+                node["meta"] = reaction_metadata
             if _route_step_metadata and sid in _route_step_metadata:
                 node.update(_route_step_metadata[sid])
 
@@ -265,85 +260,85 @@ def make_json(
     return all_routes
 
 
+def build_route_trees(
+    routes_dict,
+    keep_ids: bool = True,
+    tree: "Tree | None" = None,
+    route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
+    *,
+    strict: bool = False,
+) -> RouteExportResult:
+    """Build v1 route trees with explicit diagnostics for skipped routes."""
+
+    route_trees = _make_json_v1(
+        routes_dict,
+        keep_ids=True,
+        tree=tree,
+        route_metadata=route_metadata,
+    )
+    diagnostics = tuple(
+        RouteDiagnostic(
+            route_id=route_id,
+            stage="route_tree_export",
+            message="Route could not be represented as a valid v1 route tree",
+        )
+        for route_id, steps in routes_dict.items()
+        if steps and int(route_id) not in route_trees
+    )
+    if strict and diagnostics:
+        raise RouteExportError(diagnostics)
+    routes = route_trees if keep_ids else list(route_trees.values())
+    return RouteExportResult(routes=routes, diagnostics=diagnostics)
+
+
+def make_json(
+    routes_dict,
+    keep_ids: bool = True,
+    tree: "Tree | None" = None,
+    route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
+    *,
+    strict: bool = False,
+):
+    """Convert routes into v1 JSON trees.
+
+    ``keep_ids=True`` returns a route-id mapping; ``False`` returns a list.
+    Use :func:`build_route_trees` when callers need skipped-route diagnostics.
+    """
+
+    return build_route_trees(
+        routes_dict,
+        keep_ids=keep_ids,
+        tree=tree,
+        route_metadata=route_metadata,
+        strict=strict,
+    ).routes
+
+
 def write_routes_json(
     routes_dict,
     file_path,
     tree: "Tree | None" = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
-):
-    """Serialize reaction routes to a JSON file."""
-    routes_json = make_json(
+    *,
+    strict: bool = False,
+) -> RouteExportResult:
+    """Serialize v1 route trees and return export diagnostics."""
+
+    result = build_route_trees(
         routes_dict,
         tree=tree,
         route_metadata=route_metadata,
+        strict=strict,
     )
     with open(file_path, "w") as f:
-        json.dump(routes_json, f, indent=2)
-
-
-def write_routes_csv(routes_dict, file_path="routes.csv"):
-    """Write route reactions to a CSV file.
-
-    ``routes_dict`` is a nested ``route_id -> step_id -> reaction`` mapping. The
-    output file contains ``route_id``, ``step_id``, ``smiles``, and ``meta``
-    columns; ``smiles`` is written with ``format(reaction, "m")`` and ``meta``
-    is left blank.
-    """
-    with open(file_path, "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        # header row
-        writer.writerow(["route_id", "step_id", "smiles", "meta"])
-        # sort routes and steps for deterministic output
-        for route_id in sorted(routes_dict):
-            steps = routes_dict[route_id]
-            for step_id in sorted(steps):
-                reaction = steps[step_id]
-                smiles = format(reaction, "m")
-                meta = ""  # or reaction.meta if you add that later
-                writer.writerow([route_id, step_id, smiles, meta])
-
-
-def export_tree_to_json(tree: "Tree", file_path: str, route_id=None):
-    """
-    Export a retrosynthetic search tree directly to a JSON file.
-
-    Args:
-        tree: synplan.mcts.tree.Tree instance.
-        file_path: Output JSON path.
-        route_id: If provided, export only this specific route (node id).
-    """
-    from synplan.chem.reaction.routes.representation import extract_reactions
-
-    routes_dict = extract_reactions(tree, route_id)
-    if routes_dict is None:
-        raise ValueError("Failed to extract reactions for the specified route_id.")
-    write_routes_json(routes_dict, file_path, tree=tree)
-
-
-def export_tree_to_csv(tree: "Tree", file_path: str = "routes.csv", route_id=None):
-    """
-    Export a retrosynthetic search tree directly to a CSV file.
-
-    Args:
-        tree: synplan.mcts.tree.Tree instance.
-        file_path: Output CSV path.
-        route_id: If provided, export only this specific route (node id).
-    """
-    from synplan.chem.reaction.routes.representation import extract_reactions
-
-    routes_dict = extract_reactions(tree, route_id)
-    if routes_dict is None:
-        raise ValueError("Failed to extract reactions for the specified route_id.")
-    write_routes_csv(routes_dict, file_path)
+        json.dump(result.routes, f, indent=2)
+    return result
 
 
 __all__ = [
-    "export_tree_to_csv",
-    "export_tree_to_json",
+    "build_route_trees",
     "make_dict",
     "make_json",
-    "read_routes_csv",
     "read_routes_json",
-    "write_routes_csv",
     "write_routes_json",
 ]

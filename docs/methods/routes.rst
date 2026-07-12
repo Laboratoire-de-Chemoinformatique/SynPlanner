@@ -38,3 +38,16 @@ a developer check. It composes winning routes with ``preserve_transient_bonds``
 enabled and verifies side-wise atom-map preservation for the reconstructed
 reaction steps. Generated benchmark data and round-trip result folders are
 local artifacts and should not be committed.
+
+
+Typed Route APIs
+----------------
+
+``build_route_cgr()`` is the typed counterpart to ``compose_route_cgr()``. It
+returns a ``RouteCGRBuildResult`` with either the RouteCGR or a diagnostic; the
+older mapping-or-``None`` API remains available for compatibility.
+
+For route serialization, ``build_route_trees()`` returns a ``RouteExportResult``
+with all skipped-route diagnostics. ``make_json()`` retains the existing v1
+dict/list output, while ``strict=True`` on ``build_route_trees()`` or
+``write_routes_json()`` raises before writing an incomplete export.

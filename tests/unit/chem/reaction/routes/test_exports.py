@@ -1,7 +1,7 @@
 from chython.containers import ReactionContainer
 
 from synplan.chem.reaction.routes.clustering import cluster_routes
-from synplan.chem.reaction.routes.leaving_groups import DynamicX
+from synplan.chem.reaction.routes.clustering.pseudo_atoms import DynamicX
 from synplan.chem.reaction.routes.quality import ProtectionConfig, RouteScorer
 from synplan.chem.reaction.routes.quality.protection.functional_groups import (
     FunctionalGroupDetector,
