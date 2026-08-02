@@ -1190,6 +1190,7 @@ def group_lg_table_2_html_fixed(
     groups_to_display=None,
     if_display=False,
     max_group_col_width: int = 200,
+    mark_prefix: str = "X",
 ) -> str:
     """
     Generates an HTML table visualizing leaving groups X 'marks' for representative routes in grouped data.
@@ -1239,7 +1240,7 @@ def group_lg_table_2_html_fixed(
     ]
     # numeric headers
     html += [
-        f"<th style='border:1px solid #ccc; padding:4px; text-align:center;'>X<small>{mark}</small></th>"
+        f"<th style='border:1px solid #ccc; padding:4px; text-align:center;'>{mark_prefix}<small>{mark}</small></th>"
         for mark in all_marks
     ]
     html.append("</tr></thead><tbody>")
@@ -1282,56 +1283,22 @@ def group_supporting_table_2_html_fixed(
     if_display=False,
     max_group_col_width: int = 200,
 ) -> str:
-    """Generate a grouped HTML table for supporting pseudo-reactants marked as Y."""
+    """Generate a grouped HTML table for supporting pseudo-reactants marked as Y.
+
+    Unlike the X table, an empty or all-empty ``grouped`` renders nothing rather
+    than an empty table.
+    """
 
     if not grouped or not _has_table_values(grouped):
         return ""
 
-    if groups_to_display is None:
-        groups = list(grouped.keys())
-    else:
-        groups = [g for g in groups_to_display if g in grouped]
-
-    all_marks = sorted({m for rep in grouped.values() for m in rep})
-
-    html = [
-        "<table style='width:100%; table-layout:auto; border-collapse: collapse;'>",
-        "<thead><tr>",
-        "<th style='border:1px solid #ccc; padding:4px;'>Route IDs</th>",
-    ]
-    html += [
-        f"<th style='border:1px solid #ccc; padding:4px; text-align:center;'>Y<small>{mark}</small></th>"
-        for mark in all_marks
-    ]
-    html.append("</tr></thead><tbody>")
-
-    group_td_style = (
-        f"border:1px solid #ccc; padding:4px; "
-        "white-space: normal; overflow-wrap: break-word; "
-        f"max-width:{max_group_col_width}px;"
+    return group_lg_table_2_html_fixed(
+        grouped,
+        groups_to_display,
+        if_display,
+        max_group_col_width,
+        mark_prefix="Y",
     )
-    img_td_style = (
-        "border:1px solid #ccc; padding:4px; text-align:center; vertical-align:middle;"
-    )
-
-    for group in groups:
-        rep = grouped[group]
-        label = ",".join(str(n) for n in group)
-        row = [f"<td style='{group_td_style}'>{label}</td>"]
-        for mark in all_marks:
-            cell = ["<td style='" + img_td_style + "'>"]
-            if mark in rep:
-                cell.append(_render_table_value(rep[mark]))
-            cell.append("</td>")
-            row.append("".join(cell))
-        html.append("<tr>" + "".join(row) + "</tr>")
-
-    html.append("</tbody></table>")
-    out = "".join(html)
-    if if_display:
-        display(HTML(out))
-
-    return out
 
 
 def routes_subclustering_report(

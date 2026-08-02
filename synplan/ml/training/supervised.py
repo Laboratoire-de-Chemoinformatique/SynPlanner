@@ -25,9 +25,8 @@ from synplan.ml.training.preprocessing import (
     RankingPolicyDataset,
 )
 from synplan.ml.training.trainers import (
-    LitFilteringPolicy,
+    POLICY_TRAINERS,
     LitMHNRanking,
-    LitRankingPolicy,
     rebind_training_rules,
     validate_ranking_labels,
 )
@@ -317,24 +316,18 @@ def fit_policy_network(
     print(f"Policy network balanced accuracy: {ba}")
 
 
-TRAINER_BY_KEY: dict[str, type[LitNetworkTrainer]] = {
-    "mhn_ranking": LitMHNRanking,
-    "ranking": LitRankingPolicy,
-    "filtering": LitFilteringPolicy,
-}
-
-
 def build_policy_trainer(config: PolicyNetworkConfig, dataset) -> LitNetworkTrainer:
-    """Build the pure network + matching Lit trainer for the configured policy."""
+    """Build the pure network + matching Lit trainer for the configured policy.
+
+    Trainers register themselves with ``@register_trainer(name)``; ``architecture``
+    wins over ``policy_type`` so a named architecture can override the head type.
+    """
     key = (
         config.architecture
-        if config.architecture == "mhn_ranking"
+        if config.architecture in POLICY_TRAINERS
         else config.policy_type
     )
-    trainer_cls = TRAINER_BY_KEY[key]
-    if key == "mhn_ranking":
-        return trainer_cls.from_config(config, dataset)
-    return trainer_cls.from_config(config, n_rules=dataset.num_classes)
+    return POLICY_TRAINERS[key].from_config(config, dataset)
 
 
 def run_policy_training(

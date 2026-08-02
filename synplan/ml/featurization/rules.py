@@ -29,6 +29,7 @@ from synplan.chem.reaction.rules.representation.query_cgr import (
     compress_labels,
     query_cgr_atom_label,
     query_cgr_bond_label,
+    refine_colors,
 )
 
 # Local aliases; canonical definitions live in chem…representation.config.
@@ -149,29 +150,8 @@ def _canonical_atom_order(
     query_cgr: QueryCGRContainer, atom_labels: Mapping[int, Any]
 ) -> tuple[int, ...]:
     labels = _node_order_labels(query_cgr, atom_labels)
-    colors = compress_labels(labels)
+    colors = refine_colors(query_cgr, compress_labels(labels))
     atoms = tuple(query_cgr._atoms)
-
-    for _ in range(len(atoms)):
-        signatures = {}
-        for atom in atoms:
-            neighborhood = tuple(
-                sorted(
-                    (
-                        (
-                            query_cgr_bond_label(query_cgr, atom, neighbor),
-                            colors[neighbor],
-                        )
-                        for neighbor in query_cgr._bonds[atom]
-                    ),
-                    key=repr,
-                )
-            )
-            signatures[atom] = (colors[atom], neighborhood)
-        refined = compress_labels(signatures)
-        if refined == colors:
-            break
-        colors = refined
 
     return tuple(
         atom

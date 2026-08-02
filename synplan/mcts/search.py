@@ -7,21 +7,25 @@ import json
 import logging
 import os.path
 from collections.abc import Iterator
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from chython.containers import MoleculeContainer
 from rdkit import Chem
 from tqdm.auto import tqdm
 
+from synplan import __version__
 from synplan.chem.reaction import CanonicalRetroReactor
-from synplan.chem.reaction.routes.io import make_json, write_routes_csv, write_routes_json
+from synplan.chem.reaction.routes.io import (
+    make_json,
+    write_routes_csv,
+    write_routes_json,
+)
 from synplan.chem.reaction.routes.quality.scorer import RouteScorer
 from synplan.chem.reaction.routes.representation import extract_reactions
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.tree import Tree, TreeConfig
 from synplan.utils.config import PolicyNetworkConfig
-from synplan.utils.files import iter_csv_smiles
+from synplan.utils.files import iter_csv_smiles, iter_smiles_records
 from synplan.utils.loading import (
     load_building_blocks,
     load_evaluation_function,
@@ -66,11 +70,7 @@ def _iter_target_smiles(targets_path: str) -> Iterator[str]:
         delimiter = "\t" if suffix == ".tsv" else ","
         yield from iter_csv_smiles(targets_path, delimiter=delimiter)
         return
-    with open(targets_path, encoding="utf-8") as fh:
-        for line in fh:
-            smi = line.strip()
-            if smi:
-                yield smi
+    yield from iter_smiles_records(targets_path)
 
 
 def extract_tree_stats(
@@ -94,20 +94,6 @@ def extract_tree_stats(
     stats["newick_tree"] = newick_tree
     stats["newick_meta"] = newick_meta_line
     return stats
-
-
-def _resolve_synplan_version() -> str | None:
-    """Best-effort resolution of the installed SynPlanner version."""
-    try:
-        return version("synplanner")
-    except PackageNotFoundError:
-        pass
-    try:
-        import synplan
-
-        return getattr(synplan, "__version__", None)
-    except Exception:
-        return None
 
 
 def build_target_routes(tree, reactions: dict | None = None) -> list[dict]:
@@ -135,9 +121,6 @@ def export_routes_artifact(
     results_root,
     *,
     filename: str = "results.json.gz",
-    write_manifest: bool = True,
-    schema_version: str = ROUTE_EXPORT_SCHEMA_VERSION,
-    synplan_version: str | None = None,
 ) -> Path:
     """Write the target-keyed route-export artifact (public contract).
 
@@ -148,9 +131,8 @@ def export_routes_artifact(
     for unsolved targets, where each ``route_tree`` is a
     :func:`build_target_routes` / ``make_json`` node tree.
 
-    When ``write_manifest`` is true, also writes ``results_root/manifest.json``
-    with a top-level ``directives`` dict
-    (``{"adapter": "synplanner", "raw_results_filename": filename}``) plus
+    Also writes ``results_root/manifest.json`` with a top-level ``directives``
+    dict (``{"adapter": "synplanner", "raw_results_filename": filename}``) plus
     top-level ``schema_version`` and ``synplan_version`` keys.
 
     :return: Path to the written gzipped results file.
@@ -162,19 +144,16 @@ def export_routes_artifact(
     with gzip.open(results_path, "wt", encoding="utf-8") as fh:
         json.dump(results, fh)
 
-    if write_manifest:
-        manifest = {
-            "schema_version": schema_version,
-            "synplan_version": synplan_version,
-            "directives": {
-                "adapter": "synplanner",
-                "raw_results_filename": filename,
-            },
-        }
-        with open(
-            results_root.joinpath("manifest.json"), "w", encoding="utf-8"
-        ) as fh:
-            json.dump(manifest, fh, indent=2)
+    manifest = {
+        "schema_version": ROUTE_EXPORT_SCHEMA_VERSION,
+        "synplan_version": __version__,
+        "directives": {
+            "adapter": "synplanner",
+            "raw_results_filename": filename,
+        },
+    }
+    with open(results_root.joinpath("manifest.json"), "w", encoding="utf-8") as fh:
+        json.dump(manifest, fh, indent=2)
 
     return results_path
 
@@ -307,9 +286,12 @@ def run_search(
         ):
             target_smi = target_smi.strip()
             # Key the export dict by the RDKit-canonical target SMILES so keys
-            # match retrocast's Target.smiles byte-for-byte (see
-            # _canonical_target_key). Computed only on the export path.
-            export_key = _canonical_target_key(target_smi) if export_routes else None
+            # match retrocast's Target.smiles byte-for-byte. Every target starts
+            # empty; only a solved one overwrites it.
+            export_key = None
+            if export_routes:
+                export_key = _canonical_target_key(target_smi)
+                exported_routes[export_key] = []
             try:
                 target_mol = mol_from_smiles(target_smi)
                 # run search
@@ -340,8 +322,6 @@ def run_search(
                 logging.warning(
                     f"Retrosynthetic_planning {target_smi} failed with the following error: {e}"
                 )
-                if export_routes:
-                    exported_routes[export_key] = []
 
                 continue
 
@@ -380,19 +360,12 @@ def run_search(
                     exported_routes[export_key] = build_target_routes(
                         tree, reactions=routes_dict
                     )
-            elif export_routes:
-                exported_routes[export_key] = []
 
             # save stats
             statswriter.writerow(extract_tree_stats(tree, target_smi))
             csvfile.flush()
 
     if export_routes:
-        export_routes_artifact(
-            exported_routes,
-            results_root,
-            filename=routes_filename,
-            synplan_version=_resolve_synplan_version(),
-        )
+        export_routes_artifact(exported_routes, results_root, filename=routes_filename)
 
     print(f"Number of solved target molecules: {n_solved}")

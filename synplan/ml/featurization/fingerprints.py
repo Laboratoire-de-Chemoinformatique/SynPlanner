@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
 from collections.abc import Sequence
+from functools import lru_cache
 
 import numpy as np
 import torch
@@ -15,14 +15,10 @@ from synplan.chem.reaction.rules.representation import (
     query_cgr_morgan_fingerprint,
     query_reaction_atom_labels,
     reaction_query_to_reaction,
-    rule_fingerprint_digest,
-)
-from synplan.ml.featurization.cache import (
-    cache_get,
-    cache_set,
 )
 
-_RULE_FINGERPRINT_CACHE: OrderedDict[str, torch.Tensor] = OrderedDict()
+#: Maximum number of distinct rule sets whose fingerprints are retained.
+MAX_RULE_FINGERPRINT_CACHE_SIZE = 8
 
 
 def _side_fingerprint(
@@ -140,27 +136,12 @@ def _mhnreact_rdkit_rule_fingerprint(
     return product - 0.5 * reactants
 
 
-def rule_fingerprints_from_smarts(
-    rule_smarts: Sequence[str],
-    fingerprint_config: RuleFingerprintConfig | None = None,
+@lru_cache(maxsize=MAX_RULE_FINGERPRINT_CACHE_SIZE)
+def _build_rule_fingerprints(
+    rules: tuple[str, ...],
+    fingerprint_config: RuleFingerprintConfig,
 ) -> torch.Tensor:
-    """Build ordered rule fingerprints for retrospective reaction SMARTS.
-
-    ``legacy`` uses the Chython side delta, ``target - 0.5 * precursors``,
-    after converting query rules to ordinary reaction containers.
-    ``mhnreact_rdkit`` reproduces original MHNreact's RDKit SMARTS template
-    encoding, ``left_side - 0.5 * right_side`` with RDK path fingerprints.
-    ``query_cgr`` fingerprints Chython ``QueryCGRContainer`` objects with
-    original query-side atom labels so constraints such as hydrogen count and
-    ring size are retained.
-    """
-    fingerprint_config = fingerprint_config or RuleFingerprintConfig()
-    rules = tuple(rule_smarts)
-    fingerprint_digest = rule_fingerprint_digest(rules, fingerprint_config)
-    cached = cache_get(_RULE_FINGERPRINT_CACHE, fingerprint_digest)
-    if cached is not None:
-        return cached
-
+    """Tensorize ``rules``; cached because callers re-request the same rule set."""
     fingerprints = []
     for index, rule_smarts_text in enumerate(rules):
         try:
@@ -186,13 +167,30 @@ def rule_fingerprints_from_smarts(
                 f"  error: {type(err).__name__}: {err}"
             ) from err
 
-    tensor = (
+    return (
         torch.stack(fingerprints)
         if fingerprints
         else torch.empty((0, fingerprint_config.fp_size), dtype=torch.float)
     )
-    cache_set(_RULE_FINGERPRINT_CACHE, fingerprint_digest, tensor)
-    return tensor
+
+
+def rule_fingerprints_from_smarts(
+    rule_smarts: Sequence[str],
+    fingerprint_config: RuleFingerprintConfig | None = None,
+) -> torch.Tensor:
+    """Build ordered rule fingerprints for retrospective reaction SMARTS.
+
+    ``legacy`` uses the Chython side delta, ``target - 0.5 * precursors``,
+    after converting query rules to ordinary reaction containers.
+    ``mhnreact_rdkit`` reproduces original MHNreact's RDKit SMARTS template
+    encoding, ``left_side - 0.5 * right_side`` with RDK path fingerprints.
+    ``query_cgr`` fingerprints Chython ``QueryCGRContainer`` objects with
+    original query-side atom labels so constraints such as hydrogen count and
+    ring size are retained.
+    """
+    return _build_rule_fingerprints(
+        tuple(rule_smarts), fingerprint_config or RuleFingerprintConfig()
+    )
 
 
 __all__ = [

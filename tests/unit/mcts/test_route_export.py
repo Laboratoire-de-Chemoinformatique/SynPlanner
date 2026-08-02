@@ -3,6 +3,7 @@
 import gzip
 import json
 
+from synplan import __version__
 from synplan.mcts.search import (
     ROUTE_EXPORT_SCHEMA_VERSION,
     _canonical_target_key,
@@ -52,33 +53,17 @@ def test_results_gzip_roundtrip(tmp_path):
 
 
 def test_manifest_contract(tmp_path):
-    export_routes_artifact(
-        _sample_results(), tmp_path, synplan_version="9.9.9"
-    )
+    export_routes_artifact(_sample_results(), tmp_path)
     manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
 
     assert manifest["directives"]["adapter"] == "synplanner"
     assert manifest["directives"]["raw_results_filename"] == "results.json.gz"
     assert manifest["schema_version"] == ROUTE_EXPORT_SCHEMA_VERSION
-    assert manifest["synplan_version"] == "9.9.9"
-
-
-def test_custom_filename_and_no_manifest(tmp_path):
-    out = export_routes_artifact(
-        _sample_results(),
-        tmp_path,
-        filename="routes.json.gz",
-        write_manifest=False,
-    )
-    assert out == tmp_path / "routes.json.gz"
-    assert out.exists()
-    assert not (tmp_path / "manifest.json").exists()
+    assert manifest["synplan_version"] == __version__
 
 
 def test_manifest_filename_tracks_results_filename(tmp_path):
-    export_routes_artifact(
-        _sample_results(), tmp_path, filename="routes.json.gz"
-    )
+    export_routes_artifact(_sample_results(), tmp_path, filename="routes.json.gz")
     manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["directives"]["raw_results_filename"] == "routes.json.gz"
 

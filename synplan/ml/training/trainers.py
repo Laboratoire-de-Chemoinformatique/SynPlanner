@@ -31,7 +31,6 @@ from synplan.ml.networks.policy.linear import (
     RankingPolicyNetwork,
 )
 from synplan.ml.networks.policy.mhnreact import MHNReact
-from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training.lightning import LitNetworkTrainer
 from synplan.utils.config import (
     LinearPolicyNetworkConfig,
@@ -42,13 +41,25 @@ if TYPE_CHECKING:
     from synplan.ml.training.preprocessing import RankingPolicyDataset
 
 
+#: Policy trainers by config key, populated by :func:`register_trainer`.
+POLICY_TRAINERS: dict[str, type[LitNetworkTrainer]] = {}
+
+
+def register_trainer(name: str):
+    """Register a policy trainer under ``name`` for config-driven construction.
+
+    The decorated class must expose ``from_config(config, dataset)``.
+    """
+
+    def decorator(cls: type[LitNetworkTrainer]) -> type[LitNetworkTrainer]:
+        POLICY_TRAINERS[name] = cls
+        return cls
+
+    return decorator
+
+
 class LitValue(LitNetworkTrainer):
     """Trains a :class:`ValueNetwork` (BCE-with-logits + balanced accuracy + f1)."""
-
-    def __init__(self, network: ValueNetwork) -> None:
-        super().__init__(
-            network, learning_rate=network.lr, batch_size=network.batch_size
-        )
 
     def compute_loss(self, batch: Batch) -> dict[str, Tensor]:
         """Loss and classification metrics for synthesisability prediction."""
@@ -63,20 +74,16 @@ class LitValue(LitNetworkTrainer):
         return {"loss": loss, "balanced_accuracy": ba, "f1_score": f1}
 
 
+@register_trainer("ranking")
 class LitRankingPolicy(LitNetworkTrainer):
     """Trains a :class:`RankingPolicyNetwork` (softmax cross-entropy + metrics)."""
 
-    def __init__(self, network: RankingPolicyNetwork) -> None:
-        super().__init__(
-            network, learning_rate=network.lr, batch_size=network.batch_size
-        )
-
     @classmethod
     def from_config(
-        cls, config: LinearPolicyNetworkConfig, n_rules: int
+        cls, config: LinearPolicyNetworkConfig, dataset: RankingPolicyDataset
     ) -> LitRankingPolicy:
         """Build a ranking policy network from a config and wrap it for training."""
-        return cls(RankingPolicyNetwork(config, n_rules))
+        return cls(RankingPolicyNetwork(config, dataset.num_classes))
 
     def compute_loss(self, batch: Batch) -> dict[str, Tensor]:
         """Cross-entropy loss and ranking metrics for reaction-rule prediction."""
@@ -102,20 +109,16 @@ class LitRankingPolicy(LitNetworkTrainer):
         return metrics
 
 
+@register_trainer("filtering")
 class LitFilteringPolicy(LitNetworkTrainer):
     """Trains a :class:`FilteringPolicyNetwork` (BCE on rule + priority heads)."""
 
-    def __init__(self, network: FilteringPolicyNetwork) -> None:
-        super().__init__(
-            network, learning_rate=network.lr, batch_size=network.batch_size
-        )
-
     @classmethod
     def from_config(
-        cls, config: LinearPolicyNetworkConfig, n_rules: int
+        cls, config: LinearPolicyNetworkConfig, dataset: RankingPolicyDataset
     ) -> LitFilteringPolicy:
         """Build a filtering policy network from a config and wrap it for training."""
-        return cls(FilteringPolicyNetwork(config, n_rules))
+        return cls(FilteringPolicyNetwork(config, dataset.num_classes))
 
     def compute_loss(self, batch: Batch) -> dict[str, Tensor]:
         """BCE loss + metrics for the rule and priority filtering heads."""
@@ -156,13 +159,9 @@ class LitFilteringPolicy(LitNetworkTrainer):
         }
 
 
+@register_trainer("mhn_ranking")
 class LitMHNRanking(LitNetworkTrainer):
     """Trains an :class:`MHNRankingNetwork` (softmax cross-entropy + metrics)."""
-
-    def __init__(self, network: MHNReact) -> None:
-        super().__init__(
-            network, learning_rate=network.lr, batch_size=network.batch_size
-        )
 
     @classmethod
     def from_config(

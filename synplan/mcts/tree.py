@@ -403,15 +403,16 @@ class Tree:
 
         if self.config.use_priority and self._priority_policies:
             for source_name, policy in self._priority_policies.items():
-                for rule_id, rule in enumerate(policy.priority_rules):
-                    if policy._rule_applies(rule, curr_node.curr_precursor):
-                        yield _RuleCandidate(
-                            probability=1.0,
-                            rule=rule,
-                            rule_id=rule_id,
-                            rule_source=source_name,
-                            policy_rank=None,
-                        )
+                for prob, rule, rule_id in policy.predict_reaction_rules(
+                    curr_node.curr_precursor, self.reaction_rules
+                ):
+                    yield _RuleCandidate(
+                        probability=prob,
+                        rule=rule,
+                        rule_id=rule_id,
+                        rule_source=source_name,
+                        policy_rank=None,
+                    )
 
         policy_top_rules = self._get_policy_top_rules_limit()
         for policy_rank, (prob, rule, rule_id) in enumerate(

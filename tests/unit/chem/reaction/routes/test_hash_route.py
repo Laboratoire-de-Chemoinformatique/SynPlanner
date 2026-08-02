@@ -1,3 +1,4 @@
+import pytest
 from chython import smiles
 
 from synplan.chem.reaction.routes.representation import compose_route_cgr
@@ -77,49 +78,40 @@ def test_route_cgr_hash_includes_transient_bonds():
     assert route_cgr_hash(default_cgr) != route_cgr_hash(transient_cgr)
 
 
-def test_route_cgr_hash_includes_bond_route_order():
+def _bonds(route_cgr):
+    return [bond for _, _, bond in route_cgr.bonds()]
+
+
+def _atoms(route_cgr):
+    return [atom for _, atom in route_cgr.atoms()]
+
+
+@pytest.mark.parametrize(
+    ("elements", "attribute", "mutate"),
+    [
+        (
+            _bonds,
+            "route_order",
+            lambda bond: setattr(bond, "route_order", bond.route_order + 1),
+        ),
+        (_atoms, "route_order", lambda atom: atom.route_order.add(99)),
+        (_bonds, "route_step_order", lambda bond: bond.route_step_order.add(99)),
+        (_atoms, "route_step_order", lambda atom: atom.route_step_order.add(99)),
+    ],
+    ids=[
+        "bond_route_order",
+        "atom_route_order",
+        "bond_route_step_order",
+        "atom_route_step_order",
+    ],
+)
+def test_route_cgr_hash_includes_route_order(elements, attribute, mutate):
     route_cgr = _transient_route_cgr()
     changed = route_cgr.copy()
 
-    for _, _, bond in changed.bonds():
-        if getattr(bond, "route_order", None) is not None:
-            bond.route_order += 1
-            break
-
-    assert route_cgr_hash(route_cgr) != route_cgr_hash(changed)
-
-
-def test_route_cgr_hash_includes_atom_route_order():
-    route_cgr = _transient_route_cgr()
-    changed = route_cgr.copy()
-
-    for _, atom in changed.atoms():
-        if getattr(atom, "route_order", None):
-            atom.route_order.add(99)
-            break
-
-    assert route_cgr_hash(route_cgr) != route_cgr_hash(changed)
-
-
-def test_route_cgr_hash_includes_bond_route_step_order():
-    route_cgr = _transient_route_cgr()
-    changed = route_cgr.copy()
-
-    for _, _, bond in changed.bonds():
-        if getattr(bond, "route_step_order", None):
-            bond.route_step_order.add(99)
-            break
-
-    assert route_cgr_hash(route_cgr) != route_cgr_hash(changed)
-
-
-def test_route_cgr_hash_includes_atom_route_step_order():
-    route_cgr = _transient_route_cgr()
-    changed = route_cgr.copy()
-
-    for _, atom in changed.atoms():
-        if getattr(atom, "route_step_order", None):
-            atom.route_step_order.add(99)
+    for element in elements(changed):
+        if getattr(element, attribute, None) is not None:
+            mutate(element)
             break
 
     assert route_cgr_hash(route_cgr) != route_cgr_hash(changed)

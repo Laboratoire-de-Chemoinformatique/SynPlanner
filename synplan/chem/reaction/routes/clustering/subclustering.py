@@ -582,25 +582,11 @@ def new_lg_reaction_replacer(synthon_reaction, new_lgs, max_in_target_mol):
         replaced by a `MarkedAt` atom with its `.mark` and `.isotope` set
         to the leaving-group label, and original bonds reattached.
     """
-    new_reactants = []
-    for reactant in synthon_reaction.reactants:
-        atom_keys = list(reactant._atoms.keys())
-        for atom_num in atom_keys:
-            if atom_num > max_in_target_mol:
-                for k, val in new_lgs.items():
-                    lg = MarkedAt()
-                    if atom_num == val:
-                        lg.mark = k
-                        lg.isotope = k
-                        atom1 = next(iter(reactant._bonds[atom_num].keys()))
-                        bond = reactant._bonds[atom_num][atom1]
-                        reactant.delete_bond(atom1, atom_num)
-                        reactant.delete_atom(atom_num)
-                        reactant.add_atom(lg, atom_num)
-                        reactant.add_bond(atom1, atom_num, bond)
-        new_reactants.append(reactant)
-
-    return new_reactants
+    return lg_reaction_replacer(
+        synthon_reaction,
+        {label: (None, atom_num) for label, atom_num in new_lgs.items()},
+        max_in_target_mol,
+    )
 
 
 def remove_and_shift(nested_dict, to_remove):

@@ -20,7 +20,6 @@ from synplan.ml.featurization.molecules import mol_to_pyg
 from synplan.ml.featurization.rules import query_cgr_graphs_from_smarts
 
 if TYPE_CHECKING:
-    import torch_geometric
     import torch_geometric.data
 
     from synplan.chem.precursor import Precursor
@@ -308,7 +307,11 @@ class PriorityPolicy(Policy):
         precursor: Precursor,
         reaction_rules: Sequence[CanonicalRetroReactor],
     ) -> Iterator[tuple[float, CanonicalRetroReactor, int]]:
-        """Yield applicable curated rules with ``prob=1.0``, in rule order."""
+        """Yield applicable curated rules with ``prob=1.0``, in rule order.
+
+        ``reaction_rules`` is ignored: this policy ranks its own curated set, so
+        the yielded ``rule_id`` indexes ``self.priority_rules``.
+        """
         for rule_id, rule in enumerate(self.priority_rules):
             if self._rule_applies(rule, precursor):
                 yield 1.0, rule, rule_id

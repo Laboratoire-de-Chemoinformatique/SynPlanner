@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -55,19 +56,8 @@ class _MHNPolicy(nn.Module):
 
 
 class _MHNGraphPolicy(_MHNPolicy):
-    rule_representation_config = RuleRepresentationConfig(
-        embedding_type="query_cgr_graph",
-        fingerprint_config=RuleFingerprintConfig(
-            fp_size=4,
-            min_radius=1,
-            max_radius=2,
-            active_bits=2,
-            fp_type="query_cgr",
-            schema_version=RULE_FINGERPRINT_SCHEMA_VERSION,
-        ),
-        graph_embedder_type="gps",
-        graph_batch_size=2,
-        graph_schema_version=RULE_GRAPH_SCHEMA_VERSION,
+    rule_representation_config = replace(
+        _MHNPolicy.rule_representation_config, embedding_type="query_cgr_graph"
     )
 
     def encode_rules(self, rule_representations):

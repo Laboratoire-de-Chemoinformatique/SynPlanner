@@ -107,18 +107,16 @@ def compress_labels(labels: dict[int, tuple]) -> dict[int, int]:
     return {atom: label_to_order[label] for atom, label in labels.items()}
 
 
-def _refined_query_cgr_colors(query_cgr: QueryCGRContainer) -> dict[int, int]:
-    """Run 1-WL colour refinement on the QueryCGR atom graph.
+def refine_colors(
+    query_cgr: QueryCGRContainer, colors: dict[int, int]
+) -> dict[int, int]:
+    """Run 1-WL colour refinement from ``colors`` until it stabilises.
 
-    Returns a stable colour per atom: atoms in the same final class are
-    structurally indistinguishable under the chosen labels and so must be
-    enumerated as a permutation group when deriving a canonical key.
+    Callers supply the seed colouring, which is what distinguishes the
+    structure-only refinement from one that also folds in caller-supplied atom
+    labels.
     """
     atoms = tuple(query_cgr._atoms)
-    colors = compress_labels(
-        {atom: query_cgr_atom_label(query_cgr, atom) for atom in atoms}
-    )
-
     for _ in range(len(atoms)):
         signatures = {}
         for atom in atoms:
@@ -140,6 +138,21 @@ def _refined_query_cgr_colors(query_cgr: QueryCGRContainer) -> dict[int, int]:
             return refined
         colors = refined
     return colors
+
+
+def _refined_query_cgr_colors(query_cgr: QueryCGRContainer) -> dict[int, int]:
+    """Run 1-WL colour refinement on the QueryCGR atom graph.
+
+    Returns a stable colour per atom: atoms in the same final class are
+    structurally indistinguishable under the chosen labels and so must be
+    enumerated as a permutation group when deriving a canonical key.
+    """
+    return refine_colors(
+        query_cgr,
+        compress_labels(
+            {atom: query_cgr_atom_label(query_cgr, atom) for atom in query_cgr._atoms}
+        ),
+    )
 
 
 def _query_cgr_order_encoding(

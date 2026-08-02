@@ -76,22 +76,13 @@ def test_cgr_display_produces_parseable_svg(simple_cgr):
         )
 
 
-def test_cgr_depiction_renders_none_none_dynamic_bond_blue():
+def test_cgr_depiction_renders_none_none_dynamic_bond_blue(transient_route_cgr):
     """``DynamicBond(None, None)`` marks a protecting bond in route CGRs."""
     import pickle
 
-    from chython import smiles
-
-    from synplan.chem.reaction.routes.representation import compose_route_cgr
     from synplan.chem.reaction.routes.visualisation import cgr_display
 
-    routes = {
-        1: {
-            0: smiles("[CH3:1].[CH3:2][Cl:3]>>[CH3:1][CH3:2].[ClH:3]"),
-            1: smiles("[CH3:1][CH3:2]>>[CH4:1]"),
-        }
-    }
-    cgr = compose_route_cgr(routes, 1, preserve_transient_bonds=True)["cgr"]
+    cgr = transient_route_cgr
 
     assert "[.>.]" in str(cgr)
 

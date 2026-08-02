@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -22,10 +21,6 @@ from synplan.chem.reaction.rules.representation import (
     rule_representation_digest,
 )
 from synplan.chem.utils import reaction_query_to_reaction
-from synplan.ml.featurization.cache import (
-    MAX_RULE_FINGERPRINT_CACHE_SIZE,
-    cache_set,
-)
 from synplan.ml.featurization.fingerprints import (
     _side_fingerprint,
     rule_fingerprints_from_smarts,
@@ -423,22 +418,12 @@ def test_rule_representation_digest_includes_encoder_contract():
         )
 
 
-def test_rule_fingerprintcache_set_is_bounded_lru():
-    cache = OrderedDict()
+def test_rule_fingerprints_are_cached_per_rule_set():
+    config = _fp_config()
+    first = rule_fingerprints_from_smarts((RULE_A, RULE_B), config)
 
-    for index in range(MAX_RULE_FINGERPRINT_CACHE_SIZE + 2):
-        cache_set(cache, str(index), torch.tensor([float(index)]))
-
-    assert len(cache) == MAX_RULE_FINGERPRINT_CACHE_SIZE
-    assert list(cache) == [
-        str(index) for index in range(2, MAX_RULE_FINGERPRINT_CACHE_SIZE + 2)
-    ]
-
-    cache_set(cache, "2", torch.tensor([2.0]))
-    cache_set(cache, "new", torch.tensor([99.0]))
-
-    assert "3" not in cache
-    assert list(cache)[-1] == "new"
+    assert rule_fingerprints_from_smarts((RULE_A, RULE_B), config) is first
+    assert rule_fingerprints_from_smarts((RULE_B, RULE_A), config) is not first
 
 
 def test_reaction_rules_path_is_inferred_from_extracted_policy_mapping(tmp_path):

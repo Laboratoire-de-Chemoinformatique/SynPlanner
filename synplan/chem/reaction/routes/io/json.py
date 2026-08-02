@@ -31,13 +31,9 @@ def _route_tree_has_null_node(node) -> bool:
     root or nested in a ``children`` list, which would serialize to a JSON
     ``null`` child and corrupt the route.
     """
-    if node is None:
-        return True
-    if isinstance(node, dict):
-        return any(
-            _route_tree_has_null_node(child) for child in node.get("children", []) or []
-        )
-    return False
+    return node is None or any(
+        _route_tree_has_null_node(child) for child in node.get("children", ())
+    )
 
 
 def _route_molecule_smiles(mol) -> str:
@@ -190,25 +186,20 @@ def _make_json_v1(
             with the target.
             """
             rxn = _steps[sid]
+            product = None
             if want_react is not None:
-                for p in rxn.products:
-                    if p == want_react:
-                        smiles = _route_molecule_smiles(p)
-                        return {
-                            "type": "mol",
-                            "smiles": smiles,
-                            "children": [build_reaction_node(sid)],
-                            "in_stock": False,
-                        }
-            for p in rxn.products:
-                if _atom_nums & set(p._atoms.keys()):
-                    smiles = _route_molecule_smiles(p)
-                    return {
-                        "type": "mol",
-                        "smiles": smiles,
-                        "children": [build_reaction_node(sid)],
-                        "in_stock": False,
-                    }
+                product = next((p for p in rxn.products if p == want_react), None)
+            if product is None:
+                product = next(
+                    (p for p in rxn.products if _atom_nums & p._atoms.keys()), None
+                )
+            if product is not None:
+                return {
+                    "type": "mol",
+                    "smiles": _route_molecule_smiles(product),
+                    "children": [build_reaction_node(sid)],
+                    "in_stock": False,
+                }
             # Neither structural identity nor atom-number overlap matched: route
             # is genuinely unrecoverable; the drop guard in make_json handles it.
             return None

@@ -91,9 +91,11 @@ def test_reconcile_default_is_false_signature():
     """``reconcile_atom_mapping`` defaults to the fast path."""
     import inspect
 
-    default = inspect.signature(extract_reactions).parameters[
-        "reconcile_atom_mapping"
-    ].default
+    default = (
+        inspect.signature(extract_reactions)
+        .parameters["reconcile_atom_mapping"]
+        .default
+    )
     assert default is False
 
 
@@ -126,7 +128,9 @@ def test_toggle_changes_exported_reactions():
     """
     data = read_routes_csv("tests/data/routes_mol_1.csv")
 
-    fast = extract_reactions(_MockTree(copy.deepcopy(data)), reconcile_atom_mapping=False)
+    fast = extract_reactions(
+        _MockTree(copy.deepcopy(data)), reconcile_atom_mapping=False
+    )
     rec = extract_reactions(_MockTree(copy.deepcopy(data)), reconcile_atom_mapping=True)
 
     def _step_smiles(d):

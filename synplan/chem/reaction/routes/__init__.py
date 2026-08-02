@@ -44,8 +44,6 @@ _EXPORTS = {
     "subcluster_one_cluster": "clustering",
     "supporting_groups_from_route_cgr": "clustering",
     # io
-    "export_tree_to_csv": "io",
-    "export_tree_to_json": "io",
     "make_dict": "io",
     "build_route_trees": "io",
     "make_json": "io",

@@ -26,17 +26,16 @@ class GradNormLogger(Callback):
 class LitNetworkTrainer(LightningModule, ABC):
     """Lightning wrapper: owns steps/optimizer/metric logging, delegates loss."""
 
-    def __init__(self, network: Module, learning_rate: float, batch_size: int) -> None:
+    def __init__(self, network: Module) -> None:
         """Wrap a pure network for training.
 
-        :param network: The pure ``nn.Module`` to train.
-        :param learning_rate: Optimizer learning rate.
-        :param batch_size: Batch size used for metric logging.
+        :param network: The pure ``nn.Module`` to train; supplies ``lr`` and
+            ``batch_size`` (both set by ``GraphMCTSNetwork.__init__``).
         """
         super().__init__()
         self.network = network
-        self.lr = learning_rate
-        self.batch_size = batch_size
+        self.lr = network.lr
+        self.batch_size = network.batch_size
 
     @abstractmethod
     def compute_loss(self, batch: Batch) -> dict[str, Tensor]:
