@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [1.5.2] - 2026-07-13
+## [1.6.0] - 2026-08-03
 
 ### Added
 
@@ -57,6 +57,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Requires `chython-synplan` 1.100, pinned exactly. Its SMARTS parser now reads
+  92% of real-world patterns instead of 57%, and three primitives follow
+  Daylight rather than chython's own reading: an unmarked charge is
+  unconstrained, `A` is any aliphatic atom where `*` is any atom, and `x` is
+  ring connectivity where the heteroatom count it used to mean is now `y`.
+  Rules written against the old meanings of `A` and `x` need updating.
+- Supports Python 3.14, which chython 1.100 is the first release to ship wheels
+  for. Python 3.15 is out of reach until torch, rdkit, numpy and chytorch
+  publish cp315 wheels.
+- Verifies chython ring-connectivity queries against RDKit's `AtomRingBondCount`
+  during rule conversion instead of passing them through unchecked; only
+  `rings_count` and heteroatom queries stay unverifiable.
+- Dropped the `exclude-newer` resolution cutoff; the exact `chython-synplan` pin
+  is what holds the lock steady now.
 - Moved route clustering, route analysis, route depiction, route I/O, notebook
   plotting, route-quality scoring, and RouteCGR implementation to
   `synplan.chem.reaction.routes`.
@@ -635,8 +649,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CLI interface (`synplan` command)
 - Docker images for CLI and GUI
 
-[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.2...HEAD
-[1.5.2]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.1...v1.5.2
+[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.4...v1.5.0
 [1.4.4]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.3...v1.4.4

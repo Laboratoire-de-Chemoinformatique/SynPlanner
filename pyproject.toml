@@ -1,6 +1,6 @@
 [project]
 name = "SynPlanner"
-version = "1.5.2"
+version = "1.6.0"
 description = "Toolbox for chemical synthesis planning"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
