@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   tests:
-    name: "Unit‑tests (Python ${{ matrix.python-version }})"
+    name: "Unit‑tests (${{ matrix.os }}, Python ${{ matrix.python-version }})"
     runs-on: ${{ matrix.os }}
 
     strategy:
