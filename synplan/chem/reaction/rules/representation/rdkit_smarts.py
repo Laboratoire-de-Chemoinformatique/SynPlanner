@@ -351,6 +351,7 @@ def _chython_atom_signature(atom: Any) -> dict[str, Any]:
         "ring_sizes": tuple(getattr(atom, "ring_sizes", ()) or ()),
         "rings_count": tuple(getattr(atom, "rings_count", ()) or ()),
         "heteroatoms": tuple(getattr(atom, "heteroatoms", ()) or ()),
+        "ring_connectivity": tuple(getattr(atom, "ring_connectivity", ()) or ()),
     }
 
 
@@ -458,6 +459,16 @@ def _verify_atom_query(
             f"{prefix}: unverified Chython hybridization query {hybridization}"
         )
 
+    ring_connectivity = signature["ring_connectivity"]
+    if ring_connectivity and not _query_has_all_values(
+        query_text, "AtomRingBondCount", ring_connectivity
+    ):
+        errors.append(
+            f"{prefix}: RDKit query does not expose Chython ring connectivity "
+            f"{ring_connectivity}"
+        )
+
+    # heteroatoms is chython's <y>, which Daylight and RDKit have no primitive for
     for field in ("rings_count", "heteroatoms"):
         value = signature[field]
         if value:

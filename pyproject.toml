@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "chython-synplan[racer-default]>=1.95",
+  "chython-synplan[racer-default]>=1.97",
   "chytorch-synplan>=1.70",
   "chytorch-rxnmap-synplan>=1.7",
   "numpy>=2",
@@ -92,10 +92,6 @@ packages = ["synplan", "scripts"]
 artifacts = ["*.tsv", "*.csv", "*.yaml", "*.json"]
 
 [tool.uv]
-# Supply-chain hardening. Use an explicit UTC timestamp so `uv --locked`
-# resolves the same cutoff in local shells and Docker builders.
-exclude-newer = "2026-05-18T22:00:00Z"
-
 # Floors on transitive dependencies that ship CVE fixes.
 constraint-dependencies = [
   "urllib3>=2.7.0",          # GHSA-38jv-5279-wg99, GHSA-gm62-xv2j-4w53, GHSA-qccp-gfcp-xxvc

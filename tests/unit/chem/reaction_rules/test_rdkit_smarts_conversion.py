@@ -40,20 +40,20 @@ def test_conversion_handles_reagents_and_multiple_fragments():
 
 
 def test_strict_mode_fails_on_unverified_chython_query_semantics():
-    result = chython_rule_smarts_to_rdkit_smarts("[C;x2:1]>>[C:1]")
+    result = chython_rule_smarts_to_rdkit_smarts("[C;R2:1]>>[C:1]")
 
     assert not result.ok
     assert result.parse_status == "semantic_loss"
-    assert any("heteroatoms" in warning for warning in result.warnings)
+    assert any("rings_count" in warning for warning in result.warnings)
     assert any("strict semantic warning" in error for error in result.errors)
 
 
 def test_non_strict_mode_reports_unverified_semantics_without_failing():
-    result = chython_rule_smarts_to_rdkit_smarts("[C;x2:1]>>[C:1]", strict=False)
+    result = chython_rule_smarts_to_rdkit_smarts("[C;R2:1]>>[C:1]", strict=False)
 
     assert result.ok
     assert not result.is_lossless
-    assert any("heteroatoms" in warning for warning in result.warnings)
+    assert any("rings_count" in warning for warning in result.warnings)
     assert result.errors == ()
 
 
@@ -125,7 +125,8 @@ def test_rdkit_to_chython_ignores_radical_annotation_roundtrip_loss():
 
 
 def test_rdkit_to_chython_fails_for_chython_unsupported_recursive_smarts():
-    result = rdkit_rule_smarts_to_chython_smarts("[C;v4:1]>>[C:1]")
+    # OR across primitive types needs an expression tree the atom query cannot hold
+    result = rdkit_rule_smarts_to_chython_smarts("[C,X3:1]>>[C:1]")
 
     assert not result.ok
     assert result.rdkit_parse_status == "ok"
@@ -144,7 +145,7 @@ def test_chython_rdkit_chython_roundtrip_exact_equality():
 
 
 def test_strict_roundtrip_fails_on_forward_semantic_loss():
-    rule = "[C;x2:1]>>[C:1]"
+    rule = "[C;R2:1]>>[C:1]"
 
     result = roundtrip_chython_rdkit_chython(rule)
 
@@ -153,19 +154,19 @@ def test_strict_roundtrip_fails_on_forward_semantic_loss():
     assert result.reverse_chython_parse_status == "ok"
     assert result.roundtrip_equal
     assert not result.ok
-    assert any("heteroatoms" in warning for warning in result.warnings)
+    assert any("rings_count" in warning for warning in result.warnings)
     assert any("strict semantic warning" in error for error in result.errors)
 
 
 def test_non_strict_roundtrip_accepts_forward_semantic_warning():
-    rule = "[C;x2:1]>>[C:1]"
+    rule = "[C;R2:1]>>[C:1]"
 
     result = roundtrip_chython_rdkit_chython(rule, strict=False)
 
     assert result.forward_parse_status == "ok"
     assert result.roundtrip_equal
     assert result.ok
-    assert any("heteroatoms" in warning for warning in result.warnings)
+    assert any("rings_count" in warning for warning in result.warnings)
     assert result.errors == ()
 
 
