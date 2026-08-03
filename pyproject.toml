@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "chython-synplan[racer-default]==1.98",
+  "chython-synplan[racer-default]==1.100",
   "chytorch-synplan>=1.70",
   "chytorch-rxnmap-synplan>=1.7",
   "numpy>=2",
