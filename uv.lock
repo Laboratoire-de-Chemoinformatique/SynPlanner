@@ -2,15 +2,9 @@ version = 1
 revision = 3
 requires-python = ">=3.10, <3.15"
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version < '3.11' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
@@ -666,7 +660,7 @@ wheels = [
 
 [[package]]
 name = "chython-synplan"
-version = "1.97"
+version = "1.98"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "lazy-object-proxy" },
@@ -674,24 +668,24 @@ dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5a/b4/3ad21f095eaaec9b639a9a0b88303ed7064681c9208948467b849f0feb22/chython_synplan-1.97.tar.gz", hash = "sha256:427304591b89f41675e911abd182687ea3e73bfcd77a8898f9aa41aadc182c6c", size = 912398, upload-time = "2026-08-03T16:50:05.088Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2e/10/bbfd6a920465efde85d56e19cee8c806c80a40ca47a6402f1e51a738f833/chython_synplan-1.98.tar.gz", hash = "sha256:7079620e322b32b15d56db198e6c31f473392fd64041825a2b15dfe907763549", size = 913290, upload-time = "2026-08-03T17:13:39.324Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/99/f9/1a1951be1762ef37b99c591e0cd568bb90443ab8190536caccd55b3d72a7/chython_synplan-1.97-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:97b1002166e2019a0952d211b6418f4fb33f22036fb9ab0d389895f623757865", size = 1349574, upload-time = "2026-08-03T16:49:36.894Z" },
-    { url = "https://files.pythonhosted.org/packages/d6/00/28f78f5f95378e5ca997f51a37c8e8da93b25f8d4f4a100401dd925deac9/chython_synplan-1.97-cp310-cp310-macosx_13_0_x86_64.whl", hash = "sha256:09dff2a3d7bcc7f0fdd4b44da56bb56e28e5d9527f70f49041439305bd7ad51a", size = 2039007, upload-time = "2026-08-03T16:49:38.619Z" },
-    { url = "https://files.pythonhosted.org/packages/47/2d/648f2bab504840e271d97eea344185cf5b048616be77f6d5ba364d094272/chython_synplan-1.97-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:fb8556eb8d798ebac51567ded50c16a69653063cdeb94b3377ed7b267acd2fc2", size = 3373178, upload-time = "2026-08-03T16:49:40.535Z" },
-    { url = "https://files.pythonhosted.org/packages/28/fb/d970eaf970a1a90564db6558fe8fcd23a52dd5b37e26cd6a4a0086a52e58/chython_synplan-1.97-cp310-cp310-win_amd64.whl", hash = "sha256:292e2e12025571f7d09bae802b425946921b7525ec32cd712d5e353103fbf6f2", size = 1994462, upload-time = "2026-08-03T16:49:41.909Z" },
-    { url = "https://files.pythonhosted.org/packages/e2/ac/85a5efef58b90ebdf19ef5d4a96fd238917c3a7fa572a599bb85a59e730f/chython_synplan-1.97-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:5be2021855fbb9bbe22158898afa424e738dcdc8512495afbe993d99fdd57fe9", size = 1634545, upload-time = "2026-08-03T16:49:43.358Z" },
-    { url = "https://files.pythonhosted.org/packages/5d/91/6b93af4686aa56e6accf426568e48b08bc1db3ad1df977418c807e9f6120/chython_synplan-1.97-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:1a9fec6ac60940f08e1af132c9b9bfff8c285691fd834dc511845bc1ec3411ab", size = 2329863, upload-time = "2026-08-03T16:49:44.817Z" },
-    { url = "https://files.pythonhosted.org/packages/a4/a0/11d9b95f54298878c08497b63d56829040240d355c230d25e5263ebe6ac0/chython_synplan-1.97-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e9e5bc58218af3a2c4e5b4652b2c9f8efa8df3ad6c8ead3b4631df9f2c30cc2b", size = 5107476, upload-time = "2026-08-03T16:49:46.761Z" },
-    { url = "https://files.pythonhosted.org/packages/11/ad/83b3cec98820e6d2456ec5493a01c36ff6f12371d7a58a73507ac44eb19a/chython_synplan-1.97-cp311-cp311-win_amd64.whl", hash = "sha256:5d8462edd6e5ca4b758a276b8322b6839e0d1a19784b6536329866069657a646", size = 2245732, upload-time = "2026-08-03T16:49:48.6Z" },
-    { url = "https://files.pythonhosted.org/packages/33/0a/04598e9f07d5b0d221c5bf33abbc17c2311023e61fb891f84056471c13ab/chython_synplan-1.97-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:8cb4e52463e8989768fd5c67348f6979d9b1428fcecc3b6d3dcc61ae05432821", size = 1919168, upload-time = "2026-08-03T16:49:50.032Z" },
-    { url = "https://files.pythonhosted.org/packages/d8/cf/5b9f2262c4db8607fb7247c05fd43a4dbf65f9e9011228da8ee98512d685/chython_synplan-1.97-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:f8fbc55513a770ee4040c07a97f0a1f0752adbb60eaa11b18e91e6d1ec71e5e9", size = 2618031, upload-time = "2026-08-03T16:49:51.436Z" },
-    { url = "https://files.pythonhosted.org/packages/84/b0/590c03197ec125cf23063c1f17655c271af82504700ba460b4d457d8cf33/chython_synplan-1.97-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:fdef8dba4f8b20cb56a4214a1ea0c34c71dd94516f6971d3dcc6400f64444041", size = 6819436, upload-time = "2026-08-03T16:49:53.133Z" },
-    { url = "https://files.pythonhosted.org/packages/ee/b9/4f68a170c7f3dfe2d7d603e7ce67b18e4ccfeea9f330ece087a7d036b56e/chython_synplan-1.97-cp312-cp312-win_amd64.whl", hash = "sha256:b5db5d016e6f0acf83c0f793e1539c78e8d17d0697269b06b599f66813aa37de", size = 2497440, upload-time = "2026-08-03T16:49:55.01Z" },
-    { url = "https://files.pythonhosted.org/packages/78/a6/a101734465c4698b42c554ab846e413ce797dcf842815f0a88b10fa86ad4/chython_synplan-1.97-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:47994a08c0ad65b15bab3f209b3f341e52a735f31843a08cff3139dacfd1ac38", size = 2201201, upload-time = "2026-08-03T16:49:56.4Z" },
-    { url = "https://files.pythonhosted.org/packages/cf/75/a7409052722ffc2e6154f0e7a613d582cc9fdd57a72835c89c892b9f4174/chython_synplan-1.97-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:99795a4737af6bc013ccacf9e1853e8f828fc7b251a0330fc3a645d580395f7d", size = 2904071, upload-time = "2026-08-03T16:49:57.823Z" },
-    { url = "https://files.pythonhosted.org/packages/c8/be/49251730f1721ff25fd394b473b3180bec8e8e0a7a5a0f342728c7192e87/chython_synplan-1.97-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:55a94b89d6848c9531968fbb77784c3fc855af92f481fb5336a87fdeef3f09a1", size = 8505434, upload-time = "2026-08-03T16:49:59.656Z" },
-    { url = "https://files.pythonhosted.org/packages/ff/f3/ccadc2bff6982fcbdc90715b29e04b585bcd2ddba2cb97d9f3365eaa9379/chython_synplan-1.97-cp313-cp313-win_amd64.whl", hash = "sha256:52d16f7f6f2ed5932e12d1dd74ca23dc25f5a6977153f6cfa5d5ec3fa5105174", size = 2748086, upload-time = "2026-08-03T16:50:01.599Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/75/7bb50f01a952ce49c74bf1e0db2c00e54cf86b6f797c932500cd85943f61/chython_synplan-1.98-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:163ae0d022b9644b511375b02cc9439c658aec9f7058f08560b7e5c6154e681f", size = 1350536, upload-time = "2026-08-03T17:13:15.84Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/a9/4101c3d0703211b5ea973fd26d23e515a7dd70ceb4d08d243798eaea3aac/chython_synplan-1.98-cp310-cp310-macosx_13_0_x86_64.whl", hash = "sha256:17120a4742127760cc274bb07d6655281ddade222a2362116862ce09267146bc", size = 2039968, upload-time = "2026-08-03T17:13:17.298Z" },
+    { url = "https://files.pythonhosted.org/packages/76/39/f66a6180844525b7512a747747e64ab031c6ac9cb183b788501de1f25769/chython_synplan-1.98-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b9d5c99006ca5793ad647b954e2b7406738d76198f44da4c5c218e86b5190e23", size = 3374139, upload-time = "2026-08-03T17:13:18.872Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/8e/33f0c39ba24ca3bc724be78b406e115d072b63ff3dff23df4fc36956099a/chython_synplan-1.98-cp310-cp310-win_amd64.whl", hash = "sha256:b8441a708e31482b12d6d217b9822487fc2cdab2e6d8b29f9d6350fe1d273704", size = 1995423, upload-time = "2026-08-03T17:13:20.213Z" },
+    { url = "https://files.pythonhosted.org/packages/23/e1/9d9ba24c769a3cfe852eedb2b193188b7f333654d2aa47e7571af561dc6e/chython_synplan-1.98-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:8ef5d66ac11a5256910f90e4aac9a383d330bb4e02b8cf06340c3475eb4bd196", size = 1635510, upload-time = "2026-08-03T17:13:21.718Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/45/3f128565c84d6e664ea567a693e73abaef58c17736cad4839bda55eee581/chython_synplan-1.98-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:2d66b757b34271e9409e12e8a5278d5b03d3ba7fe5fc9d0608c8a79f7de221f9", size = 2330824, upload-time = "2026-08-03T17:13:23.204Z" },
+    { url = "https://files.pythonhosted.org/packages/74/34/8099931c964c140202dd0a0bdb264af97b3c4a3d0e9f6452d8f84f3f1ba1/chython_synplan-1.98-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d90b21de41b427c2683957bca6a488df70464f89744f3a4f813d567ad637a72b", size = 5108437, upload-time = "2026-08-03T17:13:24.688Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/fd/2cfc3d8dcadb19a734e3b1f00155e1a027027bfe961290ac7ad7162ec746/chython_synplan-1.98-cp311-cp311-win_amd64.whl", hash = "sha256:ec6c4b171ae98493cd525ac23a19dcfd699d70a91bb7871ca403a8a3fe5fdb75", size = 2246693, upload-time = "2026-08-03T17:13:25.979Z" },
+    { url = "https://files.pythonhosted.org/packages/38/bb/6073dd8c2a1230e3ff0b9840adb5a0ae9075ee581c5680f9638f0036de8f/chython_synplan-1.98-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:c01994db422623b3ebddd6e9cb721c3bdb0eb5406b12f5fbcf7da3c29d4adf35", size = 1920124, upload-time = "2026-08-03T17:13:27.495Z" },
+    { url = "https://files.pythonhosted.org/packages/af/d0/b0446946d8d1f1924e7b6e65e4ed3a44fddd69c0c67a218ecf0aa94b8ad7/chython_synplan-1.98-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:8d45662ec347ce65ef7b13a0806788dbce927f48c1334592d0fe30a9d8304c1e", size = 2618987, upload-time = "2026-08-03T17:13:28.767Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/fc/46caa2019f934c744ee9ef8a7a5687e8a1f5500c5d5300970265e91195f2/chython_synplan-1.98-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:16dfd087891e839b6f3ebaa4dd244a0209e92c15cae19d8438857d6520c649fd", size = 6820396, upload-time = "2026-08-03T17:13:30.103Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/10/e541ec00b50cac1e546b82ce4d12f08b18e6a6f17ba88b9d3a4041a24d3a/chython_synplan-1.98-cp312-cp312-win_amd64.whl", hash = "sha256:6b0864fa425f559aa85ff7b4318ec384fc0a88bcdaecc04463265a209601c22c", size = 2498400, upload-time = "2026-08-03T17:13:31.787Z" },
+    { url = "https://files.pythonhosted.org/packages/db/d8/7ff7ebff7acc03717622b3b4e01db44d46bb99fe1bcbba29907a7371908a/chython_synplan-1.98-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:c019a21b0b32af883f3325bfa0c3ab156407c90e2bc2d132b52dcc00bfec340b", size = 2202154, upload-time = "2026-08-03T17:13:33.287Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/e9/688c95e0a9b5d9e8beffc2d77aa8da2c5dba59774bac15c499da3045d858/chython_synplan-1.98-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:a13d0c372012c8f01ac123c7e1da5629ed99558caf268cf3485b18e7ac07101f", size = 2905027, upload-time = "2026-08-03T17:13:34.702Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/f3/d3b1fc87c05aa6bf424015f1a23c8ec4e0e95c5e40b3825cd4a541eb6dd4/chython_synplan-1.98-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:45874bf3108d79a41157f3a77b52b5889f31686655d85648cb27325483c06408", size = 8506391, upload-time = "2026-08-03T17:13:36.192Z" },
+    { url = "https://files.pythonhosted.org/packages/06/b8/1e233b6b227f4ca3ceda0a556542a83b4e17c5cf2ed382f1a5c84f19ffe7/chython_synplan-1.98-cp313-cp313-win_amd64.whl", hash = "sha256:12f8251d4d902afeeea0a280ba48f9b29342cf2956cffaa80e4141a51843a672", size = 2749048, upload-time = "2026-08-03T17:13:38.121Z" },
 ]
 
 [package.optional-dependencies]
@@ -865,15 +859,9 @@ name = "contourpy"
 version = "1.3.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
@@ -1148,17 +1136,13 @@ name = "cuda-bindings"
 version = "12.9.6"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version < '3.11' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version < '3.11' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
+    "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "cuda-pathfinder", marker = "(python_full_version < '3.11' and sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu128') or (python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-10-synplanner-cu126') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "cuda-pathfinder", marker = "extra == 'extra-10-synplanner-cu126' or extra == 'extra-10-synplanner-cu128'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/08/9d/dd87e1071bcb2e438c14e2e4497aa0037faf2c9775ac1d172f578f448668/cuda_bindings-12.9.6-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:bb2f1eedc8f65902b34e807c21a3b7c922dc8de1f51d0829ecbb5c6a5e9c5ff1", size = 7094433, upload-time = "2026-03-11T14:47:22.811Z" },
@@ -1280,9 +1264,9 @@ name = "cuda-toolkit"
 version = "12.8.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 wheels = [
@@ -1291,37 +1275,37 @@ wheels = [
 
 [package.optional-dependencies]
 cublas = [
-    { name = "nvidia-cublas-cu12", version = "12.8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (python_full_version >= '3.11' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-cublas-cu12", version = "12.8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 cudart = [
-    { name = "nvidia-cuda-runtime-cu12", version = "12.8.90", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (python_full_version >= '3.11' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-cuda-runtime-cu12", version = "12.8.90", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 cufft = [
-    { name = "nvidia-cufft-cu12", version = "11.3.3.83", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (python_full_version >= '3.11' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-cufft-cu12", version = "11.3.3.83", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 cufile = [
     { name = "nvidia-cufile-cu12", version = "1.13.1.3", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 cupti = [
-    { name = "nvidia-cuda-cupti-cu12", version = "12.8.90", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (python_full_version >= '3.11' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-cuda-cupti-cu12", version = "12.8.90", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 curand = [
-    { name = "nvidia-curand-cu12", version = "10.3.9.90", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (python_full_version >= '3.11' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-curand-cu12", version = "10.3.9.90", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 cusolver = [
-    { name = "nvidia-cusolver-cu12", version = "11.7.3.90", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (python_full_version >= '3.11' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-cusolver-cu12", version = "11.7.3.90", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 cusparse = [
-    { name = "nvidia-cusparse-cu12", version = "12.5.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (python_full_version >= '3.11' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-cusparse-cu12", version = "12.5.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 nvjitlink = [
-    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (python_full_version >= '3.11' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 nvrtc = [
-    { name = "nvidia-cuda-nvrtc-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (python_full_version >= '3.11' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-cuda-nvrtc-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 nvtx = [
-    { name = "nvidia-nvtx-cu12", version = "12.8.90", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (python_full_version >= '3.11' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'linux' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-nvtx-cu12", version = "12.8.90", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'linux' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 
 [[package]]
@@ -1487,15 +1471,9 @@ name = "docutils"
 version = "0.22.4"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
@@ -2068,7 +2046,7 @@ name = "gunicorn"
 version = "25.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "packaging", marker = "python_full_version < '3.11' or sys_platform != 'win32' or extra == 'extra-10-synplanner-cpu' or extra == 'extra-10-synplanner-cu126' or extra != 'extra-10-synplanner-cu128'" },
+    { name = "packaging" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c4/f4/e78fa054248fab913e2eab0332c6c2cb07421fca1ce56d8fe43b6aef57a4/gunicorn-25.3.0.tar.gz", hash = "sha256:f74e1b2f9f76f6cd1ca01198968bd2dd65830edc24b6e8e4d78de8320e2fe889", size = 634883, upload-time = "2026-03-27T00:00:26.092Z" }
 wheels = [
@@ -3026,15 +3004,9 @@ name = "markdown-it-py"
 version = "4.2.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
@@ -3569,15 +3541,9 @@ name = "myst-parser"
 version = "5.0.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
@@ -3719,15 +3685,9 @@ name = "networkx"
 version = "3.6.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
@@ -3866,15 +3826,9 @@ name = "numpy"
 version = "2.4.4"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
@@ -3994,9 +3948,9 @@ name = "nvidia-cublas-cu12"
 version = "12.8.4.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 wheels = [
@@ -4038,9 +3992,9 @@ name = "nvidia-cuda-cupti-cu12"
 version = "12.8.90"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 wheels = [
@@ -4080,9 +4034,9 @@ name = "nvidia-cuda-nvrtc-cu12"
 version = "12.8.93"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 wheels = [
@@ -4124,9 +4078,9 @@ name = "nvidia-cuda-runtime-cu12"
 version = "12.8.90"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 wheels = [
@@ -4159,13 +4113,13 @@ name = "nvidia-cudnn-cu12"
 version = "9.19.0.56"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "nvidia-cublas-cu12", version = "12.8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu128') or (python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-cublas-cu12", version = "12.8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/09/b8/277c51962ee46fa3e5b203ac5f76107c650f781d6891e681e28e6f3e9fe6/nvidia_cudnn_cu12-9.19.0.56-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:08caaf27fe556aca82a3ee3b5aa49a77e7de0cfcb7ff4e5c29da426387a8267e", size = 656910700, upload-time = "2026-02-03T20:40:25.508Z" },
@@ -4225,13 +4179,13 @@ name = "nvidia-cufft-cu12"
 version = "11.3.3.83"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu128') or (python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/60/bc/7771846d3a0272026c416fbb7e5f4c1f146d6d80704534d0b187dd6f4800/nvidia_cufft_cu12-11.3.3.83-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:848ef7224d6305cdb2a4df928759dca7b1201874787083b6e7550dd6765ce69a", size = 193109211, upload-time = "2025-03-07T01:44:56.873Z" },
@@ -4268,9 +4222,9 @@ name = "nvidia-cufile-cu12"
 version = "1.13.1.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 wheels = [
@@ -4311,9 +4265,9 @@ name = "nvidia-curand-cu12"
 version = "10.3.9.90"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 wheels = [
@@ -4365,15 +4319,15 @@ name = "nvidia-cusolver-cu12"
 version = "11.7.3.90"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "nvidia-cublas-cu12", version = "12.8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu128') or (python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
-    { name = "nvidia-cusparse-cu12", version = "12.5.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu128') or (python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
-    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu128') or (python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-cublas-cu12", version = "12.8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-cusparse-cu12", version = "12.5.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/32/f7cd6ce8a7690544d084ea21c26e910a97e077c9b7f07bf5de623ee19981/nvidia_cusolver_cu12-11.7.3.90-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:db9ed69dbef9715071232caa9b69c52ac7de3a95773c2db65bdba85916e4e5c0", size = 267229841, upload-time = "2025-03-07T01:46:54.356Z" },
@@ -4420,13 +4374,13 @@ name = "nvidia-cusparse-cu12"
 version = "12.5.8.93"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu128') or (python_full_version < '3.11' and sys_platform == 'win32' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bc/f7/cd777c4109681367721b00a106f491e0d0d15cfa1fd59672ce580ce42a97/nvidia_cusparse_cu12-12.5.8.93-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:9b6c161cb130be1a07a27ea6923df8141f3c295852f4b260c65f18f3e0a091dc", size = 288117129, upload-time = "2025-03-07T01:47:40.407Z" },
@@ -4503,9 +4457,9 @@ name = "nvidia-nvjitlink-cu12"
 version = "12.8.93"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 wheels = [
@@ -4565,9 +4519,9 @@ name = "nvidia-nvtx-cu12"
 version = "12.8.90"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 wheels = [
@@ -4741,7 +4695,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "(python_full_version < '3.11' and sys_platform == 'emscripten') or (python_full_version < '3.11' and sys_platform == 'win32') or (sys_platform != 'emscripten' and sys_platform != 'win32') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'win32' and extra != 'extra-10-synplanner-cu128')" },
+    { name = "ptyprocess" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -6077,15 +6031,9 @@ name = "scikit-learn"
 version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
@@ -6213,15 +6161,9 @@ name = "scipy"
 version = "1.17.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
@@ -6307,8 +6249,8 @@ name = "secretstorage"
 version = "3.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cryptography", marker = "(python_full_version < '3.11' and sys_platform == 'emscripten') or (python_full_version < '3.11' and sys_platform == 'win32') or (sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'win32') or (sys_platform == 'darwin' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'darwin' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'darwin' and extra != 'extra-10-synplanner-cpu') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'win32' and extra != 'extra-10-synplanner-cu128')" },
-    { name = "jeepney", marker = "(python_full_version < '3.11' and sys_platform == 'emscripten') or (python_full_version < '3.11' and sys_platform == 'win32') or (sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'win32') or (sys_platform == 'darwin' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'darwin' and extra == 'extra-10-synplanner-cu128') or (sys_platform == 'darwin' and extra != 'extra-10-synplanner-cpu') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cpu') or (sys_platform == 'emscripten' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cu128') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cpu') or (sys_platform == 'win32' and extra == 'extra-10-synplanner-cu126') or (sys_platform == 'win32' and extra != 'extra-10-synplanner-cu128')" },
+    { name = "cryptography", marker = "sys_platform != 'darwin' or extra != 'extra-10-synplanner-cpu' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "jeepney", marker = "sys_platform != 'darwin' or extra != 'extra-10-synplanner-cpu' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1c/03/e834bcd866f2f8a49a85eaff47340affa3bfa391ee9912a952a1faa68c7b/secretstorage-3.5.0.tar.gz", hash = "sha256:f04b8e4689cbce351744d5537bf6b1329c6fc68f91fa666f60a380edddcd11be", size = 19884, upload-time = "2025-11-23T19:02:53.191Z" }
 wheels = [
@@ -6450,9 +6392,7 @@ name = "sphinx"
 version = "9.0.4"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version == '3.11.*' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
@@ -6487,12 +6427,8 @@ name = "sphinx"
 version = "9.1.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
@@ -6810,7 +6746,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "adabelief-pytorch", specifier = ">=0.2.1" },
-    { name = "chython-synplan", extras = ["racer-default"], specifier = ">=1.97" },
+    { name = "chython-synplan", extras = ["racer-default"], specifier = "==1.98" },
     { name = "chytorch-rxnmap-synplan", specifier = ">=1.7" },
     { name = "chytorch-synplan", specifier = ">=1.70" },
     { name = "click", specifier = ">=8.0.0" },
@@ -7170,15 +7106,9 @@ name = "torch"
 version = "2.11.0+cu128"
 source = { registry = "https://download.pytorch.org/whl/cu128" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'win32'",
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
-    "python_full_version == '3.11.*' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
     "python_full_version < '3.11'",
 ]
 dependencies = [
