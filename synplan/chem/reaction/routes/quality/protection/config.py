@@ -27,5 +27,7 @@ class ProtectionConfig(BaseConfigModel):
     competing_groups_path: str = str(_DATA_DIR / "competing_groups.yaml")
     incompatibility_path: str = str(_DATA_DIR / "incompatibility_matrix.tsv")
     halogen_groups_path: str = str(_DATA_DIR / "halogen_groups.yaml")
+    protecting_groups_path: str = str(_DATA_DIR / "protection_group_templates.csv")
+    allowed_labels_path: str = str(_DATA_DIR / "reactive_function_label_mapping.json")
     score_weight: float = Field(default=0.5, ge=0.0, le=1.0)
     enable_reranking: bool = True

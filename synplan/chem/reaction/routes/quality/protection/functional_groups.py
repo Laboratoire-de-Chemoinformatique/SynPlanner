@@ -47,8 +47,18 @@ class FunctionalGroupDetector:
 
     def __init__(self, config_path: str):
         self._patterns: list[dict] = []
+        self._templates: dict[str, tuple[str, str]] = {}
         self._cache: dict[str, list[FunctionalGroupMatch]] = {}
         self._load_config(config_path)
+
+    def template_for(self, name: str) -> tuple[str, str] | None:
+        """Return ``(template_smarts, modification_type)`` for a group.
+
+        :param name: Functional-group name.
+        :return: The mapped protection template and its modification type,
+            or ``None`` when the library defines no template for ``name``.
+        """
+        return self._templates.get(name)
 
     def _load_config(self, config_path: str) -> None:
         with open(config_path, encoding="utf-8") as fh:
@@ -75,6 +85,12 @@ class FunctionalGroupDetector:
                         "query": query,
                     }
                 )
+                # Consumed by the protection strategy, not by detection.
+                if entry.get("template_smarts"):
+                    self._templates[name] = (
+                        entry["template_smarts"],
+                        entry.get("modification_type", "label"),
+                    )
 
     def _cache_key(self, molecule: MoleculeContainer) -> str:
         """Return a canonical SMILES string suitable as a cache key."""
