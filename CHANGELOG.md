@@ -95,6 +95,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Four shipped configuration files could not be loaded at all, because every
+  config model forbids unknown keys and nothing checked that the files parse:
+  the two combined-policy configs carried `priority_rules_fraction`, which
+  belongs to a different model, `mhn_ranking_policy_training.yaml` used
+  `rule_encoder_type` where the field is `rule_embedding_type`, and
+  `planning_value.yaml` was unreachable because the planning CLI merged the
+  `node_evaluation` section into the tree config. Loading every shipped config
+  is now a test.
+- The functional-group patterns in `extraction_functional_groups.yaml` used `A`
+  to mean any atom, which chython 1.100 reads as any *aliphatic* atom, so they
+  silently stopped matching aromatic neighbours such as benzaldehyde and
+  styrene. They now use `*`.
 - Route JSON export now recovers precursor nodes whose producing fragment is
   structurally identical to the consuming reactant even when atom-number overlap
   with the final target is absent, and drops malformed routes instead of emitting

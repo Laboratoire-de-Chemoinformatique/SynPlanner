@@ -1,9 +1,12 @@
 # Combined policy configuration
-# Combines filtering and ranking policies by summing their probabilities
-# filtering_prob (sigmoid) + ranking_prob (softmax)
+# Combines filtering and ranking policies by weighted addition of logits:
+#   combined_logits = filtering_logits + ranking_weight * ranking_logits
+#   combined_probs  = softmax(combined_logits / temperature)
+# Both checkpoints must be trained on the SAME reaction rule set.
 
 filtering_weights_path: "path/to/filtering_policy_network.ckpt"
 ranking_weights_path: "path/to/ranking_policy_network.ckpt"
 top_rules: 50
 rule_prob_threshold: 0.0
-priority_rules_fraction: 0.5
+ranking_weight: 1.0
+temperature: 1.0

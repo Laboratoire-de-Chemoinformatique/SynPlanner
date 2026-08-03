@@ -10,9 +10,9 @@ batch_size: 1000
 association_dim: 512
 beta: 0.05
 normalize_associations: true
-rule_encoder_type: fingerprint
+rule_embedding_type: fingerprint
 # To switch from rule fingerprints to QueryCGR rule graphs, set
-# rule_encoder_type: query_cgr_graph (rule_embedder.embedder_type must stay gps).
+# rule_embedding_type: query_cgr_graph (rule_embedder.embedder_type must stay gps).
 rule_fp_size: 2048
 rule_fp_min_radius: 1
 rule_fp_max_radius: 4

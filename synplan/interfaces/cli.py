@@ -808,7 +808,9 @@ def planning_cli(
     with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
-    search_config = {**config["tree"], **config.get("node_evaluation", {})}
+    # node_evaluation keys are read separately below; merging them here would
+    # reach TreeConfig (extra="forbid") and reject every config that has them.
+    search_config = dict(config["tree"])
     policy_config = PolicyNetworkConfig.from_dict(
         {**config["node_expansion"], **{"weights_path": policy_network}}
     )
