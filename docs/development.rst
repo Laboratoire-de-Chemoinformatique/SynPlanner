@@ -62,6 +62,12 @@ date plus footer links, and rotates ``docs/_static/switcher.json``. The GHCR
 ``|release|`` and needs no edit. Review the diff, then commit and tag
 ``vX.Y.Z``.
 
+The compare links and the switcher entry are derived from the newest ``vX.Y.Z``
+git tag, not from ``pyproject.toml``. If a version was bumped but never tagged,
+the script says so and you must fold that CHANGELOG section into the new release
+by hand. Pushing the ``vX.Y.Z`` tag is what triggers the PyPI and TestPyPI
+publish workflows.
+
 Manual path
 ~~~~~~~~~~~
 

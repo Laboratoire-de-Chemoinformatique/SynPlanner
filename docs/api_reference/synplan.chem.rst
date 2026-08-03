@@ -9,7 +9,7 @@ Subpackages
 
    synplan.chem.data
    synplan.chem.reaction.routes
-   synplan.chem.reaction_rules
+   synplan.chem.reaction.rules
 
 Submodules
 ----------

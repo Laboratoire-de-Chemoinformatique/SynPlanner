@@ -12,8 +12,37 @@ For the full per-release log, see :doc:`/release_notes`.
    :local:
    :depth: 2
 
-1.5.2
+1.6.0
 =====
+
+chython 1.100 changes what your SMARTS mean
+--------------------------------------------
+
+SynPlanner now requires ``chython-synplan`` 1.100 exactly. Its rewritten SMARTS
+parser follows Daylight on three primitives that chython used to read
+differently. Hand-written patterns — priority rules, ``func_groups_list``,
+protection group definitions — that use them silently change meaning:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 40 45
+
+   * - Primitive
+     - Old chython reading
+     - chython 1.100 (Daylight)
+   * - ``A``
+     - any atom
+     - any *aliphatic* atom; use ``*`` for any atom
+   * - ``x``
+     - number of heteroatom neighbours
+     - ring connectivity; the heteroatom count is now ``y``
+   * - unmarked charge
+     - charge 0
+     - unconstrained; ``[N]`` also matches a cationic N, ``[N+0]`` does not
+
+Rewrite ``A`` as ``*`` and ``x`` as ``y`` wherever the old meaning was intended,
+and add ``+0`` where a neutral atom was assumed. Rules extracted by SynPlanner
+itself are unaffected — they are generated from CGRs, not hand-written.
 
 Route post-processing moved to ``synplan.chem.reaction.routes``
 ----------------------------------------------------------------
@@ -54,6 +83,18 @@ New code should use the canonical paths below.
      - ``synplan.chem.reaction.routes.quality.protection``
    * - ``synplan.route_quality``
      - ``synplan.chem.reaction.routes.quality``
+
+Reaction rules moved to ``synplan.chem.reaction.rules``
+-------------------------------------------------------
+
+Rule analysis, extraction, priority-rule parsing, and the QueryCGR/Morgan rule
+representations now live under ``synplan.chem.reaction.rules`` (and
+``synplan.chem.reaction.rules.representation``). ``synplan.chem.reaction_rules``
+remains as a deprecated shim for ``analysis``, ``extraction``, and ``priority``;
+importing from it emits a ``DeprecationWarning``.
+
+MCTS expansion wrappers moved to ``synplan.mcts.policy``. The old
+``synplan.mcts.expansion`` module is gone.
 
 Tree persistence and route exports
 ----------------------------------

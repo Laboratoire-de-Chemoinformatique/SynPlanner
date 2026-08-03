@@ -11,6 +11,7 @@ Subpackages and modules
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. automodule:: synplan.chem.reaction.routes.representation
    :members:
@@ -31,3 +32,4 @@ Subpackages and modules
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:

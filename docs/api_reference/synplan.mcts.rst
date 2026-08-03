@@ -12,10 +12,18 @@ synplan.mcts.evaluation module
    :undoc-members:
    :show-inheritance:
 
-synplan.mcts.expansion module
+synplan.mcts.algorithm module
 -----------------------------
 
-.. automodule:: synplan.mcts.expansion
+.. automodule:: synplan.mcts.algorithm
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+synplan.mcts.policy package
+---------------------------
+
+.. automodule:: synplan.mcts.policy
    :members:
    :undoc-members:
    :show-inheritance:

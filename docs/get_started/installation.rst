@@ -7,8 +7,8 @@ Supported environments
 ~~~~~~~~~~~~~~~~~~~~~~
 
 - Python: ``>=3.10,<3.15`` (CPython). The publishing workflow builds with Python ``3.12``.
-- OS/arch: developed and CI-tested on Linux x86_64 and MacOS arm64. Other platforms may work, but Docker is
-  recommended for maximum portability.
+- OS/arch: CI runs the test suite on Linux, macOS, and Windows across every supported Python version.
+  Other platforms may work, but Docker is recommended for maximum portability.
 
 What you get after install
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -59,8 +59,7 @@ From source with uv (dev)
 Limitations and notes
 ~~~~~~~~~~~~~~~~~~~~~
 
-- Wheels are published from Linux. If you experience platform issues on macOS/Windows,
-  prefer Docker or a Linux environment (e.g., WSL2).
+- If you experience platform issues, prefer Docker or a Linux environment (e.g., WSL2).
 - Example data and model weights are not included; download them with the CLI
   (see :doc:`data_download`).
 - To run the full planning quickstart in 10 minutes, continue to :doc:`/user_guide/ten_minutes`.

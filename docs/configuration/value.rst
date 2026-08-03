@@ -33,33 +33,30 @@ Run value network tuning using the repository configuration in ``configs/tuning.
 
     tree:
       max_iterations: 100
-      max_tree_size: 10000
+      max_tree_size: 1000000
       max_time: 120
       max_depth: 9
-      search_strategy: expansion_first
       ucb_type: uct
       c_ucb: 0.1
       backprop_type: muzero
-      exclude_small: True
-      min_mol_size: 6
-      init_node_value: 0.5
-      epsilon: 0
-      silent: True
-    node_evaluation:
-      evaluation_type: rollout
+      search_strategy: expansion_first
       evaluation_agg: max
+      exclude_small: True
+      init_node_value: 0.5
+      min_mol_size: 6
+      silent: True
     node_expansion:
       top_rules: 50
       rule_prob_threshold: 0.0
       priority_rules_fraction: 0.5
     value_network:
       vector_dim: 512
-      num_conv_layers: 5
-      learning_rate: 0.0005
-      dropout: 0.4
-      num_epoch: 100
       batch_size: 1000
-    reinforcement:
+      dropout: 0.4
+      learning_rate: 0.0005
+      num_conv_layers: 5
+      num_epoch: 100
+    tuning:
       batch_size: 100
       num_simulations: 1
 
@@ -83,8 +80,8 @@ Run value network tuning using the repository configuration in ``configs/tuning.
     tree:init_node_value                     The initial value for newly created nodes in the tree (for expansion_first search strategy)
     tree:epsilon                             This parameter is used in the epsilon-greedy strategy during the node selection, representing the probability of choosing a random action for exploration. A higher value leads to more exploration
     tree:silent                              If True, suppresses the progress logging of the tree search
-    node_evaluation:evaluation_agg           The way the evaluation scores are aggregated. Options are "max" (using the maximum score of the child nodes) and "average" (using the average score of the child nodes)
-    node_evaluation:evaluation_type          The method used for node evaluation. Options include "random" (random number between 0 and 1), "rollout" (using rollout simulations), and "gcn" (graph convolutional value network)
+    tree:evaluation_agg                      The way the evaluation scores are aggregated. Options are "max" (using the maximum score of the child nodes) and "average" (using the average score of the child nodes)
+    node_evaluation:evaluation_type          The method used for node evaluation. Options are "rollout" (rollout simulations, default), "gcn" (graph convolutional value network), "random" (random number between 0 and 1), "policy", and "rdkit"
     node_expansion:top_rules                 The maximum amount of rules to be selected for node expansion from the list of predicted reaction rules
     node_expansion:rule_prob_threshold       The reaction rules with predicted probability lower than this parameter will be discarded
     node_expansion:priority_rules_fraction   The fraction of priority rules in comparison to the regular rules
@@ -94,6 +91,6 @@ Run value network tuning using the repository configuration in ``configs/tuning.
     value_network:learning_rate              The learning rate
     value_network:num_epoch                  The number of training epochs
     value_network:batch_size                 The size of the batch of input molecular graphs
-    reinforcement:batch_size                 The size of the batch of target molecules used for planning simulation and value network update
-    reinforcement:num_simulations            The number of planning simulations per reinforcement learning iteration
+    tuning:batch_size                        The size of the batch of target molecules used for planning simulation and value network update
+    tuning:num_simulations                   The number of planning simulations per reinforcement learning iteration
     ======================================== ==========================================================

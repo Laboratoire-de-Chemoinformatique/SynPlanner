@@ -13,6 +13,7 @@ class BaseSearchStrategy(ABC):
     """Minimal abstract base for search strategies operating on a retrosynthesis `Tree`.
 
     Contract:
+
     - Holds a reference to `tree` with fields like `children`, `parents`,
       and `nodes` (a `dict[int, Node]`). Per-node search state lives on
       ``Node`` directly: ``tree.nodes[node_id].visit``,

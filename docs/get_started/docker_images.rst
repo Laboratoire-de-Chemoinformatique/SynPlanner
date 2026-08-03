@@ -44,7 +44,7 @@ Quick planning example (mount config and data):
      -v "$(pwd)":/app -w /app \
      ghcr.io/laboratoire-de-chemoinformatique/synplanner:${VERSION}-cli-amd64 \
      planning \
-       --config configs/planning.yaml \
+       --config configs/planning_standard.yaml \
        --targets tutorials/synplan_data/benchmarks/sascore/targets_with_sascore_1.5_2.5.smi \
        --reaction_rules synplan_data/policy/supervised_gcn/v1/reaction_rules.tsv \
        --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \

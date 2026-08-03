@@ -34,11 +34,9 @@ Extract rules using the repository configuration in ``configs/rules_extraction.y
     multicenter_rules: True
     include_rings: False
     include_func_groups: False
-    func_groups_list: []
     keep_leaving_groups: True
     keep_incoming_groups: False
     keep_reagents: False
-    reactor_validation: True
     atom_info_retention:
       reaction_center:
         neighbors: False
@@ -48,7 +46,7 @@ Extract rules using the repository configuration in ``configs/rules_extraction.y
         neighbors: False
         implicit_hydrogens: False
         ring_sizes: False
-        worker_timeout_per_reaction: 10.0
+    worker_timeout_per_reaction: 10.0
 
 **Configuration parameters**
 

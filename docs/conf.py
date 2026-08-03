@@ -94,7 +94,7 @@ autodoc_type_aliases = {
     "Tree": "synplan.mcts.tree.Tree",
 }
 
-# Suppress warnings for modules that fail to import at doc-build time
-# (e.g. decompositions.py executes code at import that requires runtime deps)
-# Also suppress ambiguous cross-reference warnings for re-exported symbols (e.g. Tree)
-suppress_warnings = ["autodoc.import_object", "ref.python"]
+# Ambiguous cross-references come from re-exports (e.g. Tree in synplan/__init__.py).
+# autodoc.import_object is deliberately NOT suppressed: it is what catches modules
+# that were moved or that no longer import.
+suppress_warnings = ["ref.python"]

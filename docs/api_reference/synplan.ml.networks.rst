@@ -12,16 +12,24 @@ synplan.ml.networks.base module
    :undoc-members:
    :show-inheritance:
 
-synplan.ml.networks.embedders module
--------------------------------------
+synplan.ml.networks.checkpoint module
+--------------------------------------
 
-.. automodule:: synplan.ml.networks.embedders
+.. automodule:: synplan.ml.networks.checkpoint
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.ml.networks.policy module
----------------------------------
+synplan.ml.networks.embedding package
+--------------------------------------
+
+.. automodule:: synplan.ml.networks.embedding
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+synplan.ml.networks.policy package
+----------------------------------
 
 .. automodule:: synplan.ml.networks.policy
    :members:

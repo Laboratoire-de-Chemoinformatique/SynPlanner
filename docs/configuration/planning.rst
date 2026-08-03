@@ -31,33 +31,31 @@ Run planning using the repository configuration in ``configs/planning_standard.y
 .. code-block:: yaml
 
     tree:
-      algorithm: uct
       max_iterations: 100
-      max_tree_size: 10000
-      max_time: 120
-      max_depth: 9
+      max_tree_size: 1000000
+      max_time: 600
+      max_depth: 6
       search_strategy: expansion_first
       ucb_type: uct
       c_ucb: 0.1
       backprop_type: muzero
+      evaluation_agg: max
       exclude_small: True
       init_node_value: 0.5
       min_mol_size: 6
-      epsilon: 0
+      epsilon: 0.0
       silent: True
-      use_priority: False
-      priority_rule_multiapplication: False
-      # NMCS-specific parameters (used when algorithm is "nmcs" or "lazy_nmcs")
-      nmcs_level: 2
-      nmcs_playout_mode: greedy
-      lnmcs_ratio: 0.2
-    node_evaluation:
-      evaluation_type: rollout
-      evaluation_agg: max
     node_expansion:
       top_rules: 50
       rule_prob_threshold: 0.0
       priority_rules_fraction: 0.5
+
+Keys absent from the file fall back to the defaults of
+:class:`~synplan.utils.config.TreeConfig` and
+:class:`~synplan.utils.config.PolicyNetworkConfig`. The optional ones are listed
+below; ``algorithm``, ``use_priority``, ``priority_rule_multiapplication`` and
+the ``nmcs_*`` / ``lnmcs_ratio`` keys go under ``tree:``, and
+``node_evaluation:`` takes ``evaluation_type``.
 
 **Configuration parameters**
 
@@ -85,8 +83,8 @@ Run planning using the repository configuration in ``configs/planning_standard.y
     tree:lnmcs_ratio                         Pruning percentile for LazyNMCS algorithm. Only candidates scoring above this percentile threshold are explored. Value in range [0.0, 1.0]. Defaults to 0.2
     tree:use_priority                        Try curated priority rules passed via ``Tree(priority_rules=...)`` ahead of the policy on every expansion. Requires a non-empty ``priority_rules`` mapping. Defaults to False
     tree:priority_rule_multiapplication      Apply each priority rule to its product set until no new tuple is produced (BFS to fixpoint), instead of stopping at the first match. Affects priority rules only, not the policy. Defaults to False
-    node_evaluation:evaluation_agg           The way the evaluation scores are aggregated. Options are "max" (using the maximum score) and "average" (using the average score)
-    node_evaluation:evaluation_type          The method used for node evaluation. Options include "random" (random number between 0 and 1), "rollout" (using rollout simulations), and "gcn" (graph convolutional networks)
+    tree:evaluation_agg                      The way the evaluation scores are aggregated. Options are "max" (using the maximum score) and "average" (using the average score)
+    node_evaluation:evaluation_type          The method used for node evaluation. Options are "rollout" (rollout simulations, default), "gcn" (value network), "random" (random number between 0 and 1), "policy" (policy probability), and "rdkit" (RDKit descriptor score, see ``score_function``)
     node_expansion:top_rules                 The maximum amount of rules to be selected for node expansion from the list of predicted reaction rules
     node_expansion:rule_prob_threshold       The reaction rules with predicted probability lower than this parameter will be discarded
     node_expansion:priority_rules_fraction   The fraction of priority rules in comparison to the regular rules (only for filtering policy)

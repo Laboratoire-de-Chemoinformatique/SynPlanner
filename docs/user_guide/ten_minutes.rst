@@ -291,7 +291,7 @@ After planning, open the HTML report:
 
 .. code-block:: bash
 
-    open planning_results/routes.html
+    open planning_results/extracted_routes_html/retroroutes_target_0.html
 
 Or generate visualisations from Python:
 

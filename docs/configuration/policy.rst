@@ -61,9 +61,9 @@ The rules TSV is inferred from the extracted policy mapping name:
 together when training ``mhn_ranking``.
 
 ``embedder_type`` controls the product molecule encoder. Use
-``rule_encoder_type: query_cgr_graph`` (with ``rule_embedder.embedder_type: gps``)
+``rule_embedding_type: query_cgr_graph`` (with ``rule_embedder.embedder_type: gps``)
 to embed labeled QueryCGR rule graphs instead of Morgan rule fingerprints;
-``rule_fp_*`` fields are used only by ``rule_encoder_type: fingerprint``.
+``rule_fp_*`` fields are used only by ``rule_embedding_type: fingerprint``.
 QueryCGR rule graphs currently require the rule-side GPS embedder because rule
 bond dynamics are encoded as edge attributes. By default, the rule graph GPS
 shares ``vector_dim``, ``num_conv_layers``, ``heads``, and ``attn_type`` with the
@@ -86,7 +86,7 @@ rule GPS:
    heads: 8
    attn_type: multihead
 
-   rule_encoder_type: query_cgr_graph
+   rule_embedding_type: query_cgr_graph
    rule_embedder:
      embedder_type: gps
      attn_type: performer
@@ -97,21 +97,21 @@ Common MHN configurations:
 
    # Product GCN + rule fingerprints
    embedder_type: gcn
-   rule_encoder_type: fingerprint
+   rule_embedding_type: fingerprint
 
    # Product GCN + QueryCGR rule graphs
    embedder_type: gcn
-   rule_encoder_type: query_cgr_graph
+   rule_embedding_type: query_cgr_graph
    rule_embedder:
      embedder_type: gps
 
    # Product GPS + rule fingerprints
    embedder_type: gps
-   rule_encoder_type: fingerprint
+   rule_embedding_type: fingerprint
 
    # Product GPS + QueryCGR rule graphs
    embedder_type: gps
-   rule_encoder_type: query_cgr_graph
+   rule_embedding_type: query_cgr_graph
    rule_embedder:
      embedder_type: gps
 
@@ -147,14 +147,14 @@ rules must retain their training order.
     embedder_type                      Graph embedder: ``gcn``, ``gcn_concat``, or ``gps``; ``gcn_concat`` requires ``vector_dim`` divisible by ``num_conv_layers``
     architecture                       Ranking head: ``linear`` (default) or ``mhn_ranking``
     heads                              Number of attention heads for ``embedder_type: gps``
-    attn_type                          GPS attention type: ``multihead``, ``performer``, or ``null``
+    attn_type                          GPS attention type: ``performer`` (default) or ``multihead``
     attn_dropout                       Attention dropout for GPS layers
     log_grad_norm                      If true, log module-level gradient norms during training
     logger                             Training logger configuration (see below). Set to ``null`` to disable.
     association_dim                    MHN molecule-rule association dimension
     beta                               Scale applied to MHN association logits
     normalize_associations             Apply non-affine LayerNorm after each MHN projection
-    rule_encoder_type                  Rule encoder mode: ``fingerprint`` (default) or ``query_cgr_graph``
+    rule_embedding_type                Rule encoder mode: ``fingerprint`` (default) or ``query_cgr_graph``
     rule_graph_batch_size              Rule graph batch size used while embedding all rules
     rule_graph_schema_version          QueryCGR rule graph schema version included in digests and caches
     rule_fp_size                       Chython Morgan rule fingerprint size; must be a power of two

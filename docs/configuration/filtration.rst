@@ -28,13 +28,13 @@ Run reaction filtration using the repository configuration in ``configs/reaction
 
 .. code-block:: yaml
 
-    multi_center_config:
     no_reaction_config:
     dynamic_bonds_config:
       min_bonds_number: 1
-      max_bonds_number: 6
+      max_bonds_number: 12
     small_molecules_config:
       mol_max_size: 6
+    cc_sp3_breaking_config:
 
 **Configuration parameters**
 
@@ -59,5 +59,6 @@ Run reaction filtration using the repository configuration in ``configs/reaction
 
 .. note::
     1. If the reaction filter name is listed in the configuration file, it means that this filter will be activated.
-    2. The order of filters listed in the configuration file defines the order of their application to the input reactions.
+    2. The configuration file enables filters and sets their parameters; it does not define execution order. Filters run in the fixed order of :meth:`~synplan.chem.data.filtering.ReactionFilterConfig.create_filters`.
     3. Some filters require additional parameters (e.g. ``small_molecules_config``).
+    4. To disable a filter, omit its key entirely. A bare ``key:`` enables the filter with its defaults.

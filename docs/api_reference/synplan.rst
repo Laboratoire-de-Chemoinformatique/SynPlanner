@@ -11,7 +11,6 @@ Subpackages
    synplan.interfaces
    synplan.mcts
    synplan.ml
-   synplan.chem.reaction.routes
    synplan.utils
 
 Module contents

@@ -7,7 +7,7 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   synplan.chem.reaction_rules.manual
+   synplan.chem.reaction.rules.manual
 
 Submodules
 ----------

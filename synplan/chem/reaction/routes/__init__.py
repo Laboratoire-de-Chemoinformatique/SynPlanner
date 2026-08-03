@@ -1,6 +1,7 @@
 """Reaction-route domain code, organized by artifact.
 
-Modules / subpackages:
+Modules / subpackages::
+
     representation   route-CGR + strategic-bond CGR representations (route_cgr,
                      sb_cgr) plus container/state/hash/depiction helpers
     clustering       cluster / subcluster logic and pseudo-atom primitives

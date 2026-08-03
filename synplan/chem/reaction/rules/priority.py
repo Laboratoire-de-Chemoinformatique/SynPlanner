@@ -70,7 +70,7 @@ def parse_priority_rules(
     automorphism_filter: bool = False,
     delete_atoms: bool = False,
 ) -> dict[str, list[CanonicalRetroReactor]]:
-    """Parse a ``{set_name: [SMARTS, ...]}`` mapping into chython :class:`Reactor`s.
+    """Parse a ``{set_name: [SMARTS, ...]}`` mapping into chython :class:`Reactor` objects.
 
     On a parsing failure, raises :exc:`PrioritySmartsError` naming the offending
     set, the offending SMARTS, the underlying chython error, and (when RDKit is
