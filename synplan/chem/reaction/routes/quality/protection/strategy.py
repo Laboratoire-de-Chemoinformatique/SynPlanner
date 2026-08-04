@@ -390,7 +390,20 @@ def apply_protection(
     :param first_step: Step the protection must precede.
     :param last_step: Step the deprotection must follow.
     :return: A new route dict with two extra steps.
+    :raises KeyError: If either step is not in the route.
+    :raises ValueError: If ``last_step`` comes before ``first_step``.
     """
+    missing = {first_step, last_step} - set(route)
+    if missing:
+        # the splice is positional, so an absent step would drop its half of the
+        # pair and hand back a route that looks protected and is not
+        raise KeyError(f"steps {sorted(missing)} are not in the route")
+    if last_step < first_step:
+        raise ValueError(
+            f"last_step {last_step} precedes first_step {first_step}, which "
+            "would deprotect before protecting"
+        )
+
     spliced: dict[int, ReactionContainer] = {}
     next_id = 0
     for step_id in sorted(route):

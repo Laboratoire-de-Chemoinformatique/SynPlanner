@@ -62,6 +62,22 @@ def test_carbonyl_protection_is_the_known_gap(config):
     assert planner.candidates("Phenol")  # unaffected groups still work
 
 
+def test_apply_protection_rejects_a_range_it_cannot_splice():
+    """Silently returning an unprotected route is worse than raising."""
+    from synplan.chem.reaction.routes.quality.protection.strategy import (
+        apply_protection,
+    )
+
+    route = {0: "a", 1: "b"}
+    with pytest.raises(KeyError):
+        apply_protection(route, "P", "D", first_step=0, last_step=9)
+    with pytest.raises(ValueError):
+        apply_protection(route, "P", "D", first_step=1, last_step=0)
+
+    spliced = apply_protection(route, "P", "D", first_step=0, last_step=1)
+    assert list(spliced.values()) == ["P", "a", "b", "D"]
+
+
 def test_allowed_labels_load(config):
     labels = load_allowed_labels(config.allowed_labels_path)
     assert labels
