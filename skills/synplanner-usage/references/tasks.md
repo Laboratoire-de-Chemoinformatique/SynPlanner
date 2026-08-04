@@ -58,8 +58,7 @@ Clean → `extract_rules_from_reactions` → `create_policy_dataset` +
 Check the rule count before training. Policy training needs a corpus large
 enough to hold out a validation split; a handful of rules will not train and the
 run fails on the missing validation metric. If extraction yields only a few
-rules — a narrow dataset, or an HTE screen where dedup collapses thousands of
-records to a handful of distinct reactions — **use priority rules instead of
+rules - **use priority rules instead of
 training**, see "Plan with my own retrosynthetic SMARTS" below.
 
 ## Finding routes
@@ -107,10 +106,7 @@ Tutorial: `11_Planning_with_RDKit`
 **Plan with my own retrosynthetic SMARTS**
 Also the answer when a custom dataset is too small to train a policy on — hand
 the chemistry over as priority rules rather than trying to learn it from a few
-examples.
-Planning setup with `RDKitEvaluationConfig` instead of `RolloutEvaluationConfig`.
-Per-source usage statistics and rule provenance are on the tree and route objects;
-the tutorial defines its own small helper to summarise them.
+examples. Сombine priority rules with preset policy. 
 Tutorial: `13_Priority_Rules`
 Docs: `methods/priority_rules` — read the SMARTS dialect note before writing any
 

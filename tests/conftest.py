@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 import tempfile
 from pathlib import Path
 
@@ -18,20 +17,6 @@ os.environ.setdefault("MPLCONFIGDIR", str(_mpl_config_dir))
 # Some CI images include color emoji fonts that FreeType cannot inspect.
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
-
-
-def pytest_unconfigure(config):
-    """Force-exit after test session to prevent hanging from PyTorch daemon threads."""
-    # os._exit skips stdio flushing; without this the failure tracebacks and the
-    # summary line are silently dropped whenever output is redirected to a file.
-    sys.stdout.flush()
-    sys.stderr.flush()
-    os._exit(getattr(config, "_exitstatus", 0))
-
-
-def pytest_sessionfinish(session, exitstatus):
-    """Store exit status for pytest_unconfigure."""
-    session.config._exitstatus = exitstatus
 
 
 from synplan.chem.data.filtering import (  # noqa: E402
