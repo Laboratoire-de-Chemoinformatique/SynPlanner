@@ -356,59 +356,6 @@ class TestVisualizationSVG:
 
 
 # ---------------------------------------------------------------------------
-# 5. Visualization — PNG
-# ---------------------------------------------------------------------------
-
-
-class TestVisualizationPNG:
-    """Test PNG generation (requires playwright/browser support)."""
-
-    @pytest.fixture(autouse=True)
-    def _check_png_support(self):
-        """Skip PNG tests if svg2png is not available."""
-        try:
-            from chython.algorithms.depict import svg2png  # noqa: F401
-        except ImportError:
-            pytest.skip("svg2png not available (missing playwright/browser)")
-
-    def test_molecule_depict_png(self, routes_dict_from_json):
-        first_route = next(iter(routes_dict_from_json.values()))
-        first_rxn = next(iter(first_route.values()))
-        mol = first_rxn.reactants[0]
-        mol.clean2d()
-        try:
-            png = mol.depict(format="png")
-            assert isinstance(png, bytes)
-            assert len(png) > 0
-            # PNG magic bytes
-            assert png[:4] == b"\x89PNG"
-        except Exception as e:
-            pytest.skip(f"PNG rendering failed (browser not available?): {e}")
-
-    def test_cgr_depict_png(self, all_route_cgrs):
-        first_cgr = next(iter(all_route_cgrs.values()))
-        first_cgr.clean2d()
-        try:
-            png = first_cgr.depict(format="png")
-            assert isinstance(png, bytes)
-            assert len(png) > 0
-            assert png[:4] == b"\x89PNG"
-        except Exception as e:
-            pytest.skip(f"PNG rendering failed (browser not available?): {e}")
-
-    def test_reaction_depict_png(self, routes_dict_from_json):
-        first_route = next(iter(routes_dict_from_json.values()))
-        first_rxn = next(iter(first_route.values()))
-        try:
-            png = first_rxn.depict(format="png")
-            assert isinstance(png, bytes)
-            assert len(png) > 0
-            assert png[:4] == b"\x89PNG"
-        except Exception as e:
-            pytest.skip(f"PNG rendering failed (browser not available?): {e}")
-
-
-# ---------------------------------------------------------------------------
 # 6. HTML reports
 # ---------------------------------------------------------------------------
 

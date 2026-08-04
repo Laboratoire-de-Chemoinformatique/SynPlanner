@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -21,6 +22,10 @@ logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 
 def pytest_unconfigure(config):
     """Force-exit after test session to prevent hanging from PyTorch daemon threads."""
+    # os._exit skips stdio flushing; without this the failure tracebacks and the
+    # summary line are silently dropped whenever output is redirected to a file.
+    sys.stdout.flush()
+    sys.stderr.flush()
     os._exit(getattr(config, "_exitstatus", 0))
 
 
