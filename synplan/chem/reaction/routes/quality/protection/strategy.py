@@ -63,14 +63,27 @@ def load_protecting_groups(path: str | Path) -> dict[int, list[ProtectingGroup]]
     (six of the labels do), so every row is kept and the choice between them is
     left to the classifier.
 
+    Rows whose template does not parse are dropped here rather than failing
+    once per call site. Nine of them map two atoms to :512 to attach at two
+    points, which acetals and dithianes need because they replace the carbonyl
+    double bond rather than hanging a group off it; the product builder adds a
+    single bond and deletes nothing, so it cannot express them. The table is
+    kept byte-identical to the published one and the gap lives in the code.
+
     :param path: Path to the tab-separated template table.
     :return: Mapping of label id to its :class:`ProtectingGroup` rows, in file
         order.
     """
     groups: dict[int, list[ProtectingGroup]] = {}
+    unsupported: dict[int, str] = {}
     with open(path, encoding="utf-8") as fh:
         for row in csv.DictReader(fh, delimiter="\t"):
             label = int(row["label"])
+            try:
+                smarts(row["template"])
+            except Exception as err:
+                unsupported.setdefault(label, str(err))
+                continue
             groups.setdefault(label, []).append(
                 ProtectingGroup(
                     label=label,
@@ -81,6 +94,14 @@ def load_protecting_groups(path: str | Path) -> dict[int, list[ProtectingGroup]]
                     deprotection_class=row["deprotection_class"],
                 )
             )
+    if unsupported:
+        logger.warning(
+            "Protecting-group labels %s have no usable template, so the "
+            "functional groups that allow only those labels cannot be "
+            "protected: %s",
+            sorted(unsupported),
+            "; ".join(f"{label}: {err}" for label, err in sorted(unsupported.items())),
+        )
     return groups
 
 

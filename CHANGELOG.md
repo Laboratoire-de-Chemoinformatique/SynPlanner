@@ -103,6 +103,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `planning_value.yaml` was unreachable because the planning CLI merged the
   `node_evaluation` section into the tree config. Loading every shipped config
   is now a test.
+- Protecting-group selection cannot protect aldehydes, ketones, alpha-halo
+  ketones or phthalimide-protected amines. Nine of the twenty-five published
+  templates attach at two points, which acetals and dithianes need because they
+  replace the carbonyl double bond rather than substituting onto it, and the
+  product builder adds a single bond and deletes nothing. Eighteen reactive
+  functions allow only those templates, so they have no protection option at
+  all. The table is unchanged and the loader now says this once at startup
+  rather than failing quietly at each call.
 - The functional-group patterns in `extraction_functional_groups.yaml` used `A`
   to mean any atom, which chython 1.100 reads as any *aliphatic* atom, so they
   silently stopped matching aromatic neighbours such as benzaldehyde and

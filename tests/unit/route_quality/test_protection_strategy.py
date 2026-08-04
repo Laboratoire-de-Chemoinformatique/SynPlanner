@@ -37,6 +37,31 @@ def test_protecting_groups_keep_every_row(config):
     assert sum(len(v) for v in groups.values()) > len(groups)
 
 
+def test_bidentate_templates_are_dropped_not_offered(config, caplog):
+    """Nine templates attach at two points and cannot be built; say so once."""
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        groups = load_protecting_groups(config.protecting_groups_path)
+
+    assert not (set(groups) & {11, 12, 13, 14, 18})
+    assert "no usable template" in caplog.text
+    for rows in groups.values():
+        for group in rows:
+            build_protection_rule("[C;H2:1]", group)  # every kept row is usable
+
+
+def test_carbonyl_protection_is_the_known_gap(config):
+    """Aldehydes and ketones have no protection option; keep that visible."""
+    planner = ProtectionPlanner(
+        load_protecting_groups(config.protecting_groups_path),
+        load_allowed_labels(config.allowed_labels_path),
+    )
+    assert planner.candidates("Aldehyde_Aromatic") == []
+    assert planner.candidates("KetoneAliphaticCyclic") == []
+    assert planner.candidates("Phenol")  # unaffected groups still work
+
+
 def test_allowed_labels_load(config):
     labels = load_allowed_labels(config.allowed_labels_path)
     assert labels
