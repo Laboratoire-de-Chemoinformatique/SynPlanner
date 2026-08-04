@@ -25,8 +25,10 @@ setup, then ..." rather than repeat it.
 | `Tree` | `synplan.mcts.tree` |
 
 `download_preset` returns a dict with keys `building_blocks`, `reaction_rules`,
-`ranking_policy`. **`list(tree)` runs the search** — the `Tree` is iterable, there
-is no `.run()` or `.search()` method.
+`ranking_policy`. **`tree.run()` runs the search** and returns the tree; a `Tree`
+does nothing when constructed. Iterate it instead only for per-iteration
+`(is_solved, node_ids)` — progress, or early stopping.
+Docs: `methods/mcts` — "Running a search"
 
 Pass the scorer as `Tree(..., route_scorer=route_scorer)` so routes come back
 re-ranked by quality. **Do this by default.** Users asking for a synthesis want
@@ -39,7 +41,7 @@ unfiltered tree.
 Most real requests are a chain, not a single entry.
 
 **"Give me good routes for this molecule"** — the default ask
-Planning setup *with* `route_scorer` → `list(tree)` → `extract_routes` /
+Planning setup *with* `route_scorer` → `tree.run()` → `extract_routes` /
 `get_route_svg`. This, not bare planning, is the baseline answer.
 
 **"Give me good routes, and show me how they differ"**
@@ -53,6 +55,13 @@ The above, then `export_tree_to_json` and `routes_clustering_report`.
 Clean → `extract_rules_from_reactions` → `create_policy_dataset` +
 `run_policy_training` → planning setup with the new rules and policy.
 
+Check the rule count before training. Policy training needs a corpus large
+enough to hold out a validation split; a handful of rules will not train and the
+run fails on the missing validation metric. If extraction yields only a few
+rules — a narrow dataset, or an HTE screen where dedup collapses thousands of
+records to a handful of distinct reactions — **use priority rules instead of
+training**, see "Plan with my own retrosynthetic SMARTS" below.
+
 ## Finding routes
 
 **Find a synthesis route for a molecule**
@@ -64,7 +73,12 @@ Docs: `methods/planning`, `methods/mcts`, `configuration/planning`
 **Plan many molecules at once**
 `run_search` (`synplan.mcts.search`) with `PolicyNetworkConfig` and
 `RolloutEvaluationConfig`. Targets are a `.smi` file.
-CLI: `synplan planning`. Prefer this for large batches.
+CLI: `synplan planning --config --targets --reaction_rules --building_blocks
+--policy_network --results_dir`. Those four data paths are required and all come
+from `download_preset`; `--value_network` is optional. `--export_routes` also
+writes `results.json.gz` (target-keyed) and `manifest.json`;
+`--reconcile-mapping` reconciles atom-map numbering across steps but is roughly
+4x slower. Prefer the CLI for large batches.
 Docs: `user_guide/cli_interface`, `configuration/planning`
 
 **Tune the search — depth, time, breadth, quality**
@@ -91,6 +105,9 @@ Planning setup, but swap `mol_from_smiles` → `target_from_rdkit` and
 Tutorial: `11_Planning_with_RDKit`
 
 **Plan with my own retrosynthetic SMARTS**
+Also the answer when a custom dataset is too small to train a policy on — hand
+the chemistry over as priority rules rather than trying to learn it from a few
+examples.
 Planning setup with `RDKitEvaluationConfig` instead of `RolloutEvaluationConfig`.
 Per-source usage statistics and rule provenance are on the tree and route objects;
 the tutorial defines its own small helper to summarise them.
@@ -155,7 +172,6 @@ CLI: `synplan download_preset`.
 Docs: `get_started/data_download`, `user_guide/data`
 
 **Clean a reaction dataset**
-Order matters: **mapping → standardization → filtration**.
 `MappingConfig` + `map_reactions_from_file` (`synplan.chem.data.mapping`), then
 `standardize_reactions_from_file`, then `filter_reactions_from_file`.
 CLI: `reaction_mapping` → `reaction_standardizing` → `reaction_filtering`.

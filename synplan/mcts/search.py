@@ -309,7 +309,7 @@ def run_search(
                     priority_rules=priority_rules,
                 )
 
-                _ = list(tree)
+                tree.run()
 
             except Exception as e:
                 extracted_routes.append(

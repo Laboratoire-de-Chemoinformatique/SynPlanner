@@ -140,66 +140,93 @@ you write.
 The reverse failure is as bad: do not force a rung that does not fit. Three
 SynPlanner calls chained into a workaround is worse than one honest chython call.
 
-### CLI commands
+`synplan --help` lists every command. The CLI covers the whole pipeline — ORD
+import, curation, rule extraction, training, planning, clustering — so check it
+before writing Python, and prefer it for long-running work.
 
-| Stage | Commands |
-| --- | --- |
-| Data | `download_preset` |
-| Preparation | `building_blocks_standardizing`, `ord_convert` |
-| Curation (in order) | `reaction_mapping` → `reaction_standardizing` → `reaction_filtering` |
-| Rules | `rule_extracting` |
-| Training | `ranking_policy_training`, `filtering_policy_training`, `mhn_network_tuning`, `value_network_tuning` |
-| Planning | `planning` |
-| Analysis | `clustering` |
+## Start every task from `references/tasks.md`
 
-Prefer the CLI over Python for long-running work.
+That file sits next to this one — also published
+[here](https://synplanner.readthedocs.io/en/latest/tasks.html) — and maps around
+thirty tasks to the exact API pieces each needs, in order, with links to a
+worked notebook and the reference page.
 
-### Which API pieces a task needs
+**This file gives the rules. That one gives the sequences.** No call sequence is
+repeated here, so working without it means reconstructing one from the source,
+which is where the time goes.
 
-For the call sequence behind any task — planning, clustering, route comparison,
-data curation, rule extraction, training — read `references/tasks.md`, next to
-this file, or the
-[published copy](https://synplanner.readthedocs.io/en/latest/tasks.html). It maps
-each task to the exact functions and their order, and links to the worked
-notebook and reference page.
+How to use it:
+
+1. Scan the bold titles for the one matching the request. They are phrased the
+   way users ask — "find a synthesis route for a molecule", "clean a reaction
+   dataset", "compare two sets of routes", "nothing was found".
+2. Read that entry. It names the functions and the order to call them in.
+3. Follow its links only if you need running code or the reasoning behind a
+   parameter.
+4. Check the combinations section first — most real requests are a chain of two
+   or three entries, not one.
+
+Read it before writing planning, route analysis, comparison, clustering,
+curation or training code.
+
+**Do not write your own route-tree walker.** Recursing over the route structure
+to count depth or collect precursors is the most common reinvention here, and
+every one of those traversals already exists — `extract_routes`,
+`export_tree_to_json`, `compose_all_route_cgrs` and the rest are listed in
+`tasks.md` under "Working with routes".
 
 ## Use a config from `configs/`, do not write YAML from scratch
 
-Eleven task configs live in the repository (not installed by pip — see above).
-Copy the closest one and edit it:
+One shipped config per task lives in `configs/` in the repository — `ls` it.
+Copy the closest and edit it; they are small, and reading one takes less time
+than getting a hand-written config subtly wrong.
 
-| Task | Config |
-| --- | --- |
-| Planning | `planning_standard.yaml`, `planning_value.yaml`, `planning_combined_policies.yaml` |
-| Rule extraction | `rules_extraction.yaml`, `extraction_functional_groups.yaml` |
-| Data curation | `reactions_standardization.yaml`, `reactions_filtration.yaml` |
-| Policy training | `policy_training.yaml`, `mhn_ranking_policy_training.yaml`, `combined_ranking_filtering_policy.yaml` |
-| Tuning | `tuning.yaml` |
+### Start with the defaults, then adjust when the data says to
 
-They are small. `planning_standard.yaml` has two sections, `tree` and
-`node_expansion`. Read the config before changing any value.
+The shipped configs are tuned for large public datasets. On a smaller or
+different corpus a stage can legitimately return nothing — standardization
+rejecting every reaction, rule extraction writing a file with only a header,
+planning finding no routes. None of these raise an error.
 
-## Running a plan, and what comes back
+**An empty result is a signal to tune, not a result to report.** When a stage
+returns nothing:
 
-```bash
-synplan planning \
-  --config configs/planning_standard.yaml \
-  --targets <targets-file> \
-  --reaction_rules <path> \
-  --building_blocks <path> \
-  --policy_network <path> \
-  --results_dir ./results
-```
+1. Read the matching page under `configuration/` and `methods/` in the docs.
+   Every parameter is documented there with its default and what it filters.
+2. Find the parameter that is excluding the data — popularity and frequency
+   thresholds, reagent handling, size and validity filters are the usual ones.
+3. Change it deliberately, re-run that stage, and check the count moved.
+4. Look at what else is available before concluding it cannot work — other
+   configs, other strategies, other evaluation modes. The default path is not
+   the only path.
 
-Four data paths are required and all come from `download_preset`.
-`--value_network` is optional.
+Say which parameter you changed and why. Stopping at "the pipeline produced
+nothing" when a threshold tuned for a million reactions was applied to a hundred
+is not a finding.
 
-Two flags change the output:
+**Check the chemistry before you tune anything.** Rules extracted from a dataset
+can only disconnect bonds that dataset contains. A corpus of C–N couplings cannot
+produce a route to a molecule with no C–N bond, at any threshold. Before treating
+an empty result as a tuning problem, look at what reactions are actually in the
+set and whether they could reach the target at all. If they cannot, say so and
+stop — lowering thresholds against chemistry that is not there wastes time and
+ends in a route that does not exist. Tuning fixes a filter that is too strict; it
+does not fix a corpus that is the wrong corpus.
 
-- `--export_routes` also writes `results.json.gz` (target-keyed routes) and
-  `manifest.json` for downstream consumers.
-- `--reconcile-mapping` reconciles atom-map numbering across steps. **Roughly 4x
-  slower.** The default uses per-step-local atom numbering.
+## Two defaults that are easy to miss
+
+**`tree.run()` runs the search.** A `Tree` does no work when constructed — build
+one, call `run()`, then read its results. `run()` returns the tree, so it chains.
+Iterate the tree instead only when you need the per-iteration
+`(is_solved, node_ids)` for progress or early stopping. Older code exhausts the
+iterator with `list(tree)`; that still works but allocates results only to
+discard them.
+
+**Pass `route_scorer=ProtectionRouteScorer.from_config()` to `Tree` by
+default.** Someone asking for a synthesis wants routes they can act on, and the
+raw search output is not ranked by quality — unranked routes are the common
+disappointment. Omit it only when the user explicitly asks for the unfiltered
+tree. There is no CLI flag for it; this is Python-only.
 
 ## Before final delivery
 

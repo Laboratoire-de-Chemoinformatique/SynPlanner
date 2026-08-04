@@ -2,6 +2,7 @@
 
 import logging
 import pickle
+from collections import deque
 from dataclasses import dataclass, field, fields
 from os import PathLike
 from time import time
@@ -320,6 +321,28 @@ class Tree:
                 self.stats.first_solution_time = round(self.curr_time, 4)
 
         return is_solved, last_node_id
+
+    def run(self) -> "Tree":
+        """Run the search to completion and return the tree.
+
+        Search stops on whichever limit is reached first — ``max_iterations``,
+        ``max_tree_size``, ``max_time``, or a route being found when
+        ``stop_at_first`` is set. Inspect the finished tree through
+        :attr:`stats`, or extract its routes with the functions in
+        ``synplan.chem.reaction.routes``.
+
+        Iterate the tree directly instead when you need the per-iteration
+        ``(is_solved, node_ids)`` results — to report progress, or to stop on a
+        condition of your own::
+
+            for is_solved, node_ids in tree:
+                if is_solved and my_condition(tree):
+                    break
+
+        ``run()`` is the same search without the intermediate results.
+        """
+        deque(self, maxlen=0)  # exhaust without materialising the yielded tuples
+        return self
 
     def _init_target_node(self, target: MoleculeContainer):
         assert isinstance(target, MoleculeContainer), (

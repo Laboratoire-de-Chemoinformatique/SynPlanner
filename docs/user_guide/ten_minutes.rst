@@ -215,7 +215,7 @@ Pass the scorer to the tree so routes are re-ranked during the search:
         route_scorer=route_scorer,   # routes re-ranked by protection score
     )
 
-    _ = list(tree)  # run the full search
+    tree.run()  # run the full search
 
 The score S(T) is in [0, 1]: 1.0 means no competing interactions detected,
 lower values indicate steps that may require protecting group strategies.

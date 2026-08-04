@@ -149,7 +149,7 @@ def run_tree_search(
     tree._tqdm = False
 
     # run tree search
-    _ = list(tree)
+    tree.run()
 
     return tree
 
