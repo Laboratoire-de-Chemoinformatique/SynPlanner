@@ -51,17 +51,26 @@ synplan --version
 synplan download_preset --preset synplanner-gps --save_to synplan_data
 ```
 
-**2.** Run planning on a target molecule:
+**2.** Write your targets and fetch a planning config (`configs/` is not installed by pip):
+
+```bash
+echo 'CC(=O)Oc1ccccc1C(=O)O' > targets.smi
+curl -O https://raw.githubusercontent.com/Laboratoire-de-Chemoinformatique/SynPlanner/main/configs/planning_standard.yaml
+```
+
+**3.** Run planning on a target molecule:
 
 ```bash
 synplan planning \
-  --config configs/planning_standard.yaml \
+  --config planning_standard.yaml \
   --targets targets.smi \
-  --reaction_rules synplan_data/policy/supervised_gcn/v1/reaction_rules.tsv \
+  --reaction_rules synplan_data/policy/supervised_gps/v1/reaction_rules.tsv \
   --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \
-  --policy_network synplan_data/policy/supervised_gcn/v1/v1/ranking_policy.ckpt \
+  --policy_network synplan_data/policy/supervised_gps/v1/v1/ranking_policy.ckpt \
   --results_dir planning_results
 ```
+
+Paths above are what `synplanner-gps` writes — the download command prints each one.
 
 > [!TIP]
 > Try it in the browser, no installation required:

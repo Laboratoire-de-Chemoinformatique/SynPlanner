@@ -283,6 +283,8 @@ def main():
     if not src_dir.is_dir():
         parser.error(f"Source directory not found: {src_dir}")
 
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
     print(f"Source: {src_dir}")
     print(f"Output: {dst_dir}")
     print()

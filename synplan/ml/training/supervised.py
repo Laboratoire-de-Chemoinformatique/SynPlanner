@@ -234,8 +234,9 @@ def create_training_logger(logger_config: dict | None, results_path: Path):
             from pytorch_lightning.loggers import LitLogger
         except ImportError as e:
             raise ImportError(
-                "LitLogger requires the 'litlogger' package. "
-                "Install SynPlanner with the 'litlogger' or 'loggers' extra."
+                "LitLogger lives in pytorch-lightning 2.6.1 and later and needs "
+                "'pip install litlogger' at runtime. There is no SynPlanner "
+                "extra for it."
             ) from e
 
         root_dir = kwargs.pop("root_dir", kwargs.pop("save_dir", str(results_path)))

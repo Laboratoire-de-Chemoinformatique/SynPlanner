@@ -220,10 +220,10 @@ def clean_molecules(
     :param atom_retention_details: A dictionary specifying what atom information to retain or remove.
                                    This dictionary should have two keys: "reaction_center" and "environment",
                                    each mapping to another dictionary. The nested dictionaries should have
-                                   keys representing atom attributes (like "neighbors", "hybridization",
-                                   "implicit_hydrogens", "ring_sizes") and boolean values.
-                                   A value of True indicates that the corresponding attribute
+                                   the keys "neighbors", "implicit_hydrogens" and "ring_sizes" with boolean
+                                   values. A value of True indicates that the corresponding attribute
                                    should be retained, while False indicates it should be removed from the atom.
+                                   Any other key is ignored.
 
     :return: A list of QueryContainer objects representing the cleaned rule molecules.
 

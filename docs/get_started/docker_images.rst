@@ -38,7 +38,14 @@ Show help:
 
 Quick planning example (mount config and data). Paths below are the layout
 ``synplan download_preset --preset synplanner-gps --save_to synplan_data``
-writes; ``targets.smi`` is your own file of target SMILES:
+writes; ``targets.smi`` is your own file of target SMILES. The image does not
+contain ``configs/`` — it is read from the mounted host directory, so clone the
+repository or fetch the file first:
+
+.. code-block:: bash
+
+   mkdir -p configs && curl -o configs/planning_standard.yaml \
+     https://raw.githubusercontent.com/Laboratoire-de-Chemoinformatique/SynPlanner/main/configs/planning_standard.yaml
 
 .. code-block:: bash
 

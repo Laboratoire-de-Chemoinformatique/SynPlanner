@@ -210,8 +210,7 @@ def run_search(
 
     # results folder
     results_root = Path(results_root)
-    if not results_root.exists():
-        results_root.mkdir()
+    results_root.mkdir(parents=True, exist_ok=True)
 
     # output files
     stats_file = results_root.joinpath("tree_search_stats.csv")

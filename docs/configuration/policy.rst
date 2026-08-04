@@ -80,6 +80,7 @@ rule GPS:
 
 .. code-block:: yaml
 
+   architecture: mhn_ranking
    embedder_type: gps
    vector_dim: 256
    num_conv_layers: 5
@@ -91,25 +92,38 @@ rule GPS:
      embedder_type: gps
      attn_type: performer
 
-Common MHN configurations:
+Common MHN configurations. Each block below is a **separate** config file, not four
+stanzas of one file — ``architecture: mhn_ranking`` is mandatory in every one, because
+every ``rule_*`` key is rejected by the default ``architecture: linear`` config
+(the models use ``extra="forbid"``):
 
 .. code-block:: yaml
 
    # Product GCN + rule fingerprints
+   architecture: mhn_ranking
    embedder_type: gcn
    rule_embedding_type: fingerprint
 
+.. code-block:: yaml
+
    # Product GCN + QueryCGR rule graphs
+   architecture: mhn_ranking
    embedder_type: gcn
    rule_embedding_type: query_cgr_graph
    rule_embedder:
      embedder_type: gps
 
+.. code-block:: yaml
+
    # Product GPS + rule fingerprints
+   architecture: mhn_ranking
    embedder_type: gps
    rule_embedding_type: fingerprint
 
+.. code-block:: yaml
+
    # Product GPS + QueryCGR rule graphs
+   architecture: mhn_ranking
    embedder_type: gps
    rule_embedding_type: query_cgr_graph
    rule_embedder:
@@ -206,11 +220,24 @@ The ``type`` sub-key is required; all other sub-keys are passed directly as keyw
 arguments to the corresponding Lightning logger constructor.
 The ``save_dir`` parameter defaults to ``results_dir`` automatically. For
 ``litlogger``, ``save_dir`` is treated as an alias for LitLogger's ``root_dir``.
-Remote logger integrations are optional dependencies. Install only the backend
-you need, for example ``SynPlanner[litlogger]``, ``SynPlanner[wandb]``,
-``SynPlanner[mlflow]``, or ``SynPlanner[loggers]`` for all optional logger
-backends. With ``uv`` in this repository, use ``uv sync --extra litlogger``,
-``uv sync --extra wandb``, or ``uv sync --extra loggers``.
+Every backend except ``csv`` needs a package SynPlanner does not depend on:
+
+.. table::
+    :widths: 15 40
+
+    ============== ==========================================================
+    Logger type    How to install its backend
+    ============== ==========================================================
+    csv            nothing to install
+    tensorboard    ``pip install tensorboard`` (or ``tensorboardX``) — there is no SynPlanner extra for it
+    mlflow         ``SynPlanner[mlflow]`` or ``SynPlanner[loggers]``; with ``uv``: ``uv sync --extra mlflow``
+    wandb          ``SynPlanner[wandb]`` or ``SynPlanner[loggers]``; with ``uv``: ``uv sync --extra wandb``
+    litlogger      ``pip install litlogger`` — there is no ``litlogger`` extra, and ``SynPlanner[loggers]`` covers only mlflow + wandb
+    ============== ==========================================================
+
+The only extras SynPlanner defines for logging are ``mlflow``, ``wandb`` and
+``loggers`` (= mlflow + wandb). ``uv sync --extra litlogger`` and
+``uv sync --extra tensorboard`` both fail with "Extra ... is not defined".
 
 You can also enable a logger from the command line without editing the YAML file:
 
@@ -268,7 +295,7 @@ CSV logger parameters:
     flush_logs_every_n_steps       How often to write to disk. Default ``100``.
     ============================== =========================================================================
 
-**LitLogger** (requires ``SynPlanner[litlogger]`` or ``SynPlanner[loggers]``)
+**LitLogger** (requires ``pip install litlogger``; no SynPlanner extra provides it)
 
 Logs metrics, metadata, terminal output, and optionally model checkpoints to
 Lightning AI. See the

@@ -217,11 +217,11 @@ class RuleExtractionConfig(BaseConfigModel):
     # adjustable parameters
     environment_atom_count: int = 1
     min_popularity: int = 3
-    include_rings: bool = True
+    include_rings: bool = False
     multicenter_rules: bool = True
     include_func_groups: bool = False
     keep_leaving_groups: bool = True
-    keep_incoming_groups: bool = True
+    keep_incoming_groups: bool = False
     keep_reagents: bool = False
     func_groups_list: list[str] = Field(default_factory=list)
     atom_info_retention: dict[str, dict[str, bool]] = Field(default_factory=dict)

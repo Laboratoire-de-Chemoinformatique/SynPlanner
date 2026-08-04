@@ -60,6 +60,17 @@ Run value network tuning using the repository configuration in ``configs/tuning.
       batch_size: 100
       num_simulations: 1
 
+``synplan value_network_tuning`` reads exactly four top-level sections — ``tree``,
+``node_expansion``, ``value_network`` and ``tuning`` — and all four are required.
+
+.. warning::
+    Unlike :doc:`planning`, the tuning loop has **no** ``node_evaluation`` section.
+    Node evaluation during the planning simulations is always the value network being
+    tuned; that is the point of the reinforcement loop. A ``node_evaluation:`` block
+    added to this file is silently ignored — it does not switch the loop to rollout,
+    RDKit or random scoring, and no warning is printed. Normalisation of those scores
+    is ``tree:normalize_scores``, not ``node_evaluation:normalize``.
+
 **Configuration parameters**
 
 .. table::
@@ -81,7 +92,8 @@ Run value network tuning using the repository configuration in ``configs/tuning.
     tree:epsilon                             This parameter is used in the epsilon-greedy strategy during the node selection, representing the probability of choosing a random action for exploration. A higher value leads to more exploration
     tree:silent                              If True, suppresses the progress logging of the tree search
     tree:evaluation_agg                      The way the evaluation scores are aggregated. Options are "max" (using the maximum score of the child nodes) and "average" (using the average score of the child nodes)
-    node_evaluation:evaluation_type          The method used for node evaluation. Options are "rollout" (rollout simulations, default), "gcn" (graph convolutional value network), "random" (random number between 0 and 1), "policy", and "rdkit"
+    tree:c_ucb                               The exploration-exploitation balance coefficient of the Upper Confidence Bound. Defaults to 0.1
+    tree:normalize_scores                    Rescale the value network's node scores to [0, 1] during the planning simulations. Defaults to False
     node_expansion:top_rules                 The maximum amount of rules to be selected for node expansion from the list of predicted reaction rules
     node_expansion:rule_prob_threshold       The reaction rules with predicted probability lower than this parameter will be discarded
     node_expansion:priority_rules_fraction   The fraction of priority rules in comparison to the regular rules

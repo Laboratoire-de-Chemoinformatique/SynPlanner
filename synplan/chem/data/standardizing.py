@@ -949,12 +949,20 @@ def _print_error_summary(
     n_processed: int,
     n_ok: int,
     error_file_path: Path | None,
+    n_duplicates: int = 0,
 ) -> None:
     """Print a categorized summary of errors to stdout and logger."""
     n_failed = n_processed - n_ok
     summary_lines = [
         f"Finished: processed {n_processed}, succeeded {n_ok}, failed {n_failed}"
     ]
+
+    # Deduplication drops are counted in n_failed but never reach the error file,
+    # so name them or the summary reads as data corruption.
+    if n_duplicates:
+        summary_lines.append(
+            f"  duplicates removed: {n_duplicates} (not written to the error file)"
+        )
 
     if error_counts:
         data_errors: list[str] = []
@@ -1111,7 +1119,11 @@ def standardize_reactions_from_file(
     summary.error_file = str(_error_path) if _error_path else None
 
     _print_error_summary(
-        error_counts, summary.total_input, summary.succeeded, _error_path
+        error_counts,
+        summary.total_input,
+        summary.succeeded,
+        _error_path,
+        summary.duplicates,
     )
 
     return summary

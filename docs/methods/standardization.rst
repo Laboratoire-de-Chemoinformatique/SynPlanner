@@ -42,6 +42,21 @@ The status is recorded on ``rxn.meta["mapping_status"]`` so worker
 processes can route partially-mapped reactions to audit logs instead
 of failing the whole batch.
 
+.. warning::
+    ``parse_reaction`` defaults to ``check_atom_mapping="off"``, and none of the
+    ``synplan reaction_standardizing`` / ``reaction_filtering`` / ``rule_extracting``
+    commands expose the flag. **The data-preparation CLIs do not verify atom mapping.**
+    Unmapped input is parsed with sequential atom numbering, which makes reactant and
+    product atoms unrelated; the resulting CGR marks nearly every bond as dynamic.
+    In practice such records are rejected by ``DynamicBondsFilter`` — reported as an
+    ordinary filter rejection, with nothing pointing at the real cause — and if that
+    filter is not enabled they flow straight into rule extraction.
+
+    Run ``synplan reaction_mapping`` first, or verify mapping yourself by calling
+    ``parse_reaction(..., check_atom_mapping="reject_unmapped")`` over a sample of the
+    input. A filtration run whose rejections are overwhelmingly ``DynamicBondsFilter``
+    is the signature of unmapped input, not of bad chemistry.
+
 Reaction standardization
 --------------------------------
 
