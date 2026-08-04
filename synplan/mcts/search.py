@@ -24,10 +24,11 @@ from synplan.chem.reaction.routes.quality.scorer import RouteScorer
 from synplan.chem.reaction.routes.representation import extract_reactions
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.tree import Tree, TreeConfig
-from synplan.utils.config import PolicyNetworkConfig
+from synplan.utils.config import CombinedPolicyConfig, PolicyNetworkConfig
 from synplan.utils.files import iter_csv_smiles, iter_smiles_records
 from synplan.utils.loading import (
     load_building_blocks,
+    load_combined_policy_function,
     load_evaluation_function,
     load_policy_function,
     load_reaction_rules,
@@ -258,7 +259,10 @@ def run_search(
     ]
 
     # Load resources
-    policy_function = load_policy_function(policy_config=policy_config)
+    if isinstance(policy_config, CombinedPolicyConfig):
+        policy_function = load_combined_policy_function(combined_config=policy_config)
+    else:
+        policy_function = load_policy_function(policy_config=policy_config)
     reaction_rules = load_reaction_rules(reaction_rules_path)
     building_blocks = load_building_blocks(building_blocks_path, standardize=False)
 

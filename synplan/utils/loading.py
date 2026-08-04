@@ -668,9 +668,21 @@ def load_combined_policy_function(
             f"'{ranking_config.policy_type}'"
         )
 
+    filtering_policy = build_policy_from_config(filtering_config)
+    ranking_policy = build_policy_from_config(ranking_config)
+    if filtering_policy.n_rules != ranking_policy.n_rules:
+        # the two heads' logits are added, so a shape mismatch would otherwise
+        # surface as a bare tensor-size error in the middle of a search
+        raise ValueError(
+            f"the filtering head knows {filtering_policy.n_rules} rules and the "
+            f"ranking head {ranking_policy.n_rules}; their logits are added, so "
+            "both must be trained on the same rule set. Use a preset that ships "
+            "a matched pair, such as synplanner-article."
+        )
+
     return CompositePolicy(
-        build_policy_from_config(filtering_config),
-        build_policy_from_config(ranking_config),
+        filtering_policy,
+        ranking_policy,
         top_rules=top_rules,
         rule_prob_threshold=rule_prob_threshold,
         ranking_weight=ranking_weight,

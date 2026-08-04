@@ -136,12 +136,6 @@ CASES = [
             "--policy_network",
             "net.ckpt",
         ],
-        marks=pytest.mark.xfail(
-            strict=True,
-            reason="shipped config no command can read: planning_cli wants a "
-            "node_expansion section, and run_search only builds a single "
-            "policy. Delete the config or wire combined_policy through.",
-        ),
     ),
 ]
 
