@@ -1,5 +1,9 @@
 # Planning configuration with combined filtering + ranking policy
-# The combined policy sums filtering and ranking probabilities for better rule selection
+# The combined policy adds filtering and ranking logits before the softmax:
+#   combined_logits = filtering_logits + ranking_weight * ranking_logits
+# Both checkpoints must come from the same rule set, so use a preset that ships
+# a matched pair — synplanner-article does; synplanner-gps does not, its heads
+# know 24094 and 11235 rules and loading them together is refused.
 
 tree:
   max_iterations: 100
@@ -21,4 +25,5 @@ combined_policy:
   ranking_weights_path: "path/to/ranking_policy_network.ckpt"
   top_rules: 50
   rule_prob_threshold: 0.0
-  priority_rules_fraction: 0.5
+  ranking_weight: 1.0
+  temperature: 1.0

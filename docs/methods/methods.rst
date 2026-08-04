@@ -20,3 +20,4 @@ Practical usage is covered in :doc:`/configuration/configuration` and :doc:`/use
     mcts
     planning
     priority_rules
+    routes

@@ -17,6 +17,10 @@ extensions = [
 source_suffix = ".rst"
 master_doc = "index"
 
+# Served verbatim at the site root. llms.txt is a curated index for LLMs that
+# fetch the docs; see https://llmstxt.org
+html_extra_path = ["llms.txt"]
+
 # nbsphinx configuration: do not execute notebooks during the build
 # This avoids long build times from heavy notebooks
 nbsphinx_execute = "never"
@@ -94,7 +98,7 @@ autodoc_type_aliases = {
     "Tree": "synplan.mcts.tree.Tree",
 }
 
-# Suppress warnings for modules that fail to import at doc-build time
-# (e.g. decompositions.py executes code at import that requires runtime deps)
-# Also suppress ambiguous cross-reference warnings for re-exported symbols (e.g. Tree)
-suppress_warnings = ["autodoc.import_object", "ref.python"]
+# Ambiguous cross-references come from re-exports (e.g. Tree in synplan/__init__.py).
+# autodoc.import_object is deliberately NOT suppressed: it is what catches modules
+# that were moved or that no longer import.
+suppress_warnings = ["ref.python"]

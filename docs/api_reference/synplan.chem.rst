@@ -8,7 +8,8 @@ Subpackages
    :maxdepth: 4
 
    synplan.chem.data
-   synplan.chem.reaction_rules
+   synplan.chem.reaction.routes
+   synplan.chem.reaction.rules
 
 Submodules
 ----------
@@ -21,8 +22,8 @@ synplan.chem.precursor module
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.reaction module
-----------------------------
+synplan.chem.reaction package
+-----------------------------
 
 .. automodule:: synplan.chem.reaction
    :members:

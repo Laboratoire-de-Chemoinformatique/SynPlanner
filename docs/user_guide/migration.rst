@@ -12,6 +12,100 @@ For the full per-release log, see :doc:`/release_notes`.
    :local:
    :depth: 2
 
+1.6.0
+=====
+
+chython 1.100 changes what your SMARTS mean
+--------------------------------------------
+
+SynPlanner now requires ``chython-synplan`` 1.100 exactly. Its rewritten SMARTS
+parser follows Daylight on three primitives that chython used to read
+differently. Hand-written patterns — priority rules, ``func_groups_list``,
+protection group definitions — that use them silently change meaning:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 40 45
+
+   * - Primitive
+     - Old chython reading
+     - chython 1.100 (Daylight)
+   * - ``A``
+     - any atom
+     - any *aliphatic* atom; use ``*`` for any atom
+   * - ``x``
+     - number of heteroatom neighbours
+     - ring connectivity; the heteroatom count is now ``y``
+   * - unmarked charge
+     - charge 0
+     - unconstrained; ``[N]`` also matches a cationic N, ``[N+0]`` does not
+
+Rewrite ``A`` as ``*`` and ``x`` as ``y`` wherever the old meaning was intended,
+and add ``+0`` where a neutral atom was assumed. Rules extracted by SynPlanner
+itself are unaffected — they are generated from CGRs, not hand-written.
+
+Route post-processing moved to ``synplan.chem.reaction.routes``
+----------------------------------------------------------------
+
+Route-level post-processing now lives in ``synplan.chem.reaction.routes``. This includes
+RouteCGR construction and hashing, route IO, route clustering, route analysis,
+depiction, route-quality scoring, and related route analysis helpers. Notebook plotting helpers now live in ``synplan.chem.reaction.routes.notebook_plots``.
+
+The interim ``synplan.routes`` package and the older ``synplan.route_quality``
+compatibility namespace were removed. The ``synplan.chem.reaction_routes`` namespace
+remains as a deprecated compatibility layer for the ``main``-branch module paths
+``io``, ``route_cgr``, ``clustering``, ``leaving_groups``, and ``visualisation``.
+New code should use the canonical paths below.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 45 55
+
+   * - Removed path
+     - New path
+   * - ``synplan.routes.analysis``
+     - ``synplan.chem.reaction.routes.analysis``
+   * - ``synplan.routes.clustering``
+     - ``synplan.chem.reaction.routes.clustering``
+   * - ``synplan.routes.depiction``
+     - ``synplan.chem.reaction.routes.representation.depiction``
+   * - ``synplan.routes.io``
+     - ``synplan.chem.reaction.routes.io``
+   * - ``synplan.routes.notebook_plots``
+     - ``synplan.chem.reaction.routes.notebook_plots``
+   * - ``synplan.routes.route_cgr``
+     - ``synplan.chem.reaction.routes.representation``
+   * - ``synplan.routes.route_cgr.hash``
+     - ``synplan.chem.reaction.routes.representation.hash``
+   * - ``synplan.routes.quality``
+     - ``synplan.chem.reaction.routes.quality``
+   * - ``synplan.routes.quality.protection``
+     - ``synplan.chem.reaction.routes.quality.protection``
+   * - ``synplan.route_quality``
+     - ``synplan.chem.reaction.routes.quality``
+
+Reaction rules moved to ``synplan.chem.reaction.rules``
+-------------------------------------------------------
+
+Rule analysis, extraction, priority-rule parsing, and the QueryCGR/Morgan rule
+representations now live under ``synplan.chem.reaction.rules`` (and
+``synplan.chem.reaction.rules.representation``). ``synplan.chem.reaction_rules``
+remains as a deprecated shim for ``analysis``, ``extraction``, and ``priority``;
+importing from it emits a ``DeprecationWarning``.
+
+MCTS expansion wrappers moved to ``synplan.mcts.policy``. The old
+``synplan.mcts.expansion`` module is gone.
+
+Tree persistence and route exports
+----------------------------------
+
+``TreeWrapper`` was removed. Save a tree directly with
+``tree.save_pickle(path)`` and load it with ``pickle.load()``; the saved tree
+has ``_tqdm`` disabled. Route JSON and CSV exports now live in
+``synplan.chem.reaction.routes.io``. Update imports from
+``synplan.mcts.tree.export_tree_to_json`` and
+``synplan.mcts.tree.export_tree_to_csv`` to the canonical route-I/O module.
+
 1.5.0
 =====
 
@@ -89,11 +183,10 @@ Pickled trees from 1.4.x
 ------------------------
 
 Pickled ``Tree`` instances from 1.4.x are *partially* compatible with
-1.5.0. Direct unpickling (via
-:meth:`~synplan.mcts.tree.TreeWrapper.load_tree_from_id` or equivalent)
-still succeeds because ``TreeWrapper.__setstate__`` uses
-``Tree.__new__(Tree)`` plus ``__dict__.update``, so legacy attributes
-survive verbatim.
+1.5.0 only when loaded through project-specific legacy unpickling code.
+The old reaction-route tree wrapper has been removed from the public API.
+When a legacy pickle can still be loaded, its legacy attributes survive
+verbatim.
 
 Code paths that only read ``tree.synthesis_route``,
 ``tree.route_to_node``, or ``tree.nodes[id].precursors_to_expand``

@@ -1,0 +1,37 @@
+# Modern-Hopfield-style ranking policy with dynamic Chython reaction rules.
+architecture: mhn_ranking
+vector_dim: 512
+num_conv_layers: 5
+learning_rate: 0.0005
+dropout: 0.4
+num_epoch: 100
+batch_size: 1000
+
+association_dim: 512
+beta: 0.05
+normalize_associations: true
+rule_embedding_type: fingerprint
+# To switch from rule fingerprints to QueryCGR rule graphs, set
+# rule_embedding_type: query_cgr_graph (rule_embedder.embedder_type must stay gps).
+rule_fp_size: 2048
+rule_fp_min_radius: 1
+rule_fp_max_radius: 4
+rule_fp_active_bits: 2
+rule_fp_type: query_cgr
+rule_fp_schema_version: "1"
+rule_graph_batch_size: 1024
+rule_graph_schema_version: "1"
+
+# Rule-side graph embedder. Omitted fields fall back to the molecule-side
+# GPS settings above.
+rule_embedder:
+  embedder_type: gps
+  # vector_dim: 128
+  # num_conv_layers: 3
+  # heads: 4
+  # attn_type: performer
+  # dropout: 0.1
+  # attn_dropout: 0.1
+
+logger:
+  type: csv

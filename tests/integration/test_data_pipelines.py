@@ -197,35 +197,34 @@ def test_rule_extraction_tsv_roundtrip(
 
 
 @pytest.mark.parametrize("env_cnt", [0, 1, 2])
-@pytest.mark.parametrize("popularity", [1, 2])
 def test_rule_extraction_variants(
     tmp_path: Path,
     sample_reactions_file: Path,
     rule_cfg_factory,
     env_cnt,
-    popularity,
 ):
-    cfg = rule_cfg_factory(environment_atom_count=env_cnt, min_popularity=popularity)
-    out = tmp_path / f"rules_env{env_cnt}_pop{popularity}.tsv"
+    # Both popularities run in one test: tmp_path is per-invocation, so
+    # parametrizing popularity left the pop=1 output invisible to pop=2 and
+    # the monotonicity assertion never executed.
+    n_rules = {}
+    for popularity in (1, 2):
+        cfg = rule_cfg_factory(
+            environment_atom_count=env_cnt, min_popularity=popularity
+        )
+        out = tmp_path / f"rules_env{env_cnt}_pop{popularity}.tsv"
 
-    extract_rules_from_reactions(
-        config=cfg,
-        reaction_data_path=str(sample_reactions_file),
-        reaction_rules_path=str(out),
-        num_cpus=1,
-        batch_size=2,
-    )
+        extract_rules_from_reactions(
+            config=cfg,
+            reaction_data_path=str(sample_reactions_file),
+            reaction_rules_path=str(out),
+            num_cpus=1,
+            batch_size=2,
+        )
 
-    assert out.exists(), "TSV file not created"
-    tsv_lines = out.read_text().splitlines()
-    n_rules = len(tsv_lines) - 1  # subtract header
+        assert out.exists(), "TSV file not created"
+        n_rules[popularity] = len(out.read_text().splitlines()) - 1  # minus header
 
-    # For higher popularity thresholds, we might get no rules
-    if popularity == 1:
-        assert n_rules > 0  # at least one rule for min_popularity=1
-    # stricter popularity => never *more* rules
-    if popularity > 1:
-        prev_file = tmp_path / f"rules_env{env_cnt}_pop1.tsv"
-        if prev_file.exists():
-            prev_n = len(prev_file.read_text().splitlines()) - 1
-            assert n_rules <= prev_n
+    assert n_rules[1] > 0, "at least one rule for min_popularity=1"
+    # No reaction in the fixture repeats a rule, so min_popularity=2 must drop
+    # rules. `<=` would also pass if the popularity filter were a no-op.
+    assert n_rules[2] < n_rules[1]

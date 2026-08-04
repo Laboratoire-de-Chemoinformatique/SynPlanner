@@ -10,6 +10,7 @@ Download example configuration
 ------------------------------
 
 - GitHub: `configs/policy_training.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/policy_training.yaml>`_
+- GitHub: `configs/mhn_ranking_policy_training.yaml <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/configs/mhn_ranking_policy_training.yaml>`_
 
 Quickstart (CLI)
 ----------------
@@ -37,6 +38,112 @@ Train a policy network using the repository configuration in ``configs/policy_tr
     logger:
       type: csv
 
+MHN ranking policy
+------------------
+
+``architecture: mhn_ranking`` replaces the fixed ranking head with a dense
+molecule-rule association model inspired by
+`MHNreact <https://github.com/ml-jku/mhn-react>`_ and the
+`MHNreact paper <https://doi.org/10.1021/acs.jcim.1c01065>`_. SynPlanner keeps
+its graph embedder for product molecules and can encode rules either from
+Chython fingerprints or from native QueryCGR rule graphs. Rule embeddings are
+encoded lazily on the first prediction and cached for reuse.
+
+.. code-block:: bash
+
+   synplan ranking_policy_training \
+     --config configs/mhn_ranking_policy_training.yaml \
+     --policy_data reaction_rules_policy_data.tsv \
+     --results_dir mhn_ranking_policy_network
+
+The rules TSV is inferred from the extracted policy mapping name:
+``<base>_policy_data.tsv`` uses ``<base>.tsv``. Keep both generated files
+together when training ``mhn_ranking``.
+
+``embedder_type`` controls the product molecule encoder. Use
+``rule_embedding_type: query_cgr_graph`` (with ``rule_embedder.embedder_type: gps``)
+to embed labeled QueryCGR rule graphs instead of Morgan rule fingerprints;
+``rule_fp_*`` fields are used only by ``rule_embedding_type: fingerprint``.
+QueryCGR rule graphs currently require the rule-side GPS embedder because rule
+bond dynamics are encoded as edge attributes. By default, the rule graph GPS
+shares ``vector_dim``, ``num_conv_layers``, ``heads``, and ``attn_type`` with the
+product graph encoder. Set ``rule_embedder.vector_dim``,
+``rule_embedder.num_conv_layers``, ``rule_embedder.heads``, or
+``rule_embedder.attn_type`` when the rule encoder should use a different GPS
+shape. It uses the global ``dropout`` and ``attn_dropout`` values unless
+``rule_embedder.dropout`` or ``rule_embedder.attn_dropout`` are set.
+
+To switch the default rule-fingerprint configuration to QueryCGR rule graphs,
+while keeping product GPS settings at ``vector_dim: 256``,
+``num_conv_layers: 5``, and ``heads: 8`` but using Performer attention for the
+rule GPS:
+
+.. code-block:: yaml
+
+   architecture: mhn_ranking
+   embedder_type: gps
+   vector_dim: 256
+   num_conv_layers: 5
+   heads: 8
+   attn_type: multihead
+
+   rule_embedding_type: query_cgr_graph
+   rule_embedder:
+     embedder_type: gps
+     attn_type: performer
+
+Common MHN configurations. Each block below is a **separate** config file, not four
+stanzas of one file — ``architecture: mhn_ranking`` is mandatory in every one, because
+every ``rule_*`` key is rejected by the default ``architecture: linear`` config
+(the models use ``extra="forbid"``):
+
+.. code-block:: yaml
+
+   # Product GCN + rule fingerprints
+   architecture: mhn_ranking
+   embedder_type: gcn
+   rule_embedding_type: fingerprint
+
+.. code-block:: yaml
+
+   # Product GCN + QueryCGR rule graphs
+   architecture: mhn_ranking
+   embedder_type: gcn
+   rule_embedding_type: query_cgr_graph
+   rule_embedder:
+     embedder_type: gps
+
+.. code-block:: yaml
+
+   # Product GPS + rule fingerprints
+   architecture: mhn_ranking
+   embedder_type: gps
+   rule_embedding_type: fingerprint
+
+.. code-block:: yaml
+
+   # Product GPS + QueryCGR rule graphs
+   architecture: mhn_ranking
+   embedder_type: gps
+   rule_embedding_type: query_cgr_graph
+   rule_embedder:
+     embedder_type: gps
+
+Standalone MHN ranking checkpoints can score unseen, reordered, or replaced
+runtime rule sets. Combined filtering + MHN ranking policies remain restricted
+to the filtering checkpoint's ordered rule set because filtering heads have a
+fixed output index. SynPlanner validates dimensions; the supplied filtering
+rules must retain their training order.
+
+.. note::
+
+   Dynamic MHN rule associations are prepared by
+   ``predict_reaction_rules(precursor, reaction_rules)``. The lighter
+   ``predict_reaction_rules_light(precursor, reaction_rules_len)`` API receives
+   only an integer count, so it cannot bind a new runtime rule set by itself;
+   use the full prediction path when MHN rules may change, or call the light
+   path only after the same wrapper has already prepared the same rule set.
+
 **Configuration parameters**
 
 .. table::
@@ -51,13 +158,58 @@ Train a policy network using the repository configuration in ``configs/policy_tr
     dropout                            The dropout value
     num_epoch                          The number of training epochs
     batch_size                         The size of the training batch of input molecular graphs
-    embedder_type                      Graph embedder: ``gcn``, ``gcn_concat``, or ``gps``
+    embedder_type                      Graph embedder: ``gcn``, ``gcn_concat``, or ``gps``; ``gcn_concat`` requires ``vector_dim`` divisible by ``num_conv_layers``
+    architecture                       Ranking head: ``linear`` (default) or ``mhn_ranking``
     heads                              Number of attention heads for ``embedder_type: gps``
-    attn_type                          GPS attention type: ``multihead``, ``performer``, or ``null``
+    attn_type                          GPS attention type: ``performer`` (default) or ``multihead``
     attn_dropout                       Attention dropout for GPS layers
     log_grad_norm                      If true, log module-level gradient norms during training
     logger                             Training logger configuration (see below). Set to ``null`` to disable.
+    association_dim                    MHN molecule-rule association dimension
+    beta                               Scale applied to MHN association logits
+    normalize_associations             Apply non-affine LayerNorm after each MHN projection
+    rule_embedding_type                Rule encoder mode: ``fingerprint`` (default) or ``query_cgr_graph``
+    rule_graph_batch_size              Rule graph batch size used while embedding all rules
+    rule_graph_schema_version          QueryCGR rule graph schema version included in digests and caches
+    rule_fp_size                       Chython Morgan rule fingerprint size; must be a power of two
+    rule_fp_min_radius                 Minimum Chython Morgan fingerprint radius
+    rule_fp_max_radius                 Maximum Chython Morgan fingerprint radius
+    rule_fp_active_bits                Active bits per Chython Morgan fingerprint feature
+    rule_fp_type                       Rule fingerprint source: ``query_cgr`` (default), ``legacy``, or ``mhnreact_rdkit`` (RDKit MHNreact-compatible)
+    rule_fp_schema_version             Rule fingerprint schema version included in digests and caches
+    rule_embedder.embedder_type        Rule graph embedder for ``query_cgr_graph``: ``gps`` (required)
+    rule_embedder.vector_dim           Optional hidden dimension override for the rule graph GPS; defaults to ``vector_dim``
+    rule_embedder.num_conv_layers      Optional layer-count override for the rule graph GPS; defaults to ``num_conv_layers``
+    rule_embedder.heads                Optional attention-head override for the rule graph GPS; defaults to ``heads``
+    rule_embedder.attn_type            Optional attention type override for the rule graph GPS; defaults to ``attn_type``
+    rule_embedder.dropout              Optional dropout override for the rule-side projection and graph embedder; defaults to ``dropout``
+    rule_embedder.attn_dropout         Optional attention-dropout override for the rule-side GPS embedder; defaults to ``attn_dropout``
     ================================== =========================================================================
+
+Benchmark recipe
+----------------
+
+Train the baseline and MHN ranking policies against the same extracted rules and
+``*_policy_data.tsv`` mapping, then compare validation ``balanced_accuracy_y``,
+``top5_accuracy_y``, and ``top10_accuracy_y`` logs. For planning benchmarks, use
+the same targets, building blocks, reaction rules, and tree configuration for
+both checkpoints. Record checkpoint size, first-expansion latency (which
+includes lazy MHN rule binding), warm expansion latency, and the generated
+``tree_search_stats.csv`` summary.
+
+.. code-block:: bash
+
+   synplan ranking_policy_training \
+     --config configs/policy_training.yaml \
+     --policy_data reaction_rules_policy_data.tsv \
+     --results_dir benchmark/linear
+
+   synplan ranking_policy_training \
+     --config configs/mhn_ranking_policy_training.yaml \
+     --policy_data reaction_rules_policy_data.tsv \
+     --results_dir benchmark/mhn_ranking
+
+   du -h benchmark/linear/*.ckpt benchmark/mhn_ranking/*.ckpt
 
 Training logger
 ---------------
@@ -68,11 +220,24 @@ The ``type`` sub-key is required; all other sub-keys are passed directly as keyw
 arguments to the corresponding Lightning logger constructor.
 The ``save_dir`` parameter defaults to ``results_dir`` automatically. For
 ``litlogger``, ``save_dir`` is treated as an alias for LitLogger's ``root_dir``.
-Remote logger integrations are optional dependencies. Install only the backend
-you need, for example ``SynPlanner[litlogger]``, ``SynPlanner[wandb]``,
-``SynPlanner[mlflow]``, or ``SynPlanner[loggers]`` for all optional logger
-backends. With ``uv`` in this repository, use ``uv sync --extra litlogger``,
-``uv sync --extra wandb``, or ``uv sync --extra loggers``.
+Every backend except ``csv`` needs a package SynPlanner does not depend on:
+
+.. table::
+    :widths: 15 40
+
+    ============== ==========================================================
+    Logger type    How to install its backend
+    ============== ==========================================================
+    csv            nothing to install
+    tensorboard    ``pip install tensorboard`` (or ``tensorboardX``) — there is no SynPlanner extra for it
+    mlflow         ``SynPlanner[mlflow]`` or ``SynPlanner[loggers]``; with ``uv``: ``uv sync --extra mlflow``
+    wandb          ``SynPlanner[wandb]`` or ``SynPlanner[loggers]``; with ``uv``: ``uv sync --extra wandb``
+    litlogger      ``pip install litlogger`` — there is no ``litlogger`` extra, and ``SynPlanner[loggers]`` covers only mlflow + wandb
+    ============== ==========================================================
+
+The only extras SynPlanner defines for logging are ``mlflow``, ``wandb`` and
+``loggers`` (= mlflow + wandb). ``uv sync --extra litlogger`` and
+``uv sync --extra tensorboard`` both fail with "Extra ... is not defined".
 
 You can also enable a logger from the command line without editing the YAML file:
 
@@ -130,7 +295,7 @@ CSV logger parameters:
     flush_logs_every_n_steps       How often to write to disk. Default ``100``.
     ============================== =========================================================================
 
-**LitLogger** (requires ``SynPlanner[litlogger]`` or ``SynPlanner[loggers]``)
+**LitLogger** (requires ``pip install litlogger``; no SynPlanner extra provides it)
 
 Logs metrics, metadata, terminal output, and optionally model checkpoints to
 Lightning AI. See the

@@ -2,9 +2,13 @@ from chython import smiles as read_smiles
 from chython.containers import MoleculeContainer
 
 from synplan.chem.precursor import Precursor
-from synplan.chem.reaction_routes.io import make_json
+from synplan.chem.reaction.routes.io import make_json
 from synplan.mcts.node import Node
-from synplan.utils.visualisation import get_route_svg, get_route_svg_from_json
+from synplan.utils.visualisation import (
+    extract_routes,
+    get_route_svg,
+    get_route_svg_from_json,
+)
 
 
 def make_mol(n: int) -> MoleculeContainer:
@@ -114,3 +118,31 @@ def test_get_route_svg_from_json_can_render_rule_labels():
     assert "<svg" in svg
     assert "policy:42" in svg
     assert "priority:0" in svg
+
+
+def test_extract_routes_uses_root_to_terminal_steps():
+    target = Precursor(make_mol(7))
+    product = Precursor(make_mol(8))
+    tree = type("RouteTree", (), {})()
+    tree.config = _MockConfig()
+    tree.building_blocks = frozenset()
+    tree.nodes = {
+        1: Node(
+            precursors_to_expand=(target,),
+            new_precursors=(target,),
+        ),
+        2: Node(
+            precursors_to_expand=(),
+            new_precursors=(product,),
+            rule_key="policy:1",
+        ),
+    }
+    tree.parents = {1: 0, 2: 1}
+    tree.winning_nodes = [2]
+
+    routes = extract_routes(tree)
+
+    assert routes[0]["smiles"] == str(target.molecule)
+    reaction = routes[0]["children"][0]
+    assert reaction["type"] == "reaction"
+    assert reaction["children"][0]["smiles"] == str(product.molecule)

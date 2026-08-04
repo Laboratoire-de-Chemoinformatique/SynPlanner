@@ -5,15 +5,146 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-08-03
+
+### Added
+
+- Added `synplan.chem.reaction.routes` as the public route post-processing layer for route
+  clustering, route quality, RouteCGR utilities, route I/O, analysis, depiction,
+  and notebook plotting.
+- Added typed RouteCGR and route-export contracts, including
+  `RouteCGRBuildResult`, `RouteExportResult`, route diagnostics, and strict
+  export failure handling while preserving the existing JSON and CSV shapes.
+- Added `synplan.chem.reaction.routes.representation` to group RouteCGR builder, container,
+  depiction, state, hashing, and native deconvolution helpers.
+- Added route-aware RouteCGR composition with `route_order` metadata on dynamic
+  atoms and bonds, transient bonds for bonds formed and later removed during a
+  synthetic route, and compact per-step labels for reconstructing mapped route
+  reactions from the RouteCGR itself.
+- Added exact RouteCGR hashing in `synplan.chem.reaction.routes.representation.hash`, including a
+  fast WL bucket hash followed by exact canonical confirmation for shared
+  buckets.
+- Added RouteCGR comparison helpers for identifying overlapping and unique route
+  IDs across route dictionaries whose route IDs do not need to match.
+- Added RouteCGR analysis helpers for selected building-block lookup and real
+  versus supporting pseudo-reactant usage statistics.
+- Added native RouteCGR deconvolution APIs (`routes_dict_from_route_cgrs()` and
+  `reactions_from_route_cgr()`).
+- Added `synplan.chem.reaction.routes.clustering` as a package, with clustering logic in
+  `synplan.chem.reaction.routes.clustering.core` and route marker helpers in
+  `synplan.chem.reaction.routes.leaving_groups`.
+- Added `synplan.chem.reaction.rules` and `synplan.chem.reaction.rules.representation`
+  as the public homes for rule analysis, extraction, priority rules, and Chython
+  QueryCGR/Morgan rule representations.
+- Added MHN ranking policy support (`architecture: mhn_ranking`) with QueryCGR
+  rule fingerprints by default, optional QueryCGR rule-graph encoding with GPS,
+  bounded runtime rule-association caches, dynamic runtime rule-set scoring, and
+  checkpoint migration for the redesigned policy networks.
+- Added `synplan mhn_network_tuning` for fine-tuning an already trained MHN
+  ranking checkpoint on new rule policy data.
+- Added policy/network modules for pure policy wrappers, graph embedders,
+  checkpoint loading, featurization caches, and Lightning-based supervised
+  training utilities.
+- Added MHN ranking configuration, policy documentation, CLI documentation, and
+  Tutorial 14 for MHN training/tuning workflows.
+- Added strict Chython-to-RDKit SMARTS conversion with reverse diagnostics and
+  semantic-loss reporting for strict round-trip validation.
+- Added the `mhnreact_rdkit` rule-fingerprint mode for MHN ranking, using the
+  original RDKit path-fingerprint template encoding.
+- Added `Tree.save_pickle(path)` for direct tree persistence and the
+  `synplan-convert-protection-data` command for protection source-data conversion.
+- Added API documentation for `synplan.chem.reaction.routes`.
+
+### Changed
+
+- Requires `chython-synplan` 1.100, pinned exactly. Its SMARTS parser now reads
+  92% of real-world patterns instead of 57%, and three primitives follow
+  Daylight rather than chython's own reading: an unmarked charge is
+  unconstrained, `A` is any aliphatic atom where `*` is any atom, and `x` is
+  ring connectivity where the heteroatom count it used to mean is now `y`.
+  Rules written against the old meanings of `A` and `x` need updating.
+- Supports Python 3.14, which chython 1.100 is the first release to ship wheels
+  for. Python 3.15 is out of reach until torch, rdkit, numpy and chytorch
+  publish cp315 wheels.
+- Verifies chython ring-connectivity queries against RDKit's `AtomRingBondCount`
+  during rule conversion instead of passing them through unchecked; only
+  `rings_count` and heteroatom queries stay unverifiable.
+- Dropped the `exclude-newer` resolution cutoff; the exact `chython-synplan` pin
+  is what holds the lock steady now.
+- Moved route clustering, route analysis, route depiction, route I/O, notebook
+  plotting, route-quality scoring, and RouteCGR implementation to
+  `synplan.chem.reaction.routes`.
+- Moved reaction-rule analysis, extraction, priority-rule parsing, and rule
+  representation helpers under `synplan.chem.reaction.rules`.
+- Moved MCTS expansion wrappers into `synplan.mcts.policy`, separating generic
+  policy selection from MHN-specific dynamic rule-association preparation.
+- Split ML graph embedders, policy networks, checkpoint loading, featurization,
+  and training helpers into focused submodules under `synplan.ml`.
+- Updated internal imports, tests, tutorials, Colab notebooks, API docs, and
+  migration notes to use the new route, rule, policy, and ML module layout.
+- Centralized route parent-chain traversal for tree, visualisation, and RDKit
+  route conversion while preserving their existing output formats.
+- `compose_route_cgr()` now uses a fast default path that returns the RouteCGR
+  without eagerly reconstructing reactions; callers that need the debug
+  `reactions_dict` can request it explicitly or deconvolute from the RouteCGR.
+- RouteCGR composition now assumes route-level atom mapping: the same atom-map
+  number must identify the same atom throughout a route, while independently
+  mapped local reaction steps are outside the supported input contract.
+- MHN light prediction keeps the rollout-friendly integer rule-count API; dynamic
+  MHN rule associations are prepared by the full `predict_reaction_rules()` path.
+
+### Fixed
+
+- Four shipped configuration files could not be loaded at all, because every
+  config model forbids unknown keys and nothing checked that the files parse:
+  the two combined-policy configs carried `priority_rules_fraction`, which
+  belongs to a different model, `mhn_ranking_policy_training.yaml` used
+  `rule_encoder_type` where the field is `rule_embedding_type`, and
+  `planning_value.yaml` was unreachable because the planning CLI merged the
+  `node_evaluation` section into the tree config. Loading every shipped config
+  is now a test.
+- Protecting-group selection cannot protect aldehydes, ketones, alpha-halo
+  ketones or phthalimide-protected amines. Nine of the twenty-five published
+  templates attach at two points, which acetals and dithianes need because they
+  replace the carbonyl double bond rather than substituting onto it, and the
+  product builder adds a single bond and deletes nothing. Eighteen reactive
+  functions allow only those templates, so they have no protection option at
+  all. The table is unchanged and the loader now says this once at startup
+  rather than failing quietly at each call.
+- The functional-group patterns in `extraction_functional_groups.yaml` used `A`
+  to mean any atom, which chython 1.100 reads as any *aliphatic* atom, so they
+  silently stopped matching aromatic neighbours such as benzaldehyde and
+  styrene. They now use `*`.
+- Route JSON export now recovers precursor nodes whose producing fragment is
+  structurally identical to the consuming reactant even when atom-number overlap
+  with the final target is absent, and drops malformed routes instead of emitting
+  JSON `null` children.
+- QueryCGR rule fingerprints and QueryCGR rule graphs preserve important query
+  constraints, including degree, hydrogen-count, ring-size, set-valued atom
+  labels, and dynamic bond semantics.
+- Runtime MHN rule-association caches are bounded and keyed by the ordered rule
+  SMARTS plus the rule representation contract.
+
+### Removed
+
+- Removed deprecated route compatibility namespaces: `synplan.routes`,
+  `synplan.routes.quality`, and `synplan.route_quality`.
+- Retained `synplan.chem.reaction_routes` as a deprecated forwarding namespace
+  for the historical `main`-branch route module paths.
+- Removed `TreeWrapper`; use `Tree.save_pickle(path)` instead.
+- Removed the old flat `synplan.mcts.expansion` and `synplan.ml.networks.policy`
+  modules in favor of the new policy/network package layout.
+
 ## [1.5.1] - 2026-06-04
 
 ### Fixed
+
 - Fixed score assignment for priority-rule nodes during evaluation.
 
 ## [1.5.0] - 2026-05-16
 
-> Migration guide: see [docs/user_guide/migration.rst](docs/user_guide/migration.rst).
-> Priority rules concept page: see [docs/methods/priority_rules.rst](docs/methods/priority_rules.rst).
+> Migration guide: see [docs/user_guide/migration.rst](https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/user_guide/migration.rst).
+> Priority rules concept page: see [docs/methods/priority_rules.rst](https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/docs/methods/priority_rules.rst).
 
 ### ⚠️ Backwards-incompatible
 
@@ -263,7 +394,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 #### Protection Strategy Scoring (NEW MODULE)
-- New `synplan/route_quality/` module implementing the competing-sites scoring framework
+- New `synplan/chem/reaction/routes/quality/` module implementing the competing-sites scoring framework
   from Westerlund et al. (ChemRxiv, 2025)
 - `FunctionalGroupDetector` with 102 SMARTS patterns across 18 reactivity categories
 - `HalogenDetector` with 140 SMARTS patterns across 5 halogen families
@@ -322,7 +453,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Tutorial 07: Protection Scoring (end-to-end with capivasertib, 128 routes)
 - Tutorial 08: Combined Ranking Filtering Policy (dual policy tuning)
 - Tutorial 09: NMCS Algorithms (Nested Monte Carlo Search guide)
-- API docs for `synplan.route_quality` module
+- API docs for `synplan.chem.reaction.routes.quality` module
 - 5 new user guide pages linked from docs index
 
 #### Configs
@@ -538,7 +669,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CLI interface (`synplan` command)
 - Docker images for CLI and GUI
 
-[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.1...HEAD
+[Unreleased]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.4...v1.5.0
 [1.4.4]: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/compare/v1.4.3...v1.4.4

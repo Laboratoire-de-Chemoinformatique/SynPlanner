@@ -16,17 +16,15 @@ import yaml
 from chython.files.SDFrw import SDFRead
 from chython.reactor.reactor import Reactor
 from huggingface_hub import hf_hub_download, snapshot_download
-from torch import device
 from tqdm.auto import tqdm
 
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.utils import (
     AtomMappingCheck,
-    _standardize_sdf_text,
-    _standardize_smiles_batch,
     reaction_string_mapping_status,
+    standardize_sdf_text,
+    standardize_smiles_batch,
 )
-from synplan.ml.networks.policy import PolicyNetwork
 from synplan.ml.networks.value import ValueNetwork
 from synplan.utils.config import ReactorConfig
 from synplan.utils.files import (
@@ -41,11 +39,11 @@ from synplan.utils.files import (
 from synplan.utils.parallel import process_pool_map_stream
 
 if TYPE_CHECKING:
-    from synplan.mcts.evaluation import EvaluationStrategy, ValueNetworkFunction
-    from synplan.mcts.expansion import (
-        CombinedPolicyNetworkFunction,
-        PolicyNetworkFunction,
+    from synplan.mcts.evaluation import (
+        EvaluationStrategy,
+        ValueNetworkEvaluationStrategy,
     )
+    from synplan.mcts.policy import CompositePolicy, TemplateBasedPolicy
     from synplan.utils.config import (
         CombinedPolicyConfig,
         PolicyNetworkConfig,
@@ -409,7 +407,7 @@ def load_building_blocks(
             progress_iter = _building_blocks_progress(total, silent=silent)
             for out in _map_blocks(
                 iter_smiles_blocks(building_blocks_path, step),
-                _standardize_smiles_batch,
+                standardize_smiles_batch,
                 num_workers=num_workers,
             ):
                 if out:
@@ -430,7 +428,7 @@ def load_building_blocks(
                 smiles_column=smiles_column,
             )
             for out in _map_blocks(
-                blocks, _standardize_smiles_batch, num_workers=num_workers
+                blocks, standardize_smiles_batch, num_workers=num_workers
             ):
                 if out:
                     building_blocks_smiles.update(out)
@@ -446,7 +444,7 @@ def load_building_blocks(
 
             progress = _building_blocks_progress(n, silent=silent)
             for chunk_out in _map_blocks(
-                blocks, _standardize_sdf_text, num_workers=num_workers
+                blocks, standardize_sdf_text, num_workers=num_workers
             ):
                 if chunk_out:
                     building_blocks_smiles.update(chunk_out)
@@ -476,7 +474,7 @@ def load_building_blocks(
 
 
 def load_value_net(
-    model_class: ValueNetwork, value_network_path: str | Path
+    model_class: type[ValueNetwork], value_network_path: str | Path
 ) -> ValueNetwork:
     """Loads the value network.
 
@@ -484,65 +482,68 @@ def load_value_net(
     :param model_class: The model class to be loaded.
     :return: The loaded value network.
     """
+    from synplan.ml.networks.checkpoint import load_network_from_checkpoint
 
-    map_location = device("cpu")
-    return model_class.load_from_checkpoint(value_network_path, map_location)
-
-
-def load_policy_net(
-    model_class: PolicyNetwork, policy_network_path: str | Path
-) -> PolicyNetwork:
-    """Loads the policy network.
-
-    :param policy_network_path: The path to the file storing policy network weights.
-    :param model_class: The model class to be loaded.
-    :return: The loaded policy network.
-    """
-
-    map_location = device("cpu")
-    return model_class.load_from_checkpoint(
-        policy_network_path, map_location, batch_size=1
+    return load_network_from_checkpoint(
+        model_class, value_network_path, map_location="cpu"
     )
+
+
+def build_policy_from_config(
+    policy_config: "PolicyNetworkConfig",
+) -> "TemplateBasedPolicy":
+    """Build a :class:`TemplateBasedPolicy` matching a checkpoint architecture."""
+    from synplan.mcts.policy import LinearPolicy, MHNReactPolicy
+    from synplan.ml.networks.checkpoint import load_policy_network_from_checkpoint
+
+    policy_net = load_policy_network_from_checkpoint(
+        policy_config.weights_path, batch_size=1, dropout=0
+    )
+    knobs = dict(
+        top_rules=policy_config.top_rules,
+        rule_prob_threshold=policy_config.rule_prob_threshold,
+        priority_rules_fraction=policy_config.priority_rules_fraction,
+    )
+    if getattr(policy_net, "architecture", "linear") == "mhn_ranking":
+        return MHNReactPolicy(policy_net, **knobs)
+    return LinearPolicy(policy_net, **knobs)
 
 
 def load_policy_function(
     policy_config: Union["PolicyNetworkConfig", dict, None] = None,
     weights_path: str | None = None,
     **config_kwargs,
-) -> "PolicyNetworkFunction":
-    """Factory function to create PolicyNetworkFunction with flexible configuration.
+) -> "TemplateBasedPolicy":
+    """Build a template-based :class:`Policy` from flexible configuration.
 
     Priority order: policy_config > weights_path + kwargs > defaults
 
     :param policy_config: PolicyNetworkConfig object or dict with config parameters
     :param weights_path: Direct path to weights file (shortcut for simple cases)
     :param config_kwargs: Additional config parameters to override defaults
-    :return: PolicyNetworkFunction ready for use in tree search
+    :return: A :class:`TemplateBasedPolicy` ready for use in tree search
 
     Examples:
         >>> # Using config object
         >>> config = PolicyNetworkConfig(weights_path="path.ckpt", top_rules=50)
-        >>> policy_fn = load_policy_function(policy_config=config)
+        >>> policy = load_policy_function(policy_config=config)
         >>>
         >>> # Using direct path (simplest)
-        >>> policy_fn = load_policy_function(weights_path="path.ckpt")
+        >>> policy = load_policy_function(weights_path="path.ckpt")
         >>>
         >>> # Using path with overrides
-        >>> policy_fn = load_policy_function(weights_path="path.ckpt", top_rules=100)
+        >>> policy = load_policy_function(weights_path="path.ckpt", top_rules=100)
     """
-    from synplan.mcts.expansion import PolicyNetworkFunction
     from synplan.utils.config import PolicyNetworkConfig
 
-    # Priority 1: Use provided config
     if policy_config is not None:
         if isinstance(policy_config, dict):
             policy_config = PolicyNetworkConfig.from_dict(policy_config)
-        return PolicyNetworkFunction(policy_config=policy_config)
+        return build_policy_from_config(policy_config)
 
-    # Priority 2: Create config from weights_path and kwargs
     if weights_path is not None:
         policy_config = PolicyNetworkConfig(weights_path=weights_path, **config_kwargs)
-        return PolicyNetworkFunction(policy_config=policy_config)
+        return build_policy_from_config(policy_config)
 
     raise ValueError("Must provide either policy_config or weights_path")
 
@@ -557,8 +558,8 @@ def load_combined_policy_function(
     rule_prob_threshold: float = 0.0,
     ranking_weight: float = 1.0,
     temperature: float = 1.0,
-) -> "CombinedPolicyNetworkFunction":
-    """Factory function to create CombinedPolicyNetworkFunction with flexible configuration.
+) -> "CompositePolicy":
+    """Build a :class:`CompositePolicy` merging filtering and ranking policies.
 
     Combines filtering and ranking policies by weighted addition of logits:
         combined_logits = filtering_logits + ranking_weight * ranking_logits
@@ -578,7 +579,7 @@ def load_combined_policy_function(
         Values > 1.0 give more weight to ranking (feasibility).
     :param temperature: Temperature for softmax (default 1.0).
         Values > 1.0 produce softer distributions (more exploration).
-    :return: CombinedPolicyNetworkFunction ready for use in tree search.
+    :return: A :class:`CompositePolicy` ready for use in tree search.
 
     Examples:
         >>> # Using CombinedPolicyConfig
@@ -600,7 +601,7 @@ def load_combined_policy_function(
         ...     ranking_weights_path="ranking.ckpt",
         ... )
     """
-    from synplan.mcts.expansion import CombinedPolicyNetworkFunction
+    from synplan.mcts.policy import CompositePolicy
     from synplan.utils.config import CombinedPolicyConfig, PolicyNetworkConfig
 
     # Priority 1: Use CombinedPolicyConfig
@@ -619,52 +620,69 @@ def load_combined_policy_function(
         ranking_config = PolicyNetworkConfig(
             weights_path=ranking_weights_path, policy_type="ranking"
         )
-        return CombinedPolicyNetworkFunction(
-            filtering_config=filtering_config,
-            ranking_config=ranking_config,
-            top_rules=top_rules,
-            rule_prob_threshold=rule_prob_threshold,
-            ranking_weight=ranking_weight,
-            temperature=temperature,
-        )
-
-    # Build filtering config
-    if filtering_config is not None:
-        if isinstance(filtering_config, str):
+    else:
+        # Build filtering config
+        if filtering_config is not None:
+            if isinstance(filtering_config, str):
+                filtering_config = PolicyNetworkConfig(
+                    weights_path=filtering_config, policy_type="filtering"
+                )
+            elif isinstance(filtering_config, dict):
+                filtering_config.setdefault("policy_type", "filtering")
+                filtering_config = PolicyNetworkConfig.from_dict(filtering_config)
+        elif filtering_weights_path is not None:
             filtering_config = PolicyNetworkConfig(
-                weights_path=filtering_config, policy_type="filtering"
+                weights_path=filtering_weights_path, policy_type="filtering"
             )
-        elif isinstance(filtering_config, dict):
-            filtering_config.setdefault("policy_type", "filtering")
-            filtering_config = PolicyNetworkConfig.from_dict(filtering_config)
-    elif filtering_weights_path is not None:
-        filtering_config = PolicyNetworkConfig(
-            weights_path=filtering_weights_path, policy_type="filtering"
-        )
-    else:
-        raise ValueError(
-            "Must provide either filtering_config or filtering_weights_path"
-        )
+        else:
+            raise ValueError(
+                "Must provide either filtering_config or filtering_weights_path"
+            )
 
-    # Build ranking config
-    if ranking_config is not None:
-        if isinstance(ranking_config, str):
+        # Build ranking config
+        if ranking_config is not None:
+            if isinstance(ranking_config, str):
+                ranking_config = PolicyNetworkConfig(
+                    weights_path=ranking_config, policy_type="ranking"
+                )
+            elif isinstance(ranking_config, dict):
+                ranking_config.setdefault("policy_type", "ranking")
+                ranking_config = PolicyNetworkConfig.from_dict(ranking_config)
+        elif ranking_weights_path is not None:
             ranking_config = PolicyNetworkConfig(
-                weights_path=ranking_config, policy_type="ranking"
+                weights_path=ranking_weights_path, policy_type="ranking"
             )
-        elif isinstance(ranking_config, dict):
-            ranking_config.setdefault("policy_type", "ranking")
-            ranking_config = PolicyNetworkConfig.from_dict(ranking_config)
-    elif ranking_weights_path is not None:
-        ranking_config = PolicyNetworkConfig(
-            weights_path=ranking_weights_path, policy_type="ranking"
-        )
-    else:
-        raise ValueError("Must provide either ranking_config or ranking_weights_path")
+        else:
+            raise ValueError(
+                "Must provide either ranking_config or ranking_weights_path"
+            )
 
-    return CombinedPolicyNetworkFunction(
-        filtering_config=filtering_config,
-        ranking_config=ranking_config,
+    if filtering_config.policy_type != "filtering":
+        raise ValueError(
+            f"filtering_config must have policy_type='filtering', got "
+            f"'{filtering_config.policy_type}'"
+        )
+    if ranking_config.policy_type != "ranking":
+        raise ValueError(
+            f"ranking_config must have policy_type='ranking', got "
+            f"'{ranking_config.policy_type}'"
+        )
+
+    filtering_policy = build_policy_from_config(filtering_config)
+    ranking_policy = build_policy_from_config(ranking_config)
+    if filtering_policy.n_rules != ranking_policy.n_rules:
+        # the two heads' logits are added, so a shape mismatch would otherwise
+        # surface as a bare tensor-size error in the middle of a search
+        raise ValueError(
+            f"the filtering head knows {filtering_policy.n_rules} rules and the "
+            f"ranking head {ranking_policy.n_rules}; their logits are added, so "
+            "both must be trained on the same rule set. Use a preset that ships "
+            "a matched pair, such as synplanner-article."
+        )
+
+    return CompositePolicy(
+        filtering_policy,
+        ranking_policy,
         top_rules=top_rules,
         rule_prob_threshold=rule_prob_threshold,
         ranking_weight=ranking_weight,
@@ -675,16 +693,18 @@ def load_combined_policy_function(
 def load_value_network(
     value_config: Union["ValueNetworkConfig", dict, None] = None,
     weights_path: str | None = None,
+    normalize: bool = False,
     **config_kwargs,
-) -> "ValueNetworkFunction":
-    """Factory function to create ValueNetworkFunction with flexible configuration.
+) -> "ValueNetworkEvaluationStrategy":
+    """Factory function to create a value evaluation strategy.
 
     Priority order: value_config > weights_path + kwargs > defaults
 
     :param value_config: ValueNetworkConfig object or dict with config parameters
     :param weights_path: Direct path to weights file (shortcut for simple cases)
+    :param normalize: Whether to normalize scores to [0, 1].
     :param config_kwargs: Additional config parameters to override defaults
-    :return: ValueNetworkFunction ready for use in tree search
+    :return: ValueNetworkEvaluationStrategy ready for use in tree search
 
     Examples:
         >>> # Using config object
@@ -694,21 +714,19 @@ def load_value_network(
         >>> # Using direct path (simplest)
         >>> value_fn = load_value_network(weights_path="path.ckpt")
     """
-    from synplan.mcts.evaluation import ValueNetworkFunction
+    from synplan.mcts.evaluation import ValueNetworkEvaluationStrategy
     from synplan.utils.config import ValueNetworkConfig
 
-    # Priority 1: Use provided config
     if value_config is not None:
         if isinstance(value_config, dict):
             value_config = ValueNetworkConfig.from_dict(value_config)
-        # ValueNetworkFunction only takes weights_path
-        return ValueNetworkFunction(weights_path=value_config.weights_path)
+        weights_path = value_config.weights_path
+    if weights_path is None:
+        raise ValueError("Must provide either value_config or weights_path")
 
-    # Priority 2: Use direct weights_path
-    if weights_path is not None:
-        return ValueNetworkFunction(weights_path=weights_path)
-
-    raise ValueError("Must provide either value_config or weights_path")
+    return ValueNetworkEvaluationStrategy(
+        weights_path=weights_path, normalize=normalize
+    )
 
 
 def load_evaluation_function(eval_config) -> "EvaluationStrategy":
@@ -768,10 +786,8 @@ def load_evaluation_function(eval_config) -> "EvaluationStrategy":
         )
 
     elif isinstance(eval_config, ValueNetworkEvaluationConfig):
-        # Load value network from path in config
-        value_net = load_value_network(weights_path=eval_config.weights_path)
         return ValueNetworkEvaluationStrategy(
-            value_network=value_net,
+            weights_path=eval_config.weights_path,
             normalize=eval_config.normalize,
         )
 

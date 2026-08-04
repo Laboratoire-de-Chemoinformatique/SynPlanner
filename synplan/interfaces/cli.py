@@ -12,13 +12,18 @@ from synplan.chem.data.standardizing import (
     ReactionStandardizationConfig,
     standardize_reactions_from_file,
 )
-from synplan.chem.reaction_routes.clustering import run_cluster_cli
-from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions
+from synplan.chem.reaction.routes.cli import run_cluster_cli
+from synplan.chem.reaction.rules.extraction import extract_rules_from_reactions
 from synplan.chem.utils import standardize_building_blocks
 from synplan.mcts.search import run_search
 from synplan.ml.training.reinforcement import run_updating
-from synplan.ml.training.supervised import create_policy_dataset, run_policy_training
+from synplan.ml.training.supervised import (
+    create_policy_dataset,
+    run_mhn_network_tuning,
+    run_policy_training,
+)
 from synplan.utils.config import (
+    CombinedPolicyConfig,
     PolicyEvaluationConfig,
     PolicyNetworkConfig,
     RandomEvaluationConfig,
@@ -495,6 +500,69 @@ def ranking_policy_training_cli(
     run_policy_training(datamodule, config=policy_config, results_path=results_dir)
 
 
+@synplan.command(name="mhn_network_tuning")
+@click.option(
+    "--config",
+    "config_path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the configuration file for MHN policy fine-tuning.",
+)
+@click.option(
+    "--policy_network",
+    "policy_network",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to an already trained MHN ranking policy checkpoint.",
+)
+@click.option(
+    "--new_policy_data",
+    "new_policy_data",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the new ranking policy mapping file (*_policy_data.tsv).",
+)
+@click.option(
+    "--results_dir",
+    default=Path("."),
+    type=click.Path(),
+    help="Path to the directory where the tuned MHN checkpoint will be stored.",
+)
+@click.option(
+    "--workers",
+    "num_workers",
+    default=0,
+    type=int,
+    help="CPU workers for dataset preprocessing (0 = auto-detect).",
+)
+@click.option(
+    "--no-cache",
+    "no_cache",
+    is_flag=True,
+    default=False,
+    help="Disable dataset caching (always reprocess from scratch).",
+)
+def mhn_network_tuning_cli(
+    config_path: str,
+    policy_network: str,
+    new_policy_data: str,
+    results_dir: str,
+    num_workers: int,
+    no_cache: bool,
+) -> None:
+    """Fine-tune an existing MHN ranking checkpoint on new policy data."""
+    policy_config = PolicyNetworkConfig.from_yaml(config_path)
+
+    run_mhn_network_tuning(
+        policy_network_path=policy_network,
+        new_policy_data_path=new_policy_data,
+        results_path=results_dir,
+        config=policy_config,
+        num_workers=num_workers,
+        cache=not no_cache,
+    )
+
+
 @synplan.command(name="filtering_policy_training")
 @click.option(
     "--config",
@@ -557,6 +625,10 @@ def filtering_policy_training_cli(
 
     policy_config = PolicyNetworkConfig.from_yaml(config_path)
     policy_config.policy_type = "filtering"
+    if policy_config.architecture == "mhn_ranking":
+        raise click.UsageError(
+            "architecture=mhn_ranking is only supported by ranking_policy_training"
+        )
     if logger_type is not None:
         policy_config.logger = {"type": logger_type}
 
@@ -570,7 +642,11 @@ def filtering_policy_training_cli(
         cache=not no_cache,
     )
 
-    run_policy_training(datamodule, config=policy_config, results_path=results_dir)
+    run_policy_training(
+        datamodule,
+        config=policy_config,
+        results_path=results_dir,
+    )
 
 
 @synplan.command(name="value_network_tuning")
@@ -697,6 +773,26 @@ def value_network_tuning_cli(
     type=click.Path(exists=False),
     help="Path to the file where retrosynthetic planning results will be stored.",
 )
+@click.option(
+    "--reconcile-mapping",
+    "reconcile_mapping",
+    is_flag=True,
+    default=False,
+    help=(
+        "Reconcile atom-map numbering across steps in exported routes (slow). "
+        "By default the export skips the route CGR composition and uses "
+        "per-step-local atom numbering, which is ~4x faster."
+    ),
+)
+@click.option(
+    "--export_routes",
+    "--export-routes",
+    "export_routes",
+    is_flag=True,
+    default=False,
+    help="Also emit a consumable target-keyed routes artifact (results.json.gz) "
+    "plus manifest.json for downstream consumers.",
+)
 def planning_cli(
     config_path: str,
     targets: str,
@@ -705,16 +801,24 @@ def planning_cli(
     policy_network: str,
     value_network: str,
     results_dir: str,
+    reconcile_mapping: bool,
+    export_routes: bool,
 ):
     """Retrosynthetic planning."""
 
     with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
-    search_config = {**config["tree"], **config.get("node_evaluation", {})}
-    policy_config = PolicyNetworkConfig.from_dict(
-        {**config["node_expansion"], **{"weights_path": policy_network}}
-    )
+    # node_evaluation keys are read separately below; merging them here would
+    # reach TreeConfig (extra="forbid") and reject every config that has them.
+    search_config = dict(config["tree"])
+    if "combined_policy" in config:
+        # both heads come from the config; --policy_network has nothing to point at
+        policy_config = CombinedPolicyConfig.from_dict(config["combined_policy"])
+    else:
+        policy_config = PolicyNetworkConfig.from_dict(
+            {**config["node_expansion"], **{"weights_path": policy_network}}
+        )
 
     # Create evaluation config based on evaluation_type
     node_evaluation = config.get("node_evaluation", {})
@@ -768,6 +872,8 @@ def planning_cli(
         reaction_rules_path=reaction_rules,
         building_blocks_path=building_blocks,
         results_root=results_dir,
+        reconcile_atom_mapping=reconcile_mapping,
+        export_routes=export_routes,
     )
 
 

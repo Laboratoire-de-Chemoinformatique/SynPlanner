@@ -20,6 +20,28 @@ Download a ready-to-use data preset from HuggingFace with all components needed 
     - ``preset`` - preset name (default: ``synplanner-gps``).
     - ``save_to`` - the directory where downloaded data will be stored.
 
+Protection source-data conversion
+---------------------------------
+Convert the Westerlund protection-strategy source dataset into the YAML and
+TSV files consumed by SynPlanner's protection configuration. The source
+directory must contain ``protection_reactive_function_SMARTS.txt``,
+``halogen_reactive_function_SMARTS.txt``, and
+``protection_SMARTS_incompatibility.csv``. Supporting template and label
+mapping files are copied when present.
+
+Use an explicit output directory so generated files are written to a known
+location:
+
+.. code-block:: bash
+
+    synplan-convert-protection-data /path/to/protection-source \
+        --output-dir synplan_data/protection
+
+The command writes ``competing_groups.yaml``, ``halogen_groups.yaml``, and
+``incompatibility_matrix.tsv``, together with any supporting files copied from
+the source directory. Without ``--output-dir``, output is written relative to
+the installed converter script.
+
 ORD conversion
 ---------------------------
 ORD ``.pb`` datasets can be converted to SynPlanner-compatible reaction SMILES:
@@ -57,6 +79,15 @@ form ``reaction_smiles<TAB>row_id<TAB>patent_ids``, standardization preserves
 those source columns in successful output rows. When ``--ignore-errors`` is
 used, failed rows are removed from the standardized output and written to the
 error TSV with a ``source_info`` column.
+
+.. note::
+    This command **deduplicates by default** (``deduplicate: true`` in
+    ``configs/reactions_standardization.yaml``, and also the model default, so removing
+    the key does not disable it). Duplicates are matched on the CGR of the standardized
+    reaction, so records differing only in atom numbering, component order or SMILES
+    writing collapse into one. They are counted in the summary's ``failed`` total, listed
+    separately as ``duplicates removed``, and deliberately not written to the error TSV.
+    Output count below input count is therefore expected even on perfectly clean data.
 
 .. code-block:: bash
 
@@ -151,8 +182,28 @@ types of policy networks is configured by the same configuration file (see the d
     - ``--workers`` - CPU workers for ranking dataset preprocessing (0 = auto).
     - ``--no-cache`` - disable dataset cache reuse.
     - ``--logger`` - logger backend: ``csv``, ``tensorboard``, ``mlflow``, ``wandb``, or ``litlogger``.
-      Optional remote backends require the matching extra, e.g. ``SynPlanner[litlogger]``,
-      ``SynPlanner[wandb]``, ``SynPlanner[mlflow]``, or ``SynPlanner[loggers]``.
+      ``csv`` and ``tensorboard`` work out of the box; ``wandb`` and ``mlflow``
+      need ``SynPlanner[wandb]``, ``SynPlanner[mlflow]`` or ``SynPlanner[loggers]``.
+      ``litlogger`` needs ``pytorch-lightning>=2.6.1`` (which is where the
+      ``LitLogger`` class lives) plus ``pip install litlogger``. There is no
+      ``SynPlanner[litlogger]`` extra — ``pip`` only warns and installs nothing
+      when you ask for one — and ``SynPlanner[loggers]`` covers wandb + mlflow only.
+
+**MHN ranking policy tuning**
+
+.. code-block:: bash
+
+    synplan mhn_network_tuning --config configs/mhn_ranking_policy_training.yaml --policy_network policy_network.ckpt --new_policy_data new_reaction_rules_policy_data.tsv --results_dir mhn_tuned
+
+**Parameters**:
+    - ``config`` - the path to the policy configuration file. Fine-tuning
+      epochs, batch size, learning rate, logger settings, and Trainer options
+      are read from this YAML file.
+    - ``policy_network`` - the path to an already trained MHN ranking checkpoint.
+    - ``new_policy_data`` - the path to the new ranking policy mapping file (``*_policy_data.tsv``) generated during rule extraction.
+    - ``results_dir`` - the path to the directory where the tuned MHN checkpoint will be stored.
+    - ``--workers`` - CPU workers for ranking dataset preprocessing (0 = auto).
+    - ``--no-cache`` - disable dataset cache reuse.
 
 **Filtering policy network**
 
@@ -168,8 +219,12 @@ types of policy networks is configured by the same configuration file (see the d
     - ``--num_cpus`` - CPUs for filtering dataset preparation.
     - ``--no-cache`` - disable dataset cache reuse.
     - ``--logger`` - logger backend: ``csv``, ``tensorboard``, ``mlflow``, ``wandb``, or ``litlogger``.
-      Optional remote backends require the matching extra, e.g. ``SynPlanner[litlogger]``,
-      ``SynPlanner[wandb]``, ``SynPlanner[mlflow]``, or ``SynPlanner[loggers]``.
+      ``csv`` and ``tensorboard`` work out of the box; ``wandb`` and ``mlflow``
+      need ``SynPlanner[wandb]``, ``SynPlanner[mlflow]`` or ``SynPlanner[loggers]``.
+      ``litlogger`` needs ``pytorch-lightning>=2.6.1`` (which is where the
+      ``LitLogger`` class lives) plus ``pip install litlogger``. There is no
+      ``SynPlanner[litlogger]`` extra — ``pip`` only warns and installs nothing
+      when you ask for one — and ``SynPlanner[loggers]`` covers wandb + mlflow only.
 
 Value network training
 ---------------------------
@@ -188,6 +243,7 @@ with the configuration file (see the details here).
     - ``reaction_rules`` - the path to the file with reactions rules.
     - ``building_blocks`` - the path to the file with building blocks.
     - ``policy_network`` - the path to the file with trained policy network (ranking or filtering policy network).
+    - ``value_network`` - optional path to value network weights to start tuning from.
     - ``results_dir`` - the path to the directory where the trained value network will be to be stored.
 
 Retrosynthetic planning
@@ -204,5 +260,10 @@ Retrosynthetic planning can be performed in ``SynPlanner``.
     - ``reaction_rules`` - the path to the file with reaction rules.
     - ``building_blocks`` - the path to the file with building blocks.
     - ``policy_network`` - the path to the file with trained policy network (ranking or filtering).
-    - ``value_network`` - the path to the file with trained value network if available (default is None).
-    - ``results_dir`` - the path to the directory where the trained value network will be to be stored.
+    - ``value_network`` - the path to the file with trained value network. Read **only** when the
+      config sets ``node_evaluation: evaluation_type: gcn`` (as ``configs/planning_value.yaml``
+      does). With ``configs/planning_standard.yaml`` the evaluator defaults to ``rollout`` and this
+      option is silently ignored.
+    - ``results_dir`` - the path to the directory where the planning results will be stored.
+    - ``--reconcile-mapping`` - reconcile atom-map numbering across route steps (slower).
+    - ``--export_routes`` - additionally write ``results.json.gz`` + ``manifest.json``.

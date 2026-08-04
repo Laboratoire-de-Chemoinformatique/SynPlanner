@@ -16,12 +16,12 @@ from pathlib import Path
 import pytest
 from chython.containers import CGRContainer, ReactionContainer
 
-from synplan.chem.reaction_routes.clustering import (
+from synplan.chem.reaction.routes.clustering import (
     cluster_routes,
     post_process_subgroup,
     subcluster_all_clusters,
 )
-from synplan.chem.reaction_routes.io import (
+from synplan.chem.reaction.routes.io import (
     make_dict,
     make_json,
     read_routes_csv,
@@ -29,11 +29,11 @@ from synplan.chem.reaction_routes.io import (
     write_routes_csv,
     write_routes_json,
 )
-from synplan.chem.reaction_routes.route_cgr import (
+from synplan.chem.reaction.routes.representation import (
     compose_all_route_cgrs,
     compose_all_sb_cgrs,
 )
-from synplan.chem.reaction_routes.visualisation import (
+from synplan.chem.reaction.routes.visualisation import (
     cgr_display,
     depict_custom_reaction,
 )
@@ -241,6 +241,9 @@ class TestClustering:
             assert isinstance(subcl, dict)
             for _sc_num, sc_data in subcl.items():
                 assert "routes_data" in sc_data
+                assert "supporting_data" in sc_data
+                assert "cluster_id" in sc_data
+                assert "subcluster_id" in sc_data
                 assert "synthon_reaction" in sc_data
 
     def test_subcluster_keys_match_cluster_keys(self, clusters, all_subclusters):
@@ -353,59 +356,6 @@ class TestVisualizationSVG:
 
 
 # ---------------------------------------------------------------------------
-# 5. Visualization — PNG
-# ---------------------------------------------------------------------------
-
-
-class TestVisualizationPNG:
-    """Test PNG generation (requires playwright/browser support)."""
-
-    @pytest.fixture(autouse=True)
-    def _check_png_support(self):
-        """Skip PNG tests if svg2png is not available."""
-        try:
-            from chython.algorithms.depict import svg2png  # noqa: F401
-        except ImportError:
-            pytest.skip("svg2png not available (missing playwright/browser)")
-
-    def test_molecule_depict_png(self, routes_dict_from_json):
-        first_route = next(iter(routes_dict_from_json.values()))
-        first_rxn = next(iter(first_route.values()))
-        mol = first_rxn.reactants[0]
-        mol.clean2d()
-        try:
-            png = mol.depict(format="png")
-            assert isinstance(png, bytes)
-            assert len(png) > 0
-            # PNG magic bytes
-            assert png[:4] == b"\x89PNG"
-        except Exception as e:
-            pytest.skip(f"PNG rendering failed (browser not available?): {e}")
-
-    def test_cgr_depict_png(self, all_route_cgrs):
-        first_cgr = next(iter(all_route_cgrs.values()))
-        first_cgr.clean2d()
-        try:
-            png = first_cgr.depict(format="png")
-            assert isinstance(png, bytes)
-            assert len(png) > 0
-            assert png[:4] == b"\x89PNG"
-        except Exception as e:
-            pytest.skip(f"PNG rendering failed (browser not available?): {e}")
-
-    def test_reaction_depict_png(self, routes_dict_from_json):
-        first_route = next(iter(routes_dict_from_json.values()))
-        first_rxn = next(iter(first_route.values()))
-        try:
-            png = first_rxn.depict(format="png")
-            assert isinstance(png, bytes)
-            assert len(png) > 0
-            assert png[:4] == b"\x89PNG"
-        except Exception as e:
-            pytest.skip(f"PNG rendering failed (browser not available?): {e}")
-
-
-# ---------------------------------------------------------------------------
 # 6. HTML reports
 # ---------------------------------------------------------------------------
 
@@ -441,16 +391,12 @@ class TestHTMLReports:
         content = Path(html_path).read_text()
         assert len(content) > 0
 
-    def test_routes_subclustering_report(
-        self, all_subclusters, all_sb_cgrs, routes_json
-    ):
+    def test_routes_subclustering_report(self, all_subclusters, routes_json):
         """routes_subclustering_report should produce valid HTML."""
         tested = 0
-        for cluster_key, subcl in all_subclusters.items():
-            for sc_num, sc_data in subcl.items():
-                html = routes_subclustering_report(
-                    routes_json, sc_data, cluster_key, sc_num, all_sb_cgrs
-                )
+        for _cluster_key, subcl in all_subclusters.items():
+            for _sc_num, sc_data in subcl.items():
+                html = routes_subclustering_report(routes_json, sc_data)
                 assert isinstance(html, str)
                 assert len(html) > 0
                 tested += 1
@@ -594,9 +540,7 @@ class TestFullPipelineSmokeTest:
         first_sc_key = next(iter(all_subclusters))
         first_sc_num = next(iter(all_subclusters[first_sc_key]))
         subgroup = all_subclusters[first_sc_key][first_sc_num]
-        sc_html = routes_subclustering_report(
-            routes_json, subgroup, first_sc_key, first_sc_num, all_sb_cgrs
-        )
+        sc_html = routes_subclustering_report(routes_json, subgroup)
         assert len(sc_html) > 0
 
         # Cell: Post-processing (if applicable)

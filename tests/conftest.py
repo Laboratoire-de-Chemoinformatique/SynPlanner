@@ -19,16 +19,6 @@ logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 
 
-def pytest_unconfigure(config):
-    """Force-exit after test session to prevent hanging from PyTorch daemon threads."""
-    os._exit(getattr(config, "_exitstatus", 0))
-
-
-def pytest_sessionfinish(session, exitstatus):
-    """Store exit status for pytest_unconfigure."""
-    session.config._exitstatus = exitstatus
-
-
 from synplan.chem.data.filtering import (  # noqa: E402
     CCsp3BreakingConfig,
     DynamicBondsConfig,

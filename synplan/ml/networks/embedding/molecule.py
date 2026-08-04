@@ -1,0 +1,231 @@
+"""Graph embedder zoo for SynPlanner policy and value networks."""
+
+import torch
+from torch import Tensor
+from torch.nn import GELU, Dropout, Linear, Module, ModuleDict, ModuleList, Sequential
+from torch.nn.functional import relu
+from torch_geometric.data.batch import Batch
+from torch_geometric.nn.aggr import VariancePreservingAggregation
+from torch_geometric.nn.conv import GCNConv, GINEConv, GPSConv
+from torch_geometric.nn.pool import global_add_pool
+
+
+class GraphEmbedding(Module):
+    """Needed to convert molecule atom vectors to the single vector using graph
+    convolution."""
+
+    def __init__(
+        self,
+        vector_dim: int = 512,
+        dropout: float = 0.4,
+        num_conv_layers: int = 5,
+        node_dim: int = 11,
+    ):
+        """Initializes a graph convolutional module. Needed to convert molecule atom
+        vectors to the single vector using graph convolution.
+
+        :param vector_dim: The dimensionality of the hidden layers and output layer of
+            graph convolution module.
+        :param dropout: Dropout is a regularization technique used in neural networks to
+            prevent overfitting. It randomly sets a fraction of input units to 0 at each
+            update during training time.
+        :param num_conv_layers: The number of convolutional layers in a graph
+            convolutional module.
+        """
+
+        super().__init__()
+        self.expansion = Linear(node_dim, vector_dim)
+        self.dropout = Dropout(dropout)
+        self.gcn_convs = ModuleList(
+            [
+                GCNConv(
+                    vector_dim,
+                    vector_dim,
+                    improved=True,
+                )
+                for _ in range(num_conv_layers)
+            ]
+        )
+
+    def forward(self, graph: Batch) -> Tensor:
+        """Takes a graph as input and performs graph convolution on it.
+
+        :param graph: The batch of molecular graphs, where each atom is represented by
+            the atom/bond vector.
+        :return: Graph embedding.
+        """
+        atoms, connections = graph.x.float(), graph.edge_index.long()
+        atoms = torch.log(atoms + 1)
+        atoms = self.expansion(atoms)
+        for gcn_conv in self.gcn_convs:
+            atoms = atoms + self.dropout(relu(gcn_conv(atoms, connections)))
+
+        return global_add_pool(atoms, graph.batch)
+
+
+class GraphEmbeddingConcat(GraphEmbedding, Module):
+    """Needed to concat."""  # TODO for what ?
+
+    def __init__(
+        self,
+        vector_dim: int = 512,
+        dropout: float = 0.4,
+        num_conv_layers: int = 8,
+        node_dim: int = 11,
+    ):
+        Module.__init__(self)
+
+        gcn_dim = vector_dim // num_conv_layers
+
+        self.expansion = Linear(node_dim, gcn_dim)
+        self.dropout = Dropout(dropout)
+        self.gcn_convs = ModuleList(
+            [
+                ModuleDict(
+                    {
+                        "gcn": GCNConv(gcn_dim, gcn_dim, improved=True),
+                        "activation": GELU(),
+                    }
+                )
+                for _ in range(num_conv_layers)
+            ]
+        )
+
+    def forward(self, graph: Batch) -> Tensor:
+        """Takes a graph as input and performs graph convolution on it.
+
+        :param graph: The batch of molecular graphs, where each atom is represented by
+            the atom/bond vector.
+        :return: Graph embedding.
+        """
+
+        atoms, connections = graph.x.float(), graph.edge_index.long()
+        atoms = torch.log(atoms + 1)
+        atoms = self.expansion(atoms)
+
+        collected_atoms = []
+        for gcn_convs in self.gcn_convs:
+            atoms = gcn_convs["gcn"](atoms, connections)
+            atoms = gcn_convs["activation"](atoms)
+            atoms = self.dropout(atoms)
+            collected_atoms.append(atoms)
+
+        atoms = torch.cat(collected_atoms, dim=-1)
+
+        return global_add_pool(atoms, graph.batch)
+
+
+class GraphEmbeddingGPS(Module):
+    """GPS-style graph embedder: GINEConv + optional attention + LayerNorm + GELU.
+
+    :param vector_dim: Hidden dimension for node and edge embeddings.
+    :param edge_dim: Input edge feature dimension (4 bond features from mol_to_pyg).
+    :param dropout: Dropout probability for the GPS layer (applied to MPNN output).
+    :param num_conv_layers: Number of GPS layers.
+    :param heads: Number of attention heads. Only used when attn_type is not None.
+    :param attn_type: Attention mechanism: ``"performer"`` (O(N) linear)
+        or ``"multihead"`` (O(N^2) full).
+    :param attn_dropout: Dropout on attention weights (separate from layer dropout).
+    """
+
+    def __init__(
+        self,
+        vector_dim: int = 256,
+        node_dim: int = 11,
+        edge_dim: int = 4,
+        dropout: float = 0.3,
+        num_conv_layers: int = 5,
+        heads: int = 4,
+        attn_type: str = "performer",
+        attn_dropout: float = 0.5,
+    ):
+        super().__init__()
+        self.node_expansion = Linear(node_dim, vector_dim)
+        self.edge_expansion = Linear(edge_dim, vector_dim)
+        self.pool = VariancePreservingAggregation()
+
+        self.convs = ModuleList()
+        for _ in range(num_conv_layers):
+            nn_layer = Sequential(
+                Linear(vector_dim, vector_dim),
+                GELU(),
+                Linear(vector_dim, vector_dim),
+            )
+            local_conv = GINEConv(nn_layer, edge_dim=vector_dim)
+            attn_kwargs = {"dropout": attn_dropout}
+            layer = GPSConv(
+                channels=vector_dim,
+                conv=local_conv,
+                heads=heads,
+                dropout=dropout,
+                act="gelu",
+                norm="layer_norm",
+                norm_kwargs={"mode": "node"},
+                attn_type=attn_type,
+                attn_kwargs=attn_kwargs,
+            )
+            self.convs.append(layer)
+
+    def forward(self, graph: Batch) -> Tensor:
+        atoms = graph.x.float()
+        atoms = torch.log(atoms + 1)
+        atoms = self.node_expansion(atoms)
+
+        edge_attr = self.edge_expansion(graph.edge_attr.float())
+
+        for conv in self.convs:
+            atoms = conv(atoms, graph.edge_index, graph.batch, edge_attr=edge_attr)
+
+        return self.pool(atoms, index=graph.batch)
+
+
+def build_graph_embedder(
+    embedder_type: str,
+    vector_dim: int,
+    *,
+    dropout: float = 0.4,
+    num_conv_layers: int = 5,
+    heads: int = 4,
+    attn_type: str = "performer",
+    attn_dropout: float = 0.5,
+    node_dim: int = 11,
+    edge_dim: int = 4,
+) -> Module:
+    """Build a SynPlanner graph embedder for a concrete node/edge schema."""
+    valid_embedder_types = {"gcn", "gcn_concat", "gps"}
+    if embedder_type not in valid_embedder_types:
+        expected = "', '".join(sorted(valid_embedder_types))
+        raise ValueError(f"embedder_type must be one of '{expected}'")
+    if num_conv_layers <= 0:
+        raise ValueError("num_conv_layers must be > 0")
+    if embedder_type == "gps":
+        return GraphEmbeddingGPS(
+            vector_dim,
+            node_dim=node_dim,
+            edge_dim=edge_dim,
+            dropout=dropout,
+            num_conv_layers=num_conv_layers,
+            heads=heads,
+            attn_type=attn_type,
+            attn_dropout=attn_dropout,
+        )
+    if embedder_type == "gcn_concat":
+        if vector_dim % num_conv_layers:
+            raise ValueError(
+                "embedder_type='gcn_concat' requires vector_dim to be divisible "
+                "by num_conv_layers"
+            )
+        return GraphEmbeddingConcat(
+            vector_dim,
+            dropout=dropout,
+            num_conv_layers=num_conv_layers,
+            node_dim=node_dim,
+        )
+    if embedder_type == "gcn":
+        return GraphEmbedding(
+            vector_dim,
+            dropout=dropout,
+            num_conv_layers=num_conv_layers,
+            node_dim=node_dim,
+        )
+    raise AssertionError("unreachable graph embedder type")

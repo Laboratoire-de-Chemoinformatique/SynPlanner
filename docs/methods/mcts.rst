@@ -85,6 +85,38 @@ Other Algorithms
 - **Best-First Search (best_first):** Prioritises nodes with the highest evaluation scores
 - **Beam Search (beam):** Like best-first, but expands only the top-k nodes at each level (controlled by ``beam_width``)
 
+Running a search
+----------------
+
+A ``Tree`` does no work when constructed. Call ``run()`` to search to completion:
+
+.. code-block:: python
+
+   tree = Tree(target=target, config=tree_config, ...)
+   tree.run()
+
+``run()`` returns the tree, so it chains: ``routes = extract_routes(Tree(...).run())``.
+Search stops at whichever limit comes first — ``max_iterations``, ``max_tree_size``,
+``max_time``, or the first route found when ``stop_at_first`` is set.
+
+The ``Tree`` is also iterable, and each iteration yields ``(is_solved, node_ids)``
+for that step. Iterate it directly when you want to see the search progress or stop
+on your own condition:
+
+.. code-block:: python
+
+   for is_solved, node_ids in tree:
+       if is_solved and len(tree.stats.solution_iterations) >= 5:
+           break   # five routes is enough for this target
+
+Both run the same search. ``run()`` simply discards the per-iteration results, so
+reach for the loop only when you actually need them — ``run()`` is the default.
+
+.. note::
+
+   Older code exhausts the iterator with ``list(tree)``. That still works, but it
+   allocates a tuple per iteration only to discard them. Prefer ``run()``.
+
 Tree Analytics
 --------------
 

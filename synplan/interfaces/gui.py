@@ -11,12 +11,26 @@ import streamlit as st
 from huggingface_hub.utils import disable_progress_bars
 from streamlit_ketcher import st_ketcher
 
-from synplan.chem.reaction_routes.clustering import *
-from synplan.chem.reaction_routes.route_cgr import *
+from synplan.chem.reaction.routes.clustering import (
+    cluster_routes,
+    group_by_identical_values,
+    post_process_subgroup,
+    subcluster_all_clusters,
+)
+from synplan.chem.reaction.routes.io import make_json
+from synplan.chem.reaction.routes.quality.scorer import ProtectionRouteScorer
+from synplan.chem.reaction.routes.representation import (
+    compose_all_route_cgrs,
+    compose_all_sb_cgrs,
+    extract_reactions,
+)
+from synplan.chem.reaction.routes.representation.depiction import (
+    cgr_display,
+    depict_custom_reaction,
+)
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.search import extract_tree_stats
 from synplan.mcts.tree import Tree
-from synplan.route_quality.scorer import ProtectionRouteScorer
 from synplan.utils.config import TreeConfig
 from synplan.utils.loading import (
     download_preset,
@@ -901,7 +915,6 @@ def generate_sb_cgr_image(_cgr):
 
 @st.cache_data
 def generate_synthon_reaction_image(_synthon_reaction):
-    _synthon_reaction.clean2d()
     return depict_custom_reaction(_synthon_reaction)
 
 
@@ -1220,9 +1233,6 @@ def download_subclustering_results():
                 subcluster_html_content = routes_subclustering_report(
                     tree,
                     processed_subcluster_data,
-                    user_input_cluster_num_display,
-                    selected_subcluster_idx,
-                    sb_cgrs_for_report,
                     if_lg_group=True,
                 )
                 st.download_button(

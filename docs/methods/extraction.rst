@@ -36,7 +36,7 @@ the whole ring is included in the reaction center.
 
 **5. Functional group inclusion**
 
-Functional groups to be included in the reaction center should be specified manually as a list of their SMILES in
+Functional groups to be included in the reaction center should be specified manually as a list of their SMARTS in
 ``func_groups_list`` in the configuration file. If ``include_func_groups`` is ``True``, any atom of the reaction center is part of
 any specified functional group, and the whole functional group is included in the reaction center.
 
@@ -57,11 +57,13 @@ if they are associated with different reagents.
 
 **8. Atom properties specification**
 
-Each atom in the extended and specified reaction center and its environment atoms (neighbor atoms) is described by four properties:
-the number of neighbors, hybridization type, the number of hydrogens, and the size of the ring (if the atom belongs to any ring).
+Each atom in the extended and specified reaction center and its environment atoms (neighbor atoms) is described by three
+retainable properties: ``neighbors`` (the number of neighbors), ``implicit_hydrogens`` (the number of hydrogens), and
+``ring_sizes`` (the size of the ring, if the atom belongs to any ring).
 These properties determine the level of atom and reaction rule specification and can be disabled if needed in the
 ``atom_info_retention`` section in the configuration file. If some property in ``atom_info_retention`` is ``True``, it means that this property of
-the atom will be included in the final reaction rule.
+the atom will be included in the final reaction rule. Aromaticity is always stamped on aromatic atoms and is not
+configurable.
 
 **9. Reaction rule creation**
 
@@ -87,7 +89,9 @@ The list of functional groups can be specified in the configuration file, where 
 .. tip::
     The ``chython`` SMARTS definition is slightly different from the popular `Daylight SMARTS definition <https://www.daylight.com/dayhtml/doc/theory/theory.smarts.html>`_, please consult the official ``chython`` documentation `here <https://chython.readthedocs.io/en/latest/>`_.
 
-In ``SynPlanner``, roughly 25 functional groups from ``Coley, Connor W., JCIM., 59.6 (2019): 2529-2537`` are available in the default configuration file.
+In ``SynPlanner``, roughly 25 functional groups from ``Coley, Connor W., JCIM., 59.6 (2019): 2529-2537`` ship in
+``configs/extraction_functional_groups.yaml``. The default ``configs/rules_extraction.yaml`` leaves ``func_groups_list``
+empty and ``include_func_groups`` off.
 
 **Important:** currently in ``SynPlanner`` there is no exact specification of atom in the functional group, which must
 intersect with reaction center atoms or their neighbors for inclusion of the whole functional group to the reaction rule.

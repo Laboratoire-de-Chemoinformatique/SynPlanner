@@ -1,0 +1,48 @@
+# SynPlanner
+
+> A toolbox for chemical synthesis planning: retrosynthetic route search, reaction
+> data curation, reaction rule extraction, and analysis of synthetic routes.
+
+SynPlanner is built on **chython** (chython-synplan, formerly CGRtools), a
+pure-Python chemoinformatics engine — not RDKit. Canonical SMILES from chython do
+not match canonical SMILES from RDKit for the same molecule, so never compare
+SMILES strings across the two engines; parse through one engine and compare the
+objects, or compare InChI. 
+
+## For AI agents
+
+- [Agent skill](https://synplanner.readthedocs.io/en/latest/agent_skill.html): how to use SynPlanner correctly — read before writing any code
+- [Agent skill, raw](https://raw.githubusercontent.com/Laboratoire-de-Chemoinformatique/SynPlanner/main/skills/synplanner-usage/SKILL.md): the same file, plain Markdown, one fetch
+- [Task index](https://synplanner.readthedocs.io/en/latest/tasks.html): every task mapped to the API pieces it needs, in order
+- [Task index, raw](https://raw.githubusercontent.com/Laboratoire-de-Chemoinformatique/SynPlanner/main/skills/synplanner-usage/references/tasks.md): the same file, plain Markdown
+
+## Start here
+
+- [10 minutes to SynPlanner](https://synplanner.readthedocs.io/en/latest/user_guide/ten_minutes.html): install, download data, plan a first route
+- [Installation](https://synplanner.readthedocs.io/en/latest/get_started/installation.html): pip, Docker, uv from source; choosing a PyTorch build
+- [Data download](https://synplanner.readthedocs.io/en/latest/get_started/data_download.html): models and building blocks are not bundled and must be fetched
+
+## Using SynPlanner
+
+- [Command-line interface](https://synplanner.readthedocs.io/en/latest/user_guide/cli_interface.html): every command; prefer the CLI for long runs
+- [Configuration](https://synplanner.readthedocs.io/en/latest/configuration/configuration.html): the YAML knobs for each pipeline stage
+- [Retrosynthetic planning](https://synplanner.readthedocs.io/en/latest/methods/planning.html): what the planner does
+- [Priority rules](https://synplanner.readthedocs.io/en/latest/methods/priority_rules.html): custom retrosynthetic SMARTS
+- [Monte-Carlo tree search](https://synplanner.readthedocs.io/en/latest/methods/mcts.html): search algorithms, alternatives, tree analytics
+- [Routes](https://synplanner.readthedocs.io/en/latest/methods/routes.html): RouteCGR deconvolution and the typed route APIs
+- [Migration guide](https://synplanner.readthedocs.io/en/latest/user_guide/migration.html): read this if code or SMARTS from an older version behaves differently
+
+## Building your own planner
+
+- [Reaction standardization](https://synplanner.readthedocs.io/en/latest/methods/standardization.html): mapping, enforcement, and the required order
+- [Reaction filtration](https://synplanner.readthedocs.io/en/latest/methods/filtration.html)
+- [Reaction rules](https://synplanner.readthedocs.io/en/latest/methods/extraction.html): extraction protocol and functional groups
+- [Policy network](https://synplanner.readthedocs.io/en/latest/methods/policy.html): ranking and filtering policies
+- [Value network](https://synplanner.readthedocs.io/en/latest/methods/value.html)
+- [Tutorials](https://synplanner.readthedocs.io/en/latest/user_guide/index.html): seventeen worked notebooks
+
+## Optional
+
+- [API reference](https://synplanner.readthedocs.io/en/latest/api.html): full module documentation
+- [Docker images](https://synplanner.readthedocs.io/en/latest/get_started/docker_images.html)
+- [Release notes](https://synplanner.readthedocs.io/en/latest/release_notes.html)

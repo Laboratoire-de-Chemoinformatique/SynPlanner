@@ -29,6 +29,25 @@ def next_version(part: str) -> str:
     return out.split("=>")[-1].strip()
 
 
+def last_released_version() -> str:
+    """Newest ``vX.Y.Z`` git tag.
+
+    The compare links and the switcher point at published tags, so the previous
+    version has to come from the tags. ``pyproject.toml`` may hold a version that
+    was bumped but never tagged, which would link to a tag that does not exist.
+    """
+    tags = subprocess.run(
+        ["git", "tag", "--list", "v[0-9]*.[0-9]*.[0-9]*", "--sort=-v:refname"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split()
+    if not tags:
+        sys.exit("no vX.Y.Z tag found; cannot derive the previous released version")
+    return tags[0].removeprefix("v")
+
+
 def update_changelog(text: str, new: str, prev: str, today: str) -> str:
     if f"## [{new}]" in text:
         sys.exit(f"CHANGELOG.md already has a [{new}] section")
@@ -77,16 +96,24 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    prev = uv("version", "--short")
+    current = uv("version", "--short")
+    prev = last_released_version()
     new = next_version(args.part)
     today = date.today().isoformat()
+
+    if current != prev:
+        print(
+            f"note: pyproject.toml is at {current} but the last tag is v{prev}. "
+            f"Links point at v{prev}; fold any [{current}] CHANGELOG section into "
+            f"[{new}] by hand."
+        )
 
     changelog = update_changelog(CHANGELOG.read_text(), new, prev, today)
     switcher = update_switcher(SWITCHER.read_text(), new, prev)
 
     if args.dry_run:
-        print(f"[dry-run] {prev} => {new}")
-        print(f"  pyproject.toml / uv.lock  {prev} -> {new}")
+        print(f"[dry-run] {current} => {new}")
+        print(f"  pyproject.toml / uv.lock  {current} -> {new}")
         print(f"  CHANGELOG.md              [Unreleased] -> [{new}] - {today}")
         print(f"  switcher.json             {prev} archived, {new} (stable)")
         print("  docker_images.rst         auto (Sphinx |release|)")
@@ -96,7 +123,7 @@ def main() -> None:
     CHANGELOG.write_text(changelog)
     SWITCHER.write_text(switcher)
 
-    print(f"Bumped {prev} -> {new}")
+    print(f"Bumped {current} -> {new}")
     print("Updated: pyproject.toml, uv.lock, CHANGELOG.md, switcher.json")
     print("\nNext (review the diff, then):")
     print("  git add -A")

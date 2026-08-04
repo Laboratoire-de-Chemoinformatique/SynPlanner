@@ -13,7 +13,7 @@ from synplan.ml.training.preprocessing import (
     FilteringPolicyDataset,
     RankingPolicyDataset,
 )
-from synplan.ml.training.supervised import _stratified_ranking_split
+from synplan.ml.training.supervised import stratified_ranking_split
 from synplan.utils.cache import cache_digest
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
@@ -80,7 +80,7 @@ def test_parallel_dataset_build_submits_batches(monkeypatch, tmp_path):
             submitted_batches.append(batch)
             yield worker_fn(batch)
 
-    monkeypatch.setattr(preprocessing, "_convert_ranking_item", fake_convert_item)
+    monkeypatch.setattr(preprocessing, "convert_ranking_item", fake_convert_item)
     monkeypatch.setattr(
         preprocessing, "process_pool_map_stream", fake_process_pool_map_stream
     )
@@ -125,7 +125,7 @@ def test_ranking_batch_payload_does_not_return_torch_objects(monkeypatch):
             return any(contains_torch_object(v) for v in value)
         return False
 
-    monkeypatch.setattr(preprocessing, "_convert_ranking_item", fake_convert_item)
+    monkeypatch.setattr(preprocessing, "convert_ranking_item", fake_convert_item)
 
     payload = preprocessing._convert_ranking_batch([("CC", "3")])
 
@@ -160,13 +160,13 @@ def test_filtering_dataset_parallel_crash_refuses_serial_fallback(
 
 def test_split_covers_all_indices(dataset):
     """Train + val must cover every index exactly once."""
-    train, val = _stratified_ranking_split(dataset)
+    train, val = stratified_ranking_split(dataset)
     assert sorted(train + val) == list(range(len(dataset)))
 
 
 def test_no_data_leakage(dataset):
     """Products appearing multiple times must all be in train."""
-    train, val = _stratified_ranking_split(dataset)
+    train, val = stratified_ranking_split(dataset)
     train_set, val_set = set(train), set(val)
     keys = dataset._product_keys
 
@@ -186,7 +186,7 @@ def test_no_data_leakage(dataset):
 
 def test_val_fraction_per_rule(dataset):
     """No rule contributes more than ~10% of its examples to validation."""
-    _train, val = _stratified_ranking_split(dataset)
+    _train, val = stratified_ranking_split(dataset)
     set(val)
     y = dataset._data.y_rules.view(-1).tolist()
 
@@ -205,7 +205,7 @@ def test_val_fraction_per_rule(dataset):
 
 def test_small_rules_stay_in_train(dataset):
     """Rules with ≤20 single-occurrence examples must have 0 val entries."""
-    _train, val = _stratified_ranking_split(dataset)
+    _train, val = stratified_ranking_split(dataset)
     set(val)
     y = dataset._data.y_rules.view(-1).tolist()
     keys = dataset._product_keys
@@ -231,15 +231,15 @@ def test_small_rules_stay_in_train(dataset):
 
 def test_split_deterministic(dataset):
     """Same seed → same split."""
-    t1, v1 = _stratified_ranking_split(dataset, seed=42)
-    t2, v2 = _stratified_ranking_split(dataset, seed=42)
+    t1, v1 = stratified_ranking_split(dataset, seed=42)
+    t2, v2 = stratified_ranking_split(dataset, seed=42)
     assert sorted(t1) == sorted(t2)
     assert sorted(v1) == sorted(v2)
 
 
 def test_split_has_validation(dataset):
     """With rules >20, the validation set must be non-empty."""
-    _, val = _stratified_ranking_split(dataset)
+    _, val = stratified_ranking_split(dataset)
     assert len(val) > 0, "Validation set is empty"
 
 

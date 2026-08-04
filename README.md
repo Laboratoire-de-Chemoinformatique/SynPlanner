@@ -51,17 +51,26 @@ synplan --version
 synplan download_preset --preset synplanner-gps --save_to synplan_data
 ```
 
-**2.** Run planning on a target molecule:
+**2.** Write your targets and fetch a planning config (`configs/` is not installed by pip):
+
+```bash
+echo 'CC(=O)Oc1ccccc1C(=O)O' > targets.smi
+curl -O https://raw.githubusercontent.com/Laboratoire-de-Chemoinformatique/SynPlanner/main/configs/planning_standard.yaml
+```
+
+**3.** Run planning on a target molecule:
 
 ```bash
 synplan planning \
-  --config configs/planning_standard.yaml \
+  --config planning_standard.yaml \
   --targets targets.smi \
-  --reaction_rules synplan_data/policy/supervised_gcn/v1/reaction_rules.tsv \
+  --reaction_rules synplan_data/policy/supervised_gps/v1/reaction_rules.tsv \
   --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \
-  --policy_network synplan_data/policy/supervised_gcn/v1/v1/ranking_policy.ckpt \
+  --policy_network synplan_data/policy/supervised_gps/v1/v1/ranking_policy.ckpt \
   --results_dir planning_results
 ```
+
+Paths above are what `synplanner-gps` writes — the download command prints each one.
 
 > [!TIP]
 > Try it in the browser, no installation required:
@@ -73,9 +82,19 @@ The full CLI includes commands for every pipeline step: `reaction_mapping`, `rea
 
 For local tutorials covering all steps from data curation to protection scoring, see the [tutorials/](https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials) directory and the [documentation](https://synplanner.readthedocs.io/).
 
+## Using SynPlanner with an AI agent
+
+If you use Claude Code, Codex, Cursor, Copilot, or another agent that supports the [Agent Skills](https://agentskills.io) format, this repository ships a skill that teaches the agent how to use SynPlanner correctly — which API to reach for, how chython differs from RDKit, and what to do by default.
+
+Copy [`skills/synplanner-usage/`](https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/skills/synplanner-usage) into your agent's skills directory — `.claude/skills/`, `.cursor/skills/`, or `~/.codex/skills/` — or `~/.claude/skills/` to make it available in every project. No further setup is needed.
+
+It bundles a [task index](https://synplanner.readthedocs.io/en/latest/tasks.html) mapping each task to the API pieces it needs, in order.
+
+**For LLMs:** [`llms.txt`](https://synplanner.readthedocs.io/en/latest/llms.txt) &middot; [skill, raw Markdown](https://raw.githubusercontent.com/Laboratoire-de-Chemoinformatique/SynPlanner/main/skills/synplanner-usage/SKILL.md)
+
 ## Team
 
-**Questions & bug reports:** open an [issue](https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/issues) or contact [Tagir Akhmetshin](https://github.com/tagirshin) (lead developer) and [Almaz Gilmullin](https://github.com/Protolaw) (clustering module)
+**Questions & bug reports:** open an [issue](https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/issues) or contact [Tagir Akhmetshin](https://github.com/tagirshin) (lead developer, maintainer) and [Almaz Gilmullin](https://github.com/Protolaw) (maintainer)
 
 **Contributors:**
 [Timur Madzhidov](mailto:tmadzhidov@gmail.com) (initiator),

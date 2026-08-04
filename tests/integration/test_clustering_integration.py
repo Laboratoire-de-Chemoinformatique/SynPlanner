@@ -2,12 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from synplan.chem.reaction_routes.clustering import (
+from synplan.chem.reaction.routes.clustering import (
     cluster_routes,
     subcluster_all_clusters,
 )
-from synplan.chem.reaction_routes.io import read_routes_json
-from synplan.chem.reaction_routes.route_cgr import (
+from synplan.chem.reaction.routes.io import read_routes_json
+from synplan.chem.reaction.routes.representation import (
     compose_all_route_cgrs,
     compose_all_sb_cgrs,
 )

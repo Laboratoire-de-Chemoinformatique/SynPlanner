@@ -11,7 +11,6 @@ Subpackages
    synplan.interfaces
    synplan.mcts
    synplan.ml
-   synplan.route_quality
    synplan.utils
 
 Module contents

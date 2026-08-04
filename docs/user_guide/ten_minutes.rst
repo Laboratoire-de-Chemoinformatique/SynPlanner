@@ -42,15 +42,24 @@ After downloading, you will have:
 .. code-block:: text
 
     synplan_data/
-    ├── policy/supervised_gcn/v1/
+    ├── policy/supervised_gps/v1/
     │   ├── reaction_rules.tsv          # reaction rules
     │   └── v1/
-    │       ├── ranking_policy.ckpt     # ranking policy network weights
-    │       └── filtering_policy.ckpt   # filtering policy network weights
+    │       └── ranking_policy.ckpt     # ranking policy network weights
+    ├── policy/supervised_gcn/v1/v1/
+    │   └── filtering_policy.ckpt       # filtering policy network weights
     ├── value/supervised_gcn/v1/
     │   └── value_network.ckpt          # value network weights (advanced)
     └── building_blocks/emolecules-salt-ln/
         └── building_blocks.tsv         # purchasable building blocks
+
+The rules and ranking head of ``synplanner-gps`` live under ``supervised_gps``;
+only its filtering head comes from ``supervised_gcn``. Use
+``--preset synplanner-article`` if you need a filtering and a ranking head
+trained on the same rule set (see :doc:`09_Combined_Ranking_Filtering_Policy`).
+
+The CLI prints the local path of every file it downloaded — prefer copying those
+paths over retyping them.
 
 Step 3: Key concepts
 --------------------
@@ -105,8 +114,8 @@ The example below uses the ranking policy network and rollout evaluation. This i
     # Download preset data (skip if already downloaded)
     paths = download_preset("synplanner-gps", save_to="synplan_data")
 
-    # Load components
-    building_blocks = load_building_blocks(paths["building_blocks"], standardize=True)
+    # Load components (preset building blocks are already standardized)
+    building_blocks = load_building_blocks(paths["building_blocks"], standardize=False)
     reaction_rules  = load_reaction_rules(paths["reaction_rules"])
     policy_network  = load_policy_function(weights_path=paths["ranking_policy"])
 
@@ -157,6 +166,14 @@ The example below uses the ranking policy network and rollout evaluation. This i
 
     print(tree)  # summary: nodes explored, routes found, time elapsed
 
+.. note::
+    Pass ``standardize=True`` only for your own, un-standardized building-block
+    file. It runs a process pool, so on macOS and Windows the calling code must
+    sit under ``if __name__ == "__main__":`` — otherwise Python's spawn start
+    method re-imports the script and raises
+    ``RuntimeError: An attempt has been made to start a new process before the
+    current process has finished its bootstrapping phase``.
+
 Inspect and visualise routes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -183,7 +200,7 @@ Pass the scorer to the tree so routes are re-ranked during the search:
 
 .. code-block:: python
 
-    from synplan.route_quality.scorer import ProtectionRouteScorer
+    from synplan.chem.reaction.routes.quality.scorer import ProtectionRouteScorer
 
     # Build scorer with default configuration (bundled data)
     route_scorer = ProtectionRouteScorer.from_config()
@@ -198,7 +215,7 @@ Pass the scorer to the tree so routes are re-ranked during the search:
         route_scorer=route_scorer,   # routes re-ranked by protection score
     )
 
-    _ = list(tree)  # run the full search
+    tree.run()  # run the full search
 
 The score S(T) is in [0, 1]: 1.0 means no competing interactions detected,
 lower values indicate steps that may require protecting group strategies.
@@ -269,18 +286,36 @@ Batch-plan a list of targets from the command line:
     synplan planning \
       --config configs/planning_standard.yaml \
       --targets targets.smi \
-      --reaction_rules synplan_data/policy/supervised_gcn/v1/reaction_rules.tsv \
+      --reaction_rules synplan_data/policy/supervised_gps/v1/reaction_rules.tsv \
       --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \
-      --policy_network synplan_data/policy/supervised_gcn/v1/v1/ranking_policy.ckpt \
+      --policy_network synplan_data/policy/supervised_gps/v1/v1/ranking_policy.ckpt \
       --results_dir planning_results
 
-``targets.smi`` is a plain text file with one SMILES per line.
+``targets.smi`` is a plain text file with one SMILES per line — you write it
+yourself, nothing ships one. ``configs/planning_standard.yaml`` comes from the
+git repository; ``pip install SynPlanner`` does not install the ``configs/``
+directory (see :doc:`../get_started/installation`).
 Results are written to ``planning_results/``: a CSV with per-target statistics,
 JSON routes, and HTML visualisations.
 
-To use the value network for faster evaluation (advanced), add
-``--value_network synplan_data/value/supervised_gcn/v1/value_network.ckpt``
-to the command above.
+To use the value network for evaluation (advanced), switch the config as well:
+
+.. code-block:: bash
+
+    synplan planning \
+      --config configs/planning_value.yaml \
+      --value_network synplan_data/value/supervised_gcn/v1/value_network.ckpt \
+      ...   # same --targets/--reaction_rules/--building_blocks/--policy_network
+
+.. warning::
+    ``--value_network`` alone does nothing. The evaluator is chosen by
+    ``node_evaluation: evaluation_type:`` in the config file, and
+    ``planning_standard.yaml`` omits that section, so it defaults to
+    ``rollout``. Adding ``--value_network`` to the standard command runs to
+    completion, prints the same "solved" summary, and never loads the value
+    network. ``configs/planning_value.yaml`` sets ``evaluation_type: gcn``
+    (and ``search_strategy: evaluation_first``, which is the strategy the value
+    network is meant for).
 
 See :doc:`cli_interface` for a full list of all CLI commands and options.
 
@@ -291,7 +326,7 @@ After planning, open the HTML report:
 
 .. code-block:: bash
 
-    open planning_results/routes.html
+    open planning_results/extracted_routes_html/retroroutes_target_0.html
 
 Or generate visualisations from Python:
 

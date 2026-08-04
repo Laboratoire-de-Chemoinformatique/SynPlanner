@@ -4,12 +4,12 @@ import pytest
 from chython import smiles
 from pydantic import ValidationError
 
-from synplan.route_quality.protection.config import ProtectionConfig
-from synplan.route_quality.protection.functional_groups import (
+from synplan.chem.reaction.routes.quality.protection.config import ProtectionConfig
+from synplan.chem.reaction.routes.quality.protection.functional_groups import (
     FunctionalGroupDetector,
     HalogenDetector,
 )
-from synplan.route_quality.protection.scanner import (
+from synplan.chem.reaction.routes.quality.protection.scanner import (
     CompetingInteraction,
     IncompatibilityMatrix,
     RouteScanner,
@@ -196,16 +196,26 @@ def test_scan_route_severity_depends_on_reacting_fg(scanner):
 
 
 def test_scan_route_with_halogen_detector(scanner_with_halogens):
-    """Scanner with halogen detector should count halogens."""
-    # Reaction on a molecule with two Br atoms (same family)
-    # Using mapped SMILES for a substitution on Br where another Br is competing
+    """A same-family halogen competing with a halogen at the centre is counted."""
+    # Bromination of bromobenzene: Br:8 lands on the reaction centre, Br:7 is
+    # the competing same-family site.
+    rxn = smiles(
+        "[cH:1]1[cH:2][cH:3][c:4]([Br:7])[cH:5][cH:6]1.[Br:8][Br:9]>>"
+        "[Br:8][c:1]1[cH:2][cH:3][c:4]([Br:7])[cH:5][cH:6]1.[BrH:9]"
+    )
+    _interactions, halogen_count = scanner_with_halogens.scan_route({0: rxn})
+    assert halogen_count == 1
+
+
+def test_scan_route_halogen_consumed_at_centre_is_not_counted(scanner_with_halogens):
+    """Known gap: counting looks at the product only, so a halogen consumed at
+    the centre (any halide coupling) contributes nothing. Pins current
+    behaviour; flip to 1 if scan_route learns to look at the reactant side."""
     rxn = smiles(
         "[Br:1]c1ccc([Br:2])cc1.[CH3:3][Li:4]>>[CH3:3]c1ccc([Br:2])cc1.[Li:4][Br:1]"
     )
-    route = {0: rxn}
-    _interactions, halogen_count = scanner_with_halogens.scan_route(route)
-    # There should be a competing halogen site (the other Br)
-    assert halogen_count >= 0  # at least verified it runs
+    _interactions, halogen_count = scanner_with_halogens.scan_route({0: rxn})
+    assert halogen_count == 0
 
 
 # --- classify_interactions tests ---

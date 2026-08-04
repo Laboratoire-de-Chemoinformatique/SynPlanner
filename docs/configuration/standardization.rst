@@ -41,25 +41,26 @@ Run reaction standardization using the repository configuration in ``configs/rea
 **Configuration parameters**
 
 .. table::
-    :widths: 30 50
+    :widths: 25 45 30
 
-    ================================== =================================================================================
-    Reaction standardizer              Description
-    ================================== =================================================================================
-    functional_groups_config           Standardization of functional groups
-    kekule_form_config                 Transform molecules to Kekule form when possible
-    check_valence_config               Check atom valences
-    implicify_hydrogens_config         Remove hydrogen atoms
-    check_isotopes_config              Check and clean isotope atoms when possible
-    split_ions_config                  Split ions in reaction when possible
-    aromatic_form_config               Transform molecules to aromatic form when possible
-    mapping_fix_config                 Fix atom-to-atom mapping in reaction when needed and possible
-    unchanged_parts_config             Remove unchanged parts in reaction
-    small_molecules_config             Remove small molecule from reaction
-    remove_reagents_config             Remove reagents from reaction
-    rebalance_reaction_config          Rebalance reaction
-    deduplicate                        Deduplicate reactions by CGR hash (default: true)
-    ================================== =================================================================================
+    ================================== ============================================================== ================================
+    Reaction standardizer              Description                                                    Sub-parameters (bare-key value)
+    ================================== ============================================================== ================================
+    functional_groups_config           Standardization of functional groups                           none
+    kekule_form_config                 Transform molecules to Kekule form when possible               none
+    check_valence_config               Check atom valences                                            none
+    implicify_hydrogens_config         Remove hydrogen atoms                                          none
+    check_isotopes_config              Check and clean isotope atoms when possible                    none
+    split_ions_config                  Split ions in reaction when possible                           none
+    aromatic_form_config               Transform molecules to aromatic form when possible             none
+    mapping_fix_config                 Fix atom-to-atom mapping in reaction when needed and possible   none
+    unchanged_parts_config             Remove unchanged parts in reaction                             none
+    small_molecules_config             Remove small molecule from reaction                            ``mol_max_size: 6``
+    remove_reagents_config             Remove reagents from reaction                                  ``reagent_max_size: 7``
+    rebalance_reaction_config          Rebalance reaction                                             none
+    deduplicate                        Deduplicate reactions by CGR hash                              ``true`` (plain boolean, not a nested config)
+    ================================== ============================================================== ================================
+
 
 .. note::
     1. If the reaction standardizer name is listed in the configuration file (see above), it means that this standardizer will be applied.

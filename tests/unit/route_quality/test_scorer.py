@@ -6,17 +6,17 @@ import pytest
 from chython import smiles
 from pydantic import ValidationError
 
-from synplan.route_quality.protection.config import ProtectionConfig
-from synplan.route_quality.protection.functional_groups import (
+from synplan.chem.reaction.routes.quality.protection.config import ProtectionConfig
+from synplan.chem.reaction.routes.quality.protection.functional_groups import (
     FunctionalGroupDetector,
     HalogenDetector,
 )
-from synplan.route_quality.protection.scanner import (
+from synplan.chem.reaction.routes.quality.protection.scanner import (
     CompetingInteraction,
     IncompatibilityMatrix,
     RouteScanner,
 )
-from synplan.route_quality.protection.scorer import CompetingSitesScore
+from synplan.chem.reaction.routes.quality.protection.scorer import CompetingSitesScore
 
 
 @pytest.fixture

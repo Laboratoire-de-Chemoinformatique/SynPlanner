@@ -37,7 +37,7 @@ PIPELINE_MODULES_WITH_ERROR_TSV = [
     "synplan/chem/data/standardizing.py",
     "synplan/chem/data/filtering.py",
     "synplan/chem/data/mapping.py",
-    "synplan/chem/reaction_rules/extraction.py",
+    "synplan/chem/reaction/rules/extraction.py",
 ]
 
 

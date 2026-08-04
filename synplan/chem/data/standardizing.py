@@ -17,6 +17,7 @@ from chython.containers import MoleculeContainer, ReactionContainer
 from pydantic import Field
 from tqdm.auto import tqdm
 
+from synplan.chem.data.config import SmallMoleculesConfig
 from synplan.chem.data.pipeline import (
     build_batch_result,
     reaction_cgr_key,
@@ -478,10 +479,6 @@ class UnchangedPartsStandardizer(BaseStandardizer):
         return new_reaction
 
 
-class SmallMoleculesConfig(BaseConfigModel):
-    mol_max_size: int = Field(default=6, ge=1)
-
-
 class SmallMoleculesStandardizer(BaseStandardizer):
     """Remove small molecule from reaction."""
 
@@ -923,7 +920,7 @@ def _make_timeout_result(exc: Exception, items: list[str]) -> BatchResult:
 
 # -- Error taxonomy for categorized summaries --
 # Stages / chython exceptions that represent noisy *data*, not pipeline bugs.
-_DATA_ERROR_STAGES = frozenset(
+DATA_ERROR_STAGES = frozenset(
     {
         "CheckValence",
         "ReactionMapping",
@@ -934,7 +931,7 @@ _DATA_ERROR_STAGES = frozenset(
         "parse",
     }
 )
-_DATA_ERROR_TYPES = frozenset(
+DATA_ERROR_TYPES = frozenset(
     {
         "InvalidAromaticRing",
         "MappingError",
@@ -952,6 +949,7 @@ def _print_error_summary(
     n_processed: int,
     n_ok: int,
     error_file_path: Path | None,
+    n_duplicates: int = 0,
 ) -> None:
     """Print a categorized summary of errors to stdout and logger."""
     n_failed = n_processed - n_ok
@@ -959,12 +957,19 @@ def _print_error_summary(
         f"Finished: processed {n_processed}, succeeded {n_ok}, failed {n_failed}"
     ]
 
+    # Deduplication drops are counted in n_failed but never reach the error file,
+    # so name them or the summary reads as data corruption.
+    if n_duplicates:
+        summary_lines.append(
+            f"  duplicates removed: {n_duplicates} (not written to the error file)"
+        )
+
     if error_counts:
         data_errors: list[str] = []
         pipeline_errors: list[str] = []
         for (stage, etype), count in error_counts.most_common():
             label = f"{stage}/{etype}={count}"
-            if stage in _DATA_ERROR_STAGES or etype in _DATA_ERROR_TYPES:
+            if stage in DATA_ERROR_STAGES or etype in DATA_ERROR_TYPES:
                 data_errors.append(label)
             else:
                 pipeline_errors.append(label)
@@ -1114,7 +1119,11 @@ def standardize_reactions_from_file(
     summary.error_file = str(_error_path) if _error_path else None
 
     _print_error_summary(
-        error_counts, summary.total_input, summary.succeeded, _error_path
+        error_counts,
+        summary.total_input,
+        summary.succeeded,
+        _error_path,
+        summary.duplicates,
     )
 
     return summary

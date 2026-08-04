@@ -1,8 +1,10 @@
 """Module containing a class Tree that used for tree search of retrosynthetic routes."""
 
-import itertools
 import logging
+import pickle
+from collections import deque
 from dataclasses import dataclass, field, fields
+from os import PathLike
 from time import time
 
 from chython.containers import MoleculeContainer
@@ -10,11 +12,16 @@ from tqdm.auto import tqdm
 
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
-from synplan.chem.reaction_rules import POLICY_SOURCE_NAME
+from synplan.chem.reaction.routes.quality.scorer import RouteScorer
+from synplan.chem.reaction.routes.traversal import (
+    iter_route_nodes,
+    iter_route_steps,
+    route_node_ids,
+)
+from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
 from synplan.mcts.evaluation import EvaluationStrategy
-from synplan.mcts.expansion import PolicyNetworkFunction, _rule_query_pattern
 from synplan.mcts.node import Node
-from synplan.route_quality.scorer import RouteScorer
+from synplan.mcts.policy import Policy, PriorityPolicy
 from synplan.utils.config import TreeConfig
 
 from .algorithm import (
@@ -79,6 +86,27 @@ class TreeStats:
         raise KeyError(key)
 
 
+@dataclass(slots=True)
+class _ExpansionContext:
+    """State shared by all candidate rules during one node expansion."""
+
+    node_id: int
+    parent: Node
+    previous_precursors: list[Precursor]
+    seen_products: set
+
+
+@dataclass(frozen=True, slots=True)
+class _RuleCandidate:
+    """Reaction rule and provenance yielded by :meth:`Tree._iter_rules`."""
+
+    probability: float
+    rule: CanonicalRetroReactor
+    rule_id: int
+    rule_source: str
+    policy_rank: int | None
+
+
 _REMOVED_NODE_ATTRS: dict[str, tuple[str, str]] = {
     "nodes_visit": ("tree.nodes[node_id].visit", "1.5.0"),
     "nodes_depth": ("tree.nodes[node_id].depth", "1.5.0"),
@@ -98,7 +126,7 @@ class Tree:
         config: TreeConfig,
         reaction_rules: list[CanonicalRetroReactor],
         building_blocks: set[str],
-        expansion_function: PolicyNetworkFunction,
+        expansion_function: Policy,
         evaluation_function: EvaluationStrategy = None,
         route_scorer: RouteScorer | None = None,
         priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
@@ -151,10 +179,20 @@ class Tree:
                 "config.use_priority=True but no priority_rules were supplied. "
                 "Pass priority_rules={'<name>': [...rules]} or set use_priority=False."
             )
+        # Curated-rule selection is delegated to a PriorityPolicy per source.
+        self._priority_policies: dict[str, PriorityPolicy] = {
+            name: PriorityPolicy(rules) for name, rules in self.priority_rules.items()
+        }
 
         # policy and evaluation services
         assert expansion_function is not None, "Expansion function is required"
-        self.expansion_function = expansion_function
+        # Node expansion is driven through the Policy seam.
+        self.expansion_function: Policy = expansion_function
+        prepare_rules = getattr(
+            self.expansion_function, "prepare_rule_associations", None
+        )
+        if prepare_rules is not None:
+            prepare_rules(self.reaction_rules)
 
         assert evaluation_function is not None, "Evaluation function is required"
         self.evaluator = evaluation_function
@@ -219,6 +257,13 @@ class Tree:
             f"normalize_scores={config.normalize_scores}, "
         )
 
+    def save_pickle(self, file_path: str | PathLike[str]) -> None:
+        """Save this tree directly as a pickle after disabling tqdm."""
+
+        self._tqdm = None
+        with open(file_path, "wb") as file:
+            pickle.dump(self, file)
+
     def __len__(self) -> int:
         """Returns the current size (the number of nodes) in the tree."""
 
@@ -277,6 +322,28 @@ class Tree:
 
         return is_solved, last_node_id
 
+    def run(self) -> "Tree":
+        """Run the search to completion and return the tree.
+
+        Search stops on whichever limit is reached first — ``max_iterations``,
+        ``max_tree_size``, ``max_time``, or a route being found when
+        ``stop_at_first`` is set. Inspect the finished tree through
+        :attr:`stats`, or extract its routes with the functions in
+        ``synplan.chem.reaction.routes``.
+
+        Iterate the tree directly instead when you need the per-iteration
+        ``(is_solved, node_ids)`` results — to report progress, or to stop on a
+        condition of your own::
+
+            for is_solved, node_ids in tree:
+                if is_solved and my_condition(tree):
+                    break
+
+        ``run()`` is the same search without the intermediate results.
+        """
+        deque(self, maxlen=0)  # exhaust without materialising the yielded tuples
+        return self
+
     def _init_target_node(self, target: MoleculeContainer):
         assert isinstance(target, MoleculeContainer), (
             "Target should be given as MoleculeContainer"
@@ -297,47 +364,39 @@ class Tree:
         :param node_id: The id of the node to be expanded.
         :return: None.
         """
-        total_expanded = 0
         curr_node = self.nodes[node_id]
         prev_precursor = curr_node.curr_precursor.prev_precursors
 
         # Track raw product molecules to avoid repeating equivalent expansions
         tmp_products = set()
+        context = _ExpansionContext(
+            node_id=node_id,
+            parent=curr_node,
+            previous_precursors=prev_precursor,
+            seen_products=tmp_products,
+        )
         expanded = False
-        for prob, rule, rule_id, rule_source, policy_rank in self._iter_rules(
-            curr_node
-        ):
-            self._increment_rule_stats(rule_source, tried=1)
+        for candidate in self._iter_rules(curr_node):
+            self._increment_rule_stats(candidate.rule_source, tried=1)
             rule_produced = False
             # Multi-application fires for any priority source (every source
             # other than "policy"); the configured boolean is a global switch.
             enable_multirule = bool(
-                rule_source != POLICY_SOURCE_NAME
+                candidate.rule_source != POLICY_SOURCE_NAME
                 and self.config.priority_rule_multiapplication
             )
             for products in apply_reaction_rule(
                 curr_node.curr_precursor.molecule,
-                rule,
+                candidate.rule,
                 multirule=enable_multirule,
                 rm_dup=enable_multirule,
             ):
-                if self._add_child_if_new(
-                    node_id=node_id,
-                    curr_node=curr_node,
-                    prev_precursor=prev_precursor,
-                    products=products,
-                    prob=prob,
-                    rule_id=rule_id,
-                    policy_rank=policy_rank,
-                    tmp_products=tmp_products,
-                    rule_source=rule_source,
-                ):
+                if self._add_child_if_new(context, products, candidate):
                     rule_produced = True
-                    total_expanded += 1
                     expanded = True
 
             if rule_produced:
-                self._increment_rule_stats(rule_source, succeeded=1)
+                self._increment_rule_stats(candidate.rule_source, succeeded=1)
 
         # update statistics
         self.stats.expansion_calls += 1
@@ -365,18 +424,18 @@ class Tree:
         policy rules are *additive*, not gated: both run on every node.
         """
 
-        if self.config.use_priority and self.priority_rules:
-            molecule = curr_node.curr_precursor.molecule
-            for source_name, rules in self.priority_rules.items():
-                for rule_id, rule in enumerate(rules):
-                    pattern = _rule_query_pattern(rule)
-                    if pattern is None:
-                        continue
-                    try:
-                        if pattern < molecule:
-                            yield 1.0, rule, rule_id, source_name, None
-                    except TypeError:
-                        continue
+        if self.config.use_priority and self._priority_policies:
+            for source_name, policy in self._priority_policies.items():
+                for prob, rule, rule_id in policy.predict_reaction_rules(
+                    curr_node.curr_precursor, self.reaction_rules
+                ):
+                    yield _RuleCandidate(
+                        probability=prob,
+                        rule=rule,
+                        rule_id=rule_id,
+                        rule_source=source_name,
+                        policy_rank=None,
+                    )
 
         policy_top_rules = self._get_policy_top_rules_limit()
         for policy_rank, (prob, rule, rule_id) in enumerate(
@@ -387,32 +446,38 @@ class Tree:
         ):
             if policy_top_rules is not None and policy_rank > policy_top_rules:
                 break
-            yield prob, rule, rule_id, POLICY_SOURCE_NAME, policy_rank
+            yield _RuleCandidate(
+                probability=prob,
+                rule=rule,
+                rule_id=rule_id,
+                rule_source=POLICY_SOURCE_NAME,
+                policy_rank=policy_rank,
+            )
 
     def _get_policy_top_rules_limit(self) -> int | None:
-        """Return the configured policy Top-N limit when exposed by the expansion fn."""
+        """Return the configured policy Top-N limit when exposed by the policy."""
 
-        config = getattr(self.expansion_function, "config", None)
-        top_rules = getattr(config, "top_rules", None)
-        if top_rules is None:
-            top_rules = getattr(self.expansion_function, "top_rules", None)
+        top_rules = getattr(self.expansion_function, "top_rules", None)
         if top_rules is None:
             return None
         return int(top_rules)
 
     def _add_child_if_new(
         self,
-        node_id: int,
-        curr_node: Node,
-        prev_precursor,
+        context: _ExpansionContext,
         products,
-        prob: float,
-        rule_id: int,
-        policy_rank: int | None,
-        tmp_products: set,
-        rule_source: str,
+        candidate: _RuleCandidate,
     ) -> bool:
         """Add a child node if the generated products form a new valid state."""
+
+        node_id = context.node_id
+        curr_node = context.parent
+        prev_precursor = context.previous_precursors
+        tmp_products = context.seen_products
+        prob = candidate.probability
+        rule_id = candidate.rule_id
+        policy_rank = candidate.policy_rank
+        rule_source = candidate.rule_source
 
         if not products or not (set(products) - tmp_products):
             return False
@@ -648,12 +713,9 @@ class Tree:
         :return: The route score.
         """
 
-        cumulated_nodes_value, route_length = 0, 0
-        nid = node_id
-        while nid:
-            route_length += 1
-            cumulated_nodes_value += self.nodes[nid].total_value
-            nid = self.parents[nid]
+        route_nodes = tuple(iter_route_nodes(self, node_id))
+        route_length = len(route_nodes)
+        cumulated_nodes_value = sum(node.total_value for node in route_nodes)
 
         original = cumulated_nodes_value / (route_length**2)
 
@@ -673,11 +735,7 @@ class Tree:
         :return: The list of nodes.
         """
 
-        nodes = []
-        while node_id:
-            nodes.append(node_id)
-            node_id = self.parents[node_id]
-        return [self.nodes[node_id] for node_id in reversed(nodes)]
+        return list(iter_route_nodes(self, node_id))
 
     def synthesis_route(self, node_id: int) -> tuple[Reaction,]:
         """Given a node_id, return a tuple of reactions that represent the
@@ -687,14 +745,12 @@ class Tree:
         :return: The tuple of extracted reactions representing the synthesis route.
         """
 
-        nodes = self.route_to_node(node_id)
-
         reaction_sequence = [
             Reaction(
                 [x.molecule for x in after.new_precursors],
                 [before.curr_precursor.molecule],
             )
-            for before, after in itertools.pairwise(nodes)
+            for before, after in iter_route_steps(self, node_id)
         ]
 
         for r in reaction_sequence:
@@ -847,14 +903,13 @@ class Tree:
         :param node_id: The id of the terminal (winning) node.
         :return: Dict with route_score, route_length, and per-step details.
         """
+        route_ids = route_node_ids(self.parents, node_id)
         steps = []
-        nid = node_id
-        while nid and nid != 1:
-            parent_id = self.parents[nid]
-            node = self.nodes[nid]
+        for route_node_id in route_ids[1:]:
+            node = self.nodes[route_node_id]
             steps.append(
                 {
-                    "node_id": nid,
+                    "node_id": route_node_id,
                     "depth": node.depth,
                     "rule_id": node.rule_id,
                     "rule_source": node.rule_source,
@@ -868,13 +923,12 @@ class Tree:
                     "n_precursors": len(node.new_precursors),
                 }
             )
-            nid = parent_id
 
         return {
             "node_id": node_id,
             "route_score": round(self.route_score(node_id), 6),
             "route_length": len(steps),
-            "steps": list(reversed(steps)),
+            "steps": steps,
         }
 
     def to_stats_dict(self) -> dict:

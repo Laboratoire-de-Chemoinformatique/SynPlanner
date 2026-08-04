@@ -31,11 +31,11 @@ func_groups_list: [
                     '[C;h3][C;h0]([C;h3])([C;h3])O',             #
                     '[C,N]=[C,N]',                               # alkene/imine
                     '[C,N]#[C,N]',                               # alkyne/nitrile
-                    'C=C-[A]',                                   # adj to alkene
-                    'C#C-[A]',                                   # adj to alkyne
-                    'O=C-[A]',                                   # adj to carbonyl
-                    'O=C([C;h3])-[A]',                           # adj to methyl ketone
-                    'O=C([O,N])-[A]',                            # adj to carboxylic acid/amide/ester
+                    'C=C-*',                                     # adj to alkene
+                    'C#C-*',                                     # adj to alkyne
+                    'O=C-*',                                     # adj to carbonyl
+                    'O=C([C;h3])-*',                             # adj to methyl ketone
+                    'O=C([O,N])-*',                              # adj to carboxylic acid/amide/ester
                     'ClS(Cl)=O',                                 # thionyl chloride
                     '[Mg,Li,Zn,Sn][Br,Cl,I,F]',                  # grinard/metal (non-disassociated)
                     'S(O)(O)',                                   # SO2 group

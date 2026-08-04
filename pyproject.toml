@@ -1,6 +1,6 @@
 [project]
 name = "SynPlanner"
-version = "1.5.1"
+version = "1.6.0"
 description = "Toolbox for chemical synthesis planning"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "chython-synplan[racer-default]>=1.95",
+  "chython-synplan[racer-default]==1.101",
   "chytorch-synplan>=1.70",
   "chytorch-rxnmap-synplan>=1.7",
   "numpy>=2",
@@ -36,6 +36,7 @@ dependencies = [
   "streamlit-ketcher>=0.0.1",
   "rdkit>=2023.9.1",
   "matplotlib>=3.7",
+  "matplotlib-venn>=1.1",
   "pydantic>=2.0",
   "pyyaml>=6.0",
   "safetensors>=0.4",
@@ -77,6 +78,7 @@ synplan = "synplan.interfaces.cli:synplan"
 release = "scripts.release:main"
 sascore-benchmark = "scripts.sascore_bench.run_benchmark:main"
 sascore-plot = "scripts.sascore_bench.plot_results:main"
+synplan-convert-protection-data = "scripts.convert_protection_source_data:main"
 
 [build-system]
 requires = ["hatchling>=1.26"]
@@ -90,22 +92,24 @@ packages = ["synplan", "scripts"]
 artifacts = ["*.tsv", "*.csv", "*.yaml", "*.json"]
 
 [tool.uv]
-# Supply-chain hardening. Use an explicit UTC timestamp so `uv --locked`
-# resolves the same cutoff in local shells and Docker builders.
-exclude-newer = "2026-05-18T22:00:00Z"
-
 # Floors on transitive dependencies that ship CVE fixes.
 constraint-dependencies = [
   "urllib3>=2.7.0",          # GHSA-38jv-5279-wg99, GHSA-gm62-xv2j-4w53, GHSA-qccp-gfcp-xxvc
-  "gitpython>=3.1.50",       # GHSA-rpm5-65cw-6hj4, CVE-2026-44243, CVE-2026-44244, GHSA-mv93-w799-cj2w
-  "jupyter-server>=2.18.0",  # GHSA-5mrq-x3x5-8v8f, CVE-2026-35397, CVE-2026-40110
-  "pillow>=12.2.0",          # CVE-2026-40192 (FITS bomb), CVE-2026-42308 (PSD OOB)
+  "gitpython>=3.1.57",       # argument injection: archive/ls_remote/checkout/diff --output
+  "jupyter-server>=2.20.0",  # stored XSS in NbconvertFileHandler (missing sandbox CSP)
+  "jupyterlab>=4.5.10",      # XSS via crafted overrides.json
+  "pillow>=12.3.0",          # RankFilter heap OOB, McIdas mmap OOB read, bomb-check bypasses
   "tornado>=6.5.5",          # CVE-2026-31958, CVE-2026-35536
-  "mistune>=3.2.1",          # CVE-2026-33079 (ReDoS)
+  "mistune>=3.3.0",          # quadratic-time parsing (link text, emphasis, ref-link lists)
   "lxml>=6.1.0",             # CVE-2026-41066 (XXE)
-  "aiohttp>=3.13.4",         # CVE-2026-22815, CVE-2026-34515, CVE-2026-34516, CVE-2026-34525
+  "aiohttp>=3.14.1",         # CVE-2026-22815, CVE-2026-34515, CVE-2026-34516, CVE-2026-34525
   "cryptography>=46.0.7",    # CVE-2026-39892
   "nbconvert>=7.17.1",       # CVE-2026-39377, CVE-2026-39378 (path traversal)
+  "bleach>=6.4.0",           # one further bleach advisory has no patched release yet
+  "idna>=3.15",
+  "pyasn1>=0.6.4",
+  "python-multipart>=0.0.31",
+  "soupsieve>=2.8.4",        # ReDoS and memory exhaustion in the selector parser
 ]
 
 # PyTorch backend extras are mutually exclusive
@@ -142,8 +146,6 @@ explicit = true
 [tool.ruff]
 line-length = 88
 target-version = "py310"
-extend-exclude = ["synplan/chem/reaction_routes"]
-
 [tool.ruff.lint]
 select = [
     "F",      # pyflakes
@@ -173,6 +175,11 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
+# Back-compat shim modules emit a DeprecationWarning at the top (before the
+# re-exports) via ``deprecated_module(...)``; that call sits ahead of the
+# module-level re-export imports by design, so E402 does not apply here.
+"synplan/chem/reaction_rules/*.py" = ["E402"]
+"synplan/chem/reaction/routes/route_cgr.py" = ["E402"]
 
 # -- ty type checker ---------------------------------------------------------
 # Most chython types are dynamic unions (MoleculeContainer | QueryContainer | ...)
@@ -196,3 +203,8 @@ invalid-assignment = "ignore"    # chython union narrowing false positives
 invalid-parameter-default = "ignore" # chython defaults
 # Keep enabled (catches real bugs like undefined names)
 # unresolved-reference = "error"   (default)
+[[tool.ty.overrides]]
+include = ["synplan/chem/reaction/rules/manual/*.py"]
+
+[tool.ty.overrides.rules]
+unknown-argument = "ignore"

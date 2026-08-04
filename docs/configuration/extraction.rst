@@ -34,11 +34,9 @@ Extract rules using the repository configuration in ``configs/rules_extraction.y
     multicenter_rules: True
     include_rings: False
     include_func_groups: False
-    func_groups_list: []
     keep_leaving_groups: True
     keep_incoming_groups: False
     keep_reagents: False
-    reactor_validation: True
     atom_info_retention:
       reaction_center:
         neighbors: False
@@ -48,7 +46,7 @@ Extract rules using the repository configuration in ``configs/rules_extraction.y
         neighbors: False
         implicit_hydrogens: False
         ring_sizes: False
-        worker_timeout_per_reaction: 10.0
+    worker_timeout_per_reaction: 10.0
 
 **Configuration parameters**
 
@@ -67,9 +65,63 @@ Extract rules using the repository configuration in ``configs/rules_extraction.y
     keep_leaving_groups                Keeps the leaving groups in the extracted reaction rule when set to True.
     keep_incoming_groups               Retains incoming groups in the extracted reaction rule if set to True.
     keep_reagents                      Includes reagents in the extracted reaction rule when True.
-    single_product_only                Skips reactions with more than one product after reagent removal. Default True.
-    ignore_stereo                      Strips atom/bond stereochemistry from input reactions before extraction. Default True (the reactor path does not preserve stereo).
-    worker_timeout_per_reaction        Seconds allowed per reaction in a parallel extraction batch. The per-batch worker timeout is this value times the batch size. Default 10.0.
-    reactor_validation                 Skip rules whose forward-application in the reactor does not reproduce the original products. Default True.
-    atom_info_retention                Dictates the level of detail retained about atoms in the reaction center and their environment.
+    single_product_only                Skips reactions with more than one product after reagent removal.
+    ignore_stereo                      Strips atom/bond stereochemistry from input reactions before extraction (the reactor path does not preserve stereo).
+    worker_timeout_per_reaction        Seconds allowed per reaction in a parallel extraction batch. The per-batch worker timeout is this value times the batch size.
+    reactor_validation                 Skip rules whose forward-application in the reactor does not reproduce the original products.
+    atom_info_retention                Dictates the level of detail retained about atoms in the reaction center and their environment. See below.
     ================================== =================================================================================
+
+**Defaults**
+
+Every key is optional. An omitted key takes the model default, which for
+``include_rings``, ``keep_incoming_groups`` and ``atom_info_retention`` is **not**
+the value used by ``configs/rules_extraction.yaml``.
+
+.. table::
+    :widths: 40 25 35
+
+    =========================== ================= ==============================
+    Parameter                   Model default     ``rules_extraction.yaml``
+    =========================== ================= ==============================
+    environment_atom_count      ``1``             ``1``
+    min_popularity              ``3``             ``3``
+    multicenter_rules           ``True``          ``True``
+    include_rings               ``True``          ``False``
+    include_func_groups         ``False``         ``False``
+    func_groups_list            ``[]``            not set
+    keep_leaving_groups         ``True``          ``True``
+    keep_incoming_groups        ``True``          ``False``
+    keep_reagents               ``False``         ``False``
+    single_product_only         ``True``          ``True``
+    ignore_stereo               ``True``          ``True``
+    worker_timeout_per_reaction ``10.0``          ``10.0``
+    reactor_validation          ``True``          not set
+    atom_info_retention         see below         all six sub-keys ``False``
+    =========================== ================= ==============================
+
+.. warning::
+    ``include_rings`` and ``keep_incoming_groups`` default to ``True`` but are set to
+    ``False`` in the shipped configuration. Writing a configuration from this table —
+    setting only the parameters you want to change and omitting the rest — therefore
+    produces a **different and much more specific rule set** than
+    ``configs/rules_extraction.yaml`` produces, with no error and no warning.
+
+    For a Diels-Alder onto a cyclopentene, the shipped config yields
+    ``[C:1]-1-[C:2]=[C:3]-[C:4](-[C:5](-[C:6]-1-[C:7])-[C:8])-[C:9]>>...`` while a
+    config carrying only ``min_popularity`` yields
+    ``[C;D2:1]-1-[C;D2:2]=[C;D2:3]-[C;D3:4](-[C;D3:5]-2-[C;D3:6]-1-...)-[C;D2:10]>>...``
+    — the whole ring pulled in by ``include_rings`` and degree constraints stamped on
+    by the ``atom_info_retention`` default. Specific rules match far fewer targets and
+    are far more likely to fall below ``min_popularity``. Start from
+    ``configs/rules_extraction.yaml`` and edit it.
+
+``atom_info_retention``
+-----------------------
+
+Two mandatory blocks, ``reaction_center`` and ``environment``, each with all three
+boolean sub-keys ``neighbors``, ``implicit_hydrogens`` and ``ring_sizes``. Supplying
+only one block, or a block missing a sub-key, is a validation error. ``True`` keeps the
+attribute in the extracted query (more specific rules, fewer matches at planning time);
+``False`` strips it.
+
