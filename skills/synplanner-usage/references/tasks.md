@@ -171,9 +171,14 @@ Docs: `get_started/data_download`, `user_guide/data`
 `MappingConfig` + `map_reactions_from_file` (`synplan.chem.data.mapping`), then
 `standardize_reactions_from_file`, then `filter_reactions_from_file`.
 CLI: `reaction_mapping` → `reaction_standardizing` → `reaction_filtering`.
+Mapping is the one stage where hardware matters: CPU is fine to roughly ten
+thousand reactions, beyond that use `MappingConfig(device=...)` on a GPU.
+chython's `reset_mapping()` maps a single reaction in memory and is the wrong
+tool for a file.
 Tutorial: `02_Data_Curation`
-Docs: `methods/standardization` — "Standardization order" is authoritative —
-`methods/filtration`, `configuration/standardization`, `configuration/filtration`
+Docs: `methods/standardization` — "Standardization order" is authoritative, and
+"Two ways to map" covers the hardware choice — `methods/filtration`,
+`configuration/standardization`, `configuration/filtration`
 
 **Extract reaction rules from my own reactions**
 `RuleExtractionConfig` (`synplan.utils.config`) → `extract_rules_from_reactions`
