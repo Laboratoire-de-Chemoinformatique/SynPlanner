@@ -21,6 +21,19 @@ metadata:
 
 # SynPlanner usage
 
+## READ `references/tasks.md` FIRST
+
+**Before exploring the repository, before grepping the source, before writing a
+line of code — read `references/tasks.md`, sitting next to this file.**
+
+It maps around thirty tasks to the exact API pieces each one needs, in order,
+with links to a worked notebook and the reference page. **This file gives the
+rules. That one gives the sequences**, and no sequence is repeated here.
+
+Skipping it means reconstructing from the source what is already written down —
+which is where the time goes, and where wrong answers come from. Read it first
+even when the task looks simple.
+
 ## What SynPlanner is
 
 SynPlanner is a high-level reaction processing toolbox for retrosynthesis. It
@@ -144,18 +157,10 @@ SynPlanner calls chained into a workaround is worse than one honest chython call
 import, curation, rule extraction, training, planning, clustering — so check it
 before writing Python, and prefer it for long-running work.
 
-## Start every task from `references/tasks.md`
+## How to use `references/tasks.md`
 
-That file sits next to this one — also published
-[here](https://synplanner.readthedocs.io/en/latest/tasks.html) — and maps around
-thirty tasks to the exact API pieces each needs, in order, with links to a
-worked notebook and the reference page.
-
-**This file gives the rules. That one gives the sequences.** No call sequence is
-repeated here, so working without it means reconstructing one from the source,
-which is where the time goes.
-
-How to use it:
+Also published [here](https://synplanner.readthedocs.io/en/latest/tasks.html) if
+you are working without the repository.
 
 1. Scan the bold titles for the one matching the request. They are phrased the
    way users ask — "find a synthesis route for a molecule", "clean a reaction
@@ -165,9 +170,6 @@ How to use it:
    parameter.
 4. Check the combinations section first — most real requests are a chain of two
    or three entries, not one.
-
-Read it before writing planning, route analysis, comparison, clustering,
-curation or training code.
 
 **Do not write your own route-tree walker.** Recursing over the route structure
 to count depth or collect precursors is the most common reinvention here, and
