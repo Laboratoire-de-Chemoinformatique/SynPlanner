@@ -21,14 +21,16 @@ paths:
   # Output folder for benchmark results (timestamped subfolder will be created)
   results_folder: "benchmark_results_combined_policy"
   
-  # Policy network weights (relative to data_folder)
-  ranking_policy: "uspto/weights/ranking_policy_network.ckpt"
-  filtering_policy: "uspto/weights/filtering_policy_network.ckpt"
-  
+  # Policy network weights (relative to data_folder).
+  # Layout of `synplan download_preset --preset synplanner-article`: the only
+  # preset whose two heads share a rule set, which a combined policy requires.
+  ranking_policy: "policy/supervised_gcn/v1/v1/ranking_policy.ckpt"
+  filtering_policy: "policy/supervised_gcn/v1/v1/filtering_policy.ckpt"
+
   # Reaction rules and building blocks (relative to data_folder)
-  reaction_rules: "uspto/uspto_reaction_rules.pickle"
-  building_blocks: "building_blocks/building_blocks_em_sa_ln.smi"
-  
+  reaction_rules: "policy/supervised_gcn/v1/reaction_rules.tsv"
+  building_blocks: "building_blocks/emolecules-salt-ln/building_blocks.tsv"
+
   # Benchmark targets folder (relative to data_folder)
   benchmark_folder: "benchmarks/sascore"
 
@@ -36,8 +38,10 @@ paths:
 # Benchmark Selection
 # -----------------------------------------------------------------------------
 benchmark:
-  # Pattern for target files (glob pattern)
-  target_pattern: "targets_with_sascore_*.smi"
+  # Pattern for target files (glob pattern). The published benchmark files are
+  # TSV with a `smiles` column; download them from the SynPlanner-data repo
+  # under benchmarks/sascore/ (no preset ships them).
+  target_pattern: "targets_with_sascore_*.tsv"
   
   # Which SAScore ranges to run (0-indexed slice of sorted files)
   # [1:4] means files 1, 2, 3 (skipping first, taking next 3)
@@ -54,9 +58,6 @@ policy:
   
   # Minimum probability threshold for rules (0.0 = no threshold)
   rule_prob_threshold: 0.0
-  
-  # Fraction of rules prioritized by filtering policy
-  priority_rules_fraction: 0.5
 
 # -----------------------------------------------------------------------------
 # Tree Search Configuration

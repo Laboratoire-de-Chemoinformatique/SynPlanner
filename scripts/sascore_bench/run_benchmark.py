@@ -63,6 +63,7 @@ import yaml
 from tqdm.auto import tqdm
 
 from synplan.chem.utils import mol_from_smiles
+from synplan.mcts.search import _iter_target_smiles
 from synplan.mcts.tree import Tree
 from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import (
@@ -160,7 +161,6 @@ def load_policy_from_config(config_path: Path | None = None):
         ranking_weights_path=str(ranking_policy_path),
         top_rules=policy_cfg["top_rules"],
         rule_prob_threshold=policy_cfg["rule_prob_threshold"],
-        priority_rules_fraction=policy_cfg["priority_rules_fraction"],
     )
 
     return policy_function
@@ -223,7 +223,6 @@ def load_resources_from_config(config_path: Path | None = None):
         ranking_weights_path=str(ranking_policy_path),
         top_rules=policy_cfg["top_rules"],
         rule_prob_threshold=policy_cfg["rule_prob_threshold"],
-        priority_rules_fraction=policy_cfg["priority_rules_fraction"],
     )
 
     # Load reaction rules
@@ -304,8 +303,8 @@ def run_benchmark(
     n_solved = 0
     n_errors = 0
 
-    with open(targets_path, encoding="utf-8") as targets_file:
-        targets = [line.strip() for line in targets_file if line.strip()]
+    # same reader as run_search: bare .smi lines or a .tsv/.csv SMILES column
+    targets = list(_iter_target_smiles(str(targets_path)))
 
     with open(stats_file, "w", encoding="utf-8", newline="") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=stats_header)
@@ -377,12 +376,18 @@ def main():
     )
     args = parser.parse_args()
 
-    # Load configuration
-    config = load_config(args.config)
+    # Load configuration and resources
+    logger.info("Loading resources...")
+    resources = load_resources_from_config(args.config)
+    config = resources["config"]
+    policy_function = resources["policy_function"]
+    reaction_rules = resources["reaction_rules"]
+    building_blocks = resources["building_blocks"]
+    tree_config = resources["tree_config"]
+
     paths_cfg = config["paths"]
     benchmark_cfg = config["benchmark"]
     policy_cfg = config["policy"]
-    tree_cfg = config["tree"]
     eval_cfg = config["evaluation"]
 
     # Resolve paths
@@ -391,60 +396,6 @@ def main():
     results_root = Path(paths_cfg["results_folder"]).resolve()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_root = results_root / timestamp
-
-    # Data paths
-    ranking_policy_path = data_folder / paths_cfg["ranking_policy"]
-    filtering_policy_path = data_folder / paths_cfg["filtering_policy"]
-    reaction_rules_path = data_folder / paths_cfg["reaction_rules"]
-    building_blocks_path = data_folder / paths_cfg["building_blocks"]
-
-    # Verify paths exist
-    for path in [
-        ranking_policy_path,
-        filtering_policy_path,
-        reaction_rules_path,
-        building_blocks_path,
-    ]:
-        if not path.exists():
-            raise FileNotFoundError(f"Required file not found: {path}")
-
-    logger.info("Loading resources...")
-
-    # Load combined policy
-    logger.info("Loading combined policy (filtering + ranking)...")
-    policy_function = load_combined_policy_function(
-        filtering_weights_path=str(filtering_policy_path),
-        ranking_weights_path=str(ranking_policy_path),
-        top_rules=policy_cfg["top_rules"],
-        rule_prob_threshold=policy_cfg["rule_prob_threshold"],
-        priority_rules_fraction=policy_cfg["priority_rules_fraction"],
-    )
-
-    # Load reaction rules and building blocks
-    logger.info("Loading reaction rules...")
-    reaction_rules = load_reaction_rules(str(reaction_rules_path))
-
-    logger.info("Loading building blocks...")
-    building_blocks = load_building_blocks(building_blocks_path, standardize=True)
-
-    # Tree configuration
-    tree_config = TreeConfig(
-        max_iterations=tree_cfg["max_iterations"],
-        max_time=tree_cfg["max_time"],
-        max_depth=tree_cfg["max_depth"],
-        max_tree_size=tree_cfg["max_tree_size"],
-        search_strategy=tree_cfg["search_strategy"],
-        ucb_type=tree_cfg["ucb_type"],
-        c_ucb=tree_cfg["c_ucb"],
-        backprop_type=tree_cfg["backprop_type"],
-        evaluation_agg=tree_cfg["evaluation_agg"],
-        exclude_small=tree_cfg["exclude_small"],
-        init_node_value=tree_cfg["init_node_value"],
-        min_mol_size=tree_cfg["min_mol_size"],
-        epsilon=tree_cfg["epsilon"],
-        enable_pruning=tree_cfg["enable_pruning"],
-        silent=tree_cfg["silent"],
-    )
 
     # Evaluation configuration (rollout)
     eval_config = RolloutEvaluationConfig(
@@ -468,7 +419,6 @@ def main():
         "policy_config": {
             "top_rules": policy_cfg["top_rules"],
             "rule_prob_threshold": policy_cfg["rule_prob_threshold"],
-            "priority_rules_fraction": policy_cfg["priority_rules_fraction"],
         },
     }
 
@@ -560,9 +510,7 @@ def main():
     total_solved = 0
     total_molecules = 0
     for result in all_results:
-        sascore_range = (
-            result["file"].replace("targets_with_sascore_", "").replace(".smi", "")
-        )
+        sascore_range = Path(result["file"]).stem.replace("targets_with_sascore_", "")
         print(
             f"{sascore_range:<20} {result['solved']:<10} {result['total']:<10} {result['solve_rate']:.1%}"
         )

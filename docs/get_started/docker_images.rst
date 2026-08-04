@@ -36,7 +36,9 @@ Show help:
    docker run --rm --platform linux/amd64 \
      ghcr.io/laboratoire-de-chemoinformatique/synplanner:${VERSION}-cli-amd64 --help
 
-Quick planning example (mount config and data):
+Quick planning example (mount config and data). Paths below are the layout
+``synplan download_preset --preset synplanner-gps --save_to synplan_data``
+writes; ``targets.smi`` is your own file of target SMILES:
 
 .. code-block:: bash
 
@@ -45,10 +47,10 @@ Quick planning example (mount config and data):
      ghcr.io/laboratoire-de-chemoinformatique/synplanner:${VERSION}-cli-amd64 \
      planning \
        --config configs/planning_standard.yaml \
-       --targets tutorials/synplan_data/benchmarks/sascore/targets_with_sascore_1.5_2.5.smi \
-       --reaction_rules synplan_data/policy/supervised_gcn/v1/reaction_rules.tsv \
+       --targets targets.smi \
+       --reaction_rules synplan_data/policy/supervised_gps/v1/reaction_rules.tsv \
        --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \
-       --policy_network synplan_data/policy/supervised_gcn/v1/v1/ranking_policy.ckpt \
+       --policy_network synplan_data/policy/supervised_gps/v1/v1/ranking_policy.ckpt \
        --results_dir planning_results
 
 Run the GUI
