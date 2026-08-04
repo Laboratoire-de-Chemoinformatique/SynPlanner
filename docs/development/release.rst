@@ -35,6 +35,23 @@ recommendation has gone stale.
 Both files are published on the docs site and served through ``llms.txt``, so a
 stale skill misleads users and their agents until the next release.
 
+Run every gate CI runs
+~~~~~~~~~~~~~~~~~~~~~~
+
+These four are what ``ci.yml`` enforces. Run them exactly as written — over the
+whole tree, not over the files you touched, or a clean local run can still fail
+CI on breakage someone else introduced:
+
+.. code-block:: bash
+
+   uv run --no-sync pytest --cov=synplan --cov-report=xml
+   uv run --no-sync ruff format --check synplan tests
+   uv run --no-sync ruff check synplan tests
+   uvx ty check synplan/
+
+``ruff check`` and ``ruff format --check`` are separate gates. ``check`` says
+nothing about line wrapping, so it passes on a file the formatter would rewrite.
+
 Other checks
 ~~~~~~~~~~~~
 
@@ -42,7 +59,33 @@ Other checks
   changes.
 - Documentation touched by the release is updated — see the checklist in
   :doc:`pr_review`.
-- The full test suite passes: ``uv run pytest -q``.
+- The docs build clean: ``uv run sphinx-build -b html docs /tmp/synplanner-docs``.
+
+Dependencies
+~~~~~~~~~~~~
+
+Check open Dependabot alerts before tagging:
+
+.. code-block:: bash
+
+   gh api repos/Laboratoire-de-Chemoinformatique/SynPlanner/dependabot/alerts \
+     --paginate -q '.[] | select(.state=="open") | [.security_vulnerability.package.name,
+     .security_vulnerability.severity,
+     (.security_vulnerability.first_patched_version.identifier // "none")] | @tsv' | sort -u
+
+Most close by raising a floor in ``[tool.uv] constraint-dependencies``, which
+also records which advisory each floor is for. Relock with a cooldown, because a
+freshly published release is the one worth distrusting, and exempt our own
+package so its newest version still resolves:
+
+.. code-block:: bash
+
+   # dates as YYYY-MM-DD: cutoff seven days back, exemption a day ahead
+   uv lock --exclude-newer 2026-07-28 \
+           --exclude-newer-package chython-synplan=2026-08-05
+
+Leave an alert open rather than take a major-version jump on the eve of a
+release; note the reason beside the constraint block and handle it separately.
 
 Bump version
 ------------

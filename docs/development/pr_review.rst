@@ -79,6 +79,20 @@ For Python changes:
    uv run ruff check <changed-python-files>
    uvx ty check <changed-python-files>
 
+Before pushing, run them the way CI does — over the whole tree, and with
+``format --check`` rather than ``format``:
+
+.. code-block:: bash
+
+   uv run --no-sync ruff format --check synplan tests
+   uv run --no-sync ruff check synplan tests
+   uvx ty check synplan/
+
+Scoping to changed files is fine while iterating but hides two things: a
+pre-existing failure elsewhere that CI will still fail on, and the fact that
+``ruff check`` passes on files ``ruff format`` would rewrite. They are separate
+gates.
+
 For targeted behavior:
 
 .. code-block:: bash
