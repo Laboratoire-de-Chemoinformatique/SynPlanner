@@ -63,7 +63,9 @@ def test_no_strategy_overrides_the_public_entry_point():
     scoring them 1.0 — and unlike the abstract case, a subclass that overrides
     both instantiates cleanly and gets it wrong in silence.
     """
-    offenders = [c.__name__ for c in _shipped_strategies() if "evaluate_node" in c.__dict__]
+    offenders = [
+        c.__name__ for c in _shipped_strategies() if "evaluate_node" in c.__dict__
+    ]
     assert not offenders, (
         f"{offenders} override evaluate_node; override _evaluate_node instead, "
         "or priority rules lose their score"

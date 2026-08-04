@@ -157,7 +157,9 @@ def test_skill_body_within_recommended_length():
     assert len(SKILL_MD.read_text(encoding="utf-8").splitlines()) < 500
 
 
-@pytest.mark.parametrize("dotted", sorted(set(re.findall(r"\bsynplan(?:\.[a-z_]+)+", _text()))))
+@pytest.mark.parametrize(
+    "dotted", sorted(set(re.findall(r"\bsynplan(?:\.[a-z_]+)+", _text())))
+)
 def test_named_module_exists(dotted):
     """Every synplan.x.y path named in the skill resolves to a real module."""
     modules = _module_names()
@@ -182,9 +184,7 @@ def test_cli_command_documented_or_known(name):
 def test_named_configs_exist():
     """Every configs/*.yaml filename mentioned is present."""
     available = {p.name for p in (REPO_ROOT / "configs").glob("*.yaml")}
-    named = {
-        s for s in _code_spans(_text()) if s.endswith(".yaml") and "*" not in s
-    }
+    named = {s for s in _code_spans(_text()) if s.endswith(".yaml") and "*" not in s}
     missing = named - available
     assert not missing, f"skill names missing config files: {sorted(missing)}"
 
