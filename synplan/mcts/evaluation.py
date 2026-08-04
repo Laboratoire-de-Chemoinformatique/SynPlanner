@@ -350,7 +350,7 @@ class ValueNetworkEvaluationStrategy(EvaluationStrategy):
                 return self.value_network.forward(pyg_graph)[0].item()
         return -1e6
 
-    def evaluate_node(
+    def _evaluate_node(
         self,
         node,
         node_id: int,
