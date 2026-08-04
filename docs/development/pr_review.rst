@@ -115,8 +115,8 @@ When ``pyproject.toml`` or ``uv.lock`` changes:
 - Review dependency diffs in GitHub when available, and do not rely only on the
   manifest diff.
 
-Documentation and release checklist
------------------------------------
+Documentation checklist
+-----------------------
 
 Any change that affects users, developers, installation, commands, configuration,
 or release artifacts should update documentation in the same pull request.
@@ -127,6 +127,10 @@ Check the relevant files:
 - ``docs/configuration/*.rst`` for YAML/config fields.
 - ``docs/api_reference/*.rst`` for new public modules that should appear in API
   docs.
+- ``skills/synplanner-usage/references/tasks.md`` when a workflow, CLI command,
+  or public entry point changes — the task index maps each task to the API it
+  needs, and agents rely on it. ``skills/synplanner-usage/SKILL.md`` as well if
+  the *guidance* changed, not just the surface.
 - ``tutorials/*.ipynb`` when the notebook workflow would otherwise show stale API calls.
 - ``CHANGELOG.md`` for user-visible changes, release notes, dependency changes,
   and developer workflow changes.
@@ -135,6 +139,10 @@ Check the relevant files:
   changes.
 - Docker build files and ``.github/workflows/build-docker.yml`` when image tags,
   build args, Python versions, or extras change.
+
+``uv run pytest tests/test_skill.py`` fails when the skill names something that
+no longer exists. It cannot tell you that something *new* is missing — that is
+what this checklist is for.
 
 Do not manually edit generated ``docs/_build`` output. Rebuild docs instead, or
 leave generated output untouched.
@@ -145,25 +153,7 @@ For docs-only or docs-heavy changes, validate with a temporary build directory:
 
    uv run sphinx-build -b html docs /tmp/synplanner-docs-html
 
-Version and Docker notes
-------------------------
-
-Patch releases are appropriate for bug fixes, dependency constraints,
-documentation repair, and robustness improvements that do not intentionally
-change the public feature set.
-
-Use ``uv`` for version bumps:
-
-.. code-block:: bash
-
-   uv version --bump patch --no-sync
-   uv lock --check
-
-Docker images are tagged from ``project.version`` in ``pyproject.toml`` by the
-Docker GitHub Actions workflow. For version ``1.4.4``, the expected GHCR tags are:
-
-- ``ghcr.io/laboratoire-de-chemoinformatique/synplanner:1.4.4-cli-amd64``
-- ``ghcr.io/laboratoire-de-chemoinformatique/synplanner:1.4.4-gui-amd64``
+Version bumps and release mechanics are covered in :doc:`release`.
 
 Before accepting a release-preparation pull request, check that
 ``docs/get_started/docker_images.rst`` uses the same version.

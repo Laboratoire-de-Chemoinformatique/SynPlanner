@@ -75,8 +75,10 @@ The main steps of this pipeline are listed below.
 
     get_started/index
     user_guide/index
+    tasks
+    agent_skill
     api
-    development
+    development/index
     release_notes
 
 How to navigate this documentation
@@ -84,6 +86,8 @@ How to navigate this documentation
 
 - Getting started: quick install and first runs: :doc:`get_started/index`
 - User Guide: tutorials and core topics (concepts, configuration, interfaces): :doc:`user_guide/index`
+- Task index: what you want to do, mapped to the API you need: :doc:`tasks`
+- AI agents: the shipped agent skill and how to install it: :doc:`agent_skill`
 - API reference: Python package API: :doc:`api`
-- Development: contributing, PR review, local dev, building: :doc:`development`
+- Development: local setup, PR review, releases: :doc:`development/index`
 - Release notes: version changes: :doc:`release_notes`

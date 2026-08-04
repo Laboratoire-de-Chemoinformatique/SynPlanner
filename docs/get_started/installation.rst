@@ -65,6 +65,43 @@ From source with uv (dev)
    uv sync --extra cpu   # add "--group docs --group dev" if you need docs or dev extras
    uv run synplan --help
 
+Selecting a PyTorch build
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Most users do not need to think about this: the default PyTorch wheel for your
+platform is installed automatically and works.
+
+If you need a specific build (CPU-only on a GPU machine, or a particular CUDA
+version), how you select it depends on the installer.
+
+**With uv**, three mutually exclusive extras are available:
+
+.. code-block:: bash
+
+   uv sync --extra cpu      # CPU only
+   uv sync --extra cu126    # CUDA 12.6
+   uv sync --extra cu128    # CUDA 12.8
+
+**With pip**, these extras change nothing. ``pip install "SynPlanner[cpu]"``
+succeeds — pip accepts the extra — but all it adds is ``torch>=2.0``, which is
+already satisfied by the transitive requirement from ``chytorch-synplan``,
+``torch-geometric`` and ``pytorch-lightning``. The index mapping that gives the
+extras their meaning lives in ``[tool.uv.sources]`` and ``[[tool.uv.index]]``,
+which pip does not read, so torch is resolved from PyPI either way. The result is
+identical to a plain ``pip install SynPlanner``. To control the build with pip, install ``torch`` from the
+`PyTorch install selector <https://pytorch.org/get-started/locally/>`_ first, then
+install SynPlanner.
+
+To check what you ended up with:
+
+.. code-block:: bash
+
+   python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+
+If ``torch.cuda.is_available()`` is ``False`` on a machine with a GPU, the build
+does not match the hardware — reinstall torch from the matching index rather than
+patching the existing install.
+
 Limitations and notes
 ~~~~~~~~~~~~~~~~~~~~~
 

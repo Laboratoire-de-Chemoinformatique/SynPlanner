@@ -17,6 +17,10 @@ extensions = [
 source_suffix = ".rst"
 master_doc = "index"
 
+# Served verbatim at the site root. llms.txt is a curated index for LLMs that
+# fetch the docs; see https://llmstxt.org
+html_extra_path = ["llms.txt"]
+
 # nbsphinx configuration: do not execute notebooks during the build
 # This avoids long build times from heavy notebooks
 nbsphinx_execute = "never"
