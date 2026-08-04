@@ -106,7 +106,11 @@ Tutorial: `11_Planning_with_RDKit`
 **Plan with my own retrosynthetic SMARTS**
 Also the answer when a custom dataset is too small to train a policy on — hand
 the chemistry over as priority rules rather than trying to learn it from a few
-examples. Сombine priority rules with preset policy. 
+examples. Combine priority rules with the preset policy.
+`parse_priority_rules` (`synplan.chem.reaction.rules`) →
+`Tree(config=TreeConfig(use_priority=True), priority_rules=...)`.
+**Python API only — there is no CLI flag for priority rules**, so this is one of
+the few tasks where `synplan planning` is not the answer.
 Tutorial: `13_Priority_Rules`
 Docs: `methods/priority_rules` — read the SMARTS dialect note before writing any
 
