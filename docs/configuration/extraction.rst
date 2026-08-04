@@ -125,15 +125,3 @@ only one block, or a block missing a sub-key, is a validation error. ``True`` ke
 attribute in the extracted query (more specific rules, fewer matches at planning time);
 ``False`` strips it.
 
-.. warning::
-    Omitting ``atom_info_retention`` entirely is **not** the same as copying the block
-    from ``configs/rules_extraction.yaml``. The model default is
-    ``reaction_center.neighbors: True``, whereas the shipped config sets it to
-    ``False``. Leaving the key out therefore pins neighbour counts on every
-    reaction-center atom and yields a stricter, less transferable rule set — silently,
-    with no warning and no error.
-
-    Sub-keys other than the three listed above (``hybridization``, for instance, which
-    appears in ``configs/extraction_functional_groups.yaml``) pass validation and are
-    then ignored: ``clean_atom`` only ever touches ``neighbors``,
-    ``implicit_hydrogens`` and ``ring_sizes``.

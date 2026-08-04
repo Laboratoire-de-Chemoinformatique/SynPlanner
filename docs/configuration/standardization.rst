@@ -61,20 +61,6 @@ Run reaction standardization using the repository configuration in ``configs/rea
     deduplicate                        Deduplicate reactions by CGR hash                              ``true`` (plain boolean, not a nested config)
     ================================== ============================================================== ================================
 
-.. warning::
-    ``deduplicate`` is ``true`` both in the shipped configuration and as the model
-    default, so **omitting the key does not turn deduplication off** — set
-    ``deduplicate: false`` explicitly if you need one output record per input record.
-
-    Duplicates are detected on the CGR string of the *standardized* reaction, so two
-    input records that differ in atom numbering, component order or SMILES writing
-    collapse to one output record. On a large corpus this can account for a large part
-    of the drop between input and output count.
-
-    The CLI summary line reports removed duplicates inside its ``failed`` total and
-    also breaks them out as ``duplicates removed``. They are **not** written to the
-    error TSV — an empty error file next to a non-zero ``failed`` count means the
-    losses were duplicates, not broken reactions.
 
 .. note::
     1. If the reaction standardizer name is listed in the configuration file (see above), it means that this standardizer will be applied.
