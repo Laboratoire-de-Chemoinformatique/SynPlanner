@@ -13,123 +13,123 @@
 # Total: 140 patterns.
 
 AcidX-Fluoride_SaturatedAliphatic:
-  smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(**[C]=[C]);!$(**[C]#[C]);!$(**[C]#[N]);!$(**a)])]'
+  smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(*-,:*-,:[C]=[C]);!$(*-,:*-,:[C]#[C]);!$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)])]'
   family: fluoride
-  template_smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(**[C]=[C]);!$(**[C]#[C]);!$(**[C]#[N]);!$(**a)]):1][*:2]'
+  template_smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(*-,:*-,:[C]=[C]);!$(*-,:*-,:[C]#[C]);!$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCC(=O)F
 AcidX-Chloride_SaturatedAliphatic:
-  smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(**[C]=[C]);!$(**[C]#[C]);!$(**[C]#[N]);!$(**a)])]'
+  smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(*-,:*-,:[C]=[C]);!$(*-,:*-,:[C]#[C]);!$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(**[C]=[C]);!$(**[C]#[C]);!$(**[C]#[N]);!$(**a)]):1][*:2]'
+  template_smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(*-,:*-,:[C]=[C]);!$(*-,:*-,:[C]#[C]);!$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCC(=O)Cl
 AcidX-Bromide_SaturatedAliphatic:
-  smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(**[C]=[C]);!$(**[C]#[C]);!$(**[C]#[N]);!$(**a)])]'
+  smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(*-,:*-,:[C]=[C]);!$(*-,:*-,:[C]#[C]);!$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)])]'
   family: bromide
-  template_smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(**[C]=[C]);!$(**[C]#[C]);!$(**[C]#[N]);!$(**a)]):1][*:2]'
+  template_smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(*-,:*-,:[C]=[C]);!$(*-,:*-,:[C]#[C]);!$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCC(=O)Br
 AcidX-Iodide_SaturatedAliphatic:
-  smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(**[C]=[C]);!$(**[C]#[C]);!$(**[C]#[N]);!$(**a)])]'
+  smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(*-,:*-,:[C]=[C]);!$(*-,:*-,:[C]#[C]);!$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)])]'
   family: iodide
-  template_smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(**[C]=[C]);!$(**[C]#[C]);!$(**[C]#[N]);!$(**a)]):1][*:2]'
+  template_smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(*-,:*-,:[C]=[C]);!$(*-,:*-,:[C]#[C]);!$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCC(=O)I
 AcidX-Triflate_SaturatedAliphatic:
-  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(**[C]=[C]);!$(**[C]#[C]);!$(**[C]#[N]);!$(**a)])]'
+  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(*-,:*-,:[C]=[C]);!$(*-,:*-,:[C]#[C]);!$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)])]'
   family: triflate
-  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(**[C]=[C]);!$(**[C]#[C]);!$(**[C]#[N]);!$(**a)]):1][*:2]'
+  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([!$(*-,:*-,:[C]=[C]);!$(*-,:*-,:[C]#[C]);!$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCC(=O)OS(=O)(=O)C(F)(F)F
 AcidX-Fluoride_UnsaturatedAliphatic:
-  smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[C]=[C]),$(**[C]#[C]),$(**[C]#[N]);!$(**a)])]'
+  smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[C]=[C]),$(*-,:*-,:[C]#[C]),$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)])]'
   family: fluoride
-  template_smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[C]=[C]),$(**[C]#[C]),$(**[C]#[N]);!$(**a)]):1][*:2]'
+  template_smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[C]=[C]),$(*-,:*-,:[C]#[C]),$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXC=CC(=O)F
 AcidX-Chloride_UnsaturatedAliphatic:
-  smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[C]=[C]),$(**[C]#[C]),$(**[C]#[N]);!$(**a)])]'
+  smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[C]=[C]),$(*-,:*-,:[C]#[C]),$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[C]=[C]),$(**[C]#[C]),$(**[C]#[N]);!$(**a)]):1][*:2]'
+  template_smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[C]=[C]),$(*-,:*-,:[C]#[C]),$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXC=CC(=O)Cl
 AcidX-Bromide_UnsaturatedAliphatic:
-  smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[C]=[C]),$(**[C]#[C]),$(**[C]#[N]);!$(**a)])]'
+  smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[C]=[C]),$(*-,:*-,:[C]#[C]),$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)])]'
   family: bromide
-  template_smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[C]=[C]),$(**[C]#[C]),$(**[C]#[N]);!$(**a)]):1][*:2]'
+  template_smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[C]=[C]),$(*-,:*-,:[C]#[C]),$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXC=CC(=O)Br
 AcidX-Iodide_UnsaturatedAliphatic:
-  smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[C]=[C]),$(**[C]#[C]),$(**[C]#[N]);!$(**a)])]'
+  smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[C]=[C]),$(*-,:*-,:[C]#[C]),$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)])]'
   family: iodide
-  template_smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[C]=[C]),$(**[C]#[C]),$(**[C]#[N]);!$(**a)]):1][*:2]'
+  template_smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[C]=[C]),$(*-,:*-,:[C]#[C]),$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXC=CC(=O)I
 AcidX-Triflate_UnsaturatedAliphatic:
-  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[C]=[C]),$(**[C]#[C]),$(**[C]#[N]);!$(**a)])]'
+  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[C]=[C]),$(*-,:*-,:[C]#[C]),$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)])]'
   family: triflate
-  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[C]=[C]),$(**[C]#[C]),$(**[C]#[N]);!$(**a)]):1][*:2]'
+  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[C]=[C]),$(*-,:*-,:[C]#[C]),$(*-,:*-,:[C]#[N]);!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXC=CC(=O)OS(=O)(=O)C(F)(F)F
 AcidX-Fluoride_Aromatic:
-  smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[c;$(c1ccccc1)]),$(**[c;$(c1cccc1)])])]'
+  smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[c;$(c1ccccc1)]),$(*-,:*-,:[c;$(c1cccc1)])])]'
   family: fluoride
-  template_smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[c;$(c1ccccc1)]),$(**[c;$(c1cccc1)])]):1][*:2]'
+  template_smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[c;$(c1ccccc1)]),$(*-,:*-,:[c;$(c1cccc1)])]):1][*:2]'
   modification_type: clip
   example: c1Xccccc1C(=O)F
 AcidX-Chloride_Aromatic:
-  smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[c;$(c1ccccc1)]),$(**[c;$(c1cccc1)])])]'
+  smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[c;$(c1ccccc1)]),$(*-,:*-,:[c;$(c1cccc1)])])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[c;$(c1ccccc1)]),$(**[c;$(c1cccc1)])]):1][*:2]'
+  template_smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[c;$(c1ccccc1)]),$(*-,:*-,:[c;$(c1cccc1)])]):1][*:2]'
   modification_type: clip
   example: c1Xccccc1C(=O)Cl
 AcidX-Bromide_Aromatic:
-  smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[c;$(c1ccccc1)]),$(**[c;$(c1cccc1)])])]'
+  smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[c;$(c1ccccc1)]),$(*-,:*-,:[c;$(c1cccc1)])])]'
   family: bromide
-  template_smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[c;$(c1ccccc1)]),$(**[c;$(c1cccc1)])]):1][*:2]'
+  template_smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[c;$(c1ccccc1)]),$(*-,:*-,:[c;$(c1cccc1)])]):1][*:2]'
   modification_type: clip
   example: c1Xccccc1C(=O)Br
 AcidX-Iodide_Aromatic:
-  smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[c;$(c1ccccc1)]),$(**[c;$(c1cccc1)])])]'
+  smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[c;$(c1ccccc1)]),$(*-,:*-,:[c;$(c1cccc1)])])]'
   family: iodide
-  template_smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[c;$(c1ccccc1)]),$(**[c;$(c1cccc1)])]):1][*:2]'
+  template_smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[c;$(c1ccccc1)]),$(*-,:*-,:[c;$(c1cccc1)])]):1][*:2]'
   modification_type: clip
   example: c1Xccccc1C(=O)I
 AcidX-Triflate_Aromatic:
-  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[c;$(c1ccccc1)]),$(**[c;$(c1cccc1)])])]'
+  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[c;$(c1ccccc1)]),$(*-,:*-,:[c;$(c1cccc1)])])]'
   family: triflate
-  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[c;$(c1ccccc1)]),$(**[c;$(c1cccc1)])]):1][*:2]'
+  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[c;$(c1ccccc1)]),$(*-,:*-,:[c;$(c1cccc1)])]):1][*:2]'
   modification_type: clip
   example: c1Xccccc1C(=O)OS(=O)(=O)C(F)(F)F
 AcidX-Fluoride_Heteroaromatic:
-  smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[a;$(a1aaaaa1)]),$(**[a;$(a1aaaa1)]);!$(**[c;$(c1ccccc1)]);!$(**[c;$(c1cccc1)])])]'
+  smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[a;$(a1aaaaa1)]),$(*-,:*-,:[a;$(a1aaaa1)]);!$(*-,:*-,:[c;$(c1ccccc1)]);!$(*-,:*-,:[c;$(c1cccc1)])])]'
   family: fluoride
-  template_smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[a;$(a1aaaaa1)]),$(**[a;$(a1aaaa1)]);!$(**[c;$(c1ccccc1)]);!$(**[c;$(c1cccc1)])]):1][*:2]'
+  template_smarts: '[F;$([F][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[a;$(a1aaaaa1)]),$(*-,:*-,:[a;$(a1aaaa1)]);!$(*-,:*-,:[c;$(c1ccccc1)]);!$(*-,:*-,:[c;$(c1cccc1)])]):1][*:2]'
   modification_type: clip
   example: c1Xcnccc1C(=O)F
 AcidX-Chloride_Heteroaromatic:
-  smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[a;$(a1aaaaa1)]),$(**[a;$(a1aaaa1)]);!$(**[c;$(c1ccccc1)]);!$(**[c;$(c1cccc1)])])]'
+  smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[a;$(a1aaaaa1)]),$(*-,:*-,:[a;$(a1aaaa1)]);!$(*-,:*-,:[c;$(c1ccccc1)]);!$(*-,:*-,:[c;$(c1cccc1)])])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[a;$(a1aaaaa1)]),$(**[a;$(a1aaaa1)]);!$(**[c;$(c1ccccc1)]);!$(**[c;$(c1cccc1)])]):1][*:2]'
+  template_smarts: '[Cl;$([Cl][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[a;$(a1aaaaa1)]),$(*-,:*-,:[a;$(a1aaaa1)]);!$(*-,:*-,:[c;$(c1ccccc1)]);!$(*-,:*-,:[c;$(c1cccc1)])]):1][*:2]'
   modification_type: clip
   example: c1Xcnccc1C(=O)Cl
 AcidX-Bromide_Heteroaromatic:
-  smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[a;$(a1aaaaa1)]),$(**[a;$(a1aaaa1)]);!$(**[c;$(c1ccccc1)]);!$(**[c;$(c1cccc1)])])]'
+  smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[a;$(a1aaaaa1)]),$(*-,:*-,:[a;$(a1aaaa1)]);!$(*-,:*-,:[c;$(c1ccccc1)]);!$(*-,:*-,:[c;$(c1cccc1)])])]'
   family: bromide
-  template_smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[a;$(a1aaaaa1)]),$(**[a;$(a1aaaa1)]);!$(**[c;$(c1ccccc1)]);!$(**[c;$(c1cccc1)])]):1][*:2]'
+  template_smarts: '[Br;$([Br][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[a;$(a1aaaaa1)]),$(*-,:*-,:[a;$(a1aaaa1)]);!$(*-,:*-,:[c;$(c1ccccc1)]);!$(*-,:*-,:[c;$(c1cccc1)])]):1][*:2]'
   modification_type: clip
   example: c1Xcnccc1C(=O)Br
 AcidX-Iodide_Heteroaromatic:
-  smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[a;$(a1aaaaa1)]),$(**[a;$(a1aaaa1)]);!$(**[c;$(c1ccccc1)]);!$(**[c;$(c1cccc1)])])]'
+  smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[a;$(a1aaaaa1)]),$(*-,:*-,:[a;$(a1aaaa1)]);!$(*-,:*-,:[c;$(c1ccccc1)]);!$(*-,:*-,:[c;$(c1cccc1)])])]'
   family: iodide
-  template_smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[a;$(a1aaaaa1)]),$(**[a;$(a1aaaa1)]);!$(**[c;$(c1ccccc1)]);!$(**[c;$(c1cccc1)])]):1][*:2]'
+  template_smarts: '[I;$([I][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[a;$(a1aaaaa1)]),$(*-,:*-,:[a;$(a1aaaa1)]);!$(*-,:*-,:[c;$(c1ccccc1)]);!$(*-,:*-,:[c;$(c1cccc1)])]):1][*:2]'
   modification_type: clip
   example: c1Xcnccc1C(=O)I
 AcidX-Triflate_Heteroaromatic:
-  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[a;$(a1aaaaa1)]),$(**[a;$(a1aaaa1)]);!$(**[c;$(c1ccccc1)]);!$(**[c;$(c1cccc1)])])]'
+  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[a;$(a1aaaaa1)]),$(*-,:*-,:[a;$(a1aaaa1)]);!$(*-,:*-,:[c;$(c1ccccc1)]);!$(*-,:*-,:[c;$(c1cccc1)])])]'
   family: triflate
-  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(**[a;$(a1aaaaa1)]),$(**[a;$(a1aaaa1)]);!$(**[c;$(c1ccccc1)]);!$(**[c;$(c1cccc1)])]):1][*:2]'
+  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][C;$(C(=O));!$(C([#7,#8,#15,#16])(=[O;D1])[#9,#17,#35,#53])]);$([$(*-,:*-,:[a;$(a1aaaaa1)]),$(*-,:*-,:[a;$(a1aaaa1)]);!$(*-,:*-,:[c;$(c1ccccc1)]);!$(*-,:*-,:[c;$(c1cccc1)])]):1][*:2]'
   modification_type: clip
   example: c1Xcnccc1C(=O)OS(=O)(=O)C(F)(F)F
 X-Fluoride_Aliph:
@@ -253,93 +253,93 @@ X-Triflate_Nitrile:
   modification_type: clip
   example: CXC[N+]#COS(=O)(=O)C(F)(F)F
 X-Fluoride_Phe:
-  smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1[c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])]1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])])]'
+  smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1ccccc1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])])]'
   family: fluoride
-  template_smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1[c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])]1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])]):1][a:2]'
+  template_smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1ccccc1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xccccc1F
 X-Chloride_Phe:
-  smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1[c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])]1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])])]'
+  smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1ccccc1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1[c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])]1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])]):1][a:2]'
+  template_smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1ccccc1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xccccc1Cl
 X-Bromide_Phe:
-  smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1[c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])]1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])])]'
+  smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1ccccc1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])])]'
   family: bromide
-  template_smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1[c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])]1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])]):1][a:2]'
+  template_smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1ccccc1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xccccc1Br
 X-Iodide_Phe:
-  smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1[c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])]1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])])]'
+  smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1ccccc1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])])]'
   family: iodide
-  template_smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1[c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])]1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])]):1][a:2]'
+  template_smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1ccccc1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xccccc1I
 X-Triflate_Phe:
-  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1[c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])]1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])])]'
+  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1ccccc1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])])]'
   family: triflate
-  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1[c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])][c;!$([a3])]1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])]):1][a:2]'
+  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[c;$(c1ccccc1)]);$(*[c;$(c1ccccc1)]);!$([$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)])])]):1][a:2]'
   modification_type: clip
   example: c1cXcccc1OS(=O)(=O)C(F)(F)F
 X-Fluoride_Het6:
-  smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])])]'
+  smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(a1aaaaa1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])])]'
   family: fluoride
-  template_smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])]):1][a:2]'
+  template_smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(a1aaaaa1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xcnccc1F
 X-Chloride_Het6:
-  smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])])]'
+  smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(a1aaaaa1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])]):1][a:2]'
+  template_smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(a1aaaaa1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xcnccc1Cl
 X-Bromide_Het6:
-  smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])])]'
+  smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(a1aaaaa1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])])]'
   family: bromide
-  template_smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])]):1][a:2]'
+  template_smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(a1aaaaa1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xcnccc1Br
 X-Iodide_Het6:
-  smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])])]'
+  smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(a1aaaaa1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])])]'
   family: iodide
-  template_smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])]):1][a:2]'
+  template_smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(a1aaaaa1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xcnccc1I
 X-Triflate_Het6:
-  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])])]'
+  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(a1aaaaa1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])])]'
   family: triflate
-  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])]):1][a:2]'
+  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaaa1)]);$(*[a;$(a1aaaaa1)]);!$([$(*[c;$(c1ccccc1)]),$(*[a;$(a1a2a(aaa2)aaa1)]),$(*[a;$(a1aaa2a(aaa2)a1)]),$(*[c;$(c1ccc2c(aaa2)c1)]),$(*[$(c1cc2c(cccc2)cc1)]),$(*[$(c(ccc2)c1c2cccc1)]),$(*[$(a1ac2c(cccc2)aa1)]),$(*[$(a(aaa2)c1c2cccc1)]),$(*[$(c1cc2c(aaaa2)cc1)]),$(*[$(c(ccc2)c1c2aaaa1)]),$(*[$(a(aaa2)a1a2aaaa1)]),$(*[$(a1aa2a(aaaa2)aa1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xcnccc1OS(=O)(=O)C(F)(F)F
 X-Fluoride_Het5:
-  smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])])]'
+  smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(a1aaaa1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])])]'
   family: fluoride
-  template_smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])]):1][a:2]'
+  template_smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(a1aaaa1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xcocc1F
 X-Chloride_Het5:
-  smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])])]'
+  smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(a1aaaa1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])]):1][a:2]'
+  template_smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(a1aaaa1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xcocc1Cl
 X-Bromide_Het5:
-  smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])])]'
+  smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(a1aaaa1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])])]'
   family: bromide
-  template_smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])]):1][a:2]'
+  template_smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(a1aaaa1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xcocc1Br
 X-Iodide_Het5:
-  smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])])]'
+  smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(a1aaaa1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])])]'
   family: iodide
-  template_smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])]):1][a:2]'
+  template_smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(a1aaaa1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xcocc1I
 X-Triflate_Het5:
-  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])])]'
+  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(a1aaaa1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])])]'
   family: triflate
-  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(*1[*;!$([a3])][*;!$([a3])][*;!$([a3])][*;!$([a3])]1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])]):1][a:2]'
+  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[a;$(a1aaaa1)]);$(*[a;$(a1aaaa1)]);!$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]),$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)]),$(*[$(a1aa(aaa2)a2a1)]),$(*[$(a1a(aaa2)a2aa1)])])]):1][a:2]'
   modification_type: clip
   example: c1Xcocc1OS(=O)(=O)C(F)(F)F
 X-Fluoride_Het6Het5:
@@ -403,63 +403,63 @@ X-Triflate_PheHet5:
   modification_type: clip
   example: c1Xcc2cocc2cc1OS(=O)(=O)C(F)(F)F
 X-Fluoride_Het5Het6:
-  smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])])]'
+  smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])])]'
   family: fluoride
-  template_smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])]):1][a:2]'
+  template_smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])]):1][a:2]'
   modification_type: clip
   example: cX1c2cnccc2oc1F
 X-Chloride_Het5Het6:
-  smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])])]'
+  smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])]):1][a:2]'
+  template_smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])]):1][a:2]'
   modification_type: clip
   example: cX1c2cnccc2oc1Cl
 X-Bromide_Het5Het6:
-  smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])])]'
+  smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])])]'
   family: bromide
-  template_smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])]):1][a:2]'
+  template_smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])]):1][a:2]'
   modification_type: clip
   example: cX1c2cnccc2oc1Br
 X-Iodide_Het5Het6:
-  smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])])]'
+  smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])])]'
   family: iodide
-  template_smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])]):1][a:2]'
+  template_smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])]):1][a:2]'
   modification_type: clip
   example: cX1c2cnccc2oc1I
 X-Triflate_Het5Het6:
-  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])])]'
+  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])])]'
   family: triflate
-  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])]):1][a:2]'
+  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)a1a2aaaa1)]),$(*[$(a2aa1a(a2)aaaa1)]);!$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])]):1][a:2]'
   modification_type: clip
   example: cX1c2cnccc2oc1OS(=O)(=O)C(F)(F)F
 X-Fluoride_Het5Phe:
-  smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])]'
+  smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])]'
   family: fluoride
-  template_smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])]):1][a:2]'
+  template_smarts: '[F;$([F][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])]):1][a:2]'
   modification_type: clip
   example: cX1c2ccccc2oc1F
 X-Chloride_Het5Phe:
-  smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])]'
+  smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])]):1][a:2]'
+  template_smarts: '[Cl;$([Cl][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])]):1][a:2]'
   modification_type: clip
   example: cX1c2ccccc2oc1Cl
 X-Bromide_Het5Phe:
-  smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])]'
+  smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])]'
   family: bromide
-  template_smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])]):1][a:2]'
+  template_smarts: '[Br;$([Br][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])]):1][a:2]'
   modification_type: clip
   example: cX1c2ccccc2oc1Br
 X-Iodide_Het5Phe:
-  smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])]'
+  smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])]'
   family: iodide
-  template_smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])]):1][a:2]'
+  template_smarts: '[I;$([I][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])]):1][a:2]'
   modification_type: clip
   example: cX1c2ccccc2oc1I
 X-Triflate_Het5Phe:
-  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])])]'
+  smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])])]'
   family: triflate
-  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[$(*(aa2)c1c2cccc1)]),$(*[$(*2ac1c(a2)cccc1)])]):1][a:2]'
+  template_smarts: '[O;$(OS(=O)(=O)C(F)(F)F);$([O;$(OS(=O)(=O)C(F)(F)F)][*;$([#6]);!$(*=*)]);$([$(*[$(a(aa2)c1c2cccc1)]),$(*[$(a2ac1c(a2)cccc1)])]):1][a:2]'
   modification_type: clip
   example: cX1c2ccccc2oc1OS(=O)(=O)C(F)(F)F
 X-Fluoride_Het5Het5:
@@ -673,182 +673,182 @@ NitrogenTriflateAcyclic:
   modification_type: label
   example: CXCCN(OS(=O)(=O)C(F)(F)F)CC
 Sulfonyl-Fluoride_Aliphatic:
-  smarts: '[F;$([F][S;D4](=O)(=O));$([!$(**a)])]'
+  smarts: '[F;$([F][S;D4](=O)(=O));$([!$(*-,:*-,:a)])]'
   family: fluoride
-  template_smarts: '[F;$([F][S;D4](=O)(=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[F;$([F][S;D4](=O)(=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=O)(=O)F
 Sulfonyl-Chloride_Aliphatic:
-  smarts: '[Cl;$([Cl][S;D4](=O)(=O));$([!$(**a)])]'
+  smarts: '[Cl;$([Cl][S;D4](=O)(=O));$([!$(*-,:*-,:a)])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][S;D4](=O)(=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[Cl;$([Cl][S;D4](=O)(=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=O)(=O)Cl
 Sulfonyl-Bromide_Aliphatic:
-  smarts: '[Br;$([Br][S;D4](=O)(=O));$([!$(**a)])]'
+  smarts: '[Br;$([Br][S;D4](=O)(=O));$([!$(*-,:*-,:a)])]'
   family: bromide
-  template_smarts: '[Br;$([Br][S;D4](=O)(=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[Br;$([Br][S;D4](=O)(=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=O)(=O)Br
 Sulfonyl-Iodide_Aliphatic:
-  smarts: '[I;$([I][S;D4](=O)(=O));$([!$(**a)])]'
+  smarts: '[I;$([I][S;D4](=O)(=O));$([!$(*-,:*-,:a)])]'
   family: iodide
-  template_smarts: '[I;$([I][S;D4](=O)(=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[I;$([I][S;D4](=O)(=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=O)(=O)I
 Sulfonyl-Triflate_Aliphatic:
-  smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)S(=O)(=O));$([O;$(OS(=O)(=O)C(F)(F)F);!$(OC(#,=*));!$(O[C;D2][C;D3](=[O,S]));!$(O[C;D2][C;D3](=[O,S]));!$(O[S;D3](=O));!$(O[S;D4](=N)(=O))][S;D4](=O)(=O));$([!$(**a)])]'
+  smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)S(=O)(=O));$([O;$(OS(=O)(=O)C(F)(F)F);!$(OC(#,=*));!$(O[C;D2][C;D3](=[O,S]));!$(O[C;D2][C;D3](=[O,S]));!$(O[S;D3](=O));!$(O[S;D4](=N)(=O))][S;D4](=O)(=O));$([!$(*-,:*-,:a)])]'
   family: triflate
-  template_smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)S(=O)(=O));$([O;$(OS(=O)(=O)C(F)(F)F);!$(OC(#,=*));!$(O[C;D2][C;D3](=[O,S]));!$(O[C;D2][C;D3](=[O,S]));!$(O[S;D3](=O));!$(O[S;D4](=N)(=O))][S;D4](=O)(=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)S(=O)(=O));$([O;$(OS(=O)(=O)C(F)(F)F);!$(OC(#,=*));!$(O[C;D2][C;D3](=[O,S]));!$(O[C;D2][C;D3](=[O,S]));!$(O[S;D3](=O));!$(O[S;D4](=N)(=O))][S;D4](=O)(=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=O)(=O)OS(=O)(=O)C(F)(F)F
 Sulfonyl-Fluoride_Aromatic:
-  smarts: '[F;$([F][S;D4](=O)(=O));$([$(**a)])]'
+  smarts: '[F;$([F][S;D4](=O)(=O));$([$(*-,:*-,:a)])]'
   family: fluoride
-  template_smarts: '[F;$([F][S;D4](=O)(=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[F;$([F][S;D4](=O)(=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=O)(=O)F
 Sulfonyl-Chloride_Aromatic:
-  smarts: '[Cl;$([Cl][S;D4](=O)(=O));$([$(**a)])]'
+  smarts: '[Cl;$([Cl][S;D4](=O)(=O));$([$(*-,:*-,:a)])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][S;D4](=O)(=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[Cl;$([Cl][S;D4](=O)(=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=O)(=O)Cl
 Sulfonyl-Bromide_Aromatic:
-  smarts: '[Br;$([Br][S;D4](=O)(=O));$([$(**a)])]'
+  smarts: '[Br;$([Br][S;D4](=O)(=O));$([$(*-,:*-,:a)])]'
   family: bromide
-  template_smarts: '[Br;$([Br][S;D4](=O)(=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[Br;$([Br][S;D4](=O)(=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=O)(=O)Br
 Sulfonyl-Iodide_Aromatic:
-  smarts: '[I;$([I][S;D4](=O)(=O));$([$(**a)])]'
+  smarts: '[I;$([I][S;D4](=O)(=O));$([$(*-,:*-,:a)])]'
   family: iodide
-  template_smarts: '[I;$([I][S;D4](=O)(=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[I;$([I][S;D4](=O)(=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=O)(=O)I
 Sulfonyl-Triflate_Aromatic:
-  smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)S(=O)(=O));$([O;$(OS(=O)(=O)C(F)(F)F);!$(OC(=*));!$(O[C;D2][C;D3](=[O,S]));!$(O[S;D3](=O));!$(O[S;D4](=N)(=O))][S;D4](=O)(=O));$([$(**a)])]'
+  smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)S(=O)(=O));$([O;$(OS(=O)(=O)C(F)(F)F);!$(OC(=*));!$(O[C;D2][C;D3](=[O,S]));!$(O[S;D3](=O));!$(O[S;D4](=N)(=O))][S;D4](=O)(=O));$([$(*-,:*-,:a)])]'
   family: triflate
-  template_smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)S(=O)(=O));$([O;$(OS(=O)(=O)C(F)(F)F);!$(OC(=*));!$(O[C;D2][C;D3](=[O,S]));!$(O[S;D3](=O));!$(O[S;D4](=N)(=O))][S;D4](=O)(=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)S(=O)(=O));$([O;$(OS(=O)(=O)C(F)(F)F);!$(OC(=*));!$(O[C;D2][C;D3](=[O,S]));!$(O[S;D3](=O));!$(O[S;D4](=N)(=O))][S;D4](=O)(=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=O)(=O)OS(=O)(=O)C(F)(F)F
 Sulfinyl-Fluoride_Aliphatic:
-  smarts: '[F;$([F][S;D3](=O));$([!$(**a)])]'
+  smarts: '[F;$([F][S;D3](=O));$([!$(*-,:*-,:a)])]'
   family: fluoride
-  template_smarts: '[F;$([F][S;D3](=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[F;$([F][S;D3](=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=O)F
 Sulfinyl-Chloride_Aliphatic:
-  smarts: '[Cl;$([Cl][S;D3](=O));$([!$(**a)])]'
+  smarts: '[Cl;$([Cl][S;D3](=O));$([!$(*-,:*-,:a)])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][S;D3](=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[Cl;$([Cl][S;D3](=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=O)Cl
 Sulfinyl-Bromide_Aliphatic:
-  smarts: '[Br;$([Br][S;D3](=O));$([!$(**a)])]'
+  smarts: '[Br;$([Br][S;D3](=O));$([!$(*-,:*-,:a)])]'
   family: bromide
-  template_smarts: '[Br;$([Br][S;D3](=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[Br;$([Br][S;D3](=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=O)Br
 Sulfinyl-Iodide_Aliphatic:
-  smarts: '[I;$([I][S;D3](=O));$([!$(**a)])]'
+  smarts: '[I;$([I][S;D3](=O));$([!$(*-,:*-,:a)])]'
   family: iodide
-  template_smarts: '[I;$([I][S;D3](=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[I;$([I][S;D3](=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=O)I
 Sulfinyl-Triflate_Aliphatic:
-  smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D3](=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D3](=O));$([!$(**a)])]'
+  smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D3](=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D3](=O));$([!$(*-,:*-,:a)])]'
   family: triflate
-  template_smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D3](=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D3](=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D3](=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D3](=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=O)OS(=O)(=O)C(F)(F)F
 Sulfinyl-Fluoride_Aromatic:
-  smarts: '[F;$([F][S;D3](=O));$([$(**a)])]'
+  smarts: '[F;$([F][S;D3](=O));$([$(*-,:*-,:a)])]'
   family: fluoride
-  template_smarts: '[F;$([F][S;D3](=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[F;$([F][S;D3](=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=O)F
 Sulfinyl-Chloride_Aromatic:
-  smarts: '[Cl;$([Cl][S;D3](=O));$([$(**a)])]'
+  smarts: '[Cl;$([Cl][S;D3](=O));$([$(*-,:*-,:a)])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][S;D3](=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[Cl;$([Cl][S;D3](=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=O)Cl
 Sulfinyl-Bromide_Aromatic:
-  smarts: '[Br;$([Br][S;D3](=O));$([$(**a)])]'
+  smarts: '[Br;$([Br][S;D3](=O));$([$(*-,:*-,:a)])]'
   family: bromide
-  template_smarts: '[Br;$([Br][S;D3](=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[Br;$([Br][S;D3](=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=O)Br
 Sulfinyl-Iodide_Aromatic:
-  smarts: '[I;$([I][S;D3](=O));$([$(**a)])]'
+  smarts: '[I;$([I][S;D3](=O));$([$(*-,:*-,:a)])]'
   family: iodide
-  template_smarts: '[I;$([I][S;D3](=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[I;$([I][S;D3](=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=O)I
 Sulfinyl-Triflate_Aromatic:
-  smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D3](=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D3](=O));$([$(**a)])]'
+  smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D3](=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D3](=O));$([$(*-,:*-,:a)])]'
   family: triflate
-  template_smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D3](=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D3](=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D3](=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D3](=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=O)OS(=O)(=O)C(F)(F)F
 SulfonylImine-Fluoride_Aliphatic:
-  smarts: '[F;$([F][S;D4](=N)(=O));$([!$(**a)])]'
+  smarts: '[F;$([F][S;D4](=N)(=O));$([!$(*-,:*-,:a)])]'
   family: fluoride
-  template_smarts: '[F;$([F][S;D4](=N)(=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[F;$([F][S;D4](=N)(=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=N)(=O)F
 SulfonylImine-Chloride_Aliphatic:
-  smarts: '[Cl;$([Cl][S;D4](=N)(=O));$([!$(**a)])]'
+  smarts: '[Cl;$([Cl][S;D4](=N)(=O));$([!$(*-,:*-,:a)])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][S;D4](=N)(=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[Cl;$([Cl][S;D4](=N)(=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=N)(=O)Cl
 SulfonylImine-Bromide_Aliphatic:
-  smarts: '[Br;$([Br][S;D4](=N)(=O));$([!$(**a)])]'
+  smarts: '[Br;$([Br][S;D4](=N)(=O));$([!$(*-,:*-,:a)])]'
   family: bromide
-  template_smarts: '[Br;$([Br][S;D4](=N)(=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[Br;$([Br][S;D4](=N)(=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=N)(=O)Br
 SulfonylImine-Iodide_Aliphatic:
-  smarts: '[I;$([I][S;D4](=N)(=O));$([!$(**a)])]'
+  smarts: '[I;$([I][S;D4](=N)(=O));$([!$(*-,:*-,:a)])]'
   family: iodide
-  template_smarts: '[I;$([I][S;D4](=N)(=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[I;$([I][S;D4](=N)(=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=N)(=O)I
 SulfonylImine-Triflate_Aliphatic:
-  smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D4](=N)(=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D4](=N)(=O));$([!$(**a)])]'
+  smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D4](=N)(=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D4](=N)(=O));$([!$(*-,:*-,:a)])]'
   family: triflate
-  template_smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D4](=N)(=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D4](=N)(=O));$([!$(**a)]):1][*:2]'
+  template_smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D4](=N)(=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D4](=N)(=O));$([!$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXCS(=N)(=O)OS(=O)(=O)C(F)(F)F
 SulfonylImine-Fluoride_Aromatic:
-  smarts: '[F;$([F][S;D4](=N)(=O));$([$(**a)])]'
+  smarts: '[F;$([F][S;D4](=N)(=O));$([$(*-,:*-,:a)])]'
   family: fluoride
-  template_smarts: '[F;$([F][S;D4](=N)(=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[F;$([F][S;D4](=N)(=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=N)(=O)F
 SulfonylImine-Chloride_Aromatic:
-  smarts: '[Cl;$([Cl][S;D4](=N)(=O));$([$(**a)])]'
+  smarts: '[Cl;$([Cl][S;D4](=N)(=O));$([$(*-,:*-,:a)])]'
   family: chloride
-  template_smarts: '[Cl;$([Cl][S;D4](=N)(=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[Cl;$([Cl][S;D4](=N)(=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=N)(=O)Cl
 SulfonylImine-Bromide_Aromatic:
-  smarts: '[Br;$([Br][S;D4](=N)(=O));$([$(**a)])]'
+  smarts: '[Br;$([Br][S;D4](=N)(=O));$([$(*-,:*-,:a)])]'
   family: bromide
-  template_smarts: '[Br;$([Br][S;D4](=N)(=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[Br;$([Br][S;D4](=N)(=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=N)(=O)Br
 SulfonylImine-Iodide_Aromatic:
-  smarts: '[I;$([I][S;D4](=N)(=O));$([$(**a)])]'
+  smarts: '[I;$([I][S;D4](=N)(=O));$([$(*-,:*-,:a)])]'
   family: iodide
-  template_smarts: '[I;$([I][S;D4](=N)(=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[I;$([I][S;D4](=N)(=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=N)(=O)I
 SulfonylImine-Triflate_Aromatic:
-  smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D4](=N)(=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D4](=N)(=O));$([$(**a)])]'
+  smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D4](=N)(=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D4](=N)(=O));$([$(*-,:*-,:a)])]'
   family: triflate
-  template_smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D4](=N)(=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D4](=N)(=O));$([$(**a)]):1][*:2]'
+  template_smarts: '[O;$(O(S(=O)(=O)C(F)(F)F)[S;D4](=N)(=O));$([O;$(OS(=O)(=O)C(F)(F)F)][S;D4](=N)(=O));$([$(*-,:*-,:a)]):1][*:2]'
   modification_type: clip
   example: CXc1ccccc1S(=N)(=O)OS(=O)(=O)C(F)(F)F

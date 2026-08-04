@@ -1,7 +1,8 @@
 """Tests for the functional group and halogen detection modules."""
 
 import pytest
-from chython import smiles
+import yaml
+from chython import smarts, smiles
 from pydantic import ValidationError
 
 from synplan.chem.reaction.routes.quality.protection.config import ProtectionConfig
@@ -191,6 +192,28 @@ def test_clear_cache(detector):
     result2 = detector.detect_all(mol)
     assert result1 is not result2  # new object after cache clear
     assert len(result1) == len(result2)
+
+
+def test_every_shipped_pattern_matches_its_own_example():
+    """Each SMARTS in the two data files must match the example bundled with it.
+
+    The examples come from the source dataset and mark the reactive site with a
+    literal ``X``. A pattern that stops matching its own example has been
+    silently narrowed by a chython SMARTS-dialect change.
+    """
+    cfg = ProtectionConfig()
+    entries = []
+    for lst in yaml.safe_load(open(cfg.competing_groups_path)).values():
+        entries += [(e["name"], e["smarts"], e["example"]) for e in lst]
+    for name, e in yaml.safe_load(open(cfg.halogen_groups_path)).items():
+        entries.append((name, e["smarts"], e["example"]))
+
+    missed = [
+        name
+        for name, pattern, example in entries
+        if not next(smarts(pattern).get_mapping(smiles(example.replace("X", ""))), None)
+    ]
+    assert not missed, f"patterns that no longer match their own example: {missed}"
 
 
 # --- HalogenDetector tests ---
