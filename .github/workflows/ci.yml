@@ -68,6 +68,26 @@ jobs:
           path: coverage.xml
           if-no-files-found: warn
 
+  # Preserve the check names expected by existing repository or organization
+  # rules. Each compatibility check represents the complete OS/Python matrix.
+  required-tests:
+    name: "Unit‑tests (Python ${{ matrix.python-version }})"
+    needs: tests
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - name: Confirm full test matrix passed
+        env:
+          TEST_MATRIX_RESULT: ${{ needs.tests.result }}
+        run: |
+          if [ "$TEST_MATRIX_RESULT" != "success" ]; then
+            echo "::error::Full test matrix result: $TEST_MATRIX_RESULT"
+            exit 1
+          fi
+
   lint:
     name: "Lint & typecheck"
     runs-on: ubuntu-latest
