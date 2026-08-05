@@ -23,11 +23,11 @@ from synplan.chem.data.reaction_result import (
     ExtractionBatchResult,
 )
 from synplan.chem.data.standardizing import RemoveReagentsStandardizer
+from synplan.chem.molecule.standardization import unite_molecules
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.utils import (
     canonical_query_cgr_key,
     reverse_reaction,
-    unite_molecules,
 )
 from synplan.utils.config import RuleExtractionConfig
 from synplan.utils.files import (

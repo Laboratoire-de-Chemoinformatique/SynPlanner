@@ -11,6 +11,7 @@ import streamlit as st
 from huggingface_hub.utils import disable_progress_bars
 from streamlit_ketcher import st_ketcher
 
+from synplan.chem.molecule.standardization import mol_from_smiles
 from synplan.chem.reaction.routes.clustering import (
     cluster_routes,
     group_by_identical_values,
@@ -28,7 +29,6 @@ from synplan.chem.reaction.routes.representation.depiction import (
     cgr_display,
     depict_custom_reaction,
 )
-from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.search import extract_tree_stats
 from synplan.mcts.tree import Tree
 from synplan.utils.config import TreeConfig

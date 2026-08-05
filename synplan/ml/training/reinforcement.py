@@ -14,7 +14,7 @@ from torch.utils.data import random_split
 from torch_geometric.data.lightning import LightningDataset
 from tqdm.auto import tqdm
 
-from synplan.chem.precursor import compose_precursors
+from synplan.chem.molecule.precursor import compose_precursors
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.mcts.tree import Tree
 from synplan.ml.networks.value import ValueNetwork

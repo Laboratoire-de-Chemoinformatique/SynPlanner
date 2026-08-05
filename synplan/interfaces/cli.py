@@ -12,9 +12,9 @@ from synplan.chem.data.standardizing import (
     ReactionStandardizationConfig,
     standardize_reactions_from_file,
 )
+from synplan.chem.molecule.io import standardize_building_blocks
 from synplan.chem.reaction.routes.cli import run_cluster_cli
 from synplan.chem.reaction.rules.extraction import extract_rules_from_reactions
-from synplan.chem.utils import standardize_building_blocks
 from synplan.mcts.search import run_search
 from synplan.ml.training.reinforcement import run_updating
 from synplan.ml.training.supervised import (

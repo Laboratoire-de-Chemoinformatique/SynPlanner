@@ -9,11 +9,11 @@ from argparse import ArgumentParser
 from pathlib import Path
 from typing import Any
 
+from synplan.chem.molecule.standardization import mol_from_smiles
 from synplan.chem.reaction.routes.representation import (
     compose_route_cgr,
     routes_dict_from_route_cgrs,
 )
-from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.tree import Tree
 from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import (

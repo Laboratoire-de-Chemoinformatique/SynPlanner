@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from synplan.mcts.policy.base import Policy
 
 if TYPE_CHECKING:
-    from synplan.chem.precursor import Precursor
+    from synplan.chem.molecule.precursor import Precursor
     from synplan.chem.reaction import CanonicalRetroReactor
 
 

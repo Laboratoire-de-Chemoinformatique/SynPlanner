@@ -28,7 +28,7 @@ from synplan.chem.data.reaction_result import (
     ErrorEntry,
     PipelineSummary,
 )
-from synplan.chem.utils import unite_molecules
+from synplan.chem.molecule.standardization import unite_molecules
 from synplan.utils.config import BaseConfigModel, NestedConfigContainer
 from synplan.utils.files import (
     RawReactionReader,

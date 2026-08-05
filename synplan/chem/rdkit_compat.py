@@ -11,8 +11,11 @@ from collections.abc import Iterable
 
 from chython.containers import MoleculeContainer
 
+from synplan.chem.molecule.standardization import (
+    _clean_molecule,
+    safe_canonicalization,
+)
 from synplan.chem.reaction.routes.traversal import iter_route_steps
-from synplan.chem.utils import _clean_molecule, safe_canonicalization
 
 
 def target_from_rdkit(

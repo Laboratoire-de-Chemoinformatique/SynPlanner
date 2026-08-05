@@ -8,7 +8,7 @@ from typing import Any
 
 from chython import smiles as chython_smiles
 
-from synplan.chem.utils import mol_from_smiles
+from synplan.chem.molecule.standardization import mol_from_smiles
 
 
 def top_bb_usage_rows(

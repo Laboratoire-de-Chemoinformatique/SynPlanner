@@ -10,7 +10,7 @@ from time import time
 from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
-from synplan.chem.precursor import Precursor
+from synplan.chem.molecule.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
 from synplan.chem.reaction.routes.quality.scorer import RouteScorer
 from synplan.chem.reaction.routes.traversal import (

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import torch
 
-    from synplan.chem.precursor import Precursor
+    from synplan.chem.molecule.precursor import Precursor
     from synplan.chem.reaction import CanonicalRetroReactor
 
 

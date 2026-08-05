@@ -14,6 +14,7 @@ from rdkit import Chem
 from tqdm.auto import tqdm
 
 from synplan import __version__
+from synplan.chem.molecule.standardization import mol_from_smiles
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.routes.io import (
     make_json,
@@ -22,7 +23,6 @@ from synplan.chem.reaction.routes.io import (
 )
 from synplan.chem.reaction.routes.quality.scorer import RouteScorer
 from synplan.chem.reaction.routes.representation import extract_reactions
-from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.tree import Tree, TreeConfig
 from synplan.utils.config import CombinedPolicyConfig, PolicyNetworkConfig
 from synplan.utils.files import iter_csv_smiles, iter_smiles_records
