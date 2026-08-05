@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-08-05
+
 ### Added
 
 - Added `synplan.chem.molecule` as the canonical package for molecule-domain
