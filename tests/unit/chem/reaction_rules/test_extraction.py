@@ -195,12 +195,19 @@ def test_process_extraction_result_uses_worker_serialized_rule(monkeypatch):
         n_multi_product=0,
     )
     rules_statistics = defaultdict(list)
+    eligible_rules_statistics = defaultdict(list)
     cgr_to_rule = {}
 
-    count = process_extraction_result(result, rules_statistics, cgr_to_rule)
+    count = process_extraction_result(
+        result,
+        rules_statistics,
+        eligible_rules_statistics,
+        cgr_to_rule,
+    )
 
     assert count == 1
     assert rules_statistics["stable-cgr"] == [7]
+    assert eligible_rules_statistics["stable-cgr"] == [7]
     assert cgr_to_rule["stable-cgr"].rule_smarts == "[C:1]>>[O:1]"
 
 

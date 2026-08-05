@@ -88,6 +88,7 @@ class ExtractedRuleRecord:
     cgr_key: str
     rule_smarts: str
     reactor_validation: str | None = None
+    source_is_multicenter: bool = False
 
 
 @dataclass
