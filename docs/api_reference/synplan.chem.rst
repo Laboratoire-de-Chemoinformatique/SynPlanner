@@ -17,6 +17,13 @@ Submodules
 synplan.chem.molecule package
 -----------------------------
 
+For downstream applications and documentation, prefer package-level imports
+such as ``from synplan.chem.molecule import Precursor, mol_from_smiles``. Within
+SynPlanner, import from the focused ``molecule.precursor``,
+``molecule.standardization``, and ``molecule.io`` modules so ownership and
+dependency boundaries remain explicit. The historical ``synplan.chem.precursor``
+and ``synplan.chem.utils`` imports remain supported for v1.6 compatibility.
+
 .. automodule:: synplan.chem.molecule
    :members:
    :undoc-members:

@@ -20,9 +20,13 @@ setup, then ..." rather than repeat it.
 | `load_building_blocks`, `load_reaction_rules`, `load_policy_function` | `synplan.utils.loading` |
 | `TreeConfig`, `RolloutEvaluationConfig` | `synplan.utils.config` |
 | `load_evaluation_function` | `synplan.utils.loading` |
-| `mol_from_smiles` | `synplan.chem.utils` |
+| `mol_from_smiles` | `synplan.chem.molecule` |
 | `ProtectionRouteScorer.from_config()` | `synplan.chem.reaction.routes.quality.scorer` |
 | `Tree` | `synplan.mcts.tree` |
+
+Use `synplan.chem.molecule` for new molecule-domain imports. The historical
+`synplan.chem.utils` and `synplan.chem.precursor` locations remain supported as
+v1.6 compatibility paths.
 
 `download_preset` returns a dict with keys `building_blocks`, `reaction_rules`,
 `ranking_policy`. **`tree.run()` runs the search** and returns the tree; a `Tree`
@@ -116,7 +120,7 @@ Docs: `methods/priority_rules` — read the SMARTS dialect note before writing a
 
 **Combine ranking and filtering policies**
 `load_combined_policy_function` (`synplan.utils.loading`) applied to a
-`Precursor` (`synplan.chem.precursor`).
+`Precursor` (`synplan.chem.molecule`).
 Tutorial: `09_Combined_Ranking_Filtering_Policy`
 Docs: `methods/policy`, `configuration/planning`
 
