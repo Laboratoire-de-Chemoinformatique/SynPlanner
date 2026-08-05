@@ -1,24 +1,28 @@
 """Module containing additional functions needed in different reaction data processing
 protocols."""
 
-import logging
 import re
 import warnings
-from collections.abc import Iterable
-from io import StringIO
 from typing import Literal
 
-from chython import smiles as smiles_parser
 from chython.containers import (
     MoleculeContainer,
     ReactionContainer,
 )
 from chython.exceptions import InvalidAromaticRing, MappingError
 from chython.files.daylight.tokenize import smarts_tokenize
-from chython.files.SDFrw import SDFRead
-from tqdm.auto import tqdm
 
-from synplan.utils.files import MoleculeReader, MoleculeWriter
+from synplan.chem.molecule import io as _molecule_io
+from synplan.chem.molecule import standardization as _molecule_standardization
+
+# v1.6 compatibility aliases; canonical imports live in synplan.chem.molecule.
+standardize_building_blocks = _molecule_io.standardize_building_blocks
+standardize_sdf_text = _molecule_io.standardize_sdf_text
+standardize_smiles_batch = _molecule_io.standardize_smiles_batch
+_clean_molecule = _molecule_standardization._clean_molecule
+mol_from_smiles = _molecule_standardization.mol_from_smiles
+safe_canonicalization = _molecule_standardization.safe_canonicalization
+unite_molecules = _molecule_standardization.unite_molecules
 
 ReactionMappingStatus = Literal["fully_mapped", "partially_mapped", "unmapped"]
 AtomMappingCheck = Literal["off", "reject_unmapped", "reject_partial"]
@@ -205,97 +209,6 @@ def assert_reaction_atom_mapped(
         warnings.warn(message, stacklevel=2)
 
 
-def _clean_molecule(
-    molecule: MoleculeContainer,
-    *,
-    standardize: bool = True,
-    clean_stereo: bool = True,
-    clean2d: bool = True,
-) -> MoleculeContainer:
-    """Clean a Chython molecule on a copy while preserving failure semantics."""
-
-    tmp = molecule.copy()
-    try:
-        tmp.remove_coordinate_bonds(keep_to_terminal=False)
-        if standardize:
-            tmp.canonicalize()
-        if clean_stereo:
-            tmp.clean_stereo()
-        if clean2d:
-            tmp.clean2d()
-        return tmp
-    except InvalidAromaticRing:
-        logging.warning(
-            "chython was not able to standardize molecule due to invalid aromatic ring"
-        )
-        return molecule
-
-
-def mol_from_smiles(
-    smiles: str,
-    standardize: bool = True,
-    clean_stereo: bool = True,
-    clean2d: bool = True,
-) -> MoleculeContainer:
-    """Converts a SMILES string to a `MoleculeContainer` object and optionally
-    standardizes, cleans stereochemistry, and cleans 2D coordinates.
-
-    :param smiles: The SMILES string representing the molecule.
-    :param standardize: Whether to standardize the molecule (default is True).
-    :param clean_stereo: Whether to remove the stereo marks on atoms of the molecule (default is True).
-    :param clean2d: Whether to clean the 2D coordinates of the molecule (default is True).
-    :return: The processed molecule object.
-    :raises ValueError: If the SMILES string could not be processed by chython.
-    """
-    molecule = smiles_parser(smiles, ignore=True)
-
-    if not isinstance(molecule, MoleculeContainer):
-        raise ValueError("SMILES string was not processed by chython")
-
-    return _clean_molecule(
-        molecule,
-        standardize=standardize,
-        clean_stereo=clean_stereo,
-        clean2d=clean2d,
-    )
-
-
-def unite_molecules(molecules: Iterable[MoleculeContainer]) -> MoleculeContainer:
-    """Unites a list of MoleculeContainer objects into a single MoleculeContainer. This
-    function takes multiple molecules and combines them into one larger molecule. The
-    first molecule in the list is taken as the base, and subsequent molecules are united
-    with it sequentially.
-
-    :param molecules: A list of MoleculeContainer objects to be united.
-    :return: A single MoleculeContainer object representing the union of all input
-        molecules.
-    """
-    new_mol = MoleculeContainer()
-    for mol in molecules:
-        new_mol = new_mol.union(mol)
-    return new_mol
-
-
-def safe_canonicalization(molecule: MoleculeContainer) -> MoleculeContainer:
-    """Attempts to canonicalize a molecule, handling any exceptions. If the
-    canonicalization process fails due to an InvalidAromaticRing exception, it safely
-    returns the original molecule.
-
-    :param molecule: The given molecule to be canonicalized.
-    :return: The canonicalized molecule if successful, otherwise the original molecule.
-    """
-    molecule._atoms = dict(sorted(molecule._atoms.items()))
-
-    molecule_copy = molecule.copy()
-    try:
-        molecule_copy.remove_coordinate_bonds(keep_to_terminal=False)
-        molecule_copy.canonicalize()
-        molecule_copy.clean_stereo()
-        return molecule_copy
-    except InvalidAromaticRing:
-        return molecule
-
-
 def validate_and_canonicalize(
     molecule: MoleculeContainer,
 ) -> MoleculeContainer | None:
@@ -325,88 +238,6 @@ def validate_and_canonicalize(
         return tmp
     except InvalidAromaticRing:
         return None
-
-
-def standardize_building_blocks(input_file: str, output_file: str) -> str:
-    """Standardizes custom building blocks.
-
-    :param input_file: The path to the file that stores the original building blocks.
-    :param output_file: The path to the file that will store the standardized building
-        blocks.
-    :return: The path to the file with standardized building blocks.
-    """
-    if input_file == output_file:
-        raise ValueError("input_file name and output_file name cannot be the same.")
-
-    with (
-        MoleculeReader(input_file) as inp_file,
-        MoleculeWriter(output_file) as out_file,
-    ):
-        for mol in tqdm(
-            inp_file,
-            desc="Number of building blocks processed: ",
-            bar_format="{desc}{n} [{elapsed}]",
-        ):
-            try:
-                mol = safe_canonicalization(mol)
-            except Exception as e:
-                logging.debug(e)
-                continue
-            out_file.write(mol)
-
-    return output_file
-
-
-def _standardize_one_smiles(smiles_str: str) -> str | None:
-    try:
-        mol = smiles_parser(smiles_str, ignore=True)
-        mol = safe_canonicalization(mol)
-        return str(mol)
-    except Exception:
-        return None
-
-
-def _standardize_sdf_range(filename: str, start: int, end: int) -> list[str]:
-    out: list[str] = []
-    sdf = SDFRead(filename, indexable=True)
-    try:
-        for i in range(start, end):
-            try:
-                mol = sdf[i]
-                mol = safe_canonicalization(mol)
-                out.append(str(mol))
-            except Exception:
-                pass
-    finally:
-        sdf.close()
-    return out
-
-
-def standardize_sdf_text(block: str) -> list[str]:
-    """Standardize molecules from an SDF text block.
-
-    The block may contain one or multiple SDF records, separated by $$$$ lines.
-    """
-    out: list[str] = []
-    with StringIO(block) as fh, SDFRead(fh) as sdf:
-        for mol in sdf:
-            try:
-                mol = safe_canonicalization(mol)
-                out.append(str(mol))
-            except Exception:
-                # ignore malformed entries
-                pass
-    return out
-
-
-def standardize_smiles_batch(batch: list[str]) -> list[str]:
-    """Standardize a batch of SMILES strings and return valid results."""
-    out: list[str] = []
-    for smiles_str in batch:
-        res = _standardize_one_smiles(smiles_str)
-        if res:
-            out.append(res)
-    return out
 
 
 def hash_from_reaction_rule(reaction_rule: ReactionContainer) -> int:
