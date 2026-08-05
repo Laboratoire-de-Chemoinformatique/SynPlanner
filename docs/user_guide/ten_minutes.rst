@@ -108,7 +108,7 @@ The example below uses the ranking policy network and rollout evaluation. This i
         download_preset,
     )
     from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
-    from synplan.chem.utils import mol_from_smiles
+    from synplan.chem.molecule.standardization import mol_from_smiles
     from synplan.mcts.tree import Tree
 
     # Download preset data (skip if already downloaded)

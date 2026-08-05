@@ -14,8 +14,34 @@ Subpackages
 Submodules
 ----------
 
-synplan.chem.precursor module
+synplan.chem.molecule package
 -----------------------------
+
+.. automodule:: synplan.chem.molecule
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Molecule submodules
+~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: synplan.chem.molecule.standardization
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: synplan.chem.molecule.io
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: synplan.chem.molecule.precursor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+synplan.chem.precursor compatibility module
+-------------------------------------------
 
 .. automodule:: synplan.chem.precursor
    :members:

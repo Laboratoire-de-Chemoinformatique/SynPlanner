@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Added `synplan.chem.molecule` as the canonical package for molecule-domain
+  APIs, with focused `precursor`, `standardization`, and `io` modules.
+- Exposed `Precursor`, `compose_precursors`, SMILES parsing and canonicalization
+  helpers, molecule union, and building-block file standardization from the new
+  package.
+
+### Changed
+
+- Migrated MCTS, policy, reinforcement-training, reaction-processing, GUI, CLI,
+  RDKit compatibility, route tooling, and data-loading callers to the canonical
+  molecule modules.
+- Kept `synplan.chem.precursor` and the molecule helpers previously exported by
+  `synplan.chem.utils` as lightweight compatibility aliases. Existing v1.6
+  imports continue to resolve to the same classes and functions, so this package
+  reorganization does not require downstream code changes.
+
 ## [1.6.0] - 2026-08-03
 
 ### Added
