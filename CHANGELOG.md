@@ -5,6 +5,108 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- Removed the `cgr_connected_components_config` filter. It rejected any reaction
+  whose CGR was not a single connected component, which after reagent removal
+  and unchanged-part removal fires on 0.8% of standardized USPTO and uniquely on
+  0.1% — everything else it caught was already caught by `multi_center_config`
+  or `dynamic_bonds_config`. It is not in the shipped filtration config. Against
+  rebalanced reactions it is actively wrong: a dissociated leaving group such as
+  `[H+]` is an atom with no bonds, so it is always its own component, and the
+  filter rejected 98% of balanced reactions on that alone.
+
+- Removed the `compete_products_config` filter. It compared reagents against
+  products, so it only saw a competing product after atom mapping and reagent
+  removal had already chosen between them — and reagent removal discards the
+  loser outright, leaving the filter nothing to compare and returning False on
+  the records it exists for. `rebalance_reaction_config`'s
+  `drop_competing_products` replaces it, reading the imbalance instead and
+  needing no mapping.
+
+### Fixed
+
+- `rebalance_reaction_config` now runs after `remove_reagents_config` rather
+  than before it. Reagent removal moves spectators out of the reactants and
+  products, which unbalances whatever was balanced first: on 20,000 USPTO
+  records, balancing first left 13% of the balanced results still balanced by
+  the time they were written, against 95% when it runs second. Running second
+  also refuses far less — 485 records against 1,579 — because it works on an
+  equation the spectators have already been taken out of.
+
+- Rebalancing no longer caps an open bond with a halide on a carbon that
+  already holds two oxygens. That invented carbonate halides — `[O-]C([O-])I`,
+  `OC([O-])Cl` — which balance perfectly and do not exist. Carbonate and
+  bicarbonate are the two commonest reagents in USPTO, so it fired often. An
+  acyl halide has one oxygen on that carbon and is unaffected.
+
+- Rebalancing no longer leaves a reaction whose CGR cannot be composed. Imputed
+  species are parsed fresh, so they started at atom 1 and landed on top of the
+  reaction's own numbering; on mapped input every later standardization step
+  then failed with `elements should be of the same type`. Only the atoms that
+  clash are renumbered, so an imputed fragment keeps the reactant numbers that
+  say where it came from. Reagents count as part of the reactant side, which is
+  where `ReactionContainer.compose` puts them.
+
+- `split_ions_config` no longer fails on every ionic reaction. It read a
+  molecule's total charge off `MoleculeContainer._charges`, which
+  chython-synplan 1.101 does not have, so the step raised `AttributeError` on
+  any input carrying a charge.
+
+### Changed
+
+- `rebalance_reaction_config` now imputes the molecules a reaction is missing
+  rather than round-tripping it through a CGR. The old step could only
+  redistribute atoms the reaction already had, and only when the mapping was
+  good enough to build a CGR from; it never added anything, so it left every
+  genuinely unbalanced reaction unbalanced. It also runs earlier now, before
+  the steps that assume mapping.
+
+### Added
+
+- Added `synplan.chem.utils.strip_reaction_mapping`, which renumbers a reaction
+  the way chython numbers one that was never mapped. Reaching the same place
+  through `smiles(str(reaction))` costs a SMILES write and reparse.
+
+- Added `synplan.chem.data.rebalancing`, which adds the molecules an unbalanced
+  reaction is missing without needing atom mapping. Missing carbon is recovered
+  as a substructure of the reactants, located by matching Morgan environment
+  hash counts against the products instead of searching for a maximum common
+  subgraph, and the remaining deficit is covered from a table of small
+  molecules. Where the reaction is mapped, the CGR names the bonds that break,
+  so reagents it never touched are carried through whole instead of being cut
+  apart. Imputed species are rejected when an atom is left with an unsatisfied
+  valence, which is what distinguishes Mg(OH)Br from a bare `[Mg]Br`. Exposed as
+  the `rebalance_reaction_config` standardization step, whose `add_redox_agents`
+  option (off by default) names the oxidant behind a plain loss of hydrogen, a
+  reagent the record names leaves as its spent form rather than as whatever
+  covers the arithmetic (acetic anhydride as acetic acid, NBS as succinimide,
+  mCPBA as m-chlorobenzoic acid, and five more; reached only when the reagent
+  is in the record, so a reaction that never used one cannot pick it up),
+  species that cannot survive in a flask are broken into what they vent
+  (carbonic acid into CO2 and water, chlorosulfinic acid into SO2 and HCl),
+  `refuse_unsupported_redox` (off by default) refuses an answer that balances
+  with free hydrogen when the record names no reagent that could have moved it
+  — on USPTO that is 44% of answers, and three chemistry reviewers judged them
+  right one time in five —
+  `drop_competing_products` removes the products the reactants cannot have
+  made, and `use_mapping` (on by default) reads the bonds that break off the
+  CGR, worth ten points of accuracy on a hand-curated mapping and worth turning
+  off for machine mapping that is not trusted.
+  Ports the rest of SynRBL's rule sets: its functional-group table, the
+  phosphorus and diazo merge rules, the water- and alcohol-catalyst compound
+  rules, its banned by-products, and its fewest-fragments tie-break. Candidate
+  breaks are ranked by how much of the element deficit the resulting molecules
+  account for, and a reactant side short of carbon is solved by rebalancing the
+  reaction backwards. Every answer carries a `confidence` score in its metadata,
+  and `min_confidence` refuses the ones that fall below it: on SynRBL's
+  validation set it answers 98.8% of unbalanced reactions at 85% accuracy, and
+  `min_confidence` trades coverage for precision where that is wanted. Named
+  reagents are only invented where the chemistry asks for them: pyridinium
+  chlorochromate for an alcohol oxidation, a bare oxygen atom otherwise, and a
+  cross-coupling gives its halide to the boron, tin or silicon left holding the
+  open bond rather than as the acid.
+
 ## [1.6.0] - 2026-08-03
 
 ### Added

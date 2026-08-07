@@ -142,7 +142,7 @@ The current available reaction standardizers in ``SynPlanner``:
 - Unchanged parts validation (remove unchanged parts in reaction)
 - Hydrogen manipulation (remove hydrogen atoms)
 - Ions splitting (split ions in reaction when possible)
-- Reaction rebalancing (rebalancing reaction)
+- Reaction rebalancing (add the molecules an unbalanced reaction does not account for)
 - Duplicate reaction removal (remove duplicate reactions)
 
 Standardization order
