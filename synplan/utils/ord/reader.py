@@ -92,16 +92,22 @@ def _reaction_to_smiles(reaction) -> tuple[str | None, dict]:
                 if smi:
                     reactant_smiles.append(smi)
 
-    product_smiles = []
-    yields = []
-    for outcome in reaction.outcomes:
-        for prod in outcome.products:
-            smi = _get_smiles(prod.identifiers)
-            if smi:
-                product_smiles.append(smi)
-                y = _get_yield(prod.measurements)
-                if y is not None:
-                    yields.append(y)
+    # A screening record lists everything the plate was read for: the desired
+    # product, the isomers competing with it, and an internal standard. Only
+    # the first is a product of this equation, and the record says which it is.
+    products = [
+        (prod, _get_smiles(prod.identifiers))
+        for outcome in reaction.outcomes
+        for prod in outcome.products
+    ]
+    products = [(prod, smi) for prod, smi in products if smi]
+    if any(prod.is_desired_product for prod, _ in products):
+        products = [(prod, smi) for prod, smi in products if prod.is_desired_product]
+
+    product_smiles = [smi for _, smi in products]
+    yields = [
+        y for prod, _ in products if (y := _get_yield(prod.measurements)) is not None
+    ]
 
     if not reactant_smiles or not product_smiles:
         return None, {}
