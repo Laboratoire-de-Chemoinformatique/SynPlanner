@@ -37,6 +37,7 @@ from synplan.chem.utils import (
     is_reaction_atom_mapped,
     reaction_mapping_status,
     reaction_string_mapping_status,
+    strip_reaction_mapping,
 )
 
 # ---- Container API on SMILES-parsed reactions ------------------------------
@@ -183,3 +184,17 @@ def test_string_status_malformed_raises_value_error() -> None:
         reaction_string_mapping_status("not a reaction")
     with pytest.raises(ValueError, match="malformed reaction string"):
         reaction_string_mapping_status("a>b>c>d")
+
+
+def test_strip_reaction_mapping_matches_an_unmapped_parse() -> None:
+    """Stripping leaves the numbering chython gives a record that was never
+    mapped, which is the whole point: it is the cheap stand-in for writing the
+    SMILES out and reading it back."""
+    text = "[CH3:1][CH2:2][O:3][C:4](=[O:5])[CH3:6].[OH2:7]>>[OH:3][C:4](=[O:5])[CH3:6]"
+    stripped = strip_reaction_mapping(read_smiles(text))
+    reparsed = read_smiles(str(read_smiles(text)))
+
+    assert reaction_mapping_status(reparsed) == "unmapped"
+    assert [list(m) for m in stripped.molecules()] == [
+        list(m) for m in reparsed.molecules()
+    ]

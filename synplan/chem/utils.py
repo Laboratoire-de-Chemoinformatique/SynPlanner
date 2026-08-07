@@ -6,6 +6,7 @@ import re
 import warnings
 from collections.abc import Iterable
 from io import StringIO
+from itertools import count
 from typing import Literal
 
 from chython import smiles as smiles_parser
@@ -163,6 +164,26 @@ def is_reaction_atom_mapped(reaction: ReactionContainer | str) -> bool:
     if isinstance(reaction, str):
         return reaction_string_mapping_status(reaction) == "fully_mapped"
     return reaction_mapping_status(reaction) == "fully_mapped"
+
+
+def strip_reaction_mapping(reaction: ReactionContainer) -> ReactionContainer:
+    """Renumber the reaction 1..N straight through, in place.
+
+    That is the numbering chython gives a record that was never mapped: no atom
+    number is shared between the two sides, so a CGR built from the result
+    carries none of the original correspondence.  ``smiles(str(reaction))``
+    reaches the same place by writing and reparsing a SMILES, which is the
+    expensive way round.  Note that :func:`reaction_mapping_status` still
+    reports ``fully_mapped``: it reads each atom's parse trace, which
+    renumbering does not touch.
+
+    :param reaction: Reaction to strip; its molecules are renumbered in place.
+    :return: The same reaction, for chaining.
+    """
+    numbers = count(1)
+    for molecule in reaction.molecules():
+        molecule.remap(dict(zip(molecule, numbers)))
+    return reaction
 
 
 def assert_reaction_atom_mapped(
