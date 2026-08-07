@@ -44,10 +44,8 @@ Run reaction filtration using the repository configuration in ``configs/reaction
     ================================== ================================================================= ================================================================
     Reaction filter                    Description                                                       Sub-parameters (value used when the key is left bare)
     ================================== ================================================================= ================================================================
-    compete_products_config            Checks if there are compete reactions                             ``fingerprint_tanimoto_threshold: 0.3``, ``mcs_tanimoto_threshold: 0.6``
     dynamic_bonds_config               Checks if there is an unacceptable number of dynamic bonds in CGR ``min_bonds_number: 1``, ``max_bonds_number: 6`` (the shipped config raises this to ``12`` — see the warning below)
     small_molecules_config             Checks for small molecules in the reaction (see note 5)           ``mol_max_size: 6``
-    cgr_connected_components_config    Checks if CGR contains unrelated components (without reagents)    none
     rings_change_config                Checks if there is changing rings number in the reaction          none
     strange_carbons_config             Checks if there are 'strange' carbons in the reaction             none
     no_reaction_config                 Checks if there is no reaction in the provided reaction container none

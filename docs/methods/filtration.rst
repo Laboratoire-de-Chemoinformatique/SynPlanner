@@ -11,10 +11,8 @@ The name in ``code font`` is the key to list in the configuration file to activa
 The current available reaction filters in ``SynPlanner``:
 
 - ``no_reaction_config`` — No reaction filter: checks if there is no reaction in the provided reaction container
-- ``compete_products_config`` — Compete products filter: checks if there are competing reactions
 - ``dynamic_bonds_config`` — Dynamic bonds filter: checks if there is an unacceptable number of dynamic bonds in CGR
 - ``small_molecules_config`` — Small molecules filter: checks if there are only small molecules in the reaction or if there is only one small reactant or product
-- ``cgr_connected_components_config`` — CGR connected components filter: checks if CGR contains unrelated components (without reagents)
 - ``rings_change_config`` — Rings change filter: checks if there is a changing ring number in the reaction
 - ``strange_carbons_config`` — Strange carbons filter: checks if there are 'strange' carbons in the reaction
 - ``multi_center_config`` — Multi-center filter: checks if there is a multicenter reaction
