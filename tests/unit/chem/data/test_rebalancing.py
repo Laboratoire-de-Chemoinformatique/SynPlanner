@@ -262,7 +262,7 @@ def test_a_balanced_mapped_reaction_still_composes_a_cgr():
         for number, atom in molecule.atoms():
             assert elements.get(number, atom.atomic_symbol) == atom.atomic_symbol
 
-    ~balanced  # noqa: B018 — raises if the numbering is unusable
+    assert (~balanced).atoms_count, "the numbering still composes a CGR"
 
 
 def test_split_ions_reads_charges_off_the_atoms():
@@ -362,7 +362,7 @@ def test_imputed_reaction_makes_no_mapping_claim():
     left = {n for m in balanced.reactants for n in m}
     right = {n for m in balanced.products for n in m}
     assert not (left & right), "a withdrawn mapping shares no atom number"
-    ~balanced  # noqa: B018 — still composable, which is what the CGR needs
+    assert (~balanced).atoms_count, "still composable, which is what the CGR needs"
 
 
 def test_ester_releases_the_alcohol_when_no_water_is_recorded():
