@@ -1,17 +1,26 @@
 """Per-dataset success rate and accuracy for the missing-molecule imputer.
 
-Runs against SynRBL's validation set (10.1186/s13321-024-00875-4) with that
-paper's metric definitions:
+Runs against SynRBL's validation set (10.1186/s13321-024-00875-4).  That set is
+not an independent answer key: `expected_reaction` is SynRBL's own output that a
+reviewer accepted, so agreement with it is the most this can measure.  Two kinds
+of row cannot measure even that and are dropped from the accuracy denominator
+rather than counted as losses:
+
+* no `expected_reaction` at all (327 rows) — unwinnable by construction.
+* an `expected_reaction` that does not itself balance (250 rows) — the answer
+  key fails the task it defines.  Every row whose reference spells free oxygen
+  `[O]` lands here, because chython reads that as water.
+
+SynRBL's own benchmark counts both as wrong.  Reproduce that with `--synrbl`.
 
 * success     = balanced results / reactions that were not already balanced
-* accuracy    = exact matches / balanced results.  A result with no expected
-  reaction to check against counts as wrong, as SynRBL's benchmark does.
-* end-to-end  = success x accuracy = exact matches / reactions needing a fix.
-  The one number to compare against the paper.
+* accuracy    = exact matches / results with a usable reference
+* end-to-end  = success x accuracy
 
 Usage::
 
     uv run python scripts/rebalance_bench.py <validation_set.csv> [limit]
+        [--redox] [--unmapped] [--synrbl]
 """
 
 import ast
@@ -27,7 +36,6 @@ from synplan.chem.data.rebalancing import (
     reaction_imbalance,
     rebalance_reaction,
 )
-from synplan.chem.utils import strip_reaction_mapping
 
 csv.field_size_limit(10**7)
 
@@ -49,7 +57,7 @@ def _canonical(molecule) -> str:
         molecule.kekule()
         molecule.thiele()
     except Exception:
-        pass
+        pass  # already aromatic, or a ring that will not kekulise; compare as is
     return str(molecule)
 
 
@@ -78,7 +86,27 @@ def key(reaction) -> str:
     return ".".join(left) + ">>" + ".".join(right)
 
 
-def bench(rows, add_redox_agents: bool = False, unmapped: bool = False):
+def usable_reference(expected: str):
+    """The reference to score against, or ``None`` where it cannot be one.
+
+    A reference that does not itself balance is not an answer to a balancing
+    task; scoring against it measures nothing but SynRBL's own defects.
+    """
+    if not expected:
+        return None
+    try:
+        parsed = reference(expected)
+    except Exception:
+        return None
+    return None if reaction_imbalance(parsed) else parsed
+
+
+def bench(
+    rows,
+    add_redox_agents: bool = False,
+    unmapped: bool = False,
+    synrbl_metric: bool = False,
+):
     """Run the imputer over ``(dataset, reaction, expected)`` triples."""
     stats: dict = defaultdict(
         lambda: {"n": 0, "balanced": 0, "solved": 0, "scored": 0, "correct": 0}
@@ -93,7 +121,7 @@ def bench(rows, add_redox_agents: bool = False, unmapped: bool = False):
             failures[f"parse: {type(exc).__name__}"] += 1
             continue
         if unmapped:
-            strip_reaction_mapping(reaction)
+            reaction = smiles(str(reaction))
         if not reaction_imbalance(reaction):
             counts["balanced"] += 1
             continue
@@ -106,31 +134,43 @@ def bench(rows, add_redox_agents: bool = False, unmapped: bool = False):
             failures[f"{type(exc).__name__}: {str(exc)[:50]}"] += 1
             continue
         counts["solved"] += 1
-        if not expected:
-            continue
+        expected_reaction = usable_reference(expected)
+        if expected_reaction is None:
+            if not synrbl_metric:
+                continue  # nothing here can be right or wrong
+            counts["scored"] += 1
+            continue  # SynRBL's metric: no usable reference counts as wrong
         counts["scored"] += 1
         try:
-            if key(result) == key(reference(expected)):
+            if key(result) == key(expected_reaction):
                 counts["correct"] += 1
-        except Exception:
-            pass
+        except Exception as exc:  # a reference chython cannot canonicalise
+            failures[f"compare: {type(exc).__name__}"] += 1
     return stats, failures
 
 
 def report(stats, failures, elapsed: float) -> None:
+    template = "{:<24}{:>6}{:>6}{:>7}{:>10.2f}{:>8.2f}{:>13.2f}"
     print(
-        f"{'dataset':<24}{'N':>6}{'bal':>6}{'success%':>10}{'acc%':>8}"
+        f"{'dataset':<24}{'N':>6}{'bal':>6}{'ref':>7}{'success%':>10}{'acc%':>8}"
         f"{'end-to-end%':>13}"
     )
     total = dict.fromkeys(("n", "balanced", "solved", "scored", "correct"), 0)
     for dataset, counts in sorted(stats.items()):
         for field in total:
             total[field] += counts[field]
-        rows = [dataset, counts["n"], counts["balanced"], *_rates(counts)]
-        print("{:<24}{:>6}{:>6}{:>10.2f}{:>8.2f}{:>13.2f}".format(*rows))
+        print(
+            template.format(
+                dataset,
+                counts["n"],
+                counts["balanced"],
+                counts["scored"],
+                *_rates(counts),
+            )
+        )
     print(
-        "{:<24}{:>6}{:>6}{:>10.2f}{:>8.2f}{:>13.2f}".format(
-            "TOTAL", total["n"], total["balanced"], *_rates(total)
+        template.format(
+            "TOTAL", total["n"], total["balanced"], total["scored"], *_rates(total)
         )
     )
     print(f"{elapsed:.1f}s ({total['n'] / elapsed:.0f} rxn/s)")
@@ -141,11 +181,10 @@ def report(stats, failures, elapsed: float) -> None:
 
 
 def _rates(counts) -> tuple[float, float, float]:
-    """Success, accuracy and their product, on SynRBL's definitions."""
+    """Success, accuracy and their product."""
     unbalanced = counts["n"] - counts["balanced"]
     success = 100 * counts["solved"] / unbalanced if unbalanced else 0.0
-    # a solved reaction with nothing to check against counts as wrong
-    accuracy = 100 * counts["correct"] / counts["solved"] if counts["solved"] else 0.0
+    accuracy = 100 * counts["correct"] / counts["scored"] if counts["scored"] else 0.0
     return success, accuracy, success * accuracy / 100
 
 
@@ -169,10 +208,16 @@ def main() -> None:
         sys.exit(__doc__)
     redox = "--redox" in sys.argv[1:]
     unmapped = "--unmapped" in sys.argv[1:]
+    synrbl_metric = "--synrbl" in sys.argv[1:]
     positional = [a for a in sys.argv[1:] if not a.startswith("-")]
     rows = load(positional[0], int(positional[1]) if len(positional) > 1 else None)
     start = time.monotonic()
-    stats, failures = bench(rows, add_redox_agents=redox, unmapped=unmapped)
+    stats, failures = bench(
+        rows,
+        add_redox_agents=redox,
+        unmapped=unmapped,
+        synrbl_metric=synrbl_metric,
+    )
     report(stats, failures, time.monotonic() - start)
 
 
