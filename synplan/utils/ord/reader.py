@@ -95,14 +95,19 @@ def _reaction_to_smiles(reaction) -> tuple[str | None, dict]:
     # A screening record lists everything the plate was read for: the desired
     # product, the isomers competing with it, and an internal standard. Only
     # the first is a product of this equation, and the record says which it is.
-    products = [
-        (prod, _get_smiles(prod.identifiers))
-        for outcome in reaction.outcomes
-        for prod in outcome.products
-    ]
-    products = [(prod, smi) for prod, smi in products if smi]
-    if any(prod.is_desired_product for prod, _ in products):
-        products = [(prod, smi) for prod, smi in products if prod.is_desired_product]
+    # The flag picks between the isomers of one measurement, so the choice is
+    # made inside each outcome: a second outcome that flags nothing is another
+    # measurement, not a competitor, and keeps all of its products.
+    products = []
+    for outcome in reaction.outcomes:
+        entries = [
+            (prod, smi)
+            for prod in outcome.products
+            if (smi := _get_smiles(prod.identifiers))
+        ]
+        if any(prod.is_desired_product for prod, _ in entries):
+            entries = [(prod, smi) for prod, smi in entries if prod.is_desired_product]
+        products.extend(entries)
 
     product_smiles = [smi for _, smi in products]
     yields = [
