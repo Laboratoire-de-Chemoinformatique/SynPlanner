@@ -98,16 +98,17 @@ def _reaction_to_smiles(reaction) -> tuple[str | None, dict]:
     # The flag picks between the isomers of one measurement, so the choice is
     # made inside each outcome: a second outcome that flags nothing is another
     # measurement, not a competitor, and keeps all of its products.
+    # The flag is read before the SMILES are: a desired product recorded
+    # without a structure must leave the outcome empty rather than promote the
+    # sibling it was chosen over.
     products = []
     for outcome in reaction.outcomes:
-        entries = [
+        desired = [prod for prod in outcome.products if prod.is_desired_product]
+        products.extend(
             (prod, smi)
-            for prod in outcome.products
+            for prod in (desired or outcome.products)
             if (smi := _get_smiles(prod.identifiers))
-        ]
-        if any(prod.is_desired_product for prod, _ in entries):
-            entries = [(prod, smi) for prod, smi in entries if prod.is_desired_product]
-        products.extend(entries)
+        )
 
     product_smiles = [smi for _, smi in products]
     yields = [

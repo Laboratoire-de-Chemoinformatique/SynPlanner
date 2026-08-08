@@ -404,3 +404,14 @@ class TestDesiredProduct:
         rxn_smiles, _ = _reaction_to_smiles(ds.reactions[0])
 
         assert rxn_smiles.split(">")[-1] == "CC=O.O"
+
+    def test_desired_product_without_a_structure_keeps_no_sibling(self):
+        # The flag is the record's answer to what this equation made. A sibling
+        # that merely happens to carry a SMILES is not a substitute for it, so
+        # the outcome contributes nothing rather than the wrong product.
+        ds = _make_dataset(
+            [{"reactants": ["CCO"], "products": ["", "CC=O"], "desired": [True, False]}]
+        )
+        rxn_smiles, _ = _reaction_to_smiles(ds.reactions[0])
+
+        assert rxn_smiles is None
