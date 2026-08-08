@@ -155,9 +155,12 @@ PROTON_PARTNERS: dict[str, str] = {
     "[OH-]": "O",
 }
 
-# An oxidant recorded as nothing but its oxygen.  Needs `keep_implicit` to
-# parse, so it is named rather than spelled out at each use.
-ATOMIC_OXYGEN = "[O]"
+# An oxidant the record never named, spelled as the peroxide rather than as the
+# bare oxygen atom SynRBL writes.  chython cannot hold atomic oxygen: `[O]`
+# parses to water, and the radical form round-trips to a hydroxyl, so an answer
+# written that way comes back off disk unbalanced.  Peroxide costs one extra
+# water on the other side and is element-for-element the same claim.
+PEROXIDE = "OO"
 
 # The functional groups expand rules ask about, as
 # ``(patterns, anti-patterns)``.
@@ -643,7 +646,7 @@ def _fragments_for(
                         if best is None or score < best_score:
                             best, best_score = merged, score
                         tried += 1
-                        if score == (0, 1, 1) or tried >= _MAX_MERGE_TRIALS:
+                        if score == ((0, 0), 1, 1) or tried >= _MAX_MERGE_TRIALS:
                             return best
         if best is not None:
             return best
@@ -719,12 +722,23 @@ def _merge_apart(fragments) -> MoleculeContainer:
     return merged
 
 
-def _unexplained(merged: MoleculeContainer, deficit: dict[str, int]) -> int:
-    """How many atoms of the deficit the imputed molecules fail to account for."""
+def _unexplained(merged: MoleculeContainer, deficit: dict[str, int]) -> tuple[int, int]:
+    """Atoms of the deficit the imputed molecules fail to account for.
+
+    Heavy atoms first, hydrogen only as a tiebreak.  Hydrogen is the element
+    the balance can always shuffle — water, a proton and the hydrogen
+    completion sweep all move it — so a fragment that happens to match the
+    hydrogen count is not thereby the better reading of where the bond broke.
+    Counting it equally picks a second acetic acid out of ethyl acetate, whose
+    hydrogens land exactly, over the ethanol that actually left.
+    """
     left = dict(deficit)
     for symbol, count in merged.brutto.items():
         left[symbol] = left.get(symbol, 0) - count
-    return sum(abs(count) for symbol, count in left.items() if symbol != "Q")
+    heavy = sum(
+        abs(count) for symbol, count in left.items() if symbol not in ("Q", "H")
+    )
+    return heavy, abs(left.get("H", 0))
 
 
 def _spare_water(reaction: ReactionContainer, unmatched) -> tuple | None:
@@ -790,7 +804,7 @@ def _ketones(molecules) -> int:
 def _is_alcohol_oxidation(reaction: ReactionContainer) -> bool:
     """Whether a carbinol became a carbonyl, the one oxidation with a named
     oxidant.  Everything else that gives off hydrogen is left to
-    :data:`ATOMIC_OXYGEN`.
+    :data:`PEROXIDE`.
     """
     if _ketones(reaction.products) <= _ketones(reaction.reactants):
         return False
@@ -902,15 +916,8 @@ def _match_formula(
 
 
 def _small_molecules(smiles_strings: list[str]) -> list[MoleculeContainer]:
-    """Parse the species to add.
-
-    ``[O]`` is read with ``keep_implicit`` because chython otherwise fills the
-    valence of a bare bracket atom and hands back water.
-    """
-    return [
-        smiles_chython(text, keep_implicit=text == ATOMIC_OXYGEN)
-        for text in smiles_strings
-    ]
+    """Parse the species to add."""
+    return [smiles_chython(text) for text in smiles_strings]
 
 
 def _pair_protons(found: list[str]) -> list[str]:
@@ -931,13 +938,17 @@ def _oxidant_for_hydrogen(found: list[str]) -> tuple[list[str], list[str]]:
 
     A reaction does not vent dihydrogen: the hydrogen leaves on an oxygen the
     record never named, so each ``H2`` on the product side is written as the
-    water it becomes, and the reactant side owes the oxygen atom for it.
+    two waters a peroxide becomes, and the reactant side owes that peroxide.
+
+    Only reached under ``add_redox_agents``: naming the oxidant is a claim the
+    record does not make, and the alternative — leaving the hydrogen loose — is
+    the honest way to say the reaction was written short.
     """
     rest = [name for name in found if name != "[H][H]"]
     couples = len(found) - len(rest)
     if not couples:
         return found, []
-    return rest + ["O"] * couples, [ATOMIC_OXYGEN] * couples
+    return rest + ["O"] * (2 * couples), [PEROXIDE] * couples
 
 
 def _cover(
@@ -946,6 +957,7 @@ def _cover(
     to_reactants: bool = False,
     leaving_acid: bool = False,
     spent: tuple = (),
+    add_redox_agents: bool = False,
 ) -> tuple[list[str], list[str]]:
     """Molecules covering ``needed``, and the hydrogens the other side owes.
 
@@ -966,7 +978,7 @@ def _cover(
     if found:
         if leaving_acid:
             found = _pair_protons(found)
-        if not to_reactants:
+        if not to_reactants and add_redox_agents:
             return _oxidant_for_hydrogen(found)
         return found, []
     if (
@@ -975,9 +987,9 @@ def _cover(
         and not needed.get("Q")
         and needed.get("O", 0) > 0
     ):
-        # An oxidant written as nothing but its oxygen, rather than water plus
-        # the hydrogen the product side would then owe back.
-        return [ATOMIC_OXYGEN] * needed["O"], []
+        # An oxidant the record wrote down as nothing but the oxygen it handed
+        # over.  Each one is a peroxide, and the water it becomes is owed back.
+        return [PEROXIDE] * needed["O"], ["O"] * needed["O"]
     for hydrogens in (1, 2, 3, 4):
         found = _match_formula(
             {**needed, "H": needed.get("H", 0) + hydrogens},
@@ -1054,6 +1066,8 @@ def rebalance_reaction(
         mapping you do not trust: a mapper handed an unbalanced reaction has
         atoms it cannot place, and a wrong CGR cuts in the wrong place.
     :return: The balanced reaction, with its score under ``meta["confidence"]``.
+        Its atom mapping is withdrawn where imputation left atoms that exist on
+        only one side; see :func:`_withdraw_mapping`.
     :raises RebalancingError: If the reaction cannot be balanced, or the answer
         falls below ``min_confidence``.
     """
@@ -1081,6 +1095,8 @@ def rebalance_reaction(
     decomposed.name = balanced.name
     balanced = decomposed
     _separate_numbering(balanced)
+    if not _mapping_survives_imputation(balanced):
+        _withdraw_mapping(balanced)
     if refuse_unsupported_redox:
         before = Counter(str(molecule) for molecule in reaction.molecules())
         after = Counter(str(molecule) for molecule in balanced.molecules())
@@ -1231,6 +1247,37 @@ def _separate_numbering(reaction: ReactionContainer) -> None:
             renumber(molecule, clash)
 
 
+def _mapping_survives_imputation(reaction: ReactionContainer) -> bool:
+    """Whether every atom number still names an atom on both sides.
+
+    That is what a mapping claims.  Imputed species are parsed fresh, so an
+    atom the record conserved — the oxygen of an added water and the oxygen of
+    the alcohol it releases — can end up numbered differently on each side, and
+    the CGR then reads one atom vanishing where another appears.
+    """
+    left = {number for molecule in reaction.reactants for number in molecule}
+    right = {number for molecule in reaction.products for number in molecule}
+    return left == right
+
+
+def _withdraw_mapping(reaction: ReactionContainer) -> None:
+    """Renumber straight through, as chython numbers a record never mapped.
+
+    Imputation moves atoms the record did not account for, and nothing
+    establishes which invented atom on one side is which on the other.
+    Numbering them apart would still let a CGR compose, but it would name the
+    wrong reaction centre, which is worse for rule extraction than no mapping
+    at all.  A caller that needs one maps the balanced reaction itself —
+    ``reset_mapping()``, which is also the only thing that makes a subsequent
+    ``fix_mapping()`` mean anything.
+    """
+    spare = 0
+    for molecule in reaction.molecules():
+        molecule.remap({n: spare + i for i, n in enumerate(molecule, 1)})
+        spare += len(molecule)
+    reaction.flush_cache(keep_molecule_cache=True)
+
+
 def _rebalance_forward(
     reaction: ReactionContainer,
     *,
@@ -1308,6 +1355,25 @@ def _rebalance_forward(
             ReactionContainer(reactants, products, reaction.reagents)
         )
 
+    # A halogenation written without its halogen: the reactant side is short X
+    # and the product side short exactly as much hydrogen, which is X2 going in
+    # and HX coming out.  Balanced literally it reads as HX going in and loose
+    # hydrogen atoms venting, which is not a reaction.
+    short_halogens = [element for element in _HALOGENS if imbalance.get(element, 0) < 0]
+    if (
+        add_redox_agents
+        and len(short_halogens) == 1
+        and imbalance.get("H", 0) == -imbalance[short_halogens[0]] > 0
+        and not set(imbalance) - {"H", "Q", short_halogens[0]}
+    ):
+        element = short_halogens[0]
+        units = imbalance["H"]
+        reactants.extend(_small_molecules([element * 2] * units))
+        products.extend(_small_molecules([element] * units))
+        imbalance = reaction_imbalance(
+            ReactionContainer(reactants, products, reaction.reagents)
+        )
+
     # Cover the product side first: a species completed with hydrogen or
     # hydroxide moves the reactant side too, so that one is settled against a
     # fresh count.  Paying for a completion can leave its own small remainder,
@@ -1331,16 +1397,10 @@ def _rebalance_forward(
                 to_reactants=sign < 0,
                 leaving_acid=leaving_acid and sign > 0,
                 spent=_spent_reagents(reaction) if sign > 0 else (),
+                add_redox_agents=add_redox_agents,
             )
             if not found:
                 raise RebalancingError(f"no small molecules cover {needed}")
-            if add_redox_agents and sign > 0 and "[H][H]" in found:
-                # Hydrogen coming off is an oxidant going in: the reaction took
-                # up the oxygen and gave back water.
-                units = found.count("[H][H]")
-                found = [name for name in found if name != "[H][H]"]
-                found.extend(["O"] * units)
-                reactants.extend(_small_molecules([ATOMIC_OXYGEN] * units))
             side.extend(_small_molecules(found))
             other.extend(_small_molecules(owed))
             imbalance = reaction_imbalance(

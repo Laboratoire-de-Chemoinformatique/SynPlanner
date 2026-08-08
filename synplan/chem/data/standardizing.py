@@ -650,13 +650,7 @@ class RebalanceReactionStandardizer(BaseStandardizer):
     def from_config(
         cls, config: RebalanceReactionConfig
     ) -> "RebalanceReactionStandardizer":
-        return cls(
-            config.add_redox_agents,
-            config.min_confidence,
-            config.drop_competing_products,
-            config.use_mapping,
-            config.refuse_unsupported_redox,
-        )
+        return cls(**config.model_dump())
 
     def _run(self, rxn: ReactionContainer) -> ReactionContainer:
         """Impute the reactants and products the reaction does not account for.

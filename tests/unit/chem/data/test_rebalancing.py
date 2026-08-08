@@ -19,11 +19,11 @@ from synplan.chem.data.rebalancing import (
     rebalance_reaction,
 )
 from synplan.chem.data.standardizing import (
+    STANDARDIZER_REGISTRY,
     RebalanceReactionStandardizer,
     SplitIonsStandardizer,
     StandardizationError,
 )
-from synplan.chem.utils import strip_reaction_mapping
 
 
 @pytest.mark.parametrize(
@@ -232,7 +232,7 @@ def test_ignoring_the_mapping_equals_never_having_had_one():
         ">>[OH:3][C:4](=[O:5])[c:6]1[cH:7][cH:8][cH:9][cH:10][cH:11]1"
     )
     ignored = rebalance_reaction(smiles(text), use_mapping=False)
-    unmapped = rebalance_reaction(strip_reaction_mapping(smiles(text)))
+    unmapped = rebalance_reaction(smiles(str(smiles(text))))
     assert str(ignored) == str(unmapped)
 
     # and the mapping is worth something, or the flag would be pointless
@@ -337,3 +337,56 @@ def test_standardizer_balances():
     standardizer = RebalanceReactionStandardizer()
     balanced = standardizer(smiles("CCOC(=O)c1ccccc1>>OC(=O)c1ccccc1"))
     assert not reaction_imbalance(balanced)
+
+
+def test_oxidation_survives_being_written_out():
+    # chython cannot hold atomic oxygen: "[O]" parses to water and the radical
+    # form reads back as a hydroxyl, so an answer spelled that way balanced in
+    # memory and came off disk short of two hydrogens. Every test above keeps
+    # its reaction in memory, which is exactly why none of them caught it.
+    balanced = rebalance_reaction(smiles("CC(O)C>>CC(=O)C"), add_redox_agents=True)
+    assert not reaction_imbalance(balanced)
+    assert not reaction_imbalance(smiles(str(balanced)))
+
+
+def test_imputed_reaction_makes_no_mapping_claim():
+    # Imputed species are parsed fresh, so nothing says which invented atom on
+    # one side is which on the other. Numbering them apart still composes a
+    # CGR, but it names the wrong reaction centre; the claim is withdrawn.
+    rxn = smiles(
+        "[CH3:1][CH2:2][O:3][C:4](=[O:5])[c:6]1[cH:7][cH:8][cH:9][cH:10][cH:11]1"
+        ">>[OH:3][C:4](=[O:5])[c:6]1[cH:7][cH:8][cH:9][cH:10][cH:11]1"
+    )
+    balanced = rebalance_reaction(rxn)
+    assert not reaction_imbalance(balanced)
+    left = {n for m in balanced.reactants for n in m}
+    right = {n for m in balanced.products for n in m}
+    assert not (left & right), "a withdrawn mapping shares no atom number"
+    ~balanced  # noqa: B018 — still composable, which is what the CGR needs
+
+
+def test_ester_releases_the_alcohol_when_no_water_is_recorded():
+    # Both halves hold two carbons, so a scorer counting hydrogen equally picks
+    # a second acetic acid, whose hydrogens land exactly, over the ethanol.
+    balanced = rebalance_reaction(smiles("CCOC(C)=O>>CC(=O)O"))
+    assert not reaction_imbalance(balanced)
+    assert "CCO" in [str(m) for m in balanced.products]
+
+
+def test_halogenation_takes_up_the_elemental_halogen():
+    # Short a halogen on the left and the same amount of hydrogen on the right
+    # is X2 going in and HX coming out, not HX in and loose hydrogen venting.
+    balanced = rebalance_reaction(smiles("c1ccccc1>>Brc1ccccc1"), add_redox_agents=True)
+    assert not reaction_imbalance(balanced)
+    assert "BrBr" in [str(m) for m in balanced.reactants]
+    assert "Br" in [str(m) for m in balanced.products]
+
+
+def test_rebalancing_runs_after_reagent_removal():
+    # Reagent removal moves spectators out of the reactants and products, which
+    # unbalances whatever was balanced first: measured on USPTO, balancing
+    # first left 13% of the balanced records still balanced against 95%.
+    order = list(STANDARDIZER_REGISTRY)
+    assert order.index("rebalance_reaction_config") > order.index(
+        "remove_reagents_config"
+    )
