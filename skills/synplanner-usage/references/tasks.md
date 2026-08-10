@@ -236,6 +236,43 @@ Docs: `configuration/policy` — "Benchmark recipe". Colab:
 Optional extras `wandb` / `mlflow` / `loggers`.
 Docs: `configuration/policy` — "Training logger"
 
+## Synthons (the Synt-On port)
+
+**Turn a building-block catalogue into a synthon stock**
+`BBClassifier` assigns one or more of 147 ordered classes, then `BBSynthoniser`
+runs that class's rule program. CLI: `bb_classifying` → `bb_synthonizing`.
+Config: `synthonisation.yaml` → `SynthonConfig`.
+Module: `synplan.chem.synthon`
+
+**Cut a target into purchasable synthons**
+`Fragmenter.fragment` builds a disconnection DAG with the 39 disconnection rules
+(plus their 39 macrocyclic twins, used only when the target has a ring larger
+than 11 atoms). CLI: `synthon_fragment --stock`.
+Module: `synplan.chem.synthon.fragment`
+
+**Recombine stocked synthons into new molecules**
+`Enumerator.enumerate_library` for unconstrained library design,
+`Enumerator.enumerate_analogues` for analogues of one fragmentation pathway.
+CLI: `synthon_enumerate`.
+Module: `synplan.chem.synthon.enumeration`
+
+**Use the synthon disconnections during planning**
+`synthon_priority_rules()` returns them as `run_search(priority_rules=...)` input
+under the source name `"synthon"`; set `use_priority=True` in the search config
+or they are ignored. The children are ordinary molecules against the ordinary
+building-block stock — there is no synthon stock in the tree.
+Module: `synplan.chem.synthon.priority`
+
+**Catalogue analysis**
+`bb_scaffolds` writes Bemis-Murcko scaffolds after removing the ring-containing
+protecting groups; `ro2_pass` applies the rule of two.
+Module: `synplan.chem.synthon.scaffolds`, `synplan.chem.synthon.stock`
+
+**Regenerate the shipped synthon data**
+`python -m synplan.chem.synthon.data._convert <Synt-On/config> --out
+synplan/chem/synthon/data --check`. The JSON is committed; nothing translates at
+import time.
+
 ## When old code stops working
 
 **Code or SMARTS from an older SynPlanner behaves differently**

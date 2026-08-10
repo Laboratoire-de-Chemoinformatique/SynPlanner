@@ -7,6 +7,101 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added `synplan.chem.synthon`, a native port of Synt-On (SynthI; Zabolotna, Volochnyuk,
+  Ryabukhin, Gavrylenko, Horvath, Klimchuk, Oksiuta, Marcou, Varnek, "SynthI: A New
+  Open-Source Tool for Synthon-Based Library Design", *J. Chem. Inf. Model.* 2022,
+  62(9), 2151-2163, doi:10.1021/acs.jcim.1c00754). A synthon is a valence-complete
+  fragment whose atoms carry a reaction-centre label saying how that atom will
+  react; the reference stores that label as an RDKit atom-map number and does its
+  work with string surgery on SMILES, while this port makes it a graph property on
+  a forked chython `SynthonContainer`, serialised as `[NH2_nuc]`.
+
+  Seven components, none cut: a building-block classifier (147 ordered classes over
+  2401 SMARTS), building-block synthonisation (147 rule programs, 389 steps, four
+  execution strategies), fragmentation (39 disconnection rules, their 39 macrocyclic
+  twins, and the disconnection DAG with its gates and availability rate), recombination
+  (one join keyed by the 26-pair compatibility table, both enumeration modes), Bemis-Murcko
+  scaffolds and the rule of two, and positional analogue scanning.
+
+  CLI: `bb_classifying`, `bb_synthonizing`, `synthon_fragment`, `synthon_enumerate`
+  and `bb_scaffolds`, configured by `configs/synthonisation.yaml`.
+
+  `synthon_enumerate` fills each slot of a fragmentation pathway from the stock, and
+  `find_analogues` widens that slot to the synthon's positional analogues — the step
+  that turns the paper's Library1 into Library2. `similarity_threshold` adds a
+  Tanimoto route into the same slot, `pas_removal_direction` turns off the direction
+  upstream's own code could never reach, and `ro2_filtration` restricts the stock to
+  what the rule of two calls reagent-like, under whichever `ro2_variant` the caller
+  asks for.
+
+  The reference's RDKit SMARTS are translated once, offline, by
+  `synplan.chem.synthon.data._convert`; its output is committed and asserted in the
+  test suite, and nothing translates at import time.
+
+  Reproduces the paper's catalogue-free published numbers: 9/9 building-block
+  classifications, 18 synthons from 9 building blocks with the right token on the
+  right atom, all 47 published tutorial products (85 unique under the shipped
+  defaults), `MolW=183.035400 / HBA=4` on the
+  rule-of-two worked example, four scaffold contracts, and the README's seven
+  cenobamate disconnection pathways — which the reference itself cannot produce,
+  because `str.replace` labelling stopped matching on RDKit 2023 and it raises
+  `TypeError` on its own headline example.
+
+  Seventeen measured upstream defects are fixed rather than reproduced.
+  `tests/regression/test_synthon_divergence.py` is the divergence register, and every
+  fix that has a port-side line to revert carries an assertion that has been watched
+  fail when it is reverted. The rest are fixed by construction — the port has no
+  counterpart line to break, because the label is a graph field rather than a substring
+  and fragmentation is a BFS rather than a recursion — and are covered indirectly by the
+  paper's published numbers in `test_synthon_fixtures.py`. Three leave nothing to assert
+  at all: the deleted debug prints, the availability memoisation (a performance fix with
+  identical output), and the per-branch reaction set, whose upstream defect has no
+  witness on any target tried. Three deliberate departures from the
+  published vocabulary: code 11 collapses into `elec` (there is no `N:10` key to
+  distinguish it from); R12.3 ships as `R12.3a` (Heck) and `R12.3b` (Suzuki)
+  rather than silently dropping the first, which makes the count 39 rules, not 38;
+  and the compatibility table gains the Suzuki pairing (`elec` with `elecB`, three
+  rows read off the R12.1/R12.2/R12.6 reconstruction SMIRKS). Upstream's table is
+  only a whole-molecule pre-filter and the SMIRKS form the bond, so there the
+  pairing fires only when a partner happens to carry a second compatible label;
+  here the table IS the join, so without those rows a biaryl disconnects and then
+  reassembles to nothing.
+
+- The shipped synthon disconnections can be used as an MCTS priority-rule set.
+  `synthon_priority_rules()` returns them under the source name `"synthon"` as
+  `run_search(priority_rules=...)` / `Tree(priority_rules=...)` input, so they are tried
+  ahead of the policy on every expansion. Each rule spells its leaving group inline on
+  the RHS, which is what makes a disconnection give the acyl chloride rather than the
+  aldehyde; 96.6% of the disconnection rules convert. The children are ordinary molecules
+  checked against the ordinary building-block stock, so a rule that fires on an unbuyable
+  fragment costs one expansion and hands the node back to the policy. On a 40-target
+  FDA-2020 sample at a fixed iteration budget this solves 30/40 against the policy-only
+  23/40 (McNemar p=0.0156), and 92.8% of the winning routes contain at least one synthon
+  step.
+
+  A second design was built, measured on the same sample, and reverted: keep the children
+  as labelled synthons and check them against a separate synthon stock. It solved 21/40,
+  below policy-only, because a synthon child that misses the synthon stock is an absorbing
+  dead end — 39.3% of expansions — where a plain child that misses the ordinary stock is
+  merely handed back to the policy. Refunding it every expansion its dead ends throw away
+  lifts it only to policy-only parity, so synthon-space expansion has no measured headroom
+  to buy back the loss. Two fixes found while building it are kept, being correct
+  independently of it: `rule_query_pattern` falls back to `_pattern` (chython's `Reactor`
+  keeps its patterns on `_patterns`, a `Transformer` on `_pattern`; without the fallback
+  `PriorityPolicy` gates a transformer-based rule off forever and never says so), and
+  `apply_reaction_rule` raises `TypeError` on a labelled `SynthonContainer`, because
+  `QueryElement.__eq__` never consults `_label`, so a label-blind rule would match a
+  labelled synthon and emit unlabelled products silently.
+
+  Two things a later attempt at synthon-space search will need, recorded because the code
+  that carried them was removed with that design: a synthon needs its own `Precursor`-shaped
+  wrapper (the availability test is a different lookup and `min_mol_size` must not apply),
+  and the shipped featuriser is label-blind — `atom_to_vector` reads `MENDEL_INFO` by
+  `atomic_symbol`, so a labelled atom featurises identically to the plain one and a policy
+  trained on it cannot see the only property distinguishing one attachment point from
+  another. Widening the shipped vector would invalidate every pretrained retro model, so
+  that needs a separate featuriser, not an edit.
+
 - Added `synplan.chem.data.rebalancing`, which adds the molecules an unbalanced
   reaction is missing without needing atom mapping. Missing carbon is recovered
   as a substructure of the reactants, and the remaining deficit is covered from
@@ -30,6 +125,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   itself balance, are reported apart rather than counted as losses.
 
 ### Changed
+
+- `chython-synplan` is pinned to 1.103 and sourced from the local fork, which adds the
+  `Synthon` atom family, `SynthonContainer`, the `_token` bracket field in SMILES and
+  SMARTS, and `!rN` as a real excluded-ring-sizes constraint.
 
 - `rebalance_reaction_config` now imputes the molecules a reaction is missing
   rather than round-tripping it through a CGR. The old step could only
