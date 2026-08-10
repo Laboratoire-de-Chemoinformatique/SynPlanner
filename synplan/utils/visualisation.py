@@ -6,7 +6,7 @@ import base64
 import contextlib
 from collections import deque
 from datetime import datetime
-from itertools import count, islice
+from itertools import count, islice, zip_longest
 from typing import TYPE_CHECKING, Any
 
 from chython import depict_settings
@@ -342,16 +342,47 @@ def _render_route_svg(columns, pred, labeled: bool = False) -> str:
     return render_svg(pred, columns, _route_box_colors(), labeled=labeled)
 
 
+def _priority_rule(tree: Tree, node) -> Any | None:
+    """The curated rule that produced `node`, or None for a policy step.
+
+    Everything is fetched defensively: this renderer is also driven by JSON routes and by
+    duck-typed stand-ins that carry neither priority rules nor rule ids.
+    """
+    rules = getattr(tree, "priority_rules", {}).get(
+        getattr(node, "rule_source", None) or "", ()
+    )
+    rule_id = getattr(node, "rule_id", None)
+    if rule_id is None or rule_id >= len(rules):
+        return None
+    return rules[rule_id]
+
+
+# an arrow label sits in the 5.0-unit gap between columns, and the renderer sizes its box at
+# 0.18 per character — past this it reaches into the neighbouring molecule
+_ARROW_LABEL_CHARS = 25
+
+
 def _format_arrow_label(
     rule_key: str | None,
     policy_rank: int | None,
     *,
     include_rule_key: bool,
+    rule_name: str | None = None,
 ) -> str | None:
-    """Build the per-arrow label text for route SVGs."""
+    """Build the per-arrow label text for route SVGs.
+
+    A curated rule has a chemistry name, which is what a reader wants on the arrow; the policy
+    has only a rank. The full untruncated name stays in the step list under the scheme.
+    """
 
     parts = []
-    if include_rule_key and rule_key:
+    if rule_name:
+        parts.append(
+            rule_name
+            if len(rule_name) <= _ARROW_LABEL_CHARS
+            else rule_name[: _ARROW_LABEL_CHARS - 1].rstrip() + "…"
+        )
+    elif include_rule_key and rule_key:
         parts.append(rule_key)
     if policy_rank is not None:
         parts.append(f"Top-{policy_rank}")
@@ -395,10 +426,13 @@ def _prepare_tree_route_svg_inputs(
     for parent_idx in range(len(path_ids) - 1):
         child_id = path_ids[parent_idx + 1]
         child_node = tree.nodes[child_id]
+        rule = _priority_rule(tree, child_node)
+        name = getattr(rule, "rule_name", None)
         label_text = _format_arrow_label(
             child_node.rule_key,
             child_node.policy_rank,
             include_rule_key=labeled,
+            rule_name=f"{rule.rule_id} {name}" if name else None,
         )
         if not label_text:
             continue
@@ -595,6 +629,20 @@ def get_route_svg_from_json(
     return _render_route_svg(columns, pred, labeled=labeled)
 
 
+def route_rule_labels(tree: Tree, node_id: int) -> list[str]:
+    """One label per step of `tree.synthesis_route(node_id)`, in the same order.
+
+    Priority rules carry a chemistry name (`rule_name` stamped by their loader); the policy has
+    none, so its steps stay unlabelled rather than being given a meaningless id.
+    """
+    labels = []
+    for _before, after in iter_route_steps(tree, node_id):
+        rule = _priority_rule(tree, after)
+        name = getattr(rule, "rule_name", None)
+        labels.append(f"{rule.rule_id} — {name}" if name else "")
+    return list(reversed(labels))  # synthesis_route reverses; keep the pairing
+
+
 def generate_results_html(
     tree: Tree, html_path: str, aam: bool = False, extended: bool = False
 ) -> None:
@@ -685,11 +733,13 @@ def generate_results_html(
     for route in routes:
         svg = get_route_svg(tree, route)  # get SVG
         full_route = tree.synthesis_route(route)  # get route
+        labels = route_rule_labels(tree, route)
         # write SMILES of all reactions in synthesis path
         step = 1
         reactions = ""
-        for synth_step in full_route:
-            reactions += f"<b>Step {step}:</b> {synth_step!s}<br>"
+        for synth_step, label in zip_longest(full_route, labels):
+            named = f" <i>[{label}]</i>" if label else ""
+            reactions += f"<b>Step {step}:</b>{named} {synth_step!s}<br>"
             step += 1
         # Concatenate all content of path
         route_score = round(tree.route_score(route), 3)

@@ -5,7 +5,7 @@ import logging
 from collections.abc import Iterator
 from typing import Any
 
-from chython.containers import MoleculeContainer, ReactionContainer
+from chython.containers import MoleculeContainer, ReactionContainer, SynthonContainer
 from chython.exceptions import InvalidAromaticRing
 from chython.reactor import Reactor
 from chython.reactor.base import (
@@ -155,7 +155,17 @@ def apply_reaction_rule(
         using a canonical-SMILES dedup key. Recommended whenever ``multirule``
         is set.
     :return: An iterator yielding the products of reaction rule application.
+    :raises TypeError: if ``molecule`` carries synthon labels.
+        ``QueryElement.__eq__`` never consults ``_label``, so a plain reactor
+        matches a labelled synthon and emits unlabelled products — the labels
+        vanish with no error. A caller holding a labelled synthon must strip
+        the labels or stop, not expand it here.
     """
+    if isinstance(molecule, SynthonContainer) and molecule.synthon_labels:
+        raise TypeError(
+            f"refusing to apply a label-blind reaction rule to the labelled "
+            f"synthon {molecule}: it would silently strip the labels"
+        )
 
     def _collect_reactions(
         current_molecule: MoleculeContainer,
