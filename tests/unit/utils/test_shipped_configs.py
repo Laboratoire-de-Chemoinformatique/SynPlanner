@@ -11,6 +11,7 @@ import yaml
 
 from synplan.chem.data.filtering import ReactionFilterConfig
 from synplan.chem.data.standardizing import ReactionStandardizationConfig
+from synplan.chem.synthon.config import SynthonConfig
 from synplan.utils.config import (
     CombinedPolicyConfig,
     PolicyNetworkConfig,
@@ -31,6 +32,7 @@ FLAT = {
     "policy_training.yaml": PolicyNetworkConfig,
     "mhn_ranking_policy_training.yaml": PolicyNetworkConfig,
     "combined_ranking_filtering_policy.yaml": CombinedPolicyConfig,
+    "synthonisation.yaml": SynthonConfig,
 }
 
 # config file -> {top-level section: class}, as the CLI splits them

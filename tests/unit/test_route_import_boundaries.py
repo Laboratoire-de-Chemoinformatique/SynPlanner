@@ -111,3 +111,27 @@ assert callable(depict_route_cgr)
 assert facade_depict_route_cgr is depict_route_cgr
 """
     _run_fresh_process(code)
+
+
+def test_synthon_package_root_stays_lightweight():
+    code = """
+import sys
+import synplan.chem.synthon
+
+unexpected = [
+    name
+    for name in (
+        'torch',
+        'matplotlib',
+        'rdkit',
+        'synplan.mcts.tree',
+        'synplan.chem.synthon.classify',
+        'synplan.chem.synthon.synthonise',
+        'synplan.chem.synthon.fragment',
+    )
+    if name in sys.modules
+]
+assert unexpected == [], unexpected
+assert synplan.chem.synthon.SynthonConfig.__name__ == 'SynthonConfig'
+"""
+    _run_fresh_process(code)

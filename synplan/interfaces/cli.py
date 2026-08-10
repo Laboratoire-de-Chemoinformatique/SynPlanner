@@ -14,6 +14,14 @@ from synplan.chem.data.standardizing import (
 )
 from synplan.chem.reaction.routes.cli import run_cluster_cli
 from synplan.chem.reaction.rules.extraction import extract_rules_from_reactions
+from synplan.chem.synthon.cli import (
+    classify_file,
+    enumerate_file,
+    fragment_file,
+    scaffolds_file,
+    synthonise_file,
+)
+from synplan.chem.synthon.config import SynthonConfig
 from synplan.chem.utils import standardize_building_blocks
 from synplan.mcts.search import run_search
 from synplan.ml.training.reinforcement import run_updating
@@ -922,6 +930,178 @@ def cluster_route_from_file_cli(
         perform_subcluster=perform_subcluster,
         subcluster_results_dir=subcluster_results_dir if perform_subcluster else None,
     )
+
+
+def _synthon_config(config_path: str | None) -> SynthonConfig:
+    return SynthonConfig.from_yaml(config_path) if config_path else SynthonConfig()
+
+
+@synplan.command(name="bb_classifying")
+@click.option(
+    "--input",
+    "input_file",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the file with building blocks to be classified.",
+)
+@click.option(
+    "--output",
+    "output_file",
+    required=True,
+    type=click.Path(),
+    help="Path to the file where the classes will be stored.",
+)
+@click.option(
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to the synthonisation configuration file.",
+)
+def bb_classifying_cli(
+    input_file: str, output_file: str, config_path: str | None
+) -> None:
+    """Assigns Synt-On building-block classes."""
+    written = classify_file(input_file, output_file, _synthon_config(config_path))
+    click.echo(f"{written} building blocks classified")
+
+
+@synplan.command(name="bb_synthonizing")
+@click.option(
+    "--input",
+    "input_file",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the file with building blocks to be synthonised.",
+)
+@click.option(
+    "--output",
+    "output_file",
+    required=True,
+    type=click.Path(),
+    help="Path to the file where the synthon stock will be stored.",
+)
+@click.option(
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to the synthonisation configuration file.",
+)
+@click.option(
+    "--keep-pg/--no-keep-pg",
+    "keep_pg",
+    default=None,
+    help="Keep protected intermediates. Overrides the configuration file.",
+)
+def bb_synthonizing_cli(
+    input_file: str, output_file: str, config_path: str | None, keep_pg: bool | None
+) -> None:
+    """Turns building blocks into synthons."""
+    written, forced = synthonise_file(
+        input_file, output_file, _synthon_config(config_path), keep_pg
+    ) or (0, 0)
+    click.echo(f"{written} synthons written")
+    click.echo(f"{forced} building blocks had protecting-group retention forced on")
+
+
+@synplan.command(name="synthon_fragment")
+@click.option(
+    "--input",
+    "input_file",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the file with target molecules.",
+)
+@click.option(
+    "--output",
+    "output_file",
+    required=True,
+    type=click.Path(),
+    help="Path to the file where the disconnection pathways will be stored.",
+)
+@click.option(
+    "--stock",
+    "stock_file",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to the synthon stock file.",
+)
+@click.option(
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to the synthonisation configuration file.",
+)
+def synthon_fragment_cli(
+    input_file: str, output_file: str, stock_file: str | None, config_path: str | None
+) -> None:
+    """Cuts targets into synthons."""
+    written = fragment_file(
+        input_file, output_file, stock_file, _synthon_config(config_path)
+    )
+    click.echo(f"{written} pathways written")
+
+
+@synplan.command(name="synthon_enumerate")
+@click.option(
+    "--input",
+    "input_file",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to a synthon_fragment output file.",
+)
+@click.option(
+    "--output",
+    "output_file",
+    required=True,
+    type=click.Path(),
+    help="Path to the file where the enumerated library will be stored.",
+)
+@click.option(
+    "--stock",
+    "stock_file",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the synthon stock file.",
+)
+@click.option(
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to the synthonisation configuration file.",
+)
+def synthon_enumerate_cli(
+    input_file: str, output_file: str, stock_file: str, config_path: str | None
+) -> None:
+    """Recombines stocked synthons into molecules."""
+    written = enumerate_file(
+        input_file, output_file, stock_file, _synthon_config(config_path)
+    )
+    click.echo(f"{written} molecules written")
+
+
+@synplan.command(name="bb_scaffolds")
+@click.option(
+    "--input",
+    "input_file",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the file with building blocks.",
+)
+@click.option(
+    "--output",
+    "output_file",
+    required=True,
+    type=click.Path(),
+    help="Path to the file where the scaffolds will be stored.",
+)
+def bb_scaffolds_cli(input_file: str, output_file: str) -> None:
+    """Bemis-Murcko scaffolds after protecting-group removal."""
+    written = scaffolds_file(input_file, output_file)
+    click.echo(f"{written} scaffolds written")
 
 
 if __name__ == "__main__":
