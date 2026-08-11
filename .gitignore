@@ -158,6 +158,7 @@ uspto/
 presets/
 *.smi
 !tests/data/regression/*.smi
+!tests/data/synthon/*.smi
 *.ckpt
 # Ignore large TSV data files, but not package data (synplan/route_quality/protection/data/)
 /*.tsv
