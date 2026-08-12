@@ -2,6 +2,7 @@
 retrosynthetic models."""
 
 import contextlib
+import csv
 import functools
 import logging
 import os
@@ -9,21 +10,28 @@ import pickle
 import shutil
 import warnings
 import zipfile
+from io import StringIO
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Literal, Union
 
 import yaml
+from chython import smiles as smiles_parser
+from chython.containers import MoleculeContainer
 from chython.files.SDFrw import SDFRead
 from chython.reactor.reactor import Reactor
 from huggingface_hub import hf_hub_download, snapshot_download
 from tqdm.auto import tqdm
 
+from synplan.chem.building_blocks import (
+    BuildingBlockStock,
+    canonical_molecule_smiles,
+    inchi_to_inchi_key,
+    validate_standard_inchi_key,
+)
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.utils import (
     AtomMappingCheck,
     reaction_string_mapping_status,
-    standardize_sdf_text,
-    standardize_smiles_batch,
 )
 from synplan.ml.networks.value import ValueNetwork
 from synplan.utils.config import ReactorConfig
@@ -35,6 +43,7 @@ from synplan.utils.files import (
     iter_sdf_text_blocks,
     iter_smiles,
     iter_smiles_blocks,
+    open_text,
 )
 from synplan.utils.parallel import process_pool_map_stream
 
@@ -355,6 +364,359 @@ def _load_rules_pickle(file: str) -> tuple[CanonicalRetroReactor, ...]:
     return tuple(reaction_rules)
 
 
+BuildingBlocksFormat = Literal["auto", "smiles", "inchi", "inchikey"]
+ResolvedBuildingBlocksFormat = Literal["smiles", "inchi", "inchikey"]
+
+_STANDARD_TABLE_COLUMNS = {
+    "smiles": "smiles",
+    "cxsmiles": "smiles",
+    "inchi": "inchi",
+    "inchikey": "inchikey",
+}
+
+
+def _file_kind(path: Path) -> str:
+    suffixes = "".join(path.suffixes).lower()
+    for table_kind in ("csv", "tsv"):
+        if suffixes.endswith(f".{table_kind}") or suffixes.endswith(
+            f".{table_kind}.gz"
+        ):
+            return table_kind
+    suffix = path.suffix.lower()
+    if suffix in {".smi", ".smiles", ".inchi", ".inchikey", ".sdf"}:
+        return suffix[1:]
+    raise ValueError(
+        f"Unsupported building blocks file extension: {path.name!r}. Supported: "
+        ".smi, .smiles, .sdf, .inchi, .inchikey, .csv[.gz], .tsv[.gz]"
+    )
+
+
+def _resolved_format_argument(
+    building_blocks_format: BuildingBlocksFormat,
+    input_format: BuildingBlocksFormat | None,
+) -> BuildingBlocksFormat:
+    formats = {"auto", "smiles", "inchi", "inchikey"}
+    if building_blocks_format not in formats:
+        raise ValueError(
+            "building_blocks_format must be 'auto', 'smiles', 'inchi', or "
+            "'inchikey'"
+        )
+    if input_format is not None and input_format not in formats:
+        raise ValueError(
+            "input_format must be 'auto', 'smiles', 'inchi', or 'inchikey'"
+        )
+    if input_format is None or input_format == "auto":
+        return building_blocks_format
+    if building_blocks_format != "auto" and building_blocks_format != input_format:
+        raise ValueError("building_blocks_format and input_format specify different values")
+    return input_format
+
+
+def _is_complete_cxsmiles(value: str) -> bool:
+    head, separator, extension = value.partition(" ")
+    return bool(
+        head and separator and extension.startswith("|") and extension.endswith("|")
+    )
+
+
+def _iter_plain_stock_values(path: Path, *, smiles_records: bool):
+    with open_text(path) as handle:
+        for line_number, line in enumerate(handle, 1):
+            raw = line.rstrip("\r\n")
+            if not raw.strip() or raw.lstrip().startswith("#"):
+                continue
+            if smiles_records:
+                chemistry, *_metadata = raw.split("\t")
+                value = chemistry.strip()
+                if any(character.isspace() for character in value) and not (
+                    _is_complete_cxsmiles(value)
+                ):
+                    raise ValueError(
+                        f"{path}:{line_number}: metadata must be TAB-separated"
+                    )
+            else:
+                value = raw.strip()
+                if any(character.isspace() for character in value):
+                    raise ValueError(
+                        f"{path}:{line_number}: identity rows cannot contain whitespace"
+                    )
+            if not value:
+                raise ValueError(f"{path}:{line_number}: empty chemistry field")
+            yield line_number, value
+
+
+def _table_stock_values(
+    path: Path,
+    *,
+    delimiter: str,
+    smiles_column: str,
+) -> tuple[ResolvedBuildingBlocksFormat, list[tuple[int, str]]]:
+    with open_text(path) as handle:
+        reader = csv.reader(handle, delimiter=delimiter)
+        try:
+            header = next(reader)
+        except StopIteration as error:
+            raise ValueError(f"{path}: expected a header row") from error
+        normalized = [column.strip().lstrip("\ufeff").casefold() for column in header]
+        if not header or any(not name for name in normalized):
+            raise ValueError(f"{path}: header names must be non-empty")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError(f"{path}: header names must be unique case-insensitively")
+
+        candidates = [
+            (index, _STANDARD_TABLE_COLUMNS[name])
+            for index, name in enumerate(normalized)
+            if name in _STANDARD_TABLE_COLUMNS
+        ]
+        configured = smiles_column.strip().casefold()
+        if configured not in _STANDARD_TABLE_COLUMNS and configured in normalized:
+            candidates.append((normalized.index(configured), "smiles"))
+        if len(candidates) != 1:
+            raise ValueError(
+                f"{path}: expected exactly one SMILES, CXSMILES, InChI, or "
+                f"InChIKey column, found {len(candidates)}"
+            )
+        chemistry_index, source_format = candidates[0]
+        values: list[tuple[int, str]] = []
+        for line_number, fields in enumerate(reader, 2):
+            if not fields or not any(field.strip() for field in fields):
+                continue
+            if len(fields) != len(header):
+                raise ValueError(
+                    f"{path}:{line_number}: expected {len(header)} fields, "
+                    f"found {len(fields)}"
+                )
+            value = fields[chemistry_index].strip()
+            if not value:
+                raise ValueError(f"{path}:{line_number}: empty chemistry field")
+            values.append((line_number, value))
+    return source_format, values
+
+
+def _classify_plain_value(path: Path, line_number: int, value: str) -> str:
+    if value.startswith("InChI="):
+        if not value.startswith("InChI=1S/"):
+            raise ValueError(
+                f"{path}:{line_number}: only Standard InChI (InChI=1S/) is supported"
+            )
+        try:
+            inchi_to_inchi_key(value)
+        except ValueError as error:
+            raise ValueError(f"{path}:{line_number}: {error}") from error
+        return "inchi"
+    try:
+        validate_standard_inchi_key(value)
+    except ValueError:
+        pass
+    else:
+        return "inchikey"
+    try:
+        molecule = smiles_parser(value, ignore=True)
+    except Exception as error:
+        raise ValueError(f"{path}:{line_number}: invalid SMILES: {error}") from error
+    if not isinstance(molecule, MoleculeContainer):
+        raise ValueError(f"{path}:{line_number}: invalid SMILES: {value!r}")
+    return "smiles"
+
+
+def _validate_and_store_smiles(
+    path: Path,
+    rows: list[tuple[int, str]],
+    *,
+    standardize: bool,
+) -> frozenset[str]:
+    keys: set[str] = set()
+    for line_number, value in rows:
+        try:
+            molecule = smiles_parser(value, ignore=True)
+        except Exception as error:
+            raise ValueError(f"{path}:{line_number}: invalid SMILES: {error}") from error
+        if not isinstance(molecule, MoleculeContainer):
+            raise ValueError(f"{path}:{line_number}: invalid SMILES: {value!r}")
+        if standardize:
+            try:
+                value = canonical_molecule_smiles(molecule)
+            except Exception as error:
+                raise ValueError(
+                    f"{path}:{line_number}: cannot canonicalize SMILES: {error}"
+                ) from error
+        keys.add(value)
+    return frozenset(keys)
+
+
+def detect_building_blocks_format(
+    building_blocks_path: str | Path,
+    building_blocks_format: BuildingBlocksFormat = "auto",
+    *,
+    input_format: BuildingBlocksFormat | None = None,
+    delimiter: str = ",",
+    smiles_column: str = "SMILES",
+) -> ResolvedBuildingBlocksFormat:
+    """Resolve and fully validate a building-block file's identity representation."""
+    requested = _resolved_format_argument(building_blocks_format, input_format)
+    path = Path(building_blocks_path).resolve(strict=True)
+    kind = _file_kind(path)
+    if kind == "sdf":
+        detected: ResolvedBuildingBlocksFormat = "smiles"
+    elif kind in {"csv", "tsv"}:
+        detected, rows = _table_stock_values(
+            path,
+            delimiter="\t" if kind == "tsv" else delimiter,
+            smiles_column=smiles_column,
+        )
+        if not rows:
+            raise ValueError(f"{path}: building-block stock is empty")
+        observed = {
+            _classify_plain_value(path, line_number, value)
+            for line_number, value in rows
+        }
+        if observed != {detected}:
+            raise ValueError(
+                f"{path}: header declares {detected!r} but rows contain "
+                f"{sorted(observed)!r}"
+            )
+    else:
+        rows = list(
+            _iter_plain_stock_values(path, smiles_records=kind in {"smi", "smiles"})
+        )
+        if not rows:
+            raise ValueError(f"{path}: building-block stock is empty")
+        observed = {
+            _classify_plain_value(path, line_number, value)
+            for line_number, value in rows
+        }
+        if len(observed) != 1:
+            raise ValueError(
+                f"{path}: mixed building-block identity formats: {sorted(observed)!r}"
+            )
+        detected = observed.pop()  # type: ignore[assignment]
+        extension_format = {"inchi": "inchi", "inchikey": "inchikey"}.get(kind)
+        if extension_format is not None and detected != extension_format:
+            raise ValueError(f"{path}: .{kind} file contains {detected!r} records")
+    if requested != "auto" and detected != requested:
+        raise ValueError(f"{path}: requested {requested!r} input but detected {detected!r}")
+    return detected
+
+
+@functools.cache
+def load_building_block_stock(
+    building_blocks_path: str | Path,
+    standardize: bool | None = None,
+    silent: bool = True,
+    num_workers: int | None = None,
+    chunksize: int = 1000,
+    *,
+    header: bool = True,
+    delimiter: str = ",",
+    smiles_column: str = "SMILES",
+    building_blocks_format: BuildingBlocksFormat = "auto",
+    input_format: BuildingBlocksFormat | None = None,
+) -> BuildingBlockStock:
+    """Load a fully validated ordinary building-block stock.
+
+    Raw Standard InChI inputs are normalized once to full Standard InChIKeys.
+    ``standardize=None`` canonicalizes SMILES/SDF input and naturally disables
+    standardization for identifier inputs.
+    """
+    del silent, chunksize  # retained for a migration-compatible loader signature
+    if num_workers is not None and num_workers < 1:
+        raise ValueError("num_workers must be >= 1")
+    if not header:
+        raise ValueError("load_building_block_stock requires headered CSV/TSV input")
+
+    path = Path(building_blocks_path).resolve(strict=True)
+    kind = _file_kind(path)
+    source_format = detect_building_blocks_format(
+        path,
+        building_blocks_format,
+        input_format=input_format,
+        delimiter=delimiter,
+        smiles_column=smiles_column,
+    )
+    if standardize is None:
+        standardize = source_format == "smiles"
+    if source_format != "smiles" and standardize:
+        raise ValueError(
+            f"{source_format} building-block inputs cannot be standardized; "
+            "they are already molecular identifiers"
+        )
+
+    if kind == "sdf":
+        if source_format != "smiles":
+            raise ValueError("SDF building-block input can only use SMILES identity")
+        keys: set[str] = set()
+        parsed = 0
+        try:
+            with SDFRead(str(path)) as sdf:
+                for parsed, molecule in enumerate(sdf, 1):
+                    if not isinstance(molecule, MoleculeContainer):
+                        raise ValueError(f"{path}: SDF record {parsed} is not a molecule")
+                    keys.add(
+                        canonical_molecule_smiles(molecule)
+                        if standardize
+                        else str(molecule)
+                    )
+        except Exception as error:
+            if isinstance(error, ValueError) and str(error).startswith(str(path)):
+                raise
+            raise ValueError(
+                f"{path}: failed to parse SDF record {parsed + 1}: {error}"
+            ) from error
+        expected = count_sdf_records(path)
+        if parsed != expected:
+            raise ValueError(f"{path}: parsed {parsed} of {expected} SDF records")
+        if not keys:
+            raise ValueError(f"{path}: building-block stock is empty")
+        return BuildingBlockStock(frozenset(keys), "smiles")
+
+    if kind in {"csv", "tsv"}:
+        _header_format, rows = _table_stock_values(
+            path,
+            delimiter="\t" if kind == "tsv" else delimiter,
+            smiles_column=smiles_column,
+        )
+    else:
+        rows = list(
+            _iter_plain_stock_values(path, smiles_records=kind in {"smi", "smiles"})
+        )
+
+    if source_format == "smiles":
+        return BuildingBlockStock(
+            _validate_and_store_smiles(path, rows, standardize=standardize), "smiles"
+        )
+    if source_format == "inchi":
+        return BuildingBlockStock(
+            frozenset(inchi_to_inchi_key(value) for _, value in rows), "inchikey"
+        )
+    return BuildingBlockStock(
+        frozenset(validate_standard_inchi_key(value) for _, value in rows),
+        "inchikey",
+    )
+
+
+def _standardize_smiles_batch_preserving_stereo(batch: list[str]) -> list[str]:
+    """Process-pool worker for legacy loading without deleting defined stereo."""
+    output: list[str] = []
+    for value in batch:
+        try:
+            molecule = smiles_parser(value, ignore=True)
+            if isinstance(molecule, MoleculeContainer):
+                output.append(canonical_molecule_smiles(molecule))
+        except Exception:
+            pass
+    return output
+
+
+def _standardize_sdf_text_preserving_stereo(block: str) -> list[str]:
+    """Process-pool worker for legacy SDF loading with preserved stereo."""
+    output: list[str] = []
+    with StringIO(block) as handle, SDFRead(handle) as sdf:
+        for molecule in sdf:
+            with contextlib.suppress(Exception):
+                output.append(canonical_molecule_smiles(molecule))
+    return output
+
+
 @functools.cache
 def load_building_blocks(
     building_blocks_path: str | Path,
@@ -407,7 +769,7 @@ def load_building_blocks(
             progress_iter = _building_blocks_progress(total, silent=silent)
             for out in _map_blocks(
                 iter_smiles_blocks(building_blocks_path, step),
-                standardize_smiles_batch,
+                _standardize_smiles_batch_preserving_stereo,
                 num_workers=num_workers,
             ):
                 if out:
@@ -428,7 +790,9 @@ def load_building_blocks(
                 smiles_column=smiles_column,
             )
             for out in _map_blocks(
-                blocks, standardize_smiles_batch, num_workers=num_workers
+                blocks,
+                _standardize_smiles_batch_preserving_stereo,
+                num_workers=num_workers,
             ):
                 if out:
                     building_blocks_smiles.update(out)
@@ -444,7 +808,9 @@ def load_building_blocks(
 
             progress = _building_blocks_progress(n, silent=silent)
             for chunk_out in _map_blocks(
-                blocks, standardize_sdf_text, num_workers=num_workers
+                blocks,
+                _standardize_sdf_text_preserving_stereo,
+                num_workers=num_workers,
             ):
                 if chunk_out:
                     building_blocks_smiles.update(chunk_out)
