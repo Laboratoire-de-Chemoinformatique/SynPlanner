@@ -7,20 +7,26 @@ failure sidecars, reproducible counters and atomic publication of a complete run
 
 from __future__ import annotations
 
-import csv
-import hashlib
 import json
 import os
 import time
 from collections import Counter
-from collections.abc import Iterator, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, TextIO
+from typing import TextIO
 
 from synplan import __version__
 from synplan.chem.synthon.config import SynthonConfig
+from synplan.utils.audit import (
+    InputRecord,
+    file_metadata,
+    iter_molecule_records,
+    iter_pathway_records,
+    sha256_file,
+    tsv_field,
+    utc_now,
+)
 
 FALLBACK_HEADER = "# input_record\tsource_info\tstatus\tdetail\n"
 ERROR_HEADER = "# input_record\tsource_info\tstage\terror_type\terror_message\n"
@@ -35,8 +41,6 @@ _RESERVED_ARTIFACT_NAMES = frozenset(
     (*SIDECAR_NAMES, *(f"{name}.partial" for name in SIDECAR_NAMES))
 )
 
-_MOLECULE_SUFFIXES = frozenset({".smi", ".smiles", ".cxsmiles"})
-_CHEMISTRY_COLUMNS = frozenset({"smiles", "cxsmiles"})
 _SUCCESS_STATUS = {
     "bb_classifying": "classified",
     "bb_synthonizing": "synthonised",
@@ -51,228 +55,6 @@ _RETRYABLE_STATUS = {
     "synthon_enumerate": frozenset({"missing_stock_slots", "no_products"}),
     "bb_scaffolds": frozenset(),
 }
-
-
-def _json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-
-
-def _tsv_field(value: object) -> str:
-    """Return one reversible-enough, single-line TSV field."""
-    return str(value).replace("\t", "\\t").replace("\r", "\\r").replace("\n", "\\n")
-
-
-def _is_complete_cxsmiles(value: str) -> bool:
-    """Recognise the whitespace-bearing shape accepted for one CXSMILES field.
-
-    The chemistry parser remains authoritative later.  Here we only distinguish a
-    complete ``SMILES |CX extension|`` field from the legacy ``SMILES name`` format,
-    whose metadata separator is intentionally no longer ambiguous.
-    """
-    head, separator, extension = value.partition(" ")
-    return bool(
-        head and separator and extension.startswith("|") and extension.endswith("|")
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class InputRecord:
-    """One source row and enough provenance to reproduce or diagnose it."""
-
-    sequence: int
-    line_number: int
-    chemistry: str
-    raw: str
-    metadata: tuple[str, ...] = ()
-    metadata_names: tuple[str, ...] = ()
-    headered: bool = False
-    kind: str = "molecule"
-    fields: tuple[str, ...] = ()
-    format_error: str | None = None
-
-    @property
-    def metadata_value(self) -> list[str] | dict[str, str]:
-        if self.headered:
-            return dict(zip(self.metadata_names, self.metadata))
-        return list(self.metadata)
-
-    @property
-    def source_info(self) -> str:
-        return _json({"line": self.line_number, "metadata": self.metadata_value})
-
-    def source_info_with(self, context: Mapping[str, object]) -> str:
-        payload: dict[str, object] = {
-            "line": self.line_number,
-            "metadata": self.metadata_value,
-        }
-        if context:
-            payload["context"] = dict(context)
-        return _json(payload)
-
-    @property
-    def input_record(self) -> str:
-        return self.chemistry if self.kind == "molecule" else self.raw
-
-    @property
-    def fallback_record(self) -> str:
-        if self.kind == "pathway" or not self.headered:
-            return self.raw
-        return f"{self.chemistry}\t{_json(self.metadata_value)}"
-
-
-def _molecule_record(
-    *,
-    sequence: int,
-    line_number: int,
-    raw: str,
-    chemistry: str,
-    metadata: tuple[str, ...],
-    metadata_names: tuple[str, ...] = (),
-    headered: bool = False,
-) -> InputRecord:
-    error = None
-    if not chemistry:
-        error = "the chemistry field is empty"
-    elif any(
-        character.isspace() for character in chemistry
-    ) and not _is_complete_cxsmiles(chemistry):
-        error = "metadata must be TAB-separated; arbitrary whitespace is not supported"
-    return InputRecord(
-        sequence=sequence,
-        line_number=line_number,
-        chemistry=chemistry,
-        raw=raw,
-        metadata=metadata,
-        metadata_names=metadata_names,
-        headered=headered,
-        format_error=error,
-    )
-
-
-def iter_molecule_records(path: str | Path) -> Iterator[InputRecord]:
-    """Yield SMI/CXSMILES records or rows from a formally headered TSV.
-
-    Headerless molecule files use TAB as their only metadata delimiter, preserving
-    whitespace inside a complete CXSMILES field.  A TSV must have exactly one
-    case-insensitive ``SMILES`` or ``CXSMILES`` column; its remaining columns are
-    retained as named provenance.
-    """
-    source = Path(path)
-    suffix = source.suffix.lower()
-    if suffix not in _MOLECULE_SUFFIXES and suffix != ".tsv":
-        raise ValueError(
-            f"unsupported molecule input format {source.suffix!r}; "
-            "expected .smi, .smiles, .cxsmiles or .tsv"
-        )
-
-    with source.open(encoding="utf-8", newline="") as handle:
-        if suffix != ".tsv":
-            sequence = 0
-            for line_number, line in enumerate(handle, 1):
-                raw = line.rstrip("\r\n")
-                if not raw.strip():
-                    continue
-                sequence += 1
-                fields = raw.split("\t")
-                yield _molecule_record(
-                    sequence=sequence,
-                    line_number=line_number,
-                    raw=raw,
-                    chemistry=fields[0].strip(),
-                    metadata=tuple(fields[1:]),
-                )
-            return
-
-        reader = csv.reader(handle, delimiter="\t")
-        try:
-            header = next(reader)
-        except StopIteration as error:
-            raise ValueError(f"{source}: expected a TSV header") from error
-        normalized = [column.strip().casefold() for column in header]
-        if len(set(normalized)) != len(normalized):
-            raise ValueError(
-                f"{source}: TSV header names must be unique (case-insensitive)"
-            )
-        chemistry_indexes = [
-            index
-            for index, column in enumerate(normalized)
-            if column in _CHEMISTRY_COLUMNS
-        ]
-        if len(chemistry_indexes) != 1:
-            raise ValueError(
-                f"{source}: expected exactly one SMILES or CXSMILES column, "
-                f"found {len(chemistry_indexes)}"
-            )
-        chemistry_index = chemistry_indexes[0]
-        metadata_indexes = tuple(
-            index for index in range(len(header)) if index != chemistry_index
-        )
-        metadata_names = tuple(header[index].strip() for index in metadata_indexes)
-        sequence = 0
-        for line_number, fields in enumerate(reader, 2):
-            if not fields or not any(field.strip() for field in fields):
-                continue
-            sequence += 1
-            raw = "\t".join(fields)
-            format_error = None
-            if len(fields) != len(header):
-                format_error = f"expected {len(header)} TSV fields, found {len(fields)}"
-            padded = fields + [""] * max(0, len(header) - len(fields))
-            record = _molecule_record(
-                sequence=sequence,
-                line_number=line_number,
-                raw=raw,
-                chemistry=padded[chemistry_index].strip(),
-                metadata=tuple(padded[index] for index in metadata_indexes),
-                metadata_names=metadata_names,
-                headered=True,
-            )
-            if format_error is not None:
-                record = InputRecord(
-                    sequence=record.sequence,
-                    line_number=record.line_number,
-                    chemistry=record.chemistry,
-                    raw=record.raw,
-                    metadata=record.metadata,
-                    metadata_names=record.metadata_names,
-                    headered=True,
-                    format_error=format_error,
-                )
-            yield record
-
-
-def iter_pathway_records(path: str | Path) -> Iterator[InputRecord]:
-    """Yield the fixed, headerless five-column fragmentation TSV records."""
-    source = Path(path)
-    with source.open(encoding="utf-8", newline="") as handle:
-        sequence = 0
-        for line_number, line in enumerate(handle, 1):
-            raw = line.rstrip("\r\n")
-            if not raw.strip():
-                continue
-            sequence += 1
-            fields = tuple(raw.split("\t"))
-            error = None
-            if len(fields) != 5:
-                error = f"expected 5 fragmentation TSV fields, found {len(fields)}"
-            elif not all(fields[:3]):
-                error = "target, pathway id and synthons fields must be non-empty"
-            yield InputRecord(
-                sequence=sequence,
-                line_number=line_number,
-                chemistry=fields[0] if fields else "",
-                raw=raw,
-                metadata=fields[1:],
-                metadata_names=(
-                    "pathway_id",
-                    "synthons",
-                    "depth",
-                    "availability",
-                ),
-                kind="pathway",
-                fields=fields,
-                format_error=error,
-            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -292,28 +74,6 @@ class AuditOutcome:
     errors: tuple[AuditError, ...] = ()
     retryable: bool = False
     metrics: Mapping[str, int | bool] = field(default_factory=dict)
-
-
-def sha256_file(path: str | Path) -> str:
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
-def _file_metadata(
-    path: Path, *, reported_path: Path | None = None
-) -> dict[str, object]:
-    return {
-        "path": str((reported_path or path).resolve()),
-        "sha256": sha256_file(path),
-        "bytes": path.stat().st_size,
-    }
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 class AuditRun:
@@ -416,11 +176,11 @@ class AuditRun:
                 path.unlink()
 
     def __enter__(self) -> AuditRun:
-        self._started_at = _utc_now()
+        self._started_at = utc_now()
         self._started = time.perf_counter()
-        self._input_metadata = _file_metadata(self.input_path)
+        self._input_metadata = file_metadata(self.input_path)
         self._provenance_metadata = {
-            name: _file_metadata(path) for name, path in self.provenance_paths.items()
+            name: file_metadata(path) for name, path in self.provenance_paths.items()
         }
         try:
             for key in (
@@ -449,7 +209,7 @@ class AuditRun:
     def _log(self, level: str, message: str) -> None:
         handle = self._handles.get("run.log")
         if handle is not None and not handle.closed:
-            handle.write(f"{_utc_now()} {level} {message}\n")
+            handle.write(f"{utc_now()} {level} {message}\n")
             handle.flush()
 
     def write(self, outcome: AuditOutcome) -> None:
@@ -484,9 +244,9 @@ class AuditRun:
         else:
             self.counters["fallback_records"] += 1
             self._handles["fallback.tsv"].write(
-                f"{_tsv_field(outcome.record.input_record)}\t"
-                f"{_tsv_field(outcome.record.source_info)}\t"
-                f"{_tsv_field(outcome.status)}\t{_tsv_field(outcome.detail)}\n"
+                f"{tsv_field(outcome.record.input_record)}\t"
+                f"{tsv_field(outcome.record.source_info)}\t"
+                f"{tsv_field(outcome.status)}\t{tsv_field(outcome.detail)}\n"
             )
             retryable = outcome.status != "processing_error" and (
                 outcome.retryable or outcome.status in retryable_statuses
@@ -501,10 +261,10 @@ class AuditRun:
             self.counters["records_with_errors"] += 1
         for error in outcome.errors:
             self._handles["errors.tsv"].write(
-                f"{_tsv_field(outcome.record.input_record)}\t"
-                f"{_tsv_field(outcome.record.source_info_with(error.context))}\t"
-                f"{_tsv_field(error.stage)}\t{_tsv_field(error.error_type)}\t"
-                f"{_tsv_field(error.message)}\n"
+                f"{tsv_field(outcome.record.input_record)}\t"
+                f"{tsv_field(outcome.record.source_info_with(error.context))}\t"
+                f"{tsv_field(error.stage)}\t{tsv_field(error.error_type)}\t"
+                f"{tsv_field(error.message)}\n"
             )
             self.counters["error_rows"] += 1
 
@@ -562,12 +322,12 @@ class AuditRun:
             )
         if self._input_metadata is None:
             raise RuntimeError("audit input provenance was not captured")
-        if _file_metadata(self.input_path) != self._input_metadata:
+        if file_metadata(self.input_path) != self._input_metadata:
             raise RuntimeError(
                 f"audit input changed during processing: {self.input_path}"
             )
         for name, path in self.provenance_paths.items():
-            if _file_metadata(path) != self._provenance_metadata[name]:
+            if file_metadata(path) != self._provenance_metadata[name]:
                 raise RuntimeError(
                     f"audit provenance file changed during processing: {path}"
                 )
@@ -581,7 +341,7 @@ class AuditRun:
             "errors.tsv",
             "run.log",
         ):
-            metadata = _file_metadata(
+            metadata = file_metadata(
                 self.partial_paths[key], reported_path=self.final_paths[key]
             )
             metadata["rows"] = self._line_count(self.partial_paths[key])
@@ -597,7 +357,7 @@ class AuditRun:
             "schema_version": 1,
             "command": self.command,
             "started_at": self._started_at,
-            "finished_at": _utc_now(),
+            "finished_at": utc_now(),
             "elapsed_seconds": time.perf_counter() - self._started,
             "input": self._input_metadata,
             "provenance_files": dict(sorted(self._provenance_metadata.items())),
