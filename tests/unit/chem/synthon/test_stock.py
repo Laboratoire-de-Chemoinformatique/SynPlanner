@@ -47,6 +47,21 @@ def test_a_stock_file_round_trips(stock_file):
     assert tuple(read_synthon_records(stock_file)) == RECORDS
 
 
+def test_a_stock_file_round_trips_charged_building_blocks(tmp_path):
+    records = (
+        SynthonRecord(
+            "C[CH2_nuc]",
+            ("C[NH3+]", "[Na+].[O-]C=O", "CCN"),
+            ("PrimaryAmines",),
+            0,
+        ),
+    )
+    path = tmp_path / "charged.smi"
+    write_synthon_stock(str(path), records)
+
+    assert tuple(read_synthon_records(str(path))) == records
+
+
 def test_a_synthon_made_by_two_blocks_keeps_both(stock_file):
     assert load_synthon_stock(stock_file)["CC[NH2_nuc]"] == {
         "CCN",
