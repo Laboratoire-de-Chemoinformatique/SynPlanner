@@ -53,6 +53,9 @@ class SynthonConfig(BaseConfigModel):
     time_budget_s: float | None = Field(
         None, gt=0.0
     )  # max_products bounds output, not work
+    # CLI audit artifacts
+    write_audit_files: bool = False
+    audit_overwrite: Literal["error", "replace"] = "error"
 
     @model_validator(mode="after")
     def _mw_window_is_non_empty(self) -> "SynthonConfig":

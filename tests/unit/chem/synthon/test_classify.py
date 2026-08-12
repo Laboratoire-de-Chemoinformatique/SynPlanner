@@ -19,7 +19,7 @@ def classifier():
 
 def published():
     for line in (FIXTURES / "outSynth_BBmode.smi").read_text().splitlines():
-        fields = line.split()
+        fields = line.split("\t")
         yield fields[0], fields[2].split("+")
 
 

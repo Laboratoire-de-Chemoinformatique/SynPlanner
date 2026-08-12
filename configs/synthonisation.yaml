@@ -19,3 +19,9 @@ pas_removal_direction: true
 ro2_filtration: false
 ro2_variant: paper
 strict_availability: false
+
+# Optional auditable CLI output bundle. When enabled, fallback.smi,
+# fallback.tsv, errors.tsv, summary.json and run.log are written beside the
+# primary output. Use a dedicated output directory for each command.
+write_audit_files: false
+audit_overwrite: error

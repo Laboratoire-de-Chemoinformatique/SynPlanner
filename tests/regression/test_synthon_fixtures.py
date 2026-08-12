@@ -56,7 +56,7 @@ def canonical(smi: str) -> str:
 
 def published_synthons():
     for line in (FIXTURES / "outSynth_BBmode.smi").read_text().splitlines():
-        fields = line.split()
+        fields = line.split("\t")
         yield fields[0], {canonical(s) for s in fields[3].split(".")}
 
 
@@ -73,7 +73,7 @@ def test_published_synthons(synthoniser, smi, expected):
 
 def test_the_fixture_totals(synthoniser):
     blocks = [
-        line.split()[0]
+        line.split("\t", 1)[0]
         for line in (FIXTURES / "BBs.cxsmiles").read_text().splitlines()
         if line.strip()
     ]
@@ -105,7 +105,7 @@ def test_availability_uses_the_stock():
 
 def test_the_tutorial_round_trip(synthoniser):
     blocks = [
-        line.split()[0]
+        line.split("\t", 1)[0]
         for line in (FIXTURES / "BBs.cxsmiles").read_text().splitlines()
         if line.strip()
     ]

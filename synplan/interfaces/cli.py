@@ -1098,9 +1098,18 @@ def synthon_enumerate_cli(
     type=click.Path(),
     help="Path to the file where the scaffolds will be stored.",
 )
-def bb_scaffolds_cli(input_file: str, output_file: str) -> None:
+@click.option(
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to the synthonisation configuration file.",
+)
+def bb_scaffolds_cli(
+    input_file: str, output_file: str, config_path: str | None
+) -> None:
     """Bemis-Murcko scaffolds after protecting-group removal."""
-    written = scaffolds_file(input_file, output_file)
+    written = scaffolds_file(input_file, output_file, _synthon_config(config_path))
     click.echo(f"{written} scaffolds written")
 
 

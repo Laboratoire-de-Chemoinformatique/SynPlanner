@@ -43,7 +43,7 @@ def test_fragment_then_enumerate(blocks, tmp_path):
     stock = tmp_path / "synthons.smi"
     run("bb_synthonizing", "--input", str(blocks), "--output", str(stock))
     targets = tmp_path / "targets.smi"
-    targets.write_text("CCCCCC(C)OC(=O)CC target\n")
+    targets.write_text("CCCCCC(C)OC(=O)CC\ttarget\n")
     pathways = tmp_path / "pathways.tsv"
     run(
         "synthon_fragment",

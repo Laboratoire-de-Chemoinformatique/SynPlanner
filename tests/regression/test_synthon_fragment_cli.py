@@ -110,7 +110,7 @@ def test_the_memo_does_not_carry_over_between_targets():
 
 def test_no_command_truncates_its_own_input(tmp_path, stock):
     path = tmp_path / "bbs.smi"
-    path.write_text("CCO id1\nNCc1ccccc1 id2\n")
+    path.write_text("CCO\tid1\nNCc1ccccc1\tid2\n")
     same = str(path)
     before = path.read_text()
     for call in (
@@ -127,7 +127,7 @@ def test_no_command_truncates_its_own_input(tmp_path, stock):
 
 def test_one_bad_row_does_not_abort_the_batch(tmp_path, stock):
     targets = tmp_path / "targets.smi"
-    targets.write_text(f"[Xx] broken\n{PARACETAMOL} good\n")
+    targets.write_text(f"[Xx]\tbroken\n{PARACETAMOL}\tgood\n")
     pathways = tmp_path / "pathways.tsv"
     assert cli.fragment_file(str(targets), str(pathways))
     assert all(
@@ -145,7 +145,7 @@ def test_one_bad_row_does_not_abort_the_batch(tmp_path, stock):
 
 def test_the_synthon_stock_is_streamed(tmp_path, monkeypatch):
     path = tmp_path / "bbs.smi"
-    path.write_text("NCc1ccccc1 id1\n")
+    path.write_text("NCc1ccccc1\tid1\n")
     seen = {}
 
     def capture(target, records):
@@ -160,7 +160,7 @@ def test_the_synthon_stock_is_streamed(tmp_path, monkeypatch):
 
 def test_every_input_row_keeps_its_own_name(tmp_path):
     path = tmp_path / "bbs.smi"
-    path.write_text("CCO id1\nCCO id2\n")
+    path.write_text("CCO\tid1\nCCO\tid2\n")
     out = tmp_path / "classes.tsv"
     assert cli.classify_file(str(path), str(out)) == 2
     assert {line.split("\t")[1] for line in out.read_text().splitlines()} == {
