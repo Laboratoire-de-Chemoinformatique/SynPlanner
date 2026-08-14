@@ -7,6 +7,8 @@ _MODULES = {
     "BuildingBlockStockLoadConfig": "config",
     "DeprotectionOutput": "config",
     "DeprotectionPolicy": "config",
+    "deprotect_molecule": "deprotection",
+    "remove_protective_groups": "deprotection",
     "MoleculeIdentity": "identity",
     "MoleculeIdentityError": "identity",
     "inchi_to_inchi_key": "identity",
