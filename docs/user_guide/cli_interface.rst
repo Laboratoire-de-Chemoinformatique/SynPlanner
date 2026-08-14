@@ -56,15 +56,37 @@ ORD ``.pb`` datasets can be converted to SynPlanner-compatible reaction SMILES:
 
 Building blocks standardization
 -------------------------------
-Standardize custom building blocks for compatibility with ``SynPlanner``.
+Prepare a custom ordinary building-block stock. The two-path form remains the
+defaults-only compatibility command:
 
 .. code-block:: bash
 
     synplan building_blocks_standardizing --input building_blocks_original.smi --output building_blocks_standardized.smi
 
-**Parameters**:
-    - ``input`` - the path to the file (.smi or .rdf) with building blocks to be standardized.
-    - ``output`` - the path to the file (.smi or .rdf) where standardized building blocks to be stored.
+For deprotection, audited reports, and a full Standard InChIKey stock, use the
+shipped preset:
+
+.. code-block:: bash
+
+    mkdir -p prepared
+    synplan building_blocks_standardizing \
+        --config configs/building_blocks_full_pipeline.yaml \
+        --input building_blocks.tsv \
+        --output prepared/building_blocks.smi
+
+The input may be headerless SMI/SMILES/CXSMILES, SDF, or a headered CSV/TSV;
+compressed CSV/TSV is supported. Headerless metadata is TAB-delimited so a
+complete CXSMILES field is not truncated. All processing options are configured in YAML; the command itself accepts only
+``--input``, ``--output``, and the optional ``--config``.
+
+The primary output is a deduplicated, stereo-preserving canonical-SMILES
+planner stock. For ``building_blocks.smi``, the full preset also writes
+``building_blocks.inchikey``, ``building_blocks_identity.tsv``,
+``building_blocks_duplicates.tsv``, ``building_blocks_collisions.tsv``,
+``building_blocks_stereo.tsv``, and the audit reports. When deprotection is enabled,
+``<stem>_protected.smi`` is the canonical protected catalogue to pass to
+``bb_classifying`` and ``bb_synthonizing``; deprotected molecules do not enter
+the Synthon workflow automatically. See :doc:`/configuration/building_blocks`.
 
 Synthon workflows
 -----------------

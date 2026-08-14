@@ -10,6 +10,7 @@ requests, and cutting a release.
    setup
    pr_review
    release
+   building_block_pipeline_from_synthon
 
 - :doc:`setup` — uv environment, running tests, building Docker images.
 - :doc:`pr_review` — the checklist to work through before approving a pull

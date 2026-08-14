@@ -12,6 +12,64 @@ For the full per-release log, see :doc:`/release_notes`.
    :local:
    :depth: 2
 
+Unreleased
+==========
+
+Planning and stock identity preserve stereochemistry
+-----------------------------------------------------
+
+Planning targets, precursors, reactor products, Tree state identity, and new
+ordinary building-block stocks now preserve defined R/S and E/Z
+stereochemistry. Existing data-curation helpers keep their historical
+stereo-cleaning defaults, but a stock prepared by an older SynPlanner release
+may already have lost this information and should be regenerated.
+
+Use :func:`synplan.utils.loading.load_building_block` for new
+planning code::
+
+    from synplan.utils.loading import load_building_block
+
+It returns a typed
+:class:`synplan.chem.building_blocks.BuildingBlockStock` using either
+stereo-preserving canonical SMILES or full Standard InChIKeys. Raw Standard
+InChI is no longer accepted as a stock encoding; regenerate or convert it to a
+full Standard InChIKey file first. Legacy
+:func:`synplan.utils.loading.load_building_blocks` still returns a
+``frozenset`` for compatible callers.
+
+Stock source configuration is no longer a Tree setting. Move:
+
+.. code-block:: yaml
+
+   tree:
+     building_blocks_format: inchikey
+
+to:
+
+.. code-block:: yaml
+
+   building_blocks:
+     identity_format: inchikey
+
+Python callers may pass a
+:class:`synplan.chem.building_blocks.BuildingBlockStockLoadConfig` to
+``load_building_block(..., config=...)``. The resulting typed stock,
+not its source configuration, is supplied to :class:`~synplan.mcts.tree.Tree`.
+
+The typed loader no longer mirrors the legacy ``load_building_blocks()``
+arguments. It always validates the complete input and canonicalizes SMILES
+keys. Replace ``building_blocks_format=...`` or ``input_format=...`` with
+``config=BuildingBlockStockLoadConfig(identity_format=...)``. Legacy
+``standardize``, ``silent``, ``num_workers``, ``chunksize``, and ``header``
+arguments remain available only on ``load_building_blocks()``.
+
+The preparation CLI remains callable with only ``--input`` and ``--output``.
+For the new identity/deprotection/audit pipeline, pass one YAML configuration;
+do not combine ``--config`` with processing flags. When deprotection is enabled,
+use ``<stem>_protected.smi`` as the input to the Synt-On classifier and
+synthoniser. The planner stock may contain deprotected structures, but they are
+never added to the Synthon action space implicitly.
+
 1.6.0
 =====
 

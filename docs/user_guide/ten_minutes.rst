@@ -103,9 +103,10 @@ The example below uses the ranking policy network and rollout evaluation. This i
 .. code-block:: python
 
     from synplan.utils.loading import (
-        load_building_blocks, load_reaction_rules,
+        load_reaction_rules,
         load_policy_function, load_evaluation_function,
         download_preset,
+        load_building_block,
     )
     from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
     from synplan.chem.utils import mol_from_smiles
@@ -115,7 +116,7 @@ The example below uses the ranking policy network and rollout evaluation. This i
     paths = download_preset("synplanner-gps", save_to="synplan_data")
 
     # Load components (preset building blocks are already standardized)
-    building_blocks = load_building_blocks(paths["building_blocks"], standardize=False)
+    building_blocks = load_building_block(paths["building_blocks"])
     reaction_rules  = load_reaction_rules(paths["reaction_rules"])
     policy_network  = load_policy_function(weights_path=paths["ranking_policy"])
 
@@ -145,6 +146,7 @@ The example below uses the ranking policy network and rollout evaluation. This i
     target = mol_from_smiles(
         "NC1(C(=O)N[C@@H](CCO)c2ccc(Cl)cc2)CCN(c2nc[nH]c3nccc2-3)CC1",
         standardize=True,
+        clean_stereo=False,
     )
 
     # Run the search

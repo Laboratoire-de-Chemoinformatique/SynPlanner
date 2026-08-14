@@ -7,6 +7,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added an ordinary building-block pipeline under
+  `synplan.chem.building_blocks`. It prepares stereo-preserving canonical-SMILES
+  stocks, optionally applies 84 conservative or 95 aggressive deprotection
+  programs, and can emit a deduplicated full Standard InChIKey stock. Each key
+  is generated directly from the mapping-free RDKit molecule with
+  `MolToInchiKey`; a separate reference conversion retains the Standard InChI,
+  conversion warnings, source provenance, duplicates, and identity
+  collisions as auditable reference data. A protected canonical sidecar is kept as the supported input
+  to the Synt-On classifier/synthoniser whenever deprotection is enabled.
+
+- Added typed `BuildingBlockStock` membership and strict canonical-SMILES and
+  full-Standard-InChIKey loading. Planning, rollout evaluation, reinforcement
+  search, route export, visualisation, RDKit conversion, RouteCGR, and GUI
+  planning now share the same resolved stock identity. Legacy sets remain
+  supported as SMILES stocks; raw-InChI stocks and pickles are rejected.
+  Stock-source decoding is owned by
+  `BuildingBlockStockLoadConfig` rather than `TreeConfig`; planning YAML uses a
+  sibling `building_blocks` section and the Tree receives only the resolved typed
+  stock.
+
+- Added `BuildingBlockPreparationConfig`, two shipped preparation presets, and
+  audited preparation bundles with staged output, input/hash verification,
+  `summary.json` as the final commit marker, and deterministic ordered
+  multiprocessing.
+
 - Added `synplan.chem.synthon`, a native port of Synt-On (SynthI; Zabolotna, Volochnyuk,
   Ryabukhin, Gavrylenko, Horvath, Klimchuk, Oksiuta, Marcou, Varnek, "SynthI: A New
   Open-Source Tool for Synthon-Based Library Design", *J. Chem. Inf. Model.* 2022,
@@ -137,6 +162,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   itself balance, are reported apart rather than counted as losses.
 
 ### Changed
+
+- Planning identity now preserves defined tetrahedral and double-bond
+  stereochemistry. `safe_canonicalization()` retains its historical
+  stereo-cleaning default for unrelated workflows and exposes the copy-safe
+  `clean_stereo=False` path used by targets, precursors, stocks, and planning.
+  Existing stereochemical catalogues should be regenerated with the new
+  preparation pipeline.
 
 - `chython-synplan` is pinned to 1.103 and sourced from the local fork, which adds the
   `Synthon` atom family, `SynthonContainer`, the `_token` bracket field in SMILES and

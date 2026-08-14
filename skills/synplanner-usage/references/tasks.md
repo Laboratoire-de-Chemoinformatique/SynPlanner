@@ -17,7 +17,8 @@ setup, then ..." rather than repeat it.
 | Step | Where |
 | --- | --- |
 | `download_preset` | `synplan.utils.loading` |
-| `load_building_blocks`, `load_reaction_rules`, `load_policy_function` | `synplan.utils.loading` |
+| `load_building_block` | `synplan.utils.loading` |
+| `load_reaction_rules`, `load_policy_function` | `synplan.utils.loading` |
 | `TreeConfig`, `RolloutEvaluationConfig` | `synplan.utils.config` |
 | `load_evaluation_function` | `synplan.utils.loading` |
 | `mol_from_smiles` | `synplan.chem.utils` |
@@ -198,9 +199,18 @@ Tutorial: `12_Rule_Analysis`
 Docs: `methods/extraction`
 
 **Use my own building blocks**
-CLI: `building_blocks_standardizing`. Preset building blocks are already
-standardized — pass `standardize=False` to `load_building_blocks`.
-Docs: `user_guide/cli_interface`, `user_guide/data`
+CLI: `building_blocks_standardizing`. Use
+`building_blocks_preparation.yaml` for stereo-preserving canonical SMILES, or
+`building_blocks_full_pipeline.yaml` for conservative
+deprotection, a full Standard InChIKey stock, provenance, and audited outputs.
+Python: `prepare_building_blocks`, `load_building_block`, and
+`BuildingBlockStock` in `synplan.chem.building_blocks`. Standard InChI is
+retained only in preparation provenance; stock inputs are canonical SMILES or
+full Standard InChIKeys. When deprotection is enabled, feed the returned
+`BuildingBlockPreparationResult.synthon_input`/`<stem>_protected.smi` to the
+Synthon commands.
+Docs: `configuration/building_blocks`, `methods/building_blocks`,
+`user_guide/cli_interface`
 
 **Import reaction data from ORD**
 CLI: `ord_convert`.

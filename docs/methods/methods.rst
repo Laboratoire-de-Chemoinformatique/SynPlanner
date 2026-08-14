@@ -12,6 +12,7 @@ Practical usage is covered in :doc:`/configuration/configuration` and :doc:`/use
     :hidden:
     :titlesonly:
 
+    building_blocks
     standardization
     filtration
     extraction

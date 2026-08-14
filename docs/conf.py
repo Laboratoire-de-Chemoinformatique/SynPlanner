@@ -14,7 +14,10 @@ extensions = [
     "nbsphinx",
     "myst_parser",
 ]
-source_suffix = ".rst"
+source_suffix = {
+    ".rst": "restructuredtext",
+    ".md": "markdown",
+}
 master_doc = "index"
 
 # Served verbatim at the site root. llms.txt is a curated index for LLMs that
