@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from synplan.chem.building_blocks.config import BuildingBlockStockLoadConfig
 from synplan.chem.data.filtering import ReactionFilterConfig
 from synplan.chem.data.standardizing import ReactionStandardizationConfig
 from synplan.chem.synthon.config import SynthonConfig
@@ -31,6 +32,7 @@ FLAT = {
     "extraction_functional_groups.yaml": RuleExtractionConfig,
     "policy_training.yaml": PolicyNetworkConfig,
     "mhn_ranking_policy_training.yaml": PolicyNetworkConfig,
+    "building_blocks_stock.yaml": BuildingBlockStockLoadConfig,
     "combined_ranking_filtering_policy.yaml": CombinedPolicyConfig,
     "synthonisation.yaml": SynthonConfig,
 }

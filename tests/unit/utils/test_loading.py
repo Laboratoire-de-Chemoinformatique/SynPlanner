@@ -1,7 +1,21 @@
 import gzip
 
 from synplan.chem.utils import standardize_smiles_batch
-from synplan.utils.loading import load_building_blocks, load_policy_function
+from synplan.utils.loading import (
+    load_building_block,
+    load_building_blocks,
+    load_policy_function,
+)
+
+
+def test_load_building_block_returns_typed_canonical_stock(tmp_path):
+    path = tmp_path / "stock.smi"
+    path.write_text("OCC\n", encoding="utf-8")
+
+    stock = load_building_block(path)
+
+    assert stock.identity_format == "smiles"
+    assert stock.keys == frozenset({"CCO"})
 
 
 def test_load_building_blocks_csv_header(tmp_path):

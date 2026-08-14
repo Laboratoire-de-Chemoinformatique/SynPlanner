@@ -170,7 +170,10 @@ CASES = [
 ]
 
 # Configs consumed by the Python API only, never passed to a subcommand.
-PYTHON_API_ONLY = {"combined_ranking_filtering_policy.yaml"}
+PYTHON_API_ONLY = {
+    "building_blocks_stock.yaml",
+    "combined_ranking_filtering_policy.yaml",
+}
 
 
 def test_every_shipped_config_has_a_cli_case():

@@ -276,24 +276,33 @@ def unite_molecules(molecules: Iterable[MoleculeContainer]) -> MoleculeContainer
     return new_mol
 
 
-def safe_canonicalization(molecule: MoleculeContainer) -> MoleculeContainer:
+def safe_canonicalization(
+    molecule: MoleculeContainer, *, clean_stereo: bool = True
+) -> MoleculeContainer:
     """Attempts to canonicalize a molecule, handling any exceptions. If the
     canonicalization process fails due to an InvalidAromaticRing exception, it safely
-    returns the original molecule.
+    returns an unchanged copy of the original molecule.
+
+    The input container is never modified. ``clean_stereo=True`` retains the
+    historical data-processing behaviour; planning and stock-identity callers
+    pass ``False`` so defined tetrahedral and double-bond stereochemistry
+    survives canonicalization.
 
     :param molecule: The given molecule to be canonicalized.
-    :return: The canonicalized molecule if successful, otherwise the original molecule.
+    :param clean_stereo: Whether to remove stereochemical marks after
+        canonicalization. Defaults to the historical ``True`` behaviour.
+    :return: The canonicalized molecule if successful, otherwise an unchanged copy.
     """
-    molecule._atoms = dict(sorted(molecule._atoms.items()))
-
     molecule_copy = molecule.copy()
+    molecule_copy._atoms = dict(sorted(molecule_copy._atoms.items()))
     try:
         molecule_copy.remove_coordinate_bonds(keep_to_terminal=False)
         molecule_copy.canonicalize()
-        molecule_copy.clean_stereo()
+        if clean_stereo:
+            molecule_copy.clean_stereo()
         return molecule_copy
     except InvalidAromaticRing:
-        return molecule
+        return molecule.copy()
 
 
 def validate_and_canonicalize(

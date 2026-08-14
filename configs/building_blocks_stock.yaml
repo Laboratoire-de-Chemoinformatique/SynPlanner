@@ -1,0 +1,7 @@
+# Ordinary building-block stock loading for the InChIKey planning workflow.
+# Every non-comment record is validated as one full Standard InChIKey.
+identity_format: inchikey
+
+# These options are only needed for headered CSV/TSV stock sources.
+chemistry_column: null
+delimiter: null
