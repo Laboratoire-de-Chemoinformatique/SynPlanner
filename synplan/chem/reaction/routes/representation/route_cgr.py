@@ -3,6 +3,10 @@ from typing import TYPE_CHECKING
 
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 
+from synplan.chem.reaction.reactor import (
+    _restore_product_stereo,
+    _snapshot_product_stereo,
+)
 from synplan.chem.reaction.routes.contracts import (
     RouteCGRBuildResult,
     RouteDiagnostic,
@@ -22,6 +26,65 @@ if TYPE_CHECKING:
     from synplan.mcts.tree import Tree
 
 logger = logging.getLogger(__name__)
+
+_ReactionStereoSources = tuple[
+    tuple[MoleculeContainer, ...],
+    tuple[MoleculeContainer, ...],
+]
+
+
+def _copy_reaction_stereo_sources(
+    reaction: ReactionContainer,
+) -> _ReactionStereoSources:
+    """Copy both molecular sides before CGR reconstruction drops stereo."""
+
+    return (
+        tuple(molecule.copy() for molecule in reaction.reactants),
+        tuple(molecule.copy() for molecule in reaction.products),
+    )
+
+
+def _remap_reaction_stereo_sources(
+    sources: _ReactionStereoSources,
+    mapping: dict[int, int],
+) -> None:
+    """Apply a CGR atom-number remap to the matching stereo source copies."""
+
+    if not mapping:
+        return
+    for molecules in sources:
+        for molecule in molecules:
+            molecule_mapping = {
+                atom_number: mapped_number
+                for atom_number, mapped_number in mapping.items()
+                if atom_number in molecule._atoms
+            }
+            if molecule_mapping:
+                molecule.remap(molecule_mapping)
+
+
+def _reaction_from_cgr_with_stereo(
+    cgr: CGRContainer,
+    sources: _ReactionStereoSources,
+) -> ReactionContainer:
+    """Rebuild a reaction while restoring still-valid source-side stereo.
+
+    CGRs intentionally do not encode molecule stereochemistry. Route atom-number
+    reconciliation therefore keeps remapped copies of the original reaction sides
+    and reapplies their descriptors after ``ReactionContainer.from_cgr``.
+    Reactant and product descriptors are handled separately because mapped atom
+    numbers legitimately occur on both sides of a reaction.
+    """
+
+    reaction = ReactionContainer.from_cgr(cgr)
+    for source_molecules, rebuilt_molecules in (
+        (sources[0], reaction.reactants),
+        (sources[1], reaction.products),
+    ):
+        atom_stereo, bond_stereo = _snapshot_product_stereo(source_molecules)
+        for molecule in rebuilt_molecules:
+            _restore_product_stereo(molecule, atom_stereo, bond_stereo)
+    return reaction
 
 
 def _next_atom_number(*containers):
@@ -559,6 +622,11 @@ def _compose_route_cgr_legacy(
         sorted_ids = sorted(step_map)
         reactions = [step_map[i] for i in sorted_ids]
         cgrs = [rxn.compose() for rxn in reactions]
+        stereo_sources = (
+            [_copy_reaction_stereo_sources(reaction) for reaction in reactions]
+            if return_reactions_dict
+            else None
+        )
         route_orders = _route_order_depths(reactions)
         # Depth is kept for route interpretation; step order preserves exact
         # chronological route identity for hashing.
@@ -588,17 +656,23 @@ def _compose_route_cgr_legacy(
         # start from the last (final) reaction
         accum_cgr = cgrs[-1]
         reactions_dict = (
-            {len(reactions) - 1: ReactionContainer.from_cgr(cgrs[-1])}
-            if return_reactions_dict
+            {
+                len(reactions) - 1: _reaction_from_cgr_with_stereo(
+                    cgrs[-1], stereo_sources[-1]
+                )
+            }
+            if stereo_sources is not None
             else None
         )
         max_num = _next_atom_number(*cgrs)
         # now fold backwards through the earlier steps
         for idx in range(len(reactions) - 2, -1, -1):
             curr_cgr = cgrs[idx]
-            curr_cgr, max_num, _ = remap_composition_conflicts(
+            curr_cgr, max_num, conflict_mapping = remap_composition_conflicts(
                 curr_cgr, accum_cgr, max_num
             )
+            if stereo_sources is not None:
+                _remap_reaction_stereo_sources(stereo_sources[idx], conflict_mapping)
             _record_deconvolution_labels(
                 curr_cgr,
                 route_step_orders[idx],
@@ -615,8 +689,10 @@ def _compose_route_cgr_legacy(
                 atom_route_step_orders,
             )
             accum_cgr = _compose_cgrs(curr_cgr, accum_cgr, preserve_transient_bonds)
-            if return_reactions_dict:
-                reactions_dict[idx] = ReactionContainer.from_cgr(curr_cgr)
+            if reactions_dict is not None and stereo_sources is not None:
+                reactions_dict[idx] = _reaction_from_cgr_with_stereo(
+                    curr_cgr, stereo_sources[idx]
+                )
 
         _apply_route_orders(
             accum_cgr,
@@ -640,6 +716,11 @@ def _compose_route_cgr_legacy(
         # original tree-based logic:
         reactions = tree.synthesis_route(route_id)
         cgrs = [rxn.compose() for rxn in reactions]
+        stereo_sources = (
+            [_copy_reaction_stereo_sources(reaction) for reaction in reactions]
+            if return_reactions_dict
+            else None
+        )
         route_orders = _route_order_depths(reactions)
         # Depth is kept for route interpretation; step order preserves exact
         # chronological route identity for hashing.
@@ -668,8 +749,12 @@ def _compose_route_cgr_legacy(
 
         first_react = reactions[-1]
         reactions_dict = (
-            {len(reactions) - 1: ReactionContainer.from_cgr(cgrs[-1])}
-            if return_reactions_dict
+            {
+                len(reactions) - 1: _reaction_from_cgr_with_stereo(
+                    cgrs[-1], stereo_sources[-1]
+                )
+            }
+            if stereo_sources is not None
             else None
         )
 
@@ -692,6 +777,8 @@ def _compose_route_cgr_legacy(
 
             if prev_remap:
                 curr_cgr = curr_cgr.remap(prev_remap, copy=True)
+                if stereo_sources is not None:
+                    _remap_reaction_stereo_sources(stereo_sources[step], prev_remap)
 
             # identify new atom-numbers for any overlap
             target_block = process_target_blocks(
@@ -722,6 +809,8 @@ def _compose_route_cgr_legacy(
                 }
             if dict_map:
                 curr_cgr.remap(dict_map, copy=False)
+                if stereo_sources is not None:
+                    _remap_reaction_stereo_sources(stereo_sources[step], dict_map)
 
             # update our react_dict & bb_set
             react_dict, bb_set = update_reaction_dict(
@@ -733,10 +822,14 @@ def _compose_route_cgr_legacy(
             # apply the new overlap-mapping
             if mapping:
                 curr_cgr.remap(mapping, copy=False)
+                if stereo_sources is not None:
+                    _remap_reaction_stereo_sources(stereo_sources[step], mapping)
 
             curr_cgr, max_num, conflict_mapping = remap_composition_conflicts(
                 curr_cgr, accum_cgr, max_num
             )
+            if stereo_sources is not None:
+                _remap_reaction_stereo_sources(stereo_sources[step], conflict_mapping)
             update_react_remaps_for_conflicts(react_dict, reaction, conflict_mapping)
             _record_deconvolution_labels(
                 curr_cgr,
@@ -754,8 +847,10 @@ def _compose_route_cgr_legacy(
                 atom_route_step_orders,
             )
 
-            if return_reactions_dict:
-                reactions_dict[step] = ReactionContainer.from_cgr(curr_cgr)
+            if reactions_dict is not None and stereo_sources is not None:
+                reactions_dict[step] = _reaction_from_cgr_with_stereo(
+                    curr_cgr, stereo_sources[step]
+                )
             accum_cgr = _compose_cgrs(curr_cgr, accum_cgr, preserve_transient_bonds)
 
         _apply_route_orders(

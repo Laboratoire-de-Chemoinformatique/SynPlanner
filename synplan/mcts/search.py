@@ -296,7 +296,7 @@ def run_search(
                 export_key = _canonical_target_key(target_smi)
                 exported_routes[export_key] = []
             try:
-                target_mol = mol_from_smiles(target_smi)
+                target_mol = mol_from_smiles(target_smi, clean_stereo=False)
                 # run search
                 tree = Tree(
                     target=target_mol,

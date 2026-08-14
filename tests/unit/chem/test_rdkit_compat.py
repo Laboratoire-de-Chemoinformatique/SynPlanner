@@ -276,3 +276,18 @@ class TestExtractRoutesRdkit:
 
         for route in routes:
             check_node(route)
+
+
+def test_rdkit_planning_target_preserves_enantiomers_by_default():
+    left = target_from_rdkit(Chem.MolFromSmiles("N[C@@H](C)C(=O)O"))
+    right = target_from_rdkit(Chem.MolFromSmiles("N[C@H](C)C(=O)O"))
+
+    assert left != right
+
+
+def test_rdkit_building_blocks_preserve_stereoisomers():
+    stock = building_blocks_from_rdkit(
+        [Chem.MolFromSmiles("N[C@@H](C)C(=O)O"), Chem.MolFromSmiles("N[C@H](C)C(=O)O")]
+    )
+
+    assert len(stock) == 2

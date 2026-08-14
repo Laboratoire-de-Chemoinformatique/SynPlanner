@@ -243,7 +243,7 @@ def test_parallel_extraction_timeout_scales_with_batch_size(monkeypatch, tmp_pat
 
 
 def test_ignore_stereo_allows_validation_of_stereo_cleaned_rules():
-    """Extraction can opt into the stereo-cleaned rule/reactor contract."""
+    """Reactor validation accepts valid stereo with either extraction policy."""
     rxn_smi = (
         "[CH3:27][O-:28]."
         "[F:6][C:5]([F:8])([F:7])[c:4]1[cH:3][c:2]"
@@ -272,7 +272,7 @@ def test_ignore_stereo_allows_validation_of_stereo_cleaned_rules():
     no_stereo_cfg = RuleExtractionConfig(**base, ignore_stereo=True)
     no_stereo_rules, _ = extract_rules(no_stereo_cfg, smiles(rxn_smi))
 
-    assert stereo_rules[0].meta["reactor_validation"] == "failed"
+    assert stereo_rules[0].meta["reactor_validation"] == "passed"
     assert no_stereo_rules[0].meta["reactor_validation"] == "passed"
 
 

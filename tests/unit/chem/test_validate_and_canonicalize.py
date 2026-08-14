@@ -20,7 +20,7 @@ from synplan.chem.utils import (
 )
 
 
-def _legacy_validate_and_canonicalize(mol):
+def _stereo_preserving_validate_and_canonicalize(mol):
     """Reproduce the previous two-pass behavior exactly: validate via
     a copied kekule + check_valence, then canonicalize on a fresh copy.
     Returns ``None`` if validation rejects."""
@@ -32,7 +32,7 @@ def _legacy_validate_and_canonicalize(mol):
             return None
     except Exception:
         return None
-    return safe_canonicalization(mol)
+    return safe_canonicalization(mol, clean_stereo=False)
 
 
 # Representative target molecules covering aromatic rings, heterocycles,
@@ -53,13 +53,13 @@ _REPRESENTATIVE_SMILES = [
 
 
 @pytest.mark.parametrize("smi", _REPRESENTATIVE_SMILES)
-def test_byte_identical_to_legacy_flow(smi):
+def test_byte_identical_to_stereo_preserving_flow(smi):
     """Canonical SMILES from the merged pipeline must match the legacy
     two-pass result for all representative molecules. This is the
     contract that lets us swap one for the other in production without
     breaking MCTS state-dedup."""
     mol = smiles(smi)
-    legacy = _legacy_validate_and_canonicalize(mol)
+    legacy = _stereo_preserving_validate_and_canonicalize(mol)
     merged = validate_and_canonicalize(mol)
 
     assert (legacy is None) == (merged is None), (
@@ -165,7 +165,7 @@ def test_rdkit_roundtrip_stable_under_merged_pipeline(smi):
 
 
 @pytest.mark.parametrize("smi", _RDKIT_SMILES)
-def test_rdkit_input_byte_identical_to_legacy(smi):
+def test_rdkit_input_matches_stereo_preserving_flow(smi):
     """For an RDKit-originated molecule, the merged pipeline must
     produce the same canonical SMILES as the legacy
     ``safe_canonicalization``. This is the harder contract: it
@@ -179,7 +179,7 @@ def test_rdkit_input_byte_identical_to_legacy(smi):
     assert rdmol is not None
     mol = MoleculeContainer.from_rdkit(rdmol)
 
-    legacy = _legacy_validate_and_canonicalize(mol)
+    legacy = _stereo_preserving_validate_and_canonicalize(mol)
     merged = validate_and_canonicalize(mol)
 
     assert (legacy is None) == (merged is None), (

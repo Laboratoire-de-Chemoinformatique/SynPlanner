@@ -372,7 +372,7 @@ def setup_planning_options():
         st.session_state.target_smiles = active_smile_code
 
         try:
-            target_molecule = mol_from_smiles(active_smile_code, clean_stereo=True)
+            target_molecule = mol_from_smiles(active_smile_code, clean_stereo=False)
             if target_molecule is None:
                 st.error(f"Could not parse the input SMILES: {active_smile_code}")
             else:

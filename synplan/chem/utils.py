@@ -317,9 +317,9 @@ def validate_and_canonicalize(
     For user inputs (targets, building blocks), use the permissive
     ``safe_canonicalization`` instead.
     """
-    # Atom-key sort, idempotent across calls.
-    molecule._atoms = dict(sorted(molecule._atoms.items()))
     tmp = molecule.copy()
+    # Atom-key sort, idempotent across calls, without mutating the reactor output.
+    tmp._atoms = dict(sorted(tmp._atoms.items()))
     try:
         tmp.remove_coordinate_bonds(keep_to_terminal=False)
         tmp.kekule()
@@ -330,7 +330,7 @@ def validate_and_canonicalize(
         tmp.thiele(fix_tautomers=True)
         tmp.standardize_charges(prepare_molecule=False)
         tmp.standardize_tautomers(prepare_molecule=False)
-        tmp.clean_stereo()
+        tmp.fix_stereo()
         return tmp
     except InvalidAromaticRing:
         return None

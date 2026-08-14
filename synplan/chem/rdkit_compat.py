@@ -18,7 +18,7 @@ from synplan.chem.utils import _clean_molecule, safe_canonicalization
 def target_from_rdkit(
     rdkit_mol,
     standardize: bool = True,
-    clean_stereo: bool = True,
+    clean_stereo: bool = False,
     clean2d: bool = True,
 ) -> MoleculeContainer:
     """Convert an RDKit Mol to a chython MoleculeContainer for use as a
@@ -29,7 +29,8 @@ def target_from_rdkit(
 
     :param rdkit_mol: An RDKit Mol or RWMol object.
     :param standardize: Whether to canonicalize the molecule.
-    :param clean_stereo: Whether to remove stereo marks.
+    :param clean_stereo: Whether to remove stereo marks. Planning targets preserve
+        defined stereochemistry by default.
     :param clean2d: Whether to generate clean 2D coordinates.
     :return: A standardized MoleculeContainer ready for Tree search.
     """
@@ -53,7 +54,7 @@ def building_blocks_from_rdkit(rdkit_mols: Iterable) -> frozenset[str]:
     smiles_set: set[str] = set()
     for rdmol in rdkit_mols:
         mol = MoleculeContainer.from_rdkit(rdmol)
-        mol = safe_canonicalization(mol)
+        mol = safe_canonicalization(mol, clean_stereo=False)
         smiles_set.add(str(mol))
     return frozenset(smiles_set)
 

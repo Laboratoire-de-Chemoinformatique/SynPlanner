@@ -3,10 +3,11 @@ rules."""
 
 import logging
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any
 
 from chython.containers import MoleculeContainer, ReactionContainer, SynthonContainer
-from chython.exceptions import InvalidAromaticRing
+from chython.exceptions import InvalidAromaticRing, IsChiral, NotChiral, ValenceError
 from chython.reactor import Reactor
 from chython.reactor.base import (
     restore_aromaticity,
@@ -16,6 +17,142 @@ from chython.reactor.base import (
 from synplan.chem.utils import validate_and_canonicalize
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class _AtomStereoDescriptor:
+    """Atom stereo expressed against source atom-map neighbours."""
+
+    center: int
+    environment: tuple[int, ...]
+    mark: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _CisTransStereoDescriptor:
+    """Cis/trans stereo expressed by mapped terminals and substituents."""
+
+    first_terminal: int
+    second_terminal: int
+    first_neighbor: int
+    second_neighbor: int
+    mark: bool
+
+
+def _snapshot_product_stereo(
+    products: tuple[MoleculeContainer, ...],
+) -> tuple[tuple[_AtomStereoDescriptor, ...], tuple[_CisTransStereoDescriptor, ...]]:
+    """Capture transferable stereo without modifying reactor products.
+
+    A CGR stores atom/bond changes but not molecule stereo. Atom-map numbers survive
+    compose/decompose, so Chython's public stereo APIs can translate source parity
+    against the rebuilt molecule's neighbour ordering.
+    """
+    atom_descriptors: list[_AtomStereoDescriptor] = []
+    bond_descriptors: list[_CisTransStereoDescriptor] = []
+    for product in products:
+        tetrahedrons = product.stereogenic_tetrahedrons
+        allenes = product.stereogenic_allenes
+        for center, atom in product.atoms():
+            if atom.stereo is None:
+                continue
+            if center in tetrahedrons:
+                environment = tetrahedrons[center]
+            elif center in allenes:
+                allene_environment = allenes[center]
+                environment = allene_environment[:2]
+            else:
+                continue
+            atom_descriptors.append(
+                _AtomStereoDescriptor(center, tuple(environment), atom.stereo)
+            )
+
+        cis_trans_paths = {
+            frozenset((path[0], path[-1])): path
+            for path in product.cumulenes
+            if not len(path) % 2
+        }
+        for (first, second), environment in product.stereogenic_cis_trans.items():
+            path = cis_trans_paths[frozenset((first, second))]
+            middle = len(path) // 2
+            mark = product.bond(path[middle - 1], path[middle]).stereo
+            if mark is not None:
+                bond_descriptors.append(
+                    _CisTransStereoDescriptor(
+                        first,
+                        second,
+                        environment[0],
+                        environment[1],
+                        mark,
+                    )
+                )
+    return tuple(atom_descriptors), tuple(bond_descriptors)
+
+
+def _restore_product_stereo(
+    molecule: MoleculeContainer,
+    atom_descriptors: tuple[_AtomStereoDescriptor, ...],
+    bond_descriptors: tuple[_CisTransStereoDescriptor, ...],
+) -> None:
+    """Restore still-valid stereo onto one CGR-rebuilt fragment in place.
+
+    Descriptors spanning another fragment are ignored. ``NotChiral`` descriptors are
+    retried because Chython can resolve dependent stereocentres only after another
+    mark is installed. Descriptors the rebuilt graph never accepts are obsolete and
+    deliberately dropped.
+    """
+    atom_numbers = set(molecule.atoms_numbers)
+    pending: list[_AtomStereoDescriptor | _CisTransStereoDescriptor] = [
+        descriptor
+        for descriptor in atom_descriptors
+        if descriptor.center in atom_numbers
+        and set(descriptor.environment).issubset(atom_numbers)
+    ]
+    pending.extend(
+        descriptor
+        for descriptor in bond_descriptors
+        if {
+            descriptor.first_terminal,
+            descriptor.second_terminal,
+            descriptor.first_neighbor,
+            descriptor.second_neighbor,
+        }.issubset(atom_numbers)
+    )
+
+    while pending:
+        unresolved: list[_AtomStereoDescriptor | _CisTransStereoDescriptor] = []
+        applied = False
+        for descriptor in pending:
+            try:
+                if isinstance(descriptor, _AtomStereoDescriptor):
+                    molecule.add_atom_stereo(
+                        descriptor.center,
+                        descriptor.environment,
+                        descriptor.mark,
+                        clean_cache=False,
+                    )
+                else:
+                    molecule.add_cis_trans_stereo(
+                        descriptor.first_terminal,
+                        descriptor.second_terminal,
+                        descriptor.first_neighbor,
+                        descriptor.second_neighbor,
+                        descriptor.mark,
+                        clean_cache=False,
+                    )
+            except NotChiral:
+                unresolved.append(descriptor)
+            except (IsChiral, KeyError, ValueError, ValenceError):
+                # Changed local environments and duplicate marks are not transferable.
+                continue
+            applied = True
+
+        if not applied:
+            break
+        molecule.flush_stereo_cache()
+        pending = unresolved
+
+    molecule.fix_stereo()
 
 
 class Reaction(ReactionContainer):
@@ -75,7 +212,9 @@ class CanonicalRetroReactor(Reactor):
                     restore_aromaticity(new, snapshot)
             new.standardize_charges(prepare_molecule=False)
             new.standardize_tautomers(prepare_molecule=False)
-            new.clean_stereo()
+            # Retain unaffected, valid stereocentres in generated precursors while
+            # removing only stereo marks invalidated by the transformation.
+            new.fix_stereo()
         except InvalidAromaticRing:
             raise  # reject half-canonicalized output
 
@@ -210,6 +349,7 @@ def apply_reaction_rule(
         if rebuild_with_cgr:
             # CGR recovery path bypasses _patcher; canonicalize per fragment.
             # chython.compose raises ValueError on element-substitution rules.
+            atom_stereo, bond_stereo = _snapshot_product_stereo(reaction.products)
             try:
                 cgr = reaction.compose()
                 reactants = cgr.decompose()[1].split()
@@ -222,6 +362,7 @@ def apply_reaction_rule(
                 if c is None:
                     return None
                 c.meta.update(mol.meta)
+                _restore_product_stereo(c, atom_stereo, bond_stereo)
                 canon.append(c)
             return canon
 

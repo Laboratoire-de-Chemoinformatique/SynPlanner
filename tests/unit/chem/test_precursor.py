@@ -1,6 +1,7 @@
 import pytest
 from chython import smiles
 
+from synplan.chem.building_blocks import BuildingBlockStock, molecule_to_inchi_key
 from synplan.chem.precursor import Precursor
 
 
@@ -71,3 +72,49 @@ def test_precursor_inequality(simple_molecule, complex_molecule):
 def test_precursor_with_invalid_input():
     with pytest.raises(Exception):  # noqa: B017
         Precursor(None)
+
+
+def test_precursor_identity_preserves_stereoisomers():
+    left = Precursor(smiles("N[C@@H](C)C(=O)O"))
+    right = Precursor(smiles("N[C@H](C)C(=O)O"))
+
+    assert left != right
+    assert hash(left) != hash(right)
+    assert "@" in str(left)
+    assert "@" in str(right)
+
+
+def test_precursor_caches_typed_inchikey_stock_identity(monkeypatch):
+    molecule = smiles("CCCCCCCO")
+    expected_key = molecule_to_inchi_key(molecule)
+    stock = BuildingBlockStock(frozenset({expected_key}), "inchikey")
+    precursor = Precursor(molecule)
+    calls = 0
+
+    def counted_key(candidate):
+        nonlocal calls
+        calls += 1
+        return molecule_to_inchi_key(candidate)
+
+    monkeypatch.setattr("synplan.chem.precursor.molecule_to_inchi_key", counted_key)
+
+    assert precursor.is_building_block(stock, min_mol_size=0)
+    assert precursor.is_building_block(stock, min_mol_size=0)
+    assert precursor.inchi_key == expected_key
+    assert calls == 1
+
+
+def test_precursor_inchikey_cache_is_compatible_with_older_pickles():
+    precursor = Precursor(smiles("CCCCCCCO"))
+    del precursor._inchi_key
+
+    assert precursor.inchi_key == molecule_to_inchi_key(precursor.molecule)
+
+
+def test_precursor_uses_typed_inchikey_stock_with_full_stereo():
+    stocked = smiles("N[C@@H](C)C(=O)O")
+    other_enantiomer = smiles("N[C@H](C)C(=O)O")
+    stock = BuildingBlockStock(frozenset({molecule_to_inchi_key(stocked)}), "inchikey")
+
+    assert Precursor(stocked).is_building_block(stock, min_mol_size=0)
+    assert not Precursor(other_enantiomer).is_building_block(stock, min_mol_size=0)
