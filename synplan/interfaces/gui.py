@@ -34,7 +34,7 @@ from synplan.mcts.tree import Tree
 from synplan.utils.config import TreeConfig
 from synplan.utils.loading import (
     download_preset,
-    load_building_blocks,
+    load_building_block,
     load_policy_function,
     load_reaction_rules,
 )
@@ -384,9 +384,7 @@ def setup_planning_options():
                 with st.spinner("Running retrosynthetic planning..."):
                     with st.status("Loading resources...", expanded=False) as status:
                         st.write("Loading building blocks...")
-                        building_blocks = load_building_blocks(
-                            building_blocks_path, standardize=False
-                        )
+                        building_blocks = load_building_block(building_blocks_path)
                         st.write("Loading reaction rules...")
                         reaction_rules = load_reaction_rules(reaction_rules_path)
                         st.write("Loading policy network...")

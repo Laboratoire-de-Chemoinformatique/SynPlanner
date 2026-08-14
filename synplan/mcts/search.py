@@ -14,6 +14,7 @@ from rdkit import Chem
 from tqdm.auto import tqdm
 
 from synplan import __version__
+from synplan.chem.building_blocks import BuildingBlockStock
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.routes.io import (
     make_json,
@@ -27,7 +28,6 @@ from synplan.mcts.tree import Tree, TreeConfig
 from synplan.utils.config import CombinedPolicyConfig, PolicyNetworkConfig
 from synplan.utils.files import iter_csv_smiles, iter_smiles_records
 from synplan.utils.loading import (
-    load_building_blocks,
     load_combined_policy_function,
     load_evaluation_function,
     load_policy_function,
@@ -165,7 +165,7 @@ def run_search(
     policy_config: PolicyNetworkConfig,
     evaluation_config,
     reaction_rules_path: str,
-    building_blocks_path: str,
+    building_block_stock: BuildingBlockStock,
     results_root: str = "search_results",
     route_scorer: RouteScorer | None = None,
     priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
@@ -183,7 +183,7 @@ def run_search(
     :param policy_config: The config object containing the configuration for the policy.
     :param evaluation_config: The evaluation configuration object (e.g., RolloutEvaluationConfig).
     :param reaction_rules_path: The path to the file containing reaction rules.
-    :param building_blocks_path: The path to the file containing building blocks.
+    :param building_block_stock: The already loaded ordinary building-block stock.
     :param results_root: The name of the folder where the results of the tree search
         will be saved.
     :param route_scorer: Optional post-search route scorer for re-ranking
@@ -257,13 +257,15 @@ def run_search(
         "policy_rules_succeeded",
     ]
 
+    tree_config = TreeConfig.from_dict(search_config)
+    tree_config.silent = True
+
     # Load resources
     if isinstance(policy_config, CombinedPolicyConfig):
         policy_function = load_combined_policy_function(combined_config=policy_config)
     else:
         policy_function = load_policy_function(policy_config=policy_config)
     reaction_rules = load_reaction_rules(reaction_rules_path)
-    building_blocks = load_building_blocks(building_blocks_path, standardize=False)
 
     # Create evaluation strategy from config
     evaluation_function = load_evaluation_function(evaluation_config)
@@ -275,8 +277,6 @@ def run_search(
     # {canonical_target_smiles: [route_tree, ...]}.
     exported_routes: dict[str, list[dict]] = {}
 
-    tree_config = TreeConfig.from_dict(search_config)
-    tree_config.silent = True
     with open(stats_file, "w", encoding="utf-8", newline="\n") as csvfile:
         statswriter = csv.DictWriter(csvfile, delimiter=",", fieldnames=stats_header)
         statswriter.writeheader()
@@ -302,7 +302,7 @@ def run_search(
                     target=target_mol,
                     config=tree_config,
                     reaction_rules=reaction_rules,
-                    building_blocks=building_blocks,
+                    building_blocks=building_block_stock,
                     expansion_function=policy_function,
                     evaluation_function=evaluation_function,
                     route_scorer=route_scorer,

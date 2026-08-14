@@ -5,6 +5,7 @@ from chython import smiles
 from chython.containers import MoleculeContainer
 from rdkit import Chem
 
+from synplan.chem.building_blocks import BuildingBlockStock
 from synplan.chem.rdkit_compat import (
     building_blocks_from_rdkit,
     extract_routes_rdkit,
@@ -119,8 +120,10 @@ class _MockTree:
         from synplan.chem.precursor import Precursor
 
         self.config = _MockConfig()
-        self.building_blocks = frozenset(
-            {str(smiles("O=C(O)C")), str(smiles("Oc1ccccc1")), str(smiles("O=C=O"))}
+        self.building_blocks = BuildingBlockStock(
+            frozenset(
+                {str(smiles("O=C(O)C")), str(smiles("Oc1ccccc1")), str(smiles("O=C=O"))}
+            )
         )
 
         # molecules

@@ -10,6 +10,10 @@ from time import time
 from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
+from synplan.chem.building_blocks.stock import (
+    BuildingBlockStock,
+    coerce_building_block_stock,
+)
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
 from synplan.chem.reaction.routes.quality.scorer import RouteScorer
@@ -125,7 +129,7 @@ class Tree:
         target: MoleculeContainer,
         config: TreeConfig,
         reaction_rules: list[CanonicalRetroReactor],
-        building_blocks: set[str],
+        building_blocks: BuildingBlockStock | set[str] | frozenset[str],
         expansion_function: Policy,
         evaluation_function: EvaluationStrategy = None,
         route_scorer: RouteScorer | None = None,
@@ -137,7 +141,8 @@ class Tree:
         :param target: A target molecule for retrosynthetic routes search.
         :param config: A tree configuration.
         :param reaction_rules: A loaded reaction rules.
-        :param building_blocks: A loaded building blocks.
+        :param building_blocks: A typed ordinary building-block stock or a legacy
+            canonical-SMILES set.
         :param expansion_function: A loaded policy function.
         :param evaluation_function: An evaluation strategy. If None, a random
             evaluation strategy is used as default.
@@ -170,7 +175,7 @@ class Tree:
 
         # building blocks and reaction reaction_rules
         self.reaction_rules = tuple(reaction_rules)
-        self.building_blocks = frozenset(building_blocks)
+        self.building_blocks = coerce_building_block_stock(building_blocks)
         self.priority_rules: dict[str, tuple[CanonicalRetroReactor, ...]] = {
             name: tuple(rules) for name, rules in (priority_rules or {}).items()
         }
@@ -263,6 +268,13 @@ class Tree:
         self._tqdm = None
         with open(file_path, "wb") as file:
             pickle.dump(self, file)
+
+    def __setstate__(self, state: dict) -> None:
+        """Migrate legacy stock representations while restoring Tree pickles."""
+
+        self.__dict__.update(state)
+        if "building_blocks" in state:
+            self.building_blocks = coerce_building_block_stock(self.building_blocks)
 
     def __len__(self) -> int:
         """Returns the current size (the number of nodes) in the tree."""

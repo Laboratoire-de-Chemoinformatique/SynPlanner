@@ -5,6 +5,9 @@
 # a matched pair — synplanner-article does; synplanner-gps does not, its heads
 # know 24094 and 11235 rules and loading them together is refused.
 
+building_blocks:
+  identity_format: auto
+
 tree:
   max_iterations: 100
   max_tree_size: 1000000

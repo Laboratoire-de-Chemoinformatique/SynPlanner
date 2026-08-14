@@ -8,6 +8,10 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from synplan.chem.building_blocks.stock import (
+    BuildingBlockStock,
+    coerce_building_block_stock,
+)
 from synplan.chem.precursor import Precursor, compose_precursors
 from synplan.chem.rdkit_utils import RDKitScore
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
@@ -35,7 +39,7 @@ class RolloutSimulator:
         self,
         policy_network: "Policy",
         reaction_rules,
-        building_blocks: set[str],
+        building_blocks: BuildingBlockStock | set[str] | frozenset[str],
         min_mol_size: int,
         max_depth: int,
         stochastic: bool = False,
@@ -44,7 +48,7 @@ class RolloutSimulator:
 
         :param policy_network: Policy network for selecting reactions.
         :param reaction_rules: Available reaction rules.
-        :param building_blocks: Set of building block molecules.
+        :param building_blocks: Typed stock or legacy canonical-SMILES collection.
         :param min_mol_size: Minimum molecule size.
         :param max_depth: Maximum rollout depth.
         :param stochastic: If True, sample from valid rules using policy probabilities.
@@ -52,7 +56,7 @@ class RolloutSimulator:
         """
         self.policy_network = policy_network
         self.reaction_rules = reaction_rules
-        self.building_blocks = building_blocks
+        self.building_blocks = coerce_building_block_stock(building_blocks)
         self.min_mol_size = min_mol_size
         self.max_depth = max_depth
         self.stochastic = stochastic
@@ -267,7 +271,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         self,
         policy_network: "Policy",
         reaction_rules,
-        building_blocks: set[str],
+        building_blocks: BuildingBlockStock | set[str] | frozenset[str],
         min_mol_size: int,
         max_depth: int,
         normalize: bool = False,
@@ -277,7 +281,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
 
         :param policy_network: Policy network for selecting reactions during rollout.
         :param reaction_rules: Available reaction rules.
-        :param building_blocks: Set of building block molecules.
+        :param building_blocks: Typed stock or legacy canonical-SMILES collection.
         :param min_mol_size: Minimum molecule size.
         :param max_depth: Maximum rollout depth.
         :param normalize: Whether to normalize scores to [0, 1].

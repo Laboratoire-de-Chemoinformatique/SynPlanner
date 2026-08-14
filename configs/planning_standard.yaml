@@ -1,3 +1,6 @@
+building_blocks:
+  identity_format: auto
+
 tree:
   max_iterations: 100
   max_tree_size: 1000000

@@ -302,3 +302,10 @@ def test_select_nmcs_path_greedy_policy_and_random_on_real_tree():
     assert len(seq_r) == 1
     assert seq_r[0] in list(tree.children[1])
     assert last_rnd in list(tree.children[1])
+
+
+def test_tree_and_rollout_use_equivalent_typed_stocks():
+    tree = build_tree("uct", [])
+
+    assert tree.evaluator.rollout.building_blocks == tree.building_blocks
+    assert tree.building_blocks.identity_format == "smiles"

@@ -11,6 +11,7 @@ from collections.abc import Iterable
 
 from chython.containers import MoleculeContainer
 
+from synplan.chem.precursor import Precursor
 from synplan.chem.reaction.routes.traversal import iter_route_steps
 from synplan.chem.utils import _clean_molecule, safe_canonicalization
 
@@ -186,8 +187,9 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
                 "type": "mol",
                 "smiles": smi,
                 "mol": rdkit_mol,
-                "in_stock": smi in tree.building_blocks
-                or len(molecule) <= tree.config.min_mol_size,
+                "in_stock": Precursor(molecule, canonicalize=False).is_building_block(
+                    tree.building_blocks, tree.config.min_mol_size
+                ),
             }
             reaction = _graph.get(molecule)
             if reaction is not None:
@@ -200,6 +202,8 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
                 node["children"] = [reaction_node]
             return node
 
-        routes_block.append(_build_node(target_mol))
+        route = _build_node(target_mol)
+        route.setdefault("children", [])
+        routes_block.append(route)
 
     return routes_block

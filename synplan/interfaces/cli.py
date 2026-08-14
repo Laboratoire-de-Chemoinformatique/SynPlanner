@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 import yaml
 
+from synplan.chem.building_blocks.config import BuildingBlockStockLoadConfig
 from synplan.chem.data.filtering import ReactionFilterConfig, filter_reactions_from_file
 from synplan.chem.data.mapping import MappingConfig, map_reactions_from_file
 from synplan.chem.data.standardizing import (
@@ -46,7 +47,7 @@ from synplan.utils.config import (
 from synplan.utils.loading import (
     download_all_data,
     download_preset,
-    load_building_blocks,
+    load_building_block,
     load_policy_function,
     load_reaction_rules,
 )
@@ -724,6 +725,12 @@ def value_network_tuning_cli(
 
     tree_config = TreeConfig.from_dict(config["tree"])
     tuning_config = TuningConfig.from_dict(config["tuning"])
+    building_block_stock = load_building_block(
+        building_blocks,
+        config=BuildingBlockStockLoadConfig.from_dict(
+            config.get("building_blocks", {})
+        ),
+    )
 
     run_updating(
         targets_path=targets,
@@ -732,7 +739,7 @@ def value_network_tuning_cli(
         value_config=value_config,
         reinforce_config=tuning_config,
         reaction_rules_path=reaction_rules,
-        building_blocks_path=building_blocks,
+        building_block_stock=building_block_stock,
         results_root=results_dir,
     )
 
@@ -820,6 +827,12 @@ def planning_cli(
     # node_evaluation keys are read separately below; merging them here would
     # reach TreeConfig (extra="forbid") and reject every config that has them.
     search_config = dict(config["tree"])
+    building_block_stock_config = BuildingBlockStockLoadConfig.from_dict(
+        config.get("building_blocks", {})
+    )
+    building_block_stock = load_building_block(
+        building_blocks, config=building_block_stock_config
+    )
     if "combined_policy" in config:
         # both heads come from the config; --policy_network has nothing to point at
         policy_config = CombinedPolicyConfig.from_dict(config["combined_policy"])
@@ -844,11 +857,10 @@ def planning_cli(
         # Rollout evaluation - need to load resources
         policy_function = load_policy_function(weights_path=policy_network)
         reaction_rules_list = load_reaction_rules(reaction_rules)
-        building_blocks_set = load_building_blocks(building_blocks, standardize=False)
         evaluation_config = RolloutEvaluationConfig(
             policy_network=policy_function,
             reaction_rules=reaction_rules_list,
-            building_blocks=building_blocks_set,
+            building_blocks=building_block_stock,
             min_mol_size=search_config.get("min_mol_size", 6),
             max_depth=search_config.get("max_depth", 6),
             normalize=node_evaluation.get("normalize", False),
@@ -878,7 +890,7 @@ def planning_cli(
         policy_config=policy_config,
         evaluation_config=evaluation_config,
         reaction_rules_path=reaction_rules,
-        building_blocks_path=building_blocks,
+        building_block_stock=building_block_stock,
         results_root=results_dir,
         reconcile_atom_mapping=reconcile_mapping,
         export_routes=export_routes,

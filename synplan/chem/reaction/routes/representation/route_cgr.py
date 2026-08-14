@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 
+from synplan.chem.precursor import Precursor
 from synplan.chem.reaction.reactor import (
     _restore_product_stereo,
     _snapshot_product_stereo,
@@ -380,9 +381,8 @@ def process_first_reaction(first_react: ReactionContainer, tree: "Tree", route_i
         react_key = tuple(curr_mol._atoms)
         react_key_set = set(react_key)
 
-        if (
-            len(curr_mol) <= tree.config.min_mol_size
-            or str(curr_mol) in tree.building_blocks
+        if Precursor(curr_mol, canonicalize=False).is_building_block(
+            tree.building_blocks, tree.config.min_mol_size
         ):
             bb_set = bb_set.union(react_key_set)
 
@@ -439,9 +439,8 @@ def update_reaction_dict(
         if validate_molecule_components(curr_mol, route_id) == 0:
             return dict(), set()
 
-        if (
-            len(curr_mol) <= tree.config.min_mol_size
-            or str(curr_mol) in tree.building_blocks
+        if Precursor(curr_mol, canonicalize=False).is_building_block(
+            tree.building_blocks, tree.config.min_mol_size
         ):
             bb_set = bb_set.union(react_key_set)
 

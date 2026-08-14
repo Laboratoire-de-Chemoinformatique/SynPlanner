@@ -15,6 +15,7 @@ from chython.algorithms.depict import _graph_svg, _render_config
 from chython.containers.molecule import MoleculeContainer
 from IPython.display import HTML, display
 
+from synplan.chem.precursor import Precursor
 from synplan.chem.reaction.routes.io import make_dict
 from synplan.chem.reaction.routes.representation.depiction import (
     cgr_display,
@@ -30,6 +31,7 @@ def get_child_nodes(
     tree: Tree,
     molecule: MoleculeContainer,
     graph: dict[MoleculeContainer, dict[str, Any]],
+    min_mol_size: int = 0,
 ) -> dict[str, Any]:
     """Extracts the child nodes of the given molecule.
 
@@ -37,6 +39,8 @@ def get_child_nodes(
     :param molecule: The molecule in the tree from which to extract child nodes.
     :param graph: The relationship between the given molecule and the reaction
         metadata for its child nodes.
+    :param min_mol_size: Route-specific automatic building-block size threshold.
+        Defaults to the historical route-export value of zero.
     :return: The dict with extracted child nodes.
     """
 
@@ -49,9 +53,11 @@ def get_child_nodes(
         temp_obj = {
             "smiles": str(precursor),
             "type": "mol",
-            "in_stock": str(precursor) in tree.building_blocks,
+            "in_stock": Precursor(precursor, canonicalize=False).is_building_block(
+                tree.building_blocks, min_mol_size
+            ),
         }
-        node = get_child_nodes(tree, precursor, graph)
+        node = get_child_nodes(tree, precursor, graph, min_mol_size)
         if node:
             temp_obj["children"] = [node]
         nodes.append(temp_obj)
@@ -78,7 +84,7 @@ def extract_routes(
         children, and a boolean indicating whether the target is in building_blocks.
     """
     target = tree.nodes[1].precursors_to_expand[0].molecule
-    target_in_stock = tree.nodes[1].curr_precursor.is_building_block(
+    target_in_stock = Precursor(target, canonicalize=False).is_building_block(
         tree.building_blocks, min_mol_size
     )
 
@@ -107,12 +113,13 @@ def extract_routes(
                     "policy_rank": after_node.policy_rank,
                 }
 
+            reaction = get_child_nodes(tree, target, graph, min_mol_size)
             routes_block.append(
                 {
                     "type": "mol",
                     "smiles": str(target),
                     "in_stock": target_in_stock,
-                    "children": [get_child_nodes(tree, target, graph)],
+                    "children": [reaction] if reaction else [],
                 }
             )
     else:

@@ -31,7 +31,7 @@ WORKERS = (
     "run_search",
     "load_policy_function",
     "load_reaction_rules",
-    "load_building_blocks",
+    "load_building_block",
     "classify_file",
     "synthonise_file",
     "fragment_file",
@@ -188,6 +188,14 @@ def stubbed_workers(monkeypatch):
     calls: list[str] = []
     for name in WORKERS:
         monkeypatch.setattr(cli, name, lambda *a, _n=name, **kw: calls.append(_n))
+
+    def record_run_updating(**kwargs):
+        assert "building_block_stock" in kwargs
+        assert "building_blocks_path" not in kwargs
+        assert "building_block_stock_config" not in kwargs
+        calls.append("run_updating")
+
+    monkeypatch.setattr(cli, "run_updating", record_run_updating)
     return calls
 
 
