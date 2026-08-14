@@ -7,8 +7,6 @@ failure sidecars, reproducible counters and atomic publication of a complete run
 
 from __future__ import annotations
 
-import json
-import os
 import time
 from collections import Counter
 from collections.abc import Mapping
@@ -20,7 +18,7 @@ from synplan import __version__
 from synplan.chem.synthon.config import SynthonConfig
 from synplan.utils.audit import (
     InputRecord,
-    file_metadata,
+    OutputBundleTransaction,
     iter_molecule_records,
     iter_pathway_records,
     sha256_file,
@@ -131,72 +129,34 @@ class AuditRun:
             raise ValueError(
                 f"output filename {self.output_path.name!r} is reserved for audit artifacts"
             )
-        self.final_paths = {
+        final_paths = {
             "primary": self.output_path,
             **{name: directory / name for name in SIDECAR_NAMES},
         }
-        self.partial_paths = {
-            key: path.with_name(path.name + ".partial")
-            for key, path in self.final_paths.items()
+        source_paths = {
+            "input": self.input_path,
+            **{
+                f"provenance:{name}": path
+                for name, path in self.provenance_paths.items()
+            },
         }
-        all_artifacts = (*self.final_paths.values(), *self.partial_paths.values())
-        resolved = [path.resolve() for path in all_artifacts]
-        if len(set(resolved)) != len(resolved):
-            raise ValueError("audit output and sidecar paths must be distinct")
-        self._guard_paths()
-
-    def _guard_paths(self) -> None:
-        resolved_artifacts = {
-            path.resolve()
-            for path in (*self.final_paths.values(), *self.partial_paths.values())
-        }
-        sources = {"input": self.input_path, **self.provenance_paths}
-        for label, source in sources.items():
-            if source.resolve() in resolved_artifacts:
-                raise ValueError(
-                    f"{label} path collides with an audit output: {source}"
-                )
-
-        guarded = (*self.final_paths.values(), *self.partial_paths.values())
-        directories = [path for path in guarded if path.is_dir()]
-        if directories:
-            names = ", ".join(str(path) for path in directories)
-            raise IsADirectoryError(f"audit artifact paths are directories: {names}")
-        if self.config.audit_overwrite == "error":
-            existing = [path for path in guarded if path.exists()]
-            if existing:
-                names = ", ".join(str(path) for path in existing)
-                raise FileExistsError(f"audited outputs already exist: {names}")
-            return
-
-        for path in self.partial_paths.values():
-            if path.is_dir():
-                raise IsADirectoryError(path)
-            if path.exists():
-                path.unlink()
+        self._transaction = OutputBundleTransaction(
+            final_paths, source_paths, self.config.audit_overwrite
+        )
+        self.final_paths = self._transaction.final_paths
+        self.partial_paths = self._transaction.partial_paths
 
     def __enter__(self) -> AuditRun:
         self._started_at = utc_now()
         self._started = time.perf_counter()
-        self._input_metadata = file_metadata(self.input_path)
+        self._handles = self._transaction.open(
+            ("primary", "fallback.smi", "fallback.tsv", "errors.tsv", "run.log")
+        )
+        snapshots = self._transaction.source_metadata
+        self._input_metadata = snapshots["input"]
         self._provenance_metadata = {
-            name: file_metadata(path) for name, path in self.provenance_paths.items()
+            name: snapshots[f"provenance:{name}"] for name in self.provenance_paths
         }
-        try:
-            for key in (
-                "primary",
-                "fallback.smi",
-                "fallback.tsv",
-                "errors.tsv",
-                "run.log",
-            ):
-                self._handles[key] = self.partial_paths[key].open(
-                    "x", encoding="utf-8", newline=""
-                )
-        except Exception:
-            for handle in self._handles.values():
-                handle.close()
-            raise
         self._handles["fallback.tsv"].write(FALLBACK_HEADER)
         self._handles["errors.tsv"].write(ERROR_HEADER)
         self._log(
@@ -286,17 +246,7 @@ class AuditRun:
             self._next_progress += self.progress_every
 
     def _flush_and_close(self) -> None:
-        for handle in self._handles.values():
-            if handle.closed:
-                continue
-            handle.flush()
-            os.fsync(handle.fileno())
-            handle.close()
-
-    @staticmethod
-    def _line_count(path: Path) -> int:
-        with path.open("rb") as handle:
-            return sum(1 for _ in handle)
+        self._transaction.close()
 
     def _validate_partials(self) -> None:
         expected_lines = {
@@ -305,13 +255,7 @@ class AuditRun:
             "fallback.tsv": self.counters["fallback_records"] + 1,
             "errors.tsv": self.counters["error_rows"] + 1,
         }
-        for key, expected in expected_lines.items():
-            observed = self._line_count(self.partial_paths[key])
-            if observed != expected:
-                raise RuntimeError(
-                    f"audit line-count mismatch for {key}: expected {expected}, "
-                    f"observed {observed}"
-                )
+        self._transaction.validate_line_counts(expected_lines)
         if (
             self.counters["successful_input_records"]
             + self.counters["fallback_records"]
@@ -320,32 +264,22 @@ class AuditRun:
             raise RuntimeError(
                 "successful and fallback inputs do not partition the run"
             )
-        if self._input_metadata is None:
-            raise RuntimeError("audit input provenance was not captured")
-        if file_metadata(self.input_path) != self._input_metadata:
-            raise RuntimeError(
-                f"audit input changed during processing: {self.input_path}"
-            )
-        for name, path in self.provenance_paths.items():
-            if file_metadata(path) != self._provenance_metadata[name]:
-                raise RuntimeError(
-                    f"audit provenance file changed during processing: {path}"
-                )
+        self._transaction.validate_sources_unchanged()
 
     def _build_summary(self) -> dict[str, object]:
-        output_files: dict[str, dict[str, object]] = {}
-        for key in (
+        artifact_keys = (
             "primary",
             "fallback.smi",
             "fallback.tsv",
             "errors.tsv",
             "run.log",
-        ):
-            metadata = file_metadata(
-                self.partial_paths[key], reported_path=self.final_paths[key]
-            )
-            metadata["rows"] = self._line_count(self.partial_paths[key])
-            output_files[self.final_paths[key].name] = metadata
+        )
+        output_files = {
+            self.final_paths[key].name: metadata
+            for key, metadata in self._transaction.artifact_metadata(
+                artifact_keys
+            ).items()
+        }
         counters = dict(sorted(self.counters.items()))
         status_counts = {
             key.removeprefix("status_"): value
@@ -370,20 +304,12 @@ class AuditRun:
         }
 
     def _write_summary_partial(self) -> None:
-        path = self.partial_paths["summary.json"]
-        with path.open("x", encoding="utf-8", newline="") as handle:
-            json.dump(self.summary, handle, indent=2, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
+        if self.summary is None:
+            raise RuntimeError("audit summary was not built")
+        self._transaction.write_summary(self.summary)
 
     def _promote(self) -> None:
-        summary_final = self.final_paths["summary.json"]
-        if summary_final.exists():
-            summary_final.unlink()
-        for key in ("primary", "fallback.smi", "fallback.tsv", "errors.tsv", "run.log"):
-            os.replace(self.partial_paths[key], self.final_paths[key])
-        os.replace(self.partial_paths["summary.json"], summary_final)
+        self._transaction.promote()
 
     def __exit__(self, exc_type, exc_value, traceback) -> bool:
         if exc_type is not None:

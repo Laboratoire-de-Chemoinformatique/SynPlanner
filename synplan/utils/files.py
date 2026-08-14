@@ -4,11 +4,14 @@ reading/writing."""
 import contextlib
 import csv
 import gzip
-from collections.abc import Iterable, Iterator
-from io import StringIO
+import json
+from collections.abc import Iterable, Iterator, Mapping
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from io import BytesIO, StringIO
 from os.path import splitext
 from pathlib import Path
-from typing import TYPE_CHECKING, TextIO
+from typing import TYPE_CHECKING, Literal, TextIO
 
 from chython import smiles
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
@@ -18,6 +21,94 @@ from chython.files.SDFrw import SDFRead, SDFWrite
 
 if TYPE_CHECKING:
     from synplan.chem.utils import AtomMappingCheck
+
+
+def is_complete_cxsmiles(value: str) -> bool:
+    """Return whether ``value`` is one complete whitespace-bearing CXSMILES field."""
+    head, separator, extension = value.partition(" ")
+    return bool(
+        head and separator and extension.startswith("|") and extension.endswith("|")
+    )
+
+
+ChemicalInputFormat = Literal[
+    "auto", "smi", "smiles", "cxsmiles", "sdf", "csv", "tsv", "inchi", "inchikey"
+]
+ChemicalIdentityFormat = Literal["smiles", "inchi", "inchikey"]
+
+
+@dataclass(frozen=True, slots=True)
+class ChemicalRecord:
+    """One framed chemistry record with stable provenance and format diagnostics."""
+
+    sequence: int
+    line_number: int
+    chemistry: str
+    raw: str
+    metadata: tuple[str, ...] = ()
+    metadata_names: tuple[str, ...] = ()
+    headered: bool = False
+    kind: str = "molecule"
+    fields: tuple[str, ...] = ()
+    format_error: str | None = None
+    input_format: str = "smi"
+    chemistry_format: ChemicalIdentityFormat = "smiles"
+    molecule: MoleculeContainer | None = dataclass_field(
+        default=None, repr=False, compare=False
+    )
+
+    @property
+    def metadata_value(self) -> list[str] | dict[str, str]:
+        if self.headered:
+            return dict(zip(self.metadata_names, self.metadata))
+        return list(self.metadata)
+
+    @property
+    def source_info(self) -> str:
+        return json.dumps(
+            {"line": self.line_number, "metadata": self.metadata_value},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+
+    def source_info_with(self, context: Mapping[str, object]) -> str:
+        payload: dict[str, object] = {
+            "line": self.line_number,
+            "metadata": self.metadata_value,
+        }
+        if context:
+            payload["context"] = dict(context)
+        return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+    @property
+    def input_record(self) -> str:
+        return self.chemistry if self.kind == "molecule" else self.raw
+
+    @property
+    def fallback_record(self) -> str:
+        if self.kind == "pathway" or not self.headered:
+            return self.raw
+        metadata = json.dumps(
+            self.metadata_value, ensure_ascii=False, separators=(",", ":")
+        )
+        return f"{self.chemistry}\t{metadata}"
+
+
+def _chemical_format_error(
+    chemistry: str, chemistry_format: ChemicalIdentityFormat
+) -> str | None:
+    if not chemistry:
+        return "the chemistry field is empty"
+    if chemistry_format == "smiles":
+        if any(char.isspace() for char in chemistry) and not is_complete_cxsmiles(
+            chemistry
+        ):
+            return (
+                "metadata must be TAB-separated; arbitrary whitespace is not supported"
+            )
+    elif any(char.isspace() for char in chemistry):
+        return "identity rows cannot contain whitespace"
+    return None
 
 
 class FileHandler:
@@ -415,6 +506,58 @@ def count_sdf_records(path: str | Path) -> int:
         return sum(1 for line in f if line.strip() == "$$$$")
 
 
+def iter_sdf_text_records(path: str | Path) -> Iterator[tuple[int, str, bool]]:
+    """Yield ``(start_line, text, terminated)`` for every physical SDF frame."""
+    lines: list[str] = []
+    start_line = 1
+    with Path(path).open("r", encoding="utf-8", newline="") as handle:
+        for line_number, line in enumerate(handle, 1):
+            if not lines:
+                start_line = line_number
+            lines.append(line)
+            if line.rstrip("\r\n").strip() == "$$$$":
+                yield start_line, "".join(lines), True
+                lines = []
+    if lines and any(line.strip() for line in lines):
+        yield start_line, "".join(lines), False
+
+
+def parse_sdf_text_record(record: str) -> MoleculeContainer:
+    """Parse one framed SDF record while preserving RDKit-assigned stereo."""
+    from rdkit import Chem
+
+    supplier = Chem.ForwardSDMolSupplier(
+        BytesIO(record.encode("utf-8")),
+        sanitize=True,
+        removeHs=False,
+        strictParsing=True,
+    )
+    parsed = list(supplier)
+    if len(parsed) != 1 or parsed[0] is None:
+        raise ValueError("SDF record was not parsed as one molecule")
+    rdkit_molecule = parsed[0]
+    try:
+        molecule = MoleculeContainer.from_rdkit(rdkit_molecule)
+    except Exception as error:
+        raise ValueError(f"cannot convert SDF record to Chython: {error}") from error
+    metadata = {
+        str(key): str(value)
+        for key, value in rdkit_molecule.GetPropsAsDict(
+            includePrivate=False,
+            includeComputed=False,
+        ).items()
+    }
+    name = (
+        rdkit_molecule.GetProp("_Name").strip()
+        if rdkit_molecule.HasProp("_Name")
+        else ""
+    )
+    if name:
+        metadata.setdefault("name", name)
+    molecule.meta.update(metadata)
+    return molecule
+
+
 def iter_sdf_text_blocks(path: str | Path, records_per_block: int) -> Iterator[str]:
     """Yield SDF text blocks containing up to `records_per_block` molecules.
 
@@ -446,6 +589,244 @@ def open_text(path: str | Path) -> TextIO:
     if p.suffix.lower() == ".gz":
         return gzip.open(p, "rt", encoding="utf-8", newline="")
     return open(p, encoding="utf-8", newline="")
+
+
+def resolve_chemical_input_format(
+    path: str | Path, input_format: ChemicalInputFormat = "auto"
+) -> str:
+    """Resolve a supported chemistry-record format from an explicit value or suffix."""
+    aliases = {"smiles": "smi", "cxsmiles": "smi"}
+    if input_format != "auto":
+        return aliases.get(input_format, input_format)
+    source = Path(path)
+    suffixes = [suffix.lower() for suffix in source.suffixes]
+    if suffixes and suffixes[-1] == ".gz":
+        suffixes.pop()
+    suffix = suffixes[-1] if suffixes else ""
+    formats = {
+        ".smi": "smi",
+        ".smiles": "smi",
+        ".cxsmiles": "smi",
+        ".sdf": "sdf",
+        ".csv": "csv",
+        ".tsv": "tsv",
+        ".inchi": "inchi",
+        ".inchikey": "inchikey",
+    }
+    try:
+        return formats[suffix]
+    except KeyError as error:
+        raise ValueError(
+            f"cannot infer chemical input format from {source.name!r}"
+        ) from error
+
+
+def iter_chemical_records(
+    path: str | Path,
+    *,
+    input_format: ChemicalInputFormat = "auto",
+    chemistry_columns: Mapping[str, ChemicalIdentityFormat] | None = None,
+    chemistry_column: str | None = None,
+    delimiter: str | None = None,
+    skip_comments: bool = False,
+) -> Iterator[ChemicalRecord]:
+    """Yield consistently framed plain, table, or SDF chemistry records.
+
+    Plain SMILES/CXSMILES inputs use TAB as the only metadata delimiter. Headered
+    CSV/TSV inputs require exactly one configured chemistry column and retain every
+    other column as named provenance. Format errors belonging to an individual row
+    are yielded on that record; structural file errors raise immediately.
+    """
+    source = Path(path)
+    resolved = resolve_chemical_input_format(source, input_format)
+    columns = {
+        name.strip().lstrip("\ufeff").casefold(): value
+        for name, value in (
+            chemistry_columns or {"smiles": "smiles", "cxsmiles": "smiles"}
+        ).items()
+    }
+    if not columns:
+        raise ValueError("chemistry_columns must not be empty")
+
+    if resolved == "sdf":
+        if source.suffix.lower() == ".gz":
+            raise ValueError("compressed SDF input is not supported")
+        for sequence, (line_number, raw, terminated) in enumerate(
+            iter_sdf_text_records(source), 1
+        ):
+            error = None
+            molecule = None
+            metadata: dict[str, str] = {}
+            chemistry = raw
+            if not terminated:
+                error = "SDF record is missing the '$$$$' terminator"
+            else:
+                try:
+                    molecule = parse_sdf_text_record(raw)
+                    chemistry = str(molecule)
+                    metadata = {
+                        str(key): str(value)
+                        for key, value in sorted(
+                            molecule.meta.items(), key=lambda item: str(item[0])
+                        )
+                        if key != "init_smiles"
+                    }
+                except Exception as exception:
+                    detail = str(exception).strip()
+                    message = type(exception).__name__
+                    if detail:
+                        message = f"{message}: {detail}"
+                    error = f"invalid SDF record: {message}"
+            yield ChemicalRecord(
+                sequence=sequence,
+                line_number=line_number,
+                chemistry=chemistry,
+                raw=raw,
+                metadata=tuple(metadata.values()),
+                metadata_names=tuple(metadata),
+                headered=True,
+                format_error=error,
+                input_format=resolved,
+                molecule=molecule,
+            )
+        return
+
+    if resolved in {"smi", "inchi", "inchikey"}:
+        chemistry_format: ChemicalIdentityFormat = (
+            "smiles" if resolved == "smi" else resolved
+        )
+        sequence = 0
+        with open_text(source) as handle:
+            for line_number, line in enumerate(handle, 1):
+                raw = line.rstrip("\r\n")
+                if not raw.strip() or (skip_comments and raw.lstrip().startswith("#")):
+                    continue
+                sequence += 1
+                if chemistry_format == "smiles":
+                    fields = raw.split("\t")
+                    chemistry = fields[0].strip()
+                    metadata = tuple(fields[1:])
+                else:
+                    fields = [raw]
+                    chemistry = raw.strip()
+                    metadata = ()
+                yield ChemicalRecord(
+                    sequence=sequence,
+                    line_number=line_number,
+                    chemistry=chemistry,
+                    raw=raw,
+                    metadata=metadata,
+                    fields=tuple(fields),
+                    format_error=_chemical_format_error(chemistry, chemistry_format),
+                    input_format=resolved,
+                    chemistry_format=chemistry_format,
+                )
+        return
+
+    if resolved not in {"csv", "tsv"}:
+        raise ValueError(f"unsupported chemical input format: {resolved}")
+    table_delimiter = delimiter or ("\t" if resolved == "tsv" else ",")
+    with open_text(source) as handle:
+        reader = csv.reader(handle, delimiter=table_delimiter)
+        try:
+            header = next(reader)
+        except StopIteration as error:
+            raise ValueError(f"{source}: expected a header row") from error
+        normalized = [column.strip().lstrip("\ufeff").casefold() for column in header]
+        if not header or any(not name for name in normalized):
+            raise ValueError(f"{source}: header names must be non-empty")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError(
+                f"{source}: header names must be unique case-insensitively"
+            )
+        candidates = [
+            (index, columns[name])
+            for index, name in enumerate(normalized)
+            if name in columns
+        ]
+        configured = (chemistry_column or "").strip().casefold()
+        if configured and configured not in columns and configured in normalized:
+            candidates.append((normalized.index(configured), "smiles"))
+        if len(candidates) != 1:
+            if tuple(columns) == ("smiles", "cxsmiles"):
+                description = "SMILES or CXSMILES"
+            elif tuple(columns) == ("smiles", "cxsmiles", "inchi", "inchikey"):
+                description = "SMILES, CXSMILES, InChI, or InChIKey"
+            else:
+                description = "configured chemistry"
+            raise ValueError(
+                f"{source}: expected exactly one {description} column, "
+                f"found {len(candidates)}"
+            )
+        chemistry_index, chemistry_format = candidates[0]
+        metadata_indexes = tuple(
+            index for index in range(len(header)) if index != chemistry_index
+        )
+        metadata_names = tuple(header[index].strip() for index in metadata_indexes)
+        sequence = 0
+        for line_number, fields in enumerate(reader, 2):
+            if not fields or not any(field.strip() for field in fields):
+                continue
+            sequence += 1
+            raw = table_delimiter.join(fields)
+            padded = fields + [""] * max(0, len(header) - len(fields))
+            chemistry = padded[chemistry_index].strip()
+            error = _chemical_format_error(chemistry, chemistry_format)
+            if len(fields) != len(header):
+                error = f"expected {len(header)} {resolved.upper()} fields, found {len(fields)}"
+            yield ChemicalRecord(
+                sequence=sequence,
+                line_number=line_number,
+                chemistry=chemistry,
+                raw=raw,
+                metadata=tuple(padded[index] for index in metadata_indexes),
+                metadata_names=metadata_names,
+                headered=True,
+                fields=tuple(fields),
+                format_error=error,
+                input_format=resolved,
+                chemistry_format=chemistry_format,
+            )
+
+
+def count_chemical_records(
+    path: str | Path,
+    *,
+    input_format: ChemicalInputFormat = "auto",
+    delimiter: str | None = None,
+    skip_comments: bool = False,
+) -> int:
+    """Count records using the same framing rules as :func:`iter_chemical_records`.
+
+    This avoids parsing molecule graphs, so progress reporting does not
+    materialize or reparse the chemistry.
+    """
+    source = Path(path)
+    resolved = resolve_chemical_input_format(source, input_format)
+    if resolved == "sdf":
+        if source.suffix.lower() == ".gz":
+            raise ValueError("compressed SDF input is not supported")
+        return sum(1 for _record in iter_sdf_text_records(source))
+    if resolved in {"smi", "inchi", "inchikey"}:
+        with open_text(source) as handle:
+            return sum(
+                1
+                for line in handle
+                if line.strip()
+                and not (skip_comments and line.lstrip().startswith("#"))
+            )
+    if resolved not in {"csv", "tsv"}:
+        raise ValueError(f"unsupported chemical input format: {resolved}")
+    table_delimiter = delimiter or ("\t" if resolved == "tsv" else ",")
+    with open_text(source) as handle:
+        reader = csv.reader(handle, delimiter=table_delimiter)
+        try:
+            next(reader)
+        except StopIteration as error:
+            raise ValueError(f"{source}: expected a header row") from error
+        return sum(
+            1 for fields in reader if fields and any(field.strip() for field in fields)
+        )
 
 
 def _resolve_csv_column(fieldnames: list[str] | None, column: str) -> str:
