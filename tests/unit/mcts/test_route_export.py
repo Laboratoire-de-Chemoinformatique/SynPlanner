@@ -3,10 +3,12 @@
 import gzip
 import json
 
+import synplan.mcts.search as search_module
 from synplan import __version__
 from synplan.mcts.search import (
     ROUTE_EXPORT_SCHEMA_VERSION,
     _canonical_target_key,
+    build_target_routes,
     export_routes_artifact,
 )
 
@@ -86,3 +88,26 @@ def test_canonical_target_key_preserves_stereo():
 def test_canonical_target_key_unparseable_falls_back_to_raw():
     # RDKit cannot parse this; helper keys by the raw string instead of crashing.
     assert _canonical_target_key("not a smiles") == "not a smiles"
+
+
+def test_build_target_routes_uses_explicit_tree_json_adapter(monkeypatch):
+    reactions = {7: object()}
+
+    class SolvedTree:
+        winning_nodes = (7,)
+
+    tree = SolvedTree()
+    captured = {}
+
+    def fake_make_tree_json(source_tree, *, reactions, keep_ids):
+        captured.update(tree=source_tree, reactions=reactions, keep_ids=keep_ids)
+        return {7: {"type": "mol", "in_stock": True}}
+
+    monkeypatch.setattr(search_module, "make_tree_json", fake_make_tree_json)
+
+    assert build_target_routes(tree, reactions) == [{"type": "mol", "in_stock": True}]
+    assert captured == {
+        "tree": tree,
+        "reactions": reactions,
+        "keep_ids": True,
+    }

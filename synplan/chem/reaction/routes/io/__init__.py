@@ -9,16 +9,20 @@ from synplan.chem.reaction.routes.io.json import (
     write_routes_json,
 )
 from synplan.chem.reaction.routes.io.tree import (
+    build_tree_route_trees,
     export_tree_to_csv,
     export_tree_to_json,
+    make_tree_json,
 )
 
 __all__ = [
     "build_route_trees",
+    "build_tree_route_trees",
     "export_tree_to_csv",
     "export_tree_to_json",
     "make_dict",
     "make_json",
+    "make_tree_json",
     "read_routes_csv",
     "read_routes_json",
     "write_routes_csv",

@@ -15,8 +15,12 @@ _EXPORTS = {
         "_collect_reactions",
     ),
     "_route_step_metadata_from_tree": (
-        "synplan.chem.reaction.routes.io.json",
+        "synplan.chem.reaction.routes.io.tree",
         "_route_step_metadata_from_tree",
+    ),
+    "build_tree_route_trees": (
+        "synplan.chem.reaction.routes.io",
+        "build_tree_route_trees",
     ),
     "build_route_trees": (
         "synplan.chem.reaction.routes.io",
@@ -32,6 +36,10 @@ _EXPORTS = {
     ),
     "make_dict": ("synplan.chem.reaction.routes.io", "make_dict"),
     "make_json": ("synplan.chem.reaction.routes.io", "make_json"),
+    "make_tree_json": (
+        "synplan.chem.reaction.routes.io",
+        "make_tree_json",
+    ),
     "read_routes_csv": (
         "synplan.chem.reaction.routes.io",
         "read_routes_csv",

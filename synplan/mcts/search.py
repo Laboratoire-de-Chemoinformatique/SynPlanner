@@ -17,9 +17,9 @@ from synplan import __version__
 from synplan.chem.building_blocks import BuildingBlockStock
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.routes.io import (
-    make_json,
+    export_tree_to_json,
+    make_tree_json,
     write_routes_csv,
-    write_routes_json,
 )
 from synplan.chem.reaction.routes.quality.scorer import RouteScorer
 from synplan.chem.reaction.routes.representation import extract_reactions
@@ -103,7 +103,7 @@ def build_target_routes(tree, reactions: dict | None = None) -> list[dict]:
     Returns the list of route-tree dicts for one solved target. Each route tree
     is a recursive bipartite structure of ``{"type": "mol", ...}`` and
     ``{"type": "reaction", ...}`` nodes whose format is exactly the output of
-    :func:`synplan.chem.reaction.routes.io.make_json` (node shape is not
+    :func:`synplan.chem.reaction.routes.io.make_tree_json` (node shape is not
     reshaped). Returns ``[]`` when the tree has no winning nodes.
 
     :param tree: A completed :class:`~synplan.mcts.tree.Tree`.
@@ -112,9 +112,7 @@ def build_target_routes(tree, reactions: dict | None = None) -> list[dict]:
     """
     if not bool(tree.winning_nodes):
         return []
-    if reactions is None:
-        reactions = extract_reactions(tree)
-    return list(make_json(reactions, keep_ids=True).values())
+    return list(make_tree_json(tree, reactions=reactions, keep_ids=True).values())
 
 
 def export_routes_artifact(
@@ -354,8 +352,10 @@ def run_search(
                 )
 
                 # save mapped reactions (JSON)
-                write_routes_json(
-                    routes_dict, os.path.join(routes_folder, f"mapped_routes_{ti}.json")
+                export_tree_to_json(
+                    tree,
+                    os.path.join(routes_folder, f"mapped_routes_{ti}.json"),
+                    reactions=routes_dict,
                 )
 
                 # public route export (reuse extract_reactions result)

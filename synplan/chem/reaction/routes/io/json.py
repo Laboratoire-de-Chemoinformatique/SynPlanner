@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
+from typing import Any
 
 from chython import smiles as read_smiles
 from chython.exceptions import InvalidAromaticRing
@@ -17,10 +18,8 @@ from synplan.chem.reaction.routes.io.metadata import (
     restore_reaction_metadata as _restore_reaction_metadata,
 )
 
-if TYPE_CHECKING:
-    from synplan.mcts.tree import Tree
-
 logger = logging.getLogger(__name__)
+MoleculeInStock = Callable[[Any], bool]
 
 
 def _route_tree_has_null_node(node) -> bool:
@@ -47,28 +46,6 @@ def _route_molecule_smiles(mol) -> str:
         # preparation fails; route export should remain best-effort.
         pass
     return str(mol)
-
-
-def _route_step_metadata_from_tree(
-    tree: "Tree", route_id: int
-) -> dict[int, dict[str, Any]]:
-    """Map route step ids from ``extract_reactions`` to tree rule metadata."""
-    details = tree.route_details(route_id)
-    steps = details.get("steps", [])
-    total_steps = len(steps)
-    metadata_by_step_id = {}
-
-    for step_index, step in enumerate(steps):
-        step_id = total_steps - 1 - step_index
-        metadata_by_step_id[step_id] = {
-            "step_id": step_id,
-            "tree_node_id": step.get("node_id"),
-            "rule_id": step.get("rule_id"),
-            "rule_source": step.get("rule_source"),
-            "rule_key": step.get("rule_key"),
-        }
-
-    return metadata_by_step_id
 
 
 def _collect_reactions(tree):
@@ -128,7 +105,7 @@ def read_routes_json(file_path="routes.json", to_dict=False):
 def _make_json_v1(
     routes_dict,
     keep_ids=True,
-    tree: "Tree | None" = None,
+    molecule_in_stock: MoleculeInStock | None = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
 ):
     """
@@ -137,11 +114,9 @@ def _make_json_v1(
     Args:
         routes_dict (dict[int, dict[int, Reaction]]): Mapping route IDs to steps (step_id -> Reaction).
         keep_ids (bool): If True, returns a dict mapping route IDs to trees; otherwise returns a list.
-        tree (Tree | None): Optional source tree used to attach rule metadata to
-            reaction nodes.
         route_metadata (dict | None): Optional per-route metadata mapping
-            ``route_id -> step_id -> metadata``. This overrides metadata derived
-            from ``tree`` when provided.
+            ``route_id -> step_id -> metadata``.
+        molecule_in_stock (callable | None): Optional molecule membership callback.
 
     Returns:
         list or dict: JSON-like tree(s) of routes.
@@ -149,14 +124,17 @@ def _make_json_v1(
     # Prepare output
     all_routes = {} if keep_ids else []
 
+    def resolve_in_stock(molecule, *, fallback: bool) -> bool:
+        if molecule_in_stock is None:
+            return fallback
+        return bool(molecule_in_stock(molecule))
+
     for route_id, steps in routes_dict.items():
         if not steps:
             continue
         route_step_metadata = (
             route_metadata.get(route_id) if route_metadata is not None else None
         )
-        if route_step_metadata is None and tree is not None:
-            route_step_metadata = _route_step_metadata_from_tree(tree, route_id)
         try:
             # Determine target molecule atoms from the final step of this route
             final_step = max(steps)
@@ -198,7 +176,7 @@ def _make_json_v1(
                     "type": "mol",
                     "smiles": _route_molecule_smiles(product),
                     "children": [build_reaction_node(sid)],
-                    "in_stock": False,
+                    "in_stock": resolve_in_stock(product, fallback=False),
                 }
             # Neither structural identity nor atom-number overlap matched: route
             # is genuinely unrecoverable; the drop guard in make_json handles it.
@@ -229,7 +207,11 @@ def _make_json_v1(
                     )
                 else:
                     node["children"].append(
-                        {"type": "mol", "smiles": r_smi, "in_stock": True}
+                        {
+                            "type": "mol",
+                            "smiles": r_smi,
+                            "in_stock": resolve_in_stock(react, fallback=True),
+                        }
                     )
 
             return node
@@ -254,7 +236,7 @@ def _make_json_v1(
 def build_route_trees(
     routes_dict,
     keep_ids: bool = True,
-    tree: "Tree | None" = None,
+    molecule_in_stock: MoleculeInStock | None = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
@@ -264,7 +246,7 @@ def build_route_trees(
     route_trees = _make_json_v1(
         routes_dict,
         keep_ids=True,
-        tree=tree,
+        molecule_in_stock=molecule_in_stock,
         route_metadata=route_metadata,
     )
     diagnostics = tuple(
@@ -285,7 +267,7 @@ def build_route_trees(
 def make_json(
     routes_dict,
     keep_ids: bool = True,
-    tree: "Tree | None" = None,
+    molecule_in_stock: MoleculeInStock | None = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
@@ -299,7 +281,7 @@ def make_json(
     return build_route_trees(
         routes_dict,
         keep_ids=keep_ids,
-        tree=tree,
+        molecule_in_stock=molecule_in_stock,
         route_metadata=route_metadata,
         strict=strict,
     ).routes
@@ -308,7 +290,7 @@ def make_json(
 def write_routes_json(
     routes_dict,
     file_path,
-    tree: "Tree | None" = None,
+    molecule_in_stock: MoleculeInStock | None = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
@@ -317,7 +299,7 @@ def write_routes_json(
 
     result = build_route_trees(
         routes_dict,
-        tree=tree,
+        molecule_in_stock=molecule_in_stock,
         route_metadata=route_metadata,
         strict=strict,
     )

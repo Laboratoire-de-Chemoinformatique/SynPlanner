@@ -1,8 +1,9 @@
 from chython import smiles as read_smiles
 from chython.containers import MoleculeContainer
 
+from synplan.chem.building_blocks import BuildingBlockStock, molecule_to_inchi_key
 from synplan.chem.precursor import Precursor
-from synplan.chem.reaction.routes.io import make_json
+from synplan.chem.reaction.routes.io import make_tree_json
 from synplan.mcts.node import Node
 from synplan.utils.visualisation import (
     extract_routes,
@@ -88,7 +89,7 @@ def test_make_json_attaches_rule_metadata_from_tree():
         }
     }
 
-    routes_json = make_json(routes_dict, tree=_MockRouteMetadataTree())
+    routes_json = make_tree_json(_MockRouteMetadataTree(), reactions=routes_dict)
     root = routes_json[7]
     root_reaction = root["children"][0]
     expanded_child = next(
@@ -112,7 +113,7 @@ def test_get_route_svg_from_json_can_render_rule_labels():
         }
     }
 
-    routes_json = make_json(routes_dict, tree=_MockRouteMetadataTree())
+    routes_json = make_tree_json(_MockRouteMetadataTree(), reactions=routes_dict)
     svg = get_route_svg_from_json(routes_json, 7, labeled=True)
 
     assert "<svg" in svg
@@ -123,7 +124,7 @@ def test_get_route_svg_from_json_can_render_rule_labels():
 def test_extract_routes_uses_root_to_terminal_steps():
     target = Precursor(make_mol(7))
     product = Precursor(make_mol(8))
-    tree = type("RouteTree", (), {})()
+    tree = _MockTree()
     tree.config = _MockConfig()
     tree.building_blocks = frozenset()
     tree.nodes = {
@@ -146,3 +147,25 @@ def test_extract_routes_uses_root_to_terminal_steps():
     reaction = routes[0]["children"][0]
     assert reaction["type"] == "reaction"
     assert reaction["children"][0]["smiles"] == str(product.molecule)
+
+
+def test_make_json_uses_tree_inchikey_stock_for_leaf_flags():
+    class StockTree:
+        def __init__(self):
+            stocked = read_smiles("CCCCCCC")
+            self.config = _MockConfig()
+            self.building_blocks = BuildingBlockStock(
+                frozenset({molecule_to_inchi_key(stocked)}),
+                "inchikey",
+            )
+
+        def route_details(self, node_id: int) -> dict:
+            assert node_id == 7
+            return {"steps": [{"node_id": 2, "rule_id": 1, "rule_source": "policy"}]}
+
+    routes_dict = {7: {0: read_smiles("CCCCCCC.CCCCCCCO>>CCCCCCCCCCCCCCO")}}
+
+    route = make_tree_json(StockTree(), reactions=routes_dict)[7]
+    leaves = route["children"][0]["children"]
+
+    assert sorted(node["in_stock"] for node in leaves) == [False, True]

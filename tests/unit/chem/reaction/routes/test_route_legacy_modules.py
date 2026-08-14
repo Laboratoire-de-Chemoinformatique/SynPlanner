@@ -48,12 +48,16 @@ def test_tree_wrapper_is_removed_from_route_io_namespaces():
 
 def test_canonical_route_exports_remain_available():
     from synplan.chem.reaction.routes.io import (
+        build_tree_route_trees,
         export_tree_to_csv,
         export_tree_to_json,
+        make_tree_json,
     )
 
+    assert callable(build_tree_route_trees)
     assert callable(export_tree_to_csv)
     assert callable(export_tree_to_json)
+    assert callable(make_tree_json)
 
 
 def test_mcts_tree_no_longer_defines_route_exports():

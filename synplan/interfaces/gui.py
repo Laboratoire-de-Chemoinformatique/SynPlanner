@@ -17,7 +17,7 @@ from synplan.chem.reaction.routes.clustering import (
     post_process_subgroup,
     subcluster_all_clusters,
 )
-from synplan.chem.reaction.routes.io import make_json
+from synplan.chem.reaction.routes.io import make_tree_json
 from synplan.chem.reaction.routes.quality.scorer import ProtectionRouteScorer
 from synplan.chem.reaction.routes.representation import (
     compose_all_route_cgrs,
@@ -605,7 +605,9 @@ def run_clustering_core():
             st.session_state.sb_cgrs_dict = sb_cgrs_dict
             st.write("Extracting reactions...")
             st.session_state.reactions_dict = extract_reactions(current_tree)
-            st.session_state.route_json = make_json(st.session_state.reactions_dict)
+            st.session_state.route_json = make_tree_json(
+                current_tree, reactions=st.session_state.reactions_dict
+            )
 
             if (
                 st.session_state.clusters is not None

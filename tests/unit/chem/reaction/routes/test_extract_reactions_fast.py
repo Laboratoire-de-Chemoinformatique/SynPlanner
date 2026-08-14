@@ -16,12 +16,22 @@ from __future__ import annotations
 import copy
 from types import SimpleNamespace
 
+import pytest
+from chython import smiles as read_smiles
+
+from synplan.chem.building_blocks import BuildingBlockStock, molecule_to_inchi_key
 from synplan.chem.reaction.routes.io import (
     _route_tree_has_null_node,
     make_json,
+    make_tree_json,
     read_routes_csv,
 )
 from synplan.chem.reaction.routes.representation import extract_reactions
+from synplan.chem.reaction.routes.representation.route_cgr import (
+    _copy_reaction_stereo_sources,
+    _reaction_from_cgr_with_stereo,
+    _remap_reaction_stereo_sources,
+)
 
 
 class _MockTree:
@@ -40,6 +50,27 @@ class _MockTree:
     def synthesis_route(self, route_id):
         steps = self._routes_dict[route_id]
         return tuple(steps[sid] for sid in sorted(steps))
+
+
+class _StereoStockTree:
+    """One-step route with a full-InChIKey stock for export parity tests."""
+
+    def __init__(self, reaction):
+        self.reaction = reaction
+        self.winning_nodes = [7]
+        self.config = SimpleNamespace(min_mol_size=0)
+        self.building_blocks = BuildingBlockStock(
+            frozenset({molecule_to_inchi_key(reaction.reactants[0])}),
+            "inchikey",
+        )
+
+    def synthesis_route(self, route_id):
+        assert route_id == 7
+        return (self.reaction,)
+
+    def route_details(self, route_id):
+        assert route_id == 7
+        return {"steps": [{"node_id": 2}]}
 
 
 def _strip_reaction_smiles(node):
@@ -75,6 +106,55 @@ def test_fast_matches_reconciled_skeleton_on_real_routes():
         assert _strip_reaction_smiles(json_fast[route_id]) == _strip_reaction_smiles(
             json_rec[route_id]
         ), f"mol-skeleton differs between fast and reconciled for route {route_id}"
+
+
+@pytest.mark.parametrize(
+    ("reaction_smiles", "stereo_marker"),
+    [
+        (
+            "[F:1][C@@H:2]([Cl:3])[CH3:4].[OH2:5]>>[F:1][C@@H:2]([Cl:3])[CH2:4][OH:5]",
+            "@",
+        ),
+        (
+            r"[CH3:1]/[CH:2]=[CH:3]/[CH2:4][OH:5]"
+            r">>[CH3:1]/[CH:2]=[CH:3]/[CH:4]=[O:5]",
+            "/",
+        ),
+    ],
+    ids=("tetrahedral", "cis-trans"),
+)
+def test_reconciled_export_preserves_stereo_and_inchikey_stock_membership(
+    reaction_smiles,
+    stereo_marker,
+):
+    """CGR mapping reconciliation must not erase planner identity stereo."""
+
+    tree = _StereoStockTree(read_smiles(reaction_smiles))
+    fast_reactions = extract_reactions(tree, reconcile_atom_mapping=False)
+    reconciled_reactions = extract_reactions(tree, reconcile_atom_mapping=True)
+
+    fast = make_tree_json(tree, reactions=fast_reactions)[7]
+    reconciled = make_tree_json(tree, reactions=reconciled_reactions)[7]
+
+    assert _strip_reaction_smiles(reconciled) == _strip_reaction_smiles(fast)
+    assert stereo_marker in reconciled["smiles"]
+    stocked_leaf = reconciled["children"][0]["children"][0]
+    assert stereo_marker in stocked_leaf["smiles"]
+    assert stocked_leaf["in_stock"] is True
+
+    sources = _copy_reaction_stereo_sources(tree.reaction)
+    cgr = tree.reaction.compose()
+    atom_mapping = {atom_number: atom_number + 100 for atom_number in cgr._atoms}
+    cgr.remap(atom_mapping, copy=False)
+    _remap_reaction_stereo_sources(sources, atom_mapping)
+    remapped_reaction = _reaction_from_cgr_with_stereo(cgr, sources)
+
+    assert stereo_marker in format(remapped_reaction, "m")
+    assert {
+        atom_number
+        for molecule in (*remapped_reaction.reactants, *remapped_reaction.products)
+        for atom_number in molecule._atoms
+    } == set(atom_mapping.values())
 
 
 def test_fast_default_produces_valid_no_null_tree():
