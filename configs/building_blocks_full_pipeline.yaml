@@ -1,0 +1,20 @@
+# Audited conservative preparation for planner and Synt-On inputs.
+input_format: auto
+smiles_column: SMILES
+
+deprotect: true
+deprotect_policy: conservative
+deprotect_output: replace
+
+write_inchikey_stock: true
+protected_output_file: null
+inchikey_file: null
+identity_reference_file: null
+duplicates_file: null
+collisions_file: null
+stereo_file: null
+
+write_audit_files: true
+audit_overwrite: error
+num_workers: 8
+batch_size: 500

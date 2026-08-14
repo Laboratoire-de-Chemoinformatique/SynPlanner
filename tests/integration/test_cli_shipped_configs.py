@@ -32,6 +32,7 @@ WORKERS = (
     "load_policy_function",
     "load_reaction_rules",
     "load_building_block",
+    "prepare_building_blocks",
     "classify_file",
     "synthonise_file",
     "fragment_file",
@@ -83,6 +84,16 @@ CASES = [
         "mhn_network_tuning",
         "mhn_ranking_policy_training.yaml",
         ["--policy_network", "net.ckpt", "--new_policy_data", "policy.tsv"],
+    ),
+    (
+        "building_blocks_standardizing",
+        "building_blocks_preparation.yaml",
+        ["--input", "in.smi", "--output", "out.smi"],
+    ),
+    (
+        "building_blocks_standardizing",
+        "building_blocks_full_pipeline.yaml",
+        ["--input", "in.smi", "--output", "out.smi"],
     ),
     (
         "value_network_tuning",

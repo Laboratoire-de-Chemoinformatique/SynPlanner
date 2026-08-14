@@ -216,3 +216,85 @@ def test_mhn_network_tuning_cli_passes_checkpoint_and_new_policy_data(monkeypatc
         "num_workers": 2,
         "cache": True,
     }
+
+
+def test_building_block_cli_preserves_legacy_two_path_defaults(monkeypatch):
+    observed = {}
+
+    def fake_prepare_building_blocks(**kwargs):
+        observed.update(kwargs)
+
+    monkeypatch.setattr(cli, "prepare_building_blocks", fake_prepare_building_blocks)
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        with open("input.smi", "w", encoding="utf-8") as input_file:
+            input_file.write("CCO\n")
+        result = runner.invoke(
+            cli.synplan,
+            [
+                "building_blocks_standardizing",
+                "--input",
+                "input.smi",
+                "--output",
+                "stock.smi",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    assert observed["input_file"] == "input.smi"
+    assert observed["output_file"] == "stock.smi"
+    assert not observed["config"].deprotect
+    assert not observed["config"].write_inchikey_stock
+    assert not observed["config"].write_audit_files
+
+
+def test_building_block_cli_loads_yaml_configuration(monkeypatch):
+    observed = {}
+
+    def fake_prepare_building_blocks(**kwargs):
+        observed.update(kwargs)
+
+    monkeypatch.setattr(cli, "prepare_building_blocks", fake_prepare_building_blocks)
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        with open("input.smi", "w", encoding="utf-8") as input_file:
+            input_file.write("CCO\n")
+        with open("config.yaml", "w", encoding="utf-8") as config_file:
+            config_file.write(
+                "deprotect: true\n"
+                "deprotect_policy: aggressive\n"
+                "deprotect_output: append\n"
+                "write_inchikey_stock: true\n"
+                "write_audit_files: true\n"
+                "audit_overwrite: replace\n"
+                "num_workers: 1\n"
+            )
+        result = runner.invoke(
+            cli.synplan,
+            [
+                "building_blocks_standardizing",
+                "--config",
+                "config.yaml",
+                "--input",
+                "input.smi",
+                "--output",
+                "stock.smi",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    config = observed["config"]
+    assert config.deprotect_policy == "aggressive"
+    assert config.deprotect_output == "append"
+    assert config.write_inchikey_stock
+    assert config.write_audit_files
+    assert config.audit_overwrite == "replace"
+
+
+def test_building_block_cli_has_only_input_output_and_config():
+    command = cli.synplan.commands["building_blocks_standardizing"]
+    assert {parameter.name for parameter in command.params} == {
+        "input_file",
+        "output_file",
+        "config_path",
+    }

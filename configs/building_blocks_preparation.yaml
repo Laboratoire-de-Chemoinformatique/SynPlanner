@@ -1,0 +1,20 @@
+# Defaults-only building-block preparation. Input and output paths are CLI arguments.
+input_format: auto
+smiles_column: SMILES
+
+deprotect: false
+deprotect_policy: conservative
+deprotect_output: replace
+
+write_inchikey_stock: false
+protected_output_file: null
+inchikey_file: null
+identity_reference_file: null
+duplicates_file: null
+collisions_file: null
+stereo_file: null
+
+write_audit_files: false
+audit_overwrite: error
+num_workers: null
+batch_size: 500

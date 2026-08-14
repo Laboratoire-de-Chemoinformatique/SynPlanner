@@ -6,7 +6,11 @@ from pathlib import Path
 import click
 import yaml
 
-from synplan.chem.building_blocks.config import BuildingBlockStockLoadConfig
+from synplan.chem.building_blocks.config import (
+    BuildingBlockPreparationConfig,
+    BuildingBlockStockLoadConfig,
+)
+from synplan.chem.building_blocks.preparation import prepare_building_blocks
 from synplan.chem.data.filtering import ReactionFilterConfig, filter_reactions_from_file
 from synplan.chem.data.mapping import MappingConfig, map_reactions_from_file
 from synplan.chem.data.standardizing import (
@@ -23,7 +27,6 @@ from synplan.chem.synthon.cli import (
     synthonise_file,
 )
 from synplan.chem.synthon.config import SynthonConfig
-from synplan.chem.utils import standardize_building_blocks
 from synplan.mcts.search import run_search
 from synplan.ml.training.reinforcement import run_updating
 from synplan.ml.training.supervised import (
@@ -119,19 +122,43 @@ def download_all_data_cli(save_to: str = ".") -> None:
     "--input",
     "input_file",
     required=True,
-    type=click.Path(exists=True),
-    help="Path to the file with building blocks to be standardized.",
+    type=click.Path(exists=True, dir_okay=False),
+    help="Building-block catalogue (.smi/.smiles/.cxsmiles, SDF, CSV or TSV).",
 )
 @click.option(
     "--output",
     "output_file",
     required=True,
-    type=click.Path(),
-    help="Path to the file where standardized building blocks will be stored.",
+    type=click.Path(dir_okay=False),
+    help="Deduplicated stereo-preserving canonical-SMILES planner stock.",
 )
-def building_blocks_standardizing_cli(input_file: str, output_file: str) -> None:
-    """Standardizes building blocks."""
-    standardize_building_blocks(input_file=input_file, output_file=output_file)
+@click.option(
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(exists=True, dir_okay=False),
+    help="Building-block preparation YAML.",
+)
+def building_blocks_standardizing_cli(
+    input_file: str,
+    output_file: str,
+    config_path: str | None,
+) -> None:
+    """Prepare the ordinary planner stock and its optional audited identity bundle."""
+    try:
+        config = (
+            BuildingBlockPreparationConfig.from_yaml(config_path)
+            if config_path is not None
+            else BuildingBlockPreparationConfig()
+        )
+    except Exception as error:
+        raise click.UsageError(
+            f"Invalid building-block preparation configuration: {error}"
+        ) from error
+
+    prepare_building_blocks(
+        input_file=input_file, output_file=output_file, config=config
+    )
 
 
 @synplan.command(name="ord_convert")
