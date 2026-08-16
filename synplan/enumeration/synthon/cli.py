@@ -4,21 +4,21 @@ from pathlib import Path
 
 from chython import smiles, synthon_smiles
 
-from synplan.chem.synthon.config import SynthonConfig
-from synplan.chem.synthon.enumeration import Enumerator
-from synplan.chem.synthon.fragment import Fragmenter
-from synplan.chem.synthon.scaffolds import murcko_scaffold
-from synplan.chem.synthon.stock import (
+from synplan.chem.scaffolds import murcko_scaffold
+from synplan.chem.utils import safe_canonicalization
+from synplan.enumeration.synthon.config import SynthonConfig
+from synplan.enumeration.synthon.enumeration import Enumerator
+from synplan.enumeration.synthon.fragment import Fragmenter
+from synplan.enumeration.synthon.stock import (
     SynthonRecord,
     load_synthon_stock,
     write_synthon_stock,
 )
-from synplan.chem.synthon.synthonise import (
+from synplan.enumeration.synthon.synthonise import (
     classify_batch,
     init_worker,
     synthonise_batch,
 )
-from synplan.chem.utils import safe_canonicalization
 from synplan.utils.files import iter_smiles_records
 from synplan.utils.parallel import chunked, process_pool_map_stream
 

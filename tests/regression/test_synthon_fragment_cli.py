@@ -3,17 +3,17 @@
 import pytest
 from chython import smiles
 
-from synplan.chem.synthon import cli
-from synplan.chem.synthon.classify import BBClassifier
-from synplan.chem.synthon.config import SynthonConfig, load_data
-from synplan.chem.synthon.fragment import (
+from synplan.chem.utils import safe_canonicalization
+from synplan.enumeration.synthon import cli
+from synplan.enumeration.synthon.classify import BBClassifier
+from synplan.enumeration.synthon.config import SynthonConfig, load_data
+from synplan.enumeration.synthon.fragment import (
     STUDY_FRAGMENTS_TO_IGNORE,
     Fragmenter,
     _select,
     fragment_smiles,
 )
-from synplan.chem.synthon.stock import SynthonRecord, write_synthon_stock
-from synplan.chem.utils import safe_canonicalization
+from synplan.enumeration.synthon.stock import SynthonRecord, write_synthon_stock
 
 IMATINIB = "Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1"
 PARACETAMOL = "CC(=O)Nc1ccc(O)cc1"

@@ -116,7 +116,7 @@ assert facade_depict_route_cgr is depict_route_cgr
 def test_synthon_package_root_stays_lightweight():
     code = """
 import sys
-import synplan.chem.synthon
+import synplan.enumeration.synthon
 
 unexpected = [
     name
@@ -125,13 +125,13 @@ unexpected = [
         'matplotlib',
         'rdkit',
         'synplan.mcts.tree',
-        'synplan.chem.synthon.classify',
-        'synplan.chem.synthon.synthonise',
-        'synplan.chem.synthon.fragment',
+        'synplan.enumeration.synthon.classify',
+        'synplan.enumeration.synthon.synthonise',
+        'synplan.enumeration.synthon.fragment',
     )
     if name in sys.modules
 ]
 assert unexpected == [], unexpected
-assert synplan.chem.synthon.SynthonConfig.__name__ == 'SynthonConfig'
+assert synplan.enumeration.synthon.SynthonConfig.__name__ == 'SynthonConfig'
 """
     _run_fresh_process(code)

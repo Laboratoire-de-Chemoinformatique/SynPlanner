@@ -5,9 +5,13 @@ from pathlib import Path
 import pytest
 from chython import smiles
 
-from synplan.chem.synthon.classify import BBClassifier, SynthonDataError, _compile
-from synplan.chem.synthon.config import SynthonConfig, load_data
 from synplan.chem.utils import safe_canonicalization
+from synplan.enumeration.synthon.classify import (
+    BBClassifier,
+    SynthonDataError,
+    _compile,
+)
+from synplan.enumeration.synthon.config import SynthonConfig, load_data
 
 FIXTURES = Path(__file__).resolve().parents[3] / "data" / "synthon"
 

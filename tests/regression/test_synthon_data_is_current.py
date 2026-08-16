@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from synplan.chem.synthon.config import SynthonConfig
+from synplan.enumeration.synthon.config import SynthonConfig
 
 # the reference clone lives beside the repo, not inside it, so walk up until it turns up
 CONFIG_DIR = next(
@@ -29,7 +29,7 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def built():
-    from synplan.chem.synthon.data._convert import build
+    from synplan.enumeration.synthon.data._convert import build
 
     return build(CONFIG_DIR)
 
@@ -48,7 +48,7 @@ def test_committed_data_matches_the_converter(built, name, attribute):
 
 
 def test_the_converter_self_check_passes(built):
-    from synplan.chem.synthon.data._convert import check
+    from synplan.enumeration.synthon.data._convert import check
 
     problems = [p for p in check(built, CONFIG_DIR) if not p.startswith("note:")]
     assert problems == []
@@ -57,7 +57,7 @@ def test_the_converter_self_check_passes(built):
 def test_the_whole_classifier_corpus_translates():
     from chython import smarts
 
-    from synplan.chem.synthon.data._dialect import to_chython
+    from synplan.enumeration.synthon.data._dialect import to_chython
 
     library = json.loads((CONFIG_DIR / "SMARTSLibNew.json").read_text())
     patterns = [

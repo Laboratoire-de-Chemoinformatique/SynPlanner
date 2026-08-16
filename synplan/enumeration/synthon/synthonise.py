@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from chython import smarts, smiles, synthon_smiles
 from chython.containers import MoleculeContainer, SynthonContainer
 
-from synplan.chem.synthon.classify import BBClassifier, SynthonDataError
-from synplan.chem.synthon.config import SynthonConfig, load_data
-from synplan.chem.synthon.reactor import SynthonTransformer
 from synplan.chem.utils import safe_canonicalization
+from synplan.enumeration.synthon.classify import BBClassifier, SynthonDataError
+from synplan.enumeration.synthon.config import SynthonConfig, load_data
+from synplan.enumeration.synthon.reactor import SynthonTransformer
 
 # solvents and counterions dropped from a multi-component input, canonicalised once at import
 # (the reference re-canonicalises this list on every call)

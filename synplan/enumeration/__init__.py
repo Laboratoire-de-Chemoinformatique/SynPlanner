@@ -1,4 +1,4 @@
-"""Synt-On port: building-block classification, synthonisation, fragmentation and enumeration.
+"""Combinatorial library enumeration. Enumeration is the capability, `synthon` is one method.
 
 Lazy exports — importing this package must not pull torch, matplotlib or synplan.mcts.
 """
@@ -14,19 +14,17 @@ __all__ = [
     "SynthonTransformer",
     "find_analogues",
     "load_synthon_stock",
-    "murcko_scaffold",
 ]
 
 _EXPORTS = {
-    "BBClassifier": "classify",
-    "BBSynthoniser": "synthonise",
-    "Enumerator": "enumeration",
-    "Fragmenter": "fragment",
-    "SynthonConfig": "config",
-    "SynthonTransformer": "reactor",
-    "find_analogues": "analogues",
-    "load_synthon_stock": "stock",
-    "murcko_scaffold": "scaffolds",
+    "BBClassifier": "synthon",
+    "BBSynthoniser": "synthon",
+    "Enumerator": "synthon",
+    "Fragmenter": "synthon",
+    "SynthonConfig": "synthon",
+    "SynthonTransformer": "synthon",
+    "find_analogues": "synthon",
+    "load_synthon_stock": "synthon",
 }
 
 
