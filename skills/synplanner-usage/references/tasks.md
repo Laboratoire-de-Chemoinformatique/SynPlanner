@@ -268,6 +268,15 @@ Module: `synplan.enumeration.synthon.priority`
 protecting groups; `ro2_pass` applies the rule of two.
 Module: `synplan.chem.scaffolds`, `synplan.enumeration.synthon.stock`
 
+**Keep an auditable record of any synthon CLI run**
+All five synthon commands accept `synthonisation.yaml`. Set
+`write_audit_files: true` to create `fallback.smi`, `fallback.tsv`,
+`errors.tsv`, `summary.json`, and `run.log` beside the requested output. Use a
+dedicated directory per command because those sidecar names are fixed.
+`fallback.smi` contains only valid retryable inputs; for `synthon_enumerate` it
+preserves the complete fragmentation TSV row. `fallback.tsv` also records
+processing errors. Metadata on SMI/CXSMILES records must be separated by TAB.
+
 **Regenerate the shipped synthon data**
 `python -m synplan.enumeration.synthon.data._convert <Synt-On/config> --out
 synplan/enumeration/synthon/data --check`. The JSON is committed; nothing translates at

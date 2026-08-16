@@ -69,6 +69,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   here the table IS the join, so without those rows a biaryl disconnects and then
   reassembles to nothing.
 
+- Added opt-in audited output bundles to all five synthon CLI workflows. Set
+  `write_audit_files: true` in `SynthonConfig` to write `fallback.smi`,
+  `fallback.tsv`, `errors.tsv`, `summary.json`, and `run.log` beside the primary
+  output. Audited runs preserve an exact success/fallback input partition,
+  stage retryable records separately from processing errors, and publish validated
+  files with atomic replacement and `summary.json` promoted last. `audit_overwrite` defaults to `error`; use a
+  dedicated output directory per command and select `replace` explicitly to
+  replace an earlier bundle. Python return values and CLI result messages stay
+  unchanged. Synthon molecule inputs reserve spaces for complete CXSMILES and
+  require TAB-delimited metadata; headered TSV inputs use a `SMILES` or
+  `CXSMILES` column.
+
 - The shipped synthon disconnections can be used as an MCTS priority-rule set.
   `synthon_priority_rules()` returns them under the source name `"synthon"` as
   `run_search(priority_rules=...)` / `Tree(priority_rules=...)` input, so they are tried

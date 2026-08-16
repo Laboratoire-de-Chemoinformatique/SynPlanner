@@ -69,9 +69,16 @@ class BBClassifier:
         """
         found: set[str] = set()
         parsed = False
-        for part in smi.split("."):
+        try:
+            whole = smiles(smi)
+            if not isinstance(whole, MoleculeContainer):
+                return None
+            components = whole.split()
+        except Exception:
+            return None
+        for component in components:
             try:
-                molecule = safe_canonicalization(smiles(part))
+                molecule = safe_canonicalization(component)
             except Exception:
                 continue
             parsed = True

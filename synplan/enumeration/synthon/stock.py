@@ -37,6 +37,22 @@ class SynthonRecord:
         )
 
 
+def _split_building_blocks(text: str) -> tuple[str, ...]:
+    """Split ``+``-joined source SMILES without splitting bracketed charges."""
+    blocks: list[str] = []
+    start = depth = 0
+    for index, character in enumerate(text):
+        if character == "[":
+            depth += 1
+        elif character == "]":
+            depth = max(0, depth - 1)
+        elif character == "+" and depth == 0:
+            blocks.append(text[start:index])
+            start = index + 1
+    blocks.append(text[start:])
+    return tuple(blocks)
+
+
 def read_synthon_records(path: str) -> Iterator[SynthonRecord]:
     """Parse the stock file. Text-level: MoleculeReader hard-codes plain `smiles` and would raise."""
     for line in iter_smiles_records(path):
@@ -45,7 +61,10 @@ def read_synthon_records(path: str) -> Iterator[SynthonRecord]:
             fields = line.split()
         synthon, blocks, classes, component = fields[:4]
         yield SynthonRecord(
-            synthon, tuple(blocks.split("+")), tuple(classes.split("+")), int(component)
+            synthon,
+            _split_building_blocks(blocks),
+            tuple(classes.split("+")),
+            int(component),
         )
 
 

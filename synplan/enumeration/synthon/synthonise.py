@@ -482,12 +482,18 @@ class BBSynthoniser:
         inside a ProcessPoolExecutor.
         """
         out: dict[str, dict] = {}
-        components = smi.split(".")
+        try:
+            whole = smiles(smi)
+            if not isinstance(whole, MoleculeContainer):
+                return out
+            components = list(whole.split())
+        except Exception:
+            return out
         if len(components) > self.config.max_components:
             return out
-        for index, part in enumerate(components):
+        for index, component in enumerate(components):
             try:
-                molecule = safe_canonicalization(smiles(part))
+                molecule = safe_canonicalization(component)
                 if (
                     len(components) > 1
                     and self.config.ignore_solvents

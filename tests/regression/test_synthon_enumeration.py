@@ -8,6 +8,7 @@ from chython.containers import SynthonContainer
 from rdkit import Chem
 
 from synplan.chem.utils import safe_canonicalization
+from synplan.enumeration.synthon.cli import enumerate_file
 from synplan.enumeration.synthon.config import SynthonConfig, load_data
 from synplan.enumeration.synthon.enumeration import (
     Enumerator,
@@ -17,6 +18,7 @@ from synplan.enumeration.synthon.enumeration import (
 )
 from synplan.enumeration.synthon.fragment import Fragmenter
 from synplan.enumeration.synthon.reactor import SynthonTransformer
+from synplan.enumeration.synthon.stock import SynthonRecord, write_synthon_stock
 
 HYDROGEN = 1.008
 
@@ -46,6 +48,23 @@ ALDEHYDES = [
     "CCCC[CH_elec]=O",
     "c1ccccc1[CH_elec]=O",
 ]
+
+
+def _enumerate_file_case(tmp_path, config, synthons, stock_records):
+    case = tmp_path / ("audited" if config.write_audit_files else "regular")
+    case.mkdir()
+    pathways = case / "pathways.tsv"
+    pathways.write_text(
+        f"target\tR-test\t{'.'.join(synthons)}\t1\t1.0000\n",
+        encoding="utf-8",
+    )
+    stock = case / "stock.smi"
+    write_synthon_stock(str(stock), stock_records)
+    output = case / "products.smi"
+
+    written = enumerate_file(str(pathways), str(output), str(stock), config)
+    products = {line.split("\t", 1)[0] for line in output.read_text().splitlines()}
+    return written, products
 
 
 def mk(smi: str) -> SynthonContainer:
@@ -231,3 +250,87 @@ def test_a_ring_rule_round_trips_its_target(rule_id, target_smi):
 
     off = SynthonConfig(ring_closure_sizes=())
     assert not list(Enumerator(off).enumerate_analogues(keys, {k: [k] for k in keys}))
+
+
+@pytest.mark.parametrize("audited", (False, True))
+def test_enumerate_file_uses_configured_analogue_slots(tmp_path, audited):
+    synthons = ("C[CH_elec]=O", "CCC[NH2_nuc]")
+    records = (
+        SynthonRecord("C[CH_elec]=O", ("CC(=O)Cl",), ("AcidHalides_AcylHalides",), 0),
+        SynthonRecord("CC[NH2_nuc]", ("CCN",), ("Amines_Amines",), 0),
+        SynthonRecord("CCC[NH2_nuc]", ("CCCN",), ("Amines_Amines",), 0),
+        SynthonRecord("CCCC[NH2_nuc]", ("CCCCN",), ("Amines_Amines",), 0),
+    )
+    config = SynthonConfig(
+        find_analogues=True,
+        similarity_threshold=-1.0,
+        pas_removal_direction=True,
+        mw_lower=0.0,
+        mw_upper=10_000.0,
+        num_workers=1,
+        write_audit_files=audited,
+        audit_overwrite="replace",
+    )
+
+    written, products = _enumerate_file_case(tmp_path, config, synthons, records)
+
+    assert written == 3
+    assert products == {"CCCNC(=O)C", "CCNC(=O)C", "CCCCNC(=O)C"}
+
+
+@pytest.mark.parametrize("audited", (False, True))
+def test_enumerate_file_ro2_filter_rejects_an_empty_strict_slot(tmp_path, audited):
+    synthons = ("C[CH3_elec]", "NCC(O)C[NH2_nuc]")
+    records = (
+        SynthonRecord("C[CH3_elec]", ("CCl",), ("Test_Electrophile",), 0),
+        SynthonRecord(
+            "NCC(O)C[NH2_nuc]",
+            ("NCC(O)CN",),
+            ("Test_Nucleophile",),
+            0,
+        ),
+    )
+    config = SynthonConfig(
+        ro2_filtration=True,
+        ro2_variant="paper",
+        strict_availability=True,
+        mw_lower=0.0,
+        mw_upper=1_000.0,
+        num_workers=1,
+        write_audit_files=audited,
+        audit_overwrite="replace",
+    )
+
+    written, products = _enumerate_file_case(tmp_path, config, synthons, records)
+
+    assert written == 0
+    assert products == set()
+
+
+@pytest.mark.parametrize("audited", (False, True))
+def test_enumerate_file_non_strict_mode_uses_the_pathway_synthon(tmp_path, audited):
+    synthons = ("C[CH3_elec]", "NCC(O)C[NH2_nuc]")
+    records = (
+        SynthonRecord("C[CH3_elec]", ("CCl",), ("Test_Electrophile",), 0),
+        SynthonRecord(
+            "NCC(O)C[NH2_nuc]",
+            ("NCC(O)CN",),
+            ("Test_Nucleophile",),
+            0,
+        ),
+    )
+    config = SynthonConfig(
+        ro2_filtration=True,
+        ro2_variant="paper",
+        strict_availability=False,
+        mw_lower=0.0,
+        mw_upper=1_000.0,
+        num_workers=1,
+        write_audit_files=audited,
+        audit_overwrite="replace",
+    )
+
+    written, products = _enumerate_file_case(tmp_path, config, synthons, records)
+
+    assert written == 1
+    assert products == {"OC(CNCC)CN"}

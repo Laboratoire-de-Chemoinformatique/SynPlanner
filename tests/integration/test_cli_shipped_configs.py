@@ -36,6 +36,7 @@ WORKERS = (
     "synthonise_file",
     "fragment_file",
     "enumerate_file",
+    "scaffolds_file",
 )
 
 # Input files touched in the isolated filesystem before each invocation.
@@ -160,6 +161,11 @@ CASES = [
         "synthon_enumerate",
         "synthonisation.yaml",
         ["--input", "in.smi", "--output", "out.smi", "--stock", "bb.smi"],
+    ),
+    (
+        "bb_scaffolds",
+        "synthonisation.yaml",
+        ["--input", "in.smi", "--output", "out.tsv"],
     ),
 ]
 
