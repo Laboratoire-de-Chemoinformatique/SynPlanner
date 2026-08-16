@@ -3,8 +3,8 @@
 import pytest
 from chython import synthon_smiles
 
-from synplan.chem.synthon.config import SynthonConfig, load_data
-from synplan.chem.synthon.reactor import (
+from synplan.enumeration.synthon.config import SynthonConfig, load_data
+from synplan.enumeration.synthon.reactor import (
     SynthonRuleError,
     SynthonTransformer,
     load_rules,
@@ -63,11 +63,14 @@ def test_a_product_only_atom_gets_its_token():
 
 def test_all_shipped_rules_load_and_keep_their_tokens():
     data = load_data(SynthonConfig().rules_path)
-    normal = [r for r in data["disconnections"] if not r["macro"]]
+    normal = [r for r in data["disconnections"] if not r["macro"] and not r["ring"]]
     macro = [r for r in data["disconnections"] if r["macro"]]
+    ring = [r for r in data["disconnections"] if r["ring"]]
     assert len(normal) == 39  # R12.3 ships as R12.3a (Heck) and R12.3b (Suzuki)
     assert len(macro) == 39
-    for record, rule in load_rules(normal + macro):
+    assert len(ring) == 9  # the R16 heterocyclisations, which have no macrocyclic twin
+    assert not any(r["macro"] for r in ring)
+    for record, rule in load_rules(normal + macro + ring):
         # the SMARTS writer drops the token, so the source string is the artefact
         assert query_labels(smarts_of(record)) == rule._synthon_labels
 

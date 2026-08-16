@@ -10,16 +10,21 @@ from chython.containers import MoleculeContainer, SynthonContainer
 from chython.exceptions import InvalidAromaticRing
 from chython.periodictable.base.synthon import BIVALENT_LABELS
 
-from synplan.chem.synthon.config import SynthonConfig, load_data
-from synplan.chem.synthon.stock import label_keys
+from synplan.enumeration.synthon.config import SynthonConfig, load_data
+from synplan.enumeration.synthon.stock import label_keys
 
 Key = tuple[str, bool, str]
 
 
-def load_pairs(config: SynthonConfig | None = None) -> dict[Key, set[Key]]:
+def load_pairs(
+    config: SynthonConfig | None = None, key: str = "pairs"
+) -> dict[Key, set[Key]]:
     """The compatibility matrix, expanded symmetric. Keyed on (symbol, aromatic, token) — NEVER on
-    the token alone: C:elec has six partners, S:elec has exactly one."""
-    rows = load_data((config or SynthonConfig()).rules_path)["pairs"]
+    the token alone: C:elec has six partners, S:elec has exactly one.
+
+    `key="ring_pairs"` reads the ring-only rows instead; they are never consulted by `join`.
+    """
+    rows = load_data((config or SynthonConfig()).rules_path)[key]
     pairs: dict[Key, set[Key]] = {}
     for symbol_a, aromatic_a, token_a, symbol_b, aromatic_b, token_b in rows:
         a, b = (symbol_a, aromatic_a, token_a), (symbol_b, aromatic_b, token_b)
@@ -75,6 +80,45 @@ def join(
     return merged
 
 
+def close_ring(
+    molecule: SynthonContainer, atom_a: int, atom_b: int
+) -> SynthonContainer:
+    """`join`, minus the merge: the two labels are already in the same molecule.
+
+    This is the whole of heterocyclisation. A ring synthon is an ordinary H-capped fragment of the
+    product carrying two labels; the first bond is drawn by `join` and merges the partner in, which
+    leaves the second one INTRAMOLECULAR and so beyond anything `join` can express.
+    """
+    label_a, label_b = molecule.atom(atom_a).label, molecule.atom(atom_b).label
+    order = 2 if label_a in BIVALENT_LABELS and label_b in BIVALENT_LABELS else 1
+    closed = molecule.copy()
+    closed.atom(atom_a)._label = None
+    closed.atom(atom_b)._label = None
+    closed.add_bond(atom_a, atom_b, order)
+    _fix_aromatic_marks(closed)
+    closed.flush_cache()
+    return closed
+
+
+def ring_size(
+    molecule: SynthonContainer, start: int, end: int, limit: int
+) -> int | None:
+    """Size of the ring the bond start-end would close, or None beyond `limit` atoms."""
+    seen, frontier = {start}, [start]
+    bonds = molecule._bonds
+    for distance in range(1, limit):
+        nxt = []
+        for n in frontier:
+            for m in bonds[n]:
+                if m == end:
+                    return distance + 1
+                if m not in seen:
+                    seen.add(m)
+                    nxt.append(m)
+        frontier = nxt
+    return None
+
+
 def open_points(synthon: SynthonContainer) -> list[tuple[int, Key]]:
     return [
         (n, (a.atomic_symbol, a.hybridization == 4, a.label))
@@ -94,9 +138,37 @@ class Enumerator:
     ) -> None:
         self.config = config or SynthonConfig()
         self.pairs = pairs if pairs is not None else load_pairs(self.config)
+        # a separate table: aliphatic C:nuc + N:elec is the C5-N1 bond of every 1,2,3-triazole, but
+        # in `pairs` it would claim an alkyl nucleophile aminates, so it is legal ONLY in a ring
+        self.ring_pairs = load_pairs(self.config, "ring_pairs")
 
     def compatible(self, a: Key, b: Key) -> bool:
         return b in self.pairs.get(a, ())
+
+    def closable(self, a: Key, b: Key) -> bool:
+        """A ring closes on anything `pairs` allows, plus the ring-only rows."""
+        return self.compatible(a, b) or b in self.ring_pairs.get(a, ())
+
+    def _fuse(self, molecule: SynthonContainer) -> Iterator[SynthonContainer]:
+        """Every legal ring closure between two open points of ONE molecule.
+
+        Terminates: each fuse consumes two labels. `ring_closure_sizes=()` disables it entirely.
+        """
+        sizes = self.config.ring_closure_sizes
+        if not sizes:
+            return
+        points = open_points(molecule)
+        limit = max(sizes)
+        for index, (atom_a, key_a) in enumerate(points):
+            for atom_b, key_b in points[index + 1 :]:
+                if not self.closable(key_a, key_b):
+                    continue
+                if ring_size(molecule, atom_a, atom_b, limit) not in sizes:
+                    continue
+                try:
+                    yield close_ring(molecule, atom_a, atom_b)
+                except InvalidAromaticRing:
+                    continue  # the two labels ask for a ring that cannot exist
 
     def _index(self, synthons: Iterable[str]) -> dict[Key, list[str]]:
         index: dict[Key, list[str]] = {}
@@ -145,6 +217,8 @@ class Enumerator:
     ) -> Iterator[SynthonContainer]:
         if perf_counter() > deadline:
             return
+        for fused in self._fuse(molecule):
+            yield from self._grow(fused, index, used, deadline)
         points = open_points(molecule)
         if not points:
             yield molecule
@@ -208,12 +282,7 @@ class Enumerator:
     ) -> Iterator[MoleculeContainer]:
         if not synthons:
             return
-        head, rest = synthons[0], synthons[1:]
-        if not rest:
-            if not open_points(head):
-                yield head
-            return
-        yield from self._close(head, rest, deadline)
+        yield from self._close(synthons[0], synthons[1:], deadline)
 
     def _close(
         self,
@@ -223,6 +292,8 @@ class Enumerator:
     ) -> Iterator[MoleculeContainer]:
         if perf_counter() > deadline:
             return
+        for fused in self._fuse(molecule):
+            yield from self._close(fused, remaining, deadline)
         if not remaining:
             if not open_points(molecule):
                 yield molecule
@@ -241,4 +312,12 @@ class Enumerator:
                     yield from self._close(closed, rest, deadline)
 
 
-__all__ = ["Enumerator", "Key", "join", "load_pairs", "open_points"]
+__all__ = [
+    "Enumerator",
+    "Key",
+    "close_ring",
+    "join",
+    "load_pairs",
+    "open_points",
+    "ring_size",
+]

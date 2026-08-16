@@ -9,8 +9,8 @@ from chython import smarts
 
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.rules import parse_priority_rules, rule_query_pattern
-from synplan.chem.synthon.config import SynthonConfig, load_data
-from synplan.chem.synthon.fragment import _select
+from synplan.enumeration.synthon.config import SynthonConfig, load_data
+from synplan.enumeration.synthon.fragment import _select
 
 SYNTHON_SOURCE_NAME = "synthon"
 """``rule_source`` these rules carry into ``tree.stats.per_priority_source``."""
@@ -77,10 +77,14 @@ def capped_smarts(
     :param rule_id: The record's id, consulted against :data:`_RULE_NUCLEOPHILE_CAPS` where the
         label-keyed table cannot name the reagent.
     :return: The same SMARTS with every labelled RHS atom carrying its capped leaving group.
+    :raises ValueError: when a labelled RHS atom keeps its ``_token`` through capping. The SMARTS
+        writer drops the token, so such an atom reaches the reactor as a plain atom with no
+        leaving group and no label — a wrong-but-purchasable fragment, with no error.
     """
     lhs_text, rhs_text = rule_smarts.split(">>", 1)
     lhs = dict(smarts(lhs_text.strip()).atoms())
     caps: dict[int, str] = {}
+    tokens: dict[int, str] = {}
     for number, atom in smarts(rhs_text.strip()).atoms():
         token = getattr(atom, "_label", None)
         if token is None:
@@ -97,12 +101,16 @@ def capped_smarts(
         if cap in _UNSHIPPABLE_CAPS:
             cap = _RULE_NUCLEOPHILE_CAPS.get(rule_id or "", "H")
         caps[number] = cap
+        tokens[number] = token
 
     next_map = itertools.count(90)
+    capped: set[int] = set()
 
     def replace(match: re.Match) -> str:
+        number = int(match.group(4))
+        capped.add(number)
         atom = f"[{match.group(1)}{match.group(3)}]"
-        cap = caps[int(match.group(4))]
+        cap = caps[number]
         if cap == "H":
             return atom
         template = _CAP_SMARTS[cap]
@@ -110,15 +118,28 @@ def capped_smarts(
         bond = "=" if match.group(2).endswith("2") else "-"
         return atom + bond + template.format(*maps)
 
-    return f"{lhs_text}>>{_LABELLED.sub(replace, rhs_text)}"
+    rhs = _LABELLED.sub(replace, rhs_text)
+    # the parser and `_LABELLED` must agree on what a token looks like. When they disagree — a
+    # ninth token, a spec the regex cannot spell — the atom is capped with nothing and reaches the
+    # reactor as a bare atom, and the whole failure is one missing substring in a SMARTS string.
+    if missed := sorted(set(caps) - capped):
+        raise ValueError(
+            f"synthon rule {rule_id or '?'}: labelled RHS atoms {missed} kept their tokens "
+            f"({', '.join(sorted({tokens[n] for n in missed}))}) through capping; the SMARTS "
+            f"writer drops the token, so the leaving group would vanish silently"
+        )
+    return f"{lhs_text}>>{rhs}"
 
 
 def _records(config: SynthonConfig | None, macro: bool) -> list[dict]:
     """The selected ``rules.json`` disconnection records, macrocyclic half optional."""
     config = config or SynthonConfig()
     data = load_data(config.rules_path)
+    # the R16 heterocyclisations are excluded: they cut TWO bonds, so their fragments have no open
+    # valence for `capped_smarts` to spell a leaving group on, and an uncapped ring synthon
+    # proposes a purchasable compound of the wrong class — a styrene where the alkyne belongs
     records = _select(
-        [r for r in data["disconnections"] if not r["macro"]],
+        [r for r in data["disconnections"] if not r["macro"] and not r["ring"]],
         config.rule_mode,
         config.rules_selection,
     )

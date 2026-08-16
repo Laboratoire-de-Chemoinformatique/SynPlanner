@@ -15,7 +15,7 @@ from pathlib import Path
 from chython import smarts
 from chython.periodictable import AnyElement
 
-from synplan.chem.synthon.data._dialect import DialectError, to_chython
+from synplan.enumeration.synthon.data._dialect import DialectError, to_chython
 
 # the one-time migration. Code 11 ("electrophilic nitrogen") collapses into 'elec': marksCombinations
 # has no N:10 key, so on nitrogen "electrophile" already has exactly one meaning.
@@ -87,6 +87,88 @@ FORBIDDEN_MARKS = [
     {"c:20", "c:21"},
     {"c:70", "C:21"},
     {"c:20", "C:21"},
+]
+
+# Heterocyclisation: authored here, not in the upstream XML, which has no ring-forming rule at all.
+# A ring synthon is an ordinary H-capped labelled fragment of the PRODUCT carrying two labels — the
+# synthons of a triazole are a benzyl triazene and a styrene, not an azide and an alkyne — so the
+# record format, the SMARTS dialect and the token set are unchanged; only `ring` is new.
+#
+# Three dialect rules, each found by a rule that silently misfired:
+#  - the RHS bond orders are load-bearing: `[#7:2]=[#7:3]` de-aromatises, omitting the `=` gives a
+#    saturated fragment;
+#  - every mapped atom whose bonds must survive has to appear on the RHS, adjacent to its partner,
+#    or that bond is lost;
+#  - a ring-fusion atom needs `[c;R2:n]` to pin the traversal direction. `r5`/`r6` do not behave as
+#    Daylight would suggest here.
+# And one chemistry rule: never put a label on an atom inside a tautomerisable amide / amidine /
+# thioamide / enol triad. chython is the authority on tautomers and moves the double bond while
+# leaving the label where it was, which is silently wrong rather than an error. That is why
+# isoxazole appears here and oxazole does not, and pyridazine but not pyrimidine.
+RING_RULES = [
+    (
+        "R16.1",
+        "1,2,3-triazole / CuAAC (azide + alkyne)",
+        "[n;D3:1]1[n;D2:2][n;D2:3][c:4][c:5]1"
+        ">>[#7_elec:1][#7:2]=[#7_nuc:3].[#6_elec:4]=[#6_nuc:5]",
+    ),
+    (
+        "R16.2",
+        "tetrazole / azide + nitrile",
+        "[n;D3:1]1[n;D2:2][n;D2:3][n;D2:4][c:5]1"
+        ">>[#7_nuc:1][#7:2]=[#7_elec:3].[#7_nuc:4]=[#6_elec:5]",
+    ),
+    (
+        "R16.3",
+        "pyrazole / Knorr (hydrazine + 1,3-dicarbonyl)",
+        "[n;D3:1]1[n;D2:2][c:3][c:4][c:5]1"
+        ">>[#7_nuc:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6_elec:5]",
+    ),
+    (
+        "R16.4",
+        "imidazole / amidine + alpha-halo ketone",
+        "[n;D3:1]1[c:2][n;D2:3][c:4][c:5]1"
+        ">>[#7_nuc:1][#6:2]=[#7_nuc:3].[#6_elec:4]=[#6_elec:5]",
+    ),
+    (
+        "R16.5",
+        "isoxazole / hydroxylamine + 1,3-dicarbonyl",
+        "[o:1]1[n;D2:2][c:3][c:4][c:5]1"
+        ">>[#8_nuc:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6_elec:5]",
+    ),
+    (
+        "R16.6",
+        "pyridine / Kroehnke-Bohlmann-Rahtz (enamine + enone)",
+        "[n;D2:1]1[c:2][c:3][c:4][c:5][c:6]1"
+        ">>[#7_nuc:1]=[#6:2][#6_nuc2:3].[#6_elec2:4][#6:5]=[#6_elec:6]",
+    ),
+    (
+        "R16.7",
+        "pyridazine / hydrazine + 1,4-dicarbonyl",
+        "[n;D2:1]1[n;D2:2][c:3][c:4][c:5][c:6]1"
+        ">>[#7_nuc2:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6:5][#6_elec2:6]",
+    ),
+    (
+        "R16.8",
+        "indole / Fischer (arylhydrazine + ketone)",
+        "[n;D3:1]1[c:2][c:3][c;R2:4][c;R2:5]1"
+        ">>[#6_elec:2]=[#6_elec:3].[c_nuc:4][c:5][#7_nuc:1]",
+    ),
+    (
+        "R16.9",
+        "quinoline / Friedlaender (2-aminoaryl ketone + ketone)",
+        "[n;D2:1]1[c:2][c:3][c:4][c;R2:5][c;R2:6]1"
+        ">>[#7_nuc2:1][c:6][c:5][#6_elec2:4].[#6_elec2:2][#6_nuc2:3]",
+    ),
+]
+
+# rows legal ONLY as the closing bond of a ring, so they cannot leak into acyclic `join`. Aliphatic
+# C:nuc + N:elec is the C5-N1 bond of every 1,2,3-triazole; the shipped `pairs` restricts N:elec to
+# AROMATIC C:nuc because its one source (R3.3, umpolung cross-coupling) is aryl chemistry, and
+# putting these in `pairs` would claim an alkyl nucleophile aminates.
+RING_PAIRS = [
+    ["C", False, "nuc", "N", False, "elec"],
+    ["N", False, "nuc", "N", False, "elec"],
 ]
 
 # the leaving group a planner caps an attachment point with to recover an orderable reagent.
@@ -504,6 +586,7 @@ def _rule_records(path: Path, macro: bool) -> list[dict]:
                         "id": f"{rule.tag}{suffix}",
                         "name": rule.get("name") or group.get("name"),
                         "macro": macro,
+                        "ring": False,
                         "smarts": variants[0],
                         "single_product": macro,
                     }
@@ -550,6 +633,7 @@ def _macro_twins(rules: list[dict], path: Path) -> list[dict]:
                 "id": f"M{rule['id']}",
                 "name": f"{rule['name']} (macrocyclic)",
                 "macro": True,
+                "ring": False,
                 "smarts": f"{left}>>{right}",
                 "single_product": True,
             }
@@ -620,10 +704,23 @@ def build(config_dir: Path) -> dict[str, object]:
     classes = convert_classes(config_dir / "SMARTSLibNew.json")
     marks = convert_marks(config_dir / "BB_Marks.xml")
     disconnections = _rule_records(config_dir / "Setup.xml", macro=False)
+    # the ring rules go last: they have no macrocyclic twin, and `_select` slices the ORDERED list
     rules = {
         "disconnections": disconnections
-        + _macro_twins(disconnections, config_dir / "SetupForMacrocycles.xml"),
+        + _macro_twins(disconnections, config_dir / "SetupForMacrocycles.xml")
+        + [
+            {
+                "id": rule_id,
+                "name": name,
+                "macro": False,
+                "ring": True,
+                "smarts": smarts_text,
+                "single_product": False,
+            }
+            for rule_id, name, smarts_text in RING_RULES
+        ],
         "pairs": _partner_pairs(),
+        "ring_pairs": RING_PAIRS,
         "leaving_groups": LEAVING_GROUPS,
         "forbidden_marks": _forbidden_marks(
             _upstream_produced(config_dir / "Setup.xml")
@@ -634,7 +731,7 @@ def build(config_dir: Path) -> dict[str, object]:
 
 def check(built: dict, config_dir: Path) -> list[str]:
     """Assert every property the plan pins. Returns the failures, empty when the build is good."""
-    from synplan.chem.synthon.reactor import SynthonTransformer, query_labels
+    from synplan.enumeration.synthon.reactor import SynthonTransformer, query_labels
 
     problems = []
     classes, marks, rules = built["bb_classes"], built["bb_marks"], built["rules"]
@@ -681,14 +778,21 @@ def check(built: dict, config_dir: Path) -> list[str]:
             f"protecting-group programs with no `No` boundary: {sectionless}"
         )
 
-    disconnections = [r for r in rules["disconnections"] if not r["macro"]]
+    disconnections = [
+        r for r in rules["disconnections"] if not r["macro"] and not r["ring"]
+    ]
     macro = [r for r in rules["disconnections"] if r["macro"]]
+    ring = [r for r in rules["disconnections"] if r["ring"]]
     if len(disconnections) != 39:
         problems.append(
             f"{len(disconnections)} disconnection rules, expected 39 (R12.3 splits)"
         )
     if len(macro) != 39:
         problems.append(f"{len(macro)} macro twins, expected 39")
+    if len(ring) != 9:
+        problems.append(f"{len(ring)} heterocyclisation rules, expected 9")
+    if any(r["macro"] for r in ring):
+        problems.append("a heterocyclisation rule is marked macrocyclic")
 
     for record in rules["disconnections"] + [s for m in marks for s in m["steps"]]:
         for text in [record["smarts"]] if "smarts" in record else record["variants"]:
@@ -709,6 +813,10 @@ def check(built: dict, config_dir: Path) -> list[str]:
     if len(rules["pairs"]) != 29:
         problems.append(
             f"{len(rules['pairs'])} partner pairs, expected 29 (24 upstream + 2 for F7 + 3 for F18)"
+        )
+    if len(rules["ring_pairs"]) != 2:
+        problems.append(
+            f"{len(rules['ring_pairs'])} ring-only pairs, expected 2 (the two cycloadditions)"
         )
     if len(rules["forbidden_marks"]) != 12:
         problems.append(

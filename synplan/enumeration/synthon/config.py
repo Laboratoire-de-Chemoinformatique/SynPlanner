@@ -39,6 +39,9 @@ class SynthonConfig(BaseConfigModel):
     max_products: int = Field(1_000, ge=1)  # desiredNumberOfNewMols
     mw_lower: float = Field(100.0, ge=0.0)
     mw_upper: float = Field(1000.0, ge=0.0)
+    # ring sizes a heterocyclisation may close; () disables ring closure and restores the
+    # acyclic-only behaviour exactly. 5 and 6 cover every azole and azine, 7 the diazepines.
+    ring_closure_sizes: tuple[int, ...] = (5, 6, 7)
     # analogues
     find_analogues: bool = False
     similarity_threshold: float = -1.0  # simTh; -1 disables

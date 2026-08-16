@@ -4,6 +4,7 @@
    "id": "R1.1",
    "name": "Amine acylation",
    "macro": false,
+   "ring": false,
    "smarts": "[C;$([C]([#7])(=[#8])[#6]):1]!@[#7;A;+0;$([#7;D2]([#6])[#6]),$([#7;D3]([#6])([#6])[#6]):2]>>[#6_elec:1].[#7_nuc:2]",
    "single_product": false
   },
@@ -11,6 +12,7 @@
    "id": "R1.2",
    "name": "N-Acylation of RN-X compounds",
    "macro": false,
+   "ring": false,
    "smarts": "[C;$([C]([#7])(=[#8])[#6]):1]!@[#7;A;+0;!D1;!$([#7;D2]([#6])[#6]);!$([#7;D3]([#6])([#6])[#6]);!$([#7]=[#7]):2]>>[#6_elec:1].[#7_nuc:2]",
    "single_product": false
   },
@@ -18,6 +20,7 @@
    "id": "R1.3",
    "name": "N-Acylation by O=C(+)-X reagents (except isocyanates - R1.4)",
    "macro": false,
+   "ring": false,
    "smarts": "[C;$([C]([#7])=[#8]);!$([C]([#7])(=[#8])[#7]);!$([C]([#7])(=[#8])[#6]):1]!@[#7;A;+0;$([#7;D2]([#6])[#6]),$([#7;D3]([#6])([#6])[#6]):2]>>[#6_elec:1].[#7_nuc:2]",
    "single_product": false
   },
@@ -25,6 +28,7 @@
    "id": "R1.4",
    "name": "Amine acylation by isocyanates or analogues",
    "macro": false,
+   "ring": false,
    "smarts": "[#7;A;+0;$([#7;D2][#6]):1]!@[#6;A;$([#6]=[#8,#16]);!$([#6]([#7;D3])(=[#8,#16])[#7;D3]):3](!@[#7;A;+0;$([#7;D3]([#6])[#6]),$([#7;D2][#6]):2])>>[#7:1]-[#6_elec:3].[#7_nuc:2]",
    "single_product": false
   },
@@ -32,6 +36,7 @@
    "id": "R2.1",
    "name": "Alcohol/Phenol acylation",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;$([#6]([#6])([#8])=[#8]):1]!@[O;+0;$([#8]([#6])[#6]):2]>>[C_elec:1].[O_nuc:2]",
    "single_product": false
   },
@@ -39,6 +44,7 @@
    "id": "R2.2",
    "name": "O-Acylation by O=C(+)-X reagents",
    "macro": false,
+   "ring": false,
    "smarts": "[C;$([C]([#8])=[#8]);!$([#6]([#8])(=[#8])[#6]):1]!@[O;+0;$([#8]([#6])[#6]):2]>>[#6_elec:1].[#8_nuc:2]",
    "single_product": false
   },
@@ -46,6 +52,7 @@
    "id": "R2.3",
    "name": "O-Acylation of O-X compounds",
    "macro": false,
+   "ring": false,
    "smarts": "[C;$([C]([#8])(=[#8])[#6]):1]!@[#8;+0;!D1;!$([#8;D2]([#6])[#6]):2]>>[#6_elec:1].[#8_nuc:2]",
    "single_product": false
   },
@@ -53,6 +60,7 @@
    "id": "R3.1",
    "name": "SN alkylation of amines",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;A;!D4;X4:1]-!@[N;!D1;+0;!$([N]-@[#6]=[O]);$([NH](-!@[#6;A])[#6]),$([N](-!@[#6;A])([#6])[#6]):2]>>[N_nuc:2].[#6_elec:1]",
    "single_product": false
   },
@@ -60,6 +68,7 @@
    "id": "R3.2",
    "name": "Buchwald-Hartwig amination(BHA), Cu-mediated C-N coupling",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;a:1]-!@[N;!D1;+0;!$([N]-@[#6]=[O]);$([NH](-!@[#6;a])-[#6]),$([N](-!@[#6;a])([#6])[#6]):2]>>[N_nuc:2].[#6_elec:1]",
    "single_product": false
   },
@@ -67,6 +76,7 @@
    "id": "R3.3",
    "name": "Umpolung cross-coupling",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;a:1]-!@[N;D3;+0;!$([N]-@[#6]=[O]);$([N](-!@[#6;a])([#6;A])[#6;A]):2]>>[N_elec:2].[#6_nuc:1]",
    "single_product": false
   },
@@ -74,6 +84,7 @@
    "id": "R3.4",
    "name": "Tertiary amines alkylation arylation",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;!D4:1]-!@[N;D4;+1;!$([N]-@[#6]=[O]);!$([N]=*);!$([N]-[O]):2]>>[N;+1_nuc:2].[#6_elec:1]",
    "single_product": false
   },
@@ -81,6 +92,7 @@
    "id": "R4.1",
    "name": "O-SN alkylation",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;A:1]-!@[O;+0;$([#8]([#6])[#6]);!$([O]-[C]=[#6,#7,#8,#15,#16,#34]):2]>>[#6;A_elec:1].[#8;+0_nuc:2]",
    "single_product": false
   },
@@ -88,6 +100,7 @@
    "id": "R4.2",
    "name": "Cu-mediated C-O coupling",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;a:1]-!@[O;+0;$([#8]([#6])[#6]);!$([O]-[C]=[#6,#7,#8,#15,#16,#34]):2]>>[#6;a_elec:1].[#8;+0_nuc:2]",
    "single_product": false
   },
@@ -95,6 +108,7 @@
    "id": "R4.3",
    "name": "O-C Chan-Evans-Lam coupling",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;a:1]-!@[O;+0;$([#8]([#6])[#6]);!$([O]-[C]=[#6,#7,#8,#15,#16,#34]):2]>>[#6;a_elecB:1].[#8;+0_nuc:2]",
    "single_product": false
   },
@@ -102,6 +116,7 @@
    "id": "R4.4",
    "name": "N-O-alkylation",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;A:1]-!@[O;+0;$([#8](!@[#6])[#7]);!$([O]-[C]=[#6,#7,#8,#15,#16,#34]):2]>>[#6_elec:1].[#8_nuc:2]",
    "single_product": false
   },
@@ -109,6 +124,7 @@
    "id": "R5.1",
    "name": "nH-SN alkylation",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;A;!D4;X4:1]-!@[#7;a;+0;$([#7;a](@[#6,#7,#8])(-!@[#6;A])@[#6,#7,#8]);!$([#7]~[#6]=[#7,#8,#15,#16,#34]):2]>>[N_nuc:2].[#6_elec:1]",
    "single_product": false
   },
@@ -116,6 +132,7 @@
    "id": "R5.2",
    "name": "nH-Chan-Evans-Lam coupling",
    "macro": false,
+   "ring": false,
    "smarts": "[#6:1]-!@[#7;a;+0;$([#7;a](@[#6,#1,#7,#8])(-!@[#6])@[#6,#1,#7,#8]);!$([#7]~[#6]=[#7,#8,#15,#16,#34]):2]>>[N_nuc:2].[#6_elecB:1]",
    "single_product": false
   },
@@ -123,6 +140,7 @@
    "id": "R5.3",
    "name": "nH-Cu-mediated C-N coupling",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;X3:1]-!@[#7;a+0;$([#7;a](@[#6,#1,#7,#8])(-!@[#6])@[#6,#1,#7,#8]);!$([#7]~[#6]=[#7,#8,#15,#16,#34]):2]>>[N_nuc:2].[#6_elec:1]",
    "single_product": false
   },
@@ -130,6 +148,7 @@
    "id": "R6.1",
    "name": "NH-lactam SN alkylation",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;A;!D4;X4:1]-!@[#7;A;!D1;+0;$([#7](-@[#6])-@[#6](=[O])[#6]);!$([#7](-@[C]=[#6,#7,#8,#15,#16,#34])-@[#6](=[O])):2]>>[N_nuc:2].[#6_elec:1]",
    "single_product": false
   },
@@ -137,6 +156,7 @@
    "id": "R6.2",
    "name": "NH-lactam Chan-Evans-Lam coupling",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;!D4;!X2:1]-!@[#7;A;!D1;+0;$([#7](-@[#6])-@[#6](=[O])[#6]);!$([#7](-@[C]=[#6,#7,#8,#15,#16,#34])-@[#6](=[O])):2]>>[N_nuc:2].[#6_elecB:1]",
    "single_product": false
   },
@@ -144,6 +164,7 @@
    "id": "R6.3",
    "name": "NH-lactam Cu-mediated C-N coupling",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;a:1]-!@[#7;A;!D1;+0;$([#7](-@[#6])-@[#6](=[O])[#6]);!$([#7](-@[C]=[#6,#7,#8,#15,#16,#34])-@[#6](=[O])):2]>>[N_nuc:2].[#6_elec:1]",
    "single_product": false
   },
@@ -151,6 +172,7 @@
    "id": "R7.1",
    "name": "S-alkylation arylation",
    "macro": false,
+   "ring": false,
    "smarts": "[S;+0;X2;$([S](-!@[#6])-!@[#6]);!$([S]-!@[#6]=[#8,#16,#7]):1]-!@[#6;!$([#6]=[#8,#16,#7]):2]>>[#16_nuc:1].[#6_elec:2]",
    "single_product": false
   },
@@ -158,6 +180,7 @@
    "id": "R7.2",
    "name": "Simple alkylation of sulphinic acid salts",
    "macro": false,
+   "ring": false,
    "smarts": "[S;+0;X4;$([S](=[O])(=[O])(-!@[#6])-!@[#6]):1]-!@[#6;A:2]>>[#16_nuc:1].[#6_elec:2]",
    "single_product": false
   },
@@ -165,6 +188,7 @@
    "id": "R7.3",
    "name": "Cu-catalyzed arylation of sulphinic acid salts",
    "macro": false,
+   "ring": false,
    "smarts": "[S;+0;X4;$([S](=[O])(=[O])(-!@[#6])-!@[#6]):1]-!@[#6;a:2]>>[#16_nuc:1].[#6_elec:2]",
    "single_product": false
   },
@@ -172,6 +196,7 @@
    "id": "R8.1",
    "name": "Amine sulphoacilation",
    "macro": false,
+   "ring": false,
    "smarts": "[#7;+0;A;$([N][#6]):1]-!@[S;+0;X4;$([S](=[O])(=[O])-!@[#6,#7,#8]):2]>>[#7_nuc:1].[S_elec:2]",
    "single_product": false
   },
@@ -179,6 +204,7 @@
    "id": "R9.1",
    "name": "Condensation of Y-NH2 with carbonyl compounds",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;$([CH][#6]),$([C]([#6])[#6]):1]=!@[#7;+0;A;$([N][#6,#7,#8]):2]>>[#6_elec2:1].[N_nuc2:2]",
    "single_product": false
   },
@@ -186,6 +212,7 @@
    "id": "R10.1",
    "name": "Addition of Li, Mg, Zn organics to aldehydes and ketones",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;X4;$([#6;D2]-!@[OH]),$([#6;D3](-!@[OH])[#6]),$([#6;D4](-!@[OH])([#6])[#6]):1]-!@[#6:2]>>[#6_elec:1].[#6_nuc:2]",
    "single_product": false
   },
@@ -193,6 +220,7 @@
    "id": "R10.2",
    "name": "Acylation of Li, Mg, Zn organics",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;X3;$([#6;D2](=[#8])-!@[#6]),$([#6;D3](=[#8])(-!@[#6])-!@[#6]):1]-!@[#6:2]>>[#6_elec:1].[#6_nuc:2]",
    "single_product": false
   },
@@ -200,6 +228,7 @@
    "id": "R11.1",
    "name": "Knovenagel-, Wittig-, Julia-Kocienski- type reactions",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;$([CH][#6]),$([C]([#6])[#6]):1]=!@[C;$([CH][#6]),$([C]([#6])[#6]):2]>>[#6;+0_nuc2:1].[#6;+0_elec2:2]",
    "single_product": false
   },
@@ -207,6 +236,7 @@
    "id": "R11.2",
    "name": "Olefin Metathesis",
    "macro": false,
+   "ring": false,
    "smarts": "[C;$([CH][#6]):1]=!@[C;$([CH][#6]),$([C]([#6])[#6]):2]>>[#6;+0_neut2:1].[#6;+0_neut2:2]",
    "single_product": false
   },
@@ -214,6 +244,7 @@
    "id": "R12.1",
    "name": "Suzuki cross-coupling C(Ar)- C(Ar)",
    "macro": false,
+   "ring": false,
    "smarts": "[c:1]-!@[c:2]>>[c_elec:1].[c_elecB:2]",
    "single_product": false
   },
@@ -221,6 +252,7 @@
    "id": "R12.2",
    "name": "Suzuki coupling C(sp2) - C(sp2)",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;X3;$([#6](=[#6])[#6]):1]-!@[#6;X3;$([#6](=[#6])[#6]):2]>>[C_elec:1].[C_elecB:2]",
    "single_product": false
   },
@@ -228,6 +260,7 @@
    "id": "R12.3a",
    "name": "Heck and Suzuki coupling C(Ar) - C(sp2)",
    "macro": false,
+   "ring": false,
    "smarts": "[c:1]-!@[#6;X3;$([#6](=[#6])[#6,#1]):2]>>[c_elec:1].[C_nuc:2]",
    "single_product": false
   },
@@ -235,6 +268,7 @@
    "id": "R12.3b",
    "name": "Heck and Suzuki coupling C(Ar) - C(sp2)",
    "macro": false,
+   "ring": false,
    "smarts": "[c:1]-!@[#6;X3;$([#6](=[#6])[#6,#1]):2]>>[c_nuc:1].[C_elec:2]",
    "single_product": false
   },
@@ -242,6 +276,7 @@
    "id": "R12.4",
    "name": "Sonogashira coupling C(Ar) - C(sp)",
    "macro": false,
+   "ring": false,
    "smarts": "[c:1]-!@[#6;X2;$([#6]#[#6]):2]>>[c_elec:1].[C_nuc:2]",
    "single_product": false
   },
@@ -249,6 +284,7 @@
    "id": "R12.5",
    "name": "Novel methods for C(Ar)-C(sp3) coupling",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;a:1]-!@[#6;A;X4;!$([#6][#7,#8,#9,#16,#17,#35,#53]):2]>>[#6_elec:1].[#6_nuc:2]",
    "single_product": false
   },
@@ -256,6 +292,7 @@
    "id": "R12.6",
    "name": "Novel methods for C(Ar)-C(sp3) coupling with boronics",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;a:1]-!@[#6;A;X4;!$([#6][#7,#8,#9,#16,#17,#35,#53]):2]>>[#6_elec:1].[#6_elecB:2]",
    "single_product": false
   },
@@ -263,6 +300,7 @@
    "id": "R13.1",
    "name": "Minisci reaction and Baran diversinates C(Ar)-C(sp3)",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;a;$(cn);$(cccn);!$(cnn);!$(ccnn):1]!@[#6;X4;!D1:2]>>[#6_elec*:1].[#6_nuc*:2]",
    "single_product": false
   },
@@ -270,6 +308,7 @@
    "id": "R13.2",
    "name": "Giese reaction C(sp3) - C(sp3)",
    "macro": false,
+   "ring": false,
    "smarts": "[#6;X4;!D1:1]!@[#6;X4;$([#6;D2]([#6])[#6]),$([#6;D3]([#6])([#6])[#6]):2]!@[#6;X4;!D1;!D4;$([C]-[C]#[N]),$([C]-[C]=[O]),$([C]-[S](=[O])(=[O])),$([#8][#7](=[O])-[#6]):3]>>[#6_nuc*:1].[#6_elec*:2][#6:3]",
    "single_product": false
   },
@@ -277,6 +316,7 @@
    "id": "MR1.1",
    "name": "Amine acylation (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[C;$([C]([#7])(=[#8])[#6]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#7;A;+0;$([#7;D2]([#6])[#6]),$([#7;D3]([#6])([#6])[#6]):2]>>[#6_elec:1].[#7_nuc:2]",
    "single_product": true
   },
@@ -284,6 +324,7 @@
    "id": "MR1.2",
    "name": "N-Acylation of RN-X compounds (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[C;$([C]([#7])(=[#8])[#6]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#7;A;+0;!D1;!$([#7;D2]([#6])[#6]);!$([#7;D3]([#6])([#6])[#6]);!$([#7]=[#7]):2]>>[#6_elec:1].[#7_nuc:2]",
    "single_product": true
   },
@@ -291,6 +332,7 @@
    "id": "MR1.3",
    "name": "N-Acylation by O=C(+)-X reagents (except isocyanates - R1.4) (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[C;$([C]([#7])=[#8]);!$([C]([#7])(=[#8])[#7]);!$([C]([#7])(=[#8])[#6]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#7;A;+0;$([#7;D2]([#6])[#6]),$([#7;D3]([#6])([#6])[#6]):2]>>[#6_elec:1].[#7_nuc:2]",
    "single_product": true
   },
@@ -298,6 +340,7 @@
    "id": "MR1.4",
    "name": "Amine acylation by isocyanates or analogues (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#7;A;+0;$([#7;D2][#6]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#6;A;$([#6]=[#8,#16]);!$([#6]([#7;D3])(=[#8,#16])[#7;D3]):3](@[#7;A;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11;+0;$([#7;D3]([#6])[#6]),$([#7;D2][#6]):2])>>[#7:1]-[#6_elec:3].[#7_nuc:2]",
    "single_product": true
   },
@@ -305,6 +348,7 @@
    "id": "MR2.1",
    "name": "Alcohol/Phenol acylation (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;$([#6]([#6])([#8])=[#8]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[O;+0;$([#8]([#6])[#6]):2]>>[C_elec:1].[O_nuc:2]",
    "single_product": true
   },
@@ -312,6 +356,7 @@
    "id": "MR2.2",
    "name": "O-Acylation by O=C(+)-X reagents (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[C;$([C]([#8])=[#8]);!$([#6]([#8])(=[#8])[#6]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[O;+0;$([#8]([#6])[#6]):2]>>[#6_elec:1].[#8_nuc:2]",
    "single_product": true
   },
@@ -319,6 +364,7 @@
    "id": "MR2.3",
    "name": "O-Acylation of O-X compounds (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[C;$([C]([#8])(=[#8])[#6]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#8;+0;!D1;!$([#8;D2]([#6])[#6]):2]>>[#6_elec:1].[#8_nuc:2]",
    "single_product": true
   },
@@ -326,6 +372,7 @@
    "id": "MR3.1",
    "name": "SN alkylation of amines (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;A;!D4;X4;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[N;!D1;+0;$([NH]([#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11;A])[#6]),$([N]([#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11;A])([#6])[#6]):2]>>[N_nuc:2].[#6_elec:1]",
    "single_product": true
   },
@@ -333,6 +380,7 @@
    "id": "MR3.2",
    "name": "Buchwald-Hartwig amination(BHA), Cu-mediated C-N coupling (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;a;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[N;!D1;+0;$([NH]([#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11;a])-[#6]),$([N]([#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11;a])([#6])[#6]):2]>>[N_nuc:2].[#6_elec:1]",
    "single_product": true
   },
@@ -340,6 +388,7 @@
    "id": "MR3.3",
    "name": "Umpolung cross-coupling (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;a;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[N;D3;+0;$([N]([#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11;a])([#6;A])[#6;A]):2]>>[N_elec:2].[#6_nuc:1]",
    "single_product": true
   },
@@ -347,6 +396,7 @@
    "id": "MR3.4",
    "name": "Tertiary amines alkylation arylation (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;!D4;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[N;D4;+1;!$([N]=[O]);$([N]([#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11])):2]>>[N;+1_nuc:2].[#6_elec:1]",
    "single_product": true
   },
@@ -354,6 +404,7 @@
    "id": "MR4.1",
    "name": "O-SN alkylation (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;A:1]-@[O;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11;+0;$([#8]([#6])[#6]);!$([O]-[C]=[#6,#7,#8,#15,#16,#34]):2]>>[#6;A_elec:1].[#8;+0_nuc:2]",
    "single_product": true
   },
@@ -361,6 +412,7 @@
    "id": "MR4.2",
    "name": "Cu-mediated C-O coupling (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;a:1]-@[O;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11;+0;$([#8]([#6])[#6]);!$([O]-[C]=[#6,#7,#8,#15,#16,#34]):2]>>[#6;a_elec:1].[#8;+0_nuc:2]",
    "single_product": true
   },
@@ -368,6 +420,7 @@
    "id": "MR4.3",
    "name": "O-C Chan-Evans-Lam coupling (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;a:1]-@[O;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11;+0;$([#8]([#6])[#6]);!$([O]-[C]=[#6,#7,#8,#15,#16,#34]):2]>>[#6;a_elecB:1].[#8;+0_nuc:2]",
    "single_product": true
   },
@@ -375,6 +428,7 @@
    "id": "MR4.4",
    "name": "N-O-alkylation (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;A:1]-@[O;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11;+0;$([#8]([#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11])[#7]);!$([O]-[C]=[#6,#7,#8,#15,#16,#34]):2]>>[#6_elec:1].[#8_nuc:2]",
    "single_product": true
   },
@@ -382,6 +436,7 @@
    "id": "MR5.1",
    "name": "nH-SN alkylation (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;A;!D4;X4;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#7;a;+0;$([#7;a](@[#6,#7,#8])([#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11;A])@[#6,#7,#8]);!$([#7]~[#6]=[#7,#8,#15,#16,#34]):2]>>[N_nuc:2].[#6_elec:1]",
    "single_product": true
   },
@@ -389,6 +444,7 @@
    "id": "MR5.2",
    "name": "nH-Chan-Evans-Lam coupling (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#7;a;+0;$([#7;a](@[#6,#1,#7,#8])([#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11])@[#6,#1,#7,#8]);!$([#7]~[#6]=[#7,#8,#15,#16,#34]):2]>>[N_nuc:2].[#6_elecB:1]",
    "single_product": true
   },
@@ -396,6 +452,7 @@
    "id": "MR5.3",
    "name": "nH-Cu-mediated C-N coupling (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;X3;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#7;a+0;$([#7;a](@[#6,#1,#7,#8])([#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11])@[#6,#1,#7,#8]);!$([#7]~[#6]=[#7,#8,#15,#16,#34]):2]>>[N_nuc:2].[#6_elec:1]",
    "single_product": true
   },
@@ -403,6 +460,7 @@
    "id": "MR6.1",
    "name": "NH-lactam SN alkylation (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;A;!D4;X4;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#7;A;!D1;+0;$([#7](-@[#6])-@[#6](=[O])[#6]);!$([#7](-@[C]=[#6,#7,#8,#15,#16,#34])-@[#6](=[O])):2]>>[N_nuc:2].[#6_elec:1]",
    "single_product": true
   },
@@ -410,6 +468,7 @@
    "id": "MR6.2",
    "name": "NH-lactam Chan-Evans-Lam coupling (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;!D4;!X2;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#7;A;!D1;+0;$([#7](-@[#6])-@[#6](=[O])[#6]);!$([#7](-@[C]=[#6,#7,#8,#15,#16,#34])-@[#6](=[O])):2]>>[N_nuc:2].[#6_elecB:1]",
    "single_product": true
   },
@@ -417,6 +476,7 @@
    "id": "MR6.3",
    "name": "NH-lactam Cu-mediated C-N coupling (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;a;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#7;A;!D1;+0;$([#7](-@[#6])-@[#6](=[O])[#6]);!$([#7](-@[C]=[#6,#7,#8,#15,#16,#34])-@[#6](=[O])):2]>>[N_nuc:2].[#6_elec:1]",
    "single_product": true
   },
@@ -424,6 +484,7 @@
    "id": "MR7.1",
    "name": "S-alkylation arylation (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[S;+0;X2;$([S]([#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11])[#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11]);!$([S][#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11]=[#8,#16,#7]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#6;!$([#6]=[#8,#16,#7]):2]>>[#16_nuc:1].[#6_elec:2]",
    "single_product": true
   },
@@ -431,6 +492,7 @@
    "id": "MR7.2",
    "name": "Simple alkylation of sulphinic acid salts (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[S;+0;X4;$([S](=[O])(=[O])([#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11])[#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#6;A:2]>>[#16_nuc:1].[#6_elec:2]",
    "single_product": true
   },
@@ -438,6 +500,7 @@
    "id": "MR7.3",
    "name": "Cu-catalyzed arylation of sulphinic acid salts (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[S;+0;X4;$([S](=[O])(=[O])([#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11])[#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#6;a:2]>>[#16_nuc:1].[#6_elec:2]",
    "single_product": true
   },
@@ -445,6 +508,7 @@
    "id": "MR8.1",
    "name": "Amine sulphoacilation (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#7;+0;A;$([N][#6]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[S;+0;X4;$([S](=[O])(=[O])[#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;$([!r11]),$([#7]),$([#8])]):2]>>[#7_nuc:1].[S_elec:2]",
    "single_product": true
   },
@@ -452,6 +516,7 @@
    "id": "MR9.1",
    "name": "Condensation of Y-NH2 with carbonyl compounds (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;$([CH][#6]),$([C]([#6])[#6]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]=@[#7;+0;A;$([N][#6,#7,#8]):2]>>[#6_elec2:1].[N_nuc2:2]",
    "single_product": true
   },
@@ -459,6 +524,7 @@
    "id": "MR10.1",
    "name": "Addition of Li, Mg, Zn organics to aldehydes and ketones (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;X4;$([#6;D2][OH;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11]),$([#6;D3]([OH;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11])[#6]),$([#6;D4]([OH;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11])([#6])[#6]):1]-@[#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:2]>>[#6_elec:1].[#6_nuc:2]",
    "single_product": true
   },
@@ -466,6 +532,7 @@
    "id": "MR10.2",
    "name": "Acylation of Li, Mg, Zn organics (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;X3;$([#6;D2](=[#8])-[#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11]),$([#6;D3](=[#8])(-[#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11])-[#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11]):1]-@[#6;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:2]>>[#6_elec:1].[#6_nuc:2]",
    "single_product": true
   },
@@ -473,6 +540,7 @@
    "id": "MR11.1",
    "name": "Knovenagel-, Wittig-, Julia-Kocienski- type reactions (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;$([CH][#6]),$([C]([#6])[#6]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]=@[C;$([CH][#6]),$([C]([#6])[#6]):2]>>[#6;+0_nuc2:1].[#6;+0_elec2:2]",
    "single_product": true
   },
@@ -480,6 +548,7 @@
    "id": "MR11.2",
    "name": "Olefin Metathesis (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[C;$([CH][#6]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]=@[C;$([CH][#6]),$([C]([#6])[#6]):2]>>[#6;+0_neut2:1].[#6;+0_neut2:2]",
    "single_product": true
   },
@@ -487,6 +556,7 @@
    "id": "MR12.1",
    "name": "Suzuki cross-coupling C(Ar)- C(Ar) (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[c;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[c:2]>>[c_elec:1].[c_elecB:2]",
    "single_product": true
   },
@@ -494,6 +564,7 @@
    "id": "MR12.2",
    "name": "Suzuki coupling C(sp2) - C(sp2) (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;X3;$([#6](=[#6])[#6]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#6;X3;$([#6](=[#6])[#6]):2]>>[C_elec:1].[C_elecB:2]",
    "single_product": true
   },
@@ -501,6 +572,7 @@
    "id": "MR12.3a",
    "name": "Heck and Suzuki coupling C(Ar) - C(sp2) (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[c;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#6;X3;$([#6](=[#6])[#6,#1]):2]>>[c_elec:1].[C_nuc:2]",
    "single_product": true
   },
@@ -508,6 +580,7 @@
    "id": "MR12.3b",
    "name": "Heck and Suzuki coupling C(Ar) - C(sp2) (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[c;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#6;X3;$([#6](=[#6])[#6,#1]):2]>>[c_nuc:1].[C_elec:2]",
    "single_product": true
   },
@@ -515,6 +588,7 @@
    "id": "MR12.4",
    "name": "Sonogashira coupling C(Ar) - C(sp) (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[c;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#6;X2;$([#6]#[#6]):2]>>[c_elec:1].[C_nuc:2]",
    "single_product": true
   },
@@ -522,6 +596,7 @@
    "id": "MR12.5",
    "name": "Novel methods for C(Ar)-C(sp3) coupling (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;a;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#6;A;X4;!$([#6][#7,#8,#9,#16,#17,#35,#53]):2]>>[#6_elec:1].[#6_nuc:2]",
    "single_product": true
   },
@@ -529,6 +604,7 @@
    "id": "MR12.6",
    "name": "Novel methods for C(Ar)-C(sp3) coupling with boronics (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;a;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#6;A;X4;!$([#6][#7,#8,#9,#16,#17,#35,#53]):2]>>[#6_elec:1].[#6_elecB:2]",
    "single_product": true
   },
@@ -536,6 +612,7 @@
    "id": "MR13.1",
    "name": "Minisci reaction and Baran diversinates C(Ar)-C(sp3) (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;a;$(cn);$(cccn);!$(cnn);!$(ccnn);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#6;X4;!D1:2]>>[#6_elec*:1].[#6_nuc*:2]",
    "single_product": true
   },
@@ -543,8 +620,81 @@
    "id": "MR13.2",
    "name": "Giese reaction C(sp3) - C(sp3) (macrocyclic)",
    "macro": true,
+   "ring": false,
    "smarts": "[#6;X4;!D1;!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:1]-@[#6;X4;$([#6;D2]([#6])[#6]),$([#6;D3]([#6])([#6])[#6]);!r3;!r4;!r5;!r6;!r7;!r8;!r9;!r10;!r11:2][#6;X4;!D1;!D4;$([C]-[C]#[N]),$([C]-[C]=[O]),$([C]-[S](=[O])(=[O])),$([#8][#7](=[O])-[#6]):3]>>[#6_nuc*:1].[#6_elec*:2][#6:3]",
    "single_product": true
+  },
+  {
+   "id": "R16.1",
+   "name": "1,2,3-triazole / CuAAC (azide + alkyne)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D3:1]1[n;D2:2][n;D2:3][c:4][c:5]1>>[#7_elec:1][#7:2]=[#7_nuc:3].[#6_elec:4]=[#6_nuc:5]",
+   "single_product": false
+  },
+  {
+   "id": "R16.2",
+   "name": "tetrazole / azide + nitrile",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D3:1]1[n;D2:2][n;D2:3][n;D2:4][c:5]1>>[#7_nuc:1][#7:2]=[#7_elec:3].[#7_nuc:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R16.3",
+   "name": "pyrazole / Knorr (hydrazine + 1,3-dicarbonyl)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D3:1]1[n;D2:2][c:3][c:4][c:5]1>>[#7_nuc:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R16.4",
+   "name": "imidazole / amidine + alpha-halo ketone",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D3:1]1[c:2][n;D2:3][c:4][c:5]1>>[#7_nuc:1][#6:2]=[#7_nuc:3].[#6_elec:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R16.5",
+   "name": "isoxazole / hydroxylamine + 1,3-dicarbonyl",
+   "macro": false,
+   "ring": true,
+   "smarts": "[o:1]1[n;D2:2][c:3][c:4][c:5]1>>[#8_nuc:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R16.6",
+   "name": "pyridine / Kroehnke-Bohlmann-Rahtz (enamine + enone)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D2:1]1[c:2][c:3][c:4][c:5][c:6]1>>[#7_nuc:1]=[#6:2][#6_nuc2:3].[#6_elec2:4][#6:5]=[#6_elec:6]",
+   "single_product": false
+  },
+  {
+   "id": "R16.7",
+   "name": "pyridazine / hydrazine + 1,4-dicarbonyl",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D2:1]1[n;D2:2][c:3][c:4][c:5][c:6]1>>[#7_nuc2:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6:5][#6_elec2:6]",
+   "single_product": false
+  },
+  {
+   "id": "R16.8",
+   "name": "indole / Fischer (arylhydrazine + ketone)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D3:1]1[c:2][c:3][c;R2:4][c;R2:5]1>>[#6_elec:2]=[#6_elec:3].[c_nuc:4][c:5][#7_nuc:1]",
+   "single_product": false
+  },
+  {
+   "id": "R16.9",
+   "name": "quinoline / Friedlaender (2-aminoaryl ketone + ketone)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D2:1]1[c:2][c:3][c:4][c;R2:5][c;R2:6]1>>[#7_nuc2:1][c:6][c:5][#6_elec2:4].[#6_elec2:2][#6_nuc2:3]",
+   "single_product": false
   }
  ],
  "pairs": [
@@ -777,6 +927,24 @@
    false,
    "nuc",
    "S",
+   false,
+   "elec"
+  ]
+ ],
+ "ring_pairs": [
+  [
+   "C",
+   false,
+   "nuc",
+   "N",
+   false,
+   "elec"
+  ],
+  [
+   "N",
+   false,
+   "nuc",
+   "N",
    false,
    "elec"
   ]

@@ -7,8 +7,11 @@ prior quietly stops doing anything.
 
 from __future__ import annotations
 
+import re
+from unittest import mock
+
 import pytest
-from chython import smiles, synthon_smiles
+from chython import smarts, smiles, synthon_smiles
 
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.reactor import apply_reaction_rule
@@ -17,13 +20,15 @@ from synplan.chem.reaction.rules import (
     parse_priority_rules,
     rule_query_pattern,
 )
-from synplan.chem.synthon.config import SynthonConfig, load_data
-from synplan.chem.synthon.priority import (
+from synplan.enumeration.synthon import priority
+from synplan.enumeration.synthon.config import SynthonConfig, load_data
+from synplan.enumeration.synthon.priority import (
     SYNTHON_SOURCE_NAME,
+    _records,
     capped_smarts,
     synthon_priority_rules,
 )
-from synplan.chem.synthon.reactor import SynthonTransformer
+from synplan.enumeration.synthon.reactor import SynthonTransformer, query_labels
 from synplan.mcts.evaluation import RandomEvaluationStrategy
 from synplan.mcts.policy.base import Policy
 from synplan.mcts.tree import Tree
@@ -149,6 +154,46 @@ def test_capping_gives_the_acyl_chloride_not_the_aldehyde() -> None:
         for products in apply_reaction_rule(target, _rule("R1.1", cap=False))
     ]
     assert inert == [["CCN", "c1ccccc1C=O"]]
+
+
+def test_the_raw_rules_carry_labels_and_the_capped_ones_carry_none() -> None:
+    """Capping trades every token for a spelled-out leaving group — 78 labels in, 0 out.
+
+    Both halves matter. If the raw set stops carrying 78, a rule lost its labels upstream in
+    ``rules.json`` and the disconnection now proposes the wrong reagent class. If the capped set
+    ever carries one, some caller is about to trust a label that ``str(Reactor)`` will drop.
+    """
+    config = SynthonConfig()
+    leaving_groups = load_data(config.rules_path)["leaving_groups"]
+    records = _records(config, macro=False)
+
+    def labels(rule_smarts: str) -> int:
+        return len(query_labels(smarts(rule_smarts.split(">>", 1)[1].strip())))
+
+    assert sum(labels(r["smarts"]) for r in records) == 78
+    assert (
+        sum(
+            labels(capped_smarts(r["smarts"], leaving_groups, r["id"])) for r in records
+        )
+        == 0
+    )
+
+
+def test_a_token_the_capper_cannot_spell_is_loud() -> None:
+    """A ninth token, or any spec ``_LABELLED`` misses, must raise instead of passing through.
+
+    Simulated by narrowing the regex rather than by inventing a label: the eight are fixed, and
+    the failure being guarded against is precisely the parser and the regex drifting apart.
+    """
+    record = next(
+        r for r in _records(SynthonConfig(), macro=False) if r["id"] == "R1.1"
+    )
+    leaving_groups = load_data(SynthonConfig().rules_path)["leaving_groups"]
+    with (
+        mock.patch.object(priority, "_LABELLED", re.compile(r"(?!x)x()()()")),
+        pytest.raises(ValueError, match=r"R1\.1: labelled RHS atoms .* kept their"),
+    ):
+        capped_smarts(record["smarts"], leaving_groups, record["id"])
 
 
 def test_capping_never_silently_deletes_a_rule() -> None:
