@@ -59,6 +59,7 @@ def iter_reactions_postorder(
     route: Mapping[str, Any],
 ) -> Iterator[Mapping[str, Any]]:
     """Yield reaction nodes in synthesis/step order."""
+
     def visit(node: Mapping[str, Any]):
         for child in node_children(node):
             if not isinstance(child, Mapping):

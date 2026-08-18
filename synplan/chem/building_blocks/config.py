@@ -34,9 +34,7 @@ class BuildingBlockStockLoadConfig(BaseConfigModel):
     @model_validator(mode="after")
     def _validate_source_options(self) -> BuildingBlockStockLoadConfig:
         if not self.standardize and self.identity_format != "smiles":
-            raise ValueError(
-                "standardize=False requires identity_format='smiles'"
-            )
+            raise ValueError("standardize=False requires identity_format='smiles'")
         if self.chemistry_column is not None and not self.chemistry_column.strip():
             raise ValueError("chemistry_column must not be empty")
         if self.delimiter is not None and len(self.delimiter) != 1:
