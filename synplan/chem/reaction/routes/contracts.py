@@ -18,7 +18,14 @@ class RouteNode(TypedDict, total=False):
     smiles: str
     children: list[RouteNode]
     in_stock: bool
+    bb: dict[str, Any]
     meta: dict[str, Any]
+    target_protection_restored: bool
+    target_protection_sequence_mode: str
+    target_protection_variant_index: int
+    target_protection_rule_sequence: list[str]
+    target_protection_steps: int
+    stereo_mismatch: bool
     step_id: int
     tree_node_id: int | None
     rule_id: int | None

@@ -91,6 +91,27 @@ def test_route_json_and_csv_preserve_reaction_metadata(tmp_path):
     assert read_routes_csv(csv_path)[1][0].meta["source"] == "unit-test"
 
 
+def test_route_json_preserves_stock_provenance_on_leaf():
+    def stock_lookup(molecule):
+        return {
+            "records": [
+                {
+                    "source_index": 7,
+                    "input_smiles": str(molecule),
+                    "canonical_smiles": str(molecule),
+                    "output_origin": "protected",
+                }
+            ]
+        }
+
+    route = make_json(_routes(), molecule_in_stock=stock_lookup)[1]
+    leaves = route["children"][0]["children"]
+    carbon = leaves[0]
+
+    assert carbon["in_stock"] is True
+    assert carbon["bb"]["records"][0]["source_index"] == 7
+
+
 def test_route_csv_preserves_legacy_non_json_metadata(tmp_path):
     csv_path = tmp_path / "legacy.csv"
     csv_path.write_text(

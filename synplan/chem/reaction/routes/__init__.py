@@ -22,6 +22,17 @@ import warnings
 
 # public name -> submodule (relative to this package) that defines it
 _EXPORTS = {
+    # post-processing
+    "BuildingBlockCost": "postprocess.cost",
+    "RouteCostError": "postprocess.cost",
+    "RouteCostEstimate": "postprocess.cost",
+    "estimate_route_cost": "postprocess.cost",
+    "estimate_route_costs": "postprocess.cost",
+    "postprocess_routes": "postprocess.pipeline",
+    "RouteStereoError": "postprocess.stereo",
+    "restore_route_stereo": "postprocess.stereo",
+    "TargetProtectionError": "postprocess.target_protection",
+    "restore_protected_target": "postprocess.target_protection",
     # cli
     "run_cluster_cli": "cli",
     # clustering (core + subclustering, re-exported by the clustering package)

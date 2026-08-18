@@ -39,10 +39,19 @@ def _molecule_in_stock_from_tree(tree: Tree):
     if stock is None or config is None:
         return None
 
-    def molecule_in_stock(molecule) -> bool:
-        return Precursor(molecule, canonicalize=False).is_building_block(
+    def molecule_in_stock(molecule):
+        in_stock = Precursor(molecule, canonicalize=False).is_building_block(
             stock, config.min_mol_size
         )
+        if not in_stock:
+            return False
+        provenance_for_molecule = getattr(stock, "provenance_for_molecule", None)
+        if provenance_for_molecule is None:
+            return True
+        records = provenance_for_molecule(molecule)
+        if not records:
+            return True
+        return {"records": [dict(record) for record in records]}
 
     return molecule_in_stock
 

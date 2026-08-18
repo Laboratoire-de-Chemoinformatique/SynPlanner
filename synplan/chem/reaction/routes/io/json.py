@@ -1,6 +1,6 @@
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from chython import smiles as read_smiles
@@ -19,7 +19,7 @@ from synplan.chem.reaction.routes.io.metadata import (
 )
 
 logger = logging.getLogger(__name__)
-MoleculeInStock = Callable[[Any], bool]
+MoleculeInStock = Callable[[Any], bool | Mapping[str, Any]]
 
 
 def _route_tree_has_null_node(node) -> bool:
@@ -124,10 +124,13 @@ def _make_json_v1(
     # Prepare output
     all_routes = {} if keep_ids else []
 
-    def resolve_in_stock(molecule, *, fallback: bool) -> bool:
+    def molecule_fields(molecule, *, fallback: bool) -> dict[str, Any]:
         if molecule_in_stock is None:
-            return fallback
-        return bool(molecule_in_stock(molecule))
+            return {"in_stock": fallback}
+        result = molecule_in_stock(molecule)
+        if isinstance(result, Mapping):
+            return {"in_stock": True, "bb": dict(result)}
+        return {"in_stock": bool(result)}
 
     for route_id, steps in routes_dict.items():
         if not steps:
@@ -176,7 +179,7 @@ def _make_json_v1(
                     "type": "mol",
                     "smiles": _route_molecule_smiles(product),
                     "children": [build_reaction_node(sid)],
-                    "in_stock": resolve_in_stock(product, fallback=False),
+                    **molecule_fields(product, fallback=False),
                 }
             # Neither structural identity nor atom-number overlap matched: route
             # is genuinely unrecoverable; the drop guard in make_json handles it.
@@ -210,7 +213,7 @@ def _make_json_v1(
                         {
                             "type": "mol",
                             "smiles": r_smi,
-                            "in_stock": resolve_in_stock(react, fallback=True),
+                            **molecule_fields(react, fallback=True),
                         }
                     )
 
