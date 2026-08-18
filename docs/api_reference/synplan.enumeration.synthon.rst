@@ -23,7 +23,7 @@ Submodules
 ----------
 
 synplan.enumeration.synthon.analogues module
--------------------------------------
+--------------------------------------------
 
 .. automodule:: synplan.enumeration.synthon.analogues
    :members:
@@ -31,7 +31,7 @@ synplan.enumeration.synthon.analogues module
    :show-inheritance:
 
 synplan.enumeration.synthon.audit module
----------------------------------
+----------------------------------------
 
 .. automodule:: synplan.enumeration.synthon.audit
    :members:
@@ -39,7 +39,7 @@ synplan.enumeration.synthon.audit module
    :show-inheritance:
 
 synplan.enumeration.synthon.classify module
-------------------------------------
+-------------------------------------------
 
 .. automodule:: synplan.enumeration.synthon.classify
    :members:
@@ -47,7 +47,7 @@ synplan.enumeration.synthon.classify module
    :show-inheritance:
 
 synplan.enumeration.synthon.cli module
--------------------------------
+--------------------------------------
 
 .. automodule:: synplan.enumeration.synthon.cli
    :members:
@@ -55,7 +55,7 @@ synplan.enumeration.synthon.cli module
    :show-inheritance:
 
 synplan.enumeration.synthon.config module
-----------------------------------
+-----------------------------------------
 
 .. automodule:: synplan.enumeration.synthon.config
    :members:
@@ -63,7 +63,7 @@ synplan.enumeration.synthon.config module
    :show-inheritance:
 
 synplan.enumeration.synthon.enumeration module
----------------------------------------
+----------------------------------------------
 
 .. automodule:: synplan.enumeration.synthon.enumeration
    :members:
@@ -71,7 +71,7 @@ synplan.enumeration.synthon.enumeration module
    :show-inheritance:
 
 synplan.enumeration.synthon.fragment module
-------------------------------------
+-------------------------------------------
 
 .. automodule:: synplan.enumeration.synthon.fragment
    :members:
@@ -79,7 +79,7 @@ synplan.enumeration.synthon.fragment module
    :show-inheritance:
 
 synplan.enumeration.synthon.priority module
-------------------------------------
+-------------------------------------------
 
 .. automodule:: synplan.enumeration.synthon.priority
    :members:
@@ -87,23 +87,15 @@ synplan.enumeration.synthon.priority module
    :show-inheritance:
 
 synplan.enumeration.synthon.reactor module
------------------------------------
+------------------------------------------
 
 .. automodule:: synplan.enumeration.synthon.reactor
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.enumeration.synthon.scaffolds module
--------------------------------------
-
-.. automodule:: synplan.enumeration.synthon.scaffolds
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 synplan.enumeration.synthon.stock module
----------------------------------
+----------------------------------------
 
 .. automodule:: synplan.enumeration.synthon.stock
    :members:
@@ -111,7 +103,7 @@ synplan.enumeration.synthon.stock module
    :show-inheritance:
 
 synplan.enumeration.synthon.synthonise module
---------------------------------------
+---------------------------------------------
 
 .. automodule:: synplan.enumeration.synthon.synthonise
    :members:
