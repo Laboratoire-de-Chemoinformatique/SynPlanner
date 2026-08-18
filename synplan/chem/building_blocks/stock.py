@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, Protocol, runtime_checkable
 
 from chython import smiles as smiles_parser
 from chython.containers import MoleculeContainer
@@ -13,6 +13,7 @@ from chython.containers import MoleculeContainer
 from synplan.chem.utils import safe_canonicalization
 from synplan.utils.files import (
     ChemicalRecord,
+    is_complete_cxsmiles,
     iter_chemical_records,
     open_text,
     resolve_chemical_input_format,
@@ -25,6 +26,23 @@ from .identity import (
 )
 
 StockIdentityFormat = Literal["smiles", "inchikey"]
+
+
+@runtime_checkable
+class BuildingBlockLookup(Protocol):
+    """Minimal planner-facing BB membership and provenance contract."""
+
+    identity_format: StockIdentityFormat
+
+    def key_for_molecule(self, molecule: MoleculeContainer) -> str: ...
+
+    def contains_key(self, key: str) -> bool: ...
+
+    def contains_molecule(self, molecule: MoleculeContainer) -> bool: ...
+
+    def provenance_for_molecule(
+        self, molecule: MoleculeContainer
+    ) -> tuple[Mapping[str, Any], ...]: ...
 
 
 def _validate_format(identity_format: str) -> StockIdentityFormat:
@@ -81,7 +99,9 @@ class BuildingBlockStock:
 
     @classmethod
     def _from_validated_keys(
-        cls, keys: frozenset[str], identity_format: StockIdentityFormat
+        cls,
+        keys: frozenset[str],
+        identity_format: StockIdentityFormat,
     ) -> BuildingBlockStock:
         """Build from keys validated by a trusted loader or derived operation.
 
@@ -99,9 +119,19 @@ class BuildingBlockStock:
             return molecule_to_inchi_key(molecule)
         return str(safe_canonicalization(molecule, clean_stereo=False))
 
+    def contains_key(self, key: str) -> bool:
+        """Return whether an already generated identity key is in the stock."""
+        return key in self.keys
+
     def contains_molecule(self, molecule: MoleculeContainer) -> bool:
         """Return whether ``molecule`` is explicitly present in this stock."""
-        return self.key_for_molecule(molecule) in self.keys
+        return self.contains_key(self.key_for_molecule(molecule))
+
+    def provenance_for_molecule(
+        self, molecule: MoleculeContainer
+    ) -> tuple[Mapping[str, Any], ...]:
+        """Legacy key-only stocks do not carry preparation provenance."""
+        return ()
 
     def without_molecule(self, molecule: MoleculeContainer) -> BuildingBlockStock:
         """Return a stock with the key for ``molecule`` removed."""
@@ -121,9 +151,9 @@ class BuildingBlockStock:
 
 
 def coerce_building_block_stock(
-    stock: BuildingBlockStock | Iterable[str],
+    stock: BuildingBlockLookup | Iterable[str],
     identity_format: StockIdentityFormat | None = None,
-) -> BuildingBlockStock:
+) -> BuildingBlockLookup:
     """Coerce a typed or legacy canonical-SMILES or full-InChIKey stock.
 
     Full-InChIKey collections are detected only when the complete collection is
@@ -131,7 +161,7 @@ def coerce_building_block_stock(
     """
     if identity_format is not None:
         identity_format = _validate_format(identity_format)
-    if isinstance(stock, BuildingBlockStock):
+    if isinstance(stock, BuildingBlockLookup):
         if identity_format is not None and identity_format != stock.identity_format:
             raise ValueError(
                 "explicit identity_format conflicts with the typed building-block stock"
@@ -213,6 +243,33 @@ def _validated_record_key(
     return "smiles", key
 
 
+def _read_prepared_smiles_stock(path: Path) -> frozenset[str]:
+    """Read trusted canonical SMILES/CXSMILES without molecular parsing."""
+    keys: set[str] = set()
+    count = 0
+    add_key = keys.add
+    with open_text(path) as stream:
+        for line_number, line in enumerate(stream, 1):
+            raw = line.rstrip("\r\n")
+            if not raw.strip() or raw.lstrip().startswith("#"):
+                continue
+            count += 1
+            key = raw.split("\t", maxsplit=1)[0].strip()
+            if not key:
+                raise ValueError(f"{path}:{line_number}: the chemistry field is empty")
+            if any(character.isspace() for character in key) and not (
+                is_complete_cxsmiles(key)
+            ):
+                raise ValueError(
+                    f"{path}:{line_number}: metadata must be TAB-separated; "
+                    "arbitrary whitespace is not supported"
+                )
+            add_key(key)
+    if not count:
+        raise ValueError(f"{path}: building-block stock is empty")
+    return frozenset(keys)
+
+
 def _read_validated_inchikey_stock(path: Path) -> frozenset[str]:
     """Read a plain InChIKey stock without generic chemistry-record objects."""
     keys: set[str] = set()
@@ -247,6 +304,13 @@ def _read_validated_stock(
     path: Path, config: BuildingBlockStockLoadConfig
 ) -> tuple[ResolvedBuildingBlocksFormat, frozenset[str]]:
     file_format = resolve_chemical_input_format(path)
+    if not config.standardize:
+        if file_format != "smi":
+            raise ValueError(
+                f"{path}: standardize=False supports only plain .smi, .smiles, "
+                "or .cxsmiles files"
+            )
+        return "smiles", _read_prepared_smiles_stock(path)
     if file_format == "inchikey":
         if config.identity_format == "smiles":
             raise ValueError(
@@ -315,9 +379,11 @@ def load_building_block_stock(
 ) -> BuildingBlockStock:
     """Load a validated canonical-SMILES or full-InChIKey stock.
 
-    Each chemistry record is parsed exactly once. Typed SMILES stocks always own
-    stereo-preserving canonical keys. File-decoding policy is supplied explicitly
-    through a domain-owned load configuration.
+    By default each SMILES record is parsed exactly once and the typed stock owns
+    stereo-preserving canonical keys. With standardize disabled, an explicitly
+    declared plain SMILES source is trusted as already canonical and loaded without
+    molecular parsing. File-decoding policy is supplied explicitly through a
+    domain-owned load configuration.
     """
     path = Path(building_blocks_path).resolve(strict=True)
     source_format, keys = _read_validated_stock(
@@ -327,6 +393,7 @@ def load_building_block_stock(
 
 
 __all__ = [
+    "BuildingBlockLookup",
     "BuildingBlockStock",
     "BuildingBlocksFormat",
     "ResolvedBuildingBlocksFormat",

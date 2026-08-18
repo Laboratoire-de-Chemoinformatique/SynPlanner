@@ -14,7 +14,7 @@ from rdkit import Chem
 from tqdm.auto import tqdm
 
 from synplan import __version__
-from synplan.chem.building_blocks import BuildingBlockStock
+from synplan.chem.building_blocks import BuildingBlockLookup
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.routes.io import (
     export_tree_to_json,
@@ -163,7 +163,7 @@ def run_search(
     policy_config: PolicyNetworkConfig,
     evaluation_config,
     reaction_rules_path: str,
-    building_block_stock: BuildingBlockStock,
+    building_block_stock: BuildingBlockLookup,
     results_root: str = "search_results",
     route_scorer: RouteScorer | None = None,
     priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,

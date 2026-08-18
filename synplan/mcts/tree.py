@@ -11,7 +11,7 @@ from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
 from synplan.chem.building_blocks.stock import (
-    BuildingBlockStock,
+    BuildingBlockLookup,
     coerce_building_block_stock,
 )
 from synplan.chem.precursor import Precursor
@@ -129,7 +129,7 @@ class Tree:
         target: MoleculeContainer,
         config: TreeConfig,
         reaction_rules: list[CanonicalRetroReactor],
-        building_blocks: BuildingBlockStock | set[str] | frozenset[str],
+        building_blocks: BuildingBlockLookup | set[str] | frozenset[str],
         expansion_function: Policy,
         evaluation_function: EvaluationStrategy = None,
         route_scorer: RouteScorer | None = None,

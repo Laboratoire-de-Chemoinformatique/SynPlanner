@@ -13,6 +13,7 @@ from synplan.utils.config import TreeConfig
 def test_stock_load_config_defaults_to_auto_detection() -> None:
     config = BuildingBlockStockLoadConfig()
     assert config.identity_format == "auto"
+    assert config.standardize is True
     assert config.chemistry_column is None
     assert config.delimiter is None
 
@@ -26,6 +27,17 @@ def test_stock_load_config_yaml_round_trip(tmp_path) -> None:
     path = tmp_path / "stock.yaml"
     expected.to_yaml(str(path))
     assert BuildingBlockStockLoadConfig.from_yaml(str(path)) == expected
+
+
+def test_nonstandardizing_stock_requires_explicit_smiles_identity() -> None:
+    config = BuildingBlockStockLoadConfig(
+        identity_format="smiles",
+        standardize=False,
+    )
+
+    assert config.standardize is False
+    with pytest.raises(ValidationError, match="requires identity_format='smiles'"):
+        BuildingBlockStockLoadConfig(standardize=False)
 
 
 @pytest.mark.parametrize(
@@ -60,6 +72,7 @@ def test_defaults_are_backward_compatible() -> None:
         {"deprotect_output": "append"},
         {"inchikey_file": "stock.inchikey"},
         {"identity_reference_file": "identity.tsv"},
+        {"price_reference_file": "prices.tsv"},
         {"collisions_file": "collisions.tsv"},
         {"audit_overwrite": "replace"},
         {"unknown_option": True},

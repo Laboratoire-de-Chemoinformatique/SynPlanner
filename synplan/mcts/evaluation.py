@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from synplan.chem.building_blocks.stock import (
-    BuildingBlockStock,
+    BuildingBlockLookup,
     coerce_building_block_stock,
 )
 from synplan.chem.precursor import Precursor, compose_precursors
@@ -39,7 +39,7 @@ class RolloutSimulator:
         self,
         policy_network: "Policy",
         reaction_rules,
-        building_blocks: BuildingBlockStock | set[str] | frozenset[str],
+        building_blocks: BuildingBlockLookup | set[str] | frozenset[str],
         min_mol_size: int,
         max_depth: int,
         stochastic: bool = False,
@@ -271,7 +271,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         self,
         policy_network: "Policy",
         reaction_rules,
-        building_blocks: BuildingBlockStock | set[str] | frozenset[str],
+        building_blocks: BuildingBlockLookup | set[str] | frozenset[str],
         min_mol_size: int,
         max_depth: int,
         normalize: bool = False,

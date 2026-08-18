@@ -22,6 +22,7 @@ _MODULES = {
     "prepare_building_blocks": "preparation",
     "standardize_building_blocks": "preparation",
     "BuildingBlockStock": "stock",
+    "BuildingBlockLookup": "stock",
     "StockIdentityFormat": "stock",
     "coerce_building_block_stock": "stock",
     "detect_building_blocks_format": "stock",

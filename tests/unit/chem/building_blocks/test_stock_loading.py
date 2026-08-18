@@ -33,6 +33,48 @@ def test_typed_smiles_stock_always_canonicalizes_keys(tmp_path):
     assert stock.contains_molecule(smiles_parser("CCO"))
 
 
+def test_nonstandardizing_smiles_stock_trusts_complete_prepared_keys(
+    monkeypatch, tmp_path
+):
+    from synplan.chem.building_blocks import stock as stock_module
+
+    path = tmp_path / "stock.smi"
+    path.write_text(
+        "OCC\nCC |^1:0|\nCCO\tvendor metadata\n",
+        encoding="utf-8",
+    )
+
+    def unexpected_chemistry(*_args, **_kwargs):
+        raise AssertionError("trusted prepared SMILES invoked molecular chemistry")
+
+    monkeypatch.setattr(stock_module, "smiles_parser", unexpected_chemistry)
+    monkeypatch.setattr(stock_module, "safe_canonicalization", unexpected_chemistry)
+
+    stock = stock_module.load_building_block_stock(
+        path,
+        config=BuildingBlockStockLoadConfig(
+            identity_format="smiles",
+            standardize=False,
+        ),
+    )
+
+    assert stock.keys == frozenset({"OCC", "CC |^1:0|", "CCO"})
+
+
+def test_nonstandardizing_smiles_stock_rejects_non_plain_input(tmp_path):
+    path = tmp_path / "stock.tsv"
+    path.write_text("SMILES\nCCO\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="supports only plain"):
+        load_building_block(
+            path,
+            config=BuildingBlockStockLoadConfig(
+                identity_format="smiles",
+                standardize=False,
+            ),
+        )
+
+
 def test_typed_loader_observes_replaced_stock_file(tmp_path):
     path = tmp_path / "stock.smi"
     path.write_text("CCO\n", encoding="utf-8")

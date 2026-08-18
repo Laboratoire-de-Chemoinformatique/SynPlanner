@@ -8,7 +8,7 @@ from collections.abc import Set
 from chython.containers import MoleculeContainer
 
 from synplan.chem.building_blocks.identity import molecule_to_inchi_key
-from synplan.chem.building_blocks.stock import BuildingBlockStock
+from synplan.chem.building_blocks.stock import BuildingBlockLookup
 from synplan.chem.utils import safe_canonicalization
 
 
@@ -62,7 +62,7 @@ class Precursor:
         return cached
 
     def is_building_block(
-        self, bb_stock: BuildingBlockStock | Set[str], min_mol_size: int = 6
+        self, bb_stock: BuildingBlockLookup | Set[str], min_mol_size: int = 6
     ) -> bool:
         """Checks if a Precursor is a building block.
 
@@ -75,11 +75,12 @@ class Precursor:
         if len(self.molecule) <= min_mol_size:
             return True
 
+        contains_key = getattr(bb_stock, "contains_key", None)
         if (
-            isinstance(bb_stock, BuildingBlockStock)
-            and bb_stock.identity_format == "inchikey"
+            contains_key is not None
+            and getattr(bb_stock, "identity_format", None) == "inchikey"
         ):
-            return self.inchi_key in bb_stock
+            return bool(contains_key(self.inchi_key))
 
         contains_molecule = getattr(bb_stock, "contains_molecule", None)
         if contains_molecule is not None:

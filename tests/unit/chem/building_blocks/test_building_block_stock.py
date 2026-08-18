@@ -37,8 +37,10 @@ def test_coerce_canonicalizes_legacy_smiles_keys():
 def test_inchikey_stock_uses_full_stereochemical_key():
     left = smiles("F[C@H](Cl)Br")
     right = smiles("F[C@@H](Cl)Br")
-    stock = BuildingBlockStock(frozenset({molecule_to_inchi_key(left)}), "inchikey")
+    left_key = molecule_to_inchi_key(left)
+    stock = BuildingBlockStock(frozenset({left_key}), "inchikey")
 
+    assert stock.contains_key(left_key)
     assert stock.contains_molecule(left)
     assert not stock.contains_molecule(right)
 

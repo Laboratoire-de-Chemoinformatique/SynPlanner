@@ -22,15 +22,21 @@ class BuildingBlockStockLoadConfig(BaseConfigModel):
 
     This configuration belongs to the stock-loading boundary, not to tree-search
     behavior. identity_format describes the canonical SMILES or full Standard
-    InChIKeys stored in the input.
+    InChIKeys stored in the input. Setting standardize to false trusts an explicitly
+    declared plain SMILES stock as already canonical and skips molecular parsing.
     """
 
     identity_format: BuildingBlockStockInputFormat = "auto"
+    standardize: bool = True
     chemistry_column: str | None = None
     delimiter: str | None = None
 
     @model_validator(mode="after")
     def _validate_source_options(self) -> BuildingBlockStockLoadConfig:
+        if not self.standardize and self.identity_format != "smiles":
+            raise ValueError(
+                "standardize=False requires identity_format='smiles'"
+            )
         if self.chemistry_column is not None and not self.chemistry_column.strip():
             raise ValueError("chemistry_column must not be empty")
         if self.delimiter is not None and len(self.delimiter) != 1:
@@ -57,6 +63,7 @@ class BuildingBlockPreparationConfig(BaseConfigModel):
     protected_output_file: str | None = None
     inchikey_file: str | None = None
     identity_reference_file: str | None = None
+    price_reference_file: str | None = None
     duplicates_file: str | None = None
     collisions_file: str | None = None
     stereo_file: str | None = None
@@ -91,6 +98,10 @@ class BuildingBlockPreparationConfig(BaseConfigModel):
             if self.identity_reference_file is not None:
                 raise ValueError(
                     "identity_reference_file requires write_inchikey_stock to be true"
+                )
+            if self.price_reference_file is not None:
+                raise ValueError(
+                    "price_reference_file requires write_inchikey_stock to be true"
                 )
             if self.collisions_file is not None:
                 raise ValueError(

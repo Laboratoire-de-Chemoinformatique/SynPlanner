@@ -96,7 +96,14 @@ def test_precursor_caches_typed_inchikey_stock_identity(monkeypatch):
         calls += 1
         return molecule_to_inchi_key(candidate)
 
+    def unexpected_stock_conversion(_candidate):
+        pytest.fail("typed InChIKey membership regenerated the molecule key")
+
     monkeypatch.setattr("synplan.chem.precursor.molecule_to_inchi_key", counted_key)
+    monkeypatch.setattr(
+        "synplan.chem.building_blocks.stock.molecule_to_inchi_key",
+        unexpected_stock_conversion,
+    )
 
     assert precursor.is_building_block(stock, min_mol_size=0)
     assert precursor.is_building_block(stock, min_mol_size=0)
