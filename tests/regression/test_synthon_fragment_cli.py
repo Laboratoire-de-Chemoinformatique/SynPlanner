@@ -18,6 +18,7 @@ from synplan.enumeration.synthon.stock import SynthonRecord, write_synthon_stock
 IMATINIB = "Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1"
 PARACETAMOL = "CC(=O)Nc1ccc(O)cc1"
 MACROLACTAM = "O=C1CCCCCCCCCCCCN1"
+SILDENAFIL = "CCCc1nn(C)c2c(=O)[nH]c(-c3cc(S(=O)(=O)N4CCN(C)CC4)ccc3OCC)nc12"
 PARACETAMOL_SYNTHONS = ("C[CH_elec]=O", "c1cc(ccc1[NH2_nuc])O")
 RULES = [
     r for r in load_data(SynthonConfig().rules_path)["disconnections"] if not r["macro"]
@@ -216,3 +217,18 @@ def test_a_fragment_to_ignore_is_canonicalised_before_it_is_compared():
         SynthonConfig(fragments_to_ignore=list(STUDY_FRAGMENTS_TO_IGNORE))
     )
     assert study.ignore >= {"C(=O)C", "CCC"}
+
+
+# --- D9: ring_closure_sizes=() switches the ring rules off on the CUTTING side too -----------
+
+
+def test_ring_closure_off_drops_the_ring_rules_under_the_shipped_default_mode():
+    off = SynthonConfig(ring_closure_sizes=())
+    # `_select` returns every rule in the shipped default mode
+    assert off.rule_mode == "use_all"
+    assert not [r for r, _ in Fragmenter(off).rules if r["ring"]]
+    # nothing can rejoin a ring synthon with `_fuse` off, so the count returns to the
+    # pre-ring rule set instead of spending the budget on pathways that enumerate to nothing
+    assert set(fragment_smiles(SILDENAFIL, off).pathways) == set(
+        fragment_smiles(SILDENAFIL, SynthonConfig(rule_mode="include_only")).pathways
+    )

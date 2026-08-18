@@ -137,8 +137,13 @@ class Fragmenter:
         self.config = config or SynthonConfig()
         self.stock = stock or {}
         data = load_data(self.config.rules_path)
-        normal = [r for r in data["disconnections"] if not r["macro"]]
-        macro = [r for r in data["disconnections"] if r["macro"]]
+        records = data["disconnections"]
+        if not self.config.ring_closure_sizes:
+            # nothing can rejoin a ring synthon once `_fuse` is off, so cutting with the ring
+            # rules only spends the pathway budget on dead ends
+            records = [r for r in records if not r["ring"]]
+        normal = [r for r in records if not r["macro"]]
+        macro = [r for r in records if r["macro"]]
         self.rules = [
             (r, SynthonTransformer.from_smarts(r["smarts"]))
             for r in _select(normal, self.config.rule_mode, self.config.rules_selection)
