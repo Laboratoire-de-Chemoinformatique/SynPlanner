@@ -11,6 +11,8 @@ Key components:
 - ``select_device``, ``default_num_workers``: hardware helpers.
 """
 
+from __future__ import annotations
+
 import contextlib
 import logging
 import os
@@ -28,9 +30,10 @@ from concurrent.futures import (
     TimeoutError as FuturesTimeoutError,
 )
 from contextlib import contextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import torch
+if TYPE_CHECKING:
+    import torch
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +59,8 @@ def select_device(device: str | None = None) -> torch.device:
     -------
     torch.device
     """
+    import torch
+
     if device is not None:
         return torch.device(device)
     if torch.cuda.is_available():
