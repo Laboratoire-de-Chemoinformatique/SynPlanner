@@ -81,6 +81,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   require TAB-delimited metadata; headered TSV inputs use a `SMILES` or
   `CXSMILES` column.
 
+- Added synthon coverage of a mapped reaction: `classify_coverage` answers whether a reaction
+  builds a bond one of the 39 shipped acyclic disconnections already breaks, and the
+  `synthon_coverage` CLI command splits a reaction file on that answer. Its use is corpus
+  preparation — a one-step policy learns nothing from reactions the curated rules already
+  provide. The atom mapping gives the formed bond, each rule gives its broken bond, and the
+  reactant-side leaving groups are checked against the rule's `_label` tokens, which is the
+  only label-aware step available: `QueryElement.__eq__` never consults `_label`, so the
+  substructure match cannot be. Coverage is disconnection-level, not mechanism-level — a
+  reductive amination counts as covered by R3.1. On a 100k mapped USPTO sample, 37.9% covered
+  at ~1 ms/reaction. The eight rules that name their nucleophile require that element to be
+  present on the reactant side, sharing `RULE_NUCLEOPHILE_CAPS` with the capping path: read as
+  the bare "no halide left this atom", `nuc` is satisfied by an arene doing nothing, and
+  Friedel-Crafts acylations were being absorbed by R10.2 (906 hits down to 118), C-H
+  functionalisations by R12.5 (443 to 124) and enolate acylations by R10.1 (698 to 290).
+
 - The shipped synthon disconnections can be used as an MCTS priority-rule set.
   `synthon_priority_rules()` returns them under the source name `"synthon"` as
   `run_search(priority_rules=...)` / `Tree(priority_rules=...)` input, so they are tried
@@ -175,6 +190,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   itself balance, are reported apart rather than counted as losses.
 
 ### Changed
+
+- `synplan.utils.parallel` no longer imports torch at module level. `select_device` is its only
+  consumer and now imports it when called, so the process pool helpers and `default_num_workers`
+  are torch-free. The synthon package took the framework purely to reach
+  `min(os.cpu_count() or 4, cap)`, which cost 366 ms of a 501 ms import; importing
+  `synplan.enumeration.synthon.config` now takes 143 ms and pulls no torch at all.
 
 - `chython-synplan` is pinned to 1.103 and sourced from the local fork, which adds the
   `Synthon` atom family, `SynthonContainer`, the `_token` bracket field in SMILES and
