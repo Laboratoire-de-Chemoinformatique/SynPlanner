@@ -7,7 +7,10 @@ import pytest
 from chython import smarts, smiles
 
 from synplan.chem.building_blocks.deprotection import (
+    DeprotectionSequenceLimitError,
     deprotect_molecule,
+    deprotect_molecule_steps,
+    deprotect_molecule_traces,
     remove_protective_groups,
 )
 from synplan.chem.building_blocks.rules import ProtectiveRule, protective_rules
@@ -177,6 +180,75 @@ def test_independent_overlapping_protective_groups_are_removed() -> None:
     assert str(deprotect_molecule(molecule)) == str(expected)
 
 
+def test_sequence_enumeration_is_default_and_returns_both_orders() -> None:
+    molecule = smiles("CC(C)(C)OC(=O)NCCO[Si](C)(C)C")
+
+    traces = deprotect_molecule_traces(molecule)
+
+    assert len(traces) == 2
+    assert {tuple(step.rule_name for step in trace) for trace in traces} == {
+        ("hydroxyl_tms", "amine_boc"),
+        ("amine_boc", "hydroxyl_tms"),
+    }
+
+
+def test_deterministic_sequence_mode_retains_one_stable_trace() -> None:
+    molecule = smiles("CC(C)(C)OC(=O)NCCO[Si](C)(C)C")
+
+    expected = deprotect_molecule_steps(molecule)
+    traces = deprotect_molecule_traces(
+        molecule,
+        sequence_mode="deterministic",
+    )
+
+    assert len(traces) == 1
+    assert [step.rule_name for step in traces[0]] == [
+        step.rule_name for step in expected
+    ]
+
+
+def test_three_independent_groups_enumerate_six_sequences() -> None:
+    molecule = smiles("CC(C)(C)OC(=O)NCC(O[Si](C)(C)C)C1OCCO1")
+
+    traces = deprotect_molecule_traces(molecule)
+
+    assert len(traces) == 6
+    assert all(len(trace) == 3 for trace in traces)
+
+
+def test_symmetry_equivalent_sequences_are_deduplicated() -> None:
+    molecule = smiles("C(CO[Si](C)(C)C)O[Si](C)(C)C")
+
+    traces = deprotect_molecule_traces(molecule)
+
+    assert len(traces) == 1
+    assert [step.rule_name for step in traces[0]] == [
+        "hydroxyl_tms",
+        "hydroxyl_tms",
+    ]
+
+
+def test_sequence_enumeration_enforces_variant_limit() -> None:
+    molecule = smiles("CC(C)(C)OC(=O)NCCO[Si](C)(C)C")
+
+    with pytest.raises(
+        DeprotectionSequenceLimitError,
+        match="configured limit of 1 variants",
+    ):
+        deprotect_molecule_traces(molecule, max_variants=1)
+
+
+def test_sequence_mode_and_bounds_are_validated() -> None:
+    molecule = smiles("CC")
+
+    with pytest.raises(ValueError, match="sequence_mode"):
+        deprotect_molecule_traces(molecule, sequence_mode="first")
+    with pytest.raises(ValueError, match="max_steps"):
+        deprotect_molecule_traces(molecule, max_steps=0)
+    with pytest.raises(ValueError, match="max_variants"):
+        deprotect_molecule_traces(molecule, max_variants=0)
+
+
 def _replacement_rule(query: str, atom_type: str) -> ProtectiveRule:
     return ProtectiveRule(
         query=smarts(query),
@@ -187,6 +259,41 @@ def _replacement_rule(query: str, atom_type: str) -> ProtectiveRule:
         decoys=(),
         policy="conservative",
         decoy_scope="cycle_test",
+    )
+
+
+def test_sequence_enumeration_respects_rule_dependencies() -> None:
+    remove_exposed_nitrogen = ProtectiveRule(
+        query=smarts("[O:1]-[N:2]"),
+        keep_atoms=(1,),
+        add_atoms=(),
+        protected_smiles="",
+        cleaved_smiles="",
+        decoys=(),
+        policy="conservative",
+        decoy_scope="dependency_test",
+    )
+    rules = {
+        "expose_nitrogen": _replacement_rule("[O:1]-[C:2]", "N"),
+        "remove_exposed_nitrogen": remove_exposed_nitrogen,
+    }
+
+    traces = deprotect_molecule_traces(smiles("CO"), rules=rules)
+
+    assert len(traces) == 1
+    assert [step.rule_name for step in traces[0]] == [
+        "expose_nitrogen",
+        "remove_exposed_nitrogen",
+    ]
+    assert (
+        len(
+            deprotect_molecule_traces(
+                smiles("NO"),
+                rules={"remove_exposed_nitrogen": remove_exposed_nitrogen},
+                max_steps=1,
+            )[0]
+        )
+        == 1
     )
 
 

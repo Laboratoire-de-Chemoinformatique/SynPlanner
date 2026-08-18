@@ -19,6 +19,11 @@ class IdentityReportRow:
     output_origin: str
     status: str
     note: str = ""
+    standardized_input_smiles: str = ""
+    deprotection_policy: str = ""
+    protective_rules_sha256: str = ""
+    deprotection_events: str = ""
+    mapped_deprotection: str = ""
 
 
 @dataclass(frozen=True, slots=True)

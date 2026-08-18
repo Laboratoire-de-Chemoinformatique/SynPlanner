@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from synplan.chem.building_blocks.catalog import BuildingBlockCatalog
 from synplan.chem.building_blocks.config import BuildingBlockPreparationConfig
 from synplan.chem.building_blocks.preparation import (
     PreparationRun,
@@ -105,6 +106,7 @@ def test_audit_outputs_partition_processing_errors(tmp_path) -> None:
     assert len(_lines(result.audit_files["fallback.tsv"])) == 2
     assert len(_lines(result.audit_files["errors.tsv"])) == 2
     summary = json.loads(Path(result.audit_files["summary.json"]).read_text())
+    assert summary["schema_version"] == 2
     assert summary["counts"]["input_records"] == 2
     assert summary["counts"]["successful_input_records"] == 1
     assert summary["counts"]["processing_errors"] == 1
@@ -279,6 +281,33 @@ def test_single_and_multi_worker_outputs_are_order_equivalent(tmp_path) -> None:
             Path(one.audit_files[name]).read_bytes()
             == Path(many.audit_files[name]).read_bytes()
         )
+
+
+def test_preparation_writes_self_describing_price_artifact(tmp_path) -> None:
+    source = tmp_path / "input.tsv"
+    source.write_text(
+        "SMILES\tLN_ppg\tSA_ppg\nCCO\t1.5\t0\nCCN\t\t2.5\n",
+        encoding="utf-8",
+    )
+    result = prepare_building_blocks(
+        source,
+        tmp_path / "building_blocks.smi",
+        BuildingBlockPreparationConfig(write_inchikey_stock=True, num_workers=1),
+    )
+
+    assert result.price_reference_file is not None
+    assert Path(result.price_reference_file).name == "building_blocks_prices.tsv"
+    with Path(result.price_reference_file).open(encoding="utf-8", newline="") as stream:
+        rows = list(csv.DictReader(stream, delimiter="\t"))
+    assert rows == [
+        {"source_index": "1", "input_smiles": "CCO", "LN_ppg": "1.5", "SA_ppg": "0"},
+        {"source_index": "2", "input_smiles": "CCN", "LN_ppg": "", "SA_ppg": "2.5"},
+    ]
+    catalog = BuildingBlockCatalog.from_files(
+        result.identity_reference_file, result.price_reference_file
+    )
+    assert catalog.prices_by_source[1]["LN_ppg"] == 1.5
+    assert catalog.prices_by_source[2]["SA_ppg"] == 2.5
 
 
 def test_duplicate_and_stereo_reports_work_without_deprotection(tmp_path) -> None:
@@ -755,3 +784,50 @@ def test_worker_copies_a_preparsed_source_molecule() -> None:
     assert processed.protected_molecule is not molecule
     assert str(molecule) == original
     assert "@" in str(processed.protected_molecule)
+
+
+def test_deprotected_identity_records_exact_replay_provenance(tmp_path) -> None:
+    from chython import smiles
+    from chython.containers import ReactionContainer
+
+    from synplan.chem.building_blocks.rules import protective_rules_path
+
+    source = tmp_path / "input.smi"
+    source.write_text(
+        "CC(C)(C)OC(=O)NCCOCc1ccccc1\n",
+        encoding="utf-8",
+    )
+    result = prepare_building_blocks(
+        source,
+        tmp_path / "stock.smi",
+        BuildingBlockPreparationConfig(
+            deprotect=True,
+            deprotect_policy="conservative",
+            write_inchikey_stock=True,
+            num_workers=1,
+        ),
+    )
+    with Path(result.identity_reference_file).open(
+        encoding="utf-8", newline=""
+    ) as handle:
+        rows = list(csv.DictReader(handle, delimiter="\t"))
+    deprotected = next(row for row in rows if row["output_origin"] == "deprotected")
+
+    assert deprotected["standardized_input_smiles"]
+    assert deprotected["deprotection_policy"] == "conservative"
+    assert deprotected["protective_rules_sha256"] == sha256_file(
+        protective_rules_path()
+    )
+    events = json.loads(deprotected["deprotection_events"])
+    assert [event["rule_name"] for event in events] == ["amine_boc"]
+    assert events[0]["pass_index"] == 0
+    assert events[0]["query_mapping"]
+
+    reaction = smiles(deprotected["mapped_deprotection"])
+    assert isinstance(reaction, ReactionContainer)
+    assert str(reaction.reactants[0]) == deprotected["standardized_input_smiles"]
+    assert str(reaction.products[0]) == deprotected["canonical_smiles"]
+
+    catalog = BuildingBlockCatalog.from_files(result.identity_reference_file)
+    records = catalog.protected_alternative_records(deprotected["canonical_smiles"])
+    assert records[0]["mapped_deprotection"] == deprotected["mapped_deprotection"]

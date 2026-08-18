@@ -3,6 +3,7 @@
 from importlib import import_module
 
 _MODULES = {
+    "BuildingBlockCatalog": "catalog",
     "BuildingBlockPreparationConfig": "config",
     "BuildingBlockStockLoadConfig": "config",
     "DeprotectionOutput": "config",
@@ -16,6 +17,7 @@ _MODULES = {
     "molecule_to_inchi": "identity",
     "molecule_to_inchi_key": "identity",
     "validate_standard_inchi_key": "identity",
+    "deprotect_molecule_with_provenance": "provenance",
     "BuildingBlockPreparationResult": "preparation",
     "PreparationReader": "preparation",
     "PreparationRun": "preparation",

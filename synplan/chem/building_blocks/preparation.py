@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from chython import smiles as smiles_parser
-from chython.containers import MoleculeContainer
+from chython.containers import MoleculeContainer, ReactionContainer
 from rdkit import rdBase
 from rdkit.Chem import rdinchi
 from tqdm.auto import tqdm
@@ -34,7 +34,7 @@ from synplan.utils.files import (
 from synplan.utils.parallel import default_num_workers, process_pool_map_stream
 
 from .config import BuildingBlockPreparationConfig, DeprotectionPolicy
-from .deprotection import remove_protective_groups
+from .deprotection import DeprotectionEvent, remove_protective_groups
 from .identity import molecule_identity
 from .reports import (
     COLLISION_FIELDS,
@@ -62,6 +62,7 @@ class BuildingBlockPreparationResult:
     protected_output_file: str | None = None
     inchikey_file: str | None = None
     identity_reference_file: str | None = None
+    price_reference_file: str | None = None
     duplicates_file: str | None = None
     collisions_file: str | None = None
     stereo_file: str | None = None
@@ -108,6 +109,8 @@ class _ProcessedRecord:
     deprotected_smiles: str | None = None
     deprotected_stereo_free: str | None = None
     deprotection_changed: bool = False
+    deprotection_events: tuple[DeprotectionEvent, ...] = ()
+    mapped_deprotection: str = ""
     error_stage: str = ""
     error_type: str = ""
     error_message: str = ""
@@ -161,9 +164,23 @@ def _process_record(
         )
     try:
         deprotected = protected.copy()
-        changed = remove_protective_groups(deprotected, policy=policy)
+        events: list[DeprotectionEvent] = []
+        changed = remove_protective_groups(
+            deprotected, policy=policy, event_collector=events
+        )
         deprotected = safe_canonicalization(deprotected, clean_stereo=False)
         deprotected_smiles = str(deprotected)
+        changed = changed and deprotected_smiles != protected_smiles
+        mapped_deprotection = (
+            format(
+                ReactionContainer(
+                    reactants=[protected.copy()], products=[deprotected.copy()]
+                ),
+                "m",
+            )
+            if changed
+            else ""
+        )
         return _ProcessedRecord(
             source=source,
             protected_molecule=protected,
@@ -172,7 +189,9 @@ def _process_record(
             deprotected_molecule=deprotected,
             deprotected_smiles=deprotected_smiles,
             deprotected_stereo_free=_stereo_free_smiles(deprotected),
-            deprotection_changed=changed and deprotected_smiles != protected_smiles,
+            deprotection_changed=changed,
+            deprotection_events=tuple(events) if changed else (),
+            mapped_deprotection=mapped_deprotection,
         )
     except Exception as error:
         return _ProcessedRecord(
@@ -246,6 +265,16 @@ class PreparationRun:
         self.input_path = Path(input_file).expanduser().resolve(strict=True)
         self.output_path = Path(output_file).expanduser().resolve(strict=False)
         self.reader = PreparationReader(self.input_path, self.config)
+        first_record = next(iter(self.reader), None)
+        self.price_columns = tuple(
+            name
+            for name in (first_record.metadata_names if first_record else ())
+            if name.casefold().endswith("_ppg")
+        )
+        if self.config.price_reference_file is not None and not self.price_columns:
+            raise ValueError(
+                "price_reference_file requires at least one input *_ppg column"
+            )
         self.rules_path = protective_rules_path() if self.config.deprotect else None
         if self.output_path.name in _AUDIT_NAMES or self.output_path.name.endswith(
             ".partial"
@@ -278,6 +307,11 @@ class PreparationRun:
                 self.config.identity_reference_file
                 or _derived_output_path(self.output_path, "_identity.tsv")
             )
+            if self.price_columns:
+                final_paths["prices"] = Path(
+                    self.config.price_reference_file
+                    or _derived_output_path(self.output_path, "_prices.tsv")
+                )
             final_paths["collisions"] = Path(
                 self.config.collisions_file
                 or _derived_output_path(self.output_path, "_collisions.tsv")
@@ -326,6 +360,7 @@ class PreparationRun:
             collision_rows=0,
             stereo_rows=0,
             partial_identity_errors=0,
+            price_rows=0,
         )
         self.seen_primary: dict[str, tuple[int, str]] = {}
         self.seen_protected: set[str] = set()
@@ -335,6 +370,7 @@ class PreparationRun:
         )
         self.duplicate_writer: csv.DictWriter | None = None
         self.identity_writer: csv.DictWriter | None = None
+        self.price_writer: csv.DictWriter | None = None
         self.collision_writer: csv.DictWriter | None = None
         self.stereo_writer: csv.DictWriter | None = None
 
@@ -381,6 +417,9 @@ class PreparationRun:
         self.rules_metadata = source_metadata.get("protective-rule taxonomy")
         self.duplicate_writer = self._open_tsv_writer("duplicates", DUPLICATE_FIELDS)
         self.identity_writer = self._open_tsv_writer("identity", IDENTITY_FIELDS)
+        self.price_writer = self._open_tsv_writer(
+            "prices", ("source_index", "input_smiles", *self.price_columns)
+        )
         self.collision_writer = self._open_tsv_writer("collisions", COLLISION_FIELDS)
         self.stereo_writer = self._open_tsv_writer("stereo", STEREO_FIELDS)
         if self.config.write_audit_files:
@@ -427,6 +466,7 @@ class PreparationRun:
     def consume(self, processed: _ProcessedRecord) -> None:
         """Write one ordered worker result into the run's reports and indexes."""
         self.counts["input_records"] += 1
+        self._write_price(processed.source)
         if processed.failed:
             self._write_failure(processed)
             return
@@ -473,6 +513,19 @@ class PreparationRun:
                 candidate_smiles,
                 candidate_status.get((origin, candidate_smiles), "synthon_only"),
             )
+
+    def _write_price(self, source: ChemicalRecord) -> None:
+        if self.price_writer is None:
+            return
+        metadata = dict(zip(source.metadata_names, source.metadata, strict=True))
+        self.price_writer.writerow(
+            {
+                "source_index": source.sequence,
+                "input_smiles": source.chemistry,
+                **{column: metadata.get(column, "") for column in self.price_columns},
+            }
+        )
+        self.counts["price_rows"] += 1
 
     def _write_failure(self, processed: _ProcessedRecord) -> None:
         source = processed.source
@@ -590,6 +643,23 @@ class PreparationRun:
             self.counts["stereo_rows"] += 1
         return status
 
+    def _identity_provenance(
+        self, processed: _ProcessedRecord, origin: str
+    ) -> dict[str, str]:
+        fields = {"standardized_input_smiles": processed.protected_smiles}
+        if origin != "deprotected":
+            return fields
+        rules_hash = str((self.rules_metadata or {}).get("sha256", ""))
+        return {
+            **fields,
+            "deprotection_policy": self.config.deprotect_policy,
+            "protective_rules_sha256": rules_hash,
+            "deprotection_events": compact_json(
+                [event.as_dict() for event in processed.deprotection_events]
+            ),
+            "mapped_deprotection": processed.mapped_deprotection,
+        }
+
     def _write_identity(
         self,
         processed: _ProcessedRecord,
@@ -623,6 +693,7 @@ class PreparationRun:
                         output_origin=origin,
                         status="identity_error",
                         note=f"{type(error).__name__}: {error}",
+                        **self._identity_provenance(processed, origin),
                     )
                 )
             )
@@ -648,6 +719,7 @@ class PreparationRun:
                     output_origin=origin,
                     status=status,
                     note=note,
+                    **self._identity_provenance(processed, origin),
                 )
             )
         )
@@ -729,6 +801,7 @@ class PreparationRun:
             "duplicates": self.counts["duplicate_rows"] + 1,
             "inchikey": self.counts["inchikey_rows"],
             "identity": self.counts["identity_rows"] + 1,
+            "prices": self.counts["price_rows"] + 1,
             "collisions": self.counts["collision_rows"] + 1,
             "stereo": self.counts["stereo_rows"] + 1,
         }
@@ -757,7 +830,7 @@ class PreparationRun:
         }
         return {
             "synplan_version": __version__,
-            "schema_version": 1,
+            "schema_version": 2,
             "command": "prepare_building_blocks",
             "started_at": self.started_at,
             "finished_at": utc_now(),
@@ -793,6 +866,9 @@ class PreparationRun:
             ),
             identity_reference_file=(
                 str(final_paths["identity"]) if "identity" in final_paths else None
+            ),
+            price_reference_file=(
+                str(final_paths["prices"]) if "prices" in final_paths else None
             ),
             duplicates_file=(
                 str(final_paths["duplicates"]) if "duplicates" in final_paths else None

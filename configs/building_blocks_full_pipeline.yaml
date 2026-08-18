@@ -10,6 +10,7 @@ write_inchikey_stock: true
 protected_output_file: null
 inchikey_file: null
 identity_reference_file: null
+price_reference_file: null
 duplicates_file: null
 collisions_file: null
 stereo_file: null
