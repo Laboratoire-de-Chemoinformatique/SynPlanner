@@ -35,12 +35,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: 🛠️ Install build tools (Ubuntu only)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential python3-dev
-
       - name: 📚Install project (incl. dev extras)
         run: |
           uv sync --group dev --extra cpu
