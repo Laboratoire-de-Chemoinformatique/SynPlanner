@@ -9,6 +9,7 @@ from synplan.utils.visualisation import (
     extract_routes,
     get_route_svg,
     get_route_svg_from_json,
+    render_svg,
 )
 
 
@@ -21,6 +22,27 @@ def make_mol(n: int) -> MoleculeContainer:
             molecule.add_bond(prev, atom, 1)
         prev = atom
     return molecule
+
+
+def test_render_svg_can_use_transparent_boxes_with_thicker_borders():
+    box_colors = {"target": "#98EEFF"}
+
+    solid_molecule = read_smiles("CCO")
+    solid_molecule.meta["status"] = "target"
+    solid_svg = render_svg((), [[solid_molecule]], box_colors)
+
+    transparent_molecule = read_smiles("CCO")
+    transparent_molecule.meta["status"] = "target"
+    transparent_svg = render_svg(
+        (), [[transparent_molecule]], box_colors, box_solid=False
+    )
+
+    assert (
+        'stroke="#98EEFF" stroke-width=".005" '
+        'fill="#98EEFF" fill-opacity="0.30"' in solid_svg
+    )
+    assert 'stroke="#98EEFF" stroke-width=".005" fill="none"' in transparent_svg
+    assert 'fill="#98EEFF"' not in transparent_svg
 
 
 class _MockConfig:
@@ -114,11 +136,18 @@ def test_get_route_svg_from_json_can_render_rule_labels():
     }
 
     routes_json = make_tree_json(_MockRouteMetadataTree(), reactions=routes_dict)
-    svg = get_route_svg_from_json(routes_json, 7, labeled=True)
+    svg = get_route_svg_from_json(
+        routes_json,
+        7,
+        labeled=True,
+        box_solid=False,
+    )
 
     assert "<svg" in svg
     assert "policy:42" in svg
     assert "priority:0" in svg
+    assert 'stroke="#98EEFF" stroke-width=".005" fill="none"' in svg
+    assert 'fill="#98EEFF"' not in svg
 
 
 def test_extract_routes_uses_root_to_terminal_steps():

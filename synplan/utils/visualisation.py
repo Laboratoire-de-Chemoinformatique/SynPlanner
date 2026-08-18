@@ -134,7 +134,13 @@ def extract_routes(
     return routes_block
 
 
-def render_svg(pred, columns, box_colors, labeled: bool = False):
+def render_svg(
+    pred,
+    columns,
+    box_colors,
+    labeled: bool = False,
+    box_solid: bool = True,
+):
     """
     Renders an SVG representation of a retrosynthetic route.
 
@@ -155,6 +161,8 @@ def render_svg(pred, columns, box_colors, labeled: bool = False):
         box_colors (dict): A dictionary mapping molecule status strings (e.g.,
                           'target', 'mulecule', 'instock') to SVG color strings
                           for the boxes around the molecules.
+        box_solid (bool): If True, retain the colored box background. If False,
+                          use a transparent background and a thicker border.
         labeled (bool): If True, upstream preparation may include the full
                         ``rule_key`` in the rendered arrow labels.
 
@@ -214,9 +222,18 @@ def render_svg(pred, columns, box_colors, labeled: bool = False):
             min_y = -(min(y for x, y in plane.values()) - 0.45)  # min y
             x_delta = abs(max_x - min_x)
             y_delta = abs(max_y - min_y)
+            box_color = box_colors[m.meta["status"]]
+            if box_solid:
+                box_style = (
+                    f'stroke="{box_color}" stroke-width=".005" '
+                    f'fill="{box_color}" fill-opacity="0.30"'
+                )
+            else:
+                box_style = f'stroke="{box_color}" stroke-width=".005" fill="none"'
             box = (
-                f'<rect x="{min_x}" y="{max_y}" rx="{y_delta * 0.1}" ry="{y_delta * 0.1}" width="{x_delta}" height="{y_delta}"'
-                f' stroke="black" stroke-width=".0025" fill="{box_colors[m.meta["status"]]}" fill-opacity="0.30"/>'
+                f'<rect x="{min_x}" y="{max_y}" rx="{y_delta * 0.1}" '
+                f'ry="{y_delta * 0.1}" width="{x_delta}" height="{y_delta}" '
+                f"{box_style}/>"
             )
             arrow_points[next(cy)].append(y_shift - h / 2.0)
             y_shift -= h + 3.0
@@ -343,10 +360,21 @@ def _mirror_route_layout(columns, pred):
     return mirrored_columns, mirrored_pred
 
 
-def _render_route_svg(columns, pred, labeled: bool = False) -> str:
+def _render_route_svg(
+    columns,
+    pred,
+    labeled: bool = False,
+    box_solid: bool = True,
+) -> str:
     """Shared backend for prepared route columns and parent->child edges."""
     columns, pred = _mirror_route_layout(columns, pred)
-    return render_svg(pred, columns, _route_box_colors(), labeled=labeled)
+    return render_svg(
+        pred,
+        columns,
+        _route_box_colors(),
+        labeled=labeled,
+        box_solid=box_solid,
+    )
 
 
 def _priority_rule(tree: Tree, node) -> Any | None:
@@ -510,6 +538,7 @@ def get_route_svg(
     node_id: int,
     labeled: bool = False,
     allow_unsolved: bool = False,
+    box_solid: bool = True,
 ) -> str:
     """Visualizes the retrosynthetic route.
 
@@ -520,6 +549,7 @@ def get_route_svg(
         available, even when ``labeled`` is False.
     :param allow_unsolved: If True, also render partial routes ending at non-winning
         nodes. Default keeps the historical solved-only behavior.
+    :param box_solid: If False, render transparent molecule boxes with thicker borders.
     :return: The SVG string.
     """
     prepared = _prepare_tree_route_svg_inputs(
@@ -532,7 +562,12 @@ def get_route_svg(
         return None
 
     columns, pred = prepared
-    return _render_route_svg(columns, pred, labeled=labeled)
+    return _render_route_svg(
+        columns,
+        pred,
+        labeled=labeled,
+        box_solid=box_solid,
+    )
 
 
 def _get_root(routes_json: dict, route_id: int) -> dict:
@@ -625,15 +660,25 @@ def _prepare_json_route_svg_inputs(
 
 
 def get_route_svg_from_json(
-    routes_json: dict, route_id: int, labeled: bool = False
+    routes_json: dict,
+    route_id: int,
+    labeled: bool = False,
+    box_solid: bool = True,
 ) -> str:
     """
     Visualize the retrosynthetic route for routes_json[route_id] as an SVG.
+
+    :param box_solid: If False, render transparent molecule boxes with thicker borders.
     """
     columns, pred = _prepare_json_route_svg_inputs(
         routes_json, route_id, labeled=labeled
     )
-    return _render_route_svg(columns, pred, labeled=labeled)
+    return _render_route_svg(
+        columns,
+        pred,
+        labeled=labeled,
+        box_solid=box_solid,
+    )
 
 
 def route_rule_labels(tree: Tree, node_id: int) -> list[str]:
