@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TextIO
 
 from synplan import __version__
-from synplan.chem.synthon.config import SynthonConfig
+from synplan.enumeration.synthon.config import SynthonConfig
 from synplan.utils.audit import (
     InputRecord,
     OutputBundleTransaction,

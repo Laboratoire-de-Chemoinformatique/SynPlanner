@@ -12,9 +12,10 @@ __all__ = [
     "Fragmenter",
     "SynthonConfig",
     "SynthonTransformer",
+    "classify_coverage",
     "find_analogues",
+    "load_coverage_rules",
     "load_synthon_stock",
-    "murcko_scaffold",
 ]
 
 _EXPORTS = {
@@ -24,9 +25,10 @@ _EXPORTS = {
     "Fragmenter": "fragment",
     "SynthonConfig": "config",
     "SynthonTransformer": "reactor",
+    "classify_coverage": "coverage",
     "find_analogues": "analogues",
+    "load_coverage_rules": "coverage",
     "load_synthon_stock": "stock",
-    "murcko_scaffold": "scaffolds",
 }
 
 

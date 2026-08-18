@@ -2,7 +2,7 @@ synplan.chem.building_blocks package
 ====================================
 
 The ordinary planner stock is distinct from
-:class:`synplan.chem.synthon.stock.SynthonStock`. It represents purchasable
+:class:`synplan.enumeration.synthon.stock.SynthonStock`. It represents purchasable
 precursor molecules by canonical SMILES or full Standard InChIKey.
 
 Package API

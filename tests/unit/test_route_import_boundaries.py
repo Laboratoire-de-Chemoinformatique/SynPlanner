@@ -116,7 +116,7 @@ assert facade_depict_route_cgr is depict_route_cgr
 def test_synthon_package_root_stays_lightweight():
     code = """
 import sys
-import synplan.chem.synthon
+import synplan.enumeration.synthon
 
 unexpected = [
     name
@@ -125,13 +125,40 @@ unexpected = [
         'matplotlib',
         'rdkit',
         'synplan.mcts.tree',
-        'synplan.chem.synthon.classify',
-        'synplan.chem.synthon.synthonise',
-        'synplan.chem.synthon.fragment',
+        'synplan.enumeration.synthon.classify',
+        'synplan.enumeration.synthon.coverage',
+        'synplan.enumeration.synthon.synthonise',
+        'synplan.enumeration.synthon.fragment',
     )
     if name in sys.modules
 ]
 assert unexpected == [], unexpected
-assert synplan.chem.synthon.SynthonConfig.__name__ == 'SynthonConfig'
+assert synplan.enumeration.synthon.SynthonConfig.__name__ == 'SynthonConfig'
+"""
+    _run_fresh_process(code)
+
+
+def test_synthon_never_imports_torch():
+    """`select_device` is the only torch consumer in `utils.parallel`, and synthon never calls it.
+
+    Before the import moved into that function, `SynthonConfig` pulled the whole framework for the
+    sake of `default_num_workers`, which is `min(os.cpu_count() or 4, cap)`.
+    """
+    code = """
+import sys
+import synplan.enumeration.synthon.config
+import synplan.enumeration.synthon.coverage
+import synplan.enumeration.synthon.fragment
+import synplan.enumeration.synthon.cli
+
+assert 'torch' not in sys.modules, 'synthon pulled torch'
+
+from synplan.utils.parallel import default_num_workers
+assert default_num_workers() >= 1
+assert 'torch' not in sys.modules, 'default_num_workers pulled torch'
+
+from synplan.utils.parallel import select_device
+assert select_device() is not None
+assert 'torch' in sys.modules, 'select_device must load torch when actually called'
 """
     _run_fresh_process(code)

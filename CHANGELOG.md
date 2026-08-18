@@ -67,9 +67,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Added `synplan.chem.synthon`, a native port of Synt-On (SynthI; Zabolotna, Volochnyuk,
-  Ryabukhin, Gavrylenko, Horvath, Klimchuk, Oksiuta, Marcou, Varnek, "SynthI: A New
-  Open-Source Tool for Synthon-Based Library Design", *J. Chem. Inf. Model.* 2022,
+- Added `synplan.enumeration`, the combinatorial library enumeration capability. Its first
+  method, `synplan.enumeration.synthon`, is a native port of Synt-On (SynthI; Zabolotna,
+  Volochnyuk, Ryabukhin, Gavrylenko, Horvath, Klimchuk, Oksiuta, Marcou, Varnek, "SynthI:
+  A New Open-Source Tool for Synthon-Based Library Design", *J. Chem. Inf. Model.* 2022,
   62(9), 2151-2163, doi:10.1021/acs.jcim.1c00754). A synthon is a valence-complete
   fragment whose atoms carry a reaction-centre label saying how that atom will
   react; the reference stores that label as an RDKit atom-map number and does its
@@ -81,7 +82,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   execution strategies), fragmentation (39 disconnection rules, their 39 macrocyclic
   twins, and the disconnection DAG with its gates and availability rate), recombination
   (one join keyed by the 26-pair compatibility table, both enumeration modes), Bemis-Murcko
-  scaffolds and the rule of two, and positional analogue scanning.
+  scaffolds (`synplan.chem.scaffolds` — chython only, useful outside enumeration) and the
+  rule of two, and positional analogue scanning.
 
   CLI: `bb_classifying`, `bb_synthonizing`, `synthon_fragment`, `synthon_enumerate`
   and `bb_scaffolds`, configured by `configs/synthonisation.yaml`.
@@ -95,7 +97,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   asks for.
 
   The reference's RDKit SMARTS are translated once, offline, by
-  `synplan.chem.synthon.data._convert`; its output is committed and asserted in the
+  `synplan.enumeration.synthon.data._convert`; its output is committed and asserted in the
   test suite, and nothing translates at import time.
 
   Reproduces the paper's catalogue-free published numbers: 9/9 building-block
@@ -139,6 +141,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   require TAB-delimited metadata; headered TSV inputs use a `SMILES` or
   `CXSMILES` column.
 
+- Added synthon coverage of a mapped reaction: `classify_coverage` answers whether a reaction
+  builds a bond one of the 39 shipped acyclic disconnections already breaks, and the
+  `synthon_coverage` CLI command splits a reaction file on that answer. Its use is corpus
+  preparation — a one-step policy learns nothing from reactions the curated rules already
+  provide. The atom mapping gives the formed bond, each rule gives its broken bond, and the
+  reactant-side leaving groups are checked against the rule's `_label` tokens, which is the
+  only label-aware step available: `QueryElement.__eq__` never consults `_label`, so the
+  substructure match cannot be. Coverage is disconnection-level, not mechanism-level — a
+  reductive amination counts as covered by R3.1. On a 100k mapped USPTO sample, 37.9% covered
+  at ~1 ms/reaction. The eight rules that name their nucleophile require that element to be
+  present on the reactant side, sharing `RULE_NUCLEOPHILE_CAPS` with the capping path: read as
+  the bare "no halide left this atom", `nuc` is satisfied by an arene doing nothing, and
+  Friedel-Crafts acylations were being absorbed by R10.2 (906 hits down to 118), C-H
+  functionalisations by R12.5 (443 to 124) and enolate acylations by R10.1 (698 to 290).
+
 - The shipped synthon disconnections can be used as an MCTS priority-rule set.
   `synthon_priority_rules()` returns them under the source name `"synthon"` as
   `run_search(priority_rules=...)` / `Tree(priority_rules=...)` input, so they are tried
@@ -174,6 +191,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   another. Widening the shipped vector would invalidate every pretrained retro model, so
   that needs a separate featuriser, not an edit.
 
+- Added heterocyclisation support to synthon enumeration: nine ring-forming
+  disconnections (`R16.1`-`R16.9`, covering triazole, tetrazole, pyrazole, imidazole,
+  isoxazole, pyridine, pyridazine, indole and quinoline), a `ring_pairs` table and
+  `SynthonConfig.ring_closure_sizes`. The reference excludes heterocyclisation by
+  design; it becomes expressible here because a ring synthon is a fragment of the
+  product with product bond orders — a triazole cuts to a triazene and a styrene, not
+  to an azide and an alkyne — so no bond order is ever rewritten at join time. The one
+  missing primitive was `close_ring`, which draws the second bond after `join` has
+  already merged the two fragments into one molecule.
+
+  This changes default enumeration output: `rule_mode="use_all"` now loads 48 rules
+  rather than 39, and across ten drug targets unique products go from 21 to 28 (a
+  pyridine ring closure makes nicotine reachable, where the shipped rules found no
+  pathway). Held at the pre-`R16` rule set the pipeline is byte-identical to before.
+  Ring rules are excluded from `synthon_priority_rules()`, where `capped_smarts` has
+  no open valence to spell a leaving group on and would hand the planner a styrene
+  where the alkyne belongs. `ring_closure_sizes=()` disables ring closure in the
+  enumerator, but the fragmenter still cuts with ring rules unless they are also
+  removed from the selection.
+
+  Not expressible: benzimidazole and other C1 insertions, where one atom must make two
+  ring bonds to two different partners and `join` spends its attachment points on a
+  single double bond. Three further rules (oxazole, thiazole, pyrimidine) fail because
+  chython's tautomer standardisation moves the double bond while leaving the labels on
+  their atoms, and for the amidine both label orientations canonicalise to one string,
+  so the regiochemistry is destroyed rather than displaced.
+
+- Added `TreeConfig.direction`, which selects between retrosynthetic and forward search
+  and validates that the tree and the rollout evaluator score the same finish line —
+  in forward mode `building_blocks` is the goal to reach rather than the stock, and a
+  configuration where only one of the two carries it is now rejected instead of
+  silently searching toward one target and rewarding another. `apply_reaction_rule`
+  gains `co_reactants`, without which a bimolecular rule run forward is handed one
+  structure and yields nothing. Partner selection is not implemented, so the tree does
+  not yet pass co-reactants during expansion.
+
 - Added `synplan.chem.data.rebalancing`, which adds the molecules an unbalanced
   reaction is missing without needing atom mapping. Missing carbon is recovered
   as a substructure of the reactants, and the remaining deficit is covered from
@@ -197,6 +250,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   itself balance, are reported apart rather than counted as losses.
 
 ### Changed
+
+- `synplan.utils.parallel` no longer imports torch at module level. `select_device` is its only
+  consumer and now imports it when called, so the process pool helpers and `default_num_workers`
+  are torch-free. The synthon package took the framework purely to reach
+  `min(os.cpu_count() or 4, cap)`, which cost 366 ms of a 501 ms import; importing
+  `synplan.enumeration.synthon.config` now takes 143 ms and pulls no torch at all.
 
 - `chython-synplan` is pinned to 1.103 and sourced from the local fork, which adds the
   `Synthon` atom family, `SynthonContainer`, the `_token` bracket field in SMILES and

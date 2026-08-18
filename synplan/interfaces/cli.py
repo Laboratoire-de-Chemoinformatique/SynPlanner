@@ -19,14 +19,15 @@ from synplan.chem.data.standardizing import (
 )
 from synplan.chem.reaction.routes.cli import run_cluster_cli
 from synplan.chem.reaction.rules.extraction import extract_rules_from_reactions
-from synplan.chem.synthon.cli import (
+from synplan.enumeration.synthon.cli import (
     classify_file,
+    coverage_file,
     enumerate_file,
     fragment_file,
     scaffolds_file,
     synthonise_file,
 )
-from synplan.chem.synthon.config import SynthonConfig
+from synplan.enumeration.synthon.config import SynthonConfig
 from synplan.mcts.search import run_search
 from synplan.ml.training.reinforcement import run_updating
 from synplan.ml.training.supervised import (
@@ -1167,6 +1168,46 @@ def bb_scaffolds_cli(
     """Bemis-Murcko scaffolds after protecting-group removal."""
     written = scaffolds_file(input_file, output_file, _synthon_config(config_path))
     click.echo(f"{written} scaffolds written")
+
+
+@synplan.command(name="synthon_coverage")
+@click.option(
+    "--input",
+    "input_file",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to a file of atom-mapped reactions.",
+)
+@click.option(
+    "--output",
+    "output_file",
+    required=True,
+    type=click.Path(),
+    help="Path to the file where the kept reactions will be stored.",
+)
+@click.option(
+    "--keep",
+    type=click.Choice(["uncovered", "covered"]),
+    default="uncovered",
+    show_default=True,
+    help="Which side to write: the reactions the synthon rules do NOT already provide "
+    "(training corpus), or the ones they do (audit).",
+)
+@click.option(
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to the synthonisation configuration file.",
+)
+def synthon_coverage_cli(
+    input_file: str, output_file: str, keep: str, config_path: str | None
+) -> None:
+    """Filters reactions the shipped synthon disconnections already cover."""
+    written, read = coverage_file(
+        input_file, output_file, _synthon_config(config_path), keep=keep
+    )
+    click.echo(f"{written} of {read} reactions kept ({keep})")
 
 
 if __name__ == "__main__":

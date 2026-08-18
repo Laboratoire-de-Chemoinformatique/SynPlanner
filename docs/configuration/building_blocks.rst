@@ -5,7 +5,7 @@ Building-block preparation
 ============================
 
 Ordinary building blocks terminate MCTS branches. They are separate from the
-labelled :class:`~synplan.chem.synthon.stock.SynthonStock` used by target
+labelled :class:`~synplan.enumeration.synthon.stock.SynthonStock` used by target
 fragmentation and library enumeration.
 
 Use :class:`~synplan.chem.building_blocks.config.BuildingBlockPreparationConfig`
@@ -39,7 +39,7 @@ form, whereas ``append`` retains both the protected and changed deprotected
 forms.
 
 When deprotection is enabled, a protected canonical sidecar is always produced
-for :doc:`/api_reference/synplan.chem.synthon`. The protected file—not the deprotected planner
+for :doc:`/api_reference/synplan.enumeration.synthon`. The protected file—not the deprotected planner
 stock—is the supported input to ``bb_classifying`` and ``bb_synthonizing``.
 
 Identity outputs

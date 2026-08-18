@@ -85,6 +85,7 @@ def build_tree(algorithm="breadth_first", rules=None, **kwargs):
     evaluator = kwargs.pop("evaluator", None)
     policy_cls = kwargs.pop("policy_cls", FakePolicy)
     search_strategy = kwargs.pop("search_strategy", "expansion_first")
+    building_blocks = kwargs.pop("building_blocks", set())
     cfg = TreeConfig(
         algorithm=algorithm,
         max_iterations=max_iterations,
@@ -102,14 +103,16 @@ def build_tree(algorithm="breadth_first", rules=None, **kwargs):
     reactors = [r for _, r, _ in rules]
     if evaluator is None:
         eval_config = RolloutEvaluationConfig(
-            policy_network=fake_policy, reaction_rules=reactors, building_blocks=set()
+            policy_network=fake_policy,
+            reaction_rules=reactors,
+            building_blocks=building_blocks,
         )
         evaluator = load_evaluation_function(eval_config)
     return Tree(
         target=target,
         config=cfg,
         reaction_rules=reactors,
-        building_blocks=set(),
+        building_blocks=building_blocks,
         expansion_function=fake_policy,
         evaluation_function=evaluator,
         priority_rules=priority_rules,

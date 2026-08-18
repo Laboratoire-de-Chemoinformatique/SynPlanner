@@ -1,4 +1,4 @@
-"""The five synthon subcommands end to end on the published 9-building-block fixture."""
+"""The synthon subcommands end to end on the published 9-building-block fixture."""
 
 from pathlib import Path
 
@@ -77,3 +77,23 @@ def test_bb_scaffolds(blocks, tmp_path):
     rows = dict(line.split("\t") for line in out.read_text().splitlines())
     assert rows["CCO"] == "linearMolecule"
     assert rows["C1=CC=C(C=C1)N"] == "c1ccccc1"
+
+
+def test_synthon_coverage_partitions_a_reaction_file(tmp_path):
+    reactions = FIXTURES / "reaction_coverage.smi"
+    total = len(reactions.read_text().splitlines())
+    kept = {}
+    for keep in ("uncovered", "covered"):
+        out = tmp_path / f"{keep}.smi"
+        run(
+            "synthon_coverage",
+            "--input",
+            str(reactions),
+            "--output",
+            str(out),
+            "--keep",
+            keep,
+        )
+        kept[keep] = out.read_text().splitlines()
+    assert len(kept["uncovered"]) + len(kept["covered"]) == total
+    assert not set(kept["uncovered"]) & set(kept["covered"])

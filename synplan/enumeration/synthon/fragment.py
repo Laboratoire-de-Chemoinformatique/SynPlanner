@@ -1,4 +1,4 @@
-"""The disconnection DAG: 39 rules cut a target into synthons, level by level, with the gates."""
+"""The disconnection DAG: 48 rules cut a target into synthons, level by level, with the gates."""
 
 import re
 from collections import Counter
@@ -8,9 +8,9 @@ from dataclasses import dataclass, field
 from chython import smiles, synthon_smiles
 from chython.containers import MoleculeContainer, SynthonContainer
 
-from synplan.chem.synthon.config import SynthonConfig, load_data
-from synplan.chem.synthon.reactor import SynthonTransformer
 from synplan.chem.utils import safe_canonicalization
+from synplan.enumeration.synthon.config import SynthonConfig, load_data
+from synplan.enumeration.synthon.reactor import SynthonTransformer
 
 # the study list from the paper's own worked examples, H-capped: upstream spells each of these
 # twice because `[V]` counts as a heavy atom and `*` does not. Off by default.
@@ -137,8 +137,13 @@ class Fragmenter:
         self.config = config or SynthonConfig()
         self.stock = stock or {}
         data = load_data(self.config.rules_path)
-        normal = [r for r in data["disconnections"] if not r["macro"]]
-        macro = [r for r in data["disconnections"] if r["macro"]]
+        records = data["disconnections"]
+        if not self.config.ring_closure_sizes:
+            # nothing can rejoin a ring synthon once `_fuse` is off, so cutting with the ring
+            # rules only spends the pathway budget on dead ends
+            records = [r for r in records if not r["ring"]]
+        normal = [r for r in records if not r["macro"]]
+        macro = [r for r in records if r["macro"]]
         self.rules = [
             (r, SynthonTransformer.from_smarts(r["smarts"]))
             for r in _select(normal, self.config.rule_mode, self.config.rules_selection)
@@ -171,8 +176,14 @@ class Fragmenter:
         products: list[SynthonContainer],
         deep: bool,
         parent_labels: Counter | None,
+        ring: bool = False,
     ) -> bool:
-        """Every gate drops the WHOLE product set, never just the offending fragment."""
+        """Every gate drops the WHOLE product set, never just the offending fragment.
+
+        `ring` skips the label-DENSITY caps only: they were tuned for acyclic couplings, where two
+        labels on a two-heavy-atom fragment means a pathological cut, but hydrazine and
+        hydroxylamine are exactly that and are the normal case for a ring-former.
+        """
         produced = Counter()
         for product in products:
             heavy = len(product)
@@ -193,10 +204,11 @@ class Fragmenter:
             if count > self.config.max_rc_per_fragment:
                 return False
             rings = len(product.sssr)
-            if rings == 0 and count > (heavy + 1) / 3:
-                return False
-            if rings != 0 and count > (heavy + 1) / 2:
-                return False
+            if not ring:
+                if rings == 0 and count > (heavy + 1) / 3:
+                    return False
+                if rings != 0 and count > (heavy + 1) / 2:
+                    return False
             if deep:
                 keys = frozenset(
                     (a.atomic_symbol, a.hybridization == 4, a.label)
@@ -216,8 +228,9 @@ class Fragmenter:
 
     def _cut(
         self, molecule: SynthonContainer, rules
-    ) -> Iterator[tuple[int, str, tuple[str, ...], tuple]]:
-        """Yields the rule's POSITION too: `one_by_one` searches the list by index, not by id."""
+    ) -> Iterator[tuple[int, str, tuple[str, ...], tuple, bool]]:
+        """Yields the rule's POSITION too: `one_by_one` searches the list by index, not by id, and
+        its `ring` flag, which is the only thing `_accept` cannot read off the products."""
         for index, (record, rule) in enumerate(rules):
             key = (str(molecule), record["id"])
             cached = self._memo.get(key)
@@ -241,10 +254,16 @@ class Fragmenter:
                     )
                 self._memo[key] = tuple((name, smis) for name, smis, _ in sets)
                 for name, smis, parts in sets:
-                    yield index, name, smis, parts
+                    yield index, name, smis, parts, record["ring"]
                 continue
             for name, smis in cached:
-                yield index, name, smis, tuple(_reparse(s) for s in smis)
+                yield (
+                    index,
+                    name,
+                    smis,
+                    tuple(_reparse(s) for s in smis),
+                    record["ring"],
+                )
 
     def fragment(self, target: MoleculeContainer) -> DisconnectionDAG:
         self._memo.clear()
@@ -259,7 +278,7 @@ class Fragmenter:
         level_rules = self.macro_rules if macro else self.rules
         frontier: list[Pathway] = []
         opened: int | None = None
-        for index, name, smis, parts in self._cut(prepared, level_rules):
+        for index, name, smis, parts, ring in self._cut(prepared, level_rules):
             if len(dag.pathways) >= self.config.max_pathways:
                 break
             # upstream leaves level 1 after the first rule that MATCHED, accepted or not
@@ -268,7 +287,7 @@ class Fragmenter:
                     opened = index
                 elif index != opened:
                     break
-            if not self._accept(list(parts), deep=False, parent_labels=None):
+            if not self._accept(list(parts), deep=False, parent_labels=None, ring=ring):
                 continue
             if stepwise:
                 self._rule_index.update(dict.fromkeys(smis, index))
@@ -300,7 +319,7 @@ class Fragmenter:
                     parent_labels = _labels(parent)
                     floor = self._rule_index.get(smi, 0)
                     cut_at: int | None = None
-                    for index, name, smis, parts in self._cut(parent, self.rules):
+                    for index, name, smis, parts, ring in self._cut(parent, self.rules):
                         # monotone and non-backtracking: never look below the rule that made this
                         # synthon, and stop at the first rule that cuts it
                         if stepwise:
@@ -309,7 +328,10 @@ class Fragmenter:
                             if cut_at is not None and index != cut_at:
                                 break
                         if not self._accept(
-                            list(parts), deep=True, parent_labels=parent_labels
+                            list(parts),
+                            deep=True,
+                            parent_labels=parent_labels,
+                            ring=ring,
                         ):
                             continue
                         if stepwise:

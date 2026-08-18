@@ -7,6 +7,20 @@ from chython.containers import MoleculeContainer, QueryContainer, SynthonContain
 from chython.containers.synthon import restore_synthons
 from chython.reactor import Transformer
 
+# The table is keyed on `symbol:token`, which cannot tell R12.4's terminal alkyne from R10.1's
+# Grignard — both are `C:nuc`. Where the reagent is a property of the RULE, name it here.
+# R12.4 is deliberately absent: a Sonogashira nucleophile IS the terminal alkyne, so H is right.
+RULE_NUCLEOPHILE_CAPS = {
+    "R3.3": "[Mg]Br",  # umpolung coupling — organometallic partner
+    "R10.1": "[Mg]Br",  # the rule names Li/Mg/Zn organics outright
+    "R10.2": "[Mg]Br",  # same, acylation of the organometallic
+    "R12.3a": "B(O)O",  # Suzuki, sp2 partner — vinylboronic acid
+    "R12.3b": "B(O)O",  # Suzuki, aryl partner — arylboronic acid
+    "R12.5": "[Mg]Br",  # C(Ar)-C(sp3): Kumada/Negishi-style alkylmetal
+    "R13.1": "B(O)O",  # Minisci — alkylboron radical precursor
+    "R13.2": "B(O)O",  # Giese — alkylboron radical precursor
+}
+
 
 class SynthonRuleError(ValueError):
     """A rule the loader refuses: a label where it would be silently inert."""
@@ -67,4 +81,10 @@ def load_rules(records: Iterable[dict]) -> list[tuple[dict, SynthonTransformer]]
     return [(r, SynthonTransformer.from_smarts(r["smarts"])) for r in records]
 
 
-__all__ = ["SynthonRuleError", "SynthonTransformer", "load_rules", "query_labels"]
+__all__ = [
+    "RULE_NUCLEOPHILE_CAPS",
+    "SynthonRuleError",
+    "SynthonTransformer",
+    "load_rules",
+    "query_labels",
+]

@@ -70,4 +70,4 @@ rejected.
 
 For configuration and CLI usage, see :doc:`/configuration/building_blocks`
 and :doc:`/user_guide/cli_interface`. For the labelled-fragment subsystem,
-see :doc:`/api_reference/synplan.chem.synthon`.
+see :doc:`/api_reference/synplan.enumeration.synthon`.

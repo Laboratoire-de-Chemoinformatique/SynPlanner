@@ -116,6 +116,18 @@ The Synt-On workflows share ``configs/synthonisation.yaml``:
     synplan synthon_enumerate --config configs/synthonisation.yaml --input fragment/pathways.tsv --stock synthonise/synthons.smi --output enumerate/library.smi
     synplan bb_scaffolds --config configs/synthonisation.yaml --input building_blocks.smi --output scaffolds/scaffolds.tsv
 
+``synthon_coverage`` is corpus preparation rather than part of that pipeline: it
+reads atom-mapped reactions and writes back the ones the shipped disconnections do
+not already cover, so a one-step policy is not trained to rediscover them.
+
+.. code-block:: bash
+
+    synplan synthon_coverage --input mapped_reactions.smi --output training_reactions.smi
+    synplan synthon_coverage --input mapped_reactions.smi --output covered.smi --keep covered
+
+Kept lines are copied verbatim, metadata columns and all. A record that will not
+parse is kept, never dropped.
+
 The four molecule-input commands accept headerless SMI/CXSMILES records or a
 headered TSV with exactly one case-insensitive ``SMILES`` or ``CXSMILES`` column.
 In a headerless record, the complete chemistry field comes first and any
@@ -139,6 +151,8 @@ An audited command writes the primary output plus ``fallback.smi``,
 directory. Use a separate directory for each command because these names are
 fixed. ``audit_overwrite: error`` refuses an existing bundle without changing
 it; ``replace`` validates staged artifacts before replacing an earlier bundle.
+``synthon_coverage`` is not audited: its output is a verbatim subset of its
+input, so the two files together are the record.
 
 Audited status names are command-specific. Classification uses classified or
 unclassified; synthonisation uses synthonised, unclassified, no_synthon, or

@@ -556,6 +556,18 @@ class TuningConfig(BaseConfigModel):
 class TreeConfig(BaseConfigModel):
     """Configuration class for the tree search algorithm.
 
+    :param direction: "retro" (default) searches backwards from the target to
+        the building blocks; "forward" grows forwards to them. In forward mode
+        ``building_blocks`` is the GOAL rather than the stock, and
+        :class:`~synplan.mcts.tree.Tree` refuses an evaluator whose own copy of
+        the goal or of ``min_mol_size`` disagrees with the tree's. That
+        termination condition, and its consistency with the evaluator, is the
+        whole of what "forward" configures. Which rules can actually fire is a
+        separate matter: unimolecular forward rules (rearrangements,
+        deprotections, cyclisations) work today, bimolecular ones never fire,
+        because expansion applies a rule to one structure and never supplies
+        the partner — ``apply_reaction_rule`` takes ``co_reactants`` but the
+        tree does not pass it, and partner selection is unimplemented.
     :param max_iterations: The number of iterations to run the algorithm
         for.
     :param max_tree_size: The maximum number of nodes in the tree.
@@ -610,6 +622,13 @@ class TreeConfig(BaseConfigModel):
         effect on policy rules. Defaults to ``False``.
     """
 
+    # "retro" walks from the target down to `building_blocks`; "forward" grows a start material up
+    # to it. `building_blocks` therefore means STOCK in retro and GOAL in forward — the name is
+    # wrong for one of the two, but it is on Tree, RolloutSimulator, the CLI and every config file,
+    # so the rename is its own change. What this flag buys today is that Tree refuses a forward
+    # search whose evaluator is still scoring the retro finish line. It does NOT make bimolecular
+    # forward rules fire: expansion never passes `co_reactants`, so only unimolecular ones match.
+    direction: Literal["retro", "forward"] = "retro"
     max_iterations: int = Field(default=100, gt=0)
     max_tree_size: int = Field(default=1000000, gt=0)
     max_time: float = Field(default=600, gt=0)

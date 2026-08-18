@@ -1,20 +1,20 @@
-synplan.chem.synthon package
-============================
+synplan.enumeration.synthon package
+===================================
 
-``synplan.chem.synthon`` provides the adapted Synt-On workflows for
+``synplan.enumeration.synthon`` provides the adapted Synt-On workflows for
 building-block classification and synthonisation, target fragmentation,
 analogue-aware enumeration, stock handling, scaffold analysis, and MCTS
 priority rules.
 
 Use the package-level imports for the stable public facade, for example
-``from synplan.chem.synthon import Fragmenter, SynthonConfig``. Focused
+``from synplan.enumeration.synthon import Fragmenter, SynthonConfig``. Focused
 submodules expose advanced APIs and identify where each implementation is
 owned.
 
 Public package API
 ------------------
 
-.. automodule:: synplan.chem.synthon
+.. automodule:: synplan.enumeration.synthon
    :members:
    :undoc-members:
    :show-inheritance:
@@ -22,98 +22,98 @@ Public package API
 Submodules
 ----------
 
-synplan.chem.synthon.analogues module
+synplan.enumeration.synthon.analogues module
 -------------------------------------
 
-.. automodule:: synplan.chem.synthon.analogues
+.. automodule:: synplan.enumeration.synthon.analogues
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.synthon.audit module
+synplan.enumeration.synthon.audit module
 ---------------------------------
 
-.. automodule:: synplan.chem.synthon.audit
+.. automodule:: synplan.enumeration.synthon.audit
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.synthon.classify module
+synplan.enumeration.synthon.classify module
 ------------------------------------
 
-.. automodule:: synplan.chem.synthon.classify
+.. automodule:: synplan.enumeration.synthon.classify
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.synthon.cli module
+synplan.enumeration.synthon.cli module
 -------------------------------
 
-.. automodule:: synplan.chem.synthon.cli
+.. automodule:: synplan.enumeration.synthon.cli
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.synthon.config module
+synplan.enumeration.synthon.config module
 ----------------------------------
 
-.. automodule:: synplan.chem.synthon.config
+.. automodule:: synplan.enumeration.synthon.config
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.synthon.enumeration module
+synplan.enumeration.synthon.enumeration module
 ---------------------------------------
 
-.. automodule:: synplan.chem.synthon.enumeration
+.. automodule:: synplan.enumeration.synthon.enumeration
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.synthon.fragment module
+synplan.enumeration.synthon.fragment module
 ------------------------------------
 
-.. automodule:: synplan.chem.synthon.fragment
+.. automodule:: synplan.enumeration.synthon.fragment
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.synthon.priority module
+synplan.enumeration.synthon.priority module
 ------------------------------------
 
-.. automodule:: synplan.chem.synthon.priority
+.. automodule:: synplan.enumeration.synthon.priority
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.synthon.reactor module
+synplan.enumeration.synthon.reactor module
 -----------------------------------
 
-.. automodule:: synplan.chem.synthon.reactor
+.. automodule:: synplan.enumeration.synthon.reactor
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.synthon.scaffolds module
+synplan.enumeration.synthon.scaffolds module
 -------------------------------------
 
-.. automodule:: synplan.chem.synthon.scaffolds
+.. automodule:: synplan.enumeration.synthon.scaffolds
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.synthon.stock module
+synplan.enumeration.synthon.stock module
 ---------------------------------
 
-.. automodule:: synplan.chem.synthon.stock
+.. automodule:: synplan.enumeration.synthon.stock
    :members:
    :undoc-members:
    :show-inheritance:
 
-synplan.chem.synthon.synthonise module
+synplan.enumeration.synthon.synthonise module
 --------------------------------------
 
-.. automodule:: synplan.chem.synthon.synthonise
+.. automodule:: synplan.enumeration.synthon.synthonise
    :members:
    :undoc-members:
    :show-inheritance:

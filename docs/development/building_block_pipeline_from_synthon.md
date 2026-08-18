@@ -10,7 +10,7 @@
 ## Purpose
 
 This document defines the ordinary building-block pipeline that follows the
-native `synplan.chem.synthon` port. It records the ownership boundary, identity
+native `synplan.enumeration.synthon` port. It records the ownership boundary, identity
 contract, stereochemical migration, preparation artifacts, and remaining
 planner integration.
 
@@ -63,7 +63,7 @@ Synthon stock -------------------------------> fragment / enumerate / analogues
 
 ## What the Synthon baseline already provides
 
-`synplan.chem.synthon` contains:
+`synplan.enumeration.synthon` contains:
 
 - `BBClassifier`: 147 ordered classes and 2,401 SMARTS;
 - `BBSynthoniser`: component-aware building-block-to-synthon conversion;

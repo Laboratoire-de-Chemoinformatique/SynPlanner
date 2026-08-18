@@ -33,6 +33,9 @@ class BuildingBlockLookup(Protocol):
     """Minimal planner-facing BB membership and provenance contract."""
 
     identity_format: StockIdentityFormat
+    keys: frozenset[str]
+
+    def __len__(self) -> int: ...
 
     def key_for_molecule(self, molecule: MoleculeContainer) -> str: ...
 

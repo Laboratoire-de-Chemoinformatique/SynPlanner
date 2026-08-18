@@ -11,10 +11,17 @@ Subpackages
    synplan.chem.data
    synplan.chem.reaction.routes
    synplan.chem.reaction.rules
-   synplan.chem.synthon
 
 Submodules
 ----------
+
+synplan.chem.scaffolds module
+-----------------------------
+
+.. automodule:: synplan.chem.scaffolds
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 synplan.chem.precursor module
 -----------------------------

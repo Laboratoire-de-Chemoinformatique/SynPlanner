@@ -15,7 +15,7 @@ from synplan.chem.building_blocks.config import (
 )
 from synplan.chem.data.filtering import ReactionFilterConfig
 from synplan.chem.data.standardizing import ReactionStandardizationConfig
-from synplan.chem.synthon.config import SynthonConfig
+from synplan.enumeration.synthon.config import SynthonConfig
 from synplan.utils.config import (
     CombinedPolicyConfig,
     PolicyNetworkConfig,

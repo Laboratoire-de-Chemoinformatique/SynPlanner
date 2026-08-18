@@ -202,6 +202,32 @@ class Tree:
         assert evaluation_function is not None, "Evaluation function is required"
         self.evaluator = evaluation_function
 
+        # A forward search only makes sense if the tree and its evaluator share a finish line. The
+        # tree stops on `building_blocks`; a rollout evaluator carries its OWN copy and rewards
+        # reaching that. Nothing couples them, so `building_blocks={target}, min_mol_size=0` on the
+        # Tree and the retro defaults on the evaluator gives a search that halts at the goal while
+        # still being scored on how close it got to stock — plausible numbers, wrong ones.
+        if self.config.direction == "forward":
+            if not self.building_blocks:
+                raise ValueError(
+                    "config.direction='forward' but building_blocks is empty; in forward mode "
+                    "it is the GOAL to reach, so an empty set can never be satisfied."
+                )
+            rollout = getattr(self.evaluator, "rollout", None)
+            if rollout is not None and (
+                rollout.building_blocks.identity_format
+                != self.building_blocks.identity_format
+                or rollout.building_blocks.keys != self.building_blocks.keys
+                or rollout.min_mol_size != self.config.min_mol_size
+            ):
+                raise ValueError(
+                    f"config.direction='forward' requires the evaluator to score the same finish "
+                    f"line as the tree: tree has {len(self.building_blocks)} building_blocks and "
+                    f"min_mol_size={self.config.min_mol_size}, the rollout evaluator has "
+                    f"{len(frozenset(rollout.building_blocks))} and "
+                    f"min_mol_size={rollout.min_mol_size}."
+                )
+
         # post-search route re-ranking
         self._route_scorer = route_scorer
         self._rescore_cache: dict[int, float] = {}

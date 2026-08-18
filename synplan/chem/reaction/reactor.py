@@ -259,6 +259,7 @@ def apply_reaction_rule(
     rebuild_with_cgr: bool = False,
     multirule: bool = False,
     rm_dup: bool = False,
+    co_reactants: tuple[MoleculeContainer, ...] = (),
 ) -> Iterator[list[MoleculeContainer,]]:
     """Applies a reaction rule to a given molecule.
 
@@ -293,6 +294,15 @@ def apply_reaction_rule(
     :param rm_dup: If True, removes duplicate reactant sets from yielded outputs
         using a canonical-SMILES dedup key. Recommended whenever ``multirule``
         is set.
+    :param co_reactants: Extra structures handed to the rule alongside
+        ``molecule``. A retro rule is unimolecular on its reactant side, so the
+        default empty tuple is the whole of retrosynthesis; a **forward**
+        bimolecular rule needs both partners at once and matches nothing when
+        handed one structure — it yields zero reactions, silently. Partner
+        *selection* is the caller's problem: this only forwards what it is
+        given. No caller supplies it today — in particular
+        :class:`~synplan.mcts.tree.Tree` expands without it, so a
+        ``direction="forward"`` search runs unimolecular rules only.
     :return: An iterator yielding the products of reaction rule application.
     :raises TypeError: if ``molecule`` carries synthon labels.
         ``QueryElement.__eq__`` never consults ``_label``, so a plain reactor
@@ -309,7 +319,7 @@ def apply_reaction_rule(
     def _collect_reactions(
         current_molecule: MoleculeContainer,
     ) -> list[ReactionContainer]:
-        reactants = add_small_mols(current_molecule, small_molecules=False)
+        reactants = add_small_mols(current_molecule, small_molecules=co_reactants)
         try:
             if sort_reactions:
                 unsorted_reactions = list(reaction_rule(*reactants))
