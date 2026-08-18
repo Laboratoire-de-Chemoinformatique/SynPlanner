@@ -42,6 +42,24 @@ Python API:
    policy_path = paths["ranking_policy"]
    bb_path = paths["building_blocks"]
 
+SAScore benchmark
+~~~~~~~~~~~~~~~~~
+
+Download the published 100-target subsets used by ``sascore-benchmark``:
+
+.. code-block:: bash
+
+   synplan download_sascore_benchmark --save_to synplan_data
+
+The files are saved under ``synplan_data/benchmarks/sascore/subset_100``. The
+equivalent Python API is:
+
+.. code-block:: python
+
+   from synplan.utils.loading import download_sascore_benchmark
+
+   benchmark_files = download_sascore_benchmark(save_to="synplan_data")
+
 Details
 ~~~~~~~
 

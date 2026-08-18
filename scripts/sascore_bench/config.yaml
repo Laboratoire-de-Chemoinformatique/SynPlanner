@@ -32,7 +32,7 @@ paths:
   building_blocks: "building_blocks/emolecules-salt-ln/building_blocks.tsv"
 
   # Benchmark targets folder (relative to data_folder)
-  benchmark_folder: "benchmarks/sascore"
+  benchmark_folder: "benchmarks/sascore/subset_100"
 
 # -----------------------------------------------------------------------------
 # Benchmark Selection
@@ -40,7 +40,7 @@ paths:
 benchmark:
   # Pattern for target files (glob pattern). The published benchmark files are
   # TSV with a `smiles` column; download them from the SynPlanner-data repo
-  # under benchmarks/sascore/ (no preset ships them).
+  # with `synplan download_sascore_benchmark --save_to synplan_data`.
   target_pattern: "targets_with_sascore_*.tsv"
   
   # Which SAScore ranges to run (0-indexed slice of sorted files)

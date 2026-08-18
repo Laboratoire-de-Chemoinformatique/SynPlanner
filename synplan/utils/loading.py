@@ -56,6 +56,16 @@ if TYPE_CHECKING:
 
 REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner-data"
 LEGACY_REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
+SASCORE_BENCHMARK_SUBFOLDER = "benchmarks/sascore/subset_100"
+SASCORE_BENCHMARK_FILES = (
+    "targets_with_sascore_1.5_2.5.tsv",
+    "targets_with_sascore_2.5_3.5.tsv",
+    "targets_with_sascore_3.5_4.5.tsv",
+    "targets_with_sascore_4.5_5.5.tsv",
+    "targets_with_sascore_5.5_6.5.tsv",
+    "targets_with_sascore_6.5_7.5.tsv",
+    "targets_with_sascore_7.5_8.5.tsv",
+)
 logger = logging.getLogger(__name__)
 
 
@@ -151,6 +161,31 @@ def download_selected_files(
                 shutil.copy2(src, dst)
 
     return root
+
+
+def download_sascore_benchmark(
+    save_to: str | Path = "synplan_data",
+    repo_id: str | None = None,
+) -> list[Path]:
+    """Download the published 100-target SAScore benchmark subsets.
+
+    Files retain their repository layout below ``save_to`` and are written to
+    ``benchmarks/sascore/subset_100``. The returned paths are ordered by
+    increasing SAScore interval.
+
+    :param save_to: Local SynPlanner data directory.
+    :param repo_id: Override the Hugging Face repository ID.
+    :return: Local paths to the downloaded benchmark TSV files.
+    """
+    root = download_selected_files(
+        [(SASCORE_BENCHMARK_SUBFOLDER, name) for name in SASCORE_BENCHMARK_FILES],
+        save_to=save_to,
+        extract_zips=False,
+        repo_id=repo_id,
+    )
+    return [
+        root / SASCORE_BENCHMARK_SUBFOLDER / name for name in SASCORE_BENCHMARK_FILES
+    ]
 
 
 def download_unpack_data(filename, subfolder, save_to=".", repo_id=None):

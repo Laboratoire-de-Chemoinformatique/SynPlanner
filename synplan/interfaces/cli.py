@@ -50,6 +50,7 @@ from synplan.utils.config import (
 from synplan.utils.loading import (
     download_all_data,
     download_preset,
+    download_sascore_benchmark,
     load_building_block,
     load_policy_function,
     load_reaction_rules,
@@ -104,6 +105,22 @@ def download_preset_cli(preset: str, save_to: str) -> None:
     for key, path in paths.items():
         if path is not None:
             click.echo(f"  {key}: {path}")
+
+
+@synplan.command(name="download_sascore_benchmark")
+@click.option(
+    "--save_to",
+    "save_to",
+    default="synplan_data",
+    show_default=True,
+    help="SynPlanner data directory in which to save the benchmark.",
+)
+def download_sascore_benchmark_cli(save_to: str) -> None:
+    """Download the published 100-target SAScore benchmark subsets."""
+    paths = download_sascore_benchmark(save_to=save_to)
+    click.echo("SAScore benchmark downloaded:")
+    for path in paths:
+        click.echo(f"  {path}")
 
 
 @synplan.command(name="download_all_data")

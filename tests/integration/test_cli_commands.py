@@ -10,6 +10,26 @@ def test_synplan_help():
     assert "SynPlanner command line interface." in result.output
 
 
+def test_download_sascore_benchmark_cli(monkeypatch, tmp_path):
+    expected = [tmp_path / "benchmarks" / "sascore" / "target.tsv"]
+    observed = {}
+
+    def fake_download(*, save_to):
+        observed["save_to"] = save_to
+        return expected
+
+    monkeypatch.setattr(cli, "download_sascore_benchmark", fake_download)
+
+    result = CliRunner().invoke(
+        cli.synplan,
+        ["download_sascore_benchmark", "--save_to", str(tmp_path)],
+    )
+
+    assert result.exit_code == 0
+    assert observed["save_to"] == str(tmp_path)
+    assert str(expected[0]) in result.output
+
+
 def test_reaction_standardizing_cli_shows_progress_by_default(monkeypatch):
     observed = {}
 

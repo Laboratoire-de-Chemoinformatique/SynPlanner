@@ -16,7 +16,7 @@ setup, then ..." rather than repeat it.
 
 | Step | Where |
 | --- | --- |
-| `download_preset` | `synplan.utils.loading` |
+| `download_preset`, `download_sascore_benchmark` | `synplan.utils.loading` |
 | `load_building_block` | `synplan.utils.loading` |
 | `load_reaction_rules`, `load_policy_function` | `synplan.utils.loading` |
 | `TreeConfig`, `RolloutEvaluationConfig` | `synplan.utils.config` |
@@ -169,7 +169,8 @@ Docs: `methods/mcts` — "Tree Analytics"
 
 **Get the data and models**
 `download_preset` for a ready bundle; `download_unpack_data` for datasets.
-CLI: `synplan download_preset`.
+CLI: `synplan download_preset`. For the published SAScore target subsets, use
+`synplan download_sascore_benchmark --save_to synplan_data`.
 Docs: `get_started/data_download`, `user_guide/data`
 
 **Clean a reaction dataset**

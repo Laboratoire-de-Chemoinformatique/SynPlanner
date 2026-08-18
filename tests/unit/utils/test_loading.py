@@ -2,10 +2,38 @@ import gzip
 
 from synplan.chem.utils import standardize_smiles_batch
 from synplan.utils.loading import (
+    SASCORE_BENCHMARK_FILES,
+    SASCORE_BENCHMARK_SUBFOLDER,
+    download_sascore_benchmark,
     load_building_block,
     load_building_blocks,
     load_policy_function,
 )
+
+
+def test_download_sascore_benchmark_uses_published_subset(monkeypatch, tmp_path):
+    observed = {}
+
+    def fake_download_selected_files(files_to_get, **kwargs):
+        observed["files_to_get"] = files_to_get
+        observed.update(kwargs)
+        return tmp_path
+
+    monkeypatch.setattr(
+        "synplan.utils.loading.download_selected_files", fake_download_selected_files
+    )
+
+    paths = download_sascore_benchmark(tmp_path, repo_id="test/repo")
+
+    assert observed["files_to_get"] == [
+        (SASCORE_BENCHMARK_SUBFOLDER, name) for name in SASCORE_BENCHMARK_FILES
+    ]
+    assert observed["extract_zips"] is False
+    assert observed["repo_id"] == "test/repo"
+    assert paths == [
+        tmp_path / SASCORE_BENCHMARK_SUBFOLDER / name
+        for name in SASCORE_BENCHMARK_FILES
+    ]
 
 
 def test_load_building_block_returns_typed_canonical_stock(tmp_path):
