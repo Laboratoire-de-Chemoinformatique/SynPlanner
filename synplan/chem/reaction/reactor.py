@@ -161,7 +161,9 @@ def apply_reaction_rule(
         bimolecular rule needs both partners at once and matches nothing when
         handed one structure — it yields zero reactions, silently. Partner
         *selection* is the caller's problem: this only forwards what it is
-        given.
+        given. No caller supplies it today — in particular
+        :class:`~synplan.mcts.tree.Tree` expands without it, so a
+        ``direction="forward"`` search runs unimolecular rules only.
     :return: An iterator yielding the products of reaction rule application.
     :raises TypeError: if ``molecule`` carries synthon labels.
         ``QueryElement.__eq__`` never consults ``_label``, so a plain reactor
