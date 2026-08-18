@@ -20,15 +20,41 @@ def test_smiles_stock_membership_and_removal_are_immutable():
     assert set(stock) == {"CCO", "CCN"}
 
 
-def test_smiles_stock_constructor_normalizes_noncanonical_keys():
-    stock = BuildingBlockStock(frozenset({"OCC"}), "smiles")
+def test_smiles_stock_constructor_trusts_keys_by_default(monkeypatch):
+    from synplan.chem.building_blocks import stock as stock_module
+
+    def unexpected_parse(*_args, **_kwargs):
+        pytest.fail("trusted stock construction invoked the SMILES parser")
+
+    monkeypatch.setattr(stock_module, "smiles_parser", unexpected_parse)
+
+    stock = stock_module.BuildingBlockStock(frozenset({"OCC"}), "smiles")
+
+    assert stock.keys == frozenset({"OCC"})
+
+
+def test_smiles_stock_constructor_can_canonicalize_keys_explicitly():
+    stock = BuildingBlockStock(
+        frozenset({"OCC"}),
+        "smiles",
+        canonicalize=True,
+    )
 
     assert stock.keys == frozenset({"CCO"})
     assert stock.contains_molecule(smiles("OCC"))
 
 
-def test_coerce_canonicalizes_legacy_smiles_keys():
+def test_coerce_trusts_legacy_smiles_keys_by_default():
     stock = coerce_building_block_stock(frozenset({"OCC"}))
+
+    assert stock.keys == frozenset({"OCC"})
+
+
+def test_coerce_can_canonicalize_legacy_smiles_keys_explicitly():
+    stock = coerce_building_block_stock(
+        frozenset({"OCC"}),
+        canonicalize=True,
+    )
 
     assert stock.keys == frozenset({"CCO"})
     assert stock.contains_molecule(smiles("OCC"))
@@ -74,7 +100,7 @@ def test_coerce_rejects_malformed_legacy_identity_instead_of_treating_it_as_smil
     value,
 ):
     with pytest.raises(ValueError, match="invalid SMILES building-block stock key"):
-        coerce_building_block_stock({value})
+        coerce_building_block_stock({value}, canonicalize=True)
 
 
 def test_stock_rejects_non_standard_inchikey():

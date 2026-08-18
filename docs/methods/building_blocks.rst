@@ -62,8 +62,11 @@ it does not add fictitious keys to the catalogue.
 
 The same typed-stock identity is used by Tree and rollout evaluation and is consulted
 by route extraction, visualisation, RDKit conversion, RouteCGR processing, GUI
-planning, and reinforcement search. Legacy sets are adapted as SMILES or detected full-InChIKey stocks. Raw-InChI
-stocks and pickles are rejected.
+planning, and reinforcement search. Legacy sets are adapted as trusted prepared
+SMILES by default or detected as full-InChIKey stocks. Pass ``canonicalize=True``
+to :func:`synplan.chem.building_blocks.stock.coerce_building_block_stock` when a
+raw SMILES iterable needs normalization. Raw-InChI stocks and pickles are
+rejected.
 
 For configuration and CLI usage, see :doc:`/configuration/building_blocks`
 and :doc:`/user_guide/cli_interface`. For the labelled-fragment subsystem,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass
 from pathlib import Path
 from typing import Any, Literal, Protocol, runtime_checkable
 
@@ -61,12 +61,20 @@ def _is_standard_inchi_key(value: str) -> bool:
 
 @dataclass(frozen=True, slots=True)
 class BuildingBlockStock:
-    """Immutable stock keys together with their lookup representation."""
+    """Immutable stock keys together with their lookup representation.
+
+    SMILES keys are trusted as prepared by default. Pass ``canonicalize=True``
+    when constructing a stock directly from raw SMILES that must be parsed and
+    normalized first.
+    """
 
     keys: frozenset[str]
     identity_format: StockIdentityFormat = "smiles"
+    canonicalize: InitVar[bool] = False
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, canonicalize: bool) -> None:
+        if not isinstance(canonicalize, bool):
+            raise TypeError("canonicalize must be a boolean")
         identity_format = _validate_format(self.identity_format)
         try:
             keys = frozenset(self.keys)
@@ -76,7 +84,7 @@ class BuildingBlockStock:
             ) from error
         if any(not isinstance(key, str) or not key for key in keys):
             raise ValueError("building-block stock keys must be non-empty strings")
-        if identity_format == "smiles":
+        if identity_format == "smiles" and canonicalize:
             normalized: set[str] = set()
             for key in keys:
                 try:
@@ -105,8 +113,8 @@ class BuildingBlockStock:
     ) -> BuildingBlockStock:
         """Build from keys validated by a trusted loader or derived operation.
 
-        General callers and legacy coercion use the public constructor so SMILES keys
-        cannot bypass canonicalization.
+        The public constructor and legacy coercion also trust SMILES keys by default;
+        callers with raw SMILES can request canonicalization explicitly.
         """
         stock = object.__new__(cls)
         object.__setattr__(stock, "keys", keys)
@@ -153,12 +161,18 @@ class BuildingBlockStock:
 def coerce_building_block_stock(
     stock: BuildingBlockLookup | Iterable[str],
     identity_format: StockIdentityFormat | None = None,
+    *,
+    canonicalize: bool = False,
 ) -> BuildingBlockLookup:
     """Coerce a typed or legacy canonical-SMILES or full-InChIKey stock.
 
     Full-InChIKey collections are detected only when the complete collection is
-    homogeneous. Raw InChI is deliberately not a stock representation.
+    homogeneous. Raw InChI is deliberately not a stock representation. Legacy
+    SMILES keys are trusted by default; set ``canonicalize=True`` to parse and
+    normalize them during coercion.
     """
+    if not isinstance(canonicalize, bool):
+        raise TypeError("canonicalize must be a boolean")
     if identity_format is not None:
         identity_format = _validate_format(identity_format)
     if isinstance(stock, BuildingBlockLookup):
@@ -172,7 +186,11 @@ def coerce_building_block_stock(
     if any(not isinstance(value, str) or not value for value in values):
         raise ValueError("legacy building-block stock keys must be non-empty strings")
     if not values:
-        return BuildingBlockStock(values, identity_format or "smiles")
+        return BuildingBlockStock(
+            values,
+            identity_format or "smiles",
+            canonicalize=canonicalize,
+        )
 
     raw_inchi = {value for value in values if value.startswith("InChI=")}
     valid_inchikey = {value for value in values if _is_standard_inchi_key(value)}
@@ -190,7 +208,7 @@ def coerce_building_block_stock(
         return BuildingBlockStock(values, "inchikey")
     if identity_format == "inchikey":
         raise ValueError("identity_format='inchikey' requires Standard InChIKeys")
-    return BuildingBlockStock(values, "smiles")
+    return BuildingBlockStock(values, "smiles", canonicalize=canonicalize)
 
 
 BuildingBlocksFormat = BuildingBlockStockInputFormat

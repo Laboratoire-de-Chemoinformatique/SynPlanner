@@ -157,6 +157,7 @@ InChI-to-InChIKey result in regression tests.
 BuildingBlockStock(
     keys=frozenset(...),
     identity_format="smiles" | "inchikey",
+    canonicalize=False,
 )
 ```
 
@@ -164,6 +165,11 @@ The stock exposes `key_for_molecule`, `contains_molecule`,
 `without_molecule`, length, and iteration. The MCTS `min_mol_size`
 shortcut remains in `Precursor.is_building_block()`; it must not be
 represented as real stock membership.
+
+Direct construction and `coerce_building_block_stock()` trust SMILES keys as
+already prepared by default, avoiding a second chemistry pass over large legacy
+stocks. Set `canonicalize=True` explicitly for raw SMILES iterables. The file
+loader keeps its separate `BuildingBlockStockLoadConfig.standardize` policy.
 
 `load_building_block()` accepts:
 

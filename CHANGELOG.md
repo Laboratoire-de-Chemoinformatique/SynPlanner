@@ -170,6 +170,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Existing stereochemical catalogues should be regenerated with the new
   preparation pipeline.
 
+- `BuildingBlockStock` construction and legacy stock coercion now trust prepared
+  SMILES keys by default, avoiding an implicit chemistry pass over the entire
+  stock when a `Tree` is created. Raw SMILES iterables can opt into the previous
+  normalization behavior with `canonicalize=True`.
+
 - `chython-synplan` is pinned to 1.103 and sourced from the local fork, which adds the
   `Synthon` atom family, `SynthonContainer`, the `_token` bracket field in SMILES and
   SMARTS, and `!rN` as a real excluded-ring-sizes constraint.

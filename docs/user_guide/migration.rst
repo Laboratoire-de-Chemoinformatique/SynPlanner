@@ -57,11 +57,18 @@ Python callers may pass a
 not its source configuration, is supplied to :class:`~synplan.mcts.tree.Tree`.
 
 The typed loader no longer mirrors the legacy ``load_building_blocks()``
-arguments. It always validates the complete input and canonicalizes SMILES
-keys. Replace ``building_blocks_format=...`` or ``input_format=...`` with
+arguments. By default it validates the complete input and canonicalizes SMILES
+keys; set ``identity_format="smiles", standardize=False`` only for a prepared
+plain-SMILES artifact whose keys can be trusted. Replace
+``building_blocks_format=...`` or ``input_format=...`` with
 ``config=BuildingBlockStockLoadConfig(identity_format=...)``. Legacy
 ``standardize``, ``silent``, ``num_workers``, ``chunksize``, and ``header``
 arguments remain available only on ``load_building_blocks()``.
+
+Direct ``BuildingBlockStock(...)`` construction and
+``coerce_building_block_stock(...)`` now also trust SMILES keys by default so a
+large prepared legacy set is not parsed and canonicalized a second time. Pass
+``canonicalize=True`` when adapting raw, noncanonical SMILES.
 
 The preparation CLI remains callable with only ``--input`` and ``--output``.
 For the new identity/deprotection/audit pipeline, pass one YAML configuration;
