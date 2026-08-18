@@ -13,6 +13,11 @@ Subpackages and modules
    :show-inheritance:
    :no-index:
 
+.. automodule:: synplan.chem.reaction.routes.postprocess
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 .. automodule:: synplan.chem.reaction.routes.representation
    :members:
    :undoc-members:

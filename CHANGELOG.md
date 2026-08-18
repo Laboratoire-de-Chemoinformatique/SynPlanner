@@ -32,6 +32,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `summary.json` as the final commit marker, and deterministic ordered
   multiprocessing.
 
+- Added `BuildingBlockCatalog` to join prepared identities, protected-source
+  provenance, and prices by an explicit `source_index`. Prepared price files
+  now carry that key themselves, so duplicate, missing, and foreign catalogue
+  rows fail with actionable diagnostics instead of relying on row order.
+
+- Added an ordered, bounded route post-processing pipeline for planning with
+  stereo-cleaned and/or deprotected molecules. It can restore protected-target
+  sequences, expand deprotected building-block leaves, restore and propagate
+  target stereochemistry with catalogue validation, and calculate route cost
+  only after structural restoration. Target protection order is enumerated by
+  default, with a deterministic mode for callers that require one route.
+
+- Added the published 100-target SAScore benchmark downloader through both
+  `download_sascore_benchmark` and the SynPlanner CLI, and added a complete
+  stereo-aware, protection-agnostic planning tutorial.
+
+- Added optional transparent route boxes through `box_solid=False`. Box borders
+  retain their assigned `box_colors` and use a heavier stroke for readability.
+
+### Changed
+
+- Planning identity now preserves defined tetrahedral and double-bond
+  stereochemistry. `safe_canonicalization()` retains its historical
+  stereo-cleaning default for unrelated workflows and exposes the copy-safe
+  `clean_stereo=False` path used by targets, precursors, stocks, and planning.
+  Existing stereochemical catalogues should be regenerated with the new
+  preparation pipeline.
+
+- `BuildingBlockStock` construction and legacy stock coercion now trust prepared
+  SMILES keys by default, avoiding an implicit chemistry pass over the entire
+  stock when a `Tree` is created. Raw SMILES iterables can opt into the previous
+  normalization behavior with `canonicalize=True`.
+
+### Added
+
 - Added `synplan.chem.synthon`, a native port of Synt-On (SynthI; Zabolotna, Volochnyuk,
   Ryabukhin, Gavrylenko, Horvath, Klimchuk, Oksiuta, Marcou, Varnek, "SynthI: A New
   Open-Source Tool for Synthon-Based Library Design", *J. Chem. Inf. Model.* 2022,
@@ -162,18 +197,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   itself balance, are reported apart rather than counted as losses.
 
 ### Changed
-
-- Planning identity now preserves defined tetrahedral and double-bond
-  stereochemistry. `safe_canonicalization()` retains its historical
-  stereo-cleaning default for unrelated workflows and exposes the copy-safe
-  `clean_stereo=False` path used by targets, precursors, stocks, and planning.
-  Existing stereochemical catalogues should be regenerated with the new
-  preparation pipeline.
-
-- `BuildingBlockStock` construction and legacy stock coercion now trust prepared
-  SMILES keys by default, avoiding an implicit chemistry pass over the entire
-  stock when a `Tree` is created. Raw SMILES iterables can opt into the previous
-  normalization behavior with `canonicalize=True`.
 
 - `chython-synplan` is pinned to 1.103 and sourced from the local fork, which adds the
   `Synthon` atom family, `SynthonContainer`, the `_token` bracket field in SMILES and

@@ -20,6 +20,21 @@ Download a ready-to-use data preset from HuggingFace with all components needed 
     - ``preset`` - preset name (default: ``synplanner-gps``).
     - ``save_to`` - the directory where downloaded data will be stored.
 
+SAScore benchmark download
+--------------------------
+Download the published 100-target SAScore benchmark subsets:
+
+.. code-block:: bash
+
+    synplan download_sascore_benchmark --save_to synplan_data
+
+The command writes the benchmark files under
+``synplan_data/benchmarks/sascore/subset_100`` and prints every downloaded
+path.
+
+**Parameters**:
+    - ``save_to`` - the SynPlanner data directory (default: ``synplan_data``).
+
 Protection source-data conversion
 ---------------------------------
 Convert the Westerlund protection-strategy source dataset into the YAML and
