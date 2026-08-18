@@ -4,7 +4,7 @@ from collections.abc import Sized
 from pathlib import Path
 
 from chython import smiles, synthon_smiles
-from chython.containers import MoleculeContainer
+from chython.containers import MoleculeContainer, ReactionContainer
 
 import synplan.enumeration.synthon.synthonise as _synthonise_workers
 from synplan.chem.scaffolds import murcko_scaffold
@@ -18,6 +18,10 @@ from synplan.enumeration.synthon.audit import (
     iter_pathway_records,
 )
 from synplan.enumeration.synthon.config import SynthonConfig
+from synplan.enumeration.synthon.coverage import (
+    classify_coverage,
+    load_coverage_rules,
+)
 from synplan.enumeration.synthon.enumeration import Enumerator
 from synplan.enumeration.synthon.fragment import Fragmenter
 from synplan.enumeration.synthon.stock import (
@@ -30,6 +34,7 @@ from synplan.enumeration.synthon.synthonise import (
     init_worker,
     synthonise_batch,
 )
+from synplan.utils.files import split_smiles_record
 from synplan.utils.parallel import chunked, process_pool_map_stream
 
 _BATCH_SIZE = 500
@@ -622,6 +627,46 @@ def scaffolds_file(
     return written
 
 
+def coverage_file(
+    input_file: str,
+    output_file: str,
+    config: SynthonConfig | None = None,
+    *,
+    keep: str = "uncovered",
+) -> tuple[int, int]:
+    """Split a mapped-reaction file on synthon coverage; returns (written, read).
+
+    Kept lines are copied verbatim, metadata columns and all, so the output is still the input
+    file's format. A record that will not parse is treated as uncovered: dropping training data
+    on a valence quirk is the worse error.
+    """
+    _guard(input_file, output_file)
+    rules = load_coverage_rules(config or SynthonConfig())
+    wanted = keep == "covered"
+    written = read = 0
+    with (
+        open(input_file, encoding="utf-8") as source,
+        open(output_file, "w", encoding="utf-8") as out,
+    ):
+        for line in source:
+            record, _ = split_smiles_record(line)
+            if not record:
+                continue
+            read += 1
+            try:
+                reaction = smiles(record)
+                covered = (
+                    isinstance(reaction, ReactionContainer)
+                    and classify_coverage(reaction, rules).covered
+                )
+            except Exception:
+                covered = False
+            if covered is wanted:
+                out.write(line if line.endswith("\n") else line + "\n")
+                written += 1
+    return written, read
+
+
 def read_stock_synthons(stock_file: str) -> list[str]:
     """The stocked synthons as parsed containers' canonical SMILES."""
     return [str(synthon_smiles(s)) for s in load_synthon_stock(stock_file)]
@@ -629,6 +674,7 @@ def read_stock_synthons(stock_file: str) -> list[str]:
 
 __all__ = [
     "classify_file",
+    "coverage_file",
     "enumerate_file",
     "fragment_file",
     "read_stock_synthons",

@@ -263,13 +263,21 @@ or they are ignored. The children are ordinary molecules against the ordinary
 building-block stock — there is no synthon stock in the tree.
 Module: `synplan.enumeration.synthon.priority`
 
+**Drop reactions the synthon rules already cover from a training corpus**
+`classify_coverage` says whether a mapped reaction builds a bond one of the 39
+acyclic disconnections breaks, with the reactant-side leaving groups checked
+against the rule's labels. CLI: `synthon_coverage --keep uncovered|covered`.
+37.9% of a 100k USPTO sample is covered.
+Module: `synplan.enumeration.synthon.coverage`
+
 **Catalogue analysis**
 `bb_scaffolds` writes Bemis-Murcko scaffolds after removing the ring-containing
 protecting groups; `ro2_pass` applies the rule of two.
 Module: `synplan.chem.scaffolds`, `synplan.enumeration.synthon.stock`
 
 **Keep an auditable record of any synthon CLI run**
-All five synthon commands accept `synthonisation.yaml`. Set
+All five audited synthon commands accept `synthonisation.yaml`
+(`synthon_coverage` takes the config but writes no sidecars). Set
 `write_audit_files: true` to create `fallback.smi`, `fallback.tsv`,
 `errors.tsv`, `summary.json`, and `run.log` beside the requested output. Use a
 dedicated directory per command because those sidecar names are fixed.

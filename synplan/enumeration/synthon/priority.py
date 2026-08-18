@@ -11,6 +11,7 @@ from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.rules import parse_priority_rules, rule_query_pattern
 from synplan.enumeration.synthon.config import SynthonConfig, load_data
 from synplan.enumeration.synthon.fragment import _select
+from synplan.enumeration.synthon.reactor import RULE_NUCLEOPHILE_CAPS
 
 SYNTHON_SOURCE_NAME = "synthon"
 """``rule_source`` these rules carry into ``tree.stats.per_priority_source``."""
@@ -39,20 +40,6 @@ _CAP_SMARTS = {
 # alkane that cannot do the reaction but IS purchasable, so the route terminates on a lie.
 _UNSHIPPABLE_CAPS = frozenset(("[Mg]", "[B-](F)(F)F"))
 
-# The table is keyed on `symbol:token`, which cannot tell R12.4's terminal alkyne from R10.1's
-# Grignard — both are `C:nuc`. Where the reagent is a property of the RULE, name it here.
-# R12.4 is deliberately absent: a Sonogashira nucleophile IS the terminal alkyne, so H is right.
-_RULE_NUCLEOPHILE_CAPS = {
-    "R3.3": "[Mg]Br",  # umpolung coupling — organometallic partner
-    "R10.1": "[Mg]Br",  # the rule names Li/Mg/Zn organics outright
-    "R10.2": "[Mg]Br",  # same, acylation of the organometallic
-    "R12.3a": "B(O)O",  # Suzuki, sp2 partner — vinylboronic acid
-    "R12.3b": "B(O)O",  # Suzuki, aryl partner — arylboronic acid
-    "R12.5": "[Mg]Br",  # C(Ar)-C(sp3): Kumada/Negishi-style alkylmetal
-    "R13.1": "B(O)O",  # Minisci — alkylboron radical precursor
-    "R13.2": "B(O)O",  # Giese — alkylboron radical precursor
-}
-
 
 def _aromatic(hybridization) -> bool | None:
     """Aromaticity of a query atom, or None when its spec leaves it open."""
@@ -74,7 +61,7 @@ def capped_smarts(
 
     :param rule_smarts: One ``rules.json`` disconnection SMARTS.
     :param leaving_groups: The ``rules.json`` ``leaving_groups`` table.
-    :param rule_id: The record's id, consulted against :data:`_RULE_NUCLEOPHILE_CAPS` where the
+    :param rule_id: The record's id, consulted against :data:`RULE_NUCLEOPHILE_CAPS` where the
         label-keyed table cannot name the reagent.
     :return: The same SMARTS with every labelled RHS atom carrying its capped leaving group.
     :raises ValueError: when a labelled RHS atom keeps its ``_token`` through capping. The SMARTS
@@ -99,7 +86,7 @@ def capped_smarts(
             f"{symbol.lower() if aromatic else symbol}:{token}", "H"
         )
         if cap in _UNSHIPPABLE_CAPS:
-            cap = _RULE_NUCLEOPHILE_CAPS.get(rule_id or "", "H")
+            cap = RULE_NUCLEOPHILE_CAPS.get(rule_id or "", "H")
         caps[number] = cap
         tokens[number] = token
 
