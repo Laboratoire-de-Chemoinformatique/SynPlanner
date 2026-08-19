@@ -5,8 +5,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [1.6.0] - 2026-08-03
-
 ### Added
 
 - Added `synplan.chem.reaction.rules.symmetry` with
@@ -22,6 +20,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - TSV rule loading now builds `CanonicalRetroReactor` instances directly from the
   parsed reactant and product query patterns, preserving the existing pickle
   loading behavior unchanged.
+- Rule extraction now derives rule popularity, retained reaction indices, and
+  policy-training rows only from occurrences that are eligible after reactor
+  validation, while retaining per-reaction audit reasons for excluded occurrences.
 
 ### Fixed
 
@@ -30,7 +31,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   results, including external-fragment differences, target-target bond changes,
   and target atom-state changes.
 
-## [1.5.2] - 2026-06-05
+## [1.6.0] - 2026-08-03
 
 ### Added
 
