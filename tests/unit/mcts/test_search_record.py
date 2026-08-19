@@ -123,6 +123,7 @@ def test_the_record_carries_the_graph_and_no_routes(searched, tmp_path):
         "nodes",
         "winning",
         "stats",
+        "bonds_state",
     }
     assert len(written["nodes"]) == len(searched.nodes)
     # molecules interned once, nodes holding indices into them
@@ -190,3 +191,31 @@ def test_a_file_that_is_not_a_search_record_says_so(tmp_path):
 
     with pytest.raises(ValueError, match="search record"):
         read_search_record(path)
+
+
+@pytest.mark.parametrize(
+    "schema", ["synplan-tree/1", "synplan-tree/2", "synplan-tree/3"]
+)
+def test_pre_bond_records_read_as_unconstrained(searched, tmp_path, schema):
+    path = write_search_record(searched, tmp_path / "legacy.json")
+    raw = json.loads(path.read_text())
+    raw["schema"] = schema
+    raw.pop("bonds_state")
+    for node in raw["nodes"]:
+        for field in (
+            "new_provenance",
+            "expand_provenance",
+            "remaining_required_bonds",
+        ):
+            node.pop(field)
+    path.write_text(json.dumps(raw))
+
+    record = read_search_record(path)
+    assert record.bonds_state == {}
+    assert record.winning_nodes == searched.winning_nodes
+    assert all(not node.remaining_required_bonds for node in record.nodes.values())
+    assert all(
+        not p.target_atom_provenance.pairs
+        for node in record.nodes.values()
+        for p in node.new_precursors
+    )

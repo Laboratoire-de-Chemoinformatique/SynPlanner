@@ -4,6 +4,7 @@ from synplan.chem.reaction.routes.clustering.core import (
     cluster_route_from_csv,
     cluster_route_from_json,
     cluster_routes,
+    cluster_tree,
     extract_strat_bonds,
 )
 from synplan.chem.reaction.routes.clustering.subclustering import (
@@ -30,6 +31,7 @@ __all__ = [
     "cluster_route_from_csv",
     "cluster_route_from_json",
     "cluster_routes",
+    "cluster_tree",
     "extract_strat_bonds",
     "group_by_identical_values",
     "group_routes_by_synthon_detail",
