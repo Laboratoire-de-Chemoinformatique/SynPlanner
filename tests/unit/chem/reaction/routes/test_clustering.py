@@ -5,9 +5,11 @@ from chython.containers import CGRContainer, ReactionContainer
 
 from synplan.chem.reaction.routes.clustering import (
     cluster_routes,
+    cluster_tree,
     subcluster_all_clusters,
     subcluster_one_cluster,
 )
+from synplan.chem.reaction.routes.clustering import core as clustering_core
 
 
 @pytest.fixture(scope="module")
@@ -27,6 +29,40 @@ def routes_cgrs_dict():
 def test_cluster_routes_empty():
     """cluster_routes returns empty dict when given no data."""
     assert cluster_routes({}, use_strat=False) == {}
+
+
+@pytest.mark.parametrize("use_strat", [False, True])
+def test_cluster_tree_returns_pipeline_artifacts(monkeypatch, use_strat):
+    tree = object()
+    route_cgrs = {1: object()}
+    sb_cgrs = {1: object()}
+    clusters = {"1.1": {"route_ids": [1]}}
+
+    monkeypatch.setattr(
+        clustering_core,
+        "compose_all_route_cgrs",
+        lambda supplied_tree: route_cgrs if supplied_tree is tree else None,
+    )
+    monkeypatch.setattr(
+        clustering_core,
+        "compose_all_sb_cgrs",
+        lambda supplied_route_cgrs: (
+            sb_cgrs if supplied_route_cgrs is route_cgrs else None
+        ),
+    )
+
+    observed = []
+
+    def fake_cluster_routes(supplied_sb_cgrs, *, use_strat):
+        observed.append((supplied_sb_cgrs, use_strat))
+        return clusters
+
+    monkeypatch.setattr(clustering_core, "cluster_routes", fake_cluster_routes)
+
+    result = cluster_tree(tree, use_strat=use_strat)
+
+    assert result == (route_cgrs, sb_cgrs, clusters)
+    assert observed == [(sb_cgrs, use_strat)]
 
 
 @pytest.mark.parametrize("use_strat", [False, True])

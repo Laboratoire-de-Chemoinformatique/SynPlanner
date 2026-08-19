@@ -63,6 +63,7 @@ some advanced explanations and configurations, that can be used for both demonst
 - `MHN Ranking Training`_ - demonstrates how to train and fine-tune the MHN ranking policy architecture.
 - `Routes Compare`_ - demonstrates how to compare route sets with RouteCGRs.
 - `Building Block Search`_ - demonstrates building-block search utilities.
+- `Target Bond Constraints`_ - requires selected disconnections and freezes protected target bonds.
 
 .. _Welcome to Chython: 00_Welcome_to_Chython.ipynb
 .. _Coming from RDKit: 01_Coming_from_RDKit.ipynb
@@ -82,6 +83,7 @@ some advanced explanations and configurations, that can be used for both demonst
 .. _MHN Ranking Training: 14_MHN_Ranking_Training.ipynb
 .. _Routes Compare: 15_Routes_compare.ipynb
 .. _Building Block Search: 16_Building_block_search.ipynb
+.. _Target Bond Constraints: 19_Bond_freeze_break.ipynb
 
 .. toctree::
    :hidden:
@@ -108,5 +110,6 @@ some advanced explanations and configurations, that can be used for both demonst
    14_MHN_Ranking_Training
    15_Routes_compare
    16_Building_block_search
+   19_Bond_freeze_break
    ../configuration/configuration
    ../methods/methods

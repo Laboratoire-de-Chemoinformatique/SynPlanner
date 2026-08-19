@@ -13,6 +13,21 @@ from synplan.chem.reaction.routes.representation import (
 )
 
 
+def cluster_tree(tree, use_strat: bool = True) -> tuple[dict, dict, dict]:
+    """Compose and cluster every winning route in a planning tree.
+
+    :param tree: A completed :class:`~synplan.mcts.tree.Tree`.
+    :param use_strat: Group routes by strategic-bond sets when ``True``;
+        otherwise group by the complete SB-CGR representation.
+    :return: ``(route_cgrs, sb_cgrs, clusters)`` for downstream analysis.
+    """
+
+    route_cgrs = compose_all_route_cgrs(tree)
+    sb_cgrs = compose_all_sb_cgrs(route_cgrs)
+    clusters = cluster_routes(sb_cgrs, use_strat=use_strat)
+    return route_cgrs, sb_cgrs, clusters
+
+
 def cluster_route_from_csv(routes_file: str):
     """
     Reads retrosynthetic routes from a CSV file, processes them, and performs clustering.
