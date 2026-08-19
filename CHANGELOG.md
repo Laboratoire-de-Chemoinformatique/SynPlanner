@@ -26,10 +26,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- Fixed symmetric SMARTS rule loading so valid precursor orientations are
-  retained when symmetric target-atom matches produce different product-side
-  results, including external-fragment differences, target-target bond changes,
-  and target atom-state changes.
+- Fixed symmetric SMARTS rule loading where Chython's default automorphism
+  filtering could treat two atom assignments as duplicates because they matched
+  the same set of target atoms, even when the rule mapped those atoms to
+  chemically distinct precursor products. For example, a product C-C bond can
+  match a symmetric Suzuki retrosynthesis template in two orientations: one
+  orientation installs the halide on the first aryl fragment and the boronic-acid
+  handle on the second, while the other orientation swaps those handles. These
+  are two chemically distinct precursor sets, but Chython returned only one
+  because its automorphism filter discarded the second mapping. SynPlanner now
+  detects exact left-hand-side automorphisms that change the right-hand-side rule
+  patch and disables the filter only for affected rules. This retains both valid
+  Suzuki precursor orientations, as well as other external-fragment differences,
+  target-target bond changes, and target atom-state changes, while preserving
+  normal match deduplication for other rules.
 
 ## [1.6.0] - 2026-08-03
 
