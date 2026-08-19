@@ -117,6 +117,140 @@ reach for the loop only when you actually need them — ``run()`` is the default
    Older code exhausts the iterator with ``list(tree)``. That still works, but it
    allocates a tuple per iteration only to discard them. Prefer ``run()``.
 
+Target bond constraints
+-----------------------
+
+The Python ``Tree`` API can require or forbid disconnections of specific bonds
+in the mapped target molecule. Pass an optional ``bonds_state`` mapping whose
+keys are pairs of Chython atom-map numbers:
+
+.. table::
+   :widths: 15 85
+
+   ===== ================================================================
+   State Meaning
+   ===== ================================================================
+   ``0`` The bond is unconstrained. Omitting the key has the same effect.
+   ``1`` Every accepted route must break this bond at some search step.
+   ``2`` Candidate reactions that break this bond are rejected.
+   ===== ================================================================
+
+Bond direction is irrelevant: ``(7, 8)`` and ``(8, 7)`` normalize to the same
+key. Obtain the numbers from the standardized Chython target, for example by
+enabling atom-map labels before depicting it. Every specified pair must identify
+a real bond in that target.
+
+The numbers name **target-derived atoms**, not whichever atoms happen to carry
+the same integers later. ``Tree`` seeds immutable provenance after target
+canonicalization and carries it through each generated precursor. A reaction
+product inherits a target identity only for an atom present in the precursor
+being expanded. If Chython reuses a number from another fragment for a newly
+introduced atom, that atom has no target identity and cannot satisfy or violate
+a constraint accidentally.
+
+This complete example downloads and loads the current GPS preset, standardizes
+the target, applies the tutorial's required and frozen bonds, and runs the search:
+
+.. code-block:: python
+
+   from synplan.chem.utils import mol_from_smiles
+   from synplan.mcts.tree import Tree
+   from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
+   from synplan.utils.loading import (
+       download_preset,
+       load_building_blocks,
+       load_evaluation_function,
+       load_policy_function,
+       load_reaction_rules,
+   )
+
+   paths = download_preset("synplanner-gps", save_to="synplan_data")
+   building_blocks = load_building_blocks(
+       paths["building_blocks"], standardize=False
+   )
+   reaction_rules = load_reaction_rules(paths["reaction_rules"])
+   policy_function = load_policy_function(weights_path=paths["ranking_policy"])
+
+   tree_config = TreeConfig(
+       search_strategy="expansion_first",
+       max_iterations=300,
+       max_time=120,
+       max_depth=9,
+       min_mol_size=1,
+       init_node_value=0.5,
+       ucb_type="uct",
+       c_ucb=0.1,
+   )
+   evaluation_function = load_evaluation_function(
+       RolloutEvaluationConfig(
+           policy_network=policy_function,
+           reaction_rules=reaction_rules,
+           building_blocks=building_blocks,
+           min_mol_size=tree_config.min_mol_size,
+           max_depth=tree_config.max_depth,
+       )
+   )
+
+   target_molecule = mol_from_smiles(
+       "N#CC1(c2ccc(NC(=O)c3cccnc3NCc3ccncc3)cc2)CCCC1",
+       standardize=True,
+       clean_stereo=True,
+   )
+
+   bonds_state = {
+       (7, 8): 1,    # this bond must be disconnected somewhere in the route
+       (16, 17): 2,  # this bond may never be disconnected
+   }
+
+   tree = Tree(
+       target=target_molecule,
+       config=tree_config,
+       reaction_rules=reaction_rules,
+       building_blocks=building_blocks,
+       expansion_function=policy_function,
+       evaluation_function=evaluation_function,
+       bonds_state=bonds_state,
+   ).run()
+
+Frozen bonds are enforced per candidate reaction. If one candidate from a rule
+breaks a frozen bond, SynPlanner skips that candidate and continues considering
+later valid candidates from the same rule.
+
+Constraint decisions use **adjacency only**. A target bond is broken when its
+two target-derived endpoints are no longer connected in the generated products.
+Changing the bond order does not count as a break. Replacing the element at a
+mapped endpoint also does not count as a break while the two target identities
+remain adjacent. Consequently, bond-order changes and mapped element
+substitutions are allowed by state ``2`` and do not satisfy state ``1``.
+Frozen-bond checks compare product adjacency directly; they do not compose a CGR.
+
+Required breaks are route-level conditions. Each tree branch tracks which
+state-``1`` bonds remain unresolved, so the search may make unrelated preliminary
+disconnections first. A terminal node becomes a winning route only after *all*
+required bonds have been broken. A required bond retained in a fragment already
+recognized as a building block remains unresolved. Provenance and outstanding
+requirements are part of constrained candidate deduplication, cycle detection,
+and pruning, so structurally identical frontiers with different target ancestry
+cannot be merged. ``None``, an empty mapping, and a state-``0``-only mapping keep
+the original structure-only identity path.
+
+``Tree`` validates the mapping when it is constructed and raises ``ValueError``
+for malformed pair keys, non-integer or unsupported states, self-bonds,
+conflicting states supplied through reversed keys, or selected bonds absent from
+the target. ``tree.bonds_state`` returns a defensive normalized snapshot;
+mutating that returned dictionary cannot change an existing search.
+
+.. note::
+
+   Bond constraints are currently available only through the Python ``Tree``
+   API. They are not fields in planning YAML, CLI options, or arguments to the
+   batch ``run_search`` helper. Rollout and value-network evaluation remain
+   advisory and unchanged; the hard guarantees apply to generated branches and
+   accepted winning routes.
+
+See :doc:`Tutorial 19 <../user_guide/19_Bond_freeze_break>` for a complete
+baseline-versus-constrained search and clustering comparison.
+
 Tree Analytics
 --------------
 

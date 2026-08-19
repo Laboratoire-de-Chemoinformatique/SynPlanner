@@ -40,6 +40,25 @@ reaction steps. Generated benchmark data and round-trip result folders are
 local artifacts and should not be committed.
 
 
+Clustering Planning Trees
+-------------------------
+
+``cluster_tree()`` runs the complete clustering pipeline directly on a
+completed planning tree and returns each intermediate artifact needed for
+analysis:
+
+.. code-block:: python
+
+    from synplan.chem.reaction.routes.clustering import cluster_tree
+
+    route_cgrs, sb_cgrs, clusters = cluster_tree(tree, use_strat=True)
+
+``use_strat=True`` groups routes by their strategic-bond sets. Set it to
+``False`` to group by the complete SB-CGR representation. File-oriented
+``cluster_route_from_csv()`` and ``cluster_route_from_json()`` remain
+available when a planning tree is not in memory.
+
+
 Typed Route APIs
 ----------------
 

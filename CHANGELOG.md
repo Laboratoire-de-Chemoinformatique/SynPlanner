@@ -5,6 +5,51 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Added Python `Tree(..., bonds_state=...)` target-bond constraints. State `0`
+  is neutral, state `1` requires every selected bond to be broken somewhere
+  before a route is accepted, and state `2` prevents the selected bond from
+  being broken by any generated candidate. Multiple state-`1` selections must
+  all be satisfied; unrelated preliminary disconnections remain allowed.
+- Bond keys are normalized as unordered Chython atom-number pairs. Tree
+  construction rejects malformed states, reversed-pair conflicts, self-bonds,
+  unsupported state values, and pairs that are not bonds in the target.
+  `tree.bonds_state` returns a defensive normalized snapshot.
+- Added immutable target-atom provenance across precursor fragmentation and
+  multirule applications. Introduced atoms never acquire a target constraint
+  merely because Chython reuses an atom number from another fragment.
+- Added `selected_bonds_svg` in `synplan.chem.target_bonds` for depicting
+  required bonds in red and frozen bonds in blue. The helper uses the same
+  normalization and validation as `Tree`, keeping visualization logic out of
+  user notebooks.
+- Added `cluster_tree(tree, use_strat=True)` in the route-clustering API. It
+  composes RouteCGRs, reduces them to SB-CGRs, performs clustering, and returns
+  all three artifacts for in-memory analysis without a CSV/JSON round trip or
+  a notebook-local pipeline.
+- Added Tutorial 19 and MCTS documentation with a runnable
+  baseline-versus-constrained planning and clustering example. Constraints are
+  intentionally available only through the Python `Tree` API; CLI, YAML, batch
+  search, rollout evaluation, and value-network evaluation remain unchanged.
+
+### Fixed
+
+- Frozen-bond filtering now compares target-derived endpoint adjacency directly,
+  so unrelated mapped element substitutions are not lost to CGR composition
+  errors. Bond-order and mapped endpoint-element changes remain
+  adjacency-preserving: they neither satisfy state `1` nor violate state `2`.
+- Forbidden candidates no longer consume the per-rule Top-N allowance and hide
+  later valid alternatives. `top_reactions_num=0` now consistently yields no
+  candidates, while negative limits raise `ValueError`.
+- Constraint-aware candidate deduplication, cycle detection, and pruning now
+  include target provenance and unresolved required bonds. This prevents atom
+  number reuse from creating false required-bond solutions or false frozen-bond
+  rejections while retaining the original structure-only path for unconstrained
+  and state-`0`-only searches.
+- Pre-feature unconstrained `Tree`, `Node`, and `Precursor` pickles receive empty
+  constraint and provenance defaults when loaded, allowing those searches to
+  resume without migration.
+
 ## [1.6.0] - 2026-08-03
 
 ### Added
