@@ -7,6 +7,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Python `Tree(..., bonds_state=...)` can require selected target bonds to break
+  (state `1`) or forbid their cleavage (state `2`); state `0` is unconstrained.
+  Multiple required bonds must all be broken before a route is accepted, while
+  unrelated preliminary disconnections remain allowed. Bond keys are validated,
+  unordered Chython atom-number pairs; `tree.bonds_state` returns a defensive copy.
+- Immutable target-atom provenance follows precursor fragmentation and multirule
+  applications, preventing newly introduced atoms from acquiring constraints when
+  Chython reuses an atom number from another fragment.
+- `selected_bonds_svg()` in `synplan.chem.target_bonds` depicts required bonds in
+  red and frozen bonds in blue using the same validation as `Tree`.
+- `cluster_tree(tree, use_strat=True)` returns RouteCGRs, SB-CGRs, and clusters for
+  in-memory analysis. Tutorial 19 compares baseline and constrained searches and
+  independently checks each winning route's disconnections.
+- Search-record schema 4 preserves bond constraints, unresolved required bonds,
+  and precursor target identities alongside stereo state. Schemas 1–3 remain
+  readable with empty bond-constraint defaults; records cannot resume searches.
+
 - Optional progress bars for route ranking and clustering through `silent=False`.
 - Chython stereo constraints for carbon tetrahedra, E/Z and allene axes across
   preparation, extraction, stock selection, search and route reconstruction.
@@ -79,6 +96,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `{route_id: {step_id: Reaction}}` mapping still works and the v1 file is unchanged.
 
 ### Fixed
+
+- Frozen-bond filtering compares target-derived endpoint adjacency directly.
+  Bond-order changes and mapped endpoint-element substitutions neither satisfy a
+  required break nor violate a frozen bond. Forbidden candidates do not consume
+  the per-rule outcome limit, so later valid alternatives remain available;
+  zero outcomes yields none, and negative limits raise `ValueError`.
+- Candidate deduplication, cycle detection, and pruning include target ancestry
+  and unresolved required bonds when constraints are active, while retaining
+  current stereo obligations and complete precursor multiplicities. Constraints
+  are Python-only; rollout evaluation remains advisory.
 
 - Deduplicate accepted complete precursor multisets, including multiplicity.
   An earlier ester-plus-hydroxide outcome no longer suppresses an ester-only

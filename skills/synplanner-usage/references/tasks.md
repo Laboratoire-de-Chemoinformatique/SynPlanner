@@ -69,6 +69,17 @@ first, each drawing itself in a notebook — then `route_scorer.rank(...)`.
 Tutorial: `05_Retrosynthetic_Planning`, `ten_minutes`
 Docs: `methods/planning`, `methods/mcts`, `configuration/planning`
 
+**Require or freeze target disconnections**
+Pass `bonds_state` to `Tree`: state `1` requires each selected target bond to
+break somewhere in an accepted route, while state `2` rejects candidate reactions
+that break the selected bond. Keys are unordered Chython atom-map pairs naming
+target-derived atoms; immutable provenance prevents introduced atoms from gaining
+constraints through number reuse. A break means loss of endpoint adjacency, not a
+bond-order or mapped endpoint-element change.
+**Python API only** - there is no YAML, CLI, or batch `run_search` surface.
+Tutorial: `19_Bond_freeze_break`
+Docs: `methods/mcts` - "Target bond constraints"
+
 **Plan many molecules at once**
 `run_search` (`synplan.mcts.search`) with `PolicyNetworkConfig` and
 `RolloutEvaluationConfig`. Targets are a `.smi` file.
@@ -179,8 +190,9 @@ Tutorial: `07_Clustering`, `15_Routes_compare`
 Docs: `methods/routes` — "A route as a graph"
 
 **Group similar routes together**
-Planning setup, then export, then `cgr_display`
-(`...routes.representation.depiction`) and `routes_clustering_report`.
+For an in-memory planning tree, call `cluster_tree(tree, use_strat=...)`
+(`...routes.clustering`) to obtain RouteCGRs, SB-CGRs, and clusters directly.
+Use `cgr_display` and `routes_clustering_report` to inspect the results.
 CLI: `synplan clustering`.
 Tutorial: `07_Clustering`
 Docs: `methods/routes`
