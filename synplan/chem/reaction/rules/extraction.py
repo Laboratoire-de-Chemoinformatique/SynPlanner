@@ -1238,7 +1238,10 @@ def print_extraction_summary(
     if total_unique:
         summary_lines.append(f"Rule filtering ({total_unique} unique rules extracted):")
         for key, label in [
-            ("rejected_reactor_validation", "reactor validation failed"),
+            (
+                "rejected_reactor_validation",
+                "no validation-eligible occurrences",
+            ),
             ("rejected_popularity", "below min popularity"),
         ]:
             count = filter_stats.get(key, 0)

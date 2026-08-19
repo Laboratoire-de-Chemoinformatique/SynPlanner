@@ -302,3 +302,22 @@ def test_print_extraction_summary_includes_error_count(capsys):
     output = capsys.readouterr().out
     assert "Finished: processed 10, extracted 1 rules" in output
     assert "failed 2" in output
+
+
+def test_print_extraction_summary_uses_neutral_validation_label(capsys):
+    """The aggregate label must cover failures and deliberately skipped validation."""
+    print_extraction_summary(
+        n_processed=1,
+        sorted_rules=[],
+        filter_stats={
+            "total_unique_rules": 1,
+            "rejected_reactor_validation": 1,
+            "passed": 0,
+        },
+        error_counts=Counter(),
+        error_file_path=None,
+    )
+
+    output = capsys.readouterr().out
+    assert "no validation-eligible occurrences: 1 (100.0%)" in output
+    assert "reactor validation failed" not in output
