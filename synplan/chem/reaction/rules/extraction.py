@@ -44,7 +44,7 @@ from synplan.utils.parallel import graceful_shutdown, process_pool_map_stream
 
 logger = logging.getLogger(__name__)
 
-RuleOccurrence = tuple[str, str | None, bool]
+RuleOccurrence = tuple[str, str | None]
 
 
 def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
@@ -521,7 +521,6 @@ def create_rule(
 
     # 1. create reaction CGR
     cgr = ~reaction
-    source_is_multicenter = len(cgr.centers_list) > 1
     if _restrict_center_atoms is not None:
         center_atoms = set(_restrict_center_atoms)
     else:
@@ -590,12 +589,11 @@ def create_rule(
         if _skip_full_reaction_validation:
             # TODO: validate component-scoped rules against component-scoped products;
             # full-reaction validation is invalid for a single disconnected CGR center.
-            rule.meta["reactor_validation"] = "failed"
+            rule.meta["reactor_validation"] = "skipped_multicenter_component"
         elif validate_rule(rule, reaction):
             rule.meta["reactor_validation"] = "passed"
         else:
             rule.meta["reactor_validation"] = "failed"
-    rule.meta["source_is_multicenter"] = source_is_multicenter
 
     return rule
 
@@ -679,7 +677,6 @@ def _make_extracted_rule_record(rule: ReactionContainer) -> ExtractedRuleRecord:
         cgr_key=canonical_query_cgr_key(query_cgr),
         rule_smarts=_rule_to_reactor_smarts(rule),
         reactor_validation=rule.meta.get("reactor_validation"),
-        source_is_multicenter=rule.meta.get("source_is_multicenter", False),
     )
 
 
@@ -865,9 +862,9 @@ def process_extraction_result(
         per-reaction audit entries (multi-product skips, no-rules-extracted,
         parse errors). Used to build the final audit file in input-line order.
     :param reaction_rule_occurrences_by_index: Optional compact per-reaction
-        occurrence metadata. Each tuple stores the rule CGR key, validation
-        state, and whether that cleaned source reaction was multicenter. Used
-        after :func:`sort_rules` to attribute filtering to each occurrence.
+        occurrence metadata. Each tuple stores the rule CGR key and validation
+        outcome. Used after :func:`sort_rules` to attribute filtering to each
+        occurrence.
     :param audit_counts: Optional counter to accumulate audit-entry categories.
     :return: Number of reactions processed in this batch (for progress bar).
     """
@@ -881,11 +878,7 @@ def process_extraction_result(
         )
         if reaction_rule_occurrences_by_index is not None:
             reaction_rule_occurrences_by_index[index] = [
-                (
-                    rule_record.cgr_key,
-                    rule_record.reactor_validation,
-                    rule_record.source_is_multicenter,
-                )
+                (rule_record.cgr_key, rule_record.reactor_validation)
                 for rule_record in rule_records
             ]
         if products_file is not None:
@@ -976,10 +969,10 @@ def _filtered_rule_reason(
     ``"reactor_validation_<state>"`` (for non-passed sentinels),
     ``"below_min_popularity"`` or ``"retained"``.
     """
-    cgr_key, validation, source_is_multicenter = occurrence
+    cgr_key, validation = occurrence
+    if validation == "skipped_multicenter_component":
+        return "multicenter"
     if validation is not None and validation != "passed":
-        if source_is_multicenter:
-            return "multicenter"
         return f"reactor_validation_{validation}"
     if len(eligible_rules_statistics.get(cgr_key, [])) < min_popularity:
         return "below_min_popularity"
@@ -1012,8 +1005,8 @@ def _make_rule_filter_audit_entry(
     elif set(reason_counts) == {"multicenter"}:
         error_type = "MultiCenter"
         message = (
-            "all extracted rules were rejected during validation because the "
-            "source reaction has multiple reaction centers "
+            "full-reaction validation was skipped for all component rules "
+            "extracted from a multicenter reaction "
             f"(rules={reason_counts['multicenter']})"
         )
     elif all(reason.startswith("reactor_validation_") for reason in reason_counts):
@@ -1181,11 +1174,7 @@ def _extract_rules_serial(
             )
             if reaction_rule_occurrences_by_index is not None:
                 reaction_rule_occurrences_by_index[index] = [
-                    (
-                        rule_record.cgr_key,
-                        rule_record.reactor_validation,
-                        rule_record.source_is_multicenter,
-                    )
+                    (rule_record.cgr_key, rule_record.reactor_validation)
                     for rule_record in rule_records
                 ]
             if products_file is not None:

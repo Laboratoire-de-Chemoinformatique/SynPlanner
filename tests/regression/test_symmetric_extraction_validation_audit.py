@@ -244,9 +244,46 @@ def test_min_popularity_counts_only_eligible_support(
 
 
 @pytest.mark.parametrize(
-    "multicenter_rules",
-    [False, True],
-    ids=["split-centers", "combined-centers"],
+    ("multicenter_rules", "expected_status", "expected_validation_calls"),
+    [
+        pytest.param(False, "skipped_multicenter_component", 0, id="split-centers"),
+        pytest.param(True, "failed", 1, id="combined-centers"),
+    ],
+)
+def test_multicenter_rule_records_validation_outcome(
+    monkeypatch,
+    multicenter_rules,
+    expected_status,
+    expected_validation_calls,
+):
+    validation_calls = []
+
+    def validation_fails(rule, reaction):
+        validation_calls.append((rule, reaction))
+        return False
+
+    monkeypatch.setattr(
+        "synplan.chem.reaction.rules.extraction.validate_rule",
+        validation_fails,
+    )
+
+    rules, skipped = extract_rules(
+        _extraction_config(multicenter_rules=multicenter_rules),
+        smiles(_MULTI_CENTER_DEMETHYLATION),
+    )
+
+    assert not skipped
+    assert rules
+    assert len(validation_calls) == expected_validation_calls
+    assert {rule.meta["reactor_validation"] for rule in rules} == {expected_status}
+
+
+@pytest.mark.parametrize(
+    ("multicenter_rules", "expected_multicenter_error"),
+    [
+        pytest.param(False, "MultiCenter", id="split-centers"),
+        pytest.param(True, "ReactorValidationFailed", id="combined-centers"),
+    ],
 )
 @pytest.mark.parametrize(
     "reactions",
@@ -261,11 +298,12 @@ def test_min_popularity_counts_only_eligible_support(
         ),
     ],
 )
-def test_reactor_failure_audit_preserves_source_multicenter_classification(
+def test_reactor_failure_audit_uses_validation_cause(
     monkeypatch,
     tmp_path,
     reactions,
     multicenter_rules,
+    expected_multicenter_error,
 ):
     monkeypatch.setattr(
         "synplan.chem.reaction.rules.extraction.validate_rule",
@@ -285,7 +323,7 @@ def test_reactor_failure_audit_preserves_source_multicenter_classification(
     }
     assert error_type_by_reaction == {
         _SINGLE_CENTER_DEMETHYLATION: "ReactorValidationFailed",
-        _MULTI_CENTER_DEMETHYLATION: "MultiCenter",
+        _MULTI_CENTER_DEMETHYLATION: expected_multicenter_error,
     }
 
 
