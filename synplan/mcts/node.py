@@ -22,6 +22,7 @@ class Node:
         rule_source: str | None = None,
         rule_key: str | None = None,
         policy_rank: int | None = None,
+        remaining_required_bonds: frozenset[tuple[int, int]] | None = None,
     ) -> None:
         """Initialize the Node object.
 
@@ -60,6 +61,8 @@ class Node:
             or ``None`` whenever either component is missing.
         :param policy_rank: 1-indexed Top-N position from the policy network for
             policy-source rules; ``None`` for priority-source rules and the root.
+        :param remaining_required_bonds: Target bonds that must still be broken
+            before this branch can become a winning route.
         """
 
         self.precursors_to_expand = precursors_to_expand
@@ -82,6 +85,14 @@ class Node:
         self.rule_source = rule_source
         self.rule_key = rule_key
         self.policy_rank = policy_rank
+        self.remaining_required_bonds = frozenset(remaining_required_bonds or ())
+
+    def __setstate__(self, state: dict) -> None:
+        """Backfill required-bond state for pre-feature unconstrained pickles."""
+
+        self.__dict__.update(state)
+        if "remaining_required_bonds" not in state:
+            self.remaining_required_bonds = frozenset()
 
     def __len__(self) -> int:
         """Returns the number of precursor in the node to expand."""

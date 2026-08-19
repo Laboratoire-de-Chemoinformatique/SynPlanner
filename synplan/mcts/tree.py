@@ -3,6 +3,7 @@
 import logging
 import pickle
 from collections import deque
+from collections.abc import Mapping
 from dataclasses import dataclass, field, fields
 from os import PathLike
 from time import time
@@ -11,7 +12,11 @@ from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
 from synplan.chem.precursor import Precursor
-from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
+from synplan.chem.reaction import CanonicalRetroReactor, Reaction
+from synplan.chem.reaction.reactor import (
+    ReactionApplication,
+    iter_reaction_applications,
+)
 from synplan.chem.reaction.routes.quality.scorer import RouteScorer
 from synplan.chem.reaction.routes.traversal import (
     iter_route_nodes,
@@ -19,6 +24,11 @@ from synplan.chem.reaction.routes.traversal import (
     route_node_ids,
 )
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
+from synplan.chem.target_bonds import (
+    TargetAtomProvenance,
+    TargetBondConstraints,
+    removed_target_bonds,
+)
 from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.node import Node
 from synplan.mcts.policy import Policy, PriorityPolicy
@@ -130,6 +140,7 @@ class Tree:
         evaluation_function: EvaluationStrategy = None,
         route_scorer: RouteScorer | None = None,
         priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
+        bonds_state: Mapping[tuple[int, int], int] | None = None,
     ):
         """Initializes a tree object with optional parameters for tree search for target
         molecule.
@@ -163,10 +174,15 @@ class Tree:
             disconnect producing N qualifying fragments enters UCB with prior
             N. Multi-fragment priority disconnects (e.g. 4-component Ugi)
             therefore dominate sibling selection by design.
+        :param bonds_state: Optional target-bond state mapping keyed by unordered
+            Chython atom-number pairs. State ``0`` is unconstrained, state ``1``
+            requires the bond to be broken somewhere in every accepted route,
+            and state ``2`` rejects reaction candidates that break the bond.
         """
 
         # tree config parameters
         self.config = config
+        self._bond_constraints = TargetBondConstraints.from_state(target, bonds_state)
 
         # building blocks and reaction reaction_rules
         self.reaction_rules = tuple(reaction_rules)
@@ -255,6 +271,37 @@ class Tree:
             f"min_mol_size={config.min_mol_size}, "
             f"search_strategy={config.search_strategy}, "
             f"normalize_scores={config.normalize_scores}, "
+        )
+
+    @property
+    def bond_constraints(self) -> TargetBondConstraints:
+        """Return the immutable normalized target-bond constraints."""
+
+        return self._bond_constraints
+
+    @property
+    def bonds_state(self) -> dict[tuple[int, int], int]:
+        """Return a defensive normalized snapshot of the public mapping."""
+
+        return self._bond_constraints.as_dict()
+
+    @property
+    def required_break_bonds(self) -> frozenset[tuple[int, int]]:
+        """Return target bonds that every accepted route must break."""
+
+        return self._bond_constraints.required
+
+    def __setstate__(self, state: dict) -> None:
+        """Backfill empty constraints for pre-feature unconstrained pickles."""
+
+        constraints = state.pop("_bond_constraints", None)
+        state.pop("bonds_state", None)
+        state.pop("required_break_bonds", None)
+        self.__dict__.update(state)
+        self._bond_constraints = (
+            constraints
+            if isinstance(constraints, TargetBondConstraints)
+            else TargetBondConstraints()
         )
 
     def save_pickle(self, file_path: str | PathLike[str]) -> None:
@@ -351,9 +398,19 @@ class Tree:
         assert len(target) > 3, "Target molecule has less than 3 atoms"
 
         target_molecule = Precursor(target)
-        target_molecule.prev_precursors.append(Precursor(target))
+        root_provenance = TargetAtomProvenance.for_target(target_molecule.molecule)
+        target_molecule.target_atom_provenance = root_provenance
+        target_molecule.prev_precursors.append(
+            Precursor(
+                target_molecule.molecule,
+                canonicalize=False,
+                target_atom_provenance=root_provenance,
+            )
+        )
         target_node = Node(
-            precursors_to_expand=(target_molecule,), new_precursors=(target_molecule,)
+            precursors_to_expand=(target_molecule,),
+            new_precursors=(target_molecule,),
+            remaining_required_bonds=self.required_break_bonds,
         )
 
         return target_node
@@ -367,7 +424,7 @@ class Tree:
         curr_node = self.nodes[node_id]
         prev_precursor = curr_node.curr_precursor.prev_precursors
 
-        # Track raw product molecules to avoid repeating equivalent expansions
+        # Track product identities to avoid repeating equivalent expansions.
         tmp_products = set()
         context = _ExpansionContext(
             node_id=node_id,
@@ -385,13 +442,15 @@ class Tree:
                 candidate.rule_source != POLICY_SOURCE_NAME
                 and self.config.priority_rule_multiapplication
             )
-            for products in apply_reaction_rule(
-                curr_node.curr_precursor.molecule,
-                candidate.rule,
+            for application in iter_reaction_applications(
+                molecule=curr_node.curr_precursor.molecule,
+                reaction_rule=candidate.rule,
+                provenance=curr_node.curr_precursor.target_atom_provenance,
+                constraints=self._bond_constraints,
                 multirule=enable_multirule,
                 rm_dup=enable_multirule,
             ):
-                if self._add_child_if_new(context, products, candidate):
+                if self._add_child_if_new(context, application, candidate):
                     rule_produced = True
                     expanded = True
 
@@ -462,16 +521,35 @@ class Tree:
             return None
         return int(top_rules)
 
+    def _molecule_identity(
+        self,
+        molecule: MoleculeContainer,
+        provenance: TargetAtomProvenance,
+    ):
+        """Return a provenance-aware identity only for active constraints."""
+
+        if self._bond_constraints.active:
+            return molecule, provenance
+        return molecule
+
+    def _precursor_identity(self, precursor: Precursor):
+        """Return the identity used for cycle detection and pruning."""
+
+        if self._bond_constraints.active:
+            return precursor, precursor.target_atom_provenance
+        return precursor
+
     def _add_child_if_new(
         self,
         context: _ExpansionContext,
-        products,
+        application: ReactionApplication,
         candidate: _RuleCandidate,
     ) -> bool:
         """Add a child node if the generated products form a new valid state."""
 
         node_id = context.node_id
         curr_node = context.parent
+        products = application.products
         prev_precursor = context.previous_precursors
         tmp_products = context.seen_products
         prob = candidate.probability
@@ -479,9 +557,13 @@ class Tree:
         policy_rank = candidate.policy_rank
         rule_source = candidate.rule_source
 
-        if not products or not (set(products) - tmp_products):
+        product_identities = {
+            self._molecule_identity(molecule, provenance)
+            for molecule, provenance in application.states
+        }
+        if not products or not (product_identities - tmp_products):
             return False
-        tmp_products.update(products)
+        tmp_products.update(product_identities)
 
         rule_key = self._make_rule_key(rule_source, rule_id)
         for molecule in products:
@@ -490,9 +572,16 @@ class Tree:
             molecule.meta["rule_key"] = rule_key
             molecule.meta["policy_rank"] = policy_rank
 
-        # ``apply_reaction_rule`` already validated + canonicalized each
+        # The internal reaction generator already validated + canonicalized each
         # product in a single kekule pass; skip the redundant copy here.
-        new_precursor = tuple(Precursor(mol, canonicalize=False) for mol in products)
+        new_precursor = tuple(
+            Precursor(
+                molecule,
+                canonicalize=False,
+                target_atom_provenance=provenance,
+            )
+            for molecule, provenance in application.states
+        )
         # Multiply prob by the number of qualifying fragments so that
         # disconnections producing more usable precursors are preferred. Note:
         # priority rules enter here with prob=1.0, so a priority disconnect
@@ -503,7 +592,11 @@ class Tree:
             [mol for mol in products if len(mol) > self.config.min_mol_size]
         )
 
-        if not set(prev_precursor).isdisjoint(new_precursor):
+        previous_identities = {
+            self._precursor_identity(precursor) for precursor in prev_precursor
+        }
+        new_identities = {self._precursor_identity(p) for p in new_precursor}
+        if not previous_identities.isdisjoint(new_identities):
             return False
 
         precursors_to_expand = (
@@ -517,25 +610,45 @@ class Tree:
             ),
         )
 
+        broken_bonds = curr_node.remaining_required_bonds & removed_target_bonds(
+            (
+                curr_node.curr_precursor.molecule,
+                curr_node.curr_precursor.target_atom_provenance,
+            ),
+            application.states,
+        )
+        remaining_required_bonds = curr_node.remaining_required_bonds - broken_bonds
+        if not precursors_to_expand and remaining_required_bonds:
+            return False
+
         if self.config.enable_pruning:
+            pruning_key = (
+                (
+                    tuple(self._precursor_identity(p) for p in precursors_to_expand),
+                    remaining_required_bonds,
+                )
+                if self._bond_constraints.active
+                else precursors_to_expand
+            )
             if (
-                precursors_to_expand != ()
-                and precursors_to_expand
+                precursors_to_expand
+                and pruning_key
                 in self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks
             ):
                 existing_id = self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[
-                    precursors_to_expand
+                    pruning_key
                 ]
                 self.redundant_children[node_id].add(existing_id)
                 return True
 
             self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[
-                precursors_to_expand
+                pruning_key
             ] = self.curr_tree_size
 
         child_node = Node(
             precursors_to_expand=precursors_to_expand,
             new_precursors=new_precursor,
+            remaining_required_bonds=remaining_required_bonds,
         )
 
         for np in new_precursor:

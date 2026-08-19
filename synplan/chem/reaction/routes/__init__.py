@@ -30,6 +30,7 @@ _EXPORTS = {
     "cluster_route_from_csv": "clustering",
     "cluster_route_from_json": "clustering",
     "cluster_routes": "clustering",
+    "cluster_tree": "clustering",
     "extract_strat_bonds": "clustering",
     "group_by_identical_values": "clustering",
     "group_routes_by_synthon_detail": "clustering",

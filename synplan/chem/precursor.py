@@ -3,6 +3,7 @@ the search tree."""
 
 from chython.containers import MoleculeContainer
 
+from synplan.chem.target_bonds import TargetAtomProvenance
 from synplan.chem.utils import safe_canonicalization
 
 
@@ -10,13 +11,26 @@ class Precursor:
     """Precursor class is used to extend the molecule behavior needed for interaction with
     a tree in MCTS."""
 
-    def __init__(self, molecule: MoleculeContainer, canonicalize: bool = True):
+    def __init__(
+        self,
+        molecule: MoleculeContainer,
+        canonicalize: bool = True,
+        target_atom_provenance: TargetAtomProvenance | None = None,
+    ):
         """It initializes a Precursor object with a molecule container as a parameter.
 
         :param molecule: A molecule.
         """
         self.molecule = safe_canonicalization(molecule) if canonicalize else molecule
+        self.target_atom_provenance = target_atom_provenance or TargetAtomProvenance()
         self.prev_precursors = []
+
+    def __setstate__(self, state: dict) -> None:
+        """Backfill provenance when loading pre-feature unconstrained pickles."""
+
+        self.__dict__.update(state)
+        if "target_atom_provenance" not in state:
+            self.target_atom_provenance = TargetAtomProvenance()
 
     def __len__(self) -> int:
         """Return the number of atoms in Precursor."""

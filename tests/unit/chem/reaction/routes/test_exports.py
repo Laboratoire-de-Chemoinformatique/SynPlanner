@@ -1,6 +1,7 @@
 from chython.containers import ReactionContainer
 
-from synplan.chem.reaction.routes.clustering import cluster_routes
+from synplan.chem.reaction.routes import cluster_tree as root_cluster_tree
+from synplan.chem.reaction.routes.clustering import cluster_routes, cluster_tree
 from synplan.chem.reaction.routes.clustering.pseudo_atoms import DynamicX
 from synplan.chem.reaction.routes.quality import ProtectionConfig, RouteScorer
 from synplan.chem.reaction.routes.quality.protection.functional_groups import (
@@ -37,6 +38,8 @@ def test_clustering_exports_route_helpers():
     assert cgr_display.__name__ == "cgr_display"
     assert cluster_routes.__name__ == "cluster_routes"
     assert compose_all_route_cgrs.__name__ == "compose_all_route_cgrs"
+    assert cluster_tree.__name__ == "cluster_tree"
+    assert root_cluster_tree is cluster_tree
 
 
 def test_route_quality_exports_meaningful_helpers():
