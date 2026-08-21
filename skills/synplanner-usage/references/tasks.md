@@ -242,38 +242,38 @@ Docs: `configuration/policy` — "Training logger"
 `BBClassifier` assigns one or more of 147 ordered classes, then `BBSynthoniser`
 runs that class's rule program. CLI: `bb_classifying` → `bb_synthonizing`.
 Config: `synthonisation.yaml` → `SynthonConfig`.
-Module: `synplan.enumeration.synthon`
+Module: `synplan.synthon`
 
 **Cut a target into purchasable synthons**
 `Fragmenter.fragment` builds a disconnection DAG with the 39 disconnection rules
 (plus their 39 macrocyclic twins, used only when the target has a ring larger
 than 11 atoms). CLI: `synthon_fragment --stock`.
-Module: `synplan.enumeration.synthon.fragment`
+Module: `synplan.synthon.fragment`
 
 **Recombine stocked synthons into new molecules**
 `Enumerator.enumerate_library` for unconstrained library design,
 `Enumerator.enumerate_analogues` for analogues of one fragmentation pathway.
 CLI: `synthon_enumerate`.
-Module: `synplan.enumeration.synthon.enumeration`
+Module: `synplan.synthon.enumeration`
 
 **Use the synthon disconnections during planning**
 `synthon_priority_rules()` returns them as `run_search(priority_rules=...)` input
 under the source name `"synthon"`; set `use_priority=True` in the search config
 or they are ignored. The children are ordinary molecules against the ordinary
 building-block stock — there is no synthon stock in the tree.
-Module: `synplan.enumeration.synthon.priority`
+Module: `synplan.synthon.priority`
 
 **Drop reactions the synthon rules already cover from a training corpus**
 `classify_coverage` says whether a mapped reaction builds a bond one of the 39
 acyclic disconnections breaks, with the reactant-side leaving groups checked
 against the rule's labels. CLI: `synthon_coverage --keep uncovered|covered`.
 37.9% of a 100k USPTO sample is covered.
-Module: `synplan.enumeration.synthon.coverage`
+Module: `synplan.synthon.coverage`
 
 **Catalogue analysis**
 `bb_scaffolds` writes Bemis-Murcko scaffolds after removing the ring-containing
 protecting groups; `ro2_pass` applies the rule of two.
-Module: `synplan.chem.scaffolds`, `synplan.enumeration.synthon.stock`
+Module: `synplan.chem.scaffolds`, `synplan.synthon.stock`
 
 **Keep an auditable record of any synthon CLI run**
 All five audited synthon commands accept `synthonisation.yaml`
@@ -286,8 +286,8 @@ preserves the complete fragmentation TSV row. `fallback.tsv` also records
 processing errors. Metadata on SMI/CXSMILES records must be separated by TAB.
 
 **Regenerate the shipped synthon data**
-`python -m synplan.enumeration.synthon.data._convert <Synt-On/config> --out
-synplan/enumeration/synthon/data --check`. The JSON is committed; nothing translates at
+`python -m synplan.synthon.data._convert <Synt-On/config> --out
+synplan/synthon/data --check`. The JSON is committed; nothing translates at
 import time.
 
 ## When old code stops working

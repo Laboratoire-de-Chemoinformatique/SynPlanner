@@ -9,8 +9,8 @@ from chython import smiles, synthon_smiles
 from chython.containers import MoleculeContainer, SynthonContainer
 
 from synplan.chem.utils import safe_canonicalization
-from synplan.enumeration.synthon.config import SynthonConfig, load_data
-from synplan.enumeration.synthon.reactor import SynthonTransformer
+from synplan.synthon.config import SynthonConfig, load_data
+from synplan.synthon.reactor import SynthonTransformer
 
 # the study list from the paper's own worked examples, H-capped: upstream spells each of these
 # twice because `[V]` counts as a heavy atom and `*` does not. Off by default.

@@ -8,16 +8,16 @@ from chython import smiles, synthon_smiles
 
 from synplan.chem.scaffolds import scaffold_smiles
 from synplan.chem.utils import safe_canonicalization
-from synplan.enumeration.synthon.config import SynthonConfig
-from synplan.enumeration.synthon.enumeration import (
+from synplan.synthon.config import SynthonConfig
+from synplan.synthon.enumeration import (
     Enumerator,
     join,
     load_pairs,
     open_points,
 )
-from synplan.enumeration.synthon.fragment import Fragmenter, fragment_smiles
-from synplan.enumeration.synthon.stock import ro2_pass
-from synplan.enumeration.synthon.synthonise import BBSynthoniser
+from synplan.synthon.fragment import Fragmenter, fragment_smiles
+from synplan.synthon.stock import ro2_pass
+from synplan.synthon.synthonise import BBSynthoniser
 
 FIXTURES = Path(__file__).resolve().parents[1] / "data" / "synthon"
 

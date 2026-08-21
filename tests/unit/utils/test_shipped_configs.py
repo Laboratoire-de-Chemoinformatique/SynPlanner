@@ -11,7 +11,7 @@ import yaml
 
 from synplan.chem.data.filtering import ReactionFilterConfig
 from synplan.chem.data.standardizing import ReactionStandardizationConfig
-from synplan.enumeration.synthon.config import SynthonConfig
+from synplan.synthon.config import SynthonConfig
 from synplan.utils.config import (
     CombinedPolicyConfig,
     PolicyNetworkConfig,

@@ -9,9 +9,9 @@ from chython import smarts
 
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.rules import parse_priority_rules, rule_query_pattern
-from synplan.enumeration.synthon.config import SynthonConfig, load_data
-from synplan.enumeration.synthon.fragment import _select
-from synplan.enumeration.synthon.reactor import RULE_NUCLEOPHILE_CAPS
+from synplan.synthon.config import SynthonConfig, load_data
+from synplan.synthon.fragment import _select
+from synplan.synthon.reactor import RULE_NUCLEOPHILE_CAPS
 
 SYNTHON_SOURCE_NAME = "synthon"
 """``rule_source`` these rules carry into ``tree.stats.per_priority_source``."""

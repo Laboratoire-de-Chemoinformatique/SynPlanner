@@ -15,15 +15,6 @@ from synplan.chem.data.standardizing import (
 from synplan.chem.reaction.routes.cli import run_cluster_cli
 from synplan.chem.reaction.rules.extraction import extract_rules_from_reactions
 from synplan.chem.utils import standardize_building_blocks
-from synplan.enumeration.synthon.cli import (
-    classify_file,
-    coverage_file,
-    enumerate_file,
-    fragment_file,
-    scaffolds_file,
-    synthonise_file,
-)
-from synplan.enumeration.synthon.config import SynthonConfig
 from synplan.mcts.search import run_search
 from synplan.ml.training.reinforcement import run_updating
 from synplan.ml.training.supervised import (
@@ -31,6 +22,15 @@ from synplan.ml.training.supervised import (
     run_mhn_network_tuning,
     run_policy_training,
 )
+from synplan.synthon.cli import (
+    classify_file,
+    coverage_file,
+    enumerate_file,
+    fragment_file,
+    scaffolds_file,
+    synthonise_file,
+)
+from synplan.synthon.config import SynthonConfig
 from synplan.utils.config import (
     CombinedPolicyConfig,
     PolicyEvaluationConfig,

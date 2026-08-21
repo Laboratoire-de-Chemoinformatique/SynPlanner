@@ -10,12 +10,12 @@ from chython.periodictable.base.synthon import BIVALENT_LABELS
 from rdkit.Chem import AddHs, Crippen
 from rdkit.Chem.rdMolDescriptors import CalcExactMolWt, CalcNumHBA, CalcNumHBD
 
-from synplan.enumeration.synthon.analogues import (
+from synplan.synthon.analogues import (
     analogue_key,
     find_analogues,
     index_for_analogues,
 )
-from synplan.enumeration.synthon.config import SynthonConfig, load_data
+from synplan.synthon.config import SynthonConfig, load_data
 from synplan.utils.files import iter_smiles_records
 
 # MW > 200 or logP > 2 or HBD > 2 or HBA > 4 rejects. Identical across all three upstream

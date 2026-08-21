@@ -7,9 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Added `synplan.enumeration`, the combinatorial library enumeration capability. Its first
-  method, `synplan.enumeration.synthon`, is a native port of Synt-On (SynthI; Zabolotna,
-  Volochnyuk, Ryabukhin, Gavrylenko, Horvath, Klimchuk, Oksiuta, Marcou, Varnek, "SynthI:
+- Added `synplan.synthon`, a native port of Synt-On (SynthI; Zabolotna, Volochnyuk, Ryabukhin,
+  Gavrylenko, Horvath, Klimchuk, Oksiuta, Marcou, Varnek, "SynthI:
   A New Open-Source Tool for Synthon-Based Library Design", *J. Chem. Inf. Model.* 2022,
   62(9), 2151-2163, doi:10.1021/acs.jcim.1c00754). A synthon is a valence-complete
   fragment whose atoms carry a reaction-centre label saying how that atom will
@@ -37,7 +36,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   asks for.
 
   The reference's RDKit SMARTS are translated once, offline, by
-  `synplan.enumeration.synthon.data._convert`; its output is committed and asserted in the
+  `synplan.synthon.data._convert`; its output is committed and asserted in the
   test suite, and nothing translates at import time.
 
   Reproduces the paper's catalogue-free published numbers: 9/9 building-block
@@ -195,7 +194,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   consumer and now imports it when called, so the process pool helpers and `default_num_workers`
   are torch-free. The synthon package took the framework purely to reach
   `min(os.cpu_count() or 4, cap)`, which cost 366 ms of a 501 ms import; importing
-  `synplan.enumeration.synthon.config` now takes 143 ms and pulls no torch at all.
+  `synplan.synthon.config` now takes 143 ms and pulls no torch at all.
 
 - `chython-synplan` is pinned to 1.103 and sourced from the local fork, which adds the
   `Synthon` atom family, `SynthonContainer`, the `_token` bracket field in SMILES and

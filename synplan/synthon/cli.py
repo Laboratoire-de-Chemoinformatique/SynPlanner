@@ -6,10 +6,10 @@ from pathlib import Path
 from chython import smiles, synthon_smiles
 from chython.containers import MoleculeContainer, ReactionContainer
 
-import synplan.enumeration.synthon.synthonise as _synthonise_workers
+import synplan.synthon.synthonise as _synthonise_workers
 from synplan.chem.scaffolds import murcko_scaffold
 from synplan.chem.utils import safe_canonicalization
-from synplan.enumeration.synthon.audit import (
+from synplan.synthon.audit import (
     AuditError,
     AuditOutcome,
     AuditRun,
@@ -17,19 +17,19 @@ from synplan.enumeration.synthon.audit import (
     iter_molecule_records,
     iter_pathway_records,
 )
-from synplan.enumeration.synthon.config import SynthonConfig
-from synplan.enumeration.synthon.coverage import (
+from synplan.synthon.config import SynthonConfig
+from synplan.synthon.coverage import (
     classify_coverage,
     load_coverage_rules,
 )
-from synplan.enumeration.synthon.enumeration import Enumerator
-from synplan.enumeration.synthon.fragment import Fragmenter
-from synplan.enumeration.synthon.stock import (
+from synplan.synthon.enumeration import Enumerator
+from synplan.synthon.fragment import Fragmenter
+from synplan.synthon.stock import (
     SynthonRecord,
     load_synthon_stock,
     write_synthon_stock,
 )
-from synplan.enumeration.synthon.synthonise import (
+from synplan.synthon.synthonise import (
     classify_batch,
     init_worker,
     synthonise_batch,

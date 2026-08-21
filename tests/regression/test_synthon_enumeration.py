@@ -8,17 +8,17 @@ from chython.containers import SynthonContainer
 from rdkit import Chem
 
 from synplan.chem.utils import safe_canonicalization
-from synplan.enumeration.synthon.cli import enumerate_file
-from synplan.enumeration.synthon.config import SynthonConfig, load_data
-from synplan.enumeration.synthon.enumeration import (
+from synplan.synthon.cli import enumerate_file
+from synplan.synthon.config import SynthonConfig, load_data
+from synplan.synthon.enumeration import (
     Enumerator,
     join,
     load_pairs,
     open_points,
 )
-from synplan.enumeration.synthon.fragment import Fragmenter
-from synplan.enumeration.synthon.reactor import SynthonTransformer
-from synplan.enumeration.synthon.stock import SynthonRecord, write_synthon_stock
+from synplan.synthon.fragment import Fragmenter
+from synplan.synthon.reactor import SynthonTransformer
+from synplan.synthon.stock import SynthonRecord, write_synthon_stock
 
 HYDROGEN = 1.008
 
