@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Added `synplan.synthon`, a native port of Synt-On (SynthI; Zabolotna, Volochnyuk, Ryabukhin,
+- Added `synplan.chem.synthon`, a native port of Synt-On (SynthI; Zabolotna, Volochnyuk, Ryabukhin,
   Gavrylenko, Horvath, Klimchuk, Oksiuta, Marcou, Varnek, "SynthI:
   A New Open-Source Tool for Synthon-Based Library Design", *J. Chem. Inf. Model.* 2022,
   62(9), 2151-2163, doi:10.1021/acs.jcim.1c00754). A synthon is a valence-complete
@@ -36,7 +36,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   asks for.
 
   The reference's RDKit SMARTS are translated once, offline, by
-  `synplan.synthon.data._convert`; its output is committed and asserted in the
+  `synplan.chem.synthon.rules._convert`; its output is committed and asserted in the
   test suite, and nothing translates at import time.
 
   Reproduces the paper's catalogue-free published numbers: 9/9 building-block
@@ -166,7 +166,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   structure and yields nothing. Partner selection is not implemented, so the tree does
   not yet pass co-reactants during expansion.
 
-- Added `synplan.chem.data.rebalancing`, which adds the molecules an unbalanced
+- Added `synplan.chem.reaction.curation.rebalancing`, which adds the molecules an unbalanced
   reaction is missing without needing atom mapping. Missing carbon is recovered
   as a substructure of the reactants, and the remaining deficit is covered from
   a table of small molecules. Where the reaction is mapped, the CGR names the
@@ -190,11 +190,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Package layout is now written down and enforced. `docs/development/package_layout.rst` states
+  seven rules — four import layers, configuration beside its domain, verbs for pipeline stages and
+  nouns for things, no package named `data`, adapters beside their target named after their source,
+  entry points only in `interfaces`, and flat packages until roughly ten modules — plus a table
+  saying where a new use case belongs. `tests/unit/test_package_layers.py` asserts the layer graph;
+  three modules under `utils` are recorded there as known violations so the debt stays visible and
+  cannot grow.
+
+  Applying those rules moved several things. `synplan.synthon` is now `synplan.chem.synthon`: it
+  imports from `chem` and nothing in `chem` imports it back, so it was always a leaf on top of the
+  chemistry, not a peer of it. Inside it, `enumeration` became `enumerate` and `reactor` became
+  `transformer` (which also ends the collision with `chem.reaction.reactor`), `data` became `rules`
+  because it holds the shipped rule files, and `authoring` became `rules.validate` next to the
+  converter that should call it. The command layer left the package: `cli` and `audit` are now
+  `synplan.interfaces.synthon_commands` and `synplan.interfaces.synthon_audit`. The priority-rule
+  adapter moved to `synplan.chem.reaction.rules.synthon`, beside the loader it feeds.
+
+  `synplan.chem.data` became `synplan.chem.reaction.curation` — it holds no data, only the
+  standardizing, filtering, mapping and rebalancing pipeline, and the old name collided with the
+  synthon package's genuine data directory.
+
+  `synplan.utils.config` was 767 lines holding every package's configuration. `TreeConfig` and the
+  evaluation configs are now in `synplan.mcts.config`, the policy, value and tuning configs in
+  `synplan.ml.config`, `ReactorConfig` in `synplan.chem.reaction.config` and `RuleExtractionConfig`
+  in `synplan.chem.reaction.rules.config`; `synplan.utils.config` keeps only `BaseConfigModel` and
+  `NestedConfigContainer`, which makes `utils` a leaf again.
+
+  Every old import path still works, resolved lazily through a module-level `__getattr__` so that
+  the shims do not reintroduce the import edges the layer rule forbids, and each emits a
+  `DeprecationWarning` naming its replacement.
+
 - `synplan.utils.parallel` no longer imports torch at module level. `select_device` is its only
   consumer and now imports it when called, so the process pool helpers and `default_num_workers`
   are torch-free. The synthon package took the framework purely to reach
   `min(os.cpu_count() or 4, cap)`, which cost 366 ms of a 501 ms import; importing
-  `synplan.synthon.config` now takes 143 ms and pulls no torch at all.
+  `synplan.chem.synthon.config` now takes 143 ms and pulls no torch at all.
 
 - `chython-synplan` is pinned to 1.103 and sourced from the local fork, which adds the
   `Synthon` atom family, `SynthonContainer`, the `_token` bracket field in SMILES and
@@ -562,7 +593,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Writer-side CGR dedup: `hash(~rxn)` (condensed graph of reaction hash) for
   mechanism-level reaction deduplication — 8 bytes per entry in memory
 - New shared result types: `ProcessResult`, `ErrorEntry`, `FilteredEntry`,
-  `PipelineSummary` in `synplan.chem.data.reaction_result`
+  `PipelineSummary` in `synplan.chem.reaction.curation.reaction_result`
 
 #### Compatibility
 - Removed `from __future__ import annotations` from all modules (Dagster

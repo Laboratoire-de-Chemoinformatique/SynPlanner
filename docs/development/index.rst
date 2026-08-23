@@ -8,10 +8,13 @@ requests, and cutting a release.
    :maxdepth: 1
 
    setup
+   package_layout
    pr_review
    release
 
 - :doc:`setup` — uv environment, running tests, building Docker images.
+- :doc:`package_layout` — which package a new module belongs in, and how it
+  is named.
 - :doc:`pr_review` — the checklist to work through before approving a pull
   request, including which documentation a change must update.
 - :doc:`release` — version bumping, the pre-release checklist, and publishing
