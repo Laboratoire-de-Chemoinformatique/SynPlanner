@@ -3,8 +3,9 @@ name: CI
 on:
   push:
     branches: [ main ]
+  # No base-branch filter: a stacked PR targets the branch below it, not main,
+  # and would otherwise run no tests until its parent merged.
   pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 permissions:
