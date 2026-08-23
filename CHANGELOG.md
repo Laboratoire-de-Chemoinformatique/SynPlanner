@@ -203,6 +203,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Nine more tests asserted a shape rather than a behaviour, each confirmed by mutating the code they
+  cover and watching them stay green. The MHN ranking network had no behavioural test at all: collapsing
+  every rule to one identical association vector — leaving the model unable to rank anything, which is its
+  entire job — passed all 46 tests in the suite's largest file. It now asserts the ranking contract, that
+  two rules are scored apart and that permuting the rule rows permutes the logits. `classify_reaction_type_detailed`
+  was verified only by `rtype in (...)` tuples that included the `"other"` fallback, so stubbing the whole
+  function to return `"other"` passed; each case now asserts the specific label its reaction must produce.
+  `Tree.to_stats_dict` was checked by key name, so returning every value zeroed passed. Three
+  `RouteScanner` tests looped over `interactions` without asserting the list was non-empty, so returning
+  `[]` passed; they are now one test asserting the exact interaction. `test_compose_route_cgr_tree_based_invalid_route_id`
+  never called the function it named. `Precursor` construction was asserted with `is not None`, so dropping
+  canonicalisation passed. Retro-amidation asserted only that some product came back, so emitting an amine
+  instead of a carboxylic acid passed.
+
+- `classify_reaction_type_detailed` documented an `'acylation'` return value it cannot produce — the more
+  specific amide and ester branches always match first — and the changelog advertised the classifier as
+  12-category. Both now say 11, which is what the function actually returns. Behaviour is unchanged; the
+  loose tests were what let the wrong count ship.
+
 - Four tests asserted a shape rather than a behaviour and passed against broken code. Each was
   rewritten and then re-checked by re-applying the mutation that had slipped through.
   `test_audit_run_publishes_consistent_sidecars_and_summary` verified every artifact's provenance
@@ -720,7 +739,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   from Westerlund et al. (ChemRxiv, 2025)
 - `FunctionalGroupDetector` with 102 SMARTS patterns across 18 reactivity categories
 - `HalogenDetector` with 140 SMARTS patterns across 5 halogen families
-- CGR-based `ReactionClassifier` with broad (4-category) and detailed (12-category)
+- CGR-based `ReactionClassifier` with broad (4-category) and detailed (11-category)
   reaction type classification
 - `IncompatibilityMatrix` with 3-level severity (compatible / competing / incompatible)
 - `RouteScanner` for per-step competing functional group interaction detection

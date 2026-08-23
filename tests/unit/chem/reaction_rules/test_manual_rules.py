@@ -28,18 +28,21 @@ def test_rules_are_built(module):
 def test_every_rule_builds_a_reactor(module):
     """A rule that cannot become a Reactor cannot be applied to anything."""
     for i, rule in enumerate(module.rules):
-        (
-            Reactor([rule.reactants[0]], list(rule.products), delete_atoms=True),
-            f"rule {i}",
-        )
+        reactor = Reactor([rule.reactants[0]], list(rule.products), delete_atoms=True)
+        assert reactor is not None, f"rule {i}"
 
 
 def test_amide_decomposition_fires():
-    """Spot-check that a rule does chemistry, not just construct."""
+    """Retro-amidation of N-ethylacetamide gives acetic acid and ethylamine."""
     rule = decompositions.rules[0]
     reactor = Reactor([rule.reactants[0]], list(rule.products), delete_atoms=True)
     molecule = smiles("CC(=O)NCC")
     molecule.canonicalize()
 
-    products = list(reactor(molecule))
-    assert products, "retro-amidation did not fire on N-ethylacetamide"
+    reactions = list(reactor(molecule))
+    assert len(reactions) == 1, "retro-amidation did not fire on N-ethylacetamide"
+    products = set()
+    for product in reactions[0].products:
+        product.canonicalize()
+        products.add(str(product))
+    assert products == {"O=C(O)C", "CCN"}

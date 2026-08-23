@@ -122,7 +122,7 @@ def test_matrix_from_custom_tsv(tmp_path):
 
 
 def test_scan_route_with_single_step(scanner):
-    """Scanning a single-step route with a competing FG."""
+    """The free -OH left on the ester product competes with the acid at the centre."""
     # Esterification of a molecule that also has a hydroxyl group
     rxn = smiles(
         "[CH3:1][C:2](=[O:3])[OH:4].[OH:5][CH2:6][CH2:7][OH:8]>>"
@@ -130,10 +130,16 @@ def test_scan_route_with_single_step(scanner):
     )
     route = {0: rxn}
     interactions, halogen_count = scanner.scan_route(route)
-    assert isinstance(interactions, list)
-    for inter in interactions:
-        assert isinstance(inter, CompetingInteraction)
-        assert inter.step_id == 0
+    # Severity comes from the reacting FG at the centre, not the reaction type.
+    assert interactions == [
+        CompetingInteraction(
+            step_id=0,
+            fg_name="PrimaryAlcoholAliphatic",
+            fg_atoms=(8,),
+            reacting_fg="Acid_SaturatedAliphatic",
+            severity="competing",
+        )
+    ]
     assert halogen_count == 0
 
 
@@ -167,32 +173,6 @@ def test_scan_route_two_step(scanner):
     step_ids = {inter.step_id for inter in interactions}
     # At least step 0 should have interactions (free -OH on product)
     assert 0 in step_ids
-
-
-def test_scan_route_reacting_fg_field(scanner):
-    """CompetingInteraction should have the reacting_fg field set."""
-    rxn = smiles(
-        "[CH3:1][C:2](=[O:3])[OH:4].[OH:5][CH2:6][CH2:7][OH:8]>>"
-        "[CH3:1][C:2](=[O:3])[O:5][CH2:6][CH2:7][OH:8].[OH2:4]"
-    )
-    route = {0: rxn}
-    interactions, _ = scanner.scan_route(route)
-    for inter in interactions:
-        # reacting_fg should be a string or None
-        assert inter.reacting_fg is None or isinstance(inter.reacting_fg, str)
-
-
-def test_scan_route_severity_depends_on_reacting_fg(scanner):
-    """Severity should depend on the reacting FG, not the reaction type."""
-    rxn = smiles(
-        "[CH3:1][C:2](=[O:3])[OH:4].[OH:5][CH2:6][CH2:7][OH:8]>>"
-        "[CH3:1][C:2](=[O:3])[O:5][CH2:6][CH2:7][OH:8].[OH2:4]"
-    )
-    route = {0: rxn}
-    interactions, _ = scanner.scan_route(route)
-    for inter in interactions:
-        # Severity should be a valid label
-        assert inter.severity in ("compatible", "competing", "incompatible")
 
 
 def test_scan_route_with_halogen_detector(scanner_with_halogens):

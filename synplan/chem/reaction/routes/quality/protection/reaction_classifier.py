@@ -117,7 +117,6 @@ def classify_reaction_type_detailed(
     reaction center to return a more specific label.
 
     Possible return values:
-        - ``'acylation'`` -- C=O at center + new C-N or C-O bond
         - ``'alkylation'`` -- new C-N, C-O, or C-S bond without C=O at center
         - ``'reduction'`` -- net bond order decrease
         - ``'oxidation'`` -- net bond order increase

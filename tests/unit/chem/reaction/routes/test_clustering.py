@@ -1,6 +1,7 @@
 import pickle
 
 import pytest
+from chython import smiles
 from chython.containers import CGRContainer, ReactionContainer
 
 from synplan.chem.reaction.routes.clustering import (
@@ -29,10 +30,9 @@ def test_cluster_routes_empty():
     assert cluster_routes({}, use_strat=False) == {}
 
 
-@pytest.mark.parametrize("use_strat", [False, True])
-def test_cluster_routes_valid(sb_cgrs_dict, use_strat):
+def test_cluster_routes_valid(sb_cgrs_dict):
     """cluster_routes groups all routes and includes every entry."""
-    clusters = cluster_routes(sb_cgrs_dict, use_strat=use_strat)
+    clusters = cluster_routes(sb_cgrs_dict, use_strat=False)
 
     assert isinstance(clusters, dict)
     # Every original route ID must appear in exactly one cluster
@@ -51,6 +51,20 @@ def test_cluster_routes_valid(sb_cgrs_dict, use_strat):
         assert "sb_cgr" in value
         assert "strat_bonds" in value
         assert "group_size" in value
+
+
+def test_cluster_routes_use_strat_ignores_chemistry():
+    """use_strat groups by strategic bond positions, otherwise by SB-CGR signature."""
+    sb_cgrs = {
+        0: smiles("[CH3:1].[CH3:2][Cl:3]>>[CH3:1][CH3:2].[ClH:3]").compose(),
+        1: smiles("[NH3:1].[CH3:2][Cl:3]>>[NH2:1][CH3:2].[ClH:3]").compose(),
+    }
+
+    by_strat = cluster_routes(sb_cgrs, use_strat=True)
+    by_signature = cluster_routes(sb_cgrs, use_strat=False)
+
+    assert [g["route_ids"] for g in by_strat.values()] == [[0, 1]]
+    assert sorted(g["route_ids"] for g in by_signature.values()) == [[0], [1]]
 
 
 def test_subcluster_one_cluster_valid(sb_cgrs_dict, routes_cgrs_dict):
@@ -104,11 +118,9 @@ def test_subcluster_one_cluster_empty():
 
 
 def test_subcluster_one_cluster_invalid_route():
-    """subcluster_one_cluster returns None if route_id is missing in dicts."""
-    group = {"route_ids": ["nonexistent"]}
+    """subcluster_one_cluster raises KeyError if route_id is missing in dicts."""
     with pytest.raises(KeyError):
-        result = subcluster_one_cluster(group, {}, {})
-        assert result is None
+        subcluster_one_cluster({"route_ids": ["nonexistent"]}, {}, {})
 
 
 def test_subcluster_all_clusters(sb_cgrs_dict, routes_cgrs_dict):
@@ -123,7 +135,6 @@ def test_subcluster_all_clusters(sb_cgrs_dict, routes_cgrs_dict):
     total_subclusters = 0
     for cluster in subclusters.values():
         for subcluster in cluster.values():
-            print(subcluster)
             total_subclusters += len(subcluster["routes_data"])
 
     assert len(sb_cgrs_dict) == total_clusters == total_subclusters

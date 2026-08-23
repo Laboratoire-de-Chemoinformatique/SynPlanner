@@ -613,37 +613,43 @@ def test_graph_embedder_builder_validates_contract():
         build_graph_embedder("gcn_concat", 10, num_conv_layers=3)
 
 
-def test_mhn_logits_probabilities_and_gradient_flow():
+def test_mhn_ranks_fingerprint_rules_positionally():
+    torch.manual_seed(1)
     fingerprints = rule_fingerprints_from_smarts((RULE_A, RULE_B), _fp_config())
-    network = _fp_network(fingerprints)
+    network = _fp_network(fingerprints).eval()
     batch = _graph_batch()
 
     logits = network.get_logits(batch)
-    probs = network(batch)
+    swapped = network.get_logits(batch, rule_fingerprints=fingerprints.flip(0))
+
+    # Distinct rules must be ranked apart, and each logit must follow its rule row
     assert tuple(logits.shape) == (1, 2)
-    assert tuple(probs.shape) == (1, 2)
-    assert torch.allclose(probs.sum(dim=-1), torch.ones(1))
+    assert (logits[0, 0] - logits[0, 1]).abs() > 1e-3
+    assert torch.allclose(swapped, logits.flip(-1))
+    assert torch.allclose(network(batch).sum(dim=-1), torch.ones(1))
 
     # Gradient flows through molecule embedding and rule embedding
-    loss = logits.sum()
-    loss.backward()
+    logits.sum().backward()
     assert network.molecule_embedding[0].weight.grad is not None
     assert network.rule_embedding.projection[0].weight.grad is not None
 
 
-def test_mhn_query_cgr_graph_logits_and_gradient_flow():
+def test_mhn_ranks_query_cgr_graph_rules_positionally():
+    torch.manual_seed(1)
     rule_graphs = query_cgr_graphs_from_smarts((RULE_A, RULE_B))
-    network = _graph_rule_network(rule_graphs)
+    # eval(): performer attention resamples projections in train mode
+    network = _graph_rule_network(rule_graphs).eval()
     batch = _graph_batch()
 
     logits = network.get_logits(batch)
-    probs = network(batch)
-    assert tuple(logits.shape) == (1, 2)
-    assert tuple(probs.shape) == (1, 2)
-    assert torch.allclose(probs.sum(dim=-1), torch.ones(1))
+    swapped = network.get_logits(batch, rule_graphs=[rule_graphs[1], rule_graphs[0]])
 
-    loss = logits.sum()
-    loss.backward()
+    assert tuple(logits.shape) == (1, 2)
+    assert (logits[0, 0] - logits[0, 1]).abs() > 1e-3
+    assert torch.allclose(swapped, logits.flip(-1))
+    assert torch.allclose(network(batch).sum(dim=-1), torch.ones(1))
+
+    logits.sum().backward()
     assert network.embedder.node_expansion.weight.grad is not None
     assert network.rule_embedder is not None
     assert network.rule_embedder.node_expansion.weight.grad is not None
