@@ -39,7 +39,7 @@ def _identity(x):
 
 
 def _slow_identity(x):
-    time.sleep(0.5)
+    time.sleep(0.1)
     return x
 
 
@@ -105,7 +105,10 @@ def test_timeout_with_callback():
             _hang_on_value,
             max_workers=2,
             ordered=True,
-            timeout=5,  # generous timeout for slow CI (Windows)
+            # Covers pool spawn under load: with `-n auto` this file shares the
+            # machine with other workers spawning their own pools. The hung item
+            # sleeps 9999s, so a larger budget cannot mask a missing timeout.
+            timeout=5,
             on_timeout=on_timeout,
         )
     )
@@ -133,7 +136,7 @@ def test_timeout_raises_without_callback():
                 _hang_on_value,
                 max_workers=1,
                 ordered=True,
-                timeout=1,
+                timeout=5,  # spawn headroom; the only item hangs for 9999s
             )
         )
 
