@@ -7,18 +7,18 @@ from chython import smiles, synthon_smiles
 from chython.containers import SynthonContainer
 from rdkit import Chem
 
-from synplan.chem.utils import safe_canonicalization
-from synplan.synthon.cli import enumerate_file
-from synplan.synthon.config import SynthonConfig, load_data
-from synplan.synthon.enumeration import (
+from synplan.chem.synthon.config import SynthonConfig, load_data
+from synplan.chem.synthon.enumerate import (
     Enumerator,
     join,
     load_pairs,
     open_points,
 )
-from synplan.synthon.fragment import Fragmenter
-from synplan.synthon.reactor import SynthonTransformer
-from synplan.synthon.stock import SynthonRecord, write_synthon_stock
+from synplan.chem.synthon.fragment import Fragmenter
+from synplan.chem.synthon.stock import SynthonRecord, write_synthon_stock
+from synplan.chem.synthon.transformer import SynthonTransformer
+from synplan.chem.utils import safe_canonicalization
+from synplan.interfaces.synthon_commands import enumerate_file
 
 HYDROGEN = 1.008
 

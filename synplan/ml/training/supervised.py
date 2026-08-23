@@ -17,6 +17,10 @@ from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 from torch.utils.data import Subset, random_split
 from torch_geometric.data.lightning import LightningDataset
 
+from synplan.ml.config import (
+    MHNRankingPolicyNetworkConfig,
+    PolicyNetworkConfig,
+)
 from synplan.ml.networks.checkpoint import load_policy_network_from_checkpoint
 from synplan.ml.networks.policy.mhnreact import MHNReact
 from synplan.ml.training.lightning import GradNormLogger, LitNetworkTrainer
@@ -31,7 +35,6 @@ from synplan.ml.training.trainers import (
     validate_ranking_labels,
 )
 from synplan.utils.cache import cache_digest
-from synplan.utils.config import MHNRankingPolicyNetworkConfig, PolicyNetworkConfig
 from synplan.utils.logging import DisableLogger, HiddenPrints
 
 warnings.filterwarnings("ignore")

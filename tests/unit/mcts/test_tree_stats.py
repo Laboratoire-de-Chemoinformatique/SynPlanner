@@ -5,9 +5,12 @@ from collections.abc import Callable
 import pytest
 from chython.containers import MoleculeContainer
 
+from synplan.mcts.config import (
+    RolloutEvaluationConfig,
+    TreeConfig,
+)
 from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.tree import Tree, TreeStats
-from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import load_evaluation_function
 
 # -- Helpers (same pattern as test_algorithm.py) --

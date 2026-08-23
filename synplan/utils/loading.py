@@ -19,6 +19,7 @@ from huggingface_hub import hf_hub_download, snapshot_download
 from tqdm.auto import tqdm
 
 from synplan.chem.reaction import CanonicalRetroReactor
+from synplan.chem.reaction.config import ReactorConfig
 from synplan.chem.utils import (
     AtomMappingCheck,
     reaction_string_mapping_status,
@@ -26,7 +27,6 @@ from synplan.chem.utils import (
     standardize_smiles_batch,
 )
 from synplan.ml.networks.value import ValueNetwork
-from synplan.utils.config import ReactorConfig
 from synplan.utils.files import (
     count_sdf_records,
     count_smiles_records,
@@ -39,13 +39,13 @@ from synplan.utils.files import (
 from synplan.utils.parallel import process_pool_map_stream
 
 if TYPE_CHECKING:
+    from synplan.mcts.config import CombinedPolicyConfig
     from synplan.mcts.evaluation import (
         EvaluationStrategy,
         ValueNetworkEvaluationStrategy,
     )
     from synplan.mcts.policy import CompositePolicy, TemplateBasedPolicy
-    from synplan.utils.config import (
-        CombinedPolicyConfig,
+    from synplan.ml.config import (
         PolicyNetworkConfig,
         ValueNetworkConfig,
     )
@@ -534,7 +534,7 @@ def load_policy_function(
         >>> # Using path with overrides
         >>> policy = load_policy_function(weights_path="path.ckpt", top_rules=100)
     """
-    from synplan.utils.config import PolicyNetworkConfig
+    from synplan.ml.config import PolicyNetworkConfig
 
     if policy_config is not None:
         if isinstance(policy_config, dict):
@@ -601,8 +601,9 @@ def load_combined_policy_function(
         ...     ranking_weights_path="ranking.ckpt",
         ... )
     """
+    from synplan.mcts.config import CombinedPolicyConfig
     from synplan.mcts.policy import CompositePolicy
-    from synplan.utils.config import CombinedPolicyConfig, PolicyNetworkConfig
+    from synplan.ml.config import PolicyNetworkConfig
 
     # Priority 1: Use CombinedPolicyConfig
     if combined_config is not None:
@@ -715,7 +716,7 @@ def load_value_network(
         >>> value_fn = load_value_network(weights_path="path.ckpt")
     """
     from synplan.mcts.evaluation import ValueNetworkEvaluationStrategy
-    from synplan.utils.config import ValueNetworkConfig
+    from synplan.ml.config import ValueNetworkConfig
 
     if value_config is not None:
         if isinstance(value_config, dict):
@@ -758,19 +759,19 @@ def load_evaluation_function(eval_config) -> "EvaluationStrategy":
         >>> config = ValueNetworkEvaluationConfig(weights_path="path.ckpt")
         >>> evaluator = load_evaluation_function(config)
     """
+    from synplan.mcts.config import (
+        PolicyEvaluationConfig,
+        RandomEvaluationConfig,
+        RDKitEvaluationConfig,
+        RolloutEvaluationConfig,
+        ValueNetworkEvaluationConfig,
+    )
     from synplan.mcts.evaluation import (
         PolicyEvaluationStrategy,
         RandomEvaluationStrategy,
         RDKitEvaluationStrategy,
         RolloutEvaluationStrategy,
         ValueNetworkEvaluationStrategy,
-    )
-    from synplan.utils.config import (
-        PolicyEvaluationConfig,
-        RandomEvaluationConfig,
-        RDKitEvaluationConfig,
-        RolloutEvaluationConfig,
-        ValueNetworkEvaluationConfig,
     )
 
     logger.debug(f"create_evaluator config_type={type(eval_config).__name__}")

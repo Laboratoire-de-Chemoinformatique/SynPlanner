@@ -107,7 +107,7 @@ The example below uses the ranking policy network and rollout evaluation. This i
         load_policy_function, load_evaluation_function,
         download_preset,
     )
-    from synplan.utils.config import TreeConfig, RolloutEvaluationConfig
+    from synplan.mcts.config import TreeConfig, RolloutEvaluationConfig
     from synplan.chem.utils import mol_from_smiles
     from synplan.mcts.tree import Tree
 
@@ -230,7 +230,7 @@ function, which mirrors the CLI behaviour:
 .. code-block:: python
 
     from synplan.mcts.search import run_search
-    from synplan.utils.config import PolicyNetworkConfig, RolloutEvaluationConfig
+    from synplan.ml.config import PolicyNetworkConfig, RolloutEvaluationConfig
 
     run_search(
         targets_path="targets.smi",

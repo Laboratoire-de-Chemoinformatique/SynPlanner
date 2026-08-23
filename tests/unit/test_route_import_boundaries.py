@@ -116,7 +116,7 @@ assert facade_depict_route_cgr is depict_route_cgr
 def test_synthon_package_root_stays_lightweight():
     code = """
 import sys
-import synplan.synthon
+import synplan.chem.synthon
 
 unexpected = [
     name
@@ -125,15 +125,15 @@ unexpected = [
         'matplotlib',
         'rdkit',
         'synplan.mcts.tree',
-        'synplan.synthon.classify',
-        'synplan.synthon.coverage',
-        'synplan.synthon.synthonise',
-        'synplan.synthon.fragment',
+        'synplan.chem.synthon.classify',
+        'synplan.chem.synthon.coverage',
+        'synplan.chem.synthon.synthonise',
+        'synplan.chem.synthon.fragment',
     )
     if name in sys.modules
 ]
 assert unexpected == [], unexpected
-assert synplan.synthon.SynthonConfig.__name__ == 'SynthonConfig'
+assert synplan.chem.synthon.SynthonConfig.__name__ == 'SynthonConfig'
 """
     _run_fresh_process(code)
 
@@ -146,10 +146,10 @@ def test_synthon_never_imports_torch():
     """
     code = """
 import sys
-import synplan.synthon.config
-import synplan.synthon.coverage
-import synplan.synthon.fragment
-import synplan.synthon.cli
+import synplan.chem.synthon.config
+import synplan.chem.synthon.coverage
+import synplan.chem.synthon.fragment
+import synplan.interfaces.synthon_commands
 
 assert 'torch' not in sys.modules, 'synthon pulled torch'
 

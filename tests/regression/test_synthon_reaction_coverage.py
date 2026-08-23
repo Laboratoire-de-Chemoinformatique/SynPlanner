@@ -10,19 +10,19 @@ from pathlib import Path
 import pytest
 from chython import smarts, smiles
 
-from synplan.synthon import cli
-from synplan.synthon.config import SynthonConfig, load_data
-from synplan.synthon.coverage import (
+from synplan.chem.reaction.rules.synthon import capped_smarts
+from synplan.chem.synthon.config import SynthonConfig, load_data
+from synplan.chem.synthon.coverage import (
     CoverageRule,
     classify_coverage,
     load_coverage_rules,
 )
-from synplan.synthon.priority import capped_smarts
-from synplan.synthon.reactor import (
+from synplan.chem.synthon.transformer import (
     RULE_NUCLEOPHILE_CAPS,
     SynthonRuleError,
     query_labels,
 )
+from synplan.interfaces import synthon_commands as cli
 
 FIXTURE = Path(__file__).parent.parent / "data" / "synthon" / "reaction_coverage.smi"
 
@@ -100,7 +100,7 @@ def test_a_rule_that_lost_its_labels_is_refused():
 
 def test_the_named_nucleophiles_come_from_the_capping_table():
     """One table, not two: the rules that must SPELL a reagent are the rules that must SEE it."""
-    from synplan.synthon.coverage import _RULE_NUCLEOPHILE_ELEMENTS
+    from synplan.chem.synthon.coverage import _RULE_NUCLEOPHILE_ELEMENTS
 
     assert set(_RULE_NUCLEOPHILE_ELEMENTS) == set(RULE_NUCLEOPHILE_CAPS)
     assert _RULE_NUCLEOPHILE_ELEMENTS["R12.3a"] == frozenset(("B",))

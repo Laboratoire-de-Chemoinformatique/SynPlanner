@@ -19,10 +19,10 @@ from synplan.chem.reaction.routes.traversal import (
     route_node_ids,
 )
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
+from synplan.mcts.config import TreeConfig
 from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.node import Node
 from synplan.mcts.policy import Policy, PriorityPolicy
-from synplan.utils.config import TreeConfig
 
 from .algorithm import (
     UCT,

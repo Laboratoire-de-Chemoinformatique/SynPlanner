@@ -4,8 +4,8 @@ import pytest
 from chython import synthon_smiles
 from pydantic import ValidationError
 
-from synplan.synthon.config import SynthonConfig
-from synplan.synthon.stock import (
+from synplan.chem.synthon.config import SynthonConfig
+from synplan.chem.synthon.stock import (
     SynthonRecord,
     SynthonStock,
     cap_leaving_group,

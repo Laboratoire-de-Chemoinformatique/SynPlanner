@@ -20,19 +20,19 @@ from synplan.chem.reaction.rules import (
     parse_priority_rules,
     rule_query_pattern,
 )
-from synplan.mcts.evaluation import RandomEvaluationStrategy
-from synplan.mcts.policy.base import Policy
-from synplan.mcts.tree import Tree
-from synplan.synthon import priority
-from synplan.synthon.config import SynthonConfig, load_data
-from synplan.synthon.priority import (
+from synplan.chem.reaction.rules import synthon as priority
+from synplan.chem.reaction.rules.synthon import (
     SYNTHON_SOURCE_NAME,
     _records,
     capped_smarts,
     synthon_priority_rules,
 )
-from synplan.synthon.reactor import SynthonTransformer, query_labels
-from synplan.utils.config import TreeConfig
+from synplan.chem.synthon.config import SynthonConfig, load_data
+from synplan.chem.synthon.transformer import SynthonTransformer, query_labels
+from synplan.mcts.config import TreeConfig
+from synplan.mcts.evaluation import RandomEvaluationStrategy
+from synplan.mcts.policy.base import Policy
+from synplan.mcts.tree import Tree
 from synplan.utils.visualisation import (
     _format_arrow_label,
     get_route_svg,

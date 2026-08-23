@@ -12,12 +12,12 @@ from __future__ import annotations
 
 from chython import smiles as read_smiles
 
+from synplan.chem.reaction.rules.config import RuleExtractionConfig
 from synplan.chem.reaction_rules.extraction import (
     _make_extracted_rule_record,
     extract_rules,
 )
 from synplan.chem.utils import canonical_query_cgr_key
-from synplan.utils.config import RuleExtractionConfig
 
 # Fully atom-mapped Diels-Alder (ethylene + butadiene → cyclohexene).
 # Single-product cycloaddition, so it survives extract_rules' multi-product

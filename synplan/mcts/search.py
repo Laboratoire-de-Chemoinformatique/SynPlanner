@@ -23,8 +23,9 @@ from synplan.chem.reaction.routes.io import (
 from synplan.chem.reaction.routes.quality.scorer import RouteScorer
 from synplan.chem.reaction.routes.representation import extract_reactions
 from synplan.chem.utils import mol_from_smiles
+from synplan.mcts.config import CombinedPolicyConfig
 from synplan.mcts.tree import Tree, TreeConfig
-from synplan.utils.config import CombinedPolicyConfig, PolicyNetworkConfig
+from synplan.ml.config import PolicyNetworkConfig
 from synplan.utils.files import iter_csv_smiles, iter_smiles_records
 from synplan.utils.loading import (
     load_building_blocks,

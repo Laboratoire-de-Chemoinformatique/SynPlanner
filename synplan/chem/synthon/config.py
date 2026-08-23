@@ -10,7 +10,7 @@ from pydantic import Field, model_validator
 from synplan.utils.config import BaseConfigModel
 from synplan.utils.parallel import default_num_workers
 
-_DATA_DIR = Path(__file__).resolve().parent / "data"
+_DATA_DIR = Path(__file__).resolve().parent / "rules"
 
 
 class SynthonConfig(BaseConfigModel):

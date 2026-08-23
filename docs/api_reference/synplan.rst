@@ -8,7 +8,7 @@ Subpackages
    :maxdepth: 4
 
    synplan.chem
-   synplan.synthon
+   synplan.chem.synthon
    synplan.interfaces
    synplan.mcts
    synplan.ml

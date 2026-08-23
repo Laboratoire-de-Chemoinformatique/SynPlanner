@@ -3,12 +3,12 @@
 import pytest
 from chython import smiles, synthon_smiles
 
-from synplan.synthon.authoring import (
+from synplan.chem.synthon.config import SynthonConfig, load_data
+from synplan.chem.synthon.rules.validate import (
     labelled_atoms_survive_canonicalisation,
     shifted_labels,
 )
-from synplan.synthon.config import SynthonConfig, load_data
-from synplan.synthon.reactor import SynthonTransformer
+from synplan.chem.synthon.transformer import SynthonTransformer
 
 from .test_synthon_enumeration import RING_EXAMPLES
 

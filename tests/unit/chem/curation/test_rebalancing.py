@@ -3,7 +3,7 @@
 import pytest
 from chython import smiles
 
-from synplan.chem.data.rebalancing import (
+from synplan.chem.reaction.curation.rebalancing import (
     LEAVING_GROUPS,
     PROTONATED,
     SMALL_MOLECULES,
@@ -18,7 +18,7 @@ from synplan.chem.data.rebalancing import (
     reaction_imbalance,
     rebalance_reaction,
 )
-from synplan.chem.data.standardizing import (
+from synplan.chem.reaction.curation.standardizing import (
     STANDARDIZER_REGISTRY,
     RebalanceReactionStandardizer,
     SplitIonsStandardizer,

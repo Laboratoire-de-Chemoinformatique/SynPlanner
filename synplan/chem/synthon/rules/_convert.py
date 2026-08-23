@@ -15,7 +15,7 @@ from pathlib import Path
 from chython import smarts
 from chython.periodictable import AnyElement
 
-from synplan.synthon.data._dialect import DialectError, to_chython
+from synplan.chem.synthon.rules._dialect import DialectError, to_chython
 
 # the one-time migration. Code 11 ("electrophilic nitrogen") collapses into 'elec': marksCombinations
 # has no N:10 key, so on nitrogen "electrophile" already has exactly one meaning.
@@ -731,7 +731,7 @@ def build(config_dir: Path) -> dict[str, object]:
 
 def check(built: dict, config_dir: Path) -> list[str]:
     """Assert every property the plan pins. Returns the failures, empty when the build is good."""
-    from synplan.synthon.reactor import SynthonTransformer, query_labels
+    from synplan.chem.synthon.transformer import SynthonTransformer, query_labels
 
     problems = []
     classes, marks, rules = built["bb_classes"], built["bb_marks"], built["rules"]

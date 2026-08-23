@@ -10,8 +10,8 @@ from chython.containers import MoleculeContainer, SynthonContainer
 from chython.exceptions import InvalidAromaticRing
 from chython.periodictable.base.synthon import BIVALENT_LABELS
 
-from synplan.synthon.config import SynthonConfig, load_data
-from synplan.synthon.stock import label_keys
+from synplan.chem.synthon.config import SynthonConfig, load_data
+from synplan.chem.synthon.stock import label_keys
 
 Key = tuple[str, bool, str]
 

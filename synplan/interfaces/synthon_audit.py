@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from synplan import __version__
-from synplan.synthon.config import SynthonConfig
+from synplan.chem.synthon.config import SynthonConfig
 
 FALLBACK_HEADER = "# input_record\tsource_info\tstatus\tdetail\n"
 ERROR_HEADER = "# input_record\tsource_info\tstage\terror_type\terror_message\n"

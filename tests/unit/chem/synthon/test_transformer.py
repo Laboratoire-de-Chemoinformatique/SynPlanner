@@ -3,8 +3,8 @@
 import pytest
 from chython import synthon_smiles
 
-from synplan.synthon.config import SynthonConfig, load_data
-from synplan.synthon.reactor import (
+from synplan.chem.synthon.config import SynthonConfig, load_data
+from synplan.chem.synthon.transformer import (
     SynthonRuleError,
     SynthonTransformer,
     load_rules,

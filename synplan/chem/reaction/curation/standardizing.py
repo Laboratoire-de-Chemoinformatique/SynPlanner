@@ -17,23 +17,26 @@ from chython.containers import MoleculeContainer, ReactionContainer
 from pydantic import Field
 from tqdm.auto import tqdm
 
-from synplan.chem.data.config import SmallMoleculesConfig
-from synplan.chem.data.pipeline import (
+from synplan.chem.reaction.curation.config import SmallMoleculesConfig
+from synplan.chem.reaction.curation.pipeline import (
     build_batch_result,
     reaction_cgr_key,
     write_batch_results,
 )
-from synplan.chem.data.reaction_result import (
+from synplan.chem.reaction.curation.reaction_result import (
     BatchResult,
     ErrorEntry,
     PipelineSummary,
 )
-from synplan.chem.data.rebalancing import (
+from synplan.chem.reaction.curation.rebalancing import (
     RebalancingError,
     rebalance_reaction,
 )
 from synplan.chem.utils import unite_molecules
-from synplan.utils.config import BaseConfigModel, NestedConfigContainer
+from synplan.utils.config import (
+    BaseConfigModel,
+    NestedConfigContainer,
+)
 from synplan.utils.files import (
     RawReactionReader,
     ReactionWriter,
@@ -44,7 +47,7 @@ from synplan.utils.files import (
 )
 from synplan.utils.parallel import chunked, graceful_shutdown, process_pool_map_stream
 
-logger = logging.getLogger("synplan.chem.data.standardizing")
+logger = logging.getLogger("synplan.chem.reaction.curation.standardizing")
 
 
 class StandardizationError(RuntimeError):

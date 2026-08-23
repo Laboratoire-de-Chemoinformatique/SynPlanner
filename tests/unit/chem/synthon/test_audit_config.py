@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from synplan.synthon.config import SynthonConfig
+from synplan.chem.synthon.config import SynthonConfig
 
 
 def test_audit_artifacts_are_opt_in() -> None:

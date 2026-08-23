@@ -24,6 +24,10 @@ from synplan.chem.reaction.rules.representation import (
     reaction_rules_path_from_policy_data,
     rule_representation_digest,
 )
+from synplan.ml.config import (
+    LinearPolicyNetworkConfig,
+    MHNRankingPolicyNetworkConfig,
+)
 from synplan.ml.featurization.fingerprints import rule_fingerprints_from_smarts
 from synplan.ml.featurization.rules import query_cgr_graphs_from_smarts
 from synplan.ml.networks.policy.linear import (
@@ -32,10 +36,6 @@ from synplan.ml.networks.policy.linear import (
 )
 from synplan.ml.networks.policy.mhnreact import MHNReact
 from synplan.ml.training.lightning import LitNetworkTrainer
-from synplan.utils.config import (
-    LinearPolicyNetworkConfig,
-    MHNRankingPolicyNetworkConfig,
-)
 
 if TYPE_CHECKING:
     from synplan.ml.training.preprocessing import RankingPolicyDataset

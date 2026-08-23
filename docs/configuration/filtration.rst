@@ -70,7 +70,7 @@ Run reaction filtration using the repository configuration in ``configs/reaction
 
 .. note::
     1. If the reaction filter name is listed in the configuration file, it means that this filter will be activated.
-    2. The configuration file enables filters and sets their parameters; it does not define execution order. Filters run in the fixed order of :meth:`~synplan.chem.data.filtering.ReactionFilterConfig.create_filters`.
+    2. The configuration file enables filters and sets their parameters; it does not define execution order. Filters run in the fixed order of :meth:`~synplan.chem.reaction.curation.filtering.ReactionFilterConfig.create_filters`.
     3. To disable a filter, omit its key entirely. A bare ``key:`` enables the filter with the defaults in the third column.
     4. The shipped configuration enables only four of these eleven filters. The other seven are opt-in; enabling all of them is a much more aggressive curation than the SynPlanner default and will discard a substantially larger fraction of any dataset.
     5. ``small_molecules_config`` rejects a reaction in three cases, not one: every reactant *and* every product is at most ``mol_max_size`` heavy atoms; **or** there is exactly one reactant and it is small; **or** there is exactly one product and it is small. The last two cases fire even when the other side of the reaction is large — a 10-heavy-atom reactant giving methanol as its only product is rejected at the default ``mol_max_size: 6``.

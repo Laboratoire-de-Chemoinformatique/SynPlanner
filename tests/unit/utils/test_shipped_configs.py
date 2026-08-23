@@ -9,14 +9,16 @@ from pathlib import Path
 import pytest
 import yaml
 
-from synplan.chem.data.filtering import ReactionFilterConfig
-from synplan.chem.data.standardizing import ReactionStandardizationConfig
-from synplan.synthon.config import SynthonConfig
-from synplan.utils.config import (
+from synplan.chem.reaction.curation.filtering import ReactionFilterConfig
+from synplan.chem.reaction.curation.standardizing import ReactionStandardizationConfig
+from synplan.chem.reaction.rules.config import RuleExtractionConfig
+from synplan.chem.synthon.config import SynthonConfig
+from synplan.mcts.config import (
     CombinedPolicyConfig,
-    PolicyNetworkConfig,
-    RuleExtractionConfig,
     TreeConfig,
+)
+from synplan.ml.config import (
+    PolicyNetworkConfig,
     TuningConfig,
     ValueNetworkConfig,
 )

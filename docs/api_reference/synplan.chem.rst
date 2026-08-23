@@ -7,7 +7,7 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   synplan.chem.data
+   synplan.chem.reaction.curation
    synplan.chem.reaction.routes
    synplan.chem.reaction.rules
 

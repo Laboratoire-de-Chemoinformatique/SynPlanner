@@ -1,7 +1,7 @@
 """Static-source contract: every pipeline stage must reference the canonical
 5-column error TSV header literal in its source.
 
-Mapping (``synplan/chem/data/mapping.py``) cannot be driven through a real
+Mapping (``synplan/chem/reaction/curation/mapping.py``) cannot be driven through a real
 end-to-end pipeline run from a unit test because it requires the atom-mapping
 model. Its error-file bugs (3-column rows, missing header) are real but
 invisible to ``test_error_tsv_format.py``.
@@ -34,9 +34,9 @@ from .conftest import ERROR_TSV_HEADER
 # Modules that write per-record error TSVs at end-of-pipeline. New stages
 # must opt in by appending here.
 PIPELINE_MODULES_WITH_ERROR_TSV = [
-    "synplan/chem/data/standardizing.py",
-    "synplan/chem/data/filtering.py",
-    "synplan/chem/data/mapping.py",
+    "synplan/chem/reaction/curation/standardizing.py",
+    "synplan/chem/reaction/curation/filtering.py",
+    "synplan/chem/reaction/curation/mapping.py",
     "synplan/chem/reaction/rules/extraction.py",
 ]
 

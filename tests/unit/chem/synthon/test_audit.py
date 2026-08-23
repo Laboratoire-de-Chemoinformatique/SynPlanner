@@ -6,8 +6,9 @@ from types import SimpleNamespace
 import pytest
 from chython import smiles
 
-import synplan.synthon.cli as synthon_cli
-from synplan.synthon.audit import (
+import synplan.interfaces.synthon_commands as synthon_cli
+from synplan.chem.synthon.config import SynthonConfig
+from synplan.interfaces.synthon_audit import (
     ERROR_HEADER,
     FALLBACK_HEADER,
     AuditError,
@@ -17,7 +18,6 @@ from synplan.synthon.audit import (
     iter_pathway_records,
     sha256_file,
 )
-from synplan.synthon.config import SynthonConfig
 
 
 def test_smi_metadata_is_tab_only_and_preserved_verbatim(tmp_path) -> None:

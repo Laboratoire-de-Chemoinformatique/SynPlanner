@@ -1,13 +1,13 @@
 from chython import smiles
 
-from synplan.chem.data.filtering import (
+from synplan.chem.reaction.curation.filtering import (
     CCRingBreakingFilter,
     CCsp3BreakingFilter,
     DynamicBondsFilter,
     NoReactionFilter,
     WrongCHBreakingFilter,
 )
-from synplan.chem.data.standardizing import StandardizationError
+from synplan.chem.reaction.curation.standardizing import StandardizationError
 
 
 def test_ccsp3_no_break(sample_reactions):
@@ -101,7 +101,7 @@ def test_yaml_null_value_enables_filter_with_defaults():
     """
     import yaml
 
-    from synplan.chem.data.filtering import (
+    from synplan.chem.reaction.curation.filtering import (
         NoReactionConfig,
         ReactionFilterConfig,
         SmallMoleculesConfig,

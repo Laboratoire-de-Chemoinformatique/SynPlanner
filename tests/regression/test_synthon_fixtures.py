@@ -7,17 +7,17 @@ import pytest
 from chython import smiles, synthon_smiles
 
 from synplan.chem.scaffolds import scaffold_smiles
-from synplan.chem.utils import safe_canonicalization
-from synplan.synthon.config import SynthonConfig
-from synplan.synthon.enumeration import (
+from synplan.chem.synthon.config import SynthonConfig
+from synplan.chem.synthon.enumerate import (
     Enumerator,
     join,
     load_pairs,
     open_points,
 )
-from synplan.synthon.fragment import Fragmenter, fragment_smiles
-from synplan.synthon.stock import ro2_pass
-from synplan.synthon.synthonise import BBSynthoniser
+from synplan.chem.synthon.fragment import Fragmenter, fragment_smiles
+from synplan.chem.synthon.stock import ro2_pass
+from synplan.chem.synthon.synthonise import BBSynthoniser
+from synplan.chem.utils import safe_canonicalization
 
 FIXTURES = Path(__file__).resolve().parents[1] / "data" / "synthon"
 

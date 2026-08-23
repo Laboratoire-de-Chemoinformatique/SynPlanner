@@ -3,10 +3,10 @@
 import pytest
 from chython import smiles, synthon_smiles
 
+from synplan.chem.synthon.enumerate import Enumerator, load_pairs
+from synplan.chem.synthon.fragment import Fragmenter
+from synplan.chem.synthon.synthonise import BBSynthoniser
 from synplan.chem.utils import safe_canonicalization
-from synplan.synthon.enumeration import Enumerator, load_pairs
-from synplan.synthon.fragment import Fragmenter
-from synplan.synthon.synthonise import BBSynthoniser
 
 # 5-nitrothiophene-2-carbaldehyde, from the real catalogue: Bifunctional_Aldehyde_Nitro is one of
 # the five programs whose only `|No|` step is the nitro reduction

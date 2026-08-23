@@ -44,7 +44,7 @@ pass gives you.
 
 .. code-block:: python
 
-   from synplan.chem.data.mapping import MappingConfig, map_reactions_from_file
+   from synplan.chem.reaction.curation.mapping import MappingConfig, map_reactions_from_file
 
    map_reactions_from_file(MappingConfig(), "reactions.smi", "mapped.smi")
 

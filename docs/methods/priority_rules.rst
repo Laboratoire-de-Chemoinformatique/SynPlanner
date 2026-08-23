@@ -25,7 +25,7 @@ Priority rules are passed as a mapping of named sets:
 .. code-block:: python
 
     from synplan.mcts.tree import Tree
-    from synplan.utils.config import TreeConfig
+    from synplan.mcts.config import TreeConfig
 
     Tree(
         target=...,

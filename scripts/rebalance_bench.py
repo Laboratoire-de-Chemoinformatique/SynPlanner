@@ -31,7 +31,7 @@ from collections import defaultdict
 
 from chython import smiles
 
-from synplan.chem.data.rebalancing import (
+from synplan.chem.reaction.curation.rebalancing import (
     RebalancingError,
     reaction_imbalance,
     rebalance_reaction,

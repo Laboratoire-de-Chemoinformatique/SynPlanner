@@ -6,23 +6,24 @@ from pathlib import Path
 import click
 import yaml
 
-from synplan.chem.data.filtering import ReactionFilterConfig, filter_reactions_from_file
-from synplan.chem.data.mapping import MappingConfig, map_reactions_from_file
-from synplan.chem.data.standardizing import (
+from synplan.chem.reaction.curation.filtering import (
+    ReactionFilterConfig,
+    filter_reactions_from_file,
+)
+from synplan.chem.reaction.curation.mapping import (
+    MappingConfig,
+    map_reactions_from_file,
+)
+from synplan.chem.reaction.curation.standardizing import (
     ReactionStandardizationConfig,
     standardize_reactions_from_file,
 )
 from synplan.chem.reaction.routes.cli import run_cluster_cli
+from synplan.chem.reaction.rules.config import RuleExtractionConfig
 from synplan.chem.reaction.rules.extraction import extract_rules_from_reactions
+from synplan.chem.synthon.config import SynthonConfig
 from synplan.chem.utils import standardize_building_blocks
-from synplan.mcts.search import run_search
-from synplan.ml.training.reinforcement import run_updating
-from synplan.ml.training.supervised import (
-    create_policy_dataset,
-    run_mhn_network_tuning,
-    run_policy_training,
-)
-from synplan.synthon.cli import (
+from synplan.interfaces.synthon_commands import (
     classify_file,
     coverage_file,
     enumerate_file,
@@ -30,19 +31,26 @@ from synplan.synthon.cli import (
     scaffolds_file,
     synthonise_file,
 )
-from synplan.synthon.config import SynthonConfig
-from synplan.utils.config import (
+from synplan.mcts.config import (
     CombinedPolicyConfig,
     PolicyEvaluationConfig,
-    PolicyNetworkConfig,
     RandomEvaluationConfig,
     RDKitEvaluationConfig,
     RolloutEvaluationConfig,
-    RuleExtractionConfig,
     TreeConfig,
+    ValueNetworkEvaluationConfig,
+)
+from synplan.mcts.search import run_search
+from synplan.ml.config import (
+    PolicyNetworkConfig,
     TuningConfig,
     ValueNetworkConfig,
-    ValueNetworkEvaluationConfig,
+)
+from synplan.ml.training.reinforcement import run_updating
+from synplan.ml.training.supervised import (
+    create_policy_dataset,
+    run_mhn_network_tuning,
+    run_policy_training,
 )
 from synplan.utils.loading import (
     download_all_data,

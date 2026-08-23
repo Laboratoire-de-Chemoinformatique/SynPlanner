@@ -56,8 +56,8 @@ The ``tree:`` and ``node_expansion:`` sections are both **required** by
 ``synplan planning`` — omitting either raises ``KeyError`` (the only exception is
 ``node_expansion:``, which may be replaced by ``combined_policy:``, see below).
 Keys absent *within* those sections fall back to the defaults of
-:class:`~synplan.utils.config.TreeConfig` and
-:class:`~synplan.utils.config.PolicyNetworkConfig`. The optional ones are listed
+:class:`~synplan.mcts.config.TreeConfig` and
+:class:`~synplan.ml.config.PolicyNetworkConfig`. The optional ones are listed
 below; ``algorithm``, ``use_priority``, ``priority_rule_multiapplication`` and
 the ``nmcs_*`` / ``lnmcs_ratio`` keys go under ``tree:``, and the optional
 ``node_evaluation:`` section takes ``evaluation_type``, ``normalize`` and
@@ -70,7 +70,7 @@ the ``nmcs_*`` / ``lnmcs_ratio`` keys go under ``tree:``, and the optional
     ignored and the default is used instead.
 
     Score normalisation at planning time is ``node_evaluation:normalize``.
-    :class:`~synplan.utils.config.TreeConfig` also accepts ``normalize_scores``,
+    :class:`~synplan.mcts.config.TreeConfig` also accepts ``normalize_scores``,
     but ``synplan planning`` never reads it — it only takes effect during
     ``synplan value_network_tuning``. Setting ``tree: normalize_scores: true`` in a
     planning config is accepted and does nothing.
@@ -150,6 +150,6 @@ been trained on the same rule set in the same order.
 .. note::
     ``configs/combined_ranking_filtering_policy.yaml`` holds the ``combined_policy``
     block on its own, without the ``tree:`` wrapper. It is a Python-API config for
-    :class:`~synplan.utils.config.CombinedPolicyConfig`; passing it to
+    :class:`~synplan.mcts.config.CombinedPolicyConfig`; passing it to
     ``synplan planning --config`` raises ``KeyError: 'tree'``. Use
     ``configs/planning_combined_policies.yaml`` from the CLI.

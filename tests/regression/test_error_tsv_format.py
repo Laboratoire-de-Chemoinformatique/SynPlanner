@@ -20,8 +20,8 @@ from pathlib import Path
 
 import pytest
 
-from synplan.chem.data.filtering import filter_reactions_from_file
-from synplan.chem.data.standardizing import standardize_reactions_from_file
+from synplan.chem.reaction.curation.filtering import filter_reactions_from_file
+from synplan.chem.reaction.curation.standardizing import standardize_reactions_from_file
 from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions
 
 from .conftest import ERROR_TSV_COLUMNS, ERROR_TSV_HEADER, parse_error_tsv

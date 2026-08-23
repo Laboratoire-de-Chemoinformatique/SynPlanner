@@ -21,6 +21,10 @@ from synplan.chem.reaction.rules.representation import (
     rule_representation_digest,
 )
 from synplan.chem.utils import reaction_query_to_reaction
+from synplan.ml.config import (
+    MHNRankingPolicyNetworkConfig,
+    PolicyNetworkConfig,
+)
 from synplan.ml.featurization.fingerprints import (
     _side_fingerprint,
     rule_fingerprints_from_smarts,
@@ -31,7 +35,6 @@ from synplan.ml.networks.embedding.molecule import build_graph_embedder
 from synplan.ml.networks.policy.linear import RankingPolicyNetwork
 from synplan.ml.networks.policy.mhnreact import MHNReact
 from synplan.ml.training.trainers import build_mhn_ranking_network
-from synplan.utils.config import MHNRankingPolicyNetworkConfig, PolicyNetworkConfig
 
 RULE_A = "[c:1]-[N:2]>>[c:1]-[N+:2](-[O-:3])=[O:4]"
 RULE_B = "[C:1]-[O:2]>>[C:1].[O:2]"

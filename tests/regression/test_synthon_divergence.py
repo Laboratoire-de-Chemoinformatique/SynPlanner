@@ -5,24 +5,24 @@ from chython import smarts, smiles, synthon_smiles
 from chython.periodictable import LABEL_TABLE
 
 from synplan.chem.scaffolds import murcko_atoms
-from synplan.chem.utils import safe_canonicalization
-from synplan.synthon.analogues import (
+from synplan.chem.synthon.analogues import (
     analogue_key,
     census,
     find_analogues,
     index_for_analogues,
     is_analogue,
 )
-from synplan.synthon.config import SynthonConfig, load_data
-from synplan.synthon.data._dialect import to_chython
-from synplan.synthon.enumeration import Enumerator, load_pairs
-from synplan.synthon.fragment import (
+from synplan.chem.synthon.config import SynthonConfig, load_data
+from synplan.chem.synthon.enumerate import Enumerator, load_pairs
+from synplan.chem.synthon.fragment import (
     MACROCYCLE_RING,
     Fragmenter,
     fragment_smiles,
 )
-from synplan.synthon.stock import SynthonStock, ro2_pass
-from synplan.synthon.synthonise import BBSynthoniser
+from synplan.chem.synthon.rules._dialect import to_chython
+from synplan.chem.synthon.stock import SynthonStock, ro2_pass
+from synplan.chem.synthon.synthonise import BBSynthoniser
+from synplan.chem.utils import safe_canonicalization
 
 MACROCYCLE = "O=C1CCCCCCCCCCCCN1"
 # seven pathways over four rules, reagent counts 2 and 3 — enough for the sort to be non-vacuous

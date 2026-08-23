@@ -22,8 +22,8 @@ from typing import NamedTuple
 from chython import smarts
 from chython.containers import MoleculeContainer, ReactionContainer
 
-from synplan.synthon.config import SynthonConfig, load_data
-from synplan.synthon.reactor import (
+from synplan.chem.synthon.config import SynthonConfig, load_data
+from synplan.chem.synthon.transformer import (
     RULE_NUCLEOPHILE_CAPS,
     SynthonRuleError,
     query_labels,

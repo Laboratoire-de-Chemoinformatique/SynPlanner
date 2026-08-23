@@ -14,8 +14,11 @@ from synplan.chem.reaction.routes.representation import (
     routes_dict_from_route_cgrs,
 )
 from synplan.chem.utils import mol_from_smiles
+from synplan.mcts.config import (
+    RolloutEvaluationConfig,
+    TreeConfig,
+)
 from synplan.mcts.tree import Tree
-from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import (
     download_preset,
     load_building_blocks,

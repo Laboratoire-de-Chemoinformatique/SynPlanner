@@ -16,12 +16,12 @@ from torch.nn import Dropout, Identity, LayerNorm, Linear, Sequential
 from torch_geometric.data import Data
 from torch_geometric.data.batch import Batch
 
+from synplan.ml.config import MHNRankingPolicyNetworkConfig
 from synplan.ml.networks.base import GraphMCTSNetwork
 from synplan.ml.networks.embedding.rule import (
     FingerprintRuleEmbedding,
     QueryCGRRuleEmbedding,
 )
-from synplan.utils.config import MHNRankingPolicyNetworkConfig
 
 
 class MHNReact(GraphMCTSNetwork):

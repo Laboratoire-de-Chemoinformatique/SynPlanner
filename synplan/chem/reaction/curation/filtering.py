@@ -13,22 +13,28 @@ from chython.containers import CGRContainer, MoleculeContainer, ReactionContaine
 from pydantic import Field, model_validator
 from tqdm.auto import tqdm
 
-from synplan.chem.data.config import SmallMoleculesConfig
-from synplan.chem.data.pipeline import build_batch_result, write_batch_results
-from synplan.chem.data.reaction_result import (
+from synplan.chem.reaction.curation.config import SmallMoleculesConfig
+from synplan.chem.reaction.curation.pipeline import (
+    build_batch_result,
+    write_batch_results,
+)
+from synplan.chem.reaction.curation.reaction_result import (
     BatchResult,
     ErrorEntry,
     FilteredEntry,
     PipelineSummary,
 )
-from synplan.chem.data.standardizing import (
+from synplan.chem.reaction.curation.standardizing import (
     DATA_ERROR_STAGES,
     DATA_ERROR_TYPES,
     AromaticFormStandardizer,
     KekuleFormStandardizer,
     StandardizationError,
 )
-from synplan.utils.config import BaseConfigModel, NestedConfigContainer
+from synplan.utils.config import (
+    BaseConfigModel,
+    NestedConfigContainer,
+)
 from synplan.utils.files import (
     RawReactionReader,
     ReactionWriter,
@@ -39,7 +45,7 @@ from synplan.utils.files import (
 )
 from synplan.utils.parallel import chunked, graceful_shutdown, process_pool_map_stream
 
-logger = logging.getLogger("synplan.chem.data.filtering")
+logger = logging.getLogger("synplan.chem.reaction.curation.filtering")
 
 
 class DynamicBondsConfig(BaseConfigModel):

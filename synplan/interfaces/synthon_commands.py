@@ -6,33 +6,33 @@ from pathlib import Path
 from chython import smiles, synthon_smiles
 from chython.containers import MoleculeContainer, ReactionContainer
 
-import synplan.synthon.synthonise as _synthonise_workers
+import synplan.chem.synthon.synthonise as _synthonise_workers
 from synplan.chem.scaffolds import murcko_scaffold
+from synplan.chem.synthon.config import SynthonConfig
+from synplan.chem.synthon.coverage import (
+    classify_coverage,
+    load_coverage_rules,
+)
+from synplan.chem.synthon.enumerate import Enumerator
+from synplan.chem.synthon.fragment import Fragmenter
+from synplan.chem.synthon.stock import (
+    SynthonRecord,
+    load_synthon_stock,
+    write_synthon_stock,
+)
+from synplan.chem.synthon.synthonise import (
+    classify_batch,
+    init_worker,
+    synthonise_batch,
+)
 from synplan.chem.utils import safe_canonicalization
-from synplan.synthon.audit import (
+from synplan.interfaces.synthon_audit import (
     AuditError,
     AuditOutcome,
     AuditRun,
     InputRecord,
     iter_molecule_records,
     iter_pathway_records,
-)
-from synplan.synthon.config import SynthonConfig
-from synplan.synthon.coverage import (
-    classify_coverage,
-    load_coverage_rules,
-)
-from synplan.synthon.enumeration import Enumerator
-from synplan.synthon.fragment import Fragmenter
-from synplan.synthon.stock import (
-    SynthonRecord,
-    load_synthon_stock,
-    write_synthon_stock,
-)
-from synplan.synthon.synthonise import (
-    classify_batch,
-    init_worker,
-    synthonise_batch,
 )
 from synplan.utils.files import split_smiles_record
 from synplan.utils.parallel import chunked, process_pool_map_stream
