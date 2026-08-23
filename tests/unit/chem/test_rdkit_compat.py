@@ -56,11 +56,14 @@ class TestTargetFromRdkit:
         assert Chem.MolToSmiles(rdmol) == Chem.MolToSmiles(rdmol_back)
 
     def test_no_standardization(self):
-        rdmol = Chem.MolFromSmiles("CCO")
-        result = target_from_rdkit(
+        """Skipping standardization must be observable, or the flags are decorative."""
+        rdmol = Chem.MolFromSmiles("C/C=C/[C@@H](O)F")
+        cleaned = target_from_rdkit(rdmol)
+        raw = target_from_rdkit(
             rdmol, standardize=False, clean_stereo=False, clean2d=False
         )
-        assert isinstance(result, MoleculeContainer)
+        # clean_stereo strips the stereo marks the raw conversion keeps.
+        assert str(cleaned) != str(raw)
 
 
 # ---------------------------------------------------------------------------
@@ -210,11 +213,10 @@ class TestRouteToRdkit:
 
     def test_in_stock_flags(self, mock_tree):
         steps = route_to_rdkit(mock_tree, 3)
-        # step 0: aspirin → [salicylic, acetic_anh]
-        # salicylic is not small (>6 atoms) but not in BB set as written
-        # acetic_anh: also >6 atoms, check BB set
-        assert isinstance(steps[0]["in_stock"], list)
-        assert len(steps[0]["in_stock"]) == 2
+        # salicylic acid and acetic anhydride are both >6 heavy atoms and absent
+        # from the stock; phenol is in it and CO2 is under min_mol_size.
+        assert steps[0]["in_stock"] == [False, False]
+        assert steps[1]["in_stock"] == [True, True]
 
     def test_keep_mapping_true(self, mock_tree):
         steps = route_to_rdkit(mock_tree, 3, keep_mapping=True)

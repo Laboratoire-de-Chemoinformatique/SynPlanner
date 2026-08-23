@@ -123,8 +123,17 @@ def test_bare_atoms_are_bracketed():
 
 def test_juxtaposed_recursive_primitives_are_anded():
     """Daylight juxtaposition is a high-precedence AND; chython ORs same-term constraints."""
-    ported = to_chython("[N;!$(NC=O)!$(NS(=O)=O)]")
-    assert ported.count(";") > "[N;!$(NC=O)!$(NS(=O)=O)]".count(";")
+    ported = smarts(to_chython("[N;!$(NC=O)!$(NS(=O)=O)]"))
+    # An AND rejects a molecule failing EITHER constraint; an OR would accept both of these.
+    amine = smiles("CCN")
+    amine.canonicalize()
+    amide = smiles("CC(=O)NCC")
+    amide.canonicalize()
+    sulfonamide = smiles("CS(=O)(=O)NCC")
+    sulfonamide.canonicalize()
+    assert ported.is_substructure(amine)
+    assert not ported.is_substructure(amide)
+    assert not ported.is_substructure(sulfonamide)
 
 
 def test_the_ring_flag_moves_before_the_bond_order():

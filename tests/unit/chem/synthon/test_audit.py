@@ -1,5 +1,6 @@
 """Input framing and transactional sidecars shared by the five Synthon CLIs."""
 
+import hashlib
 import json
 from types import SimpleNamespace
 
@@ -16,7 +17,6 @@ from synplan.interfaces.synthon_audit import (
     AuditRun,
     iter_molecule_records,
     iter_pathway_records,
-    sha256_file,
 )
 
 
@@ -148,7 +148,7 @@ def test_audit_run_publishes_consistent_sidecars_and_summary(tmp_path) -> None:
     for name, metadata in summary["output_files"].items():
         artifact = tmp_path / name
         assert metadata["bytes"] == artifact.stat().st_size
-        assert metadata["sha256"] == sha256_file(artifact)
+        assert metadata["sha256"] == hashlib.sha256(artifact.read_bytes()).hexdigest()
     assert not list(tmp_path.glob("*.partial"))
 
 

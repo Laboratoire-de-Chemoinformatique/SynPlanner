@@ -1,5 +1,6 @@
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 
 def _run_fresh_process(code: str) -> str:
@@ -33,8 +34,16 @@ def test_mcts_imports_do_not_depend_on_route_import_order():
         "import synplan.chem.reaction.routes",
     ]
 
-    for snippet in snippets:
-        _run_fresh_process(snippet)
+    # Each snippet still gets its own fresh interpreter; they just no longer
+    # queue behind each other's torch import, which cost ~2s apiece serially.
+    with ThreadPoolExecutor(max_workers=len(snippets)) as pool:
+        for snippet, future in [
+            (s, pool.submit(_run_fresh_process, s)) for s in snippets
+        ]:
+            try:
+                future.result()
+            except AssertionError as exc:
+                raise AssertionError(f"{snippet!r}\n{exc}") from None
 
 
 def test_route_quality_imports_stay_lightweight():

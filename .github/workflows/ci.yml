@@ -48,7 +48,7 @@ jobs:
 
       - name: ✅Run test‑suite + coverage
         run: |
-          uv run --no-sync pytest --cov=synplan --cov-report=xml
+          uv run --no-sync pytest -n auto --dist loadscope --cov=synplan --cov-report=xml
           rc=$?
           # If process was killed (e.g. by os._exit or timeout) but coverage.xml
           # exists, tests completed successfully — treat as green.

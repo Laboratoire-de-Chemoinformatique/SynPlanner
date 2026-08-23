@@ -188,6 +188,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   against SynRBL's validation set. Rows whose reference is missing, or does not
   itself balance, are reported apart rather than counted as losses.
 
+
+- The test suite runs in parallel. `pytest-xdist` joins the dev group and CI runs
+  `pytest -n auto --dist loadscope`, taking CI from 224s to 79s and a local no-coverage run from
+  120s to 40s. `loadscope` keeps each module's tests on one worker so module-scoped fixtures — the
+  clustering integration pipeline in particular — are built once rather than once per worker. No
+  test was deleted, skipped or weakened to get there; the end-to-end planner and clustering tests
+  that catch real regressions all still run.
+
+- `test_mcts_imports_do_not_depend_on_route_import_order` spawns its six fresh interpreters
+  concurrently instead of serially, 10.8s to 2.5s. Each snippet still gets its own untouched
+  interpreter, which is the whole point of the test; they simply no longer queue behind each
+  other's torch import.
+
+### Fixed
+
+- Four tests asserted a shape rather than a behaviour and passed against broken code. Each was
+  rewritten and then re-checked by re-applying the mutation that had slipped through.
+  `test_audit_run_publishes_consistent_sidecars_and_summary` verified every artifact's provenance
+  hash by calling the same `sha256_file` that had written it, so stubbing that function to a
+  constant left all 83 audit tests green; it now compares against an independent
+  `hashlib.sha256`. `test_juxtaposed_recursive_primitives_are_anded` counted semicolons in the
+  translated SMARTS, so emitting a malformed pattern passed; it now checks that the ported query
+  accepts an amine and rejects both an amide and a sulfonamide, which is what the AND means.
+  `test_no_standardization` asserted only the return type, so dropping the standardization step
+  entirely passed all 21 tests in the file; it now asserts that the flags change the result.
+  `test_in_stock_flags` asserted the flag list's length, so inverting every flag passed; it now
+  asserts the flags.
 ### Changed
 
 - Package layout is now written down and enforced. `docs/development/package_layout.rst` states
