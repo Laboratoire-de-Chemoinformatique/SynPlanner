@@ -23,6 +23,9 @@ column added), this test breaks in one place; update the constant in
 ``conftest.py``.
 """
 
+# ponytail: all four stages now hit one helper, so this greps for a single literal.
+# Upgrade path: delete — the runtime test in test_error_tsv_format.py has the teeth.
+
 from __future__ import annotations
 
 from pathlib import Path

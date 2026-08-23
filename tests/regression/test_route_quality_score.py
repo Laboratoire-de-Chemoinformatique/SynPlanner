@@ -93,6 +93,8 @@ def test_failed_scan_does_not_yield_perfect_score():
     )
 
 
+# ponytail: matches the literal `max(len(route), 1)`, so an alias hides the bug.
+# Upgrade path: delete — the behavioural test above already covers this invariant.
 def test_scorer_denominator_tracks_processed_steps():
     """Static fallback: the scorer's denominator must NOT be simply
     ``max(len(route), 1)`` without a processed-step counter nearby."""

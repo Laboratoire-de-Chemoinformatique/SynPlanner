@@ -360,6 +360,8 @@ class TestVisualizationSVG:
 # ---------------------------------------------------------------------------
 
 
+# ponytail: asserts only that HTML is non-empty; stubbing both report generators to
+# "<x>" keeps all of these green. Upgrade path: assert one <svg> per route.
 class TestHTMLReports:
     """Test HTML report generation."""
 

@@ -129,6 +129,13 @@ def classify_reaction_type_detailed(
         - ``'ring_opening'`` -- ring bond broken
         - ``'other'`` -- fallback
 
+    .. warning::
+       The oxidation/reduction and carbonyl tests below are approximate; see the
+       ``ponytail:`` notes in the body. A plain C-C cleavage is currently reported
+       as ``'reduction'``. Nothing in SynPlanner calls this function — the protection
+       module uses :func:`classify_reaction_type`, which delegates to the broad
+       classifier and is unaffected.
+
     :param reaction: A chython ReactionContainer representing a chemical reaction.
     :param cgr: Pre-composed CGR.  If ``None``, computed from *reaction*.
     :return: A string label for the detailed reaction type.
@@ -156,6 +163,8 @@ def classify_reaction_type_detailed(
 
     def _has_carbonyl_at_center():
         """Check if there is a C=O bond (unchanged) involving a center atom."""
+        # ponytail: the changed-bond branch accepts any C-O pair regardless of order.
+        # Upgrade path: require order 2 on one side, as the unchanged branch does.
         for a1, a2, bond in cgr.bonds():
             syms = {atom_symbols.get(a1, ""), atom_symbols.get(a2, "")}
             if syms == {"C", "O"} and bond.order == bond.p_order:
@@ -238,6 +247,8 @@ def classify_reaction_type_detailed(
             break
 
     # Net bond order change for oxidation/reduction detection
+    # ponytail: bond-order arithmetic, not redox — `CCCC >> CC + CC` reads as a reduction.
+    # Upgrade path: count oxidation state at carbon (C-O vs C-H) instead of raw orders.
     net_order_change = 0
     for _a1, _a2, bond in info["changed_pairs"]:
         old_order = bond.order if bond.order is not None else 0
