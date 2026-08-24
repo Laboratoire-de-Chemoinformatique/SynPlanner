@@ -13,6 +13,8 @@ max_reacted_synthons: 6
 max_products: 1000
 mw_lower: 100.0
 mw_upper: 1000.0
+# ring sizes a heterocyclisation may close; [] disables ring closure in the enumerator
+ring_closure_sizes: [5, 6, 7]
 find_analogues: false
 similarity_threshold: -1.0
 pas_removal_direction: true

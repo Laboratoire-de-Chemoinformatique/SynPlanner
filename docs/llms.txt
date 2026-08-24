@@ -26,6 +26,7 @@ objects, or compare InChI.
 
 - [Command-line interface](https://synplanner.readthedocs.io/en/latest/user_guide/cli_interface.html): every command; prefer the CLI for long runs
 - [Configuration](https://synplanner.readthedocs.io/en/latest/configuration/configuration.html): the YAML knobs for each pipeline stage
+- [Synthons](https://synplanner.readthedocs.io/en/latest/configuration/synthonisation.html): cutting molecules into synthons against a building-block catalogue, and enumerating libraries from them — a different question from planning a route
 - [Retrosynthetic planning](https://synplanner.readthedocs.io/en/latest/methods/planning.html): what the planner does
 - [Priority rules](https://synplanner.readthedocs.io/en/latest/methods/priority_rules.html): custom retrosynthetic SMARTS
 - [Monte-Carlo tree search](https://synplanner.readthedocs.io/en/latest/methods/mcts.html): search algorithms, alternatives, tree analytics

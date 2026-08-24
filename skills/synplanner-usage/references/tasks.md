@@ -243,25 +243,34 @@ Docs: `configuration/policy` — "Training logger"
 runs that class's rule program. CLI: `bb_classifying` → `bb_synthonizing`.
 Config: `synthonisation.yaml` → `SynthonConfig`.
 Module: `synplan.chem.synthon`
+Tutorial: `17_Synthon_Based_Design`. Docs: `configuration/synthonisation`
 
 **Cut a target into purchasable synthons**
-`Fragmenter.fragment` builds a disconnection DAG with the 39 disconnection rules
-(plus their 39 macrocyclic twins, used only when the target has a ring larger
-than 11 atoms). CLI: `synthon_fragment --stock`.
+`Fragmenter.fragment` builds a disconnection DAG. The default `rule_mode` of
+use_all cuts with 115 rules — 39 acyclic disconnections and 76 ring-forming
+ones — plus their macrocyclic twins when the target has a ring larger than 11
+atoms. Emptying `ring_closure_sizes` drops the ring rules and restores
+acyclic-only behaviour. `rules_selection` is read only when `rule_mode` is
+something else, and the shipped R1-R13 names no ring rule.
+CLI: `synthon_fragment --stock`.
 Module: `synplan.chem.synthon.fragment`
+Tutorial: `17_Synthon_Based_Design`
 
 **Recombine stocked synthons into new molecules**
 `Enumerator.enumerate_library` for unconstrained library design,
 `Enumerator.enumerate_analogues` for analogues of one fragmentation pathway.
 CLI: `synthon_enumerate`.
 Module: `synplan.chem.synthon.enumerate`
+Tutorial: `17_Synthon_Based_Design`
 
 **Use the synthon disconnections during planning**
 `synthon_priority_rules()` returns them as `run_search(priority_rules=...)` input
 under the source name `"synthon"`; set `use_priority=True` in the search config
 or they are ignored. The children are ordinary molecules against the ordinary
-building-block stock — there is no synthon stock in the tree.
+building-block stock — there is no synthon stock in the tree. Ring rules are
+excluded: they have no open valence to spell a leaving group on.
 Module: `synplan.chem.reaction.rules.synthon`
+Tutorial: `18_Retrosynthesis_With_Synthon_Priority_Rules`
 
 **Drop reactions the synthon rules already cover from a training corpus**
 `classify_coverage` says whether a mapped reaction builds a bond one of the 39
@@ -289,6 +298,17 @@ processing errors. Metadata on SMI/CXSMILES records must be separated by TAB.
 `python -m synplan.chem.synthon.rules._convert <Synt-On/config> --out
 synplan/chem/synthon/rules --check`. The JSON is committed; nothing translates at
 import time.
+
+**Say what the disconnections do not cover**
+Every rule records its provenance: 78 converted from the reference, 76 ring rules
+authored in-repo and not yet signed off by a chemist. Ten more are held out of
+`rules.json` entirely — `chemist_review` in the development docs is the queue,
+and the port has no rule for a plain 2,5-dialkylfuran because two of them are
+held. The pipeline is also stereo-blind: `safe_canonicalization` discards
+stereocentres, so any route through a ring rule is racemic. Promote
+`StereoDiscardedWarning` to an error to refuse stereo-bearing input rather than
+racemise it silently.
+Module: `synplan.chem.utils`
 
 ## When old code stops working
 

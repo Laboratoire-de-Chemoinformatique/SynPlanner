@@ -1,10 +1,15 @@
 synplan.chem.synthon package
-=======================
+============================
 
 ``synplan.chem.synthon`` provides the adapted Synt-On workflows for
 building-block classification and synthonisation, target fragmentation,
-analogue-aware enumeration, stock handling, scaffold analysis, and MCTS
-priority rules.
+analogue-aware enumeration, stock handling, reaction-corpus coverage, and MCTS
+priority rules. Bemis-Murcko scaffolds live one level up, in
+:mod:`synplan.chem.scaffolds`.
+
+The shipped disconnections are committed data under
+``synplan/chem/synthon/rules/``; the converter and dialect modules beside them
+run at authoring time only and are not part of the public API.
 
 Use the package-level imports for the stable public facade, for example
 ``from synplan.chem.synthon import Fragmenter, SynthonConfig``. Focused
@@ -31,7 +36,7 @@ synplan.chem.synthon.analogues module
    :show-inheritance:
 
 synplan.interfaces.synthon_audit module
----------------------------------
+---------------------------------------
 
 .. automodule:: synplan.interfaces.synthon_audit
    :members:
@@ -47,7 +52,7 @@ synplan.chem.synthon.classify module
    :show-inheritance:
 
 synplan.interfaces.synthon_commands module
--------------------------------
+------------------------------------------
 
 .. automodule:: synplan.interfaces.synthon_commands
    :members:
@@ -58,6 +63,14 @@ synplan.chem.synthon.config module
 ----------------------------------
 
 .. automodule:: synplan.chem.synthon.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+synplan.chem.synthon.coverage module
+------------------------------------
+
+.. automodule:: synplan.chem.synthon.coverage
    :members:
    :undoc-members:
    :show-inheritance:
@@ -79,7 +92,7 @@ synplan.chem.synthon.fragment module
    :show-inheritance:
 
 synplan.chem.reaction.rules.synthon module
-------------------------------------
+------------------------------------------
 
 .. automodule:: synplan.chem.reaction.rules.synthon
    :members:
@@ -87,7 +100,7 @@ synplan.chem.reaction.rules.synthon module
    :show-inheritance:
 
 synplan.chem.synthon.transformer module
------------------------------------
+---------------------------------------
 
 .. automodule:: synplan.chem.synthon.transformer
    :members:

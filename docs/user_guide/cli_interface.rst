@@ -68,7 +68,8 @@ Standardize custom building blocks for compatibility with ``SynPlanner``.
 
 Synthon workflows
 -----------------
-The Synt-On workflows share ``configs/synthonisation.yaml``:
+The Synt-On workflows share ``configs/synthonisation.yaml``, whose parameters are
+documented in :doc:`/configuration/synthonisation`:
 
 .. code-block:: bash
 

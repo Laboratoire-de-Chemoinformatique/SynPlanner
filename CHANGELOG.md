@@ -7,6 +7,51 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added `synplan.chem.reaction.curation.rebalancing`, which adds the molecules an unbalanced
+  reaction is missing without needing atom mapping. Missing carbon is recovered
+  as a substructure of the reactants, and the remaining deficit is covered from
+  a table of small molecules. Where the reaction is mapped, the CGR names the
+  bonds that break, so reagents it never touched are carried through whole
+  instead of being cut apart. Imputed species are rejected when an atom is left
+  with an unsatisfied valence, which is what distinguishes Mg(OH)Br from a bare
+  `[Mg]Br`, and species that cannot survive in a flask are broken into what they
+  vent.
+
+  Exposed as the `rebalance_reaction_config` standardization step, with options
+  to name the reagent behind a redox step rather than balance it with loose
+  hydrogen, to refuse an answer that invents free hydrogen the record cannot
+  account for, to drop the products the reactants cannot have made, and to read
+  or ignore the atom mapping. A reagent the record names leaves as its spent
+  form rather than as whatever covers the arithmetic. Every answer carries a
+  confidence score, and `min_confidence` refuses the ones that fall below it.
+
+- Added `scripts/rebalance_bench.py`, which measures success rate and accuracy
+  against SynRBL's validation set. Rows whose reference is missing, or does not
+  itself balance, are reported apart rather than counted as losses.
+
+- Added `TreeConfig.direction`, which selects between retrosynthetic and forward search
+  and validates that the tree and the rollout evaluator score the same finish line —
+  in forward mode `building_blocks` is the goal to reach rather than the stock, and a
+  configuration where only one of the two carries it is now rejected instead of
+  silently searching toward one target and rewarding another. `apply_reaction_rule`
+  gains `co_reactants`, without which a bimolecular rule run forward is handed one
+  structure and yields nothing. Partner selection is not implemented, so the tree does
+  not yet pass co-reactants during expansion.
+
+- The test suite runs in parallel. `pytest-xdist` joins the dev group and CI runs
+  `pytest -n auto --dist loadscope`, taking CI from 224s to 79s and a local no-coverage run from
+  120s to 40s. `loadscope` keeps each module's tests on one worker so module-scoped fixtures — the
+  clustering integration pipeline in particular — are built once rather than once per worker. No
+  test was deleted, skipped or weakened to get there; the end-to-end planner and clustering tests
+  that catch real regressions all still run.
+
+- `test_mcts_imports_do_not_depend_on_route_import_order` spawns its six fresh interpreters
+  concurrently instead of serially, 10.8s to 2.5s. Each snippet still gets its own untouched
+  interpreter, which is the whole point of the test; they simply no longer queue behind each
+  other's torch import.
+
+#### Synthons (Synt-On port)
+
 - Added `synplan.chem.synthon`, a native port of Synt-On (SynthI; Zabolotna, Volochnyuk, Ryabukhin,
   Gavrylenko, Horvath, Klimchuk, Oksiuta, Marcou, Varnek, "SynthI:
   A New Open-Source Tool for Synthon-Based Library Design", *J. Chem. Inf. Model.* 2022,
@@ -20,7 +65,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   2401 SMARTS), building-block synthonisation (147 rule programs, 389 steps, four
   execution strategies), fragmentation (39 disconnection rules, their 39 macrocyclic
   twins, and the disconnection DAG with its gates and availability rate), recombination
-  (one join keyed by the 26-pair compatibility table, both enumeration modes), Bemis-Murcko
+  (one join keyed by the 29-pair compatibility table, both enumeration modes), Bemis-Murcko
   scaffolds (`synplan.chem.scaffolds` — chython only, useful outside enumeration) and the
   rule of two, and positional analogue scanning.
 
@@ -68,7 +113,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   here the table IS the join, so without those rows a biaryl disconnects and then
   reassembles to nothing.
 
-- Added opt-in audited output bundles to all five synthon CLI workflows. Set
+- Added opt-in audited output bundles to the five audited synthon CLI workflows —
+  every synthon command except `synthon_coverage`, whose output is a verbatim subset
+  of its input. Set
   `write_audit_files: true` in `SynthonConfig` to write `fallback.smi`,
   `fallback.tsv`, `errors.tsv`, `summary.json`, and `run.log` beside the primary
   output. Audited runs preserve an exact success/fallback input partition,
@@ -140,8 +187,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   missing primitive was `close_ring`, which draws the second bond after `join` has
   already merged the two fragments into one molecule.
 
-  This changes default enumeration output: `rule_mode="use_all"` now loads 48 rules
-  rather than 39, and across ten drug targets unique products go from 21 to 28 (a
+  This changes default enumeration output: `rule_mode="use_all"` loads the ring rules
+  alongside the 39 acyclic ones (see the curation entry below for the shipped count),
+  and across ten drug targets unique products go from 21 to 28 (a
   pyridine ring closure makes nicotine reachable, where the shipped rules found no
   pathway). Ring rules are excluded from `synthon_priority_rules()`, where `capped_smarts` has
   no open valence to spell a leaving group on and would hand the planner a styrene
@@ -220,8 +268,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   positive. `check()` also rejects a duplicated rule id, which `_positions()` would
   otherwise resolve to two rules and use to widen any range spanning it.
 
-  Ten curated rules are **held out** of `rules.json` and stay flagged pending in
-  `research/synthon/curation/curated_rules.json`: `R16.4a` (N-substituted imidazole by the
+  Ten curated rules are **held out** of `rules.json` and stay flagged pending in the
+  curation record; `docs/development/chemist_review.rst` is the queue and names the open
+  question against each: `R16.4a` (N-substituted imidazole by the
   amidine route — its own curator wrote "DOES NOT ROUND-TRIP. Do not ship. Correct only
   for N-methyl", and the acceptance gate that disagrees tests one target); `R17.7`,
   `R17.8`, `R17.10`, `R17.11` (oxa-/aza-Fiesselmann and the two Hinsberg routes, all
@@ -236,84 +285,48 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   racemic. `R17.16`/`R17.17` and `R16.6a/b` match far more often than chemists close those
   rings that way, and are not down-weighted yet.
 
-- Added `TreeConfig.direction`, which selects between retrosynthetic and forward search
-  and validates that the tree and the rollout evaluator score the same finish line —
-  in forward mode `building_blocks` is the goal to reach rather than the stock, and a
-  configuration where only one of the two carries it is now rejected instead of
-  silently searching toward one target and rewarding another. `apply_reaction_rule`
-  gains `co_reactants`, without which a bimolecular rule run forward is handed one
-  structure and yields nothing. Partner selection is not implemented, so the tree does
-  not yet pass co-reactants during expansion.
+- Every shipped disconnection now records where it came from and what it is. `provenance`
+  is `human` for the 78 rules converted from the reference's own rule file and `llm` for
+  the 76 ring rules authored in this repository, so the half that no chemist has signed off
+  is identifiable rather than inferred from a rule id. Beside it each rule carries a
+  nullable `reaction_name`, what it `forms`, its `reagents`, and the ids it `supersedes`.
+  Null is kept as the honest answer for a transformation class that names no single named
+  reaction — the free-text `name` alone could not be read as one, because it followed two
+  incompatible conventions.
 
-- Added `synplan.chem.reaction.curation.rebalancing`, which adds the molecules an unbalanced
-  reaction is missing without needing atom mapping. Missing carbon is recovered
-  as a substructure of the reactants, and the remaining deficit is covered from
-  a table of small molecules. Where the reaction is mapped, the CGR names the
-  bonds that break, so reagents it never touched are carried through whole
-  instead of being cut apart. Imputed species are rejected when an atom is left
-  with an unsatisfied valence, which is what distinguishes Mg(OH)Br from a bare
-  `[Mg]Br`, and species that cannot survive in a flask are broken into what they
-  vent.
+  `rules.json` ships 154 records: 39 acyclic disconnections, their 39 macrocyclic twins,
+  and 76 ring rules. `rule_mode: use_all` loads the 115 non-macrocyclic ones, and the
+  macrocyclic twins are added only when the target has a ring larger than 11 atoms. The
+  ring rules moved out of a 538-line literal inside
+  `synplan.chem.synthon.rules._convert` into a versioned `ring_rules.json`, and the
+  reference's own naming into `enamine_naming.json`, so the authoring record is reviewable
+  as data rather than as source. Both files ship in the wheel.
 
-  Exposed as the `rebalance_reaction_config` standardization step, with options
-  to name the reagent behind a redox step rather than balance it with loose
-  hydrogen, to refuse an answer that invents free hydrogen the record cannot
-  account for, to drop the products the reactants cannot have made, and to read
-  or ignore the atom mapping. A reagent the record names leaves as its spent
-  form rather than as whatever covers the arithmetic. Every answer carries a
-  confidence score, and `min_confidence` refuses the ones that fall below it.
-
-- Added `scripts/rebalance_bench.py`, which measures success rate and accuracy
-  against SynRBL's validation set. Rows whose reference is missing, or does not
-  itself balance, are reported apart rather than counted as losses.
-
-
-- The test suite runs in parallel. `pytest-xdist` joins the dev group and CI runs
-  `pytest -n auto --dist loadscope`, taking CI from 224s to 79s and a local no-coverage run from
-  120s to 40s. `loadscope` keeps each module's tests on one worker so module-scoped fixtures — the
-  clustering integration pipeline in particular — are built once rather than once per worker. No
-  test was deleted, skipped or weakened to get there; the end-to-end planner and clustering tests
-  that catch real regressions all still run.
-
-- `test_mcts_imports_do_not_depend_on_route_import_order` spawns its six fresh interpreters
-  concurrently instead of serially, 10.8s to 2.5s. Each snippet still gets its own untouched
-  interpreter, which is the whole point of the test; they simply no longer queue behind each
-  other's torch import.
-
-### Fixed
-
-- Nine more tests asserted a shape rather than a behaviour, each confirmed by mutating the code they
-  cover and watching them stay green. The MHN ranking network had no behavioural test at all: collapsing
-  every rule to one identical association vector — leaving the model unable to rank anything, which is its
-  entire job — passed all 46 tests in the suite's largest file. It now asserts the ranking contract, that
-  two rules are scored apart and that permuting the rule rows permutes the logits. `classify_reaction_type_detailed`
-  was verified only by `rtype in (...)` tuples that included the `"other"` fallback, so stubbing the whole
-  function to return `"other"` passed; each case now asserts the specific label its reaction must produce.
-  `Tree.to_stats_dict` was checked by key name, so returning every value zeroed passed. Three
-  `RouteScanner` tests looped over `interactions` without asserting the list was non-empty, so returning
-  `[]` passed; they are now one test asserting the exact interaction. `test_compose_route_cgr_tree_based_invalid_route_id`
-  never called the function it named. `Precursor` construction was asserted with `is not None`, so dropping
-  canonicalisation passed. Retro-amidation asserted only that some product came back, so emitting an amine
-  instead of a carboxylic acid passed.
-
-- `classify_reaction_type_detailed` documented an `'acylation'` return value it cannot produce — the more
-  specific amide and ester branches always match first — and the changelog advertised the classifier as
-  12-category. Both now say 11, which is what the function actually returns. Behaviour is unchanged; the
-  loose tests were what let the wrong count ship.
-
-- Four tests asserted a shape rather than a behaviour and passed against broken code. Each was
-  rewritten and then re-checked by re-applying the mutation that had slipped through.
-  `test_audit_run_publishes_consistent_sidecars_and_summary` verified every artifact's provenance
-  hash by calling the same `sha256_file` that had written it, so stubbing that function to a
-  constant left all 83 audit tests green; it now compares against an independent
-  `hashlib.sha256`. `test_juxtaposed_recursive_primitives_are_anded` counted semicolons in the
-  translated SMARTS, so emitting a malformed pattern passed; it now checks that the ported query
-  accepts an amine and rejects both an amide and a sulfonamide, which is what the AND means.
-  `test_no_standardization` asserted only the return type, so dropping the standardization step
-  entirely passed all 21 tests in the file; it now asserts that the flags change the result.
-  `test_in_stock_flags` asserted the flag list's length, so inverting every flag passed; it now
-  asserts the flags.
 ### Changed
+
+- `rebalance_reaction_config` now imputes the molecules a reaction is missing
+  rather than round-tripping it through a CGR. The old step could only
+  redistribute atoms the reaction already had, and only when the mapping was
+  good enough to build a CGR from, so it left every genuinely unbalanced
+  reaction unbalanced.
+
+- `rebalance_reaction_config` now runs after `remove_reagents_config` rather
+  than before it. Reagent removal moves spectators out of the reactants and
+  products, which unbalances whatever was balanced first.
+
+- An oxidation recorded without its oxidant is now balanced with a peroxide
+  rather than a bare oxygen atom. chython cannot hold atomic oxygen, so an
+  answer spelled that way balanced in memory and came back off disk unbalanced.
+
+- Naming the reagent behind a plain loss of hydrogen is now gated on
+  `add_redox_agents`, as its documentation always said. By default the hydrogen
+  is left loose, which is the honest way to say the record was written short.
+
+- Rebalancing now withdraws the atom mapping where imputation leaves atoms on
+  only one side. Nothing establishes which invented atom on one side is which on
+  the other, and numbering them apart let a CGR compose while naming the wrong
+  reaction centre. A caller that needs a mapping maps the balanced reaction
+  itself.
 
 - Package layout is now written down and enforced. `docs/development/package_layout.rst` states
   seven rules — four import layers, configuration beside its domain, verbs for pipeline stages and
@@ -356,30 +369,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Synthon` atom family, `SynthonContainer`, the `_token` bracket field in SMILES and
   SMARTS, and `!rN` as a real excluded-ring-sizes constraint.
 
-- `rebalance_reaction_config` now imputes the molecules a reaction is missing
-  rather than round-tripping it through a CGR. The old step could only
-  redistribute atoms the reaction already had, and only when the mapping was
-  good enough to build a CGR from, so it left every genuinely unbalanced
-  reaction unbalanced.
-
-- `rebalance_reaction_config` now runs after `remove_reagents_config` rather
-  than before it. Reagent removal moves spectators out of the reactants and
-  products, which unbalances whatever was balanced first.
-
-- An oxidation recorded without its oxidant is now balanced with a peroxide
-  rather than a bare oxygen atom. chython cannot hold atomic oxygen, so an
-  answer spelled that way balanced in memory and came back off disk unbalanced.
-
-- Naming the reagent behind a plain loss of hydrogen is now gated on
-  `add_redox_agents`, as its documentation always said. By default the hydrogen
-  is left loose, which is the honest way to say the record was written short.
-
-- Rebalancing now withdraws the atom mapping where imputation leaves atoms on
-  only one side. Nothing establishes which invented atom on one side is which on
-  the other, and numbering them apart let a CGR compose while naming the wrong
-  reaction centre. A caller that needs a mapping maps the balanced reaction
-  itself.
-
 ### Fixed
 
 - Rebalancing no longer caps an open bond with a halide on a carbon that already
@@ -410,6 +399,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `split_ions_config` no longer fails on every ionic reaction. It read a
   molecule's total charge off an attribute chython-synplan no longer has.
+
+- Nine more tests asserted a shape rather than a behaviour, each confirmed by mutating the code they
+  cover and watching them stay green. The MHN ranking network had no behavioural test at all: collapsing
+  every rule to one identical association vector — leaving the model unable to rank anything, which is its
+  entire job — passed all 46 tests in the suite's largest file. It now asserts the ranking contract, that
+  two rules are scored apart and that permuting the rule rows permutes the logits. `classify_reaction_type_detailed`
+  was verified only by `rtype in (...)` tuples that included the `"other"` fallback, so stubbing the whole
+  function to return `"other"` passed; each case now asserts the specific label its reaction must produce.
+  `Tree.to_stats_dict` was checked by key name, so returning every value zeroed passed. Three
+  `RouteScanner` tests looped over `interactions` without asserting the list was non-empty, so returning
+  `[]` passed; they are now one test asserting the exact interaction. `test_compose_route_cgr_tree_based_invalid_route_id`
+  never called the function it named. `Precursor` construction was asserted with `is not None`, so dropping
+  canonicalisation passed. Retro-amidation asserted only that some product came back, so emitting an amine
+  instead of a carboxylic acid passed.
+
+- `classify_reaction_type_detailed` documented an `'acylation'` return value it cannot produce — the more
+  specific amide and ester branches always match first — and the changelog advertised the classifier as
+  12-category. Both now say 11, which is what the function actually returns. Behaviour is unchanged; the
+  loose tests were what let the wrong count ship.
+
+- Four tests asserted a shape rather than a behaviour and passed against broken code. Each was
+  rewritten and then re-checked by re-applying the mutation that had slipped through.
+  `test_audit_run_publishes_consistent_sidecars_and_summary` verified every artifact's provenance
+  hash by calling the same `sha256_file` that had written it, so stubbing that function to a
+  constant left all 83 audit tests green; it now compares against an independent
+  `hashlib.sha256`. `test_juxtaposed_recursive_primitives_are_anded` counted semicolons in the
+  translated SMARTS, so emitting a malformed pattern passed; it now checks that the ported query
+  accepts an amine and rejects both an amide and a sulfonamide, which is what the AND means.
+  `test_no_standardization` asserted only the return type, so dropping the standardization step
+  entirely passed all 21 tests in the file; it now asserts that the flags change the result.
+  `test_in_stock_flags` asserted the flag list's length, so inverting every flag passed; it now
+  asserts the flags.
 
 ### Removed
 

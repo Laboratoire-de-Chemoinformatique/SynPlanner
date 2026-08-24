@@ -7,8 +7,10 @@ description: >-
   formerly CGRtools), not RDKit. Use when the user imports `synplan.*`, asks for a
   retrosynthesis or synthetic route for a target molecule, trains or tunes a ranking
   or filtering policy or a value network, extracts reaction rules from reaction data,
-  standardizes or filters a reaction dataset, clusters or compares routes, or runs
-  into chython-versus-RDKit differences such as canonical SMILES that do not match.
+  standardizes or filters a reaction dataset, clusters or compares routes, designs a
+  combinatorial library or enumerates analogues by cutting molecules into synthons
+  against a building-block catalogue, or runs into chython-versus-RDKit differences
+  such as canonical SMILES that do not match.
   Out of scope: building or contributing to SynPlanner itself, and general
   cheminformatics that does not involve reactions.
 license: MIT
@@ -58,6 +60,29 @@ exactly this for synthetic-accessibility scoring and molecular descriptors — s
 
 Do not overcorrect. "Prefer chython" is not "never RDKit" — when chython does not
 have the function, reach for RDKit and say so, rather than hand-rolling it.
+
+## A library is not a route
+
+`synplan.chem.synthon` is a port of Synt-On and answers a different question from
+planning: what can be built from a catalogue, not how to make one molecule. Asked
+for a synthesis, plan. Asked for a library, for analogues, or for what a catalogue
+reaches, fragment and enumerate. Do not reach for `Tree` to enumerate, and do not
+hand back a fragmentation pathway as a route — it names no reaction and no
+conditions.
+
+The one crossing point is `synthon_priority_rules()`, which hands the
+disconnections to the ordinary MCTS search. Python-only, and it needs
+`use_priority=True` in the search config or the rules are ignored in silence.
+
+**Build the synthon stock before using it.** `synthon_fragment` and
+`synthon_enumerate` read synthons, not building blocks: run `bb_classifying` then
+`bb_synthonizing` over the catalogue first. Pointing them at a raw building-block
+file is the usual reason nothing comes back, and it does not raise.
+
+**Do not oversell what the disconnections cover.** Half the ring rules were
+authored in this repository and no chemist has signed them off, ten more are held
+out, and the pipeline discards stereochemistry — every enumerated ring is racemic.
+Say so when you hand over a library. `references/tasks.md` has the specifics.
 
 ## Installing
 

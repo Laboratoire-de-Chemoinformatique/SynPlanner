@@ -165,7 +165,7 @@ For docs-only or docs-heavy changes, validate with a temporary build directory:
 
 .. code-block:: bash
 
-   uv run sphinx-build -b html docs /tmp/synplanner-docs-html
+   uv run --group docs sphinx-build -b html docs /tmp/synplanner-docs-html
 
 Version bumps and release mechanics are covered in :doc:`release`.
 
