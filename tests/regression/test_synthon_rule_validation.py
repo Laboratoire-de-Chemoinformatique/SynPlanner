@@ -22,8 +22,13 @@ TAUTOMER_TRAPS = {
 
 
 def _ring_records():
+    """The R16 families, which have a hand-authored target here.
+
+    The R17 block is checked the same way against its own authored targets by the converter's
+    `check()`, which `test_synthon_data_is_current` runs.
+    """
     data = load_data(SynthonConfig().rules_path)
-    return [r for r in data["disconnections"] if r.get("ring")]
+    return [r for r in data["disconnections"] if r["id"] in RING_EXAMPLES]
 
 
 @pytest.mark.parametrize("record", _ring_records(), ids=lambda r: r["id"])

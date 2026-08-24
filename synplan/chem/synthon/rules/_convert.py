@@ -10,12 +10,17 @@ import json
 import re
 import sys
 import xml.etree.ElementTree as ElementTree
+from collections import defaultdict
 from pathlib import Path
 
-from chython import smarts
+from chython import smarts, synthon_smiles
+from chython.exceptions import InvalidAromaticRing
 from chython.periodictable import AnyElement
 
 from synplan.chem.synthon.rules._dialect import DialectError, to_chython
+from synplan.chem.synthon.rules.validate import shifted_labels
+from synplan.chem.synthon.transformer import SynthonTransformer, query_labels
+from synplan.chem.utils import safe_canonicalization
 
 # the one-time migration. Code 11 ("electrophilic nitrogen") collapses into 'elec': marksCombinations
 # has no N:10 key, so on nitrogen "electrophile" already has exactly one meaning.
@@ -93,6 +98,8 @@ FORBIDDEN_MARKS = [
 # A ring synthon is an ordinary H-capped labelled fragment of the PRODUCT carrying two labels — the
 # synthons of a triazole are a benzyl triazene and a styrene, not an azide and an alkyne — so the
 # record format, the SMARTS dialect and the token set are unchanged; only `ring` is new.
+# The fourth field is the target `check()` fires the rule on. chython's `D` counts HEAVY
+# neighbours, so `[n;D3]` never matches an N-H azole and each such family needs an a/b twin pair.
 #
 # Three dialect rules, each found by a rule that silently misfired:
 #  - the RHS bond orders are load-bearing: `[#7:2]=[#7:3]` de-aromatises, omitting the `=` gives a
@@ -101,64 +108,542 @@ FORBIDDEN_MARKS = [
 #    or that bond is lost;
 #  - a ring-fusion atom needs `[c;R2:n]` to pin the traversal direction. `r5`/`r6` do not behave as
 #    Daylight would suggest here.
-# And one chemistry rule: never put a label on an atom inside a tautomerisable amide / amidine /
-# thioamide / enol triad. chython is the authority on tautomers and moves the double bond while
-# leaving the label where it was, which is silently wrong rather than an error. That is why
-# isoxazole appears here and oxazole does not, and pyridazine but not pyrimidine.
+# And one chemistry rule: inside a tautomerisable amide / amidine / thioamide / enol triad, label
+# both ends or neither. chython moves the proton and leaves the label where it was, which is
+# silently wrong unless the two atoms are the same element carrying the same token - then they are
+# interchangeable and nothing moved. `check()` enforces exactly that through `validate`.
 RING_RULES = [
     (
-        "R16.1",
-        "1,2,3-triazole / CuAAC (azide + alkyne)",
-        "[n;D3:1]1[n;D2:2][n;D2:3][c:4][c:5]1"
+        "R16.1a",
+        "1,2,3-triazole, N1-substituted / azide + alkyne (CuAAC, RuAAC, SPAAC, thermal Huisgen)",
+        "[n;D3;+0;!$(n-[#7]);!$(n-[#8]);!$([n][#6]=[#8]):1]1[n;+0;D2:2][n;+0;D2:3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a):5]1"
         ">>[#7_elec:1][#7:2]=[#7_nuc:3].[#6_elec:4]=[#6_nuc:5]",
+        "c1ccccc1Cn1cc(-c2ccccc2)nn1",
     ),
     (
-        "R16.2",
-        "tetrazole / azide + nitrile",
-        "[n;D3:1]1[n;D2:2][n;D2:3][n;D2:4][c:5]1"
+        "R16.1b",
+        "1,2,3-triazole, N-unsubstituted (1H) / azide (NaN3, TMS-N3) + alkyne [n;h1] twin of R16.1a",
+        "[n;h1;+0:1]1[n;+0;D2:2][n;+0;D2:3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a):5]1"
+        ">>[#7_elec:1][#7:2]=[#7_nuc:3].[#6_elec:4]=[#6_nuc:5]",
+        "c1ccccc1-c1cn[nH]n1",
+    ),
+    (
+        "R16.2a",
+        "tetrazole, 1,5-disubstituted / organic azide + nitrile",
+        "[n;D3;+0;!$(n-[#7]);!$(n-[#8]);!$([n][#6]=[#8]);!$([n]S(=O)=O):1]1[n;+0;D2:2][n;+0;D2:3][n;+0;D2:4][c;!$(c(:a)(:a):a):5]1"
         ">>[#7_nuc:1][#7:2]=[#7_elec:3].[#7_nuc:4]=[#6_elec:5]",
+        "Cn1nnnc1-c1ccccc1",
     ),
     (
-        "R16.3",
-        "pyrazole / Knorr (hydrazine + 1,3-dicarbonyl)",
-        "[n;D3:1]1[n;D2:2][c:3][c:4][c:5]1"
+        "R16.2b",
+        "tetrazole, 5-substituted N-unsubstituted (1H) / NaN3 + nitrile, [n;h1] twin of R16.2a",
+        "[n;h1;+0:1]1[n;+0;D2:2][n;+0;D2:3][n;+0;D2:4][c;!$(c(:a)(:a):a):5]1"
+        ">>[#7_nuc:1][#7:2]=[#7_elec:3].[#7_nuc:4]=[#6_elec:5]",
+        "c1ccccc1-c1nnn[nH]1",
+    ),
+    (
+        "R16.3a",
+        "pyrazole, N1-substituted / Knorr (substituted hydrazine + 1,3-dicarbonyl, enaminone or ynone)",
+        "[n;D3;+0;!$(n-[#7]);!$(n-[#8]);!$([n][#6]=[#8]);!$([n]S(=O)=O):1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a):5]1"
         ">>[#7_nuc:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6_elec:5]",
+        "O=S(=O)(N)c1ccc(cc1)-n1nc(cc1-c1ccc(C)cc1)C(F)(F)F",
     ),
     (
-        "R16.4",
-        "imidazole / amidine + alpha-halo ketone",
-        "[n;D3:1]1[c:2][n;D2:3][c:4][c:5]1"
+        "R16.3b",
+        "pyrazole, N-unsubstituted (1H) / Knorr with hydrazine hydrate, [n;h1] twin of R16.3a",
+        "[n;h1;+0:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a):5]1"
+        ">>[#7_nuc:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6_elec:5]",
+        "Cc1cc(-c2ccccc2)[nH]n1",
+    ),
+    (
+        "R16.4b",
+        "imidazole, N-unsubstituted (1H) / amidine + alpha-halo ketone",
+        "[n;h1;+0;R1:1]1[c;R1;+0:2][n;D2;h0;+0:3][c;R1;+0:4][c;R1;+0:5]1"
         ">>[#7_nuc:1][#6:2]=[#7_nuc:3].[#6_elec:4]=[#6_elec:5]",
+        "CCCCc1nc(Cl)c(CO)[nH]1",
     ),
     (
         "R16.5",
-        "isoxazole / hydroxylamine + 1,3-dicarbonyl",
-        "[o:1]1[n;D2:2][c:3][c:4][c:5]1"
+        "isoxazole / hydroxylamine + 1,3-dicarbonyl (Claisen-type condensation)",
+        "[o;+0:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a):5]1"
         ">>[#8_nuc:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6_elec:5]",
+        "Cc1onc(-c2ccccc2)c1-c1ccc(cc1)S(N)(=O)=O",
     ),
     (
-        "R16.6",
-        "pyridine / Kroehnke-Bohlmann-Rahtz (enamine + enone)",
-        "[n;D2:1]1[c:2][c:3][c:4][c:5][c:6]1"
+        "R16.6a",
+        "pyridine / Kroehnke-Bohlmann-Rahtz (enamine + enone), orientation A",
+        "[n;D2;+0:1]1[c;x2;!$(c[#7,#8,#16]):2][c;x2:3][c;x2;!$(c!@[OH]):4][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):5][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):6]1"
         ">>[#7_nuc:1]=[#6:2][#6_nuc2:3].[#6_elec2:4][#6:5]=[#6_elec:6]",
+        "Cc1cccnc1",
+    ),
+    (
+        "R16.6b",
+        "pyridine / Kroehnke-Bohlmann-Rahtz, orientation B (mirror twin of R16.6a)",
+        "[n;D2;+0:1]1[c;x2;!$(c[#8;h1]);!$(c[#16;h1]):2][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):3][c;x2;!$(c!@[OH]):4][c;x2:5][c;x2;!$(c[#7,#8,#16]):6]1"
+        ">>[#7_nuc:1]=[#6:6][#6_nuc2:5].[#6_elec2:4][#6:3]=[#6_elec:2]",
+        "Cc1cccnc1",
     ),
     (
         "R16.7",
-        "pyridazine / hydrazine + 1,4-dicarbonyl",
-        "[n;D2:1]1[n;D2:2][c:3][c:4][c:5][c:6]1"
+        "pyridazine / hydrazine + 1,4-dicarbonyl; also phthalazine from an ortho-diacylarene",
+        "[n;D2;+0:1]1[n;D2;+0:2][c;x2;!$(c!@[OH]):3][c;!$(c[#8;h1]);!$(c[#16;h1]):4][c;!$(c[#8;h1]);!$(c[#16;h1]):5][c;x2;!$(c!@[OH]):6]1"
         ">>[#7_nuc2:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6:5][#6_elec2:6]",
+        "Cc1cccnn1",
     ),
     (
         "R16.8",
         "indole / Fischer (arylhydrazine + ketone)",
-        "[n;D3:1]1[c:2][c:3][c;R2:4][c;R2:5]1"
+        "[n;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]):1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):3][c;R2;$(c(:a)(:a):a);$(c1ccccc1):4][c;R2;$(c(:a)(:a):a);$(c1ccccc1):5]1"
         ">>[#6_elec:2]=[#6_elec:3].[c_nuc:4][c:5][#7_nuc:1]",
+        "Cc1cc2ccccc2[nH]1",
     ),
     (
         "R16.9",
         "quinoline / Friedlaender (2-aminoaryl ketone + ketone)",
-        "[n;D2:1]1[c:2][c:3][c:4][c;R2:5][c;R2:6]1"
+        "[n;D2;+0:1]1[c;x2;!$(c!@[OH]):2][c;x2:3][c;x2;!$(c!@[OH]):4][c;R2;!$(c[A]):5][c;R2;!$(c[A]):6]1"
         ">>[#7_nuc2:1][c:6][c:5][#6_elec2:4].[#6_elec2:2][#6_nuc2:3]",
+        "Cc1cc(C)c2ccccc2n1",
+    ),
+    (
+        "R17.1",
+        "Paal-Knorr pyrrole (1,4-dicarbonyl + NH3/RNH2)",
+        "[n;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]);R1:1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a):3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):5]1"
+        ">>[#7_nuc:1][#6:2]=[#6:3][#6:4]=[#6_elec:5]",
+        "Cn1c(CC(=O)O)ccc1C(=O)c1ccc(C)cc1",
+    ),
+    (
+        "R17.2",
+        "Paal-Knorr thiophene (1,4-dicarbonyl + P4S10/Lawesson; also SH- + 1,3-diyne)",
+        "[s;+0;R1:1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a):3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):5]1"
+        ">>[#16_nuc:1][#6:2]=[#6:3][#6:4]=[#6_elec:5]",
+        "Cc1ccc(C)s1",
+    ),
+    (
+        "R17.9",
+        "Hinsberg thiophene (thiodiglycolate + 1,2-dicarbonyl)",
+        "[s;+0:1]1[c;!$(c(:a)(:a):a);$(c!@[#6](=[#8])[#8]):2][c;!$(c(:a)(:a):a):3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a);$(c!@[#6](=[#8])[#8]):5]1"
+        ">>[#6_nuc2:2][#16:1][#6_nuc2:5].[#6_elec2:3][#6_elec2:4]",
+        "CCOC(=O)c1sc(C(=O)OCC)c(-c2ccccc2)c1-c1ccccc1",
+    ),
+    (
+        "R17.12",
+        "indole / Leimgruber-Batcho (covers Cadogan-Sundberg)",
+        "[n;h1;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O):1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a);$(c1ccccc1):4][c;R2;$(c(:a)(:a):a);$(c1ccccc1):5]1"
+        ">>[#7_nuc:1][c:5][c:4][#6:3]=[#6_elec:2]",
+        "CNS(=O)(=O)Cc1ccc2[nH]cc(CCN(C)C)c2c1",
+    ),
+    (
+        "R17.13",
+        "indole / Larock heteroannulation (Bartoli maps to the same two bonds)",
+        "[n;+0;!$(n-[#7]);!$(n-[#8]):1]1[c;h0;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;h0;!$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1"
+        ">>[#7_nuc:1][c:5][c_elec:4].[#6_nuc:3]=[#6_elec:2]",
+        "Cc1[nH]c2ccccc2c1C",
+    ),
+    (
+        "R17.14",
+        "indole / Madelung (and the Houlihan and Smith variants)",
+        "[n;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]):1]1[c;h0;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a);$(c1ccccc1):4][c;R2;$(c(:a)(:a):a);$(c1ccccc1):5]1"
+        ">>[#6_elec2:2][#7:1][c:5][c:4][#6_nuc2:3]",
+        "c1ccc(-c2cc3ccccc3[nH]2)cc1",
+    ),
+    (
+        "R17.16",
+        "benzofuran / 5-endo-dig cycloisomerisation of a 2-alkynylphenol",
+        "[o;+0:1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1"
+        ">>[#8_nuc:1][c:5][c:4][#6:3]=[#6_elec:2]",
+        "CCCCc1oc2ccccc2c1C(=O)c1ccccc1",
+    ),
+    (
+        "R17.17",
+        "benzothiophene / 5-endo-dig cycloisomerisation of a 2-alkynylthiophenol",
+        "[s;+0:1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1"
+        ">>[#16_nuc:1][c:5][c:4][#6:3]=[#6_elec:2]",
+        "CCc1sc2ccc(O)cc2c1-c1ccc(O)cc1",
+    ),
+    (
+        "R17.18",
+        "carbazole / Cadogan (2-nitrobiphenyl + P(OEt)3) or Buchwald C-N of a 2-aminobiphenyl",
+        "[n;+0;!$(n-[#7]);!$(n-[#8]):1]1[c;R2;$(c(:a)(:a):a):2][c;R2;$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1"
+        ">>[#7_nuc:1][c:5][c:4][c:3][c_elec:2]",
+        "COc1ccccc1OCCNCC(O)COc1cccc2c1c1ccccc1[nH]2",
+    ),
+    (
+        "R17.19",
+        "oxindole (indolin-2-one) / intramolecular lactamisation of a 2-aminophenylacetic acid",
+        "[N;+0;!$([N]!@[#6]=[#8]);!$([N]!@S(=O)=O):1]1[C;+0:2](=[O:6])[C;+0:3][c;R2:4][c;R2:5]1"
+        ">>[#7_nuc:1][c:5][c:4][#6:3][#6_elec:2]=[O:6]",
+        "O=C1Nc2ccc(F)cc2C1=Cc1ccccc1",
+    ),
+    (
+        "R17.20",
+        "oxindole / Stolle intramolecular Friedel-Crafts of a 2-chloroacetanilide",
+        "[N;+0;!$([N]!@[#6]=[#8]);!$([N]!@S(=O)=O):1]1[C;+0:2](=[O:6])[C;+0:3][c;R2:4][c;R2:5]1"
+        ">>[#6_elec:3][#6:2](=[O:6])[#7:1][c:5][c_nuc:4]",
+        "CC1C(=O)Nc2ccccc21",
+    ),
+    (
+        "R17.30",
+        "pyrazole, N1-substituted / nitrile imine (hydrazonoyl halide) + alkyne or alkene [3+2]",
+        "[n;D3;+0;!$(n-[#7]);!$(n-[#8]);!$([n][#6]=[#8]);!$([n]S(=O)=O):1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][c;R1;!$(c(:a)(:a):a):4][c;R1;!$(c(:a)(:a):a):5]1"
+        ">>[#7_nuc:1][#7:2]=[#6_elec:3].[#6_nuc:4]=[#6_elec:5]",
+        "Cn1nc(-c2ccccc2)cc1C",
+    ),
+    (
+        "R17.31",
+        "isoxazole / nitrile oxide + alkyne (or alkene) [3+2]",
+        "[o;+0:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][c;R1;!$(c(:a)(:a):a):4][c;R1;!$(c(:a)(:a):a):5]1"
+        ">>[#8_nuc:1][#7:2]=[#6_elec:3].[#6_nuc:4]=[#6_elec:5]",
+        "Cc1cc(-c2ccccc2)on1",
+    ),
+    (
+        "R17.32a",
+        "1,2,4-triazole, 4H / N4-substituted / Pellizzari (acylhydrazide + amidine or amide)",
+        "[n;+0;D2:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][n;D3;+0;!$(n-[#8]);!$([n][#6]=[#8]);!$([n]S(=O)=O):4][c;!$(c(:a)(:a):a):5]1"
+        ">>[#7_nuc2:1][#7:2]=[#6_elec:3].[#7_nuc:4][#6_elec2:5]",
+        "Cc1nnc(-c2ccccc2)n1C",
+    ),
+    (
+        "R17.32b",
+        "1,2,4-triazole, 4H, N-unsubstituted / Pellizzari, [n;h1] twin of R17.32a",
+        "[n;+0;D2:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][n;h1;+0:4][c;!$(c(:a)(:a):a):5]1"
+        ">>[#7_nuc2:1][#7:2]=[#6_elec:3].[#7_nuc:4][#6_elec2:5]",
+        "Cc1nc(-c2ccccc2)[nH]n1",
+    ),
+    (
+        "R17.33",
+        "1,2,4-triazole, 1H / N1-substituted / nitrile imine + nitrile [3+2]",
+        "[n;D3;+0;!$(n-[#7]);!$(n-[#8]);!$([n][#6]=[#8]);!$([n]S(=O)=O):1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][n;+0;D2:4][c;!$(c(:a)(:a):a):5]1"
+        ">>[#7_nuc:1][#7:2]=[#6_elec:3].[#7_nuc:4]=[#6_elec:5]",
+        "Cn1c(C)nc(-c2ccccc2)n1",
+    ),
+    (
+        "R17.34",
+        "1,2,4-oxadiazole / nitrile oxide + nitrile [3+2]",
+        "[o;+0:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][n;+0;D2:4][c;!$(c(:a)(:a):a):5]1"
+        ">>[#8_nuc:1][#7:2]=[#6_elec:3].[#7_nuc:4]=[#6_elec:5]",
+        "Cc1noc(-c2ccccc2)n1",
+    ),
+    (
+        "R17.35",
+        "1,2,4-thiadiazole / nitrile sulfide + nitrile [3+2]",
+        "[s;+0:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][n;+0;D2:4][c;!$(c(:a)(:a):a):5]1"
+        ">>[#16_nuc:1][#7:2]=[#6_elec:3].[#7_nuc:4]=[#6_elec:5]",
+        "Cc1nsc(-c2ccccc2)n1",
+    ),
+    (
+        "R17.36",
+        "1,3,4-thiadiazole / nitrile imine + C=S dipolarophile (dithioester, thioamide) [3+2] with beta-elimination",
+        "[s;+0:1]1[c;!$(c(:a)(:a):a):2][n;+0;D2:3][n;+0;D2:4][c;!$(c(:a)(:a):a):5]1"
+        ">>[#6_elec:2]=[#7:3][#7_nuc2:4].[#16_nuc:1][#6_elec2:5]",
+        "Cc1nnc(-c2ccccc2)s1",
+    ),
+    (
+        "R17.40",
+        "Hantzsch thiazole, ring-opened S-vinyl thioimidate form (N3-C4)",
+        "[s:1]1[c;R1;+0;!$([c]!@[#7,#8,#16]):2][n;D2;+0:3][c;R1;+0:4][c;R1;+0:5]1"
+        ">>[#7_nuc:3]=[#6:2][#16:1][#6:5]=[#6_elec:4]",
+        "Cc1csc(C)n1",
+    ),
+    (
+        "R17.41",
+        "van Leusen oxazole (TosMIC + aldehyde)",
+        "[o:1]1[c;R1;+0;h1:2][n;D2;+0:3][c;R1;+0:4][c;R1;+0:5]1"
+        ">>[#6_elec:2]=[#7:3][#6_nuc2:4].[#6_elec2:5][#8_nuc:1]",
+        "Cc1cnco1",
+    ),
+    (
+        "R17.42",
+        "van Leusen imidazole (TosMIC + aldimine)",
+        "[n;D3;+0;R1;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]):1]1[c;R1;+0;h1:2][n;D2;+0:3][c;R1;+0:4][c;R1;+0:5]1"
+        ">>[#6_elec:2]=[#7:3][#6_nuc2:4].[#6_elec2:5][#7_nuc:1]",
+        "Cn1cncc1-c1ccccc1",
+    ),
+    (
+        "R17.43",
+        "van Leusen thiazole (TosMIC + isothiocyanate or thiocarbonyl)",
+        "[s:1]1[c;R1;+0;h1:2][n;D2;+0:3][c;R1;+0:4][c;R1;+0:5]1"
+        ">>[#6_elec:2]=[#7:3][#6_nuc2:4].[#6_elec2:5][#16_nuc:1]",
+        "c1ccccc1-c1cncs1",
+    ),
+    (
+        "R17.44",
+        "Cook-Heilbron 5-aminothiazole (alpha-aminonitrile + CS2 / isothiocyanate / dithioester)",
+        "[s:1]1[c;R1;+0:2][n;D2;+0:3][c;R1;+0:4][c;R1;+0;$([c]!@[#7;+0;X3]):5]1"
+        ">>[#16_nuc:1][#6_elec2:2].[#7_nuc2:3][#6:4]=[#6_elec:5]",
+        "Nc1cnc(-c2ccccc2)s1",
+    ),
+    (
+        "R17.45",
+        "oxazole C2-O1 cyclodehydration (acyloin + nitrile / imidoyl electrophile) — NOT Robinson-Gabriel",
+        "[o:1]1[c;R1;+0;!$([c]!@[#7,#8,#16]):2][n;D2;+0:3][c;R1;+0:4][c;R1;+0:5]1"
+        ">>[#6_elec:2]=[#7:3][#6:4]=[#6:5][#8_nuc:1]",
+        "Cc1oc(C)nc1C",
+    ),
+    (
+        "R17.46",
+        "oxazole, ring-opened O-vinyl imidate form (N3-C4)",
+        "[o:1]1[c;R1;+0;!$([c]!@[#7,#8,#16]):2][n;D2;+0:3][c;R1;+0:4][c;R1;+0:5]1"
+        ">>[#7_nuc:3]=[#6:2][#8:1][#6:5]=[#6_elec:4]",
+        "Cc1coc(C)n1",
+    ),
+    (
+        "R17.47",
+        "2-oxazoline (4,5-dihydro-1,3-oxazole) from a 1,2-amino alcohol, O1-C2",
+        "[O;+0;R1:1]1[C;+0;R1:2]=[N;+0;R1:3][C;X4;+0;R1:4][C;X4;+0;R1:5]1"
+        ">>[#8_nuc:1][#6:5][#6:4][#7:3]=[#6_elec:2]",
+        "c1ccccc1C1COC(C)=N1",
+    ),
+    (
+        "R17.48",
+        "2-thiazoline (4,5-dihydro-1,3-thiazole) from a 1,2-amino thiol, S1-C2",
+        "[S;+0;R1:1]1[C;+0;R1:2]=[N;+0;R1:3][C;X4;+0;R1:4][C;X4;+0;R1:5]1"
+        ">>[#16_nuc:1][#6:5][#6:4][#7:3]=[#6_elec:2]",
+        "c1ccccc1C1=NCCS1",
+    ),
+    (
+        "R17.49",
+        "2-imidazoline (4,5-dihydro-1H-imidazole) from a 1,2-diamine, N1-C2",
+        "[N;+0;R1;!$([N]!@[#6]=[O,S]):1]1[C;+0;R1:2]=[N;+0;R1:3][C;X4;+0;R1:4][C;X4;+0;R1:5]1"
+        ">>[#7_nuc:1][#6:5][#6:4][#7:3]=[#6_elec:2]",
+        "Clc1cccc(Cl)c1NC1=NCCN1",
+    ),
+    (
+        "R17.50",
+        "2-imidazoline from an amidine + 1,2-dielectrophile, N1-C5 + N3-C4",
+        "[N;+0;R1;h1;!$([N]!@[#6]=[O,S]):1]1[C;+0;R1:2]=[N;+0;R1:3][C;X4;+0;R1:4][C;X4;+0;R1:5]1"
+        ">>[#7_nuc:1][#6:2]=[#7_nuc:3].[#6_elec:4][#6_elec:5]",
+        "CC1=NCCN1",
+    ),
+    (
+        "R17.55a",
+        "pyrazine / self-condensation of alpha-aminoketones (Staedel-Rugheimer, Gutknecht, Gastaldi), orientation A",
+        "[n;D2;+0:1]1[c;x2;!$(c[#7,#8,#16]):2][c;x2:3][n;D2;+0:4][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):5][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):6]1"
+        ">>[#7_nuc:1]=[#6:2][#6_elec2:3].[#7_nuc2:4][#6:5]=[#6_elec:6]",
+        "NC(=O)c1cnccn1",
+    ),
+    (
+        "R17.55b",
+        "pyrazine / alpha-aminoketone self-condensation, orientation B (mirror twin of R16.1a0a)",
+        "[n;D2;+0:1]1[c;x2;!$(c[#8;h1]);!$(c[#16;h1]):2][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):3][n;D2;+0:4][c;x2:5][c;x2;!$(c[#7,#8,#16]):6]1"
+        ">>[#7_nuc:1]=[#6:6][#6_elec2:5].[#7_nuc2:4][#6:3]=[#6_elec:2]",
+        "NC(=O)c1cnccn1",
+    ),
+    (
+        "R17.56",
+        "quinoxaline / o-phenylenediamine + 1,2-dicarbonyl (and pteridine by the Isay route)",
+        "[n;D2;+0:1]1[c;x2:2][c;x2:3][n;D2;+0:4][c;R2;!$(c[A]):5][c;R2;!$(c[A]):6]1"
+        ">>[#7_nuc2:1][c:6][c:5][#7_nuc2:4].[#6_elec2:2][#6_elec2:3]",
+        "c1ccc(cc1)-c1nc2ccccc2nc1-c1ccccc1",
+    ),
+    (
+        "R17.57a",
+        "quinazoline / quinazolin-4(3H)-one, N3-H / Niementowski (anthranilic acid + amide)",
+        "[n;D2;+0:1]1[c;x2:2][n;D2;+0:3][c;x2:4][c;R2;!$(c[A]):5][c;R2;!$(c[A]):6]1"
+        ">>[#7_nuc2:1][c:6][c:5][#6_elec2:4].[#6_elec2:2][#7_nuc2:3]",
+        "Cc1nc2ccccc2c(=O)[nH]1",
+    ),
+    (
+        "R17.57b",
+        "quinazolin-4(3H)-one, N3-substituted / Niementowski via acylanthranil",
+        "[#7;A;+0:1]1=[#6:2][#7;A;D3;+0:3][#6:4](=[#8:7])[c;R2:5][c;R2:6]1"
+        ">>[#7_nuc2:1][c:6][c:5][#6_elec:4]=[#8:7].[#6_elec2:2][#7_nuc:3]",
+        "Cc1nc2ccccc2c(=O)n1-c1ccccc1C",
+    ),
+    (
+        "R17.58",
+        "quinoline / Combes (aniline + 1,3-diketone); also Skraup, Doebner-von Miller and Knorr",
+        "[n;D2;+0:1]1[c;x2;!$(c!@[OH]):2][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):3][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):4][c;R2;!$(c[A]):5][c;R2;!$(c[A]):6]1"
+        ">>[#7_nuc2:1][c:6][c_nuc:5].[#6_elec2:2][#6:3]=[#6_elec:4]",
+        "Cc1cc(C)c2ccccc2n1",
+    ),
+    (
+        "R17.59",
+        "isoquinoline / Bischler-Napieralski, aromatic product (one-bond cut, C1-C8a)",
+        "[c;x2;!$(c[#8;h1]);!$(c[#16;h1]):1]1[n;D2;+0:2][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):3][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):4][c;R2;!$(c[A]):5][c;R2;!$(c[A]):6]1"
+        ">>[#6_elec:1]=[#7:2][#6:3]=[#6:4][c:5][c_nuc:6]",
+        "COc1cc2ccnc(C)c2cc1OC",
+    ),
+    (
+        "R17.60",
+        "3,4-dihydroisoquinoline / Bischler-Napieralski, the literal one-step product",
+        "[#6;A;!$([#6](=[#7])[#7]):1]1=[#7;A;+0:2][#6;A;X4:3][#6;A;X4:4][c;R2:5][c;R2:6]1"
+        ">>[#6_elec:1]=[#7:2][#6:3][#6:4][c:5][c_nuc:6]",
+        "COc1cc2CCN=C(C)c2cc1OC",
+    ),
+    (
+        "R17.61",
+        "isoquinoline / Pomeranz-Fritsch (aryl aldehyde + aminoacetaldehyde acetal)",
+        "[c;x2;!$(c[#8;h1]);!$(c[#16;h1]):1]1[n;D2;+0:2][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):3][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):4][c;R2;!$(c[A]):5][c;R2;!$(c[A]):6]1"
+        ">>[#6_elec:4]=[#6:3][#7:2]=[#6:1][c:6][c_nuc:5]",
+        "COc1cc2ccncc2cc1OC",
+    ),
+    (
+        "R17.62",
+        "1,2,3,4-tetrahydroisoquinoline / one-bond N-acyliminium cyclisation (Pictet-Spengler surrogate)",
+        "[#6;A;X4;!$([#6]([#7,#8,#16])[#7]):1]1[#7;A;X3;+0:2][#6;A;X4:3][#6;A;X4:4][c;R2:5][c;R2:6]1"
+        ">>[#6_elec:1][#7:2][#6:3][#6:4][c:5][c_nuc:6]",
+        "COc1cc2CCNC(C)c2cc1OC",
+    ),
+    (
+        "R17.70",
+        "benzimidazole / Phillips (o-phenylenediamine + aldehyde or carboxylic acid), one-bond N1-C2 cut",
+        "[n;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]):1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][n;+0;h0;D2:3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1"
+        ">>[#7_nuc:1][c:5][c:4][#7:3]=[#6_elec:2]",
+        "c1ccc(-c2nc3ccccc3[nH]2)cc1",
+    ),
+    (
+        "R17.71",
+        "benzimidazole / amidine + 1,2-dihaloarene (benzo analogue of the shipped R16.4b)",
+        "[n;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]):1]1[c;!$(c(:a)(:a):a):2][n;+0;h0;D2:3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1"
+        ">>[#7_nuc:1][#6:2]=[#7_nuc:3].[c_elec:4][c_elec:5]",
+        "c1ccc(-c2nc3ccccc3[nH]2)cc1",
+    ),
+    (
+        "R17.72",
+        "benzoxazole / o-aminophenol + aldehyde or carboxylic acid, one-bond O1-C2 cut",
+        "[o;+0:1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][n;+0;h0;D2:3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1"
+        ">>[#8_nuc:1][c:5][c:4][#7:3]=[#6_elec:2]",
+        "OC(=O)c1ccc2nc(-c3cc(Cl)cc(Cl)c3)oc2c1",
+    ),
+    (
+        "R17.73",
+        "benzothiazole / o-aminothiophenol + aldehyde or carboxylic acid, one-bond S1-C2 cut",
+        "[s;+0:1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][n;+0;h0;D2:3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1"
+        ">>[#16_nuc:1][c:5][c:4][#7:3]=[#6_elec:2]",
+        "c1ccc(-c2nc3ccccc3s2)cc1",
+    ),
+    (
+        "R17.74",
+        "1H-indazole / o-fluoroaryl aldehyde or ketone + hydrazine",
+        "[n;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]):1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1"
+        ">>[#7_nuc:1][#7_nuc2:2].[#6_elec2:3][c:4][c_elec:5]",
+        "Nc1ccc2[nH]nc(-c3ccccc3)c2c1",
+    ),
+    (
+        "R17.80",
+        "piperidine / intramolecular C-N ring closure (reductive amination, N-alkylation, aza-Michael, Mitsunobu, hydroamination)",
+        "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][C;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]"
+        ">>[#7_nuc:1].[#6_elec:2]",
+        "c1ccccc1C1CCCNC1",
+    ),
+    (
+        "R17.81",
+        "pyrrolidine / intramolecular C-N ring closure",
+        "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]"
+        ">>[#7_nuc:1].[#6_elec:2]",
+        "CN1CCCC1c1cccnc1",
+    ),
+    (
+        "R17.82a",
+        "morpholine / C-O ring closure (diethanolamine cyclodehydration, haloether or epoxide closure)",
+        "[O;z1;+0;$([O]1[C;z1][C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]"
+        ">>[#8_nuc:1].[#6_elec:2]",
+        "c1ccccc1C1CNCCO1",
+    ),
+    (
+        "R17.82b",
+        "morpholine / C-N ring closure",
+        "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][O;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]"
+        ">>[#7_nuc:1].[#6_elec:2]",
+        "c1ccccc1C1CNCCO1",
+    ),
+    (
+        "R17.83",
+        "morpholine / 1,2-amino alcohol + 1,2-bis-electrophile (two bonds, on two DIFFERENT heteroatoms)",
+        "[O;z1;+0;$([O]1[C;z1][C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]-@[C;z1;!D4:3]-@[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);R1:4]"
+        ">>[#8_nuc:1].[#6_elec:2][#6_elec:3].[#7_nuc:4]",
+        "c1ccccc1C1CNCCO1",
+    ),
+    (
+        "R17.84a",
+        "piperazine / 1,2-diamine + 1,2-bis-electrophile (two bonds, on two DIFFERENT nitrogens)",
+        "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]-@[C;z1;!D4:3]-@[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);R1:4]"
+        ">>[#7_nuc:1].[#6_elec:2][#6_elec:3].[#7_nuc:4]",
+        "COc1ccccc1N1CCNCC1",
+    ),
+    (
+        "R17.84b",
+        "piperazine / intramolecular C-N ring closure (one bond)",
+        "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]"
+        ">>[#7_nuc:1].[#6_elec:2]",
+        "COc1ccccc1N1CCNCC1",
+    ),
+    (
+        "R17.85a",
+        "thiomorpholine / 1,2-amino thiol + 1,2-bis-electrophile (two bonds)",
+        "[S;z1;+0;$([S]1[C;z1][C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]-@[C;z1;!D4:3]-@[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);R1:4]"
+        ">>[#16_nuc:1].[#6_elec:2][#6_elec:3].[#7_nuc:4]",
+        "c1ccccc1C1CNCCS1",
+    ),
+    (
+        "R17.85b",
+        "thiomorpholine / C-S ring closure (one bond)",
+        "[S;z1;+0;$([S]1[C;z1][C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]"
+        ">>[#16_nuc:1].[#6_elec:2]",
+        "c1ccccc1C1CNCCS1",
+    ),
+    (
+        "R17.86a",
+        "1,4-diazepane (homopiperazine) / 1,2-diamine + 1,3-bis-electrophile (two bonds)",
+        "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][N;z1][C;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:5]-@[C;z1:6]-@[C;z1;!D4:7]-@[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);R1:4]"
+        ">>[#7_nuc:1].[#6_elec:5][#6:6][#6_elec:7].[#7_nuc:4]",
+        "C1CN(CCNC1)S(=O)(=O)c1cccc2cnccc12",
+    ),
+    (
+        "R17.86b",
+        "1,4-diazepane / intramolecular C-N ring closure (one bond)",
+        "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][N;z1][C;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]"
+        ">>[#7_nuc:1].[#6_elec:2]",
+        "C1CN(CCNC1)S(=O)(=O)c1cccc2cnccc12",
+    ),
+    (
+        "R17.87",
+        "delta-lactam (piperidin-2-one) / amino acid or amino ester lactamisation",
+        "[N;z1;+0;!$([#7][#7]);$([N]1[C;z2](=[O;z2])[C;z1][C;z1][C;z1][C;z1]1);R1:1]-@[C;z2;$([C]=[O]):2]"
+        ">>[#7_nuc:1].[#6_elec:2]",
+        "O=C1CCCCN1Cc1ccccc1",
+    ),
+    (
+        "R17.88",
+        "gamma-lactam (pyrrolidin-2-one) / amino acid or amino ester lactamisation",
+        "[N;z1;+0;!$([#7][#7]);$([N]1[C;z2](=[O;z2])[C;z1][C;z1][C;z1]1);R1:1]-@[C;z2;$([C]=[O]):2]"
+        ">>[#7_nuc:1].[#6_elec:2]",
+        "COc1ccc(cc1OC1CCCC1)C1CNC(=O)C1",
+    ),
+    (
+        "R17.89",
+        "1,2,3,6-tetrahydropyridine / ring-closing metathesis of an N-tethered diene",
+        "[C;z2;$([C]1=[C][C;z1][N;z1;+0][C;z1][C;z1]1):1]=@[C;z2:2]"
+        ">>[#6_neut2:1].[#6_neut2:2]",
+        "c1ccccc1C1=CCNCC1",
+    ),
+    (
+        "R17.90",
+        "morpholin-3-one / 1,2-amino alcohol + haloacetate (the reducible morpholine precursor)",
+        "[N;z1;+0;!$([#7][#7]);$([N]1[C;z2](=[O;z2])[C;z1][O;z1][C;z1][C;z1]1);R1:1]-@[C;z2;$([C]=[O]):2]"
+        ">>[#7_nuc:1].[#6_elec:2]",
+        "O=C1COC(c2ccccc2)CN1",
+    ),
+    (
+        "R17.91",
+        "piperazin-2-one / 1,2-diamine + haloacetate (the reducible piperazine precursor)",
+        "[N;z1;+0;!$([#7][#7]);$([N]1[C;z2](=[O;z2])[C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z2;$([C]=[O]):2]"
+        ">>[#7_nuc:1].[#6_elec:2]",
+        "O=C1CN(Cc2ccccc2)CCN1",
+    ),
+    (
+        "R17.92",
+        "piperidine / aza-annulation: amine-bearing C-nucleophile + 1,3-bis-electrophile (two bonds, N-C and C-C)",
+        "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][C;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]-@[C;z1:3]-@[C;z1;!D4:4]-@[C;z1;$([#6][c]),$([#6][#6]=[#8]),$([#6][#6]#[#7]),$([#6][#7](=[#8])[#8]),$([#6][#16](=[#8])=[#8]):5]"
+        ">>[#7_nuc:1].[#6_elec:2][#6:3][#6_elec:4].[#6_nuc:5]",
+        "c1ccccc1C1CCCNC1",
+    ),
+    (
+        "R17.93",
+        "GENERIC saturated heterocycle / one-bond heteroatom-carbon ring closure (the declared residual)",
+        "[N,O,S;z1;R;+0;!$([N,O,S][C;z1][#7,#8,#16]);!$([#7][#6]=[#8]);!$([#7][#7]);!$([#8][#6]=[#6,#7,#8,#15,#16,#34]);!$([N;z1]1[C;z1][C;z1][C;z1][C;z1]1);!$([N;z1]1[C;z1][C;z1][C,N,O,S;z1][C;z1][C;z1]1);!$([N;z1]1[C;z1][C;z1][N;z1][C;z1][C;z1][C;z1]1);!$([O,S;z1]1[C;z1][C;z1][N;z1][C;z1][C;z1]1):1]-@[C;z1;R;!D4;!$([C]([#7,#8,#16])[#7,#8,#16]);!r3;!r4:2]"
+        ">>[*_nuc:1].[#6_elec:2]",
+        "C1CCCNCC1",
     ),
 ]
 
@@ -717,7 +1202,7 @@ def build(config_dir: Path) -> dict[str, object]:
                 "smarts": smarts_text,
                 "single_product": False,
             }
-            for rule_id, name, smarts_text in RING_RULES
+            for rule_id, name, smarts_text, _target in RING_RULES
         ],
         "pairs": _partner_pairs(),
         "ring_pairs": RING_PAIRS,
@@ -729,10 +1214,76 @@ def build(config_dir: Path) -> dict[str, object]:
     return {"bb_classes": classes, "bb_marks": marks, "rules": rules}
 
 
+def _ring_labels_survive() -> list[str]:
+    """Every ring rule fires on its own target and keeps its labels where it wrote them.
+
+    A proton that moves BETWEEN two labelled atoms of the same element carrying the same token
+    leaves the fragment chemically identical, so the blanket `shifted_labels` verdict is narrowed by
+    that exemption - without it every N-H amidine rule is a false positive.
+    """
+    problems = []
+    # ponytail: one authored target per rule; widen to the curation over-firing panel if a guard
+    # edit ever needs more than "it still fires and still spells what it wrote"
+    for rule_id, _name, smarts_text, target in RING_RULES:
+        molecule = safe_canonicalization(synthon_smiles(target))
+        cuts = list(SynthonTransformer.from_smarts(smarts_text)(molecule))
+        if not cuts:
+            problems.append(f"{rule_id} does not fire on its own target {target}")
+            continue
+        for part in next(iter(cuts)).split():
+            shifted = shifted_labels(part)
+            if shifted and sorted(b for b, _ in shifted.values()) != sorted(
+                a for _, a in shifted.values()
+            ):
+                problems.append(f"{rule_id} labels move on canonicalisation: {shifted}")
+    return problems
+
+
+def _base_id(rule_id: str) -> str:
+    return rule_id[:-1] if rule_id[-1].isalpha() else rule_id
+
+
+def _no_duplicate_disconnections() -> list[str]:
+    """No two ring rule families may hand back the same synthons for the same target.
+
+    The panel is every rule's own authored target, so a rule added later is tried against every
+    rule already shipped on a retron each of them was written for - which is where a duplicate
+    shows. Measured against the ten lane-A/lane-E duplicate pairs the curation found, this panel
+    catches nine; the tenth pair has no shipped winner to collide with.
+
+    `a`/`b` twins are exempt by base id. A mirror pair (`R16.6a`/`R16.6b`) exists to emit both
+    directions of one disconnection and coincides on a symmetric target by construction.
+    """
+    problems = []
+    # ponytail: 76 authored targets, ~0.2 s. The wider check is the drug-like over-firing sweep in
+    # research/synthon/curation/overfire_harness/sweep_now.py - run that when a guard edit lands.
+    compiled = [
+        (rule_id, SynthonTransformer.from_smarts(smarts_text))
+        for rule_id, _name, smarts_text, _target in RING_RULES
+    ]
+    for _rule_id, _name, _smarts_text, target in RING_RULES:
+        molecule = safe_canonicalization(synthon_smiles(target))
+        owners = defaultdict(set)
+        for rule_id, rule in compiled:
+            try:
+                cuts = list(rule(molecule))
+            except InvalidAromaticRing:
+                continue  # `Fragmenter._cut` skips such a rule for such a target too
+            for cut in cuts:
+                synthons = tuple(
+                    sorted(str(safe_canonicalization(p)) for p in cut.split())
+                )
+                owners[synthons].add(rule_id)
+        for synthons, ids in owners.items():
+            if len({_base_id(i) for i in ids}) > 1:
+                problems.append(
+                    f"{sorted(ids)} give the same synthons on {target}: {list(synthons)}"
+                )
+    return problems
+
+
 def check(built: dict, config_dir: Path) -> list[str]:
     """Assert every property the plan pins. Returns the failures, empty when the build is good."""
-    from synplan.chem.synthon.transformer import SynthonTransformer, query_labels
-
     problems = []
     classes, marks, rules = built["bb_classes"], built["bb_marks"], built["rules"]
 
@@ -789,10 +1340,14 @@ def check(built: dict, config_dir: Path) -> list[str]:
         )
     if len(macro) != 39:
         problems.append(f"{len(macro)} macro twins, expected 39")
-    if len(ring) != 9:
-        problems.append(f"{len(ring)} heterocyclisation rules, expected 9")
+    if len(ring) != 76:
+        problems.append(f"{len(ring)} heterocyclisation rules, expected 76")
     if any(r["macro"] for r in ring):
         problems.append("a heterocyclisation rule is marked macrocyclic")
+    if len({r["id"] for r in rules["disconnections"]}) != len(rules["disconnections"]):
+        problems.append("duplicate rule id - `_positions()` would select both")
+    problems.extend(_ring_labels_survive())
+    problems.extend(_no_duplicate_disconnections())
 
     for record in rules["disconnections"] + [s for m in marks for s in m["steps"]]:
         for text in [record["smarts"]] if "smarts" in record else record["variants"]:

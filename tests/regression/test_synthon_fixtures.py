@@ -47,6 +47,15 @@ README_PATHWAYS = {
     ("R2.2_0", "R10.1_0"),
     ("R2.2_0", "R10.1_1"),
 }
+# what the port adds and upstream cannot: once R5.1/R5.2 has cut the N-CH2 bond, R16.2b closes the
+# N-H tetrazole that is left. The shipped `[n;D3]` spelling never matched it, because chython's `D`
+# counts heavy neighbours only - that is bug 1 of the ring block.
+RING_PATHWAYS = {
+    ("R5.1_0", "R16.2b_0"),
+    ("R5.2_0", "R16.2b_0"),
+    ("R2.2_0", "R5.1_0", "R16.2b_0"),
+    ("R2.2_0", "R5.2_0", "R16.2b_0"),
+}
 
 
 def as_token(smi: str) -> str:
@@ -91,7 +100,7 @@ def test_the_fixture_totals(synthoniser):
 
 def test_cenobamate_gives_the_readme_pathways():
     dag = fragment_smiles(CENOBAMATE)
-    assert {p.rules for p in dag.pathways.values()} == README_PATHWAYS
+    assert {p.rules for p in dag.pathways.values()} == README_PATHWAYS | RING_PATHWAYS
     assert dag.is_acyclic()
     assert len(dag.roots()) == 3
 

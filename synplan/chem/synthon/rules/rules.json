@@ -625,59 +625,91 @@
    "single_product": true
   },
   {
-   "id": "R16.1",
-   "name": "1,2,3-triazole / CuAAC (azide + alkyne)",
+   "id": "R16.1a",
+   "name": "1,2,3-triazole, N1-substituted / azide + alkyne (CuAAC, RuAAC, SPAAC, thermal Huisgen)",
    "macro": false,
    "ring": true,
-   "smarts": "[n;D3:1]1[n;D2:2][n;D2:3][c:4][c:5]1>>[#7_elec:1][#7:2]=[#7_nuc:3].[#6_elec:4]=[#6_nuc:5]",
+   "smarts": "[n;D3;+0;!$(n-[#7]);!$(n-[#8]);!$([n][#6]=[#8]):1]1[n;+0;D2:2][n;+0;D2:3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a):5]1>>[#7_elec:1][#7:2]=[#7_nuc:3].[#6_elec:4]=[#6_nuc:5]",
    "single_product": false
   },
   {
-   "id": "R16.2",
-   "name": "tetrazole / azide + nitrile",
+   "id": "R16.1b",
+   "name": "1,2,3-triazole, N-unsubstituted (1H) / azide (NaN3, TMS-N3) + alkyne [n;h1] twin of R16.1a",
    "macro": false,
    "ring": true,
-   "smarts": "[n;D3:1]1[n;D2:2][n;D2:3][n;D2:4][c:5]1>>[#7_nuc:1][#7:2]=[#7_elec:3].[#7_nuc:4]=[#6_elec:5]",
+   "smarts": "[n;h1;+0:1]1[n;+0;D2:2][n;+0;D2:3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a):5]1>>[#7_elec:1][#7:2]=[#7_nuc:3].[#6_elec:4]=[#6_nuc:5]",
    "single_product": false
   },
   {
-   "id": "R16.3",
-   "name": "pyrazole / Knorr (hydrazine + 1,3-dicarbonyl)",
+   "id": "R16.2a",
+   "name": "tetrazole, 1,5-disubstituted / organic azide + nitrile",
    "macro": false,
    "ring": true,
-   "smarts": "[n;D3:1]1[n;D2:2][c:3][c:4][c:5]1>>[#7_nuc:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6_elec:5]",
+   "smarts": "[n;D3;+0;!$(n-[#7]);!$(n-[#8]);!$([n][#6]=[#8]);!$([n]S(=O)=O):1]1[n;+0;D2:2][n;+0;D2:3][n;+0;D2:4][c;!$(c(:a)(:a):a):5]1>>[#7_nuc:1][#7:2]=[#7_elec:3].[#7_nuc:4]=[#6_elec:5]",
    "single_product": false
   },
   {
-   "id": "R16.4",
-   "name": "imidazole / amidine + alpha-halo ketone",
+   "id": "R16.2b",
+   "name": "tetrazole, 5-substituted N-unsubstituted (1H) / NaN3 + nitrile, [n;h1] twin of R16.2a",
    "macro": false,
    "ring": true,
-   "smarts": "[n;D3:1]1[c:2][n;D2:3][c:4][c:5]1>>[#7_nuc:1][#6:2]=[#7_nuc:3].[#6_elec:4]=[#6_elec:5]",
+   "smarts": "[n;h1;+0:1]1[n;+0;D2:2][n;+0;D2:3][n;+0;D2:4][c;!$(c(:a)(:a):a):5]1>>[#7_nuc:1][#7:2]=[#7_elec:3].[#7_nuc:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R16.3a",
+   "name": "pyrazole, N1-substituted / Knorr (substituted hydrazine + 1,3-dicarbonyl, enaminone or ynone)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D3;+0;!$(n-[#7]);!$(n-[#8]);!$([n][#6]=[#8]);!$([n]S(=O)=O):1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a):5]1>>[#7_nuc:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R16.3b",
+   "name": "pyrazole, N-unsubstituted (1H) / Knorr with hydrazine hydrate, [n;h1] twin of R16.3a",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;h1;+0:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a):5]1>>[#7_nuc:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R16.4b",
+   "name": "imidazole, N-unsubstituted (1H) / amidine + alpha-halo ketone",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;h1;+0;R1:1]1[c;R1;+0:2][n;D2;h0;+0:3][c;R1;+0:4][c;R1;+0:5]1>>[#7_nuc:1][#6:2]=[#7_nuc:3].[#6_elec:4]=[#6_elec:5]",
    "single_product": false
   },
   {
    "id": "R16.5",
-   "name": "isoxazole / hydroxylamine + 1,3-dicarbonyl",
+   "name": "isoxazole / hydroxylamine + 1,3-dicarbonyl (Claisen-type condensation)",
    "macro": false,
    "ring": true,
-   "smarts": "[o:1]1[n;D2:2][c:3][c:4][c:5]1>>[#8_nuc:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6_elec:5]",
+   "smarts": "[o;+0:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a):5]1>>[#8_nuc:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6_elec:5]",
    "single_product": false
   },
   {
-   "id": "R16.6",
-   "name": "pyridine / Kroehnke-Bohlmann-Rahtz (enamine + enone)",
+   "id": "R16.6a",
+   "name": "pyridine / Kroehnke-Bohlmann-Rahtz (enamine + enone), orientation A",
    "macro": false,
    "ring": true,
-   "smarts": "[n;D2:1]1[c:2][c:3][c:4][c:5][c:6]1>>[#7_nuc:1]=[#6:2][#6_nuc2:3].[#6_elec2:4][#6:5]=[#6_elec:6]",
+   "smarts": "[n;D2;+0:1]1[c;x2;!$(c[#7,#8,#16]):2][c;x2:3][c;x2;!$(c!@[OH]):4][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):5][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):6]1>>[#7_nuc:1]=[#6:2][#6_nuc2:3].[#6_elec2:4][#6:5]=[#6_elec:6]",
+   "single_product": false
+  },
+  {
+   "id": "R16.6b",
+   "name": "pyridine / Kroehnke-Bohlmann-Rahtz, orientation B (mirror twin of R16.6a)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D2;+0:1]1[c;x2;!$(c[#8;h1]);!$(c[#16;h1]):2][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):3][c;x2;!$(c!@[OH]):4][c;x2:5][c;x2;!$(c[#7,#8,#16]):6]1>>[#7_nuc:1]=[#6:6][#6_nuc2:5].[#6_elec2:4][#6:3]=[#6_elec:2]",
    "single_product": false
   },
   {
    "id": "R16.7",
-   "name": "pyridazine / hydrazine + 1,4-dicarbonyl",
+   "name": "pyridazine / hydrazine + 1,4-dicarbonyl; also phthalazine from an ortho-diacylarene",
    "macro": false,
    "ring": true,
-   "smarts": "[n;D2:1]1[n;D2:2][c:3][c:4][c:5][c:6]1>>[#7_nuc2:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6:5][#6_elec2:6]",
+   "smarts": "[n;D2;+0:1]1[n;D2;+0:2][c;x2;!$(c!@[OH]):3][c;!$(c[#8;h1]);!$(c[#16;h1]):4][c;!$(c[#8;h1]);!$(c[#16;h1]):5][c;x2;!$(c!@[OH]):6]1>>[#7_nuc2:1][#7_nuc2:2].[#6_elec2:3][#6:4]=[#6:5][#6_elec2:6]",
    "single_product": false
   },
   {
@@ -685,7 +717,7 @@
    "name": "indole / Fischer (arylhydrazine + ketone)",
    "macro": false,
    "ring": true,
-   "smarts": "[n;D3:1]1[c:2][c:3][c;R2:4][c;R2:5]1>>[#6_elec:2]=[#6_elec:3].[c_nuc:4][c:5][#7_nuc:1]",
+   "smarts": "[n;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]):1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):3][c;R2;$(c(:a)(:a):a);$(c1ccccc1):4][c;R2;$(c(:a)(:a):a);$(c1ccccc1):5]1>>[#6_elec:2]=[#6_elec:3].[c_nuc:4][c:5][#7_nuc:1]",
    "single_product": false
   },
   {
@@ -693,7 +725,511 @@
    "name": "quinoline / Friedlaender (2-aminoaryl ketone + ketone)",
    "macro": false,
    "ring": true,
-   "smarts": "[n;D2:1]1[c:2][c:3][c:4][c;R2:5][c;R2:6]1>>[#7_nuc2:1][c:6][c:5][#6_elec2:4].[#6_elec2:2][#6_nuc2:3]",
+   "smarts": "[n;D2;+0:1]1[c;x2;!$(c!@[OH]):2][c;x2:3][c;x2;!$(c!@[OH]):4][c;R2;!$(c[A]):5][c;R2;!$(c[A]):6]1>>[#7_nuc2:1][c:6][c:5][#6_elec2:4].[#6_elec2:2][#6_nuc2:3]",
+   "single_product": false
+  },
+  {
+   "id": "R17.1",
+   "name": "Paal-Knorr pyrrole (1,4-dicarbonyl + NH3/RNH2)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]);R1:1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a):3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):5]1>>[#7_nuc:1][#6:2]=[#6:3][#6:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.2",
+   "name": "Paal-Knorr thiophene (1,4-dicarbonyl + P4S10/Lawesson; also SH- + 1,3-diyne)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[s;+0;R1:1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a):3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):5]1>>[#16_nuc:1][#6:2]=[#6:3][#6:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.9",
+   "name": "Hinsberg thiophene (thiodiglycolate + 1,2-dicarbonyl)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[s;+0:1]1[c;!$(c(:a)(:a):a);$(c!@[#6](=[#8])[#8]):2][c;!$(c(:a)(:a):a):3][c;!$(c(:a)(:a):a):4][c;!$(c(:a)(:a):a);$(c!@[#6](=[#8])[#8]):5]1>>[#6_nuc2:2][#16:1][#6_nuc2:5].[#6_elec2:3][#6_elec2:4]",
+   "single_product": false
+  },
+  {
+   "id": "R17.12",
+   "name": "indole / Leimgruber-Batcho (covers Cadogan-Sundberg)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;h1;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O):1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a);$(c1ccccc1):4][c;R2;$(c(:a)(:a):a);$(c1ccccc1):5]1>>[#7_nuc:1][c:5][c:4][#6:3]=[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.13",
+   "name": "indole / Larock heteroannulation (Bartoli maps to the same two bonds)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;+0;!$(n-[#7]);!$(n-[#8]):1]1[c;h0;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;h0;!$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1>>[#7_nuc:1][c:5][c_elec:4].[#6_nuc:3]=[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.14",
+   "name": "indole / Madelung (and the Houlihan and Smith variants)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]):1]1[c;h0;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a);$(c1ccccc1):4][c;R2;$(c(:a)(:a):a);$(c1ccccc1):5]1>>[#6_elec2:2][#7:1][c:5][c:4][#6_nuc2:3]",
+   "single_product": false
+  },
+  {
+   "id": "R17.16",
+   "name": "benzofuran / 5-endo-dig cycloisomerisation of a 2-alkynylphenol",
+   "macro": false,
+   "ring": true,
+   "smarts": "[o;+0:1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1>>[#8_nuc:1][c:5][c:4][#6:3]=[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.17",
+   "name": "benzothiophene / 5-endo-dig cycloisomerisation of a 2-alkynylthiophenol",
+   "macro": false,
+   "ring": true,
+   "smarts": "[s;+0:1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][c;!$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1>>[#16_nuc:1][c:5][c:4][#6:3]=[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.18",
+   "name": "carbazole / Cadogan (2-nitrobiphenyl + P(OEt)3) or Buchwald C-N of a 2-aminobiphenyl",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;+0;!$(n-[#7]);!$(n-[#8]):1]1[c;R2;$(c(:a)(:a):a):2][c;R2;$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1>>[#7_nuc:1][c:5][c:4][c:3][c_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.19",
+   "name": "oxindole (indolin-2-one) / intramolecular lactamisation of a 2-aminophenylacetic acid",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;+0;!$([N]!@[#6]=[#8]);!$([N]!@S(=O)=O):1]1[C;+0:2](=[O:6])[C;+0:3][c;R2:4][c;R2:5]1>>[#7_nuc:1][c:5][c:4][#6:3][#6_elec:2]=[O:6]",
+   "single_product": false
+  },
+  {
+   "id": "R17.20",
+   "name": "oxindole / Stolle intramolecular Friedel-Crafts of a 2-chloroacetanilide",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;+0;!$([N]!@[#6]=[#8]);!$([N]!@S(=O)=O):1]1[C;+0:2](=[O:6])[C;+0:3][c;R2:4][c;R2:5]1>>[#6_elec:3][#6:2](=[O:6])[#7:1][c:5][c_nuc:4]",
+   "single_product": false
+  },
+  {
+   "id": "R17.30",
+   "name": "pyrazole, N1-substituted / nitrile imine (hydrazonoyl halide) + alkyne or alkene [3+2]",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D3;+0;!$(n-[#7]);!$(n-[#8]);!$([n][#6]=[#8]);!$([n]S(=O)=O):1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][c;R1;!$(c(:a)(:a):a):4][c;R1;!$(c(:a)(:a):a):5]1>>[#7_nuc:1][#7:2]=[#6_elec:3].[#6_nuc:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.31",
+   "name": "isoxazole / nitrile oxide + alkyne (or alkene) [3+2]",
+   "macro": false,
+   "ring": true,
+   "smarts": "[o;+0:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][c;R1;!$(c(:a)(:a):a):4][c;R1;!$(c(:a)(:a):a):5]1>>[#8_nuc:1][#7:2]=[#6_elec:3].[#6_nuc:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.32a",
+   "name": "1,2,4-triazole, 4H / N4-substituted / Pellizzari (acylhydrazide + amidine or amide)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;+0;D2:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][n;D3;+0;!$(n-[#8]);!$([n][#6]=[#8]);!$([n]S(=O)=O):4][c;!$(c(:a)(:a):a):5]1>>[#7_nuc2:1][#7:2]=[#6_elec:3].[#7_nuc:4][#6_elec2:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.32b",
+   "name": "1,2,4-triazole, 4H, N-unsubstituted / Pellizzari, [n;h1] twin of R17.32a",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;+0;D2:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][n;h1;+0:4][c;!$(c(:a)(:a):a):5]1>>[#7_nuc2:1][#7:2]=[#6_elec:3].[#7_nuc:4][#6_elec2:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.33",
+   "name": "1,2,4-triazole, 1H / N1-substituted / nitrile imine + nitrile [3+2]",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D3;+0;!$(n-[#7]);!$(n-[#8]);!$([n][#6]=[#8]);!$([n]S(=O)=O):1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][n;+0;D2:4][c;!$(c(:a)(:a):a):5]1>>[#7_nuc:1][#7:2]=[#6_elec:3].[#7_nuc:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.34",
+   "name": "1,2,4-oxadiazole / nitrile oxide + nitrile [3+2]",
+   "macro": false,
+   "ring": true,
+   "smarts": "[o;+0:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][n;+0;D2:4][c;!$(c(:a)(:a):a):5]1>>[#8_nuc:1][#7:2]=[#6_elec:3].[#7_nuc:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.35",
+   "name": "1,2,4-thiadiazole / nitrile sulfide + nitrile [3+2]",
+   "macro": false,
+   "ring": true,
+   "smarts": "[s;+0:1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][n;+0;D2:4][c;!$(c(:a)(:a):a):5]1>>[#16_nuc:1][#7:2]=[#6_elec:3].[#7_nuc:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.36",
+   "name": "1,3,4-thiadiazole / nitrile imine + C=S dipolarophile (dithioester, thioamide) [3+2] with beta-elimination",
+   "macro": false,
+   "ring": true,
+   "smarts": "[s;+0:1]1[c;!$(c(:a)(:a):a):2][n;+0;D2:3][n;+0;D2:4][c;!$(c(:a)(:a):a):5]1>>[#6_elec:2]=[#7:3][#7_nuc2:4].[#16_nuc:1][#6_elec2:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.40",
+   "name": "Hantzsch thiazole, ring-opened S-vinyl thioimidate form (N3-C4)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[s:1]1[c;R1;+0;!$([c]!@[#7,#8,#16]):2][n;D2;+0:3][c;R1;+0:4][c;R1;+0:5]1>>[#7_nuc:3]=[#6:2][#16:1][#6:5]=[#6_elec:4]",
+   "single_product": false
+  },
+  {
+   "id": "R17.41",
+   "name": "van Leusen oxazole (TosMIC + aldehyde)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[o:1]1[c;R1;+0;h1:2][n;D2;+0:3][c;R1;+0:4][c;R1;+0:5]1>>[#6_elec:2]=[#7:3][#6_nuc2:4].[#6_elec2:5][#8_nuc:1]",
+   "single_product": false
+  },
+  {
+   "id": "R17.42",
+   "name": "van Leusen imidazole (TosMIC + aldimine)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D3;+0;R1;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]):1]1[c;R1;+0;h1:2][n;D2;+0:3][c;R1;+0:4][c;R1;+0:5]1>>[#6_elec:2]=[#7:3][#6_nuc2:4].[#6_elec2:5][#7_nuc:1]",
+   "single_product": false
+  },
+  {
+   "id": "R17.43",
+   "name": "van Leusen thiazole (TosMIC + isothiocyanate or thiocarbonyl)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[s:1]1[c;R1;+0;h1:2][n;D2;+0:3][c;R1;+0:4][c;R1;+0:5]1>>[#6_elec:2]=[#7:3][#6_nuc2:4].[#6_elec2:5][#16_nuc:1]",
+   "single_product": false
+  },
+  {
+   "id": "R17.44",
+   "name": "Cook-Heilbron 5-aminothiazole (alpha-aminonitrile + CS2 / isothiocyanate / dithioester)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[s:1]1[c;R1;+0:2][n;D2;+0:3][c;R1;+0:4][c;R1;+0;$([c]!@[#7;+0;X3]):5]1>>[#16_nuc:1][#6_elec2:2].[#7_nuc2:3][#6:4]=[#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.45",
+   "name": "oxazole C2-O1 cyclodehydration (acyloin + nitrile / imidoyl electrophile) \u2014 NOT Robinson-Gabriel",
+   "macro": false,
+   "ring": true,
+   "smarts": "[o:1]1[c;R1;+0;!$([c]!@[#7,#8,#16]):2][n;D2;+0:3][c;R1;+0:4][c;R1;+0:5]1>>[#6_elec:2]=[#7:3][#6:4]=[#6:5][#8_nuc:1]",
+   "single_product": false
+  },
+  {
+   "id": "R17.46",
+   "name": "oxazole, ring-opened O-vinyl imidate form (N3-C4)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[o:1]1[c;R1;+0;!$([c]!@[#7,#8,#16]):2][n;D2;+0:3][c;R1;+0:4][c;R1;+0:5]1>>[#7_nuc:3]=[#6:2][#8:1][#6:5]=[#6_elec:4]",
+   "single_product": false
+  },
+  {
+   "id": "R17.47",
+   "name": "2-oxazoline (4,5-dihydro-1,3-oxazole) from a 1,2-amino alcohol, O1-C2",
+   "macro": false,
+   "ring": true,
+   "smarts": "[O;+0;R1:1]1[C;+0;R1:2]=[N;+0;R1:3][C;X4;+0;R1:4][C;X4;+0;R1:5]1>>[#8_nuc:1][#6:5][#6:4][#7:3]=[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.48",
+   "name": "2-thiazoline (4,5-dihydro-1,3-thiazole) from a 1,2-amino thiol, S1-C2",
+   "macro": false,
+   "ring": true,
+   "smarts": "[S;+0;R1:1]1[C;+0;R1:2]=[N;+0;R1:3][C;X4;+0;R1:4][C;X4;+0;R1:5]1>>[#16_nuc:1][#6:5][#6:4][#7:3]=[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.49",
+   "name": "2-imidazoline (4,5-dihydro-1H-imidazole) from a 1,2-diamine, N1-C2",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;+0;R1;!$([N]!@[#6]=[O,S]):1]1[C;+0;R1:2]=[N;+0;R1:3][C;X4;+0;R1:4][C;X4;+0;R1:5]1>>[#7_nuc:1][#6:5][#6:4][#7:3]=[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.50",
+   "name": "2-imidazoline from an amidine + 1,2-dielectrophile, N1-C5 + N3-C4",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;+0;R1;h1;!$([N]!@[#6]=[O,S]):1]1[C;+0;R1:2]=[N;+0;R1:3][C;X4;+0;R1:4][C;X4;+0;R1:5]1>>[#7_nuc:1][#6:2]=[#7_nuc:3].[#6_elec:4][#6_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.55a",
+   "name": "pyrazine / self-condensation of alpha-aminoketones (Staedel-Rugheimer, Gutknecht, Gastaldi), orientation A",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D2;+0:1]1[c;x2;!$(c[#7,#8,#16]):2][c;x2:3][n;D2;+0:4][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):5][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):6]1>>[#7_nuc:1]=[#6:2][#6_elec2:3].[#7_nuc2:4][#6:5]=[#6_elec:6]",
+   "single_product": false
+  },
+  {
+   "id": "R17.55b",
+   "name": "pyrazine / alpha-aminoketone self-condensation, orientation B (mirror twin of R16.1a0a)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D2;+0:1]1[c;x2;!$(c[#8;h1]);!$(c[#16;h1]):2][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):3][n;D2;+0:4][c;x2:5][c;x2;!$(c[#7,#8,#16]):6]1>>[#7_nuc:1]=[#6:6][#6_elec2:5].[#7_nuc2:4][#6:3]=[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.56",
+   "name": "quinoxaline / o-phenylenediamine + 1,2-dicarbonyl (and pteridine by the Isay route)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D2;+0:1]1[c;x2:2][c;x2:3][n;D2;+0:4][c;R2;!$(c[A]):5][c;R2;!$(c[A]):6]1>>[#7_nuc2:1][c:6][c:5][#7_nuc2:4].[#6_elec2:2][#6_elec2:3]",
+   "single_product": false
+  },
+  {
+   "id": "R17.57a",
+   "name": "quinazoline / quinazolin-4(3H)-one, N3-H / Niementowski (anthranilic acid + amide)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D2;+0:1]1[c;x2:2][n;D2;+0:3][c;x2:4][c;R2;!$(c[A]):5][c;R2;!$(c[A]):6]1>>[#7_nuc2:1][c:6][c:5][#6_elec2:4].[#6_elec2:2][#7_nuc2:3]",
+   "single_product": false
+  },
+  {
+   "id": "R17.57b",
+   "name": "quinazolin-4(3H)-one, N3-substituted / Niementowski via acylanthranil",
+   "macro": false,
+   "ring": true,
+   "smarts": "[#7;A;+0:1]1=[#6:2][#7;A;D3;+0:3][#6:4](=[#8:7])[c;R2:5][c;R2:6]1>>[#7_nuc2:1][c:6][c:5][#6_elec:4]=[#8:7].[#6_elec2:2][#7_nuc:3]",
+   "single_product": false
+  },
+  {
+   "id": "R17.58",
+   "name": "quinoline / Combes (aniline + 1,3-diketone); also Skraup, Doebner-von Miller and Knorr",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;D2;+0:1]1[c;x2;!$(c!@[OH]):2][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):3][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):4][c;R2;!$(c[A]):5][c;R2;!$(c[A]):6]1>>[#7_nuc2:1][c:6][c_nuc:5].[#6_elec2:2][#6:3]=[#6_elec:4]",
+   "single_product": false
+  },
+  {
+   "id": "R17.59",
+   "name": "isoquinoline / Bischler-Napieralski, aromatic product (one-bond cut, C1-C8a)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[c;x2;!$(c[#8;h1]);!$(c[#16;h1]):1]1[n;D2;+0:2][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):3][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):4][c;R2;!$(c[A]):5][c;R2;!$(c[A]):6]1>>[#6_elec:1]=[#7:2][#6:3]=[#6:4][c:5][c_nuc:6]",
+   "single_product": false
+  },
+  {
+   "id": "R17.60",
+   "name": "3,4-dihydroisoquinoline / Bischler-Napieralski, the literal one-step product",
+   "macro": false,
+   "ring": true,
+   "smarts": "[#6;A;!$([#6](=[#7])[#7]):1]1=[#7;A;+0:2][#6;A;X4:3][#6;A;X4:4][c;R2:5][c;R2:6]1>>[#6_elec:1]=[#7:2][#6:3][#6:4][c:5][c_nuc:6]",
+   "single_product": false
+  },
+  {
+   "id": "R17.61",
+   "name": "isoquinoline / Pomeranz-Fritsch (aryl aldehyde + aminoacetaldehyde acetal)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[c;x2;!$(c[#8;h1]);!$(c[#16;h1]):1]1[n;D2;+0:2][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):3][c;x2;!$(c[#8;h1]);!$(c[#16;h1]):4][c;R2;!$(c[A]):5][c;R2;!$(c[A]):6]1>>[#6_elec:4]=[#6:3][#7:2]=[#6:1][c:6][c_nuc:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.62",
+   "name": "1,2,3,4-tetrahydroisoquinoline / one-bond N-acyliminium cyclisation (Pictet-Spengler surrogate)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[#6;A;X4;!$([#6]([#7,#8,#16])[#7]):1]1[#7;A;X3;+0:2][#6;A;X4:3][#6;A;X4:4][c;R2:5][c;R2:6]1>>[#6_elec:1][#7:2][#6:3][#6:4][c:5][c_nuc:6]",
+   "single_product": false
+  },
+  {
+   "id": "R17.70",
+   "name": "benzimidazole / Phillips (o-phenylenediamine + aldehyde or carboxylic acid), one-bond N1-C2 cut",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]):1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][n;+0;h0;D2:3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1>>[#7_nuc:1][c:5][c:4][#7:3]=[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.71",
+   "name": "benzimidazole / amidine + 1,2-dihaloarene (benzo analogue of the shipped R16.4b)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]):1]1[c;!$(c(:a)(:a):a):2][n;+0;h0;D2:3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1>>[#7_nuc:1][#6:2]=[#7_nuc:3].[c_elec:4][c_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.72",
+   "name": "benzoxazole / o-aminophenol + aldehyde or carboxylic acid, one-bond O1-C2 cut",
+   "macro": false,
+   "ring": true,
+   "smarts": "[o;+0:1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][n;+0;h0;D2:3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1>>[#8_nuc:1][c:5][c:4][#7:3]=[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.73",
+   "name": "benzothiazole / o-aminothiophenol + aldehyde or carboxylic acid, one-bond S1-C2 cut",
+   "macro": false,
+   "ring": true,
+   "smarts": "[s;+0:1]1[c;!$(c(:a)(:a):a);!$(c!@[#7,#8,#9,#16,#17,#35,#53]):2][n;+0;h0;D2:3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1>>[#16_nuc:1][c:5][c:4][#7:3]=[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.74",
+   "name": "1H-indazole / o-fluoroaryl aldehyde or ketone + hydrazine",
+   "macro": false,
+   "ring": true,
+   "smarts": "[n;+0;!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8]):1]1[n;+0;D2:2][c;!$(c(:a)(:a):a):3][c;R2;$(c(:a)(:a):a):4][c;R2;$(c(:a)(:a):a):5]1>>[#7_nuc:1][#7_nuc2:2].[#6_elec2:3][c:4][c_elec:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.80",
+   "name": "piperidine / intramolecular C-N ring closure (reductive amination, N-alkylation, aza-Michael, Mitsunobu, hydroamination)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][C;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]>>[#7_nuc:1].[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.81",
+   "name": "pyrrolidine / intramolecular C-N ring closure",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]>>[#7_nuc:1].[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.82a",
+   "name": "morpholine / C-O ring closure (diethanolamine cyclodehydration, haloether or epoxide closure)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[O;z1;+0;$([O]1[C;z1][C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]>>[#8_nuc:1].[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.82b",
+   "name": "morpholine / C-N ring closure",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][O;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]>>[#7_nuc:1].[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.83",
+   "name": "morpholine / 1,2-amino alcohol + 1,2-bis-electrophile (two bonds, on two DIFFERENT heteroatoms)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[O;z1;+0;$([O]1[C;z1][C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]-@[C;z1;!D4:3]-@[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);R1:4]>>[#8_nuc:1].[#6_elec:2][#6_elec:3].[#7_nuc:4]",
+   "single_product": false
+  },
+  {
+   "id": "R17.84a",
+   "name": "piperazine / 1,2-diamine + 1,2-bis-electrophile (two bonds, on two DIFFERENT nitrogens)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]-@[C;z1;!D4:3]-@[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);R1:4]>>[#7_nuc:1].[#6_elec:2][#6_elec:3].[#7_nuc:4]",
+   "single_product": false
+  },
+  {
+   "id": "R17.84b",
+   "name": "piperazine / intramolecular C-N ring closure (one bond)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]>>[#7_nuc:1].[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.85a",
+   "name": "thiomorpholine / 1,2-amino thiol + 1,2-bis-electrophile (two bonds)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[S;z1;+0;$([S]1[C;z1][C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]-@[C;z1;!D4:3]-@[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);R1:4]>>[#16_nuc:1].[#6_elec:2][#6_elec:3].[#7_nuc:4]",
+   "single_product": false
+  },
+  {
+   "id": "R17.85b",
+   "name": "thiomorpholine / C-S ring closure (one bond)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[S;z1;+0;$([S]1[C;z1][C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]>>[#16_nuc:1].[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.86a",
+   "name": "1,4-diazepane (homopiperazine) / 1,2-diamine + 1,3-bis-electrophile (two bonds)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][N;z1][C;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:5]-@[C;z1:6]-@[C;z1;!D4:7]-@[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);R1:4]>>[#7_nuc:1].[#6_elec:5][#6:6][#6_elec:7].[#7_nuc:4]",
+   "single_product": false
+  },
+  {
+   "id": "R17.86b",
+   "name": "1,4-diazepane / intramolecular C-N ring closure (one bond)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][N;z1][C;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]>>[#7_nuc:1].[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.87",
+   "name": "delta-lactam (piperidin-2-one) / amino acid or amino ester lactamisation",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;z1;+0;!$([#7][#7]);$([N]1[C;z2](=[O;z2])[C;z1][C;z1][C;z1][C;z1]1);R1:1]-@[C;z2;$([C]=[O]):2]>>[#7_nuc:1].[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.88",
+   "name": "gamma-lactam (pyrrolidin-2-one) / amino acid or amino ester lactamisation",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;z1;+0;!$([#7][#7]);$([N]1[C;z2](=[O;z2])[C;z1][C;z1][C;z1]1);R1:1]-@[C;z2;$([C]=[O]):2]>>[#7_nuc:1].[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.89",
+   "name": "1,2,3,6-tetrahydropyridine / ring-closing metathesis of an N-tethered diene",
+   "macro": false,
+   "ring": true,
+   "smarts": "[C;z2;$([C]1=[C][C;z1][N;z1;+0][C;z1][C;z1]1):1]=@[C;z2:2]>>[#6_neut2:1].[#6_neut2:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.90",
+   "name": "morpholin-3-one / 1,2-amino alcohol + haloacetate (the reducible morpholine precursor)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;z1;+0;!$([#7][#7]);$([N]1[C;z2](=[O;z2])[C;z1][O;z1][C;z1][C;z1]1);R1:1]-@[C;z2;$([C]=[O]):2]>>[#7_nuc:1].[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.91",
+   "name": "piperazin-2-one / 1,2-diamine + haloacetate (the reducible piperazine precursor)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;z1;+0;!$([#7][#7]);$([N]1[C;z2](=[O;z2])[C;z1][N;z1][C;z1][C;z1]1);R1:1]-@[C;z2;$([C]=[O]):2]>>[#7_nuc:1].[#6_elec:2]",
+   "single_product": false
+  },
+  {
+   "id": "R17.92",
+   "name": "piperidine / aza-annulation: amine-bearing C-nucleophile + 1,3-bis-electrophile (two bonds, N-C and C-C)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N;z1;+0;!$([#7][#6]=[#8]);!$([#7][#7]);$([N]1[C;z1][C;z1][C;z1][C;z1][C;z1]1);R1:1]-@[C;z1;!D4:2]-@[C;z1:3]-@[C;z1;!D4:4]-@[C;z1;$([#6][c]),$([#6][#6]=[#8]),$([#6][#6]#[#7]),$([#6][#7](=[#8])[#8]),$([#6][#16](=[#8])=[#8]):5]>>[#7_nuc:1].[#6_elec:2][#6:3][#6_elec:4].[#6_nuc:5]",
+   "single_product": false
+  },
+  {
+   "id": "R17.93",
+   "name": "GENERIC saturated heterocycle / one-bond heteroatom-carbon ring closure (the declared residual)",
+   "macro": false,
+   "ring": true,
+   "smarts": "[N,O,S;z1;R;+0;!$([N,O,S][C;z1][#7,#8,#16]);!$([#7][#6]=[#8]);!$([#7][#7]);!$([#8][#6]=[#6,#7,#8,#15,#16,#34]);!$([N;z1]1[C;z1][C;z1][C;z1][C;z1]1);!$([N;z1]1[C;z1][C;z1][C,N,O,S;z1][C;z1][C;z1]1);!$([N;z1]1[C;z1][C;z1][N;z1][C;z1][C;z1][C;z1]1);!$([O,S;z1]1[C;z1][C;z1][N;z1][C;z1][C;z1]1):1]-@[C;z1;R;!D4;!$([C]([#7,#8,#16])[#7,#8,#16]);!r3;!r4:2]>>[*_nuc:1].[#6_elec:2]",
    "single_product": false
   }
  ],

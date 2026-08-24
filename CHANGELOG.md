@@ -143,8 +143,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   This changes default enumeration output: `rule_mode="use_all"` now loads 48 rules
   rather than 39, and across ten drug targets unique products go from 21 to 28 (a
   pyridine ring closure makes nicotine reachable, where the shipped rules found no
-  pathway). Held at the pre-`R16` rule set the pipeline is byte-identical to before.
-  Ring rules are excluded from `synthon_priority_rules()`, where `capped_smarts` has
+  pathway). Ring rules are excluded from `synthon_priority_rules()`, where `capped_smarts` has
   no open valence to spell a leaving group on and would hand the planner a styrene
   where the alkyne belongs. `ring_closure_sizes=()` disables ring closure in the
   enumerator, but the fragmenter still cuts with ring rules unless they are also
@@ -152,10 +151,90 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
   Not expressible: benzimidazole and other C1 insertions, where one atom must make two
   ring bonds to two different partners and `join` spends its attachment points on a
-  single double bond. Three further rules (oxazole, thiazole, pyrimidine) fail because
-  chython's tautomer standardisation moves the double bond while leaving the labels on
-  their atoms, and for the amidine both label orientations canonicalise to one string,
-  so the regiochemistry is destroyed rather than displaced.
+  single double bond. Oxazole and thiazole were also called unexpressible here, on a
+  tautomer argument that proved too strong; the curation entry below ships both.
+  Pyrimidine is still absent.
+
+- Curated the heterocyclisation block from 9 ring rules to 76, and changed what the
+  original nine do. Two id blocks: `R16` keeps the shipped families (13 rules) and
+  `R17.1`-`R17.93` holds the new ones (63), one contiguous range per curation lane —
+  pyrrole/thiophene/indole `R17.1`-`R17.20`, multi-heteroatom azoles `R17.30`-`R17.36`,
+  thiazole/oxazole/imidazole `R17.40`-`R17.50`, azines `R17.55`-`R17.62`, benzo-fused
+  azoles `R17.70`-`R17.74`, saturated N/O/S rings `R17.80`-`R17.93`. Every rule now pins
+  the ring heteroatom's charge, which no shipped ring rule did.
+
+  **Existing enumeration output changes, and so do rule ids.** The nine `R16.1`-`R16.9`
+  selectors are gone; a `rules_selection` naming them must be rewritten. Four defects
+  in the shipped nine are fixed, each of which changes an answer:
+
+  - chython's `D` counts HEAVY neighbours, so `[n;D3]` never matched an N-unsubstituted
+    azole and `R16.1`-`R16.4` and `R16.8` silently missed every N-H parent. chython
+    refuses `[n;D3,h1:1]` ("Unsupported OR statement"), so each affected family ships as
+    an `a` (N-substituted) / `b` (N-H) twin pair. Cenobamate gains four pathways: once
+    `R5.1`/`R5.2` has cut the N-CH2 bond, `R16.2b` closes the N-H tetrazole left behind.
+  - `R16.6`'s LHS is mirror-symmetric while its RHS is not, and chython's automorphism
+    filter dedupes on the SET of matched target atoms — one whole-ring mapping per ring,
+    so one of the two Kroehnke disconnections was silently lost. `R16.6a`/`R16.6b` spell
+    both orientations.
+  - `R16.4` corrupted the brutto formula on 49% of the drug-like sample. Its N-H twin
+    `R16.4b` ships with `R1`/`+0`/`h0` pins; the N-substituted half is held (below).
+  - `R16.6a/b`, `R16.7`, `R16.9` and `R17.58` disconnected N-H azinones: a Kroehnke of
+    4-pyridone, a Friedlaender of carbostyril, a hydrazine condensation of
+    phthalazin-1(2H)-one. Every one round-tripped and conserved formula while being
+    chemically wrong, because canonicalisation rewrites an N-H azinone to the aromatic
+    hydroxy-azine before any rule sees it. `!$(c!@[OH])` alpha and gamma to the ring
+    nitrogen refuses them and leaves 3-hydroxypyridine, 6-hydroxyquinoline and every
+    plain azine untouched.
+
+  Guards applied family-wide: the four-token N-substituent idiom
+  (`!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8])`, with the Fokin sulfonyl-azide
+  and Pellizzari hydrazide exemptions), `;R1` on the ring heteroatom of the monocyclic
+  and saturated rules, and a carbocyclic-fusion requirement on the four arene-requiring
+  indole rules, which stops them claiming azaindoles and 7-deazapurines. The generic
+  saturated-ring residual `R17.93` fires on 17.7% of drug-like molecules rather than
+  33.3%, with no acetal, aminal or anomeric carbon left as its electrophile —
+  glucopyranose, sucrose, solketal and penicillin G no longer disconnect, though
+  morphine's bridged ether still does.
+
+  Four code changes that the rule set needs to be usable at all. `Fragmenter._cut` catches
+  `InvalidAromaticRing` per rule and logs it, where one rule that cannot kekulise its
+  product used to kill the whole fragmentation — `R16.6` on acridine did that to 2.00% of
+  drug-like targets. `Enumerator._close`/`_grow` raise `FormulaDrift` when a rebuilt
+  product is not the sum of its synthons minus two hydrogens per bond order, and lend a
+  stranded proton back across the double bond it was pushed over, which is the mechanism
+  behind `R16.4`'s corruption. This narrows the drug-like sweep from 1889 formula
+  violations to 13, all on charged inputs, so the problem is contained rather than closed.
+  `_positions()` refuses a duplicated rule id instead of
+  returning both. `_clean_molecule` raises `StereoDiscardedWarning` when it is about to
+  discard a real stereocentre rather than dropping it in silence; promote it to an error
+  with `warnings.simplefilter("error", StereoDiscardedWarning)` to refuse stereo-bearing
+  input outright.
+
+  `_convert.check()` now calls `synplan.chem.synthon.rules.validate`, which until now had
+  no caller outside its own test: `rules.json` cannot be regenerated with a ring rule that
+  fails to fire on its own authored target, or that labels an atom whose proton
+  canonicalisation moves. The blanket predicate is narrowed to make that usable — both
+  ends of an amide / amidine / thioamide / enol triad may be labelled when they are the
+  same element carrying the same token, because then the two atoms are interchangeable and
+  nothing landed on the wrong one. Without the narrowing every N-H amidine rule is a false
+  positive. `check()` also rejects a duplicated rule id, which `_positions()` would
+  otherwise resolve to two rules and use to widen any range spanning it.
+
+  Ten curated rules are **held out** of `rules.json` and stay flagged pending in
+  `research/synthon/curation/curated_rules.json`: `R16.4a` (N-substituted imidazole by the
+  amidine route — its own curator wrote "DOES NOT ROUND-TRIP. Do not ship. Correct only
+  for N-methyl", and the acceptance gate that disagrees tests one target); `R17.7`,
+  `R17.8`, `R17.10`, `R17.11` (oxa-/aza-Fiesselmann and the two Hinsberg routes, all
+  UNVERIFIED as general methods — Hinsberg furan has zero USPTO reactions and zero
+  patents); and `R17.3`, `R17.4`, `R17.5`, `R17.6`, `R17.15`, each gated on a chemist
+  ruling on whether the activating group it requires is genuinely mandatory. Holding the
+  two furan rules leaves the port with no rule for a plain 2,5-dialkylfuran, which is
+  declared rather than hidden.
+
+  Not shipped, and known: `smirks_stereo` and `stereo_spec` are recorded for all 96 curated
+  rules but the stock is still keyed on flat structures, so any route through these rings is
+  racemic. `R17.16`/`R17.17` and `R16.6a/b` match far more often than chemists close those
+  rings that way, and are not down-weighted yet.
 
 - Added `TreeConfig.direction`, which selects between retrosynthetic and forward search
   and validates that the tree and the rollout evaluator score the same finish line —
