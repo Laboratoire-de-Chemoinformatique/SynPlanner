@@ -118,15 +118,34 @@ def capped_smarts(
     return f"{lhs_text}>>{rhs}"
 
 
+def _rule_smarts(record: dict, leaving_groups: dict[str, str], cap: bool) -> str:
+    """The SMARTS a record reaches the reactor as.
+
+    A heterocyclisation cuts TWO bonds, so its fragments have no open valence for
+    :func:`capped_smarts` to spell a leaving group on and no per-atom cap can express the reagent
+    anyway — a triazole comes from an azide and an ALKYNE, not from a triazene and a styrene. Such
+    a record ships a hand-authored reagent-form ``retro_smarts`` and bypasses capping entirely.
+    """
+    if record["ring"]:
+        return record["retro_smarts"]
+    if cap:
+        return capped_smarts(record["smarts"], leaving_groups, record["id"])
+    return record["smarts"]
+
+
 def _records(config: SynthonConfig | None, macro: bool) -> list[dict]:
     """The selected ``rules.json`` disconnection records, macrocyclic half optional."""
     config = config or SynthonConfig()
     data = load_data(config.rules_path)
-    # the R16 heterocyclisations are excluded: they cut TWO bonds, so their fragments have no open
-    # valence for `capped_smarts` to spell a leaving group on, and an uncapped ring synthon
-    # proposes a purchasable compound of the wrong class — a styrene where the alkyne belongs
+    # a heterocyclisation without its hand-authored `retro_smarts` is excluded: capping cannot
+    # spell its reagents, so it would reach the reactor uncapped and propose a purchasable
+    # compound of the wrong class — a styrene where the alkyne belongs
     records = _select(
-        [r for r in data["disconnections"] if not r["macro"] and not r["ring"]],
+        [
+            r
+            for r in data["disconnections"]
+            if not r["macro"] and (not r["ring"] or r["retro_smarts"])
+        ],
         config.rule_mode,
         config.rules_selection,
     )
@@ -152,6 +171,7 @@ def synthon_priority_rules(
         every label is inert and a fifth of the resulting fragments are purchasable compounds
         of the wrong class. On, R7.1/R10.1/R10.2 are still wrong — their leaving group is a
         property of the rule, not of the labelled atom, and the shipped table is keyed by atom.
+        Ignored by the ring rules, which ship their reagent form ready-written.
     :param macro: Also load the macrocyclic ``MR*`` half. They only match ring bonds outside
         r3-r11, so they are dead weight on a non-macrocyclic target.
     :return: ``{SYNTHON_SOURCE_NAME: [rule, ...]}``.
@@ -161,10 +181,7 @@ def synthon_priority_rules(
     parsed = parse_priority_rules(
         {
             SYNTHON_SOURCE_NAME: [
-                capped_smarts(record["smarts"], leaving_groups, record["id"])
-                if cap
-                else record["smarts"]
-                for record in records
+                _rule_smarts(record, leaving_groups, cap) for record in records
             ]
         },
         automorphism_filter=True,

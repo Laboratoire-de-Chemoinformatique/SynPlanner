@@ -692,6 +692,8 @@ def build(config_dir: Path) -> dict[str, object]:
                 "ring": True,
                 "provenance": "llm",
                 "smarts": rule["smarts"],
+                # the reagent-form retro SMIRKS, hand-authored; None until it is written
+                "retro_smarts": rule.get("retro_smarts"),
                 "single_product": False,
                 **{k: rule[k] for k in NAMING_FIELDS},
             }

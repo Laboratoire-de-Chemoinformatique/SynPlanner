@@ -123,8 +123,8 @@ def test_loader_returns_reactors_under_one_non_reserved_name() -> None:
     rules = synthon_priority_rules()
     assert list(rules) == [SYNTHON_SOURCE_NAME]
     assert SYNTHON_SOURCE_NAME != POLICY_SOURCE_NAME
-    assert len(rules[SYNTHON_SOURCE_NAME]) == 39
-    assert len(synthon_priority_rules(macro=True)[SYNTHON_SOURCE_NAME]) == 78
+    assert len(rules[SYNTHON_SOURCE_NAME]) == 108  # 39 acyclic + the authored ring rules
+    assert len(synthon_priority_rules(macro=True)[SYNTHON_SOURCE_NAME]) == 147
     assert all(
         isinstance(rule, CanonicalRetroReactor) for rule in rules[SYNTHON_SOURCE_NAME]
     )
@@ -162,10 +162,11 @@ def test_the_raw_rules_carry_labels_and_the_capped_ones_carry_none() -> None:
     Both halves matter. If the raw set stops carrying 78, a rule lost its labels upstream in
     ``rules.json`` and the disconnection now proposes the wrong reagent class. If the capped set
     ever carries one, some caller is about to trust a label that ``str(Reactor)`` will drop.
+    The ring rules are out of scope: they never see the capper, they ship a reagent form.
     """
     config = SynthonConfig()
     leaving_groups = load_data(config.rules_path)["leaving_groups"]
-    records = _records(config, macro=False)
+    records = [r for r in _records(config, macro=False) if not r["ring"]]
 
     def labels(rule_smarts: str) -> int:
         return len(query_labels(smarts(rule_smarts.split(">>", 1)[1].strip())))
