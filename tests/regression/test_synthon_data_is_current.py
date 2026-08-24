@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from synplan.chem.synthon.config import SynthonConfig
+from synplan.chem.synthon.config import SynthonConfig, load_data
 
 # the reference clone lives beside the repo, not inside it, so walk up until it turns up
 CONFIG_DIR = next(
@@ -116,3 +116,21 @@ def test_the_fork_parses_real_building_blocks_identically():
         if answer(smiles, text) != answer(synthon_smiles, text)
     ]
     assert differing == []
+
+
+def test_every_disconnection_declares_its_provenance():
+    """A chemist reading rules.json must be able to tell curated chemistry from proposed.
+
+    The Enamine rules carry decades of industrial experience; the ring rules were authored here
+    and most have not been through a chemist yet.
+    """
+    rules = load_data(SynthonConfig().rules_path)["disconnections"]
+    unknown = {
+        r["id"]: r.get("provenance")
+        for r in rules
+        if r.get("provenance") not in ("human", "llm")
+    }
+    assert unknown == {}
+    # the split is structural: everything converted from Setup.xml is curated, the ring set is not
+    assert {r["provenance"] for r in rules if r["ring"]} == {"llm"}
+    assert {r["provenance"] for r in rules if not r["ring"]} == {"human"}
