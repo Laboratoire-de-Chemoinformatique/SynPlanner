@@ -21,6 +21,7 @@ from synplan.chem.reaction.routes.representation.depiction import (
     depict_custom_reaction,
 )
 from synplan.chem.reaction.routes.traversal import iter_route_steps
+from synplan.utils.frames import depict_value
 
 if TYPE_CHECKING:
     from synplan.mcts.tree import Tree
@@ -1102,17 +1103,6 @@ def routes_clustering_report(
     return html
 
 
-def _depictable_from_table_value(value):
-    if isinstance(value, (tuple, list)) and value:
-        return value[0]
-    return value
-
-
-def _render_table_value(value) -> str:
-    value = _depictable_from_table_value(value)
-    return value.depict() if hasattr(value, "depict") else str(value)
-
-
 def _has_table_values(data: dict) -> bool:
     return any(bool(row) for row in data.values())
 
@@ -1165,7 +1155,7 @@ def lg_table_2_html(subcluster, routes_to_display=None, if_display=True):
             for mark in all_marks:
                 html += "<td style='border: 1px solid black; padding: 4px;'>"
                 if mark in route_data:
-                    html += _render_table_value(route_data[mark])
+                    html += depict_value(route_data[mark])
                 html += "</td>"
             html += "</tr>"
     else:
@@ -1177,7 +1167,7 @@ def lg_table_2_html(subcluster, routes_to_display=None, if_display=True):
                 for mark in all_marks:
                     html += "<td style='border: 1px solid black; padding: 4px;'>"
                     if mark in route_data:
-                        html += _render_table_value(route_data[mark])
+                        html += depict_value(route_data[mark])
                     html += "</td>"
                 html += "</tr>"
             else:
@@ -1223,7 +1213,7 @@ def supporting_table_2_html(subcluster, routes_to_display=None, if_display=True)
         for mark in all_marks:
             html += "<td style='border: 1px solid black; padding: 4px;'>"
             if mark in route_data:
-                html += _render_table_value(route_data[mark])
+                html += depict_value(route_data[mark])
             html += "</td>"
         html += "</tr>"
 
@@ -1314,7 +1304,7 @@ def group_lg_table_2_html_fixed(
         for mark in all_marks:
             cell = ["<td style='" + img_td_style + "'>"]
             if mark in rep:
-                cell.append(_render_table_value(rep[mark]))
+                cell.append(depict_value(rep[mark]))
             cell.append("</td>")
             row.append("".join(cell))
         html.append("<tr>" + "".join(row) + "</tr>")
