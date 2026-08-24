@@ -33,16 +33,22 @@ def load_pairs(
     return pairs
 
 
-def _fix_aromatic_marks(molecule: SynthonContainer) -> None:
+def _fix_aromatic_marks(molecule: SynthonContainer, new_ring: bool = False) -> None:
     """Rebuilding a molecule atom by atom unsets every aromatic hydrogen mark it touches, so a
     pyrrole nitrogen anywhere in the partner silently loses its hydrogen.
 
     `add_bond` documents kekule/thiele as the cure. The retry covers a labelled ring nitrogen
     whose hydrogen tautomer standardisation moved elsewhere; a ring that cannot exist raises.
+
+    `join` bonds two disconnected fragments and so can never build a ring: with nothing aromatic
+    already there is nothing to redo. `close_ring` can, and a ring that has just become aromatic
+    carries no aromatic atom until `thiele` finds one - hence `new_ring`.
     """
     # ponytail: rederives the whole product's aromatic marks per join; scope it to the ring
     # system the new bond touches if join() ever shows up in a profile
-    if not any(atom.hybridization == 4 for _, atom in molecule.atoms()):
+    if not new_ring and not any(
+        atom.hybridization == 4 for _, atom in molecule.atoms()
+    ):
         return
     try:
         molecule.kekule()
@@ -95,7 +101,7 @@ def close_ring(
     closed.atom(atom_a)._label = None
     closed.atom(atom_b)._label = None
     closed.add_bond(atom_a, atom_b, order)
-    _fix_aromatic_marks(closed)
+    _fix_aromatic_marks(closed, new_ring=True)
     closed.flush_cache()
     return closed
 

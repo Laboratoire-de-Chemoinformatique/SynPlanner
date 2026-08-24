@@ -252,6 +252,25 @@ def test_a_ring_rule_round_trips_its_target(rule_id, target_smi):
     assert not list(Enumerator(off).enumerate_analogues(keys, {k: [k] for k in keys}))
 
 
+def test_a_ring_built_from_aliphatic_synthons_comes_back_aromatic():
+    """Every RING_EXAMPLES target carries a benzo substituent, so a product always has an aromatic
+    atom before the new ring is drawn. Nicotine's pyridine does not: both synthons are aliphatic.
+
+    `_fix_aromatic_marks` skipped exactly that case, so the Kekule string reached the dedup sets
+    (`str` is the identity here) and the CLI wrote it out as the product.
+    """
+    _, target, synthons = _cut_ring_example("R16.6", "CN1CCCC1c1cccnc1")
+    assert not any(a.hybridization == 4 for s in synthons for _, a in s.atoms())
+    keys = [str(s) for s in synthons]
+    products = {
+        str(m)
+        for m in Enumerator(SynthonConfig()).enumerate_analogues(
+            keys, {k: [k] for k in keys}
+        )
+    }
+    assert str(target) in products
+
+
 @pytest.mark.parametrize("audited", (False, True))
 def test_enumerate_file_uses_configured_analogue_slots(tmp_path, audited):
     synthons = ("C[CH_elec]=O", "CCC[NH2_nuc]")
