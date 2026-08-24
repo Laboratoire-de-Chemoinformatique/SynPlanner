@@ -1,5 +1,6 @@
 """The disconnection DAG: 48 rules cut a target into synthons, level by level, with the gates."""
 
+import logging
 import re
 from collections import Counter
 from collections.abc import Iterable, Iterator
@@ -7,6 +8,7 @@ from dataclasses import dataclass, field
 
 from chython import smiles, synthon_smiles
 from chython.containers import MoleculeContainer, SynthonContainer
+from chython.exceptions import InvalidAromaticRing
 
 from synplan.chem.synthon.config import SynthonConfig, load_data
 from synplan.chem.synthon.transformer import SynthonTransformer
@@ -18,6 +20,8 @@ STUDY_FRAGMENTS_TO_IGNORE = ("CCC", "CC=O", "C=O", "CC(C)=O")
 
 # a target with any SSSR ring larger than this is cut at level 1 by the macrocyclic rules ONLY
 MACROCYCLE_RING = 11
+
+logger = logging.getLogger(__name__)
 
 _RANGE = re.compile(r"^(M?R)(\d+)(?:\.(\d+)([ab])?)?$")
 # neutralise carboxylates before the first cut, exactly as the reference does
@@ -75,7 +79,11 @@ class DisconnectionDAG:
 
 
 def _positions(rules: list[dict], token: str) -> list[int]:
-    """Where one selector lands in the ORDERED rule list. `R12.3` covers `R12.3a` and `R12.3b`."""
+    """Where one selector lands in the ORDERED rule list. `R12.3` covers `R12.3a` and `R12.3b`.
+
+    Two RECORDS sharing one id string is a data defect, not a family: it would silently widen
+    every range spanning it.
+    """
     match = _RANGE.match(token.strip())
     if not match:
         raise ValueError(f"unparsable rule selector {token!r}")
@@ -91,6 +99,9 @@ def _positions(rules: list[dict], token: str) -> list[int]:
     ]
     if not found:
         raise ValueError(f"no rule matches {token!r}")
+    counts = Counter(rules[index]["id"] for index in found)
+    if repeated := [rid for rid, n in counts.items() if n > 1]:
+        raise ValueError(f"duplicate rule id {repeated} matched by {token!r}")
     return found
 
 
@@ -104,13 +115,13 @@ def _select(rules: list[dict], mode: str, selection: str) -> list[dict]:
         return rules
     wanted: set[int] = set()
     for token in selection.split(","):
-        if "-" in token:
-            low, high = (_positions(rules, part) for part in token.split("-", 1))
-            if min(low) > max(high):
+        ends = [_positions(rules, part) for part in token.split("-", 1)]
+        if len(ends) == 2:
+            if min(ends[0]) > max(ends[1]):
                 raise ValueError(f"reversed rule range {token!r}")
-            wanted.update(range(min(low), max(high) + 1))
+            wanted.update(range(min(ends[0]), max(ends[1]) + 1))
             continue
-        wanted.update(_positions(rules, token))
+        wanted.update(ends[0])
     if mode == "exclude_some":
         return [r for index, r in enumerate(rules) if index not in wanted]
     return [r for index, r in enumerate(rules) if index in wanted]
@@ -144,18 +155,18 @@ class Fragmenter:
             records = [r for r in records if not r["ring"]]
         normal = [r for r in records if not r["macro"]]
         macro = [r for r in records if r["macro"]]
+        selected = _select(normal, self.config.rule_mode, self.config.rules_selection)
         self.rules = [
-            (r, SynthonTransformer.from_smarts(r["smarts"]))
-            for r in _select(normal, self.config.rule_mode, self.config.rules_selection)
+            (r, SynthonTransformer.from_smarts(r["smarts"])) for r in selected
         ]
-        # the same selection, translated onto the MR ids exactly as `__getMacroCycleSetup` does
+        # the same selection carried onto the MR ids, as `__getMacroCycleSetup` intends. Taking
+        # the twins by id rather than re-running the selector on the macro list is what lets a
+        # ring family be named: `R16` has no `MR16`, so it simply drops out here
+        twins = {f"M{r['id']}" for r in selected}
         self.macro_rules = [
             (r, SynthonTransformer.from_smarts(r["smarts"]))
-            for r in _select(
-                macro,
-                self.config.rule_mode,
-                re.sub(r"M?R", "MR", self.config.rules_selection),
-            )
+            for r in macro
+            if r["id"] in twins
         ]
         self.forbidden = {
             frozenset(tuple(k) for k in entry) for entry in data["forbidden_marks"]
@@ -236,22 +247,31 @@ class Fragmenter:
             cached = self._memo.get(key)
             if cached is None:
                 sets = []
-                for index, transformed in enumerate(rule(molecule)):
-                    parts = (
-                        [transformed]
-                        if record["single_product"]
-                        else transformed.split()
-                    )
-                    # canonicalise before stringifying: the stored string IS the identity, and a
-                    # non-canonical one makes the same synthon two dict keys and cuts differently
-                    parts = [safe_canonicalization(p) for p in parts]
-                    sets.append(
-                        (
-                            f"{record['id']}_{index}",
-                            tuple(str(p) for p in parts),
-                            tuple(parts),
+                try:
+                    for match, transformed in enumerate(rule(molecule)):
+                        parts = (
+                            [transformed]
+                            if record["single_product"]
+                            else transformed.split()
                         )
+                        # canonicalise before stringifying: the stored string IS the identity,
+                        # and a non-canonical one makes the same synthon two dict keys and cuts
+                        # differently
+                        parts = [safe_canonicalization(p) for p in parts]
+                        sets.append(
+                            (
+                                f"{record['id']}_{match}",
+                                tuple(str(p) for p in parts),
+                                tuple(parts),
+                            )
+                        )
+                except InvalidAromaticRing as error:
+                    # a rule whose product cannot be kekulised is skipped FOR THIS TARGET; before
+                    # this, one such rule killed the whole fragmentation (R16.6 on acridine)
+                    logger.warning(
+                        "rule %s skipped on %s: %s", record["id"], key[0], error
                     )
+                    sets = []
                 self._memo[key] = tuple((name, smis) for name, smis, _ in sets)
                 for name, smis, parts in sets:
                     yield index, name, smis, parts, record["ring"]
