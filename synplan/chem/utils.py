@@ -205,6 +205,38 @@ def assert_reaction_atom_mapped(
         warnings.warn(message, stacklevel=2)
 
 
+class StereoDiscardedWarning(UserWarning):
+    """Stereochemistry present on the input was about to be discarded.
+
+    Promote it to an error with
+    ``warnings.simplefilter("error", StereoDiscardedWarning)`` to refuse
+    stereo-bearing input instead of flattening it.
+    """
+
+
+def _warn_stereo_loss(molecule: MoleculeContainer) -> None:
+    """Warn once per call site when ``clean_stereo`` is about to discard real stereo marks.
+
+    chython only keeps a descriptor on a genuine stereocentre, so a surviving
+    ``atom.stereo``/``bond.stereo`` is the definition of "real". The message is
+    deliberately molecule-independent so the default warnings filter collapses a
+    batch run to one line per call site.
+    """
+    if not (
+        any(a.stereo is not None for _, a in molecule.atoms())
+        or any(b.stereo is not None for *_, b in molecule.bonds())
+    ):
+        return
+    warnings.warn(
+        "Input stereochemistry is being discarded: SynPlanner's rule application "
+        "and its synthon/building-block stock are keyed on flat structures, so "
+        "any route proposed for this molecule is racemic / relative configuration "
+        "not determined.",
+        StereoDiscardedWarning,
+        stacklevel=3,
+    )
+
+
 def _clean_molecule(
     molecule: MoleculeContainer,
     *,
@@ -220,6 +252,7 @@ def _clean_molecule(
         if standardize:
             tmp.canonicalize()
         if clean_stereo:
+            _warn_stereo_loss(tmp)
             tmp.clean_stereo()
         if clean2d:
             tmp.clean2d()
@@ -290,6 +323,7 @@ def safe_canonicalization(molecule: MoleculeContainer) -> MoleculeContainer:
     try:
         molecule_copy.remove_coordinate_bonds(keep_to_terminal=False)
         molecule_copy.canonicalize()
+        _warn_stereo_loss(molecule_copy)
         molecule_copy.clean_stereo()
         return molecule_copy
     except InvalidAromaticRing:
