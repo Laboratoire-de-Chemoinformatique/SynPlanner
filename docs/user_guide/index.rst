@@ -63,6 +63,8 @@ some advanced explanations and configurations, that can be used for both demonst
 - `MHN Ranking Training`_ - demonstrates how to train and fine-tune the MHN ranking policy architecture.
 - `Routes Compare`_ - demonstrates how to compare route sets with RouteCGRs.
 - `Building Block Search`_ - demonstrates building-block search utilities.
+- `Synthon-Based Library Design`_ - demonstrates the synthon subsystem: building-block classification and synthonisation, target fragmentation, availability against a synthon stock, library and analogue enumeration, positional analogue scanning, and ring closure.
+- `Retrosynthesis with Synthon Priority Rules`_ - demonstrates how the shipped synthon disconnections steer an MCTS search as a curated priority-rule set.
 
 .. _Welcome to Chython: 00_Welcome_to_Chython.ipynb
 .. _Coming from RDKit: 01_Coming_from_RDKit.ipynb
@@ -82,6 +84,8 @@ some advanced explanations and configurations, that can be used for both demonst
 .. _MHN Ranking Training: 14_MHN_Ranking_Training.ipynb
 .. _Routes Compare: 15_Routes_compare.ipynb
 .. _Building Block Search: 16_Building_block_search.ipynb
+.. _Synthon-Based Library Design: 17_Synthon_Based_Design.ipynb
+.. _Retrosynthesis with Synthon Priority Rules: 18_Retrosynthesis_With_Synthon_Priority_Rules.ipynb
 
 .. toctree::
    :hidden:
@@ -108,5 +112,7 @@ some advanced explanations and configurations, that can be used for both demonst
    14_MHN_Ranking_Training
    15_Routes_compare
    16_Building_block_search
+   17_Synthon_Based_Design
+   18_Retrosynthesis_With_Synthon_Priority_Rules
    ../configuration/configuration
    ../methods/methods
