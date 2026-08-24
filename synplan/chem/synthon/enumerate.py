@@ -15,6 +15,19 @@ from synplan.chem.synthon.stock import label_keys
 
 Key = tuple[str, bool, str]
 
+# a proton can only migrate between heteroatoms in a prototropic tautomer; a C-H shift is
+# keto-enol and a different reaction
+PROTIC = frozenset({"N", "O", "S"})
+
+
+class FormulaDrift(ValueError):
+    """A bond that changed the product's brutto formula.
+
+    Every new bond of order k caps k fewer hydrogens at each of its two ends, so the whole of the
+    bookkeeping is: heavy atoms are conserved exactly and hydrogens fall by exactly 2k. Summed over
+    a rebuild, a product of synthons S joined by bonds b has H = sum(H of S) - 2 * sum(order of b).
+    """
+
 
 def load_pairs(
     config: SynthonConfig | None = None, key: str = "pairs"
@@ -31,6 +44,58 @@ def load_pairs(
         pairs.setdefault(a, set()).add(b)
         pairs.setdefault(b, set()).add(a)
     return pairs
+
+
+def _hydrogens(molecule: SynthonContainer) -> int:
+    return sum(atom.implicit_hydrogens or 0 for _, atom in molecule.atoms())
+
+
+def _lend_hydrogen(molecule: SynthonContainer, atom: int, order: int) -> None:
+    """Move a stranded proton back onto a labelled atom that has none left to trade for its bond.
+
+    `safe_canonicalization` standardises the amidine synthon `[NH_nuc]C(=[NH_nuc])` that R16.4
+    hands back into `[N_nuc]=C([NH2_nuc])`: both protons park on one label and the other cannot
+    pay. `add_bond` then makes it hypervalent, `kekule`/`thiele` repair that by pushing the double
+    bond into the new ring, and the extra hydrogen is stranded - the 49% R16.4 corruption.
+
+    A 1,3 shift back across that double bond restores the tautomer the label needs.
+    """
+    # ponytail: one proton per call, so a bivalent label two short stays short and the
+    # FormulaDrift check drops it; loop the search if a real rule ever needs two
+    if (molecule.atom(atom).implicit_hydrogens or 0) >= order:
+        return
+    bonds = molecule._bonds
+    shift = next(
+        (
+            (middle, donor)
+            for middle, to_middle in bonds[atom].items()
+            if int(to_middle) == 2
+            for donor, to_donor in bonds[middle].items()
+            if donor != atom
+            and int(to_donor) == 1
+            and molecule.atom(donor).atomic_symbol in PROTIC
+            # the donor keeps whatever its own label still has to pay out
+            and (molecule.atom(donor).implicit_hydrogens or 0)
+            > molecule.atom(donor).attachment_points
+        ),
+        None,
+    )
+    if shift is None:
+        return
+    middle, donor = shift
+    molecule.delete_bond(atom, middle)
+    molecule.add_bond(atom, middle, 1)
+    molecule.delete_bond(middle, donor)
+    molecule.add_bond(middle, donor, 2)
+
+
+def _check_formula(molecule: SynthonContainer, expected: int) -> None:
+    """The whole gate: heavy atoms cannot move, so only the hydrogen count can drift."""
+    found = _hydrogens(molecule)
+    if found != expected:
+        raise FormulaDrift(
+            f"{molecule} has {found} hydrogens, its synthons account for {expected}"
+        )
 
 
 def _fix_aromatic_marks(molecule: SynthonContainer, new_ring: bool = False) -> None:
@@ -65,10 +130,12 @@ def join(
     The 38 reconstruction SMIRKS collapse to this: every one of them is 2 reactants -> 1 product
     drawing exactly one new bond, with the marker elements only there to find the ends.
 
-    Raises `InvalidAromaticRing` when the two labels ask for a ring that cannot exist.
+    Raises `InvalidAromaticRing` when the two labels ask for a ring that cannot exist, and
+    `FormulaDrift` when the product is not the sum of the two synthons minus 2 * order hydrogens.
     """
     label_a, label_b = a.atom(atom_a).label, b.atom(atom_b).label
     order = 2 if label_a in BIVALENT_LABELS and label_b in BIVALENT_LABELS else 1
+    expected = _hydrogens(a) + _hydrogens(b) - 2 * order
     merged = a.copy()
     mapping = {}
     for n, atom in b.atoms():
@@ -78,11 +145,14 @@ def join(
         )
     for n, m, bond in b.bonds():
         merged.add_bond(mapping[n], mapping[m], int(bond))
+    _lend_hydrogen(merged, atom_a, order)
+    _lend_hydrogen(merged, mapping[atom_b], order)
     merged.atom(atom_a)._label = None
     merged.atom(mapping[atom_b])._label = None
     merged.add_bond(atom_a, mapping[atom_b], order)
     _fix_aromatic_marks(merged)
     merged.flush_cache()
+    _check_formula(merged, expected)
     return merged
 
 
@@ -97,12 +167,16 @@ def close_ring(
     """
     label_a, label_b = molecule.atom(atom_a).label, molecule.atom(atom_b).label
     order = 2 if label_a in BIVALENT_LABELS and label_b in BIVALENT_LABELS else 1
+    expected = _hydrogens(molecule) - 2 * order
     closed = molecule.copy()
+    _lend_hydrogen(closed, atom_a, order)
+    _lend_hydrogen(closed, atom_b, order)
     closed.atom(atom_a)._label = None
     closed.atom(atom_b)._label = None
     closed.add_bond(atom_a, atom_b, order)
     _fix_aromatic_marks(closed, new_ring=True)
     closed.flush_cache()
+    _check_formula(closed, expected)
     return closed
 
 
@@ -173,8 +247,8 @@ class Enumerator:
                     continue
                 try:
                     yield close_ring(molecule, atom_a, atom_b)
-                except InvalidAromaticRing:
-                    continue  # the two labels ask for a ring that cannot exist
+                except (InvalidAromaticRing, FormulaDrift):
+                    continue  # an impossible ring, or one whose formula would not add up
 
     def _index(self, synthons: Iterable[str]) -> dict[Key, list[str]]:
         index: dict[Key, list[str]] = {}
@@ -244,8 +318,8 @@ class Enumerator:
                         continue
                     try:
                         grown = join(molecule, atom, partner, partner_atom)
-                    except InvalidAromaticRing:
-                        continue  # the two labels ask for a ring that cannot exist
+                    except (InvalidAromaticRing, FormulaDrift):
+                        continue  # an impossible ring, or one whose formula would not add up
                     yield from self._grow(grown, index, used | {candidate}, deadline)
 
     def enumerate_analogues(
@@ -313,13 +387,14 @@ class Enumerator:
                         continue
                     try:
                         closed = join(molecule, atom, partner, partner_atom)
-                    except InvalidAromaticRing:
-                        continue  # the two labels ask for a ring that cannot exist
+                    except (InvalidAromaticRing, FormulaDrift):
+                        continue  # an impossible ring, or one whose formula would not add up
                     yield from self._close(closed, rest, deadline)
 
 
 __all__ = [
     "Enumerator",
+    "FormulaDrift",
     "Key",
     "close_ring",
     "join",

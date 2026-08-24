@@ -177,14 +177,20 @@ def test_analogues_do_not_repeat_a_product_per_slot_ordering():
     assert len(set(under_cap)) == 3
 
 
-# every R16 heterocyclisation, and the target its two-bond cut has to give back
+# every R16 heterocyclisation family, and the target its two-bond cut has to give back. The `a`/`b`
+# twins are here because `D` counts heavy neighbours: one id cannot match both N-H and N-substituted
+# parents. R16.4a is held out of the rule set, so only its N-H twin has a target.
 RING_EXAMPLES = {
-    "R16.1": "c1ccccc1Cn1cc(-c2ccccc2)nn1",
-    "R16.2": "c1ccccc1Cn1nnnc1-c1ccccc1",
-    "R16.3": "Cc1cc(-c2ccccc2)n(-c2ccccc2)n1",
-    "R16.4": "Cn1cc(-c2ccccc2)nc1-c1ccccc1",
+    "R16.1a": "c1ccccc1Cn1cc(-c2ccccc2)nn1",
+    "R16.1b": "c1ccccc1-c1cn[nH]n1",
+    "R16.2a": "c1ccccc1Cn1nnnc1-c1ccccc1",
+    "R16.2b": "c1ccccc1-c1nnn[nH]1",
+    "R16.3a": "Cc1cc(-c2ccccc2)n(-c2ccccc2)n1",
+    "R16.3b": "Cc1cc(-c2ccccc2)[nH]n1",
+    "R16.4b": "c1ccccc1-c1cnc(-c2ccccc2)[nH]1",
     "R16.5": "Cc1cc(-c2ccccc2)on1",
-    "R16.6": "c1ccccc1C(=O)c1cc(-c2ccccc2)cc(-c2ccccc2)n1",
+    "R16.6a": "c1ccccc1C(=O)c1cc(-c2ccccc2)cc(-c2ccccc2)n1",
+    "R16.6b": "c1ccccc1C(=O)c1cc(-c2ccccc2)cc(-c2ccccc2)n1",
     "R16.7": "c1ccccc1-c1ccc(-c2ccccc2)nn1",
     "R16.8": "Cn1c(-c2ccccc2)c(-c2ccccc2)c2ccccc21",
     "R16.9": "Cc1nc2ccccc2cc1-c1ccccc1",
@@ -259,7 +265,7 @@ def test_a_ring_built_from_aliphatic_synthons_comes_back_aromatic():
     `_fix_aromatic_marks` skipped exactly that case, so the Kekule string reached the dedup sets
     (`str` is the identity here) and the CLI wrote it out as the product.
     """
-    _, target, synthons = _cut_ring_example("R16.6", "CN1CCCC1c1cccnc1")
+    _, target, synthons = _cut_ring_example("R16.6a", "CN1CCCC1c1cccnc1")
     assert not any(a.hybridization == 4 for s in synthons for _, a in s.atoms())
     keys = [str(s) for s in synthons]
     products = {
