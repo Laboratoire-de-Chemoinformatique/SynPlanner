@@ -1,0 +1,238 @@
+{
+ "R1.1": {
+  "reaction_name": null,
+  "forms": "amide C-N",
+  "reagents": "carboxylic acid or acyl donor + primary or secondary amine",
+  "supersedes": []
+ },
+ "R1.2": {
+  "reaction_name": null,
+  "forms": "amide C-N",
+  "reagents": "carboxylic acid or acyl donor + heteroatom-substituted amine (hydrazide, hydroxylamine, sulfonamide)",
+  "supersedes": []
+ },
+ "R1.3": {
+  "reaction_name": null,
+  "forms": "carbamate C-N",
+  "reagents": "chloroformate, carbonate or other O=C(+)-X reagent + primary or secondary amine",
+  "supersedes": [
+   "R1.4"
+  ]
+ },
+ "R1.4": {
+  "reaction_name": null,
+  "forms": "urea C-N",
+  "reagents": "isocyanate or isothiocyanate + primary or secondary amine",
+  "supersedes": []
+ },
+ "R2.1": {
+  "reaction_name": null,
+  "forms": "ester C-O",
+  "reagents": "carboxylic acid or acyl donor + alcohol or phenol",
+  "supersedes": []
+ },
+ "R2.2": {
+  "reaction_name": null,
+  "forms": "carbonate C-O",
+  "reagents": "chloroformate or carbonate (O=C(+)-X) + alcohol or phenol",
+  "supersedes": []
+ },
+ "R2.3": {
+  "reaction_name": null,
+  "forms": "ester C-O",
+  "reagents": "carboxylic acid or acyl donor + N-hydroxy compound or oxime",
+  "supersedes": []
+ },
+ "R3.1": {
+  "reaction_name": null,
+  "forms": "amine C-N",
+  "reagents": "alkyl halide or equivalent + primary or secondary amine",
+  "supersedes": []
+ },
+ "R3.2": {
+  "reaction_name": "Buchwald-Hartwig amination",
+  "forms": "arylamine C-N",
+  "reagents": "aryl halide + primary or secondary amine",
+  "supersedes": []
+ },
+ "R3.3": {
+  "reaction_name": null,
+  "forms": "arylamine C-N",
+  "reagents": "aryl nucleophile (boronate or organometal) + electrophilic aminating agent",
+  "supersedes": []
+ },
+ "R3.4": {
+  "reaction_name": null,
+  "forms": "quaternary ammonium C-N",
+  "reagents": "alkyl or aryl electrophile + tertiary amine",
+  "supersedes": []
+ },
+ "R4.1": {
+  "reaction_name": null,
+  "forms": "ether C-O",
+  "reagents": "alkyl halide or equivalent + alcohol or phenol",
+  "supersedes": []
+ },
+ "R4.2": {
+  "reaction_name": null,
+  "forms": "aryl ether C-O",
+  "reagents": "aryl halide + alcohol or phenol",
+  "supersedes": []
+ },
+ "R4.3": {
+  "reaction_name": "Chan-Evans-Lam coupling",
+  "forms": "aryl ether C-O",
+  "reagents": "aryl boronic acid + alcohol or phenol",
+  "supersedes": []
+ },
+ "R4.4": {
+  "reaction_name": null,
+  "forms": "hydroxylamine ether C-O",
+  "reagents": "alkyl halide or equivalent + hydroxylamine, oxime or N-hydroxy compound",
+  "supersedes": []
+ },
+ "R5.1": {
+  "reaction_name": null,
+  "forms": "azole N-C",
+  "reagents": "alkyl halide or equivalent + NH-azole",
+  "supersedes": []
+ },
+ "R5.2": {
+  "reaction_name": "Chan-Evans-Lam coupling",
+  "forms": "azole N-C",
+  "reagents": "aryl boronic acid + NH-azole",
+  "supersedes": []
+ },
+ "R5.3": {
+  "reaction_name": null,
+  "forms": "azole N-C",
+  "reagents": "aryl halide + NH-azole",
+  "supersedes": []
+ },
+ "R6.1": {
+  "reaction_name": null,
+  "forms": "lactam N-C",
+  "reagents": "alkyl halide or equivalent + NH-lactam",
+  "supersedes": []
+ },
+ "R6.2": {
+  "reaction_name": "Chan-Evans-Lam coupling",
+  "forms": "lactam N-C",
+  "reagents": "aryl boronic acid + NH-lactam",
+  "supersedes": []
+ },
+ "R6.3": {
+  "reaction_name": null,
+  "forms": "lactam N-C",
+  "reagents": "aryl halide + NH-lactam",
+  "supersedes": []
+ },
+ "R7.1": {
+  "reaction_name": null,
+  "forms": "thioether C-S",
+  "reagents": "alkyl or aryl halide + thiol",
+  "supersedes": []
+ },
+ "R7.2": {
+  "reaction_name": null,
+  "forms": "sulfone C-S",
+  "reagents": "alkyl halide + sulfinate salt",
+  "supersedes": []
+ },
+ "R7.3": {
+  "reaction_name": null,
+  "forms": "sulfone C-S",
+  "reagents": "aryl halide + sulfinate salt",
+  "supersedes": []
+ },
+ "R8.1": {
+  "reaction_name": null,
+  "forms": "sulfonamide S-N",
+  "reagents": "sulfonyl chloride + amine",
+  "supersedes": []
+ },
+ "R9.1": {
+  "reaction_name": null,
+  "forms": "imine C=N",
+  "reagents": "aldehyde or ketone + amine, hydrazine, hydroxylamine or semicarbazide",
+  "supersedes": []
+ },
+ "R10.1": {
+  "reaction_name": null,
+  "forms": "alcohol C-C",
+  "reagents": "organolithium, Grignard or organozinc + aldehyde or ketone",
+  "supersedes": []
+ },
+ "R10.2": {
+  "reaction_name": null,
+  "forms": "ketone C-C",
+  "reagents": "organolithium, Grignard or organozinc + acyl electrophile",
+  "supersedes": []
+ },
+ "R11.1": {
+  "reaction_name": null,
+  "forms": "alkene C=C",
+  "reagents": "aldehyde or ketone + stabilised carbanion (phosphorus/sulfur ylide or active methylene)",
+  "supersedes": []
+ },
+ "R11.2": {
+  "reaction_name": "olefin metathesis",
+  "forms": "alkene C=C",
+  "reagents": "alkene + alkene",
+  "supersedes": []
+ },
+ "R12.1": {
+  "reaction_name": "Suzuki-Miyaura coupling",
+  "forms": "biaryl C-C",
+  "reagents": "aryl halide + aryl boronic acid",
+  "supersedes": []
+ },
+ "R12.2": {
+  "reaction_name": "Suzuki-Miyaura coupling",
+  "forms": "C(sp2)-C(sp2)",
+  "reagents": "alkenyl halide + alkenyl boronic acid",
+  "supersedes": []
+ },
+ "R12.3a": {
+  "reaction_name": "Heck reaction",
+  "forms": "aryl-alkenyl C-C",
+  "reagents": "aryl halide + alkene",
+  "supersedes": []
+ },
+ "R12.3b": {
+  "reaction_name": "Suzuki-Miyaura coupling",
+  "forms": "aryl-alkenyl C-C",
+  "reagents": "aryl boronic acid + alkenyl halide",
+  "supersedes": []
+ },
+ "R12.4": {
+  "reaction_name": "Sonogashira coupling",
+  "forms": "aryl-alkynyl C-C",
+  "reagents": "aryl halide + terminal alkyne",
+  "supersedes": []
+ },
+ "R12.5": {
+  "reaction_name": null,
+  "forms": "aryl-alkyl C-C",
+  "reagents": "aryl halide + alkyl nucleophile (organometal or radical precursor)",
+  "supersedes": []
+ },
+ "R12.6": {
+  "reaction_name": null,
+  "forms": "aryl-alkyl C-C",
+  "reagents": "aryl halide + alkyl boronate",
+  "supersedes": []
+ },
+ "R13.1": {
+  "reaction_name": "Minisci reaction",
+  "forms": "aryl-alkyl C-C",
+  "reagents": "azine (pyridine-type heteroarene) + alkyl radical precursor",
+  "supersedes": []
+ },
+ "R13.2": {
+  "reaction_name": "Giese reaction",
+  "forms": "C(sp3)-C(sp3)",
+  "reagents": "Michael acceptor + alkyl radical precursor",
+  "supersedes": []
+ }
+}

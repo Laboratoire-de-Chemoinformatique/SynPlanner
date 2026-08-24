@@ -134,3 +134,32 @@ def test_every_disconnection_declares_its_provenance():
     # the split is structural: everything converted from Setup.xml is curated, the ring set is not
     assert {r["provenance"] for r in rules if r["ring"]} == {"llm"}
     assert {r["provenance"] for r in rules if not r["ring"]} == {"human"}
+
+
+def test_every_disconnection_carries_structured_naming():
+    """The four naming fields are what a visualisation reads instead of parsing `name`.
+
+    `reaction_name` is null for the many rules that are a transformation class rather than one
+    named reaction; an empty string would be a fabricated attribution wearing a null's clothes.
+    """
+    rules = load_data(SynthonConfig().rules_path)["disconnections"]
+    ids = {r["id"] for r in rules}
+    missing = {
+        r["id"]: sorted({"reaction_name", "forms", "reagents", "supersedes"} - set(r))
+        for r in rules
+        if not {"reaction_name", "forms", "reagents", "supersedes"} <= set(r)
+    }
+    assert missing == {}
+
+    def named(value):
+        return isinstance(value, str) and value.strip()
+
+    assert {
+        r["id"]: r["reaction_name"]
+        for r in rules
+        if r["reaction_name"] is not None and not named(r["reaction_name"])
+    } == {}
+    assert {r["id"]: r["forms"] for r in rules if not named(r["forms"])} == {}
+    assert {
+        (r["id"], s) for r in rules for s in r["supersedes"] if s not in ids
+    } == set()

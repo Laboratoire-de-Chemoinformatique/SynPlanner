@@ -113,20 +113,27 @@ FORBIDDEN_MARKS = [
 # both ends or neither. chython moves the proton and leaves the label where it was, which is
 # silently wrong unless the two atoms are the same element carrying the same token - then they are
 # interchangeable and nothing moved. `check()` enforces exactly that through `validate`.
-def _ring_rules() -> list[tuple[str, str, str, str]]:
+def _ring_rules() -> list[dict]:
     """The ring disconnections, authored here rather than converted from Synt-On.
 
     They live in ``ring_rules.json`` beside this module so the authoring record is versioned and
     reviewable on its own, instead of buried in a 500-line literal inside the converter.
     """
     with open(Path(__file__).with_name("ring_rules.json"), encoding="utf-8") as handle:
-        return [
-            (r["id"], r["name"], r["smarts"], r["example_target"])
-            for r in json.load(handle)
-        ]
+        return json.load(handle)
+
+
+def _enamine_naming() -> dict[str, dict]:
+    """The structured naming Setup.xml has no field for, keyed by R id; MR twins inherit it."""
+    with open(
+        Path(__file__).with_name("enamine_naming.json"), encoding="utf-8"
+    ) as handle:
+        return json.load(handle)
 
 
 RING_RULES = _ring_rules()
+ENAMINE_NAMING = _enamine_naming()
+NAMING_FIELDS = ("reaction_name", "forms", "reagents", "supersedes")
 
 RING_PAIRS = [
     ["C", False, "nuc", "N", False, "elec"],
@@ -552,6 +559,7 @@ def _rule_records(path: Path, macro: bool) -> list[dict]:
                         "provenance": "human",
                         "smarts": variants[0],
                         "single_product": macro,
+                        **ENAMINE_NAMING[f"{rule.tag}{suffix}"],
                     }
                 )
     return out
@@ -582,6 +590,9 @@ def _macro_twins(rules: list[dict], path: Path) -> list[dict]:
         raw = upstream.get(f"M{base}")
         if raw is None:
             raise ConversionError(f"no macrocyclic twin for {rule['id']}")
+        naming = {k: rule[k] for k in NAMING_FIELDS}
+        # the macro set is its own partition, so a cross-reference points at the macro twin
+        naming["supersedes"] = [f"M{i}" for i in naming["supersedes"]]
         left = to_chython(raw.split(">>")[0])
         right = rule["smarts"].split(">>", 1)[1]
         reactant_maps = set(smarts(left))
@@ -600,6 +611,7 @@ def _macro_twins(rules: list[dict], path: Path) -> list[dict]:
                 "provenance": "human",
                 "smarts": f"{left}>>{right}",
                 "single_product": True,
+                **naming,
             }
         )
     return out
@@ -674,15 +686,16 @@ def build(config_dir: Path) -> dict[str, object]:
         + _macro_twins(disconnections, config_dir / "SetupForMacrocycles.xml")
         + [
             {
-                "id": rule_id,
-                "name": name,
+                "id": rule["id"],
+                "name": rule["name"],
                 "macro": False,
                 "ring": True,
                 "provenance": "llm",
-                "smarts": smarts_text,
+                "smarts": rule["smarts"],
                 "single_product": False,
+                **{k: rule[k] for k in NAMING_FIELDS},
             }
-            for rule_id, name, smarts_text, _target in RING_RULES
+            for rule in RING_RULES
         ],
         "pairs": _partner_pairs(),
         "ring_pairs": RING_PAIRS,
@@ -704,18 +717,21 @@ def _ring_labels_survive() -> list[str]:
     problems = []
     # ponytail: one authored target per rule; widen to the curation over-firing panel if a guard
     # edit ever needs more than "it still fires and still spells what it wrote"
-    for rule_id, _name, smarts_text, target in RING_RULES:
+    for rule in RING_RULES:
+        target = rule["example_target"]
         molecule = safe_canonicalization(synthon_smiles(target))
-        cuts = list(SynthonTransformer.from_smarts(smarts_text)(molecule))
+        cuts = list(SynthonTransformer.from_smarts(rule["smarts"])(molecule))
         if not cuts:
-            problems.append(f"{rule_id} does not fire on its own target {target}")
+            problems.append(f"{rule['id']} does not fire on its own target {target}")
             continue
         for part in next(iter(cuts)).split():
             shifted = shifted_labels(part)
             if shifted and sorted(b for b, _ in shifted.values()) != sorted(
                 a for _, a in shifted.values()
             ):
-                problems.append(f"{rule_id} labels move on canonicalisation: {shifted}")
+                problems.append(
+                    f"{rule['id']} labels move on canonicalisation: {shifted}"
+                )
     return problems
 
 
@@ -738,10 +754,10 @@ def _no_duplicate_disconnections() -> list[str]:
     # ponytail: 76 authored targets, ~0.2 s. The wider check is the drug-like over-firing sweep in
     # research/synthon/curation/overfire_harness/sweep_now.py - run that when a guard edit lands.
     compiled = [
-        (rule_id, SynthonTransformer.from_smarts(smarts_text))
-        for rule_id, _name, smarts_text, _target in RING_RULES
+        (rule["id"], SynthonTransformer.from_smarts(rule["smarts"]))
+        for rule in RING_RULES
     ]
-    for _rule_id, _name, _smarts_text, target in RING_RULES:
+    for target in (rule["example_target"] for rule in RING_RULES):
         molecule = safe_canonicalization(synthon_smiles(target))
         owners = defaultdict(set)
         for rule_id, rule in compiled:
