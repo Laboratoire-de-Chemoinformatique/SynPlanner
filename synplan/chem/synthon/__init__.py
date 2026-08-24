@@ -16,6 +16,8 @@ __all__ = [
     "find_analogues",
     "load_coverage_rules",
     "load_synthon_stock",
+    "rules_frame",
+    "synthons_frame",
 ]
 
 _EXPORTS = {
@@ -29,6 +31,8 @@ _EXPORTS = {
     "find_analogues": "analogues",
     "load_coverage_rules": "coverage",
     "load_synthon_stock": "stock",
+    "rules_frame": "frames",
+    "synthons_frame": "frames",
 }
 
 
