@@ -11,6 +11,7 @@ requests, and cutting a release.
    package_layout
    pr_review
    release
+   chemist_review
 
 - :doc:`setup` — uv environment, running tests, building Docker images.
 - :doc:`package_layout` — which package a new module belongs in, and how it
@@ -19,3 +20,5 @@ requests, and cutting a release.
   request, including which documentation a change must update.
 - :doc:`release` — version bumping, the pre-release checklist, and publishing
   images to GHCR.
+- :doc:`chemist_review` — the open chemistry questions on the ``llm``-provenance
+  disconnection rules, and the rules held out of ``rules.json`` until they are answered.
