@@ -1,5 +1,6 @@
 """Building-block synthonisation: 147 rule programs, 4 execution strategies, the keepPG policy."""
 
+import warnings
 from dataclasses import dataclass
 
 from chython import smarts, smiles, synthon_smiles
@@ -8,13 +9,24 @@ from chython.containers import MoleculeContainer, SynthonContainer
 from synplan.chem.synthon.classify import BBClassifier, SynthonDataError
 from synplan.chem.synthon.config import SynthonConfig, load_data
 from synplan.chem.synthon.transformer import SynthonTransformer
-from synplan.chem.utils import safe_canonicalization
+from synplan.chem.utils import StereoDiscardedWarning, safe_canonicalization
+
+def _canonical_solvents(patterns: tuple[str, ...]) -> frozenset[str]:
+    """Canonicalise the strip list once, without warning about its own stereochemistry.
+
+    Maleic and fumaric acid carry E/Z that ``safe_canonicalization`` discards, which is
+    correct here — both are being stripped either way — but the warning fired at import,
+    before any user molecule existed, and taught people to ignore it.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", StereoDiscardedWarning)
+        return frozenset(str(safe_canonicalization(smiles(s))) for s in patterns)
+
 
 # solvents and counterions dropped from a multi-component input, canonicalised once at import
 # (the reference re-canonicalises this list on every call)
-_SOLVENTS = frozenset(
-    str(safe_canonicalization(smiles(s)))
-    for s in (
+_SOLVENTS = _canonical_solvents(
+    (
         "OC(=O)C(=O)O",
         "CC(=O)O",
         "OS(=O)(=O)O",

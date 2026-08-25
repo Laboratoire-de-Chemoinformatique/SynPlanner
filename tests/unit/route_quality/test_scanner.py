@@ -96,15 +96,26 @@ def test_matrix_lookup_aldehyde_vs_amino_acid(matrix):
 
 
 def test_matrix_lookup_unknown_fg(matrix):
-    """Unknown FG name should return 'compatible' (safe default)."""
-    result = matrix.lookup("nonexistent_group", "aldehyde")
-    assert result == "compatible"
+    """An FG absent from the matrix is unknown, not compatible.
+
+    The matrix is dense, so a stored 0 means somebody assessed the pair and it is fine.
+    Reporting the same word for a pair nobody assessed hands back a clean bill of health
+    the tool never earned.
+    """
+    assert matrix.lookup("nonexistent_group", "aldehyde") == "unknown"
 
 
 def test_matrix_lookup_unknown_reacting_fg(matrix):
-    """Unknown reacting FG should return 'compatible' (safe default)."""
-    result = matrix.lookup("PrimaryAlcoholAliphatic", "nonexistent_fg")
-    assert result == "compatible"
+    """A reacting FG that is not a column of the matrix is unknown too."""
+    assert matrix.lookup("PrimaryAlcoholAliphatic", "nonexistent_fg") == "unknown"
+
+
+def test_matrix_lookup_assessed_pair_is_still_compatible(matrix):
+    """A pair the matrix does carry keeps its assessed answer."""
+    row = next(iter(matrix._matrix))
+    column, level = next(iter(matrix._matrix[row].items()))
+    expected = {0: "compatible", 1: "competing", 2: "incompatible"}[level]
+    assert matrix.lookup(row, column) == expected
 
 
 def test_matrix_from_custom_tsv(tmp_path):
@@ -115,7 +126,7 @@ def test_matrix_from_custom_tsv(tmp_path):
     m = IncompatibilityMatrix(str(cfg_file))
     assert m.lookup("test_nuc", "test_elec") == "incompatible"
     assert m.lookup("test_nuc", "test_nuc") == "competing"
-    assert m.lookup("test_nuc", "unknown") == "compatible"
+    assert m.lookup("test_nuc", "unknown") == "unknown"
 
 
 # --- RouteScanner tests ---

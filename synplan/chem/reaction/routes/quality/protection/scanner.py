@@ -29,6 +29,9 @@ logger = logging.getLogger(__name__)
 
 # Severity level mapping: integer code -> label
 _SEVERITY_LABELS = {0: "compatible", 1: "competing", 2: "incompatible"}
+#: No entry for the pair. Scored like "compatible" because there is nothing to score,
+#: but named apart so a clean report is not mistaken for a checked one.
+UNKNOWN_SEVERITY = "unknown"
 
 
 class CompetingInteraction(BaseModel):
@@ -79,13 +82,15 @@ class IncompatibilityMatrix:
 
         :param competing_fg: Competing functional group name (row key).
         :param reacting_fg: Reacting functional group name (column key).
-        :return: Severity label: "incompatible", "competing", or "compatible".
+        The matrix is dense, so a stored 0 means the pair was assessed and is fine.
+        A missing row or column means nobody assessed it, which is not the same thing.
+
+        :return: "incompatible", "competing", "compatible", or "unknown".
         """
         fg_row = self._matrix.get(competing_fg)
-        if fg_row is None:
-            return "compatible"
-        level = fg_row.get(reacting_fg, 0)
-        return _SEVERITY_LABELS.get(level, "compatible")
+        if fg_row is None or reacting_fg not in fg_row:
+            return UNKNOWN_SEVERITY
+        return _SEVERITY_LABELS.get(fg_row[reacting_fg], UNKNOWN_SEVERITY)
 
 
 class RouteScanner:
@@ -189,15 +194,14 @@ class RouteScanner:
             # 5. Detect competing FGs on product (not overlapping reaction center)
             competing_fgs = self._fg_detector.detect_competing(product, center_atoms)
 
-            # 6. Look up severity for each competing FG against reacting FG.
-            #    If no reacting FG could be identified (reaction type not
-            #    covered by our SMARTS library), default to "compatible"
-            #    since the matrix has no information for unknown FG pairs.
+            # 6. Look up severity for each competing FG against reacting FG. An
+            #    unidentified reaction leaves nothing to look up, which is reported as
+            #    unknown rather than compatible so the caller can see it went unchecked.
             for fg in competing_fgs:
                 if reacting_fg_name is not None:
                     severity = self._incompatibility.lookup(fg.name, reacting_fg_name)
                 else:
-                    severity = "compatible"
+                    severity = UNKNOWN_SEVERITY
                 interactions.append(
                     CompetingInteraction(
                         step_id=step_id,
