@@ -30,11 +30,13 @@ does nothing when constructed. Iterate it instead only for per-iteration
 `(is_solved, node_ids)` — progress, or early stopping.
 Docs: `methods/mcts` — "Running a search"
 
-Pass the scorer as `Tree(..., route_scorer=route_scorer)` so routes come back
-re-ranked by quality. **Do this by default.** Users asking for a synthesis want
-routes they can act on, not raw search output; unranked routes are the common
-disappointment. Drop the scorer only when the user explicitly wants the
-unfiltered tree.
+Pass the scorer as `Tree(..., route_scorer=route_scorer)` and it makes
+`tree.route_score(node_id)` quality-aware. It does NOT reorder anything:
+`winning_nodes` stays in discovery order and neither `extract_routes` nor
+`generate_results_html` sorts, so both exports come back unranked and the score is
+not written into either. Sort yourself —
+`sorted(tree.winning_nodes, key=tree.route_score, reverse=True)` — or the scorer
+costs roughly three times the search time and changes nothing you can consume.
 
 ## Common combinations
 

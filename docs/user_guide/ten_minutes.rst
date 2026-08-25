@@ -196,7 +196,8 @@ The protection scoring module flags competing functional groups in a route: step
 a reagent may react with an unintended site, indicating a potential need for protecting groups.
 This follows the methodology of `Westerlund et al. (2025) <https://doi.org/10.26434/chemrxiv-2025-gdrr8>`_.
 
-Pass the scorer to the tree so routes are re-ranked during the search:
+Pass the scorer to the tree to make ``route_score`` quality-aware. Nothing is
+reordered for you — sort the winning nodes on it yourself:
 
 .. code-block:: python
 
@@ -212,7 +213,7 @@ Pass the scorer to the tree so routes are re-ranked during the search:
         building_blocks=building_blocks,
         expansion_function=policy_network,
         evaluation_function=evaluation_function,
-        route_scorer=route_scorer,   # routes re-ranked by protection score
+        route_scorer=route_scorer,   # makes route_score protection-aware; does not sort
     )
 
     tree.run()  # run the full search
@@ -230,7 +231,8 @@ function, which mirrors the CLI behaviour:
 .. code-block:: python
 
     from synplan.mcts.search import run_search
-    from synplan.ml.config import PolicyNetworkConfig, RolloutEvaluationConfig
+    from synplan.ml.config import PolicyNetworkConfig
+    from synplan.mcts.config import RolloutEvaluationConfig
 
     run_search(
         targets_path="targets.smi",

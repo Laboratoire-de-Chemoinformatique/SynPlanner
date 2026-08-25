@@ -258,7 +258,8 @@ discard them.
 
 **Pass `route_scorer=ProtectionRouteScorer.from_config()` to `Tree` by
 default.** Someone asking for a synthesis wants routes they can act on, and the
-raw search output is not ranked by quality — unranked routes are the common
+raw search output is not ranked by quality, and attaching a scorer does not
+rank it either — you must sort on `tree.route_score` yourself; unranked routes are the common
 disappointment. Omit it only when the user explicitly asks for the unfiltered
 tree. There is no CLI flag for it; this is Python-only.
 

@@ -141,9 +141,11 @@ class Tree:
         :param expansion_function: A loaded policy function.
         :param evaluation_function: An evaluation strategy. If None, a random
             evaluation strategy is used as default.
-        :param route_scorer: Optional post-search route scorer for
-            re-ranking winning routes.  When set, :meth:`route_score`
-            delegates to ``route_scorer.rescore(original, route)``.
+        :param route_scorer: Optional post-search route scorer. When set,
+            :meth:`route_score` delegates to ``route_scorer.rescore(original,
+            route)``. Nothing is reordered — ``winning_nodes`` keeps discovery
+            order and the exporters do not sort, so rank on ``route_score``
+            yourself.
         :param priority_rules: Optional **mapping** of curated rule sets,
             ``{set_name: [Reactor, ...]}``. Each set contributes rules tagged
             with its mapping key as ``rule_source``; e.g.
@@ -221,7 +223,7 @@ class Tree:
                     f"min_mol_size={rollout.min_mol_size}."
                 )
 
-        # post-search route re-ranking
+        # post-search route scoring; callers rank on route_score themselves
         self._route_scorer = route_scorer
         self._rescore_cache: dict[int, float] = {}
 
@@ -730,8 +732,8 @@ class Tree:
         The score depends on cumulated node values and the route length.
 
         When a ``route_scorer`` is set, the raw score is passed through
-        ``route_scorer.rescore(original, route)`` for post-search
-        re-ranking (e.g. protection-group penalty).
+        ``route_scorer.rescore(original, route)`` (e.g. a protection-group
+        penalty). Sorting on this is the caller's job.
 
         :param node_id: The id of the current given node.
         :return: The route score.
