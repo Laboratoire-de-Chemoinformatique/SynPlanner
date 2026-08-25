@@ -1,5 +1,6 @@
 """Recombination: one join keyed by the 26-pair table, plus the two enumeration modes."""
 
+import warnings
 from collections.abc import Iterable, Iterator
 from itertools import product as cartesian
 from math import inf
@@ -207,6 +208,10 @@ def open_points(synthon: SynthonContainer) -> list[tuple[int, Key]]:
     ]
 
 
+class ProductsTruncatedWarning(UserWarning):
+    """``max_products`` stopped the walk before it finished."""
+
+
 class Enumerator:
     """Streams products. Upstream accumulates a list and rebuilds `list(set(...))` inside the loop,
     then caps at a hard-coded million because it cannot prioritise."""
@@ -283,7 +288,23 @@ class Enumerator:
                 yield molecule
                 emitted += 1
                 if emitted >= self.config.max_products:
+                    self._truncated(emitted)
                     return
+
+    def _truncated(self, emitted: int) -> None:
+        """The cap stops a depth-first walk, so what is left is a prefix, not a sample.
+
+        Every product after the cut shares the prefix's early choices, which is why a
+        capped run comes back looking like elaborations of one seed.
+        """
+        warnings.warn(
+            f"max_products={self.config.max_products} stopped enumeration after "
+            f"{emitted} products. The walk is depth-first, so these are the first "
+            "branch explored rather than a sample of the library — raise "
+            "max_products, or narrow the synthon pool and let it run to the end.",
+            ProductsTruncatedWarning,
+            stacklevel=3,
+        )
 
     def _deadline(self) -> float:
         return perf_counter() + (self.config.time_budget_s or inf)
@@ -355,6 +376,7 @@ class Enumerator:
                 yield molecule
                 emitted += 1
                 if emitted >= self.config.max_products:
+                    self._truncated(emitted)
                     return
 
     def _assemble(
