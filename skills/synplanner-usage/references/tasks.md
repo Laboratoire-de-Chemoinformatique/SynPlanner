@@ -30,11 +30,13 @@ does nothing when constructed. Iterate it instead only for per-iteration
 `(is_solved, node_ids)` — progress, or early stopping.
 Docs: `methods/mcts` — "Running a search"
 
-Pass the scorer as `Tree(..., route_scorer=route_scorer)` so routes come back
-re-ranked by quality. **Do this by default.** Users asking for a synthesis want
-routes they can act on, not raw search output; unranked routes are the common
-disappointment. Drop the scorer only when the user explicitly wants the
-unfiltered tree.
+Pass the scorer as `Tree(..., route_scorer=route_scorer)` and it makes
+`tree.route_score(node_id)` quality-aware. It does NOT reorder anything:
+`winning_nodes` stays in discovery order and neither `extract_routes` nor
+`generate_results_html` sorts, so both exports come back unranked and the score is
+not written into either. Sort yourself —
+`sorted(tree.winning_nodes, key=tree.route_score, reverse=True)` — or the scorer
+costs roughly three times the search time and changes nothing you can consume.
 
 ## Common combinations
 
@@ -172,7 +174,7 @@ CLI: `synplan download_preset`.
 Docs: `get_started/data_download`, `user_guide/data`
 
 **Clean a reaction dataset**
-`MappingConfig` + `map_reactions_from_file` (`synplan.chem.data.mapping`), then
+`MappingConfig` + `map_reactions_from_file` (`synplan.chem.reaction.curation.mapping`), then
 `standardize_reactions_from_file`, then `filter_reactions_from_file`.
 CLI: `reaction_mapping` → `reaction_standardizing` → `reaction_filtering`.
 Mapping is the one stage where hardware matters: CPU is fine to roughly ten
@@ -193,14 +195,44 @@ Docs: `methods/extraction`, `configuration/extraction`
 
 **Inspect or visualise a rule set**
 `RuleSet` (`synplan.chem.reaction.rules.analysis`), `query_to_mol`
-(`...rules.representation`).
+(`...rules.representation`). `RuleSet.from_tsv` keeps popularity;
+`load_reaction_rules` reads the same file and drops it, so use the former when you
+want counts. `ruleset[:10]` renders a fixed three-column view; `to_dataframe()`
+returns a `ChemFrame` you can filter and sort — slice the RuleSet before drawing,
+laying out all 11k rules is slow and renders enormous.
 Tutorial: `12_Rule_Analysis`
 Docs: `methods/extraction`
+
+**Read the shipped building-block TSV**
+`SMILES` plus `LN_ppg`, `SA_ppg`, `EM_ppg`, which are supplier price columns and are
+documented nowhere in the codebase. Every one of the 186,868 rows carries a nonzero
+figure in at least one of them, so treating the whole file as orderable is safe. The
+synthon commands read the file unmodified — they want a headered TSV with a `SMILES`
+column and ignore the rest.
 
 **Use my own building blocks**
 CLI: `building_blocks_standardizing`. Preset building blocks are already
 standardized — pass `standardize=False` to `load_building_blocks`.
 Docs: `user_guide/cli_interface`, `user_guide/data`
+
+**Show rules, synthons or any chython objects as a table**
+`rules_frame` and `synthons_frame` (`synplan.chem.synthon.frames`),
+`tree_stats_frame` (`synplan.utils.frames`). They return a `ChemFrame`: a pandas
+frame that draws any column holding something with a `depict()` method. Building a
+DataFrame of depictions by hand is the common reinvention here — do not.
+`ChemFrame(rows, depict_columns=["reaction"])` takes anything: molecules,
+reactions, CGRs, SMARTS queries and synthons all draw with no extra code.
+`.df` gives plain pandas with the objects themselves still in the cells, and is
+what `.groupby` and `.str` need; a mask or `.head()` returns a ChemFrame and keeps
+drawing. The view stops at `max_display_rows` (20) because a drawn row costs
+roughly 7 kB of SVG.
+Three traps: `rules_frame()` gives all 154 shipped records, `rules_frame(rules)`
+restricts and reorders to the loaded ones; `kind` collapses macro over ring, so
+every ring-forming rule is `kind != "acyclic"`, not `== "ring"`; and a ring rule's
+`rule` and `smarts` show its hand-authored reagent form, not the raw two-cut SMARTS.
+Module: `synplan.utils.frames`, `synplan.chem.synthon.frames`
+Tutorial: `17_Synthon_Based_Design`, `18_Retrosynthesis_With_Synthon_Priority_Rules`
+Docs: `user_guide/tables`
 
 **Import reaction data from ORD**
 CLI: `ord_convert`.
@@ -235,6 +267,55 @@ Docs: `configuration/policy` — "Benchmark recipe". Colab:
 **Log training runs**
 Optional extras `wandb` / `mlflow` / `loggers`.
 Docs: `configuration/policy` — "Training logger"
+
+## Synthons (the Synt-On port)
+
+A synthon is a valence-complete fragment labelled with how its reaction centre reacts.
+Knobs that silently disable what you asked for are in `configuration/synthonisation`.
+
+**Turn a building-block catalogue into a synthon stock**
+`BBClassifier` assigns one of 147 classes, `BBSynthoniser` runs its rule program.
+CLI `bb_classifying` → `bb_synthonizing`. `synplan.chem.synthon` · T17
+
+**Judge a catalogue before buying it**
+Same commands with `write_audit_files: true`, then read `summary.json` — outside audit
+mode `classify_file` drops unclassified rows silently. `synplan.chem.synthon.stock`
+
+**Cut a target into purchasable synthons**
+`Fragmenter.fragment` builds a disconnection DAG; pass the stock at construction or
+availability is meaningless. CLI `synthon_fragment --stock`. `synplan.chem.synthon.fragment`
+
+**Recombine stocked synthons into new molecules**
+`enumerate_library` is target-free and Python-only; `enumerate_analogues` fills one
+pathway's slots and is what the CLI reaches. `synplan.chem.synthon.enumerate` · T17
+
+**Make analogues of a hit that are actually purchasable**
+Fragment, `SynthonStock.slots()`, `enumerate_analogues`. `find_analogues` and
+`strict_availability` are off by default and both disable it. `synplan.chem.synthon.analogues`
+
+**Use the synthon disconnections during planning**
+`synthon_priority_rules()` feeds `run_search(priority_rules=...)`; set `use_priority=True`
+or they are ignored. `synplan.chem.reaction.rules.synthon` · T18 · `methods/priority_rules`
+
+**Drop reactions the synthon rules already cover from a training corpus**
+`classify_coverage` on a mapped reaction; 37.9% of a 100k USPTO sample is covered.
+CLI `synthon_coverage --keep uncovered|covered`. `synplan.chem.synthon.coverage`
+
+**Catalogue analysis**
+`scaffold_smiles` strips ring-containing protecting groups first — never plain RDKit
+Murcko. `ro2_pass` applies the rule of two. CLI `bb_scaffolds`. `synplan.chem.scaffolds`
+
+**Keep an auditable record of any synthon CLI run**
+`write_audit_files: true` writes `fallback.smi`, `errors.tsv`, `summary.json` and
+`run.log` beside the output — one directory per command, the names are fixed.
+
+**Regenerate the shipped synthon data**
+`python -m synplan.chem.synthon.rules._convert <cfg> --out synplan/chem/synthon/rules
+--check`. The JSON is committed; nothing translates at import.
+
+**Say what the disconnections do not cover**
+78 rules came from the reference, 76 ring rules were authored here without chemist
+review, ten more are held out. Stereo-blind: every route is racemic. `synplan.chem.utils`
 
 ## When old code stops working
 

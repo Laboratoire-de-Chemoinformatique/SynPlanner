@@ -59,6 +59,9 @@ Skill contents
 
 The full text of ``SKILL.md``, as the agent reads it:
 
+.. comment: start-line skips the YAML frontmatter and must be re-counted when it changes;
+   Sphinx warns "Document headings start at H2" when this slips.
+
 .. include:: ../skills/synplanner-usage/SKILL.md
    :parser: myst_parser.sphinx_
-   :start-line: 20
+   :start-line: 22

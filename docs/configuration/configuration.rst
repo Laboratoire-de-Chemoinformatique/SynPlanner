@@ -25,3 +25,4 @@ For the conceptual background of each stage, see :doc:`/methods/methods`. For ho
     policy
     value
     planning
+    synthonisation

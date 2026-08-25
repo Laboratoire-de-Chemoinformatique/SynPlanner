@@ -124,13 +124,19 @@ class TestRuleSetDataFrame:
         assert "n_reactions" in df.columns
         assert list(df["popularity"]) == [100, 50, 25]
 
-    def test_to_dataframe_with_svg(self, sample_tsv: Path):
+    def test_to_dataframe_depicts_without_stringifying_the_rule(self, sample_tsv: Path):
+        """Rendering happens on display; the cell keeps the rule object itself."""
         from synplan.chem.reaction_rules.analysis import RuleSet
 
         rs = RuleSet.from_tsv(sample_tsv)
-        df = rs.to_dataframe(include_svg=True)
-        assert "svg" in df.columns
-        assert "<svg" in df["svg"].iloc[0]
+        df = rs.to_dataframe()
+        assert "rule" in df.columns
+        assert "<svg" in df._repr_html_()
+
+        rule = df.df["rule"].iloc[0]
+        assert isinstance(rule, ReactionContainer)
+        assert "<svg" in rule.depict()
+        assert "<svg" not in df.df.to_html()
 
 
 class TestRuleSetErrorHandling:

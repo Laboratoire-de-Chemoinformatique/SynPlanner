@@ -11,7 +11,7 @@ from io import StringIO
 from chython.containers import ReactionContainer
 from chython.files.RDFrw import RDFWrite
 
-from synplan.chem.data.reaction_result import (
+from synplan.chem.reaction.curation.reaction_result import (
     BatchResult,
     ErrorEntry,
     FilteredEntry,

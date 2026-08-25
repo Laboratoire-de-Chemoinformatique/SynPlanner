@@ -44,10 +44,8 @@ Run reaction filtration using the repository configuration in ``configs/reaction
     ================================== ================================================================= ================================================================
     Reaction filter                    Description                                                       Sub-parameters (value used when the key is left bare)
     ================================== ================================================================= ================================================================
-    compete_products_config            Checks if there are compete reactions                             ``fingerprint_tanimoto_threshold: 0.3``, ``mcs_tanimoto_threshold: 0.6``
     dynamic_bonds_config               Checks if there is an unacceptable number of dynamic bonds in CGR ``min_bonds_number: 1``, ``max_bonds_number: 6`` (the shipped config raises this to ``12`` — see the warning below)
     small_molecules_config             Checks for small molecules in the reaction (see note 5)           ``mol_max_size: 6``
-    cgr_connected_components_config    Checks if CGR contains unrelated components (without reagents)    none
     rings_change_config                Checks if there is changing rings number in the reaction          none
     strange_carbons_config             Checks if there are 'strange' carbons in the reaction             none
     no_reaction_config                 Checks if there is no reaction in the provided reaction container none
@@ -72,7 +70,7 @@ Run reaction filtration using the repository configuration in ``configs/reaction
 
 .. note::
     1. If the reaction filter name is listed in the configuration file, it means that this filter will be activated.
-    2. The configuration file enables filters and sets their parameters; it does not define execution order. Filters run in the fixed order of :meth:`~synplan.chem.data.filtering.ReactionFilterConfig.create_filters`.
+    2. The configuration file enables filters and sets their parameters; it does not define execution order. Filters run in the fixed order of :meth:`~synplan.chem.reaction.curation.filtering.ReactionFilterConfig.create_filters`.
     3. To disable a filter, omit its key entirely. A bare ``key:`` enables the filter with the defaults in the third column.
     4. The shipped configuration enables only four of these eleven filters. The other seven are opt-in; enabling all of them is a much more aggressive curation than the SynPlanner default and will discard a substantially larger fraction of any dataset.
     5. ``small_molecules_config`` rejects a reaction in three cases, not one: every reactant *and* every product is at most ``mol_max_size`` heavy atoms; **or** there is exactly one reactant and it is small; **or** there is exactly one product and it is small. The last two cases fire even when the other side of the reaction is large — a 10-heavy-atom reactant giving methanol as its only product is rejected at the default ``mol_max_size: 6``.

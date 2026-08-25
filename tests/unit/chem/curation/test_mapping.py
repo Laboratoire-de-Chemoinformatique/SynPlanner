@@ -9,7 +9,10 @@ import yaml
 from click.testing import CliRunner
 from pydantic import ValidationError
 
-from synplan.chem.data.mapping import MappingConfig, _append_smi_source_fields
+from synplan.chem.reaction.curation.mapping import (
+    MappingConfig,
+    _append_smi_source_fields,
+)
 from synplan.interfaces.cli import synplan
 from synplan.utils.files import init_parse_worker, parse_one
 

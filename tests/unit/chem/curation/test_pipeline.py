@@ -3,14 +3,14 @@
 import pytest
 from chython import smiles as parse_smiles
 
-import synplan.chem.data.standardizing as standardizing
-from synplan.chem.data.pipeline import (
+import synplan.chem.reaction.curation.standardizing as standardizing
+from synplan.chem.reaction.curation.pipeline import (
     build_batch_result,
     reaction_cgr_key,
     serialize_reaction,
     write_batch_results,
 )
-from synplan.chem.data.reaction_result import (
+from synplan.chem.reaction.curation.reaction_result import (
     BatchResult,
     ErrorEntry,
     ExtractedRuleRecord,
@@ -19,7 +19,7 @@ from synplan.chem.data.reaction_result import (
     PipelineSummary,
     ProcessResult,
 )
-from synplan.chem.data.standardizing import (
+from synplan.chem.reaction.curation.standardizing import (
     AromaticFormConfig,
     CheckValenceConfig,
     CheckValenceStandardizer,

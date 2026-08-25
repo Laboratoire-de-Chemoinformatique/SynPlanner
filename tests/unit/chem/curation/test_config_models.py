@@ -1,8 +1,8 @@
-from synplan.chem.data.config import SmallMoleculesConfig
-from synplan.chem.data.filtering import (
+from synplan.chem.reaction.curation.config import SmallMoleculesConfig
+from synplan.chem.reaction.curation.filtering import (
     SmallMoleculesConfig as FilteringSmallMoleculesConfig,
 )
-from synplan.chem.data.standardizing import (
+from synplan.chem.reaction.curation.standardizing import (
     SmallMoleculesConfig as StandardizingSmallMoleculesConfig,
 )
 

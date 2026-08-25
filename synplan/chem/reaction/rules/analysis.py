@@ -4,10 +4,13 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 
+import pandas as pd
 from chython import smarts
 from chython.containers.reaction import ReactionContainer
 from chython.exceptions import IncorrectSmiles
 from tqdm.auto import tqdm
+
+from synplan.utils.frames import ChemFrame
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +21,7 @@ class RuleSet:
     """A collection of reaction rules loaded from a TSV file.
 
     Provides iteration, indexing, slicing, Jupyter SVG rendering,
-    and optional pandas DataFrame export.
+    and pandas export.
 
     Attributes
     ----------
@@ -142,25 +145,21 @@ class RuleSet:
             f"</table>"
         )
 
-    def to_dataframe(self, include_svg: bool = False):
-        """Convert to pandas DataFrame.
+    def to_dataframe(self) -> ChemFrame:
+        """Tabular view whose 'rule' column depicts inline in a notebook.
 
-        :param include_svg: If True, adds an 'svg' column with depiction HTML.
-        :return: DataFrame with columns: smarts, popularity, n_reactions,
-            and optionally svg.
+        :return: ChemFrame with columns: rule, smarts, popularity, n_reactions.
+            Use ``.df`` for the plain frame, rule objects intact.
         """
-        import pandas as pd
+        for rule in self.rules:
+            rule.clean2d()
 
-        data = {
-            "smarts": list(self.smarts_strings),
-            "popularity": list(self.popularity),
-            "n_reactions": [len(idx) for idx in self.reaction_indices],
-        }
-        if include_svg:
-            svgs = []
-            for rule in self.rules:
-                rule.clean2d()
-                svgs.append(rule.depict())
-            data["svg"] = svgs
-
-        return pd.DataFrame(data)
+        data = pd.DataFrame(
+            {
+                "rule": list(self.rules),
+                "smarts": list(self.smarts_strings),
+                "popularity": list(self.popularity),
+                "n_reactions": [len(idx) for idx in self.reaction_indices],
+            }
+        )
+        return ChemFrame(data, depict_columns=["rule"])

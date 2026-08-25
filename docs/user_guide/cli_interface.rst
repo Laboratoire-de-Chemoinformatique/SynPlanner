@@ -66,6 +66,75 @@ Standardize custom building blocks for compatibility with ``SynPlanner``.
     - ``input`` - the path to the file (.smi or .rdf) with building blocks to be standardized.
     - ``output`` - the path to the file (.smi or .rdf) where standardized building blocks to be stored.
 
+Synthon workflows
+-----------------
+The Synt-On workflows share ``configs/synthonisation.yaml``, whose parameters are
+documented in :doc:`/configuration/synthonisation`:
+
+.. code-block:: bash
+
+    mkdir -p classify synthonise fragment enumerate scaffolds
+    synplan bb_classifying --config configs/synthonisation.yaml --input building_blocks.smi --output classify/classes.tsv
+    synplan bb_synthonizing --config configs/synthonisation.yaml --input building_blocks.smi --output synthonise/synthons.smi
+    synplan synthon_fragment --config configs/synthonisation.yaml --input targets.smi --stock synthonise/synthons.smi --output fragment/pathways.tsv
+    synplan synthon_enumerate --config configs/synthonisation.yaml --input fragment/pathways.tsv --stock synthonise/synthons.smi --output enumerate/library.smi
+    synplan bb_scaffolds --config configs/synthonisation.yaml --input building_blocks.smi --output scaffolds/scaffolds.tsv
+
+``synthon_coverage`` is corpus preparation rather than part of that pipeline: it
+reads atom-mapped reactions and writes back the ones the shipped disconnections do
+not already cover, so a one-step policy is not trained to rediscover them.
+
+.. code-block:: bash
+
+    synplan synthon_coverage --input mapped_reactions.smi --output training_reactions.smi
+    synplan synthon_coverage --input mapped_reactions.smi --output covered.smi --keep covered
+
+Kept lines are copied verbatim, metadata columns and all. A record that will not
+parse is kept, never dropped.
+
+The four molecule-input commands accept headerless SMI/CXSMILES records or a
+headered TSV with exactly one case-insensitive ``SMILES`` or ``CXSMILES`` column.
+In a headerless record, the complete chemistry field comes first and any
+metadata is separated by TAB. Spaces belong to the chemistry field and are
+accepted only for a complete CXSMILES extension such as ``SMILES |...|``;
+``SMILES name`` is not a metadata record. Other TSV columns are retained as
+provenance. ``synthon_enumerate`` consumes the fixed five-column, headerless TSV
+from ``synthon_fragment``. CSV and compressed inputs are not supported.
+
+Audited output
+^^^^^^^^^^^^^^
+Auditing is disabled by default. Enable it in the configuration:
+
+.. code-block:: yaml
+
+    write_audit_files: true
+    audit_overwrite: error  # error or replace
+
+An audited command writes the primary output plus ``fallback.smi``,
+``fallback.tsv``, ``errors.tsv``, ``summary.json``, and ``run.log`` in the same
+directory. Use a separate directory for each command because these names are
+fixed. ``audit_overwrite: error`` refuses an existing bundle without changing
+it; ``replace`` validates staged artifacts before replacing an earlier bundle.
+``synthon_coverage`` is not audited: its output is a verbatim subset of its
+input, so the two files together are the record.
+
+Audited status names are command-specific. Classification uses classified or
+unclassified; synthonisation uses synthonised, unclassified, no_synthon, or
+max_components; fragmentation uses fragmented or no_pathways; enumeration uses
+enumerated, missing_stock_slots, or no_products; and scaffolding uses scaffolded.
+Malformed or failed records use processing_error for every command.
+
+The fallback TSV columns are input_record, source_info, status, and detail. The
+error TSV columns are input_record, source_info, stage, error_type, and
+error_message.
+
+``fallback.smi`` contains valid inputs that produced no output and can be
+retried after changing the taxonomy, rules, stock, or configuration. Processing
+errors appear in ``fallback.tsv`` and ``errors.tsv`` but not ``fallback.smi``. For
+enumeration, ``fallback.smi`` retains the complete pathway TSV row despite its
+legacy suffix. ``summary.json`` records configuration, status counts, provenance,
+and artifact checksums.
+
 Reaction standardization
 ---------------------------
 Reactions can be standardized with ``SynPlanner``. The list of applied standardizers (see the details here) should be provided

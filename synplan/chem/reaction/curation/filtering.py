@@ -13,22 +13,28 @@ from chython.containers import CGRContainer, MoleculeContainer, ReactionContaine
 from pydantic import Field, model_validator
 from tqdm.auto import tqdm
 
-from synplan.chem.data.config import SmallMoleculesConfig
-from synplan.chem.data.pipeline import build_batch_result, write_batch_results
-from synplan.chem.data.reaction_result import (
+from synplan.chem.reaction.curation.config import SmallMoleculesConfig
+from synplan.chem.reaction.curation.pipeline import (
+    build_batch_result,
+    write_batch_results,
+)
+from synplan.chem.reaction.curation.reaction_result import (
     BatchResult,
     ErrorEntry,
     FilteredEntry,
     PipelineSummary,
 )
-from synplan.chem.data.standardizing import (
+from synplan.chem.reaction.curation.standardizing import (
     DATA_ERROR_STAGES,
     DATA_ERROR_TYPES,
     AromaticFormStandardizer,
     KekuleFormStandardizer,
     StandardizationError,
 )
-from synplan.utils.config import BaseConfigModel, NestedConfigContainer
+from synplan.utils.config import (
+    BaseConfigModel,
+    NestedConfigContainer,
+)
 from synplan.utils.files import (
     RawReactionReader,
     ReactionWriter,
@@ -39,70 +45,7 @@ from synplan.utils.files import (
 )
 from synplan.utils.parallel import chunked, graceful_shutdown, process_pool_map_stream
 
-logger = logging.getLogger("synplan.chem.data.filtering")
-
-
-class CompeteProductsConfig(BaseConfigModel):
-    fingerprint_tanimoto_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
-    mcs_tanimoto_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
-
-
-class CompeteProductsFilter:
-    """Checks if there are compete reactions."""
-
-    def __init__(
-        self,
-        fingerprint_tanimoto_threshold: float = 0.3,
-        mcs_tanimoto_threshold: float = 0.6,
-    ):
-        self.fingerprint_tanimoto_threshold = fingerprint_tanimoto_threshold
-        self.mcs_tanimoto_threshold = mcs_tanimoto_threshold
-
-    @staticmethod
-    def from_config(config: CompeteProductsConfig) -> "CompeteProductsFilter":
-        """Creates an instance of CompeteProductsFilter from a configuration object."""
-        return CompeteProductsFilter(
-            config.fingerprint_tanimoto_threshold, config.mcs_tanimoto_threshold
-        )
-
-    def __call__(self, reaction: ReactionContainer) -> bool:
-        """Checks if the reaction has competing products, else False.
-
-        :param reaction: Input reaction.
-        :return: Returns True if the reaction has competing products, else False.
-        """
-        is_compete = False
-
-        # check for compete products using both fingerprint similarity and maximum common substructure (MCS) similarity
-        for mol in reaction.reagents:
-            for other_mol in reaction.products:
-                if len(mol) > 6 and len(other_mol) > 6:
-                    # compute fingerprint similarity
-                    molf = mol.morgan_fingerprint()
-                    other_molf = other_mol.morgan_fingerprint()
-                    fingerprint_tanimoto = tanimoto_kernel(molf, other_molf)[0][0]
-
-                    # if fingerprint similarity is high enough, check for MCS similarity
-                    if fingerprint_tanimoto > self.fingerprint_tanimoto_threshold:
-                        try:
-                            # find the maximum common substructure (MCS) and compute its size
-                            clique_size = len(
-                                next(mol.get_mcs_mapping(other_mol, limit=100))
-                            )
-
-                            # calculate MCS similarity based on MCS size
-                            mcs_tanimoto = clique_size / (
-                                len(mol) + len(other_mol) - clique_size
-                            )
-
-                            # if MCS similarity is also high enough, mark the reaction as having compete products
-                            if mcs_tanimoto > self.mcs_tanimoto_threshold:
-                                is_compete = True
-                                break
-                        except StopIteration:
-                            continue
-
-        return is_compete
+logger = logging.getLogger("synplan.chem.reaction.curation.filtering")
 
 
 class DynamicBondsConfig(BaseConfigModel):
@@ -168,27 +111,6 @@ class SmallMoleculesFilter:
     def are_only_small_molecules(self, molecules: Iterable[MoleculeContainer]) -> bool:
         """Checks if all molecules in the given iterable are small molecules."""
         return all(len(molecule) <= self.limit for molecule in molecules)
-
-
-class CGRConnectedComponentsConfig(BaseConfigModel):
-    pass
-
-
-class CGRConnectedComponentsFilter:
-    """Checks if CGR contains unrelated components (without reagents)."""
-
-    @staticmethod
-    def from_config(
-        config: CGRConnectedComponentsConfig,
-    ) -> "CGRConnectedComponentsFilter":
-        """Creates an instance of CGRConnectedComponentsChecker from a configuration
-        object."""
-        return CGRConnectedComponentsFilter()
-
-    def __call__(self, reaction: ReactionContainer) -> bool:
-        tmp_reaction = ReactionContainer(reaction.reactants, reaction.products)
-        cgr = ~tmp_reaction
-        return cgr.connected_components_count > 1
 
 
 class RingsChangeConfig(BaseConfigModel):
@@ -534,8 +456,6 @@ class ReactionFilterConfig(NestedConfigContainer):
     :ivar dynamic_bonds_config: Configuration for dynamic bonds checking.
     :ivar small_molecules_config: Configuration for small molecules checking.
     :ivar strange_carbons_config: Configuration for strange carbons checking.
-    :ivar compete_products_config: Configuration for competing products checking.
-    :ivar cgr_connected_components_config: Configuration for CGR connected components checking.
     :ivar rings_change_config: Configuration for rings change checking.
     :ivar no_reaction_config: Configuration for no reaction checking.
     :ivar multi_center_config: Configuration for multi-center checking.
@@ -549,8 +469,6 @@ class ReactionFilterConfig(NestedConfigContainer):
     dynamic_bonds_config: DynamicBondsConfig | None = None
     small_molecules_config: SmallMoleculesConfig | None = None
     strange_carbons_config: StrangeCarbonsConfig | None = None
-    compete_products_config: CompeteProductsConfig | None = None
-    cgr_connected_components_config: CGRConnectedComponentsConfig | None = None
     rings_change_config: RingsChangeConfig | None = None
     no_reaction_config: NoReactionConfig | None = None
     multi_center_config: MultiCenterConfig | None = None
@@ -562,8 +480,6 @@ class ReactionFilterConfig(NestedConfigContainer):
         "dynamic_bonds_config": DynamicBondsConfig,
         "small_molecules_config": SmallMoleculesConfig,
         "strange_carbons_config": StrangeCarbonsConfig,
-        "compete_products_config": CompeteProductsConfig,
-        "cgr_connected_components_config": CGRConnectedComponentsConfig,
         "rings_change_config": RingsChangeConfig,
         "no_reaction_config": NoReactionConfig,
         "multi_center_config": MultiCenterConfig,
@@ -588,18 +504,6 @@ class ReactionFilterConfig(NestedConfigContainer):
         if self.strange_carbons_config is not None:
             filter_instances.append(
                 StrangeCarbonsFilter.from_config(self.strange_carbons_config)
-            )
-
-        if self.compete_products_config is not None:
-            filter_instances.append(
-                CompeteProductsFilter.from_config(self.compete_products_config)
-            )
-
-        if self.cgr_connected_components_config is not None:
-            filter_instances.append(
-                CGRConnectedComponentsFilter.from_config(
-                    self.cgr_connected_components_config
-                )
             )
 
         if self.rings_change_config is not None:

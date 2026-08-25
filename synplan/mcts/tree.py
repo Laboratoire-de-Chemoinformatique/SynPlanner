@@ -19,10 +19,10 @@ from synplan.chem.reaction.routes.traversal import (
     route_node_ids,
 )
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
+from synplan.mcts.config import TreeConfig
 from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.node import Node
 from synplan.mcts.policy import Policy, PriorityPolicy
-from synplan.utils.config import TreeConfig
 
 from .algorithm import (
     UCT,
@@ -141,9 +141,11 @@ class Tree:
         :param expansion_function: A loaded policy function.
         :param evaluation_function: An evaluation strategy. If None, a random
             evaluation strategy is used as default.
-        :param route_scorer: Optional post-search route scorer for
-            re-ranking winning routes.  When set, :meth:`route_score`
-            delegates to ``route_scorer.rescore(original, route)``.
+        :param route_scorer: Optional post-search route scorer. When set,
+            :meth:`route_score` delegates to ``route_scorer.rescore(original,
+            route)``. Nothing is reordered — ``winning_nodes`` keeps discovery
+            order and the exporters do not sort, so rank on ``route_score``
+            yourself.
         :param priority_rules: Optional **mapping** of curated rule sets,
             ``{set_name: [Reactor, ...]}``. Each set contributes rules tagged
             with its mapping key as ``rule_source``; e.g.
@@ -197,7 +199,31 @@ class Tree:
         assert evaluation_function is not None, "Evaluation function is required"
         self.evaluator = evaluation_function
 
-        # post-search route re-ranking
+        # A forward search only makes sense if the tree and its evaluator share a finish line. The
+        # tree stops on `building_blocks`; a rollout evaluator carries its OWN copy and rewards
+        # reaching that. Nothing couples them, so `building_blocks={target}, min_mol_size=0` on the
+        # Tree and the retro defaults on the evaluator gives a search that halts at the goal while
+        # still being scored on how close it got to stock — plausible numbers, wrong ones.
+        if self.config.direction == "forward":
+            if not self.building_blocks:
+                raise ValueError(
+                    "config.direction='forward' but building_blocks is empty; in forward mode "
+                    "it is the GOAL to reach, so an empty set can never be satisfied."
+                )
+            rollout = getattr(self.evaluator, "rollout", None)
+            if rollout is not None and (
+                frozenset(rollout.building_blocks) != self.building_blocks
+                or rollout.min_mol_size != self.config.min_mol_size
+            ):
+                raise ValueError(
+                    f"config.direction='forward' requires the evaluator to score the same finish "
+                    f"line as the tree: tree has {len(self.building_blocks)} building_blocks and "
+                    f"min_mol_size={self.config.min_mol_size}, the rollout evaluator has "
+                    f"{len(frozenset(rollout.building_blocks))} and "
+                    f"min_mol_size={rollout.min_mol_size}."
+                )
+
+        # post-search route scoring; callers rank on route_score themselves
         self._route_scorer = route_scorer
         self._rescore_cache: dict[int, float] = {}
 
@@ -706,8 +732,8 @@ class Tree:
         The score depends on cumulated node values and the route length.
 
         When a ``route_scorer`` is set, the raw score is passed through
-        ``route_scorer.rescore(original, route)`` for post-search
-        re-ranking (e.g. protection-group penalty).
+        ``route_scorer.rescore(original, route)`` (e.g. a protection-group
+        penalty). Sorting on this is the caller's job.
 
         :param node_id: The id of the current given node.
         :return: The route score.

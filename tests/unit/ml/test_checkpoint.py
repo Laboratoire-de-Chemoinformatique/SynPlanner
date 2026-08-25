@@ -2,16 +2,16 @@
 
 import torch
 
+from synplan.ml.config import (
+    LinearPolicyNetworkConfig,
+    MHNRankingPolicyNetworkConfig,
+)
 from synplan.ml.networks.checkpoint import (
     LEGACY_FIELD_ALIASES,
     _config_from_flat_hparams,
     load_network_from_checkpoint,
 )
 from synplan.ml.networks.policy.linear import RankingPolicyNetwork
-from synplan.utils.config import (
-    LinearPolicyNetworkConfig,
-    MHNRankingPolicyNetworkConfig,
-)
 
 
 def _ranking_net(n_rules: int) -> RankingPolicyNetwork:

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 import synplan.ml.training.supervised as supervised
-from synplan.utils.config import PolicyNetworkConfig
+from synplan.ml.config import PolicyNetworkConfig
 
 
 def test_run_policy_training_creates_nested_results_dir(monkeypatch, tmp_path):

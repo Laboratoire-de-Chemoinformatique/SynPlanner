@@ -7,8 +7,8 @@ from torch import Tensor
 from torch.nn import Dropout, Linear
 from torch_geometric.data.batch import Batch
 
+from synplan.ml.config import LinearPolicyNetworkConfig
 from synplan.ml.networks.base import GraphMCTSNetwork
-from synplan.utils.config import LinearPolicyNetworkConfig
 
 
 class LinearPolicyNetwork(GraphMCTSNetwork):

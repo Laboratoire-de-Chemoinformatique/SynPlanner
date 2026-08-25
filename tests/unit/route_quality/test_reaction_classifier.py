@@ -127,18 +127,26 @@ def test_broad_classifier_matches_default(esterification):
 
 
 def test_detailed_classifier_esterification(esterification):
-    """Esterification should be classified as ester_formation or acylation."""
-    rtype = classify_reaction_type_detailed(esterification)
-    assert rtype in ("ester_formation", "acylation", "alkylation", "other")
+    """New C-O bond next to a preserved carbonyl -> ester_formation."""
+    assert classify_reaction_type_detailed(esterification) == "ester_formation"
 
 
 def test_detailed_classifier_sn2():
-    """SN2 with cyanide should classify specifically."""
+    """SN2 with cyanide forms a C-C bond, which outranks the broken C-Br."""
     rxn = smiles("[C-:3]#[N:4].[CH3:1][Br:2]>>[N:4]#[C:3][CH3:1].[Br-:2]")
-    rtype = classify_reaction_type_detailed(rxn)
-    assert isinstance(rtype, str)
-    # Could be alkylation, dehalogenation, or other specific type
-    assert rtype != ""
+    assert classify_reaction_type_detailed(rxn) == "cross_coupling"
+
+
+def test_detailed_classifier_dehalogenation():
+    """C-Br broken without any C-halogen formed -> dehalogenation, not alkylation."""
+    rxn = smiles("[CH3:1][Br:2].[OH2:3]>>[CH3:1][OH:3].[Br:2]")
+    assert classify_reaction_type_detailed(rxn) == "dehalogenation"
+
+
+def test_detailed_classifier_reduction():
+    """Ketone C=O dropping to C-O is a net bond order decrease -> reduction."""
+    rxn = smiles("[CH3:1][C:2](=[O:3])[CH3:4]>>[CH3:1][CH:2]([OH:3])[CH3:4]")
+    assert classify_reaction_type_detailed(rxn) == "reduction"
 
 
 def test_detailed_classifier_no_change():
@@ -149,7 +157,6 @@ def test_detailed_classifier_no_change():
 
 
 def test_detailed_accepts_precomputed_cgr(esterification):
-    """classify_reaction_type_detailed should accept a pre-computed CGR."""
+    """A pre-computed CGR must give the same label as composing it internally."""
     cgr = ~esterification
-    rtype = classify_reaction_type_detailed(esterification, cgr=cgr)
-    assert isinstance(rtype, str)
+    assert classify_reaction_type_detailed(esterification, cgr=cgr) == "ester_formation"

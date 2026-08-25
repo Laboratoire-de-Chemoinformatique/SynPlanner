@@ -15,7 +15,11 @@ from chython.containers import (
     ReactionContainer,
 )
 
-from synplan.chem.data.reaction_result import ExtractedRuleRecord, ExtractionBatchResult
+from synplan.chem.reaction.curation.reaction_result import (
+    ExtractedRuleRecord,
+    ExtractionBatchResult,
+)
+from synplan.chem.reaction.rules.config import RuleExtractionConfig
 from synplan.chem.reaction.rules.extraction import (
     add_environment_atoms,
     add_functional_groups,
@@ -27,7 +31,6 @@ from synplan.chem.reaction.rules.extraction import (
     print_extraction_summary,
     process_extraction_result,
 )
-from synplan.utils.config import RuleExtractionConfig
 
 # ---------------------------------------------------------------------------
 # Fixtures & helpers

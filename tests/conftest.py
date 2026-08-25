@@ -19,12 +19,12 @@ logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 
 
-from synplan.chem.data.filtering import (  # noqa: E402
+from synplan.chem.reaction.curation.filtering import (  # noqa: E402
     CCsp3BreakingConfig,
     DynamicBondsConfig,
     ReactionFilterConfig,
 )
-from synplan.chem.data.standardizing import (  # noqa: E402
+from synplan.chem.reaction.curation.standardizing import (  # noqa: E402
     AromaticFormConfig,
     CheckIsotopesConfig,
     CheckValenceConfig,

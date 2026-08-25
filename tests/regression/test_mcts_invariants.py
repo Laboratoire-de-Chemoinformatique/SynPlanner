@@ -48,6 +48,8 @@ def test_solved_node_has_next_precursor_attribute():
     )
 
 
+# ponytail: matches a `try:` lexically, never what the handler does — making it
+# `raise` keeps this green. Upgrade path: stub Tree to fail target 1, assert 2 survives.
 def test_run_search_wraps_mol_from_smiles_in_try_except():
     """``mol_from_smiles`` must be called *inside* the per-target
     try/except in ``run_search``. A bad SMILES line in the input must not

@@ -1,6 +1,6 @@
 [project]
 name = "SynPlanner"
-version = "1.6.0"
+version = "1.7.0"
 description = "Toolbox for chemical synthesis planning"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "chython-synplan[racer-default]==1.101",
+  "chython-synplan[racer-default]==1.104",
   "chytorch-synplan>=1.70",
   "chytorch-rxnmap-synplan>=1.7",
   "numpy>=2",
@@ -59,6 +59,7 @@ loggers = [
 dev = [
   "pytest>=9.0.3",
   "pytest-cov>=7.1.0",
+  "pytest-xdist>=3.6",
   "twine>=6.2.0,<7",
   "ruff>=0.14.4,<0.15",
   "jupyterlab>=4.5.7",

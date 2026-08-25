@@ -3,7 +3,275 @@
 All notable changes to SynPlanner are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.7.0] - 2026-08-25
+
+### Added
+
+- Added ring-forming disconnections to the priority rule set, so a planning run can
+  propose building a heterocycle rather than only buying one. 69 of the 76 ring records
+  ship a hand-authored `retro_smarts` naming the reagents its reaction consumes, taking
+  the default set from 39 rules to 108. See `docs/methods/priority_rules.rst`,
+  "Ring-forming rules".
+
+- Added `synplan.utils.frames.ChemFrame`, a pandas frame that depicts any column holding
+  a chython object, with `rules_frame`, `synthons_frame` and `tree_stats_frame` built on
+  it. See `docs/user_guide/tables.rst`.
+
+- Added a building-block check before the search in `run_search`, reported as
+  `target_in_stock` in the statistics CSV and on the console. See
+  `docs/methods/planning.rst`, "Targets that are already purchasable".
+
+- Added `ProductsTruncatedWarning`, raised when `max_products` ends an enumeration
+  before the walk completes, so a truncated depth-first result is not mistaken for a
+  sample of the library. See `docs/configuration/synthonisation.rst`.
+
+- Added `synplan.chem.reaction.curation.rebalancing`, which adds the molecules an unbalanced
+  reaction is missing without needing atom mapping. Missing carbon is recovered
+  as a substructure of the reactants, and the remaining deficit is covered from
+  a table of small molecules. Where the reaction is mapped, the CGR names the
+  bonds that break, so reagents it never touched are carried through whole
+  instead of being cut apart. Imputed species are rejected when an atom is left
+  with an unsatisfied valence, which is what distinguishes Mg(OH)Br from a bare
+  `[Mg]Br`, and species that cannot survive in a flask are broken into what they
+  vent.
+  See `docs/methods/rebalancing.rst` for the measured results and their limits.
+
+  Exposed as the `rebalance_reaction_config` standardization step, with options
+  to name the reagent behind a redox step rather than balance it with loose
+  hydrogen, to refuse an answer that invents free hydrogen the record cannot
+  account for, to drop the products the reactants cannot have made, and to read
+  or ignore the atom mapping. A reagent the record names leaves as its spent
+  form rather than as whatever covers the arithmetic. Every answer carries a
+  confidence score, and `min_confidence` refuses the ones that fall below it.
+
+- Added `scripts/rebalance_bench.py`, which measures success rate and accuracy
+  against SynRBL's validation set. Rows whose reference is missing, or does not
+  itself balance, are reported apart rather than counted as losses.
+
+- Added `TreeConfig.direction`, which selects between retrosynthetic and forward search
+  and validates that the tree and the rollout evaluator score the same finish line —
+  in forward mode `building_blocks` is the goal to reach rather than the stock, and a
+  configuration where only one of the two carries it is now rejected instead of
+  silently searching toward one target and rewarding another. `apply_reaction_rule`
+  gains `co_reactants`, without which a bimolecular rule run forward is handed one
+  structure and yields nothing. Partner selection is not implemented, so the tree does
+  not yet pass co-reactants during expansion.
+
+- The test suite runs in parallel. `pytest-xdist` joins the dev group and CI runs
+  `pytest -n auto --dist loadscope`, taking CI from 224s to 79s and a local no-coverage run from
+  120s to 40s. `loadscope` keeps each module's tests on one worker so module-scoped fixtures — the
+  clustering integration pipeline in particular — are built once rather than once per worker. No
+  test was deleted, skipped or weakened to get there; the end-to-end planner and clustering tests
+  that catch real regressions all still run.
+
+- `test_mcts_imports_do_not_depend_on_route_import_order` spawns its six fresh interpreters
+  concurrently instead of serially, 10.8s to 2.5s. Each snippet still gets its own untouched
+  interpreter, which is the whole point of the test; they simply no longer queue behind each
+  other's torch import.
+
+#### Synthons (Synt-On port)
+
+- Added `synplan.chem.synthon`, a native port of Synt-On (SynthI; Zabolotna et al., *J.
+  Chem. Inf. Model.* 2022, 62(9), 2151-2163). Seven components, none cut: building-block
+  classification and synthonisation, fragmentation, recombination, Bemis-Murcko
+  scaffolds, the rule of two, and positional analogue scanning. CLI: `bb_classifying`,
+  `bb_synthonizing`, `synthon_fragment`, `synthon_enumerate`, `bb_scaffolds`, configured
+  by `configs/synthonisation.yaml`. See `docs/methods/synthons.rst`.
+- Added opt-in audited output bundles to the five audited synthon CLI workflows. Set
+  `write_audit_files: true` in `SynthonConfig` to write `fallback.smi`, `fallback.tsv`,
+  `errors.tsv`, `summary.json` and `run.log` beside the primary output, with an exact
+  success/fallback input partition and atomic replacement. `audit_overwrite` defaults to
+  `error`; use a dedicated output directory per command. Python return values and CLI
+  messages are unchanged. See `docs/configuration/synthonisation.rst`.
+- Added synthon coverage of a mapped reaction: `classify_coverage` answers whether a
+  reaction builds a bond one of the 39 acyclic disconnections already breaks, and the
+  `synthon_coverage` CLI splits a reaction file on that answer. Its use is corpus
+  preparation. 37.9% of a 100k mapped USPTO sample is covered. See
+  `docs/methods/synthons.rst`, "Corpus coverage".
+- The shipped synthon disconnections can be used as an MCTS priority-rule set.
+  `synthon_priority_rules()` returns them under the source name `"synthon"` as
+  `run_search(priority_rules=...)` input. On a 40-target FDA-2020 sample at a fixed
+  iteration budget this solves 30/40 against a policy-only 23/40 (McNemar p=0.0156). A
+  synthon-stock design was built, measured at 21/40 and reverted. See
+  `docs/methods/synthons.rst`, "Using the rules for planning".
+- Added heterocyclisation support to synthon enumeration: ring-forming disconnections, a
+  `ring_pairs` table and `SynthonConfig.ring_closure_sizes`. The reference excludes ring
+  closure by design; it is expressible here because a ring synthon carries product bond
+  orders, so no bond order is rewritten at join time. This changes default enumeration
+  output — across ten drug targets unique products go from 21 to 28. See
+  `docs/methods/synthons.rst`, "Enumeration".
+- Curated the heterocyclisation block from 9 ring rules to 76, in two id blocks: `R16`
+  keeps the shipped families and `R17.1`-`R17.93` holds the new ones. **This changes
+  enumeration output and rule ids** — the nine `R16.1`-`R16.9` selectors are gone, so a
+  `rules_selection` naming them must be rewritten. Four defects in the shipped nine are
+  fixed, each of which changes an answer, and ten curated rules are held out pending
+  chemist review. See `docs/methods/synthons.rst`, "The disconnection rules".
+- Every shipped disconnection now records where it came from and what it is.
+  `provenance` is `human` for the 78 rules converted from the reference and `llm` for the
+  76 ring rules authored here, so the half no chemist has signed off is identifiable
+  rather than inferred from a rule id. Beside it each rule carries `reaction_name`,
+  `forms`, `reagents` and `supersedes`. See `docs/methods/synthons.rst`, "Provenance and
+  what is not covered".
+- `rebalance_reaction_config` now imputes the molecules a reaction is missing
+  rather than round-tripping it through a CGR. The old step could only
+  redistribute atoms the reaction already had, and only when the mapping was
+  good enough to build a CGR from, so it left every genuinely unbalanced
+  reaction unbalanced.
+
+- `rebalance_reaction_config` now runs after `remove_reagents_config` rather
+  than before it. Reagent removal moves spectators out of the reactants and
+  products, which unbalances whatever was balanced first.
+
+- An oxidation recorded without its oxidant is now balanced with a peroxide
+  rather than a bare oxygen atom. chython cannot hold atomic oxygen, so an
+  answer spelled that way balanced in memory and came back off disk unbalanced.
+
+- Naming the reagent behind a plain loss of hydrogen is now gated on
+  `add_redox_agents`, as its documentation always said. By default the hydrogen
+  is left loose, which is the honest way to say the record was written short.
+
+- Rebalancing now withdraws the atom mapping where imputation leaves atoms on
+  only one side. Nothing establishes which invented atom on one side is which on
+  the other, and numbering them apart let a CGR compose while naming the wrong
+  reaction centre. A caller that needs a mapping maps the balanced reaction
+  itself.
+
+- Package layout is now written down and enforced. `docs/development/package_layout.rst` states
+  seven rules — four import layers, configuration beside its domain, verbs for pipeline stages and
+  nouns for things, no package named `data`, adapters beside their target named after their source,
+  entry points only in `interfaces`, and flat packages until roughly ten modules — plus a table
+  saying where a new use case belongs. `tests/unit/test_package_layers.py` asserts the layer graph;
+  three modules under `utils` are recorded there as known violations so the debt stays visible and
+  cannot grow.
+
+  Applying those rules moved several things. `synplan.synthon` is now `synplan.chem.synthon`: it
+  imports from `chem` and nothing in `chem` imports it back, so it was always a leaf on top of the
+  chemistry, not a peer of it. Inside it, `enumeration` became `enumerate` and `reactor` became
+  `transformer` (which also ends the collision with `chem.reaction.reactor`), `data` became `rules`
+  because it holds the shipped rule files, and `authoring` became `rules.validate` next to the
+  converter that should call it. The command layer left the package: `cli` and `audit` are now
+  `synplan.interfaces.synthon_commands` and `synplan.interfaces.synthon_audit`. The priority-rule
+  adapter moved to `synplan.chem.reaction.rules.synthon`, beside the loader it feeds.
+
+  `synplan.chem.data` became `synplan.chem.reaction.curation` — it holds no data, only the
+  standardizing, filtering, mapping and rebalancing pipeline, and the old name collided with the
+  synthon package's genuine data directory.
+
+  `synplan.utils.config` was 767 lines holding every package's configuration. `TreeConfig` and the
+  evaluation configs are now in `synplan.mcts.config`, the policy, value and tuning configs in
+  `synplan.ml.config`, `ReactorConfig` in `synplan.chem.reaction.config` and `RuleExtractionConfig`
+  in `synplan.chem.reaction.rules.config`; `synplan.utils.config` keeps only `BaseConfigModel` and
+  `NestedConfigContainer`, which makes `utils` a leaf again.
+
+  Every old import path still works, resolved lazily through a module-level `__getattr__` so that
+  the shims do not reintroduce the import edges the layer rule forbids, and each emits a
+  `DeprecationWarning` naming its replacement.
+
+- `synplan.utils.parallel` no longer imports torch at module level. `select_device` is its only
+  consumer and now imports it when called, so the process pool helpers and `default_num_workers`
+  are torch-free. The synthon package took the framework purely to reach
+  `min(os.cpu_count() or 4, cap)`, which cost 366 ms of a 501 ms import; importing
+  `synplan.chem.synthon.config` now takes 143 ms and pulls no torch at all.
+
+- `chython-synplan` is pinned to 1.104, which adds the `Synthon` atom family,
+  `SynthonContainer`, the `_token` bracket field in SMILES and SMARTS, `!rN` as a real
+  excluded-ring-sizes constraint, and the depiction fixes for synthon structures.
+
+### Fixed
+
+- `in_stock` in the exported routes now means purchasable. The route exporter set the flag from
+  a node's position in the tree, marking every leaf available and every intermediate not, so the
+  file `--export_routes` writes contradicted `extracted_routes.json` on the same run.
+
+- Decomposing a RouteCGR dropped the implicit hydrogen on an aromatic nitrogen, so every azole
+  came back as an unmatchable `c1cnc2...` and the documented building-block lookup silently found
+  none of the routes using one.
+
+- The protection scanner reported a pair it had never assessed as `compatible`. A missing matrix
+  row, a missing column, or a reaction whose reacting group could not be identified now report
+  `unknown`. Scores are unchanged; only the label was wrong.
+
+- The solvent strip list warned about its own discarded stereochemistry at import, before any
+  user molecule existed, which fired on `--help`.
+
+- Documentation in six places said a `route_scorer` makes routes come back re-ranked. Nothing
+  reorders: `winning_nodes` keeps discovery order and neither exporter sorts, so the export is
+  byte-identical with and without one. Rank on `tree.route_score` yourself.
+
+- Rebalancing no longer caps an open bond with a halide on a carbon that already
+  holds two oxygens. That invented carbonate halides, which balance perfectly
+  and do not exist. An acyl halide has one oxygen on that carbon and is
+  unaffected.
+
+- Rebalancing no longer leaves a reaction whose CGR cannot be composed. Imputed
+  species are parsed fresh, so they started at atom 1 and landed on top of the
+  reaction's own numbering, and on mapped input every later standardization step
+  then failed.
+
+- The fragment search no longer lets hydrogen outvote heavy atoms when reading
+  where a bond broke. Counting it equally picked a second acid out of an ester
+  rather than the alcohol that actually left.
+
+- A halogenation written without its halogen is now balanced as elemental
+  halogen going in and the hydrogen halide coming out, rather than as the acid
+  going in and loose hydrogen venting.
+
+- `RebalanceReactionStandardizer.from_config` no longer binds its options
+  positionally, where reordering either signature would have misbound them
+  silently.
+
+- The ORD reader now chooses the desired product within each outcome rather than
+  across the whole record, so a second outcome that flags nothing keeps its
+  products and their yields.
+
+- `split_ions_config` no longer fails on every ionic reaction. It read a
+  molecule's total charge off an attribute chython-synplan no longer has.
+
+- Nine more tests asserted a shape rather than a behaviour, each confirmed by mutating the code they
+  cover and watching them stay green. The MHN ranking network had no behavioural test at all: collapsing
+  every rule to one identical association vector — leaving the model unable to rank anything, which is its
+  entire job — passed all 46 tests in the suite's largest file. It now asserts the ranking contract, that
+  two rules are scored apart and that permuting the rule rows permutes the logits. `classify_reaction_type_detailed`
+  was verified only by `rtype in (...)` tuples that included the `"other"` fallback, so stubbing the whole
+  function to return `"other"` passed; each case now asserts the specific label its reaction must produce.
+  `Tree.to_stats_dict` was checked by key name, so returning every value zeroed passed. Three
+  `RouteScanner` tests looped over `interactions` without asserting the list was non-empty, so returning
+  `[]` passed; they are now one test asserting the exact interaction. `test_compose_route_cgr_tree_based_invalid_route_id`
+  never called the function it named. `Precursor` construction was asserted with `is not None`, so dropping
+  canonicalisation passed. Retro-amidation asserted only that some product came back, so emitting an amine
+  instead of a carboxylic acid passed.
+
+- `classify_reaction_type_detailed` documented an `'acylation'` return value it cannot produce — the more
+  specific amide and ester branches always match first — and the changelog advertised the classifier as
+  12-category. Both now say 11, which is what the function actually returns. Behaviour is unchanged; the
+  loose tests were what let the wrong count ship.
+
+- Four tests asserted a shape rather than a behaviour and passed against broken code. Each was
+  rewritten and then re-checked by re-applying the mutation that had slipped through.
+  `test_audit_run_publishes_consistent_sidecars_and_summary` verified every artifact's provenance
+  hash by calling the same `sha256_file` that had written it, so stubbing that function to a
+  constant left all 83 audit tests green; it now compares against an independent
+  `hashlib.sha256`. `test_juxtaposed_recursive_primitives_are_anded` counted semicolons in the
+  translated SMARTS, so emitting a malformed pattern passed; it now checks that the ported query
+  accepts an amine and rejects both an amide and a sulfonamide, which is what the AND means.
+  `test_no_standardization` asserted only the return type, so dropping the standardization step
+  entirely passed all 21 tests in the file; it now asserts that the flags change the result.
+  `test_in_stock_flags` asserted the flag list's length, so inverting every flag passed; it now
+  asserts the flags.
+
+### Removed
+
+- Removed the `cgr_connected_components_config` filter. Everything it caught was
+  already caught by `multi_center_config` or `dynamic_bonds_config`, it is in
+  neither shipped config, and against rebalanced reactions it is actively wrong:
+  a dissociated leaving group is an atom with no bonds, so it is always its own
+  component.
+
+- Removed the `compete_products_config` filter. It compared reagents against
+  products, so it only saw a competing product after atom mapping and reagent
+  removal had already chosen between them, and reagent removal discards the
+  loser outright. `rebalance_reaction_config`'s `drop_competing_products`
+  replaces it, reading the imbalance instead and needing no mapping.
 
 ## [1.6.0] - 2026-08-03
 
@@ -298,7 +566,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Writer-side CGR dedup: `hash(~rxn)` (condensed graph of reaction hash) for
   mechanism-level reaction deduplication — 8 bytes per entry in memory
 - New shared result types: `ProcessResult`, `ErrorEntry`, `FilteredEntry`,
-  `PipelineSummary` in `synplan.chem.data.reaction_result`
+  `PipelineSummary` in `synplan.chem.reaction.curation.reaction_result`
 
 #### Compatibility
 - Removed `from __future__ import annotations` from all modules (Dagster
@@ -398,7 +666,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   from Westerlund et al. (ChemRxiv, 2025)
 - `FunctionalGroupDetector` with 102 SMARTS patterns across 18 reactivity categories
 - `HalogenDetector` with 140 SMARTS patterns across 5 halogen families
-- CGR-based `ReactionClassifier` with broad (4-category) and detailed (12-category)
+- CGR-based `ReactionClassifier` with broad (4-category) and detailed (11-category)
   reaction type classification
 - `IncompatibilityMatrix` with 3-level severity (compatible / competing / incompatible)
 - `RouteScanner` for per-step competing functional group interaction detection

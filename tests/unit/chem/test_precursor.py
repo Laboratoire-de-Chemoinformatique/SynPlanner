@@ -49,16 +49,10 @@ def test_ring_molecule_handling(ring_molecule):
     assert p.is_building_block(bb_stock=set())  # Should be BB as size ≤6
 
 
-def test_precursor_from_reaction_components(sample_reactions):
-    # Test creating precursors from reaction components
-    for rxn_smiles in sample_reactions:
-        # Split reaction into components
-        reactants, _, _products = rxn_smiles.split(">")
-        # Create precursor from first reactant
-        reactant_mol = smiles(reactants.split(".")[0])
-        p = Precursor(reactant_mol)
-        assert p is not None
-        assert len(p) > 0
+def test_precursor_canonicalizes_molecule():
+    # Kekule benzene must be stored aromatized, unless canonicalization is off
+    assert str(Precursor(smiles("C1=CC=CC=C1"))) == "c1ccccc1"
+    assert str(Precursor(smiles("C1=CC=CC=C1"), canonicalize=False)) == "C1=CC=CC=C1"
 
 
 def test_precursor_inequality(simple_molecule, complex_molecule):

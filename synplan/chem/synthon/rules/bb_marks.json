@@ -1,0 +1,3940 @@
+[
+ {
+  "name": "Acetylenes_AlkyneCH",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C:1]#[CH:2]>>[C;+0_nuc:2]#[C:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Acylhalides_Acylhalides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])([#6])):1][Cl,F,Br:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Acylhalides_N-Acylhalides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])([N;D3])):1][Cl,F,Br:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Acylhalides_O-Acylhalides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])([O;D2])):1][Cl,F,Br:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Anhydrides_Acyclic_Anhydrides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])([#6])-!@[O]-[C](-[#6])=[O]):1][O:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Alcohols_Aliphatic_alcohols",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[O;$([OH][CX4;!$([C][$([S]),$([N]),$([P]),$([OD2])][C]=[O])]);!$([O][2H]):1]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O][CX4;!$([C][$([S]),$([N]),$([P]),$([OD2])][C]=[O])]):1][2H:2]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[OH:2][C;X4;!$([C][$([S]),$([N]),$([P]),$([OD2])][C]=[O]):1]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Alcohols_Heterols",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[O;$([OH][c;!$(c1ccccc1)]);!$([O][2H]):1]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O][c;!$(c1ccccc1)]):1][2H:2]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Alcohols_Phenols",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[O;$([OH]c1ccccc1);!$([O][2H]):1]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O]c1ccccc1):1][2H:2]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Aldehyde_Aliphatic_Aldehydes",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([CH]([C])(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([CH]([C])(=[O])):1]=[O:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([CH]([C])(=[O])):1]=[O:2]>>[C;+0_elec:1]-[OH:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Aldehyde_Aromatic_aldehydes",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([CH](c)(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([CH](c)(=[O])):1]=[O:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([CH](c)(=[O])):1]=[O:2]>>[C;+0_elec:1]-[OH:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Aldehyde_Heteroaromatic_aldehydes",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([CH]([c;!$(c1ccccc1)])(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([CH]([c;!$(c1ccccc1)])(=[O])):1]=[O:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Alkenes_AlkenesCH2",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C:1]=[CH2:2]>>[C_neut2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Alkenes_AlkenesForHeckCoupling",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C:1]=[CH2:2]>>[C:1]=[C_nuc:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "AlkylHalides_Alkyl_halides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[Cl,Br,I:1][C;X4:2]>>[C;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[I:1][C;X4:2]>>[C;+0_nuc:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "AlkylHalides_Benzyl_halides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[Cl,Br,I:1][C;X4;$([C]c1ccccc1):2]>>[C;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[I:1][C;X4;$([C]c1ccccc1):2]>>[C;+0_nuc:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "AlkylHalides_Heteroaromatic_benzyl_halides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[Cl,Br,I:1][C;X4;!$([C]c1ccccc1):2]>>[C;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[I:1][C;X4;!$([C]c1ccccc1):2]>>[C;+0_nuc:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "AlkylHalides_Heterocyclic_alkyl_halides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[Cl,Br,I:1][C;X4:2]>>[C;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[I:1][C;X4:2]>>[C;+0_nuc:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Amides_Amides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;$([$([NH]),$([NH2])][C](=[O,S])[#6]);!$([N][N,O,S,P]);!$([N][C]=[N,P]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Amides_WeinrebAmides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C]([#6])(=[O])[N]([CH3])[O][CH3]):1][N;$([N]([CH3])[O][CH3]):2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Aminoacids_AlphaAmino_Acid",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;$([$([NH]),$([NH2])]);$([N][CX4][C](=[O])[OD1]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,O,S,P]);!$([N]#[C]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([NH2]);$([N][CX4][C](=[O])[OD1]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,O,S,P]);!$([N]#[C]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])([OD1])[CX4][$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,O,S,P]);!$([N]#[C])]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([$([NH]),$([NH2])]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,O,S,P]);!$([N]#[C]);!$([N][2H]):1][CX4:2][C;$([C](=[O])([OD1])[CX4][$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,O,S,P]);!$([N]#[C])]):3][OD1:4]>>[N;+0_nuc:1][CX4:2][C_elec:3]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,O,S,P]);!$([N]#[C]);!$([N][2H]):1][CX4:2][C;$([C](=[O])([OD1])[CX4][NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,O,S,P]);!$([N]#[C])]):3][OD1:4]>>[N;+0_nuc2:1][CX4:2][C_elec:3]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Aminoacids_BetaAmino_Acid",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;$([$([NH]),$([NH2])]);$([N][$([CX4]),$([O])][CX4][C](=[O])[OD1]);!$([N][CX4][C](=[O])[OD1]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([NH2]);$([N][$([CX4]),$([O])][CX4][C](=[O])[OD1]);!$([N][CX4][C](=[O])[OD1]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])([OD1])[CX4][$([CX4]),$([O])][$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][CX4][C](=[O])[OD1]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C])]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([$([NH]),$([NH2])]);$([N][$([CX4]),$([O])][CX4][C](=[O])[OD1]);!$([N][CX4][C](=[O])[OD1]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C]);!$([N][2H]):1][$([CX4]),$([O]):2][CX4:3][C;$([C](=[O])([OD1])[CX4][$([CX4]),$([O])][$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][CX4][C](=[O])[OD1]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C])]):4][OD1:5]>>[N;+0_nuc:1][$([CX4]),$([O]):2][C:3][C_elec:4]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([NH2]);$([N][$([CX4]),$([O])][CX4][C](=[O])[OD1]);!$([N][CX4][C](=[O])[OD1]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C]);!$([N][2H]):1][$([CX4]),$([O]):2][CX4:3][C;$([C](=[O])([OD1])[CX4][$([CX4]),$([O])][NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][CX4][C](=[O])[OD1]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C])]):4][OD1:5]>>[N;+0_nuc2:1][$([CX4]),$([O]):2][C:3][C_elec:4]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Aminoacids_GammaAmino_Acid",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;$([$([NH]),$([NH2])]);$([N][$([CX4]),$([O])][CX4][CX4][C](=[O])[OD1]);!$([N][CX4][C](=[O])[OD1]);!$([N][$([CX4]),$([O])][CX4][C](=[O])[OD1]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([NH2]);$([N][$([CX4]),$([O])][CX4][CX4][C](=[O])[OD1]);!$([N][CX4][C](=[O])[OD1]);!$([N][$([CX4]),$([O])][CX4][C](=[O])[OD1]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])([OD1])[CX4][CX4][$([CX4]),$([O])][$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][CX4][C](=[O])[OD1]);!$([N][$([CX4]),$([O])][CX4][C](=[O])[OD1]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C])]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([$([NH]),$([NH2])]);$([N][$([CX4]),$([O])][CX4][CX4][C](=[O])[OD1]);!$([N][CX4][C](=[O])[OD1]);!$([N][$([CX4]),$([O])][CX4][C](=[O])[OD1]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C]);!$([N][2H]):1][$([CX4]),$([O]):2][CX4:3][CX4:4][C;$([C](=[O])([OD1])[CX4][CX4][$([CX4]),$([O])][$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][CX4][C](=[O])[OD1]);!$([N][$([CX4]),$([O])][CX4][C](=[O])[OD1]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C])]):5][OD1:6]>>[N;+0_nuc:1][$([CX4]),$([O]):2][C:3][C:4][C;+0_elec:5]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([NH2]);$([N][$([CX4]),$([O])][CX4][CX4][C](=[O])[OD1]);!$([N][CX4][C](=[O])[OD1]);!$([N][$([CX4]),$([O])][CX4][C](=[O])[OD1]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C]);!$([N][2H]):1][$([CX4]),$([O]):2][CX4:3][CX4:4][C;$([C](=[O])([OD1])[CX4][CX4][$([CX4]),$([O])][NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][CX4][C](=[O])[OD1]);!$([N][$([CX4]),$([O])][CX4][C](=[O])[OD1]);!$([N]=[C,N,O]);!$([N][c,#7,S,P]);!$([N]#[C])]):5][OD1:6]>>[N;+0_nuc2:1][$([CX4]),$([O]):2][C:3][C:4][C;+0_elec:5]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Aminoacids_N-AliphaticAmino_Acid",
+  "strategy": "normal",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;$([$([NH]),$([NH2])]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,O,S,P]);!$([N]#[C]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][c,#7,O,S,P]);!$([N]#[C]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[OD1]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Aminoacids_N-AromaticAmino_Acid",
+  "strategy": "normal",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;$([$([NH]),$([NH2])]c);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][#7,O,S,P]);!$([N]#[C]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([NH2]c);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N]=[C,N,O]);!$([N][#7,O,S,P]);!$([N]#[C]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[OD1]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "ArylHalide_Aryl_halides_Pd",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[c;$(c1[a][a][n][a][a]1):1][Cl:2]>>[c;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[c;$(c1[n][a][a][a][a]1):1][Cl:2]>>[c;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[c:1][I,Br:2]>>[c;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[c:1][O;$([O][S](=[O])(=[O])[C]([F])([F])[F]):2]>>[c;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "ArylHalide_Aryl_halides_SN",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[F,Cl,Br,I:1][c;$(c1[a;!$([a][O]);!$([a][Nv3X3])][a;!$([a][O]);!$([a][Nv3X3])][a]([$([NX3](=[O])=[O]),$([NX3+](=[O])[O-]),$([C]#[N]),$([C]([H])=[O]),$([C]([O])=[O]),$([S](=[O])=[O])])[a;!$([a][O]);!$([a][Nv3X3])][a;!$([a][O]);!$([a][Nv3X3])]1):2]>>[c;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[F,Cl,Br,I:1][c;$(c1[a]([$([NX3](=[O])=[O]),$([NX3+](=[O])[O-]),$([C]#[N]),$([C]([H])=[O]),$([C]([O])=[O]),$([S](=[O])=[O])])[a;!$([a][O]);!$([a][Nv3X3])][a;!$([a][O]);!$([a][Nv3X3])][a;!$([a][O]);!$([a][Nv3X3])][a;!$([a][O]);!$([a][Nv3X3])]1):2]>>[c;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[c;$(c1[a][a][n][a][a]1):1][Cl:2]>>[c;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[c;$(c1[n][a][a][a][a]1):1][Cl:2]>>[c;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "ArylHalide_Aryl_iodides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[c:1][I:2]>>[c;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Azides_Azides_Acylated",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C]=[O]):1][N$([N]=[N+]=[N-]):2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[S;$([S]=[O]):1][N$([N]=[N+]=[N-]):2]>>[S;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Acid_Aldehyde",
+  "strategy": "first_as_prep",
+  "func": 2,
+  "first_as_prep": true,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec:1]",
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Acid_ArylHalide",
+  "strategy": "normal",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[Cl:1][c;$(c1[c,n][c,n]n[c,n][c,n]1),$(c1[n][c,n][n,c][c,n][c,n]1),$(c1[n]aa[a;!#6]1):2]>>[c;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[I,Br:1][c:2]>>[c;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Acid_Ester",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O]([C])[C]([#6])=[O]):1][C;$([CH3]),$([CH2][CH3]),$([CH2]c1[cH][cH][cH][cH][cH]1),$([C]([CH3])([CH3])[CH3]),$([CH2][CH]=[CH2]):2]>>[OH:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_NbocAmino_Acid",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N:1][C;$([C](=[O])[O][C]([CH3])([CH3])[CH3]):2]>>[N!$([N]=[O,S]):1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_NcbzAmino_Acid",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N:1][C;$([C](=[O])[O][CH2]c1[cH][cH][cH][cH][cH]1):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Isothiocyanates_Acid",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[ND2;$([N][#6]):1]=[C;$([C](=[S])=[N]):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C](=[O])[O][CH2]c1[cH][cH][cH][cH][cH]1):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2:1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_NfmocAmino_Acid",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N:1][C;$([C](=[O])[O][CH2][CH]1c2[cH][cH][cH][cH]c2-c3[cH][cH][cH][cH]c13):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_NTFAcAmino_Acid",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N:1][C;$([C](=[O])[C]([F])([F])[F]):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Acid_Nitro",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([+0]),$([+1]);$([N+](=[O])([#6])[O-]),$([N](=[O])([#6])=[O]):1](=[O:2])=,-[O;$([+0]),$([-1]):3]>>[$([NH2]),$([+0]):1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": true
+   },
+   {
+    "variants": [
+     "[NH2:1]>>[N;+0_nuc:1]",
+     "[NH2:1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Aldehyde_ArylHalide",
+  "strategy": "first_as_prep",
+  "func": 2,
+  "first_as_prep": true,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec:1]",
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[Cl,Br,I:1][c;$(c1[c,n][c,n]n[c,n][c,n]1),$(c1[n][c,n][n,c][c,n][c,n]1),$(c1[n]aa[a;!#6]1),$(c[I]),$(c[Br]):2]>>[c;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Aldehyde_Ester",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec:1]",
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O]([C])[C]([#6])=[O]):1][C;$([CH3]),$([CH2][CH3]),$([CH2]c1[cH][cH][cH][cH][cH]1),$([C]([CH3])([CH3])[CH3]),$([CH2][CH]=[CH2]):2]>>[OH:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Aldehyde_Nboc",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec:1]",
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N:1][C;$([C](=[O])[O][C]([CH3])([CH3])[CH3]):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C](=[O])[O][C]([CH3])([CH3])[CH3]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2:1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Aldehyde_Nitro",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec:1]",
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([+0]),$([+1]);$([N+](=[O])([#6])[O-]),$([N](=[O])([#6])=[O]):1](=[O:2])=,-[O;$([+0]),$([-1]):3]>>[$([NH2]),$([+0]):1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": true
+   },
+   {
+    "variants": [
+     "[NH2:1]>>[N;+0_nuc:1]",
+     "[NH2:1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Aldehyde_SO2X",
+  "strategy": "first_as_prep",
+  "func": 2,
+  "first_as_prep": true,
+  "steps": [
+   {
+    "variants": [
+     "[S;D4;$([S](=[O])=[O]):1][F,Cl,Br:2]>>[S;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec:1]",
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Amine_Ester",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[NX3;$([NH2][$([c]),$([CX4])]),$([NH]([$([c]),$([CX4])])[CX4]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NX3;$([NH2][$([c]),$([CX4])]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NX3;$([NHR0]([$([CX4]),$([c])])!@[ND3R]),$([NH2R0]!@[ND3R]),$([NH;R](@[N;R])@[$([CX4]),$([c])]),$([NHR]([$([CX4]),$([c])])@[O]),$([NH2][O]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O]([C])[C]([#6])=[O]):1][C;$([CH3]),$([CH2][CH3]),$([CH2]c1[cH][cH][cH][cH][cH]1),$([C]([CH3])([CH3])[CH3]),$([C][CH]=[CH2]):2]>>[OH:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_NbnDi_Amines",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][CH2]c1[cH][cH][cH][cH][cH]1);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][CH2]c1[cH][cH][cH][cH][cH]1);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][CH2]c1[cH][cH][cH][cH][cH]1);!$([N][C,S,P]=[O,S,N]):1][C;$([CH2]c1[cH][cH][cH][cH][cH]1):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][CH2]c1[cH][cH][cH][cH][cH]1);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);$([NH2][$([c]),$([CX4])]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_NbocDi_Amines",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C](=[O])[O][C]([CD1])([CD1])[CD1]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;$([NH2][$([c]),$([CX4])]);!$([N][C](=[O])[O][C]([CD1])([CD1])[CD1]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][C](=[O])[O][C]([CD1])([CD1])[CD1]):1][C;$([C](=[O])[O][C]([CD1])([CD1])[CD1]):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][CH2]c1[cH][cH][cH][cH][cH]1);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);$([NH2][$([c]),$([CX4])]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_NcbzDi_Amines",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C](=[O])[O][CH2]c1[cH][cH][cH][cH][cH]1);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;$([NH2][$([c]),$([CX4])]);!$([N][C](=[O])[O][CH2]c1[cH][cH][cH][cH][cH]1);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][C](=[O])[O][CH2]c1[cH][cH][cH][cH][cH]1):1][C;$([C](=[O])[O][CH2]c1[cH][cH][cH][cH][cH]1):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][C](=[O])[O][CH2]c1[cH][cH][cH][cH][cH]1);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);$([NH2][$([c]),$([CX4])]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_NfmocDi_Amines",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;$([NH2][$([c]),$([CX4])]);!$([N][C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):1][C;$([C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);$([NH2][$([c]),$([CX4])]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_NTFAcDi_Amines",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C](=[O])[C]([F])([F])[F]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C](=[O])[C]([F])([F])[F]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][C](=[O])[C]([F])([F])[F]):1][C;$([C](=[O])[C]([F])([F])[F]):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][C](=[O])[C]([F])([F])[F]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);$([NH2][$([c]),$([CX4])]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Di_Amines_NotherCarbamates",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C](=[O])[O][CD1]);!$([N][C](=[O])[O][CH2][CD1]);!$([N][C](=[O])[O][CH2][C]([F])([F])[F]);!$([N][C](=[O])[O][CH2][CH]=[CH2]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C](=[O])[O][CD1]);!$([N][C](=[O])[O][CH2][CD1]);!$([N][C](=[O])[O][CH2][C]([F])([F])[F]);!$([N][C](=[O])[O][CH2][CH]=[CH2]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][C](=[O])[O][CD1]),$([N][C](=[O])[O][CH2][CD1]),$([N][C](=[O])[O][CH2][C]([F])([F])[F]),$([N][C](=[O])[O][CH2][CH]=[CH2]):1][C;$([C](=[O])[O][CD1]),$([C](=[O])[O][CH2][CD1]),$([C](=[O])[O][CH2][C]([F])([F])[F]),$([C](=[O])[O][CH2][CH]=[CH2]):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][C](=[O])[C]([F])([F])[F]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);$([NH2][$([c]),$([CX4])]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Ester_Isocyanates",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C]=[O]):1]=[N:2]>>[C;+0_elec:1]-[N:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O]([C])[C]([#6])=[O]):1][C;$([CH3]),$([CH2][CH3]),$([CH2]c1[cH][cH][cH][cH][cH]1),$([C]([CH3])([CH3])[CH3]),$([CH2][CH]=[CH2]):2]>>[OH:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Ester_SO2X",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[S;D4;$([S](=[O])(=[O])):1][F,Cl,Br:2]>>[S;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O]([C])[C]([#6])=[O]):1][C;$([CH3]),$([CH2][CH3]),$([CH2]c1[cH][cH][cH][cH][cH]1),$([C]([CH3])([CH3])[CH3]),$([CH2][CH]=[CH2]):2]>>[OH:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Boronics_Ncbz",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[#6:1][B;$([B]([F])([F])[F]),$([B]([O])[O]):2]>>[#6;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[#6:1][B;$([B]([F])([F])[F]):2]>>[#6;+0_nuc*:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][C](=[O])[O][CH2]c1[cH][cH][cH][cH][cH]1):1][C;$([C](=[O])[O][CH2]c1[cH][cH][cH][cH][cH]1):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][C](=[O])[O][CH2]c1[cH][cH][cH][cH][cH]1):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);$([NH2][$([c]),$([CX4])]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Boronics_Nfmoc",
+  "strategy": "protecting_group",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[#6:1][B;$([B]([F])([F])[F]),$([B]([O])[O]):2]>>[#6;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[#6:1][B;$([B]([F])([F])[F]):2]>>[#6;+0_nuc*:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):1][C;$([C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);!$([N][C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]);$([NH2][$([c]),$([CX4])]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Boronics_Acid",
+  "strategy": "first_as_prep",
+  "func": 2,
+  "first_as_prep": true,
+  "steps": [
+   {
+    "variants": [
+     "[#6:1][B;$([B]([F])([F])[F]):2]>>[#6;+0_elecB:1]",
+     "[#6:1][B;$([B]([F])([F])[F]):2]>>[#6;+0_nuc*:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[#6:1][B;$([B]([O])[O]):2]>>[#6;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Boronics_Aldehyde",
+  "strategy": "first_as_prep",
+  "func": 2,
+  "first_as_prep": true,
+  "steps": [
+   {
+    "variants": [
+     "[#6:1][B;$([B]([F])([F])[F]):2]>>[#6;+0_elecB:1]",
+     "[#6:1][B;$([B]([F])([F])[F]):2]>>[#6;+0_nuc*:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[#6:1][B;$([B]([O])[O]):2]>>[#6;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec:1]",
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Bifunctional_Hydroxy_Aldehyde",
+  "strategy": "first_as_prep",
+  "func": 2,
+  "first_as_prep": true,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec:1]",
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[OH;$([O][#6]);!$([O][C]=[O]):1]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Boronics_Aliphatic_boronates",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C:1][B;$([B]([O;!$([O][C]=[O])])[O;!$([O][C]=[O])]),$([B]([OH;!$([O][C]=[O])])[OH;!$([O][C]=[O])]):2]>>[C;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C:1][B;$([B]([$([F]),$([O][C]=[O])])[$([F]),$([O][C]=[O])]):2]>>[C;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C:1][B;-1;$([B]([O])([O])([O])):2]>>[C;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Boronics_Aromatic_boronates",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[c:1][B;$([B]([O;!$([O][C]=[O])])[O;!$([O][C]=[O])]),$([B]([OH;!$([O][C]=[O])])[OH;!$([O][C]=[O])]):2]>>[c;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[c:1][B;$([B]([$([F]),$([O][C]=[O])])[$([F]),$([O][C]=[O])]):2]>>[c;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[c:1][B;-1;$([B]([O])([O])([O])):2]>>[c;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Boronics_BF3andMIDA",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[#6:1][B;$([B]([F])([F])[F]):2]>>[#6;+0_elecB:1]",
+     "[#6:1][B;$([B]([F])([F])[F]):2]>>[#6;+0_nuc*:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[#6:1][$([B$([B;-1]([O])([O])([O]))]),$([B]([O][C]=[O])[O][C]=[O]):2]>>[#6;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Boronics_Ene_boronates",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C]=[C]):1][B;$([B]([O;!$([O][C]=[O])])[O;!$([O][C]=[O])]),$([B]([OH;!$([O][C]=[O])])[OH;!$([O][C]=[O])]):2]>>[C;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C]=[C]):1][B;$([B]([$([F]),$([O][C]=[O])])[$([F]),$([O][C]=[O])]):2]>>[C;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C]=[C]):1][B;-1;$([B]([O])([O])([O])):2]>>[C;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Boronics_Ine_boronates",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C]#[C]):1][B;$([B]([O;!$([O][C]=[O])])[O;!$([O][C]=[O])]),$([B]([OH;!$([O][C]=[O])])[OH;!$([O][C]=[O])]):2]>>[C;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C]#[C]):1][B;$([B]([$([F]),$([O][C]=[O])])[$([F]),$([O][C]=[O])]):2]>>[C;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C]#[C]):1][B;-1;$([B]([O])([O])([O])):2]>>[C;+0_elecB:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Acid_Aliphatic_Acid",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[C]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Acid_ArAcetic_Acid",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[CH2]c1ccccc1):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Acid_Aromatic_Acid",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])c1ccccc1):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Acid_HetAcetic_Acid",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[CH2][a;!$(c1ccccc1)]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Acid_Heteroaromatic_Acid",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[c;!$(c1ccccc1)]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "ElementOrganics_ArAcylTMS",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])c):1][#14;$([#14]([C;D1])([C;D1])[C;D1]):2]>>[C;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "ElementOrganics_ArSiR3",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[c:1][#14;$([#14]([$([CX4]),$([F]),$([Cl]),$([O])])([$([CX4]),$([F]),$([Cl]),$([O])])[$([CX4]),$([F]),$([Cl]),$([O])]):2]>>[c;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "ElementOrganics_ArSnAlk3",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[c:1][#50;$([#50]([CX4])([CX4])[CX4]):2]>>[c;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "ElementOrganics_EnylSiR3",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C]=[C]):1][#14;$([#14]([$([CX4]),$([F]),$([Cl]),$([O])])([$([CX4]),$([F]),$([Cl]),$([O])])[$([CX4]),$([F]),$([Cl]),$([O])]):2]>>[C;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "ElementOrganics_EnylSnAlk3",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C]=[C]):1][#50;$([#50]([CX4])([CX4])[CX4]):2]>>[C;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Esters_Esters",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]);!$([C](=[O])c1[cH][cH][cH][cH][cH]1);!$([C](=[O])[CH3]):1][O;!R;$([O][$([CX4]),$([c])]):2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;!R;$([O]([C](=[O])[#6])[$([CX4]),$([c])]);!$([O]([CH3])[C]([#6])=[O]);!$([O]([CH2][CH3])[C]([#6])=[O]);!$([O]([CH2]c1[cH][cH][cH][cH][cH]1)[C]([#6])=[O]);!$([O]([C]([CH3])([CH3])[CH3])[C]([#6])=[O]);!$([O]([CH2][CH]=[CH2])[C]([#6])=[O]):1][C;$([C](=[O])):2]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Esters_PoliEsters",
+  "strategy": "polymer",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]);!$([C](=[O])c1[cH][cH][cH][cH][cH]1);!$([C](=[O])[CH3]):1][O;!R;$([O][$([CX4]),$([c])]):2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;!R;$([O]([C](=[O])[#6])[$([CX4]),$([c])]);!$([O]([CH3])[C]([#6])=[O]);!$([O]([CH2][CH3])[C]([#6])=[O]);!$([O]([CH2]c1[cH][cH][cH][cH][cH]1)[C]([#6])=[O]);!$([O]([C]([CH3])([CH3])[CH3])[C]([#6])=[O]);!$([O]([CH2][CH]=[CH2])[C]([#6])=[O]):1][C;$([C](=[O])):2]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Ketones_Ketones",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C]([#6])[#6]):1]=[O:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C]([#6;D2])[#6;D2]):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([$([CH]),$([CH2]);D3][C](=[O])([#6]));!$([C][OH]);!$([C][2H]):1]>>[C;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C;D3][C](=[O])([#6]));!$([C][OH]):1][2H:2]>>[C;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([CH2;D2][C](=[O])([#6]));!$([C][OH]):1]>>[C;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C]([#6])[#6]):1]=[O:2]>>[C;+0_elec:1][OH]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "nHAzoles_nHAzoles",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[nH;r5:1]>>[n;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "PrimaryAmines_PriAmines_Aliphatic",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[NH2;$([NH2][CX4]);!$([NH2][C][$([OH]),$([SH])]);!$([N]([2H])[2H]):1]>>[N;+0_nuc:1]",
+     "[NH2;$([NH2][CX4]);!$([NH2][C][$([OH]),$([SH])]);!$([N]([2H])[2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][CX4]);!$([N][C][$([OH]),$([SH])]);!$([N]([2H])[2H]):1][2H:2]>>[N;+0_nuc:1]",
+     "[N;$([N][CX4]);!$([N][C][$([OH]),$([SH])]);!$([N]([2H])[2H]):1][2H:2]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][CX4]);!$([N][C][$([OH]),$([SH])]):1]([2H:2])[2H:3]>>[N;+0_nuc:1]",
+     "[N;$([N][CX4]);!$([N][C][$([OH]),$([SH])]):1]([2H:2])[2H:3]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "PrimaryAmines_PriAmines_Anilines",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[NH2;$([NH2]c1ccccc1);!$([N]([2H])[2H]):1]>>[N;+0_nuc:1]",
+     "[NH2;$([NH2]c1ccccc1);!$([N]([2H])[2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N]c1ccccc1);!$([N]([2H])[2H]):1][2H:2]>>[N;+0_nuc:1]",
+     "[N;$([N]c1ccccc1);!$([N]([2H])[2H]):1][2H:2]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N]c1ccccc1):1]([2H:2])[2H:3]>>[N;+0_nuc:1]",
+     "[N;$([N]c1ccccc1):1]([2H:2])[2H:3]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "PrimaryAmines_PriAmines_Benzylic",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[NH2;$([NH2][CX4]c1ccccc1);!$([NH2][C][$([OH]),$([SH])]);!$([N]([2H])[2H]):1]>>[N;+0_nuc:1]",
+     "[NH2;$([NH2][CX4]c1ccccc1);!$([NH2][C][$([OH]),$([SH])]);!$([N]([2H])[2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][CX4]c1ccccc1);!$([N][C][$([OH]),$([SH])]);!$([N]([2H])[2H]):1][2H:2]>>[N;+0_nuc:1]",
+     "[N;$([N][CX4]c1ccccc1);!$([N][C][$([OH]),$([SH])]);!$([N]([2H])[2H]):1][2H:2]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][CX4]c1ccccc1);!$([N][C][$([OH]),$([SH])]):1]([2H:2])[2H:3]>>[N;+0_nuc:1]",
+     "[N;$([N][CX4]c1ccccc1);!$([N][C][$([OH]),$([SH])]):1]([2H:2])[2H:3]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "PrimaryAmines_PriAmines_Het-Anilines",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[NH2;$([NH2]a);!$([NH2]c1ccccc1);!$([N]([2H])[2H]):1]>>[N;+0_nuc:1]",
+     "[NH2;$([NH2]a);!$([NH2]c1ccccc1);!$([N]([2H])[2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N]a);!$([N]c1ccccc1);!$([N]([2H])[2H]):1][2H:2]>>[N;+0_nuc:1]",
+     "[N;$([N]a);!$([N]c1ccccc1);!$([N]([2H])[2H]):1][2H:2]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N]a);!$([N]c1ccccc1):1]([2H:2])[2H:3]>>[N;+0_nuc:1]",
+     "[N;$([N]a);!$([N]c1ccccc1):1]([2H:2])[2H:3]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "PrimaryAmines_PriAmines_Het-benzylic",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[NH2;$([NH2][CX4]a);!$([NH2][C][$([OH]),$([SH])]);!$([NH2][CX4]c1ccccc1);!$([N]([2H])[2H]):1]>>[N;+0_nuc:1]",
+     "[NH2;$([NH2][CX4]a);!$([NH2][C][$([OH]),$([SH])]);!$([NH2][CX4]c1ccccc1);!$([N]([2H])[2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][CX4]a);!$([N][C][$([OH]),$([SH])]);!$([N][CX4]c1ccccc1);!$([N]([2H])[2H]):1][2H:2]>>[N;+0_nuc:1]",
+     "[N;$([N][CX4]a);!$([N][C][$([OH]),$([SH])]);!$([N][CX4]c1ccccc1);!$([N]([2H])[2H]):1][2H:2]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][CX4]a);!$([N][C][$([OH]),$([SH])]);!$([N][CX4]c1ccccc1):1]([2H:2])[2H:3]>>[N;+0_nuc:1]",
+     "[N;$([N][CX4]a);!$([N][C][$([OH]),$([SH])]);!$([N][CX4]c1ccccc1):1]([2H:2])[2H:3]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_DiAmines",
+  "strategy": "normal",
+  "func": 2,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;$([$([NH]),$([NH2])]);!$([N]=*);!$([N][$([#7]),$([CX3]),$([CX2]),$([P]),$([S])]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([$([NH]),$([NH2])]);!$([N]=*);!$([N][$([#7]),$([CX3]),$([CX2]),$([P]),$([S])]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_Hydrazines",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;$([NH]);!$([N][$([CX3]),$([CX2]),$([P]),$([S])]);!$([N]=,#*);!$([N][O,S,P]):1]!@[N;!$([N][$([CX3]),$([CX2]),$([P]),$([S])]);!$([N]=,#*);!$([N][O,S,P]):2]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([$([NH]),$([NH2])][N]);!$([N][$([CX3]),$([CX2]),$([P]),$([S])]);!$([N]=,#*);!$([N][O,S,P]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_Hydrazides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;$([$([NH]),$([NH2]),$([NH3+])][N][C](=[O])[#6]);!$([N][C]=[O,S,N]);!$([N][S,P]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_Hydroxylamines",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[NX3;!$([N]=*);!$([N][$([CX3]),$([CX2]),$([P]),$([S])]);$([$([NH]),$([NH2])]-[O;D2]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NX3;$([NH]-[O;D2]);!$([N]=*);!$([N][$([CX3]),$([CX2]),$([P]),$([S])]):1]!@[#6:2]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;D1;$([O][NX3]);!$([O][N]=*);!$([O][N][$([CX3]),$([CX2]),$([P]),$([S])]);!$([O][NH2]):1]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NX3;D3;!$([N]=*);!$([N][$([c]),$([CX3]),$([CX2]),$([P]),$([S])]):1]!@[O;D2;$([O][C](=[O])c1[cH][cH][cH][cH][cH]1):2]>>[N;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_Isocyanates",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C]=[O]):1]=[N;!$([N](=[C]=[O])[C](=[O])[C]([Cl])([Cl])[Cl]):2]>>[C;+0_elec:1]-[N:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[C]([Cl])([Cl])[Cl]):1][N;$([N](=[C]=[O])[C](=[O])[C]([Cl])([Cl])[Cl]):2]=[C;$([C]=[O]);!$([C](=[O])[C]([Cl])([Cl])[Cl]):3]>>[C;+0_elec:3]-[N:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_PoliIsocyanates",
+  "strategy": "polymer",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C]=[O]):1]=[N:2]>>[C;+0_elec:1]-[N:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_Isothiocyanates",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C]=[S]):1]=[N:2]>>[C;+0_elec:1]-[N:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_Li_organics",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[Li:2][#6:1]>>[#6;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_Mg_organics",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[Mg:2][#6:1]>>[#6;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_Zn_organics",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[Zn:2][#6:1]>>[#6;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_Oxiranes",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C:1]1[O:2][C:3]1>>[C:1]([OH:2])[C;+0_elec:3]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_PoliOxiranes",
+  "strategy": "polymer",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C:1]1[O:2][C:3]1>>[C:1]([OH:2])[C;+0_elec:3]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_Oximes",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[OD1;$([O][NX2]=[C;X3;$([C]([$([CX4]),$([c])])[$([CX4]),$([c])]),$([CH][$([CX4]),$([c])])]):1]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_Thioles",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[$([SH]),$([S-]);$([D1$([S][$([CX4]),$([c])])]),$([S][#6]=,:;@[*]):1]>>[S;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_Michael_Acceptors",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[CX3;!$([$([OH]),$([SH]),$([NH2]),$([O-]),$([S-])]);$([C][C]#[N]),$([C][$([SD4]),$([CX3]),$([P])]=[O]),$([C][N+](=[O])[O-]):1]=[CX3;!$([C][O,N,S,I,Cl,Br]);!$([C][2H]):2]>>[C:1][C;+0_elec*:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[CX3;!$([$([OH]),$([SH]),$([NH2]),$([O-]),$([S-])]);$([C][C]#[N]),$([C][$([SD4]),$([CX3]),$([P])]=[O]),$([C][N+](=[O])[O-]):1]=[CX3;!$([C][O,N,S,I,Cl,Br]):2][2H:3]>>[C:1][C;+0_elec*:2]([H])"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_Minisci_CHpartners",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[cH;r6;$(cn),$(c1[a][a][n][a][a]1);!$(c[2H]):1]>>[c;+0_elec*:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[c;r6;$(cn),$(c1[a][a][n][a][a]1):1][2H:2]>>[c;+0_elec*:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_OxalateAlkEsters",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;!$([C]=[O]):1][O;$([O]([C])[C](=[O])[C](=[O])[O][C;D1]),$([O]([C])[C](=[O])[C](=[O])[O][C;D2][C;D1]):2]>>[C;+0_nuc*:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Reagents_NOPhtal_AlkEsters",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[CX4:1][C;$([C](=[O])[O][N]1[C](=[O])c2[cH][cH][cH][cH]c2[C]1=[O]):2]>>[C;+0_nuc*:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "ReagentsForOlefination_JuliaKocienski",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[$([CH]),$([CH2]);X4:1][S;D4;$([S](=[O])(=[O])c),$([S]c1nc2[cH][cH][cH][cH]c2s1),$([S]c1n[cH][cH][cH][cH]1),$([S]c1nnnn1c2[cH][cH][cH][cH][cH]2),$([S]c1nnnn1[C]([CD1])([CD1])[CD1]),$([S]c1[cH]c([C]([F])([F])[F])[cH]c([C]([F])([F])[F])[cH]1):2]>>[C;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "ReagentsForOlefination_Wittig",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[$([CH]),$([CH2]);X4:1][PD4;$([P](c1[cH][cH][cH][cH][cH]1)(c1[cH][cH][cH][cH][cH]1)c1[cH][cH][cH][cH][cH]1):2]>>[C;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "ReagentsForOlefination_Horner_Wadsworth_EmmonsReagents",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[$([CH]),$([CH2]);X4;$([C][C,S](=[O])[O][$([CX4]),$([c])]),$([C][C](=[O])[$([CX4]),$([c])]),$([C][C]#[N]),$([C][S](=[O])[N,O]),$([C][ND3]=[O]):1][PD4;$([P](=[O])([O][$([CX4]),$([c])])[O][$([CX4]),$([c])]):2]>>[C;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SecondaryAmines_Cyc-Aliphatic",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;D2;$([NH](@[CX4])@[CX4]);!$([NH][C][$([OH]),$([SH])]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;D2;$([N](@[CX4])@[CX4]);!$([N][C][$([OH]),$([SH])]):1][2H:2]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SecondaryAmines_Cyc-Anilines",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;D2;$([NH](@[CX4])@c1ccccc1);!$([NH][C][$([OH]),$([SH])]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;D2;$([N](@[CX4])@c1ccccc1);!$([N][C][$([OH]),$([SH])]):1][2H:2]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SecondaryAmines_Cyc-Benzylic",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;D2;$([NH](@[CX4])@[CX4]c1ccccc1);!$([NH][C][$([OH]),$([SH])]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;D2;$([N](@[CX4])@[CX4]c1ccccc1);!$([N][C][$([OH]),$([SH])]):1][2H:2]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SecondaryAmines_Cyc-Het-Anilines",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;D2;$([NH](@[CX4])@c);!$([NH][C][$([OH]),$([SH])]);!$([NH]c1ccccc1);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;D2;$([N](@[CX4])@c);!$([N][C][$([OH]),$([SH])]);!$([N]c1ccccc1):1][2H:2]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SecondaryAmines_Cyc-Het-benzylic",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;D2;$([NH](@[CX4])@[CX4]c);!$([NH][C][$([OH]),$([SH])]);!$([NH][CX4]c1ccccc1);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;D2;$([N](@[CX4])@[CX4]c);!$([N][C][$([OH]),$([SH])]);!$([N][CX4]c1ccccc1):1][2H:2]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SecondaryAmines_diArylAmines",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;A;D2;$([NH](c)c);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;A;D2;$([N](c)c):1][2H:2]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SecondaryAmines_secAliphatic",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;D2;$([NH]([CX4])[CX4]);!$([NH][C][$([OH]),$([SH])]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;D2;$([N]([CX4])[CX4]);!$([N][C][$([OH]),$([SH])]):1][2H:2]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SecondaryAmines_SecAmines_Aliphatic_Fluorinated",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;D2;$([NH]([CX4])[CX4]);!$([NH][C][$([OH]),$([SH])]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;D2;$([N]([CX4])[CX4]);!$([N][C][$([OH]),$([SH])]):1][2H:2]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SecondaryAmines_SecAmines_Aliphatic_Polycyclic",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;D2;$([NH]([CX4])[CX4]);!$([NH][C][$([OH]),$([SH])]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;D2;$([N]([CX4])[CX4]);!$([N][C][$([OH]),$([SH])]):1][2H:2]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SecondaryAmines_secAnilines",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;D2;!R;$([NH]([CX4])c1ccccc1);!$([NH][C][$([OH]),$([SH])]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;D2;!R;$([N]([CX4])c1ccccc1);!$([N][C][$([OH]),$([SH])]):1][2H:2]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SecondaryAmines_secBenzylic",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;D2;!R;$([NH]([CX4])[CX4]c1ccccc1);!$([NH][C][$([OH]),$([SH])]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;D2;!R;$([N](c)c):1][2H:2]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SecondaryAmines_secHet-Anilines",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;D2;!R;$([NH]([CX4])c);!$([NH][C][$([OH]),$([SH])]);!$([NH]c1ccccc1);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;D2;!R;$([N]([CX4])c);!$([N][C][$([OH]),$([SH])]);!$([N]c1ccccc1):1][2H:2]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SecondaryAmines_secHet-benzylic",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;D2;!R;$([NH]([CX4])[CX4]c);!$([NH][C][$([OH]),$([SH])]);!$([NH][CX4]c1ccccc1);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;D2;!R;$([N]([CX4])[CX4]c);!$([N][C][$([OH]),$([SH])]);!$([N][CX4]c1ccccc1):1][2H:2]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SulfonesSulfinates_AlkylSulfinates",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[S;D3;$([S](=[O])[O-]);$([S](=[O])[OH]):2][CX4:1]>>[C;+0_nuc*:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;-1;$([O-][S](=[O])[CX4]):1]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;D1;$([OH][S](=[O])[CX4]):1]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SulfonesSulfinates_ArylSulfinates",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[S;D3;$([S](=[O])[O-]);$([S](=[O])[OH]):2][c:1]>>[c;+0_nuc*:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;-1;$([O-][S](=[O])c):1]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;D1;$([OH][S](=[O])c):1]>>[O;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SulfonesSulfinates_EnInSulfinates",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C]=[C]),$([C]#[C]):1][SD3;$([S](=[O])[$([OH]),$([O-])]):2]>>[C;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SulfonesSulfinates_Aryl_Allyl_Sulphones",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[c:1][S;$([S](=[O])(=[O])[CH2][CH]=[CH2]):2]>>[c;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SulfonylHalides_Aliphatic_Sulfonylhalides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[S;D4;$([S](=[O])(=[O])[CX4]):1][F,Cl,Br:2]>>[S;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SulfonylHalides_Benzene_Sulfonylhalides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[S;D4;$([S](=[O])(=[O])c1ccccc1):1][F,Cl,Br:2]>>[S;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SulfonylHalides_EnIn_Sulfonylhalides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[S;D4;$([S](=[O])(=[O])[C]=,#[C]):1][F,Cl,Br:2]>>[S;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SulfonylHalides_HeteroAliphatic_Sulfonylhalides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[S;D4;$([S](=[O])(=[O])[CX4R]):1][F,Cl,Br:2]>>[S;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SulfonylHalides_Heteroaromatic_Sulfonylhalides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[S;D4;$([S](=[O])(=[O])a);!$([S]c1ccccc1):1][F,Cl,Br:2]>>[S;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SulfonylHalides_Sulfamoylhalides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[S;D4;$([S](=[O])(=[O])[#7]):1][F,Cl,Br:2]>>[S;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SulfonylHalides_SulfonylFluorides",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[S;D4;$([S]=[O]):1][F:2]>>[S;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SulfonylHalides_FluoroSulfates",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[S;D4;$([S](=[O])(=[O])[O][#6]):1][F:2]>>[S;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[#6:1][O;$([O][S](=[O])(=[O])[F]):2]>>[#6;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "SulfonylHalides_Poli_Sulfonylhalides",
+  "strategy": "polymer",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[S;D4;$([S](=[O])(=[O])[#6]):1][F,Cl,Br:2]>>[S;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_Acid_Aldehyde_ArylHalide",
+  "strategy": "first_as_prep",
+  "func": 3,
+  "first_as_prep": true,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec:1]",
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[Cl,Br,I:1][c;$(c1[c,n][c,n]n[c,n][c,n]1),$(c1[n][c,n][n,c][c,n][c,n]1),$(c1[n]aa[a;!#6]1),$(c[I]),$(c[Br]):2]>>[c;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_Acid_Aldehyde_Acetylenes",
+  "strategy": "first_as_prep",
+  "func": 3,
+  "first_as_prep": true,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec:1]",
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C:1]#[CH:2]>>[C;+0_nuc:2]#[C:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_Acid_Aldehyde_Nitro",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": true,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec:1]",
+     "[C;$([CH]([#6])(=[O])):1]=[O:2]>>[C;+0_elec2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([+0]),$([+1]);$([N+](=[O])([#6])[O-]),$([N](=[O])([#6])=[O]):1](=[O:2])=,-[O;$([+0]),$([-1]):3]>>[$([NH2]),$([+0]):1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": true
+   },
+   {
+    "variants": [
+     "[NH2:1]>>[N;+0_nuc:1]",
+     "[NH2:1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_Acid_ArylHalide_Ester",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[Cl,Br,I:1][c;$(c1[c,n][c,n]n[c,n][c,n]1),$(c1[n][c,n][n,c][c,n][c,n]1),$(c1[n]aa[a;!#6]1),$(c[I]),$(c[Br]):2]>>[c;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O]([C])[C]([#6])=[O]):1][C;$([CH3]),$([CH2][CH3]),$([CH2]c1[cH][cH][cH][cH][cH]1),$([C]([CH3])([CH3])[CH3]),$([CH2][CH]=[CH2]):2]>>[OH:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_Acid_ArylHalide_Nitro",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[Cl,Br,I:1][c;$(c1[c,n][c,n]n[c,n][c,n]1),$(c1[n][c,n][n,c][c,n][c,n]1),$(c1[n]aa[a;!#6]1),$(c[I]),$(c[Br]):2]>>[c;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([+0]),$([+1]);$([N+](=[O])([#6])[O-]),$([N](=[O])([#6])=[O]):1](=[O:2])=,-[O;$([+0]),$([-1]):3]>>[$([NH2]),$([+0]):1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": true
+   },
+   {
+    "variants": [
+     "[NH2:1]>>[N;+0_nuc:1]",
+     "[NH2:1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_Acid_Ester_Nitro",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O]([C])[C]([#6])=[O]):1][C;$([CH3]),$([CH2][CH3]),$([CH2]c1[cH][cH][cH][cH][cH]1),$([C]([CH3])([CH3])[CH3]),$([CH2][CH]=[CH2]):2]>>[OH:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([+0]),$([+1]);$([N+](=[O])([#6])[O-]),$([N](=[O])([#6])=[O]):1](=[O:2])=,-[O;$([+0]),$([-1]):3]>>[$([NH2]),$([+0]):1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": true
+   },
+   {
+    "variants": [
+     "[NH2:1]>>[N;+0_nuc:1]",
+     "[NH2:1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_Amines_ArylHalide_Nitro",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": true,
+  "steps": [
+   {
+    "variants": [
+     "[NH;$([NH][$([c]),$([CX4])]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;$([$([NH]),$([NH2])][$([c]),$([CX4])]);!$([N][2H]):1]>>[N;+0_nuc:1]",
+     "[NH2;$([$([NH]),$([NH2])][$([c]),$([CX4])]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[Cl,Br,I:1][c;$(c1[c,n][c,n]n[c,n][c,n]1),$(c1[n][c,n][n,c][c,n][c,n]1),$(c1[n]aa[a;!#6]1),$(c[I]),$(c[Br]):2]>>[c;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([+0]),$([+1]);$([N+](=[O])([#6])[O-]),$([N](=[O])([#6])=[O]):1](=[O:2])=,-[O;$([+0]),$([-1]):3]>>[$([NH2]),$([+0]):1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": true
+   },
+   {
+    "variants": [
+     "[NH2:1]>>[N;+0_nuc:1]",
+     "[NH2:1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_NbocAmino_Acid_AlkyneCH",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": true,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C:1]#[CH:2]>>[C;+0_nuc:2]#[C:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N:1][C;$([C](=[O])[O][C]([CH3])([CH3])[CH3]):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_NbocAmino_Acid_ArylHalide",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[Cl,Br,I:1][c;$(c1[c,n][c,n]n[c,n][c,n]1),$(c1[n][c,n][n,c][c,n][c,n]1),$(c1[n]aa[a;!#6]1),$(c[I]),$(c[Br]):2]>>[c;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N:1][C;$([C](=[O])[O][C]([CH3])([CH3])[CH3]):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_NbocAmino_Acid_Ester",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N:1][C;$([C](=[O])[O][C]([CH3])([CH3])[CH3]):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O]([C])[C]([#6])=[O]):1][C;$([CH3]),$([CH2][CH3]),$([CH2]c1[cH][cH][cH][cH][cH]1),$([C]([CH3])([CH3])[CH3]),$([CH2][CH]=[CH2]):2]>>[OH:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_NbocAmino_Acid_Nitro",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N:1][C;$([C](=[O])[O][C]([CH3])([CH3])[CH3]):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([+0]),$([+1]);$([N+](=[O])([#6])[O-]),$([N](=[O])([#6])=[O]):1](=[O:2])=,-[O;$([+0]),$([-1]):3]>>[$([NH2]),$([+0]):1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": true
+   },
+   {
+    "variants": [
+     "[NH2:1]>>[N;+0_nuc:1]",
+     "[NH2:1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_Amines_Nboc_Ester",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C](=[O])[O][C]([CH3])([CH3])[CH3]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C](=[O])[O][C]([CH3])([CH3])[CH3]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N:1][C;$([C](=[O])[O][C]([CH3])([CH3])[CH3]):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O]([C])[C]([#6])=[O]):1][C;$([CH3]),$([CH2][CH3]),$([CH2]c1[cH][cH][cH][cH][cH]1),$([C]([CH3])([CH3])[CH3]),$([CH2][CH]=[CH2]):2]>>[OH:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_Nboc_NCbz_Amino_Acid",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N:1][C;$([C](=[O])[O][C]([CH3])([CH3])[CH3]):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N:1][C;$([C](=[O])[O][CH2]c1[cH][cH][cH][cH][cH]1):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_Nboc_Nfmoc_Amino_Acid",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N:1][C;$([C](=[O])[O][C]([CH3])([CH3])[CH3]):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):1][C;$([C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_NfmocAmino_Acid_AlkyneCH",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": true,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C:1]#[CH:2]>>[C;+0_nuc:2]#[C:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):1][C;$([C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_NfmocAmino_Acid_ArylHalide",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[Cl,Br,I:1][c;$(c1[c,n][c,n]n[c,n][c,n]1),$(c1[n][c,n][n,c][c,n][c,n]1),$(c1[n]aa[a;!#6]1),$(c[I]),$(c[Br]):2]>>[c;+0_elec:2]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):1][C;$([C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_NfmocAmino_Acid_Ester",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):1][C;$([C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O]([C])[C]([#6])=[O]):1][C;$([CH3]),$([CH2][CH3]),$([CH2]c1[cH][cH][cH][cH][cH]1),$([C]([CH3])([CH3])[CH3]),$([CH2][CH]=[CH2]):2]>>[OH:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_NfmocAmino_Acid_Nitro",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([N][C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):1][C;$([C](=[O])[O][CH2][CH]1c2ccccc2-c3ccccc13):2]>>[N:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[$([NH]),$([NH2]);!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;!$([N][C]=[N,S,P,C]);!$([N]!@[C]=[O]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[N;$([+0]),$([+1]);$([N+](=[O])([#6])[O-]),$([N](=[O])([#6])=[O]):1](=[O:2])=,-[O;$([+0]),$([-1]):3]>>[$([NH2]),$([+0]):1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": true
+   },
+   {
+    "variants": [
+     "[NH2:1]>>[N;+0_nuc:1]",
+     "[NH2:1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "Trifunctional_Di_Esters_Amino",
+  "strategy": "protecting_group",
+  "func": 3,
+  "first_as_prep": true,
+  "steps": [
+   {
+    "variants": [
+     "[NH;$([NH][$([c]),$([CX4])]);!$([N][2H]):1]>>[N;+0_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[NH2;$([$([NH]),$([NH2])][$([c]),$([CX4])]);!$([N][2H]):1]>>[N;+0_nuc:1]",
+     "[NH2;$([$([NH]),$([NH2])][$([c]),$([CX4])]);!$([N][2H]):1]>>[N;+0_nuc2:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[O;$([O]([C])[C]([#6])=[O]):1][C;$([CH3]),$([CH2][CH3]),$([CH2]c1[cH][cH][cH][cH][cH]1),$([C]([CH3])([CH3])[CH3]),$([CH2][CH]=[CH2]):2]>>[OH:1]"
+    ],
+    "is_pg_removal": true,
+    "keeps_protected": false
+   },
+   {
+    "variants": [
+     "[C;$([C](=[O])[#6]):1][OD1:2]>>[C;+0_elec:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ },
+ {
+  "name": "TertiaryAmines_TertiaryAmines",
+  "strategy": "normal",
+  "func": 1,
+  "first_as_prep": false,
+  "steps": [
+   {
+    "variants": [
+     "[N;D3;$([N]([$([CX4]),$([c])])([$([CX4]),$([c])])[$([CX4]),$([c])]);!$([N][C][$([OH]),$([SH])]);!$([N][C]=!@[O,N,S]):1]>>[N;+1_nuc:1]"
+    ],
+    "is_pg_removal": false,
+    "keeps_protected": false
+   }
+  ]
+ }
+]

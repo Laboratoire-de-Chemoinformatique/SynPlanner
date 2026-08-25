@@ -5,8 +5,11 @@ from collections.abc import Callable
 from chython.containers import MoleculeContainer
 
 from synplan.mcts.algorithm import NestedMonteCarlo
+from synplan.mcts.config import (
+    RolloutEvaluationConfig,
+    TreeConfig,
+)
 from synplan.mcts.tree import Tree
-from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import load_evaluation_function
 
 # ----------------------

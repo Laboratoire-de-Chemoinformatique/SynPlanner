@@ -57,7 +57,7 @@ Run reaction standardization using the repository configuration in ``configs/rea
     unchanged_parts_config             Remove unchanged parts in reaction                             none
     small_molecules_config             Remove small molecule from reaction                            ``mol_max_size: 6``
     remove_reagents_config             Remove reagents from reaction                                  ``reagent_max_size: 7``
-    rebalance_reaction_config          Rebalance reaction                                             none
+    rebalance_reaction_config          Add the molecules an unbalanced reaction is missing            ``add_redox_agents: false``, ``min_confidence: 0.0``, ``drop_competing_products: false``, ``use_mapping: true``, ``refuse_unsupported_redox: false``
     deduplicate                        Deduplicate reactions by CGR hash                              ``true`` (plain boolean, not a nested config)
     ================================== ============================================================== ================================
 

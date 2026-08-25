@@ -63,9 +63,12 @@ import yaml
 from tqdm.auto import tqdm
 
 from synplan.chem.utils import mol_from_smiles
+from synplan.mcts.config import (
+    RolloutEvaluationConfig,
+    TreeConfig,
+)
 from synplan.mcts.search import _iter_target_smiles
 from synplan.mcts.tree import Tree
-from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import (
     load_building_blocks,
     load_combined_policy_function,

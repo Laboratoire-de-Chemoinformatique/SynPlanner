@@ -62,17 +62,20 @@ def _make_dataset(reactions_data):
         # Add products
         outcome = rxn.outcomes.add()
         yields = rdata.get("yields", [])
+        desired = rdata.get("desired", [])
         for i, smi in enumerate(rdata.get("products", [])):
             prod = outcome.products.add()
             ident = prod.identifiers.add()
             ident.type = 2
             ident.value = smi
+            if i < len(desired):
+                prod.is_desired_product = desired[i]
             if i < len(yields):
                 m = prod.measurements.add()
                 m.type = 3  # YIELD
                 m.percentage.value = yields[i]
 
-        return ds
+    return ds
 
 
 def _write_dataset(tmp_path, reactions_data, filename="test.pb"):
@@ -367,3 +370,48 @@ class TestReactionReaderPb:
             rxns = list(r)
         assert len(rxns) == 1
         assert isinstance(rxns[0], ReactionContainer)
+
+
+class TestDesiredProduct:
+    """A screening plate lists competing isomers and an internal standard
+    beside the product. Reading all of them as products of one equation makes
+    the reaction unbalanceable and the atom mapping arbitrary."""
+
+    def test_only_the_desired_product_is_kept(self):
+        ds = _make_dataset(
+            [
+                {
+                    "reactants": ["C1COCCN1", "FC(F)(F)c1ccc(I)cc1"],
+                    "products": [
+                        "FC(F)(F)c1ccc(N2CCOCC2)cc1",
+                        "Cn1c(=O)c2c(ncn2C)n(C)c1=O",
+                        "FC(F)(F)c1cccc(N2CCOCC2)c1",
+                    ],
+                    "desired": [True, False, False],
+                    "yields": [42.0, 0.0, 1.0],
+                }
+            ]
+        )
+        rxn_smiles, meta = _reaction_to_smiles(ds.reactions[0])
+
+        assert rxn_smiles.split(">")[-1] == "FC(F)(F)c1ccc(N2CCOCC2)cc1"
+        assert meta["ord_yields"] == "42.0"
+
+    def test_all_products_kept_when_none_is_flagged(self):
+        ds = _make_dataset(
+            [{"reactants": ["CCO"], "products": ["CC=O", "O"], "desired": []}]
+        )
+        rxn_smiles, _ = _reaction_to_smiles(ds.reactions[0])
+
+        assert rxn_smiles.split(">")[-1] == "CC=O.O"
+
+    def test_desired_product_without_a_structure_keeps_no_sibling(self):
+        # The flag is the record's answer to what this equation made. A sibling
+        # that merely happens to carry a SMILES is not a substitute for it, so
+        # the outcome contributes nothing rather than the wrong product.
+        ds = _make_dataset(
+            [{"reactants": ["CCO"], "products": ["", "CC=O"], "desired": [True, False]}]
+        )
+        rxn_smiles, _ = _reaction_to_smiles(ds.reactions[0])
+
+        assert rxn_smiles is None

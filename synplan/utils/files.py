@@ -337,7 +337,7 @@ class ReactionWriter(Writer):
         first call.
 
         Use this when workers have already serialized reactions (via
-        synplan.chem.data.pipeline.serialize_reaction) to avoid redundant work in
+        synplan.chem.reaction.curation.pipeline.serialize_reaction) to avoid redundant work in
         the parent process.
         """
         s = record if record.endswith("\n") else record + "\n"

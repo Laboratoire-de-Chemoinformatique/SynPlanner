@@ -29,9 +29,9 @@ from synplan.chem.reaction.routes.representation.depiction import (
     depict_custom_reaction,
 )
 from synplan.chem.utils import mol_from_smiles
+from synplan.mcts.config import TreeConfig
 from synplan.mcts.search import extract_tree_stats
 from synplan.mcts.tree import Tree
-from synplan.utils.config import TreeConfig
 from synplan.utils.loading import (
     download_preset,
     load_building_blocks,
@@ -395,7 +395,7 @@ def setup_planning_options():
                         )
                         status.update(label="Resources loaded!", state="complete")
 
-                    from synplan.utils.config import RolloutEvaluationConfig
+                    from synplan.mcts.config import RolloutEvaluationConfig
                     from synplan.utils.loading import load_evaluation_function
 
                     tree_config = TreeConfig(

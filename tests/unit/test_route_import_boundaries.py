@@ -1,5 +1,6 @@
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 
 def _run_fresh_process(code: str) -> str:
@@ -33,8 +34,16 @@ def test_mcts_imports_do_not_depend_on_route_import_order():
         "import synplan.chem.reaction.routes",
     ]
 
-    for snippet in snippets:
-        _run_fresh_process(snippet)
+    # Each snippet still gets its own fresh interpreter; they just no longer
+    # queue behind each other's torch import, which cost ~2s apiece serially.
+    with ThreadPoolExecutor(max_workers=len(snippets)) as pool:
+        for snippet, future in [
+            (s, pool.submit(_run_fresh_process, s)) for s in snippets
+        ]:
+            try:
+                future.result()
+            except AssertionError as exc:
+                raise AssertionError(f"{snippet!r}\n{exc}") from None
 
 
 def test_route_quality_imports_stay_lightweight():
@@ -109,5 +118,56 @@ from synplan.chem.reaction.routes.visualisation import (
 
 assert callable(depict_route_cgr)
 assert facade_depict_route_cgr is depict_route_cgr
+"""
+    _run_fresh_process(code)
+
+
+def test_synthon_package_root_stays_lightweight():
+    code = """
+import sys
+import synplan.chem.synthon
+
+unexpected = [
+    name
+    for name in (
+        'torch',
+        'matplotlib',
+        'rdkit',
+        'synplan.mcts.tree',
+        'synplan.chem.synthon.classify',
+        'synplan.chem.synthon.coverage',
+        'synplan.chem.synthon.synthonise',
+        'synplan.chem.synthon.fragment',
+    )
+    if name in sys.modules
+]
+assert unexpected == [], unexpected
+assert synplan.chem.synthon.SynthonConfig.__name__ == 'SynthonConfig'
+"""
+    _run_fresh_process(code)
+
+
+def test_synthon_never_imports_torch():
+    """`select_device` is the only torch consumer in `utils.parallel`, and synthon never calls it.
+
+    Before the import moved into that function, `SynthonConfig` pulled the whole framework for the
+    sake of `default_num_workers`, which is `min(os.cpu_count() or 4, cap)`.
+    """
+    code = """
+import sys
+import synplan.chem.synthon.config
+import synplan.chem.synthon.coverage
+import synplan.chem.synthon.fragment
+import synplan.interfaces.synthon_commands
+
+assert 'torch' not in sys.modules, 'synthon pulled torch'
+
+from synplan.utils.parallel import default_num_workers
+assert default_num_workers() >= 1
+assert 'torch' not in sys.modules, 'default_num_workers pulled torch'
+
+from synplan.utils.parallel import select_device
+assert select_device() is not None
+assert 'torch' in sys.modules, 'select_device must load torch when actually called'
 """
     _run_fresh_process(code)

@@ -5,9 +5,12 @@ from collections.abc import Callable
 import pytest
 from chython.containers import MoleculeContainer
 
+from synplan.mcts.config import (
+    RolloutEvaluationConfig,
+    TreeConfig,
+)
 from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.tree import Tree, TreeStats
-from synplan.utils.config import RolloutEvaluationConfig, TreeConfig
 from synplan.utils.loading import load_evaluation_function
 
 # -- Helpers (same pattern as test_algorithm.py) --
@@ -85,6 +88,7 @@ def build_tree(algorithm="breadth_first", rules=None, **kwargs):
     evaluator = kwargs.pop("evaluator", None)
     policy_cls = kwargs.pop("policy_cls", FakePolicy)
     search_strategy = kwargs.pop("search_strategy", "expansion_first")
+    building_blocks = kwargs.pop("building_blocks", set())
     cfg = TreeConfig(
         algorithm=algorithm,
         max_iterations=max_iterations,
@@ -102,14 +106,16 @@ def build_tree(algorithm="breadth_first", rules=None, **kwargs):
     reactors = [r for _, r, _ in rules]
     if evaluator is None:
         eval_config = RolloutEvaluationConfig(
-            policy_network=fake_policy, reaction_rules=reactors, building_blocks=set()
+            policy_network=fake_policy,
+            reaction_rules=reactors,
+            building_blocks=building_blocks,
         )
         evaluator = load_evaluation_function(eval_config)
     return Tree(
         target=target,
         config=cfg,
         reaction_rules=reactors,
-        building_blocks=set(),
+        building_blocks=building_blocks,
         expansion_function=fake_policy,
         evaluation_function=evaluator,
         priority_rules=priority_rules,
@@ -427,9 +433,9 @@ def test_rule_applicability_rate():
     for _ in tree:
         pass
 
-    rate = tree.rule_applicability_rate()
-    assert isinstance(rate, float)
-    assert 0.0 <= rate <= 1.0
+    # Both rules yield products on the root, so every tried rule succeeded.
+    assert tree.stats.total_rules_tried == 2
+    assert tree.rule_applicability_rate() == 1.0
 
 
 def test_rule_applicability_rate_no_expansions():
@@ -447,12 +453,8 @@ def test_branching_profile():
     for _ in tree:
         pass
 
-    profile = tree.branching_profile()
-    assert isinstance(profile, dict)
-    assert 0 in profile
-    assert "mean_children" in profile[0]
-    assert "nodes" in profile[0]
-    assert profile[0]["nodes"] >= 1
+    # Only the root is ever expanded, and it gets one child per rule.
+    assert tree.branching_profile() == {0: {"mean_children": 2.0, "nodes": 1}}
 
 
 # -- Task 6: Route details --
@@ -466,14 +468,14 @@ def test_route_details():
     for _ in tree:
         pass
 
-    assert len(tree.winning_nodes) > 0
-    details = tree.route_details(tree.winning_nodes[0])
-    assert isinstance(details, dict)
-    assert "node_id" in details
-    assert "route_score" in details
-    assert "route_length" in details
-    assert "steps" in details
-    assert isinstance(details["steps"], list)
+    win = tree.winning_nodes[0]
+    details = tree.route_details(win)
+    # One step: root -> the solved child. Per-step rule metadata is pinned in
+    # test_priority_rule_metadata_and_counters.
+    assert details["node_id"] == win
+    assert details["route_length"] == 1
+    assert [step["node_id"] for step in details["steps"]] == [win]
+    assert details["route_score"] == round(tree.route_score(win), 6)
 
 
 # -- Task 7: to_stats_dict --
@@ -489,35 +491,26 @@ def test_to_stats_dict():
         pass
 
     d = tree.to_stats_dict()
-    assert isinstance(d, dict)
 
-    expected_keys = {
-        "num_routes",
-        "n_routes_with_priority",
-        "fraction_routes_with_priority",
-        "num_nodes",
-        "num_iter",
-        "tree_depth",
-        "search_time",
-        "solved",
-        "expansion_calls",
-        "expansion_successes",
-        "total_rules_tried",
-        "total_rules_succeeded",
-        "policy_rules_tried",
-        "policy_rules_succeeded",
-        "priority_rules_tried",
-        "priority_rules_succeeded",
-        "rule_applicability_rate",
-        "dead_end_nodes",
-        "first_solution_iteration",
-        "first_solution_time",
-        "max_branching_factor",
-        "mean_branching_factor",
-        "best_route_score",
-        "mean_winning_rule_rank",
-    }
-    assert expected_keys.issubset(d.keys()), f"Missing keys: {expected_keys - d.keys()}"
+    # The root is expanded once into two children; only the 5-atom one solves.
+    assert d["num_routes"] == 1
+    assert d["num_nodes"] == 3
+    assert d["num_iter"] == tree.curr_iteration
+    assert d["tree_depth"] == 1
+    assert d["solved"] is True
+    assert d["expansion_calls"] == 1
+    assert d["expansion_successes"] == 1
+    assert d["total_rules_tried"] == 2
+    assert d["total_rules_succeeded"] == 2
+    assert d["policy_rules_tried"] == 2
+    assert d["rule_applicability_rate"] == 1.0
+    assert d["dead_end_nodes"] == 0
+    assert d["first_solution_iteration"] == 1
+    assert d["max_branching_factor"] == 2
+    assert d["mean_branching_factor"] == 2.0
+    assert d["best_route_score"] == round(tree.route_score(tree.winning_nodes[0]), 6)
+    assert d["mean_winning_rule_rank"] == 1.0
+    assert d["priority_rules_tried"] == 0
     assert d["n_routes_with_priority"] == 0
     assert d["fraction_routes_with_priority"] == 0.0
 

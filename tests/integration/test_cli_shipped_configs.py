@@ -32,6 +32,11 @@ WORKERS = (
     "load_policy_function",
     "load_reaction_rules",
     "load_building_blocks",
+    "classify_file",
+    "synthonise_file",
+    "fragment_file",
+    "enumerate_file",
+    "scaffolds_file",
 )
 
 # Input files touched in the isolated filesystem before each invocation.
@@ -136,6 +141,31 @@ CASES = [
             "--policy_network",
             "net.ckpt",
         ],
+    ),
+    (
+        "bb_classifying",
+        "synthonisation.yaml",
+        ["--input", "in.smi", "--output", "out.tsv"],
+    ),
+    (
+        "bb_synthonizing",
+        "synthonisation.yaml",
+        ["--input", "in.smi", "--output", "out.smi"],
+    ),
+    (
+        "synthon_fragment",
+        "synthonisation.yaml",
+        ["--input", "in.smi", "--output", "out.tsv"],
+    ),
+    (
+        "synthon_enumerate",
+        "synthonisation.yaml",
+        ["--input", "in.smi", "--output", "out.smi", "--stock", "bb.smi"],
+    ),
+    (
+        "bb_scaffolds",
+        "synthonisation.yaml",
+        ["--input", "in.smi", "--output", "out.tsv"],
     ),
 ]
 

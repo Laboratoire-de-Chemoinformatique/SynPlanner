@@ -16,17 +16,19 @@ from tqdm.auto import tqdm
 
 from synplan.chem.precursor import compose_precursors
 from synplan.chem.reaction import CanonicalRetroReactor
+from synplan.mcts.config import (
+    TreeConfig,
+    ValueNetworkEvaluationConfig,
+)
 from synplan.mcts.tree import Tree
+from synplan.ml.config import (
+    PolicyNetworkConfig,
+    TuningConfig,
+    ValueNetworkConfig,
+)
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training.preprocessing import ValueNetworkDataset
 from synplan.ml.training.trainers import LitValue
-from synplan.utils.config import (
-    PolicyNetworkConfig,
-    TreeConfig,
-    TuningConfig,
-    ValueNetworkConfig,
-    ValueNetworkEvaluationConfig,
-)
 from synplan.utils.files import MoleculeReader
 from synplan.utils.loading import (
     load_building_blocks,

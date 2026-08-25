@@ -1,0 +1,29 @@
+# Synt-On port: building-block synthonisation, fragmentation and enumeration.
+keep_protecting_groups: false
+ignore_solvents: true
+max_components: 4
+max_stages: 5
+max_rc_per_fragment: 3
+max_pathways: 10000
+rule_mode: use_all
+rules_selection: R1-R13
+fragments_to_ignore: []
+availability_denominator: target
+max_reacted_synthons: 6
+max_products: 1000
+mw_lower: 100.0
+mw_upper: 1000.0
+# ring sizes a heterocyclisation may close; [] disables ring closure in the enumerator
+ring_closure_sizes: [5, 6, 7]
+find_analogues: false
+similarity_threshold: -1.0
+pas_removal_direction: true
+ro2_filtration: false
+ro2_variant: paper
+strict_availability: false
+
+# Optional auditable CLI output bundle. When enabled, fallback.smi,
+# fallback.tsv, errors.tsv, summary.json and run.log are written beside the
+# primary output. Use a dedicated output directory for each command.
+write_audit_files: false
+audit_overwrite: error

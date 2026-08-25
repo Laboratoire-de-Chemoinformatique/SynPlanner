@@ -17,19 +17,19 @@ from chython.exceptions import InvalidAromaticRing
 from chython.periodictable import QueryElement
 from tqdm.auto import tqdm
 
-from synplan.chem.data.reaction_result import (
+from synplan.chem.reaction import CanonicalRetroReactor
+from synplan.chem.reaction.curation.reaction_result import (
     ErrorEntry,
     ExtractedRuleRecord,
     ExtractionBatchResult,
 )
-from synplan.chem.data.standardizing import RemoveReagentsStandardizer
-from synplan.chem.reaction import CanonicalRetroReactor
+from synplan.chem.reaction.curation.standardizing import RemoveReagentsStandardizer
+from synplan.chem.reaction.rules.config import RuleExtractionConfig
 from synplan.chem.utils import (
     canonical_query_cgr_key,
     reverse_reaction,
     unite_molecules,
 )
-from synplan.utils.config import RuleExtractionConfig
 from synplan.utils.files import (
     RawReactionReader,
     extract_origin_fields,

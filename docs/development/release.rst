@@ -59,7 +59,16 @@ Other checks
   changes.
 - Documentation touched by the release is updated — see the checklist in
   :doc:`pr_review`.
-- The docs build clean: ``uv run sphinx-build -b html docs /tmp/synplanner-docs``.
+- The docs build clean, with no Sphinx warnings:
+
+  .. code-block:: bash
+
+     uv run --group docs sphinx-build -b html docs /tmp/synplanner-docs
+
+  ``--group docs`` is required and is what ``readthedocs.yaml`` uses. Without it
+  ``uv run`` falls through to whatever ``sphinx-build`` is on ``PATH``, which on a
+  machine with a system Sphinx fails on the missing ``myst_parser`` rather than
+  building. CI does not build the docs, so this check is manual.
 
 Dependencies
 ~~~~~~~~~~~~

@@ -25,7 +25,7 @@ Priority rules are passed as a mapping of named sets:
 .. code-block:: python
 
     from synplan.mcts.tree import Tree
-    from synplan.utils.config import TreeConfig
+    from synplan.mcts.config import TreeConfig
 
     Tree(
         target=...,
@@ -133,6 +133,40 @@ Every child carries:
 Route SVG, JSON, and RDKit exports propagate this metadata, and route
 SVGs annotate rule keys and policy ranks alongside molecules.
 
+Ring-forming rules
+------------------
+
+``synthon_priority_rules()`` loads the shipped synthon disconnections as a
+priority set. It carries both the acyclic disconnections and the ring-forming
+ones, so a planning run can propose building a heterocycle rather than only
+buying a pre-formed version of it.
+
+A ring rule needs a reagent form written by hand. The acyclic rules derive one:
+the loader spells a leaving group onto each labelled atom, which turns the
+disconnection into a pair of orderable compounds. That decoration works on one
+atom, and a heterocyclisation cuts two bonds, so the derived form names the
+wrong compound class -- a triazole comes apart into a triazene and a styrene
+where the reaction consumes an azide and an alkyne.
+
+Each supported ring record therefore ships a ``retro_smarts`` naming the
+reagents its reaction actually consumes, and the loader uses that string
+verbatim rather than capping anything::
+
+    [n;D3;+0:1]1[n;+0;D2:2][n;+0;D2:3][c:4][c:5]1
+        >> [N:1]=[N+:2]=[N-:3].[C:4]#[C:5]
+
+69 of the 76 ring records carry one, giving a default set of 108 rules. The
+remaining seven are excluded because the reagent they would emit cannot be
+isolated: an enamine that tautomerises to the imine, a beta-halo thiol that is
+really an episulfide precursor, an N-unsubstituted hydrazonoyl halide. A ring
+record without a ``retro_smarts`` is skipped rather than loaded uncapped.
+
+Provenance differs across the set. The 39 acyclic rules are ``human``, curated
+from the reference implementation; the 69 ring rules are ``llm``, authored in
+this repository and not yet signed off by a chemist. ``rules_frame()``
+(:mod:`synplan.chem.synthon.frames`) shows the split, and
+``docs/development/chemist_review`` is the review queue.
+
 Tutorial
 --------
 
@@ -142,3 +176,66 @@ priority set, running planning with and without it, comparing
 priority hits.
 
 .. _Priority Rules: ../user_guide/13_Priority_Rules.ipynb
+
+What the ring rules measurably buy
+----------------------------------
+
+The ring rules add routes rather than reach. Measured on 25 heterocyclic targets
+at a fixed iteration budget, adding the 69 ring rules to the 39 acyclic ones
+takes the route count from 2627 to 2867 and solves no target the acyclic set
+could not already solve.
+
+Searching for a target the ring rules genuinely unlock -- unsolvable with the
+acyclic priority set, solvable with the ring set added -- turned up exactly one
+in 465 real targets screened, drawn from the SAScore benchmark, its hardest
+bin, and a drug set:
+
+======================================  =======  ==============
+set                                     targets  ring unlocks
+======================================  =======  ==============
+marketed drugs                                6               0
+hand-picked heterocyclic                     25               0
+SAScore benchmark 7.5-8.5 (alkaloids)        26               0
+SAScore benchmark 4.5-7.5                    77               1
+======================================  =======  ==============
+
+The one is a macrocyclic kinase inhibitor at SAScore 5.36, opened by ``R17.93``
+at its C-N bond -- a retro-reductive-amination giving one acyclic precursor
+carrying both the aldehyde and the amine, which is how that class is made.
+
+The reason the number is so low is that the policy network is trained on USPTO,
+which is full of common heterocyclisations. The policy already proposes click
+triazoles, Fischer indoles and pyrazole condensations, so the ring rules mostly
+duplicate coverage the search already had. They earn their place by finding
+convergent routes the policy ranks poorly, not by rescuing unsolvable targets.
+
+Reagent availability is not a quality signal here. Of the 76 ring records, 32
+emit two catalogue hits, 24 one and 16 neither. A precursor that is not
+purchasable is an ordinary node for the planner to expand further, so the split
+says how often a rule terminates a branch in one step, not how often it is
+right.
+
+Authoring a reagent form
+----------------------------------
+
+A hand-authored ``retro_smarts`` fails in three ways that leave no error behind,
+which is why ``synplan.chem.synthon.rules.validate_retro`` exists and why
+``expected_reagents`` is recorded per rule:
+
+- **An unmapped atom on the right-hand side.** chython's patcher accepts it and
+  returns the *intact* target plus a free fragment. Writing ``[O]`` instead of
+  ``[O:20]`` on a benzimidazole retro gives back the benzimidazole and a
+  formaldehyde, which is plausible, purchasable and wrong.
+- **A rule that does not open the ring.** The transform applies, the products
+  parse, and the heterocycle is still there.
+- **The right transform on the wrong atoms.** Tautomerism moves a map number:
+  chython canonicalises an N-H azole to the tautomer that parks the substituted
+  ring carbon next to the NH, so a rule can emit an alpha-bromo aldehyde where
+  phenacyl bromide was intended. Automorphism does the same on a ring with two
+  interchangeable positions -- acetaldoxime plus benzonitrile becomes
+  benzaldoxime plus acetonitrile.
+
+The first two are mechanical and the validator refuses them. The third is not:
+both forms break the ring with unique map numbers and parse cleanly, so the
+validator compares emitted products against ``expected_reagents`` per product
+set, and flags a target whose tautomers are degenerate for a human to read.

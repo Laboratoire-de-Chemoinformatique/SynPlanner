@@ -29,12 +29,15 @@ def rule_query_pattern(rule) -> ReactionContainer | None:
     chython's :class:`Reactor` keeps the LHS query patterns on the private
     ``_patterns`` tuple — see ``chython/reactor/reactor.py``. We use ``[0]``
     because the priority-rule applicability check only needs *any* substructure
-    to test ``pattern < molecule`` against the current precursor.
+    to test ``pattern < molecule`` against the current precursor. A
+    :class:`chython.reactor.Transformer` (and so a ``SynthonTransformer``) keeps
+    its single pattern on ``_pattern`` instead; without the fallback
+    ``PriorityPolicy`` would gate every transformer rule off forever.
     """
     patterns = getattr(rule, "_patterns", None)
     if patterns:
         return patterns[0]
-    return None
+    return getattr(rule, "_pattern", None)
 
 
 class PrioritySmartsError(ValueError):
