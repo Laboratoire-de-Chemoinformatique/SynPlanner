@@ -175,6 +175,13 @@ The ladder shortens the code, never the checking. Reimplementing something that
 already exists is the common failure here — not writing too much code. Look before
 you write.
 
+A worked example of that failure: asked for a table of rules or synthons with each
+one drawn, the reflex is to loop `depict()` into HTML or build a DataFrame by hand.
+`rules_frame`, `synthons_frame` and `ChemFrame` already do it, and the hand-rolled
+version reads `rules.json` directly and so misses that a ring rule must be shown in
+its hand-authored reagent form. See "Show rules, synthons or any chython objects as
+a table" in `references/tasks.md`.
+
 The reverse failure is as bad: do not force a rung that does not fit. Three
 SynPlanner calls chained into a workaround is worse than one honest chython call.
 

@@ -193,14 +193,43 @@ Docs: `methods/extraction`, `configuration/extraction`
 
 **Inspect or visualise a rule set**
 `RuleSet` (`synplan.chem.reaction.rules.analysis`), `query_to_mol`
-(`...rules.representation`).
+(`...rules.representation`). `RuleSet.from_tsv` keeps popularity;
+`load_reaction_rules` reads the same file and drops it, so use the former when you
+want counts. `ruleset[:10]` renders a fixed three-column view; `to_dataframe()`
+returns a `ChemFrame` you can filter and sort — slice the RuleSet before drawing,
+laying out all 11k rules is slow and renders enormous.
 Tutorial: `12_Rule_Analysis`
 Docs: `methods/extraction`
+
+**Read the shipped building-block TSV**
+`SMILES` plus `LN_ppg`, `SA_ppg`, `EM_ppg`, which are supplier price columns and are
+documented nowhere in the codebase. Every one of the 186,868 rows carries a nonzero
+figure in at least one of them, so treating the whole file as orderable is safe. The
+synthon commands read the file unmodified — they want a headered TSV with a `SMILES`
+column and ignore the rest.
 
 **Use my own building blocks**
 CLI: `building_blocks_standardizing`. Preset building blocks are already
 standardized — pass `standardize=False` to `load_building_blocks`.
 Docs: `user_guide/cli_interface`, `user_guide/data`
+
+**Show rules, synthons or any chython objects as a table**
+`rules_frame` and `synthons_frame` (`synplan.chem.synthon.frames`),
+`tree_stats_frame` (`synplan.utils.frames`). They return a `ChemFrame`: a pandas
+frame that draws any column holding something with a `depict()` method. Building a
+DataFrame of depictions by hand is the common reinvention here — do not.
+`ChemFrame(rows, depict_columns=["reaction"])` takes anything: molecules,
+reactions, CGRs, SMARTS queries and synthons all draw with no extra code.
+`.df` gives plain pandas with the objects themselves still in the cells, and is
+what `.groupby` and `.str` need; a mask or `.head()` returns a ChemFrame and keeps
+drawing. The view stops at `max_display_rows` (20) because a drawn row costs
+roughly 7 kB of SVG.
+Three traps: `rules_frame()` gives all 154 shipped records, `rules_frame(rules)`
+restricts and reorders to the loaded ones; `kind` collapses macro over ring, so
+every ring-forming rule is `kind != "acyclic"`, not `== "ring"`; and a ring rule's
+`rule` and `smarts` show its hand-authored reagent form, not the raw two-cut SMARTS.
+Module: `synplan.utils.frames`, `synplan.chem.synthon.frames`
+Tutorial: `17_Synthon_Based_Design`, `18_Retrosynthesis_With_Synthon_Priority_Rules`
 
 **Import reaction data from ORD**
 CLI: `ord_convert`.
@@ -257,18 +286,59 @@ Module: `synplan.chem.synthon.fragment`
 Tutorial: `17_Synthon_Based_Design`
 
 **Recombine stocked synthons into new molecules**
-`Enumerator.enumerate_library` for unconstrained library design,
-`Enumerator.enumerate_analogues` for analogues of one fragmentation pathway.
-CLI: `synthon_enumerate`.
+`Enumerator.enumerate_library` grows products from the whole stock with no target;
+`Enumerator.enumerate_analogues` fills the slots of one target's fragmentation
+pathway. Only the second is wired to the CLI — `synthon_enumerate` calls
+`enumerate_file`, which never reaches `enumerate_library`, so a target-free library
+is Python only. Do not fake a pathways TSV to force it through the CLI.
+Three traps. `max_products` truncates a depth-first walk rather than sampling, so a
+capped run returns elaborations of the first seed — measured 300 of 300 products
+sharing one seed and one partner — bound the synthon pool instead and let it finish.
+`max_reacted_synthons` is what decides whether the run returns at all: 2 exhausts a
+few-hundred-synthon pool in a minute, 3 costs roughly thirty times that.
+`ro2_filtration` is applied by `load_synthon_stock`, not by the enumerator, so it
+does nothing unless the config reaches the loader.
+Library mode yields bare molecules with no record of which blocks went in;
+`enumerate_analogues` writes the source synthons per row and library mode has no
+equivalent, so a shopping list needs building yourself. Re-fragmenting a product to
+recover it does not work — the enumerator and the fragmenter are not inverses.
+CLI: `synthon_enumerate` (analogues only).
 Module: `synplan.chem.synthon.enumerate`
+Tutorial: `17_Synthon_Based_Design`
+
+**Make analogues of a hit that are actually purchasable**
+Fragment the hit, then `SynthonStock.slots()` for candidates per slot, then
+`Enumerator.enumerate_analogues`. Four things decide whether this works at all.
+`find_analogues` defaults to off and it IS the feature — off, every slot offers
+only the hit's own synthon and you rebuild the hit. `strict_availability` is off
+by default too, and then an unfillable slot silently falls back to the hit's own synthon,
+which need not be purchasable, so the shelf guarantee quietly breaks.
+`mw_lower`/`mw_upper` bound `enumerate_library` ONLY — `enumerate_analogues` ignores
+them, so they will not keep an analogue library drug-sized.
+And `best_available()[0]` is not guaranteed fillable; walk down the list until one
+yields products, because zero-with-full-slots and zero-with-empty-slots look the same.
+Two semantics to state to anyone reading the output. `is_analogue` matches on ring
+count, heavy-atom count and element census, and two of its four branches never test
+substructure at all — over a real catalogue it delivers scaffold HOPS, not periphery
+decoration, and `similarity_threshold` cannot tighten it because the Tanimoto branch
+is unioned with this one. Reassembly joins by label compatibility alone and does not
+remember which label was bonded to which, so a pharmacophore can be scrambled away —
+measured, 1440 sorafenib products none of which kept the urea. Pin the slot carrying
+the pharmacophore (`slots[core] = [core]`, only if that synthon is stocked as itself)
+and filter the products on a core SMARTS.
+Do not confuse `find_analogues` the config flag with `find_analogues()` the function —
+the function returns SYNTHONS, not molecules, and is exported at package top level.
+Module: `synplan.chem.synthon.analogues`, `synplan.chem.synthon.stock`
 Tutorial: `17_Synthon_Based_Design`
 
 **Use the synthon disconnections during planning**
 `synthon_priority_rules()` returns them as `run_search(priority_rules=...)` input
 under the source name `"synthon"`; set `use_priority=True` in the search config
 or they are ignored. The children are ordinary molecules against the ordinary
-building-block stock — there is no synthon stock in the tree. Ring rules are
-excluded: they have no open valence to spell a leaving group on.
+building-block stock — there is no synthon stock in the tree. A ring rule loads
+only when it ships a hand-authored `retro_smarts` naming its real reagents, since
+capping cannot spell a leaving group for a two-bond cut; 69 of the 76 do, so the
+default set is 39 acyclic plus 69 ring rules.
 Module: `synplan.chem.reaction.rules.synthon`
 Tutorial: `18_Retrosynthesis_With_Synthon_Priority_Rules`
 
@@ -280,9 +350,24 @@ against the rule's labels. CLI: `synthon_coverage --keep uncovered|covered`.
 Module: `synplan.chem.synthon.coverage`
 
 **Catalogue analysis**
-`bb_scaffolds` writes Bemis-Murcko scaffolds after removing the ring-containing
-protecting groups; `ro2_pass` applies the rule of two.
-Module: `synplan.chem.scaffolds`, `synplan.chem.synthon.stock`
+`scaffold_smiles` and `murcko_scaffold` take a Bemis-Murcko scaffold after removing
+ring-containing protecting groups — do not substitute plain RDKit Murcko, which keeps
+the Cbz and drops an amide carbonyl; `ro2_pass` and `ro2_filter` apply the rule of two.
+`scaffolds_file` runs a whole catalogue but is single-threaded, unlike its neighbours.
+CLI: `bb_scaffolds` (a command, not a Python symbol).
+Module: `synplan.chem.scaffolds`, `synplan.chem.synthon.stock`,
+`synplan.interfaces.synthon_commands`
+
+**Judge a catalogue before buying it**
+`classify_file` then `synthonise_file` (`synplan.interfaces.synthon_commands`) with
+`write_audit_files: true`, then read `summary.json`: the share of rows carrying no
+reactive class is the number a purchase decision turns on. Run it in audit mode or the
+figures lie — outside audit mode `classify_file` silently drops unclassified rows and
+you cannot tell those from parse failures. `load_synthon_stock` returns
+`synthon -> {blocks}`, so reactive redundancy falls out of it; exact-SMILES dedupe
+measures nothing. Note `classify_file` returns an int and `synthonise_file` a pair.
+CLI: `bb_classifying` → `bb_synthonizing`.
+Module: `synplan.chem.synthon.stock`
 
 **Keep an auditable record of any synthon CLI run**
 All five audited synthon commands accept `synthonisation.yaml`

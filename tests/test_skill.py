@@ -10,6 +10,7 @@ stays fast and never touches torch or chython.
 """
 
 import ast
+import json
 import re
 from pathlib import Path
 
@@ -63,8 +64,35 @@ def _defined_symbols() -> set[str]:
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 out.add(node.name)
+                for inner in getattr(node, "body", []):
+                    if isinstance(inner, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        out.add(inner.name)
+                    elif isinstance(inner, ast.AnnAssign) and isinstance(
+                        inner.target, ast.Name
+                    ):
+                        out.add(inner.target.id)
+                    elif isinstance(inner, ast.Assign):
+                        out.update(
+                            t.id for t in inner.targets if isinstance(t, ast.Name)
+                        )
             elif isinstance(node, ast.Assign):
                 out.update(t.id for t in node.targets if isinstance(t, ast.Name))
+    return out
+
+
+def _shipped_record_fields() -> set[str]:
+    """Field names in the shipped rule JSON, which the skill documents like symbols."""
+    out = set()
+    for path in PKG.rglob("*.json"):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            continue
+        records = data.get("disconnections") if isinstance(data, dict) else data
+        if isinstance(records, list):
+            for record in records[:1]:
+                if isinstance(record, dict):
+                    out.update(record)
     return out
 
 
@@ -133,6 +161,10 @@ def _doc_page_stems() -> set[str]:
 # Keys of the dict returned by download_preset. They come from the preset YAML
 # hosted on HuggingFace, so they cannot be derived from this repository.
 PRESET_KEYS = {"building_blocks", "reaction_rules", "ranking_policy", "value_network"}
+
+# Columns of the downloaded building-block TSV. They live in no package file, so the
+# collectors cannot see them, but the skill has to name them for anyone reading the file.
+DATA_COLUMNS = {"SMILES", "LN_ppg", "SA_ppg", "EM_ppg"}
 
 
 # --------------------------------------------------------------------------- #
@@ -218,7 +250,9 @@ def test_named_python_symbols_exist():
         | _keyword_arguments()
         | _packaging_tokens()
         | _doc_page_stems()
+        | _shipped_record_fields()
         | PRESET_KEYS
+        | DATA_COLUMNS
     )
     candidates = {
         s
