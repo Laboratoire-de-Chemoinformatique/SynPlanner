@@ -37,6 +37,8 @@ class ChemFrame:
     """
 
     depict_columns: ClassVar[tuple[str, ...]] = ()
+    max_display_rows: ClassVar[int] = 20
+    """Rows drawn before the view truncates; a depicted row costs roughly 7 kB of SVG."""
 
     def __init__(
         self,
@@ -53,7 +55,8 @@ class ChemFrame:
         return self._df
 
     def _repr_html_(self) -> str:
-        shown = self._df.copy()
+        shown = self._df.head(self.max_display_rows).copy()
+        hidden = len(self._df) - len(shown)
         for column in shown.columns:
             if column in self.depict_columns:
                 shown[column] = shown[column].map(depict_value)
@@ -62,6 +65,8 @@ class ChemFrame:
         # A recursive SMARTS spells `$(...)`, which MathJax reads as inline maths and
         # renders as a highlighted failure; the ignore classes keep it off the table.
         table = shown.to_html(escape=False)
+        if hidden:
+            table += f"<p>... and {hidden} more rows; raise max_display_rows or use .df</p>"
         return f'<div class="tex2jax_ignore mathjax_ignore">{table}</div>'
 
     def __getattr__(self, name: str) -> Any:
@@ -120,6 +125,9 @@ def demo() -> None:
     assert "benzene" in html
     assert "<svg" not in frame.df.to_html(escape=False), "df stays object-valued"
     assert len(frame.head(1)) == 1, "delegation should work"
+    wide = ChemFrame([{"n": i} for i in range(50)])
+    assert "more rows" in wide._repr_html_(), "a long frame must truncate its view"
+    assert len(wide) == 50, "truncation is display-only"
     assert isinstance(frame.head(1), ChemFrame), "a frame result stays a ChemFrame"
     assert depict_value(["x"]) == "x" and depict_value(5) == "5"
 

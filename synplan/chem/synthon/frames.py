@@ -45,9 +45,10 @@ def rules_frame(
         orders the frame to what was actually loaded; ``None`` gives every shipped record,
         macrocyclic half included, which is what a kind/provenance census wants.
     :param config: Supplies the ``rules.json`` path.
-    :return: A frame of ``id, name, kind, provenance, reaction_name, forms, reagents,
-        rule, name, kind, provenance, reaction_name, forms, reagents,
-    supersedes, smarts``, where ``kind`` is ``macro``/``ring``/``acyclic``.
+    :return: A frame of ``id, rule, name, kind, provenance, reaction_name, forms,
+        reagents, supersedes, smarts``, where ``kind`` is ``macro``/``ring``/``acyclic``
+        and ``macro`` wins over ``ring``, so ``kind == "ring"`` excludes the macrocyclic
+        ring rules and every ring-forming rule is ``kind != "acyclic"``.
     """
     records = load_data((config or SynthonConfig()).rules_path)["disconnections"]
     if rules is not None:
