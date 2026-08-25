@@ -123,7 +123,9 @@ def test_loader_returns_reactors_under_one_non_reserved_name() -> None:
     rules = synthon_priority_rules()
     assert list(rules) == [SYNTHON_SOURCE_NAME]
     assert SYNTHON_SOURCE_NAME != POLICY_SOURCE_NAME
-    assert len(rules[SYNTHON_SOURCE_NAME]) == 108  # 39 acyclic + the authored ring rules
+    assert (
+        len(rules[SYNTHON_SOURCE_NAME]) == 108
+    )  # 39 acyclic + the authored ring rules
     assert len(synthon_priority_rules(macro=True)[SYNTHON_SOURCE_NAME]) == 147
     assert all(
         isinstance(rule, CanonicalRetroReactor) for rule in rules[SYNTHON_SOURCE_NAME]

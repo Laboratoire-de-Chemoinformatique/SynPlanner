@@ -1,7 +1,6 @@
 """A target already in the catalogue must be reported, not planned."""
 
 import csv
-from pathlib import Path
 
 from synplan.mcts.search import run_search
 
@@ -20,7 +19,9 @@ def test_purchasable_target_is_skipped_and_flagged(tmp_path, monkeypatch):
         "synplan.mcts.search.load_building_blocks", lambda *a, **k: {"CCN"}
     )
     monkeypatch.setattr("synplan.mcts.search.load_reaction_rules", lambda *a, **k: [])
-    monkeypatch.setattr("synplan.mcts.search.load_policy_function", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "synplan.mcts.search.load_policy_function", lambda *a, **k: None
+    )
     monkeypatch.setattr(
         "synplan.mcts.search.load_evaluation_function", lambda *a, **k: None
     )

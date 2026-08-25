@@ -31,5 +31,7 @@ def test_uncapped_enumeration_is_silent(stock):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         products = list(Enumerator(config).enumerate_library(stock))
-    assert len(products) > 5, "fixture must exhaust below the cap or this proves nothing"
+    assert len(products) > 5, (
+        "fixture must exhaust below the cap or this proves nothing"
+    )
     assert not [w for w in caught if issubclass(w.category, ProductsTruncatedWarning)]

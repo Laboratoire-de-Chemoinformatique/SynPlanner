@@ -36,7 +36,9 @@ class ChemFrame:
     survives a ``.head()`` or a boolean mask.
     """
 
-    depict_columns: ClassVar[tuple[str, ...]] = ()
+    #: Columns holding depictable objects. A subclass sets it; a caller may override it
+    #: per instance, so it is a plain attribute rather than a ClassVar.
+    depict_columns: tuple[str, ...] = ()
     max_display_rows: ClassVar[int] = 20
     """Rows drawn before the view truncates; a depicted row costs roughly 7 kB of SVG."""
 
@@ -66,7 +68,9 @@ class ChemFrame:
         # renders as a highlighted failure; the ignore classes keep it off the table.
         table = shown.to_html(escape=False)
         if hidden:
-            table += f"<p>... and {hidden} more rows; raise max_display_rows or use .df</p>"
+            table += (
+                f"<p>... and {hidden} more rows; raise max_display_rows or use .df</p>"
+            )
         return f'<div class="tex2jax_ignore mathjax_ignore">{table}</div>'
 
     def __getattr__(self, name: str) -> Any:

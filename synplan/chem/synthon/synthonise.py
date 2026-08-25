@@ -11,6 +11,7 @@ from synplan.chem.synthon.config import SynthonConfig, load_data
 from synplan.chem.synthon.transformer import SynthonTransformer
 from synplan.chem.utils import StereoDiscardedWarning, safe_canonicalization
 
+
 def _canonical_solvents(patterns: tuple[str, ...]) -> frozenset[str]:
     """Canonicalise the strip list once, without warning about its own stereochemistry.
 

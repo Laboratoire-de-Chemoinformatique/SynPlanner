@@ -8,9 +8,7 @@ from synplan.chem.reaction.routes.representation.components import (
 
 
 def test_aromatic_nh_survives_pseudo_reactant_projection():
-    reaction = smiles(
-        "Clc1ncnc2[nH]ccc12.OB(O)c1ccccc1>>c1ccccc1-c1ncnc2[nH]ccc12"
-    )
+    reaction = smiles("Clc1ncnc2[nH]ccc12.OB(O)c1ccccc1>>c1ccccc1-c1ncnc2[nH]ccc12")
     reaction.canonicalize()
     azole = smiles("Clc1ncnc2[nH]ccc12")
     azole.canonicalize()
