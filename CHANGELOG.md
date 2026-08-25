@@ -173,9 +173,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `min(os.cpu_count() or 4, cap)`, which cost 366 ms of a 501 ms import; importing
   `synplan.chem.synthon.config` now takes 143 ms and pulls no torch at all.
 
-- `chython-synplan` is pinned to 1.103 and sourced from the local fork, which adds the
-  `Synthon` atom family, `SynthonContainer`, the `_token` bracket field in SMILES and
-  SMARTS, and `!rN` as a real excluded-ring-sizes constraint.
+- `chython-synplan` is pinned to 1.104, which adds the `Synthon` atom family,
+  `SynthonContainer`, the `_token` bracket field in SMILES and SMARTS, `!rN` as a real
+  excluded-ring-sizes constraint, and the depiction fixes for synthon structures.
 
 ### Fixed
 
