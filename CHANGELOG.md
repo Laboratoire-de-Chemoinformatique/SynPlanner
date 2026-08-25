@@ -7,26 +7,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Heterocyclisations now reach the planner. A ring rule cuts two bonds, so the leaving-group
-  capper cannot derive its reagent form and the derived answer named the wrong compound class —
-  a styrene where the alkyne belongs. 69 of the 76 ring records now ship a hand-authored
-  `retro_smarts` naming the reagents the reaction consumes, which the loader uses verbatim,
-  taking the default priority set from 39 rules to 108. The seven left out emit something that
-  cannot be isolated: an enamine that tautomerises, a beta-halo thiol, an N-unsubstituted
-  hydrazonoyl halide.
+- Added ring-forming disconnections to the priority rule set, so a planning run can
+  propose building a heterocycle rather than only buying one. 69 of the 76 ring records
+  ship a hand-authored `retro_smarts` naming the reagents its reaction consumes, taking
+  the default set from 39 rules to 108. See `docs/methods/priority_rules.rst`,
+  "Ring-forming rules".
 
-- Added `synplan.utils.frames.ChemFrame`, a pandas frame that depicts any column holding a
-  chython object, with `rules_frame` and `synthons_frame`
-  (`synplan.chem.synthon.frames`) and `tree_stats_frame` over it. Notebooks previously
-  rebuilt these tables by hand.
+- Added `synplan.utils.frames.ChemFrame`, a pandas frame that depicts any column holding
+  a chython object, with `rules_frame`, `synthons_frame` and `tree_stats_frame` built on
+  it. See `docs/user_guide/tables.rst`.
 
-- `run_search` now checks the building blocks before planning a target and reports a catalogue
-  hit instead of searching it, as `target_in_stock` in the stats CSV and a line on the console.
-  A run previously reported 605 routes for paracetamol without mentioning it is on the shelf.
+- Added a building-block check before the search in `run_search`, reported as
+  `target_in_stock` in the statistics CSV and on the console. See
+  `docs/methods/planning.rst`, "Targets that are already purchasable".
 
-- Added `ProductsTruncatedWarning`, raised when `max_products` stops an enumeration. The cap
-  truncates a depth-first walk, so a capped run returns elaborations of whichever seed it
-  started on rather than a sample of the library.
+- Added `ProductsTruncatedWarning`, raised when `max_products` ends an enumeration
+  before the walk completes, so a truncated depth-first result is not mistaken for a
+  sample of the library. See `docs/configuration/synthonisation.rst`.
 
 - Added `synplan.chem.reaction.curation.rebalancing`, which adds the molecules an unbalanced
   reaction is missing without needing atom mapping. Missing carbon is recovered
@@ -37,6 +34,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   with an unsatisfied valence, which is what distinguishes Mg(OH)Br from a bare
   `[Mg]Br`, and species that cannot survive in a flask are broken into what they
   vent.
+  See `docs/methods/rebalancing.rst` for the measured results and their limits.
 
   Exposed as the `rebalance_reaction_config` standardization step, with options
   to name the reagent behind a redox step rather than balance it with loose
@@ -73,258 +71,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 #### Synthons (Synt-On port)
 
-- Added `synplan.chem.synthon`, a native port of Synt-On (SynthI; Zabolotna, Volochnyuk, Ryabukhin,
-  Gavrylenko, Horvath, Klimchuk, Oksiuta, Marcou, Varnek, "SynthI:
-  A New Open-Source Tool for Synthon-Based Library Design", *J. Chem. Inf. Model.* 2022,
-  62(9), 2151-2163, doi:10.1021/acs.jcim.1c00754). A synthon is a valence-complete
-  fragment whose atoms carry a reaction-centre label saying how that atom will
-  react; the reference stores that label as an RDKit atom-map number and does its
-  work with string surgery on SMILES, while this port makes it a graph property on
-  a forked chython `SynthonContainer`, serialised as `[NH2_nuc]`.
-
-  Seven components, none cut: a building-block classifier (147 ordered classes over
-  2401 SMARTS), building-block synthonisation (147 rule programs, 389 steps, four
-  execution strategies), fragmentation (39 disconnection rules, their 39 macrocyclic
-  twins, and the disconnection DAG with its gates and availability rate), recombination
-  (one join keyed by the 29-pair compatibility table, both enumeration modes), Bemis-Murcko
-  scaffolds (`synplan.chem.scaffolds` — chython only, useful outside enumeration) and the
-  rule of two, and positional analogue scanning.
-
-  CLI: `bb_classifying`, `bb_synthonizing`, `synthon_fragment`, `synthon_enumerate`
-  and `bb_scaffolds`, configured by `configs/synthonisation.yaml`.
-
-  `synthon_enumerate` fills each slot of a fragmentation pathway from the stock, and
-  `find_analogues` widens that slot to the synthon's positional analogues — the step
-  that turns the paper's Library1 into Library2. `similarity_threshold` adds a
-  Tanimoto route into the same slot, `pas_removal_direction` turns off the direction
-  upstream's own code could never reach, and `ro2_filtration` restricts the stock to
-  what the rule of two calls reagent-like, under whichever `ro2_variant` the caller
-  asks for.
-
-  The reference's RDKit SMARTS are translated once, offline, by
-  `synplan.chem.synthon.rules._convert`; its output is committed and asserted in the
-  test suite, and nothing translates at import time.
-
-  Reproduces the paper's catalogue-free published numbers: 9/9 building-block
-  classifications, 18 synthons from 9 building blocks with the right token on the
-  right atom, all 47 published tutorial products (85 unique under the shipped
-  defaults), `MolW=183.035400 / HBA=4` on the
-  rule-of-two worked example, four scaffold contracts, and the README's seven
-  cenobamate disconnection pathways — which the reference itself cannot produce,
-  because `str.replace` labelling stopped matching on RDKit 2023 and it raises
-  `TypeError` on its own headline example.
-
-  Seventeen measured upstream defects are fixed rather than reproduced.
-  `tests/regression/test_synthon_divergence.py` is the divergence register, and every
-  fix that has a port-side line to revert carries an assertion that has been watched
-  fail when it is reverted. The rest are fixed by construction — the port has no
-  counterpart line to break, because the label is a graph field rather than a substring
-  and fragmentation is a BFS rather than a recursion — and are covered indirectly by the
-  paper's published numbers in `test_synthon_fixtures.py`. Three leave nothing to assert
-  at all: the deleted debug prints, the availability memoisation (a performance fix with
-  identical output), and the per-branch reaction set, whose upstream defect has no
-  witness on any target tried. Three deliberate departures from the
-  published vocabulary: code 11 collapses into `elec` (there is no `N:10` key to
-  distinguish it from); R12.3 ships as `R12.3a` (Heck) and `R12.3b` (Suzuki)
-  rather than silently dropping the first, which makes the count 39 rules, not 38;
-  and the compatibility table gains the Suzuki pairing (`elec` with `elecB`, three
-  rows read off the R12.1/R12.2/R12.6 reconstruction SMIRKS). Upstream's table is
-  only a whole-molecule pre-filter and the SMIRKS form the bond, so there the
-  pairing fires only when a partner happens to carry a second compatible label;
-  here the table IS the join, so without those rows a biaryl disconnects and then
-  reassembles to nothing.
-
-- Added opt-in audited output bundles to the five audited synthon CLI workflows —
-  every synthon command except `synthon_coverage`, whose output is a verbatim subset
-  of its input. Set
-  `write_audit_files: true` in `SynthonConfig` to write `fallback.smi`,
-  `fallback.tsv`, `errors.tsv`, `summary.json`, and `run.log` beside the primary
-  output. Audited runs preserve an exact success/fallback input partition,
-  stage retryable records separately from processing errors, and publish validated
-  files with atomic replacement and `summary.json` promoted last. `audit_overwrite` defaults to `error`; use a
-  dedicated output directory per command and select `replace` explicitly to
-  replace an earlier bundle. Python return values and CLI result messages stay
-  unchanged. Synthon molecule inputs reserve spaces for complete CXSMILES and
-  require TAB-delimited metadata; headered TSV inputs use a `SMILES` or
-  `CXSMILES` column.
-
-- Added synthon coverage of a mapped reaction: `classify_coverage` answers whether a reaction
-  builds a bond one of the 39 shipped acyclic disconnections already breaks, and the
-  `synthon_coverage` CLI command splits a reaction file on that answer. Its use is corpus
-  preparation — a one-step policy learns nothing from reactions the curated rules already
-  provide. The atom mapping gives the formed bond, each rule gives its broken bond, and the
-  reactant-side leaving groups are checked against the rule's `_label` tokens, which is the
-  only label-aware step available: `QueryElement.__eq__` never consults `_label`, so the
-  substructure match cannot be. Coverage is disconnection-level, not mechanism-level — a
-  reductive amination counts as covered by R3.1. On a 100k mapped USPTO sample, 37.9% covered
-  at ~1 ms/reaction. The eight rules that name their nucleophile require that element to be
-  present on the reactant side, sharing `RULE_NUCLEOPHILE_CAPS` with the capping path: read as
-  the bare "no halide left this atom", `nuc` is satisfied by an arene doing nothing, and
-  Friedel-Crafts acylations were being absorbed by R10.2 (906 hits down to 118), C-H
-  functionalisations by R12.5 (443 to 124) and enolate acylations by R10.1 (698 to 290).
-
+- Added `synplan.chem.synthon`, a native port of Synt-On (SynthI; Zabolotna et al., *J.
+  Chem. Inf. Model.* 2022, 62(9), 2151-2163). Seven components, none cut: building-block
+  classification and synthonisation, fragmentation, recombination, Bemis-Murcko
+  scaffolds, the rule of two, and positional analogue scanning. CLI: `bb_classifying`,
+  `bb_synthonizing`, `synthon_fragment`, `synthon_enumerate`, `bb_scaffolds`, configured
+  by `configs/synthonisation.yaml`. See `docs/methods/synthons.rst`.
+- Added opt-in audited output bundles to the five audited synthon CLI workflows. Set
+  `write_audit_files: true` in `SynthonConfig` to write `fallback.smi`, `fallback.tsv`,
+  `errors.tsv`, `summary.json` and `run.log` beside the primary output, with an exact
+  success/fallback input partition and atomic replacement. `audit_overwrite` defaults to
+  `error`; use a dedicated output directory per command. Python return values and CLI
+  messages are unchanged. See `docs/configuration/synthonisation.rst`.
+- Added synthon coverage of a mapped reaction: `classify_coverage` answers whether a
+  reaction builds a bond one of the 39 acyclic disconnections already breaks, and the
+  `synthon_coverage` CLI splits a reaction file on that answer. Its use is corpus
+  preparation. 37.9% of a 100k mapped USPTO sample is covered. See
+  `docs/methods/synthons.rst`, "Corpus coverage".
 - The shipped synthon disconnections can be used as an MCTS priority-rule set.
   `synthon_priority_rules()` returns them under the source name `"synthon"` as
-  `run_search(priority_rules=...)` / `Tree(priority_rules=...)` input, so they are tried
-  ahead of the policy on every expansion. Each rule spells its leaving group inline on
-  the RHS, which is what makes a disconnection give the acyl chloride rather than the
-  aldehyde; 96.6% of the disconnection rules convert. The children are ordinary molecules
-  checked against the ordinary building-block stock, so a rule that fires on an unbuyable
-  fragment costs one expansion and hands the node back to the policy. On a 40-target
-  FDA-2020 sample at a fixed iteration budget this solves 30/40 against the policy-only
-  23/40 (McNemar p=0.0156), and 92.8% of the winning routes contain at least one synthon
-  step.
-
-  A second design was built, measured on the same sample, and reverted: keep the children
-  as labelled synthons and check them against a separate synthon stock. It solved 21/40,
-  below policy-only, because a synthon child that misses the synthon stock is an absorbing
-  dead end — 39.3% of expansions — where a plain child that misses the ordinary stock is
-  merely handed back to the policy. Refunding it every expansion its dead ends throw away
-  lifts it only to policy-only parity, so synthon-space expansion has no measured headroom
-  to buy back the loss. Two fixes found while building it are kept, being correct
-  independently of it: `rule_query_pattern` falls back to `_pattern` (chython's `Reactor`
-  keeps its patterns on `_patterns`, a `Transformer` on `_pattern`; without the fallback
-  `PriorityPolicy` gates a transformer-based rule off forever and never says so), and
-  `apply_reaction_rule` raises `TypeError` on a labelled `SynthonContainer`, because
-  `QueryElement.__eq__` never consults `_label`, so a label-blind rule would match a
-  labelled synthon and emit unlabelled products silently.
-
-  Two things a later attempt at synthon-space search will need, recorded because the code
-  that carried them was removed with that design: a synthon needs its own `Precursor`-shaped
-  wrapper (the availability test is a different lookup and `min_mol_size` must not apply),
-  and the shipped featuriser is label-blind — `atom_to_vector` reads `MENDEL_INFO` by
-  `atomic_symbol`, so a labelled atom featurises identically to the plain one and a policy
-  trained on it cannot see the only property distinguishing one attachment point from
-  another. Widening the shipped vector would invalidate every pretrained retro model, so
-  that needs a separate featuriser, not an edit.
-
-- Added heterocyclisation support to synthon enumeration: nine ring-forming
-  disconnections (`R16.1`-`R16.9`, covering triazole, tetrazole, pyrazole, imidazole,
-  isoxazole, pyridine, pyridazine, indole and quinoline), a `ring_pairs` table and
-  `SynthonConfig.ring_closure_sizes`. The reference excludes heterocyclisation by
-  design; it becomes expressible here because a ring synthon is a fragment of the
-  product with product bond orders — a triazole cuts to a triazene and a styrene, not
-  to an azide and an alkyne — so no bond order is ever rewritten at join time. The one
-  missing primitive was `close_ring`, which draws the second bond after `join` has
-  already merged the two fragments into one molecule.
-
-  This changes default enumeration output: `rule_mode="use_all"` loads the ring rules
-  alongside the 39 acyclic ones (see the curation entry below for the shipped count),
-  and across ten drug targets unique products go from 21 to 28 (a
-  pyridine ring closure makes nicotine reachable, where the shipped rules found no
-  pathway). Ring rules are excluded from `synthon_priority_rules()`, where `capped_smarts` has
-  no open valence to spell a leaving group on and would hand the planner a styrene
-  where the alkyne belongs. `ring_closure_sizes=()` disables ring closure in the
-  enumerator, but the fragmenter still cuts with ring rules unless they are also
-  removed from the selection.
-
-  Not expressible: benzimidazole and other C1 insertions, where one atom must make two
-  ring bonds to two different partners and `join` spends its attachment points on a
-  single double bond. Oxazole and thiazole were also called unexpressible here, on a
-  tautomer argument that proved too strong; the curation entry below ships both.
-  Pyrimidine is still absent.
-
-- Curated the heterocyclisation block from 9 ring rules to 76, and changed what the
-  original nine do. Two id blocks: `R16` keeps the shipped families (13 rules) and
-  `R17.1`-`R17.93` holds the new ones (63), one contiguous range per curation lane —
-  pyrrole/thiophene/indole `R17.1`-`R17.20`, multi-heteroatom azoles `R17.30`-`R17.36`,
-  thiazole/oxazole/imidazole `R17.40`-`R17.50`, azines `R17.55`-`R17.62`, benzo-fused
-  azoles `R17.70`-`R17.74`, saturated N/O/S rings `R17.80`-`R17.93`. Every rule now pins
-  the ring heteroatom's charge, which no shipped ring rule did.
-
-  **Existing enumeration output changes, and so do rule ids.** The nine `R16.1`-`R16.9`
-  selectors are gone; a `rules_selection` naming them must be rewritten. Four defects
-  in the shipped nine are fixed, each of which changes an answer:
-
-  - chython's `D` counts HEAVY neighbours, so `[n;D3]` never matched an N-unsubstituted
-    azole and `R16.1`-`R16.4` and `R16.8` silently missed every N-H parent. chython
-    refuses `[n;D3,h1:1]` ("Unsupported OR statement"), so each affected family ships as
-    an `a` (N-substituted) / `b` (N-H) twin pair. Cenobamate gains four pathways: once
-    `R5.1`/`R5.2` has cut the N-CH2 bond, `R16.2b` closes the N-H tetrazole left behind.
-  - `R16.6`'s LHS is mirror-symmetric while its RHS is not, and chython's automorphism
-    filter dedupes on the SET of matched target atoms — one whole-ring mapping per ring,
-    so one of the two Kroehnke disconnections was silently lost. `R16.6a`/`R16.6b` spell
-    both orientations.
-  - `R16.4` corrupted the brutto formula on 49% of the drug-like sample. Its N-H twin
-    `R16.4b` ships with `R1`/`+0`/`h0` pins; the N-substituted half is held (below).
-  - `R16.6a/b`, `R16.7`, `R16.9` and `R17.58` disconnected N-H azinones: a Kroehnke of
-    4-pyridone, a Friedlaender of carbostyril, a hydrazine condensation of
-    phthalazin-1(2H)-one. Every one round-tripped and conserved formula while being
-    chemically wrong, because canonicalisation rewrites an N-H azinone to the aromatic
-    hydroxy-azine before any rule sees it. `!$(c!@[OH])` alpha and gamma to the ring
-    nitrogen refuses them and leaves 3-hydroxypyridine, 6-hydroxyquinoline and every
-    plain azine untouched.
-
-  Guards applied family-wide: the four-token N-substituent idiom
-  (`!$([n][#6]=[#8]);!$([n]S(=O)=O);!$(n-[#7]);!$(n-[#8])`, with the Fokin sulfonyl-azide
-  and Pellizzari hydrazide exemptions), `;R1` on the ring heteroatom of the monocyclic
-  and saturated rules, and a carbocyclic-fusion requirement on the four arene-requiring
-  indole rules, which stops them claiming azaindoles and 7-deazapurines. The generic
-  saturated-ring residual `R17.93` fires on 17.7% of drug-like molecules rather than
-  33.3%, with no acetal, aminal or anomeric carbon left as its electrophile —
-  glucopyranose, sucrose, solketal and penicillin G no longer disconnect, though
-  morphine's bridged ether still does.
-
-  Four code changes that the rule set needs to be usable at all. `Fragmenter._cut` catches
-  `InvalidAromaticRing` per rule and logs it, where one rule that cannot kekulise its
-  product used to kill the whole fragmentation — `R16.6` on acridine did that to 2.00% of
-  drug-like targets. `Enumerator._close`/`_grow` raise `FormulaDrift` when a rebuilt
-  product is not the sum of its synthons minus two hydrogens per bond order, and lend a
-  stranded proton back across the double bond it was pushed over, which is the mechanism
-  behind `R16.4`'s corruption. This narrows the drug-like sweep from 1889 formula
-  violations to 13, all on charged inputs, so the problem is contained rather than closed.
-  `_positions()` refuses a duplicated rule id instead of
-  returning both. `_clean_molecule` raises `StereoDiscardedWarning` when it is about to
-  discard a real stereocentre rather than dropping it in silence; promote it to an error
-  with `warnings.simplefilter("error", StereoDiscardedWarning)` to refuse stereo-bearing
-  input outright.
-
-  `_convert.check()` now calls `synplan.chem.synthon.rules.validate`, which until now had
-  no caller outside its own test: `rules.json` cannot be regenerated with a ring rule that
-  fails to fire on its own authored target, or that labels an atom whose proton
-  canonicalisation moves. The blanket predicate is narrowed to make that usable — both
-  ends of an amide / amidine / thioamide / enol triad may be labelled when they are the
-  same element carrying the same token, because then the two atoms are interchangeable and
-  nothing landed on the wrong one. Without the narrowing every N-H amidine rule is a false
-  positive. `check()` also rejects a duplicated rule id, which `_positions()` would
-  otherwise resolve to two rules and use to widen any range spanning it.
-
-  Ten curated rules are **held out** of `rules.json` and stay flagged pending in the
-  curation record; `docs/development/chemist_review.rst` is the queue and names the open
-  question against each: `R16.4a` (N-substituted imidazole by the
-  amidine route — its own curator wrote "DOES NOT ROUND-TRIP. Do not ship. Correct only
-  for N-methyl", and the acceptance gate that disagrees tests one target); `R17.7`,
-  `R17.8`, `R17.10`, `R17.11` (oxa-/aza-Fiesselmann and the two Hinsberg routes, all
-  UNVERIFIED as general methods — Hinsberg furan has zero USPTO reactions and zero
-  patents); and `R17.3`, `R17.4`, `R17.5`, `R17.6`, `R17.15`, each gated on a chemist
-  ruling on whether the activating group it requires is genuinely mandatory. Holding the
-  two furan rules leaves the port with no rule for a plain 2,5-dialkylfuran, which is
-  declared rather than hidden.
-
-  Not shipped, and known: `smirks_stereo` and `stereo_spec` are recorded for all 96 curated
-  rules but the stock is still keyed on flat structures, so any route through these rings is
-  racemic. `R17.16`/`R17.17` and `R16.6a/b` match far more often than chemists close those
-  rings that way, and are not down-weighted yet.
-
-- Every shipped disconnection now records where it came from and what it is. `provenance`
-  is `human` for the 78 rules converted from the reference's own rule file and `llm` for
-  the 76 ring rules authored in this repository, so the half that no chemist has signed off
-  is identifiable rather than inferred from a rule id. Beside it each rule carries a
-  nullable `reaction_name`, what it `forms`, its `reagents`, and the ids it `supersedes`.
-  Null is kept as the honest answer for a transformation class that names no single named
-  reaction — the free-text `name` alone could not be read as one, because it followed two
-  incompatible conventions.
-
-  `rules.json` ships 154 records: 39 acyclic disconnections, their 39 macrocyclic twins,
-  and 76 ring rules. `rule_mode: use_all` loads the 115 non-macrocyclic ones, and the
-  macrocyclic twins are added only when the target has a ring larger than 11 atoms. The
-  ring rules moved out of a 538-line literal inside
-  `synplan.chem.synthon.rules._convert` into a versioned `ring_rules.json`, and the
-  reference's own naming into `enamine_naming.json`, so the authoring record is reviewable
-  as data rather than as source. Both files ship in the wheel.
-
-### Changed
-
+  `run_search(priority_rules=...)` input. On a 40-target FDA-2020 sample at a fixed
+  iteration budget this solves 30/40 against a policy-only 23/40 (McNemar p=0.0156). A
+  synthon-stock design was built, measured at 21/40 and reverted. See
+  `docs/methods/synthons.rst`, "Using the rules for planning".
+- Added heterocyclisation support to synthon enumeration: ring-forming disconnections, a
+  `ring_pairs` table and `SynthonConfig.ring_closure_sizes`. The reference excludes ring
+  closure by design; it is expressible here because a ring synthon carries product bond
+  orders, so no bond order is rewritten at join time. This changes default enumeration
+  output — across ten drug targets unique products go from 21 to 28. See
+  `docs/methods/synthons.rst`, "Enumeration".
+- Curated the heterocyclisation block from 9 ring rules to 76, in two id blocks: `R16`
+  keeps the shipped families and `R17.1`-`R17.93` holds the new ones. **This changes
+  enumeration output and rule ids** — the nine `R16.1`-`R16.9` selectors are gone, so a
+  `rules_selection` naming them must be rewritten. Four defects in the shipped nine are
+  fixed, each of which changes an answer, and ten curated rules are held out pending
+  chemist review. See `docs/methods/synthons.rst`, "The disconnection rules".
+- Every shipped disconnection now records where it came from and what it is.
+  `provenance` is `human` for the 78 rules converted from the reference and `llm` for the
+  76 ring rules authored here, so the half no chemist has signed off is identifiable
+  rather than inferred from a rule id. Beside it each rule carries `reaction_name`,
+  `forms`, `reagents` and `supersedes`. See `docs/methods/synthons.rst`, "Provenance and
+  what is not covered".
 - `rebalance_reaction_config` now imputes the molecules a reaction is missing
   rather than round-tripping it through a CGR. The old step could only
   redistribute atoms the reaction already had, and only when the mapping was
