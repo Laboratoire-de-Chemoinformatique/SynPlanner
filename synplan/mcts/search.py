@@ -222,6 +222,7 @@ def run_search(
     # stats header
     stats_header = [
         "target_smiles",
+        "target_in_stock",
         "num_routes",
         "num_nodes",
         "num_iter",
@@ -275,6 +276,7 @@ def run_search(
     # Public route-export accumulator keyed by RDKit-canonical target SMILES:
     # {canonical_target_smiles: [route_tree, ...]}.
     exported_routes: dict[str, list[dict]] = {}
+    n_in_stock = 0
 
     tree_config = TreeConfig.from_dict(search_config)
     tree_config.silent = True
@@ -298,6 +300,23 @@ def run_search(
                 exported_routes[export_key] = []
             try:
                 target_mol = mol_from_smiles(target_smi)
+                # exact catalogue membership, not is_building_block: that also passes
+                # anything under min_mol_size, which is right for a precursor and wrong
+                # for a target -- a small target is small, not purchasable.
+                if str(target_mol) in building_blocks:
+                    n_in_stock += 1
+                    tqdm.write(
+                        f"{target_smi} is already in the building blocks - "
+                        "no search run, buy it instead"
+                    )
+                    row = dict.fromkeys(stats_header, "")
+                    row["target_smiles"] = target_smi
+                    row["target_in_stock"] = True
+                    row["num_routes"] = 0
+                    row["solved"] = False
+                    statswriter.writerow(row)
+                    csvfile.flush()
+                    continue
                 # run search
                 tree = Tree(
                     target=target_mol,
@@ -366,10 +385,14 @@ def run_search(
                     )
 
             # save stats
-            statswriter.writerow(extract_tree_stats(tree, target_smi))
+            stats_row = extract_tree_stats(tree, target_smi)
+            stats_row["target_in_stock"] = False
+            statswriter.writerow(stats_row)
             csvfile.flush()
 
     if export_routes:
         export_routes_artifact(exported_routes, results_root, filename=routes_filename)
 
     print(f"Number of solved target molecules: {n_solved}")
+    if n_in_stock:
+        print(f"Already purchasable, not searched: {n_in_stock}")
