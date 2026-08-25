@@ -3,9 +3,30 @@
 All notable changes to SynPlanner are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.7.0] - 2026-08-25
 
 ### Added
+
+- Heterocyclisations now reach the planner. A ring rule cuts two bonds, so the leaving-group
+  capper cannot derive its reagent form and the derived answer named the wrong compound class —
+  a styrene where the alkyne belongs. 69 of the 76 ring records now ship a hand-authored
+  `retro_smarts` naming the reagents the reaction consumes, which the loader uses verbatim,
+  taking the default priority set from 39 rules to 108. The seven left out emit something that
+  cannot be isolated: an enamine that tautomerises, a beta-halo thiol, an N-unsubstituted
+  hydrazonoyl halide.
+
+- Added `synplan.utils.frames.ChemFrame`, a pandas frame that depicts any column holding a
+  chython object, with `rules_frame` and `synthons_frame`
+  (`synplan.chem.synthon.frames`) and `tree_stats_frame` over it. Notebooks previously
+  rebuilt these tables by hand.
+
+- `run_search` now checks the building blocks before planning a target and reports a catalogue
+  hit instead of searching it, as `target_in_stock` in the stats CSV and a line on the console.
+  A run previously reported 605 routes for paracetamol without mentioning it is on the shelf.
+
+- Added `ProductsTruncatedWarning`, raised when `max_products` stops an enumeration. The cap
+  truncates a depth-first walk, so a capped run returns elaborations of whichever seed it
+  started on rather than a sample of the library.
 
 - Added `synplan.chem.reaction.curation.rebalancing`, which adds the molecules an unbalanced
   reaction is missing without needing atom mapping. Missing carbon is recovered
@@ -370,6 +391,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   SMARTS, and `!rN` as a real excluded-ring-sizes constraint.
 
 ### Fixed
+
+- `in_stock` in the exported routes now means purchasable. The route exporter set the flag from
+  a node's position in the tree, marking every leaf available and every intermediate not, so the
+  file `--export_routes` writes contradicted `extracted_routes.json` on the same run.
+
+- Decomposing a RouteCGR dropped the implicit hydrogen on an aromatic nitrogen, so every azole
+  came back as an unmatchable `c1cnc2...` and the documented building-block lookup silently found
+  none of the routes using one.
+
+- The protection scanner reported a pair it had never assessed as `compatible`. A missing matrix
+  row, a missing column, or a reaction whose reacting group could not be identified now report
+  `unknown`. Scores are unchanged; only the label was wrong.
+
+- The solvent strip list warned about its own discarded stereochemistry at import, before any
+  user molecule existed, which fired on `--help`.
+
+- Documentation in six places said a `route_scorer` makes routes come back re-ranked. Nothing
+  reorders: `winning_nodes` keeps discovery order and neither exporter sorts, so the export is
+  byte-identical with and without one. Rank on `tree.route_score` yourself.
 
 - Rebalancing no longer caps an open bond with a halide on a carbon that already
   holds two oxygens. That invented carbonate halides, which balance perfectly
