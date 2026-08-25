@@ -115,7 +115,14 @@ def build_target_routes(tree, reactions: dict | None = None) -> list[dict]:
         return []
     if reactions is None:
         reactions = extract_reactions(tree)
-    return list(make_json(reactions, keep_ids=True).values())
+    return list(
+        make_json(
+            reactions,
+            keep_ids=True,
+            building_blocks=tree.building_blocks,
+            min_mol_size=tree.config.min_mol_size,
+        ).values()
+    )
 
 
 def export_routes_artifact(

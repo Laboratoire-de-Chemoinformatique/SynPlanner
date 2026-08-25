@@ -36,6 +36,17 @@ def _route_tree_has_null_node(node) -> bool:
     )
 
 
+def _purchasable(smiles: str, molecule, stock, min_mol_size: int, fallback: bool):
+    """``Precursor.is_building_block`` on an already-serialised molecule.
+
+    Without a stock the caller gets the old positional answer, so an export that never
+    had a catalogue to consult keeps meaning what it used to.
+    """
+    if stock is None:
+        return fallback
+    return len(molecule) <= min_mol_size or smiles in stock
+
+
 def _route_molecule_smiles(mol) -> str:
     """Return the route-IO molecule string using the existing preparation flow."""
     try:
@@ -130,6 +141,8 @@ def _make_json_v1(
     keep_ids=True,
     tree: "Tree | None" = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
+    building_blocks: frozenset[str] | set[str] | None = None,
+    min_mol_size: int = 6,
 ):
     """
     Convert routes into a nested JSON tree of reaction and molecule nodes.
@@ -194,11 +207,14 @@ def _make_json_v1(
                     (p for p in rxn.products if _atom_nums & p._atoms.keys()), None
                 )
             if product is not None:
+                p_smi = _route_molecule_smiles(product)
                 return {
                     "type": "mol",
-                    "smiles": _route_molecule_smiles(product),
+                    "smiles": p_smi,
                     "children": [build_reaction_node(sid)],
-                    "in_stock": False,
+                    "in_stock": _purchasable(
+                        p_smi, product, building_blocks, min_mol_size, False
+                    ),
                 }
             # Neither structural identity nor atom-number overlap matched: route
             # is genuinely unrecoverable; the drop guard in make_json handles it.
@@ -229,7 +245,13 @@ def _make_json_v1(
                     )
                 else:
                     node["children"].append(
-                        {"type": "mol", "smiles": r_smi, "in_stock": True}
+                        {
+                            "type": "mol",
+                            "smiles": r_smi,
+                            "in_stock": _purchasable(
+                                r_smi, react, building_blocks, min_mol_size, True
+                            ),
+                        }
                     )
 
             return node
@@ -258,6 +280,8 @@ def build_route_trees(
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
+    building_blocks: frozenset[str] | set[str] | None = None,
+    min_mol_size: int = 6,
 ) -> RouteExportResult:
     """Build v1 route trees with explicit diagnostics for skipped routes."""
 
@@ -266,6 +290,8 @@ def build_route_trees(
         keep_ids=True,
         tree=tree,
         route_metadata=route_metadata,
+        building_blocks=building_blocks,
+        min_mol_size=min_mol_size,
     )
     diagnostics = tuple(
         RouteDiagnostic(
@@ -289,6 +315,8 @@ def make_json(
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
+    building_blocks: frozenset[str] | set[str] | None = None,
+    min_mol_size: int = 6,
 ):
     """Convert routes into v1 JSON trees.
 
@@ -302,6 +330,8 @@ def make_json(
         tree=tree,
         route_metadata=route_metadata,
         strict=strict,
+        building_blocks=building_blocks,
+        min_mol_size=min_mol_size,
     ).routes
 
 
