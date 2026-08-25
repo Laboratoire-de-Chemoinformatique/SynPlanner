@@ -94,6 +94,7 @@ some advanced explanations and configurations, that can be used for both demonst
    ten_minutes
    cli_interface
    data
+   tables
    migration
    00_Welcome_to_Chython
    01_Coming_from_RDKit

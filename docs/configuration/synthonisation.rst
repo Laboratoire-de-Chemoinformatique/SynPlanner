@@ -144,3 +144,60 @@ input rather than racemise it silently.
 deliberately absent from the shipped file: ``num_workers`` defaults to the number
 of CPUs on the machine running the job, and ``time_budget_s`` defaults to no
 limit. Set them in your own copy when a run needs bounding.
+
+Defaults that are wrong for the job
+------------------------------------
+
+Several knobs default to a value that silently disables the thing you asked
+for. None of them raises.
+
+``find_analogues`` is off by default, and it *is* analogue generation. With it
+off ``SynthonStock.slots()`` offers only the pathway's own synthon for each
+slot, so ``enumerate_analogues`` rebuilds the hit and returns roughly one
+molecule.
+
+``strict_availability`` is off by default. An unfillable slot then falls back to
+the hit's own synthon, which need not be purchasable, so products stop being
+buildable from stock without anything saying so.
+
+``ro2_filtration`` is applied by ``load_synthon_stock``, not by the enumerator.
+Building a stock in memory and passing the config only to ``Enumerator`` leaves
+the filter doing nothing.
+
+``mw_lower`` and ``mw_upper`` bound ``enumerate_library`` only.
+``enumerate_analogues`` ignores them, so they will not keep an analogue library
+drug-sized.
+
+``max_products`` truncates a depth-first walk rather than sampling it. A capped
+run returns elaborations of whichever seed it started on -- measured, 300 of 300
+products sharing one seed and one partner. Bound the synthon pool instead and
+let the enumeration finish; ``ProductsTruncatedWarning`` fires when the cap ends
+a run early.
+
+``max_reacted_synthons`` decides whether a run returns at all. Two exhausts a
+few-hundred-synthon pool in about a minute; three costs roughly thirty times
+that.
+
+What enumeration and analogues actually mean
+---------------------------------------------
+
+``Enumerator.enumerate_library`` grows products from the whole stock with no
+target. ``Enumerator.enumerate_analogues`` fills the slots of one target's
+fragmentation pathway. Only the second is wired to the CLI: ``synthon_enumerate``
+calls ``enumerate_file``, which never reaches ``enumerate_library``, so a
+target-free library is Python only.
+
+Library mode yields bare molecules with no record of which blocks went in.
+``enumerate_analogues`` writes the source synthons per row; library mode has no
+equivalent, and re-fragmenting a product to recover them does not work because
+the enumerator and the fragmenter are not inverses.
+
+Two things to state to anyone reading analogue output. ``is_analogue`` matches
+on ring count, heavy-atom count and element census, and two of its four branches
+never test substructure -- over a real catalogue it returns scaffold hops rather
+than periphery decoration, and ``similarity_threshold`` cannot tighten it
+because the Tanimoto branch is unioned with this one. And reassembly joins by
+label compatibility without remembering which label was bonded to which, so a
+pharmacophore can be scrambled away; pin the slot carrying it
+(``slots[core] = [core]``, only where that synthon is stocked as itself) and
+filter products on a core SMARTS.

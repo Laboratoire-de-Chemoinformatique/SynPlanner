@@ -14,6 +14,7 @@ Practical usage is covered in :doc:`/configuration/configuration` and :doc:`/use
 
     standardization
     rebalancing
+    synthons
     filtration
     extraction
     policy

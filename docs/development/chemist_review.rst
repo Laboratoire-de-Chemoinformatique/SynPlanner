@@ -1373,3 +1373,60 @@ including per-guard rationale, ``smirks_stereo`` and ``stereo_spec``, is in
    * It also claims 4H-thieno[3,2-b]indole via the aromatic-fusion guard. Is a
      2-amino-3-(2-halophenyl)thiophene a sane reagent?
 
+
+Guards that are wider than the chemistry
+----------------------------------------
+
+Found while authoring the reagent forms, on rules that already ship. Each fires on
+substrates its reaction cannot make, so each needs a ruling on whether the guard should
+be narrowed and how.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 12 88
+
+   * - Rule
+     - What it admits that it should not
+
+   * - ``R17.57a``
+     - C4 is guarded only as ``[c;x2]``, so it fires on any 4-substituted quinazoline.
+       4-aminoquinazoline disconnects to anthranilamide + acetamide, whose Niementowski
+       product is the 4-**oxo** ring. C2 is unguarded too, so a 2-aminoquinazolinone
+       emits urea and builds the 2,4-dione.
+
+   * - ``R17.92``
+     - The C5 activation list admits a plain aryl (``$([#6][c])``). A benzylic C-H with
+       no electron-withdrawing group has pKa around 43 and cannot be C-alkylated.
+
+   * - ``R17.43``
+     - No guard on C5, so it fires on 5-**aryl** thiazoles, whose partner would have to
+       be thiobenzaldehyde. Van Leusen uses isothiocyanates and gives 5-**amino**
+       thiazoles; requiring an exocyclic N on C5 fixes it.
+
+   * - ``R16.6a`` ``R16.6b``
+     - No electron-withdrawing requirement on the enamine carbon, so they fire on every
+       alkylpyridine and emit non-isolable enamines. Kröhnke and Bohlmann-Rahtz need an
+       activated beta-enaminone or beta-enamino ester.
+
+   * - ``R17.19`` ``R17.20``
+     - Neither guards C3 as ``X4``, so both accept 3-alkylidene oxindoles and emit an
+       alpha-benzylidene 2-aminophenylacetic acid, which relactamises on contact. Those
+       oxindoles are made by Knoevenagel onto a pre-formed ring.
+
+   * - ``R17.74``
+     - C3 is unguarded against exocyclic heteroatoms, so it fires on 3-aminoindazole.
+       That ring comes from an *ortho*-fluorobenzonitrile, not the benzamide it emits.
+
+   * - ``R17.40``
+     - The C2 guard excludes every 2-aminothiazole — sulfathiazole, famotidine and
+       dasatinib are all unmatchable. Too narrow rather than too wide.
+
+   * - ``R17.59`` ``R17.61``
+     - Byte-identical left-hand sides, so both fire on every isoquinoline and compete
+       permanently. Neither can encode Bischler-Napieralski's electron-rich-arene
+       requirement, which is the larger unfixable hole.
+
+   * - ``R17.12``
+     - Leimgruber-Batcho builds C3 from the benzylic CH2 of the *ortho*-nitrotoluene and
+       so delivers 3-**unsubstituted** indoles. The shipped rule implies C3 can come from
+       elsewhere. The reagent form ships pinned to C3-H for that reason.

@@ -36,3 +36,23 @@ instead of expansive rollout simulations.
       evaluation_type: gcn
 
 **Conclusion**. The advanced algorithm is roughly 2x slower but explores the search tree more exhaustively.
+
+Targets that are already purchasable
+------------------------------------
+
+``run_search`` checks each target against the building blocks before it builds a
+tree. A target the catalogue already sells is named on the console and recorded
+as ``target_in_stock`` in the statistics CSV, and no search is run for it.
+
+The test is exact catalogue membership rather than
+:meth:`~synplan.chem.precursor.Precursor.is_building_block`. That method also
+accepts anything at or below ``min_mol_size``, which is right for a precursor --
+a fragment too small to bother decomposing is treated as available -- and wrong
+for a target, where a small molecule is small rather than purchasable.
+
+This matters more than it sounds. Catalogues assembled from supplier data carry
+finished drugs: paracetamol, celecoxib, sildenafil and paclitaxel are all in the
+shipped eMolecules set. Without the check a run spends its budget planning them
+and reports hundreds of routes, with nothing in the console output, the
+statistics or the route HTML saying the molecule was on the shelf the whole
+time.
