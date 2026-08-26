@@ -129,6 +129,14 @@ Docs: `methods/value`, `configuration/value`
 
 ## Working with routes
 
+**Take one route out of a tree and work on it**
+`tree.routes()` returns `Route` objects, best score first, instead of node ids;
+`tree.routes(solved_only=False)` adds the unfinished ones. A `Route`
+(`synplan.chem.reaction.routes`) carries `steps`, `target`, `solved`,
+`dead_ends`, `svg()`, `to_json()` / `Route.from_json()` and `route_cgr()`, and
+holds no reference to the tree. Its `reactions_dict` is the `{step_id: reaction}`
+shape the dict-driven APIs below take.
+
 **See and export routes**
 `extract_routes`, `get_route_svg`, `generate_results_html`
 (`synplan.utils.visualisation`); `export_tree_to_json`, `export_tree_to_csv`,

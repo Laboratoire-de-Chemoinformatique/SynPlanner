@@ -13,6 +13,7 @@ from tqdm.auto import tqdm
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
 from synplan.chem.reaction.routes.quality.scorer import RouteScorer
+from synplan.chem.reaction.routes.route import Route
 from synplan.chem.reaction.routes.traversal import (
     iter_route_nodes,
     iter_route_steps,
@@ -752,6 +753,30 @@ class Tree:
             route = self.synthesis_route(node_id)
             self._rescore_cache[node_id] = self._route_scorer.rescore(original, route)
         return self._rescore_cache[node_id]
+
+    def routes(self, solved_only: bool = True) -> list["Route"]:
+        """The tree's routes as objects, best score first.
+
+        ``winning_nodes`` stays the raw id list the search appends to; this is
+        its companion for callers who want something they can draw, score and
+        serialise.
+
+        :param solved_only: When False, also return the unfinished routes, one
+            per search leaf that was never solved. That enumeration is blunt --
+            most such leaves are one step deep -- so filter on ``len(route)``.
+        """
+
+        node_ids = sorted(set(self.winning_nodes))
+        if not solved_only:
+            node_ids += [
+                node_id
+                for node_id in self.nodes
+                if not self.children.get(node_id)
+                and not self.nodes[node_id].is_solved()
+            ]
+        routes = [Route.from_tree(self, node_id) for node_id in node_ids]
+        routes.sort(key=lambda route: route.score, reverse=True)
+        return routes
 
     def route_to_node(self, node_id: int) -> list[Node,]:
         """Returns the route (list of id of nodes) to from the node current node to the
