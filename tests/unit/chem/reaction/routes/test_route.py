@@ -176,3 +176,21 @@ def test_route_cgr_delegates_to_the_route_cgr_container(solved_route):
 
 def test_reactions_dict_is_the_routes_dict_adapter(solved_route):
     assert solved_route.reactions_dict == dict(enumerate(solved_route.steps))
+
+
+def test_a_search_that_never_expanded_yields_no_route():
+    """The childless root is not a zero-step route."""
+
+    tree = _StubTree()
+    tree.children = {node_id: set() for node_id in tree.nodes}
+    tree.winning_nodes = []
+
+    routes = tree.routes(solved_only=False)
+
+    assert 1 not in [route.route_id for route in routes]
+    assert all(len(route) > 0 for route in routes)
+
+
+def test_a_route_needs_a_step():
+    with pytest.raises(ValueError):
+        Route(steps=())

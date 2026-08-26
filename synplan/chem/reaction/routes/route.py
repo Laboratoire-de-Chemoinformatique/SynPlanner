@@ -68,6 +68,10 @@ class Route:
     score: float | None = None
     route_id: int | None = None
 
+    def __post_init__(self) -> None:
+        if not self.steps:
+            raise ValueError("a route needs at least one step")
+
     # ------------------------------------------------------------------
     # construction
     # ------------------------------------------------------------------

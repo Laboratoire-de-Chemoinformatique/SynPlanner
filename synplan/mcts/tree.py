@@ -762,8 +762,10 @@ class Tree:
         serialise.
 
         :param solved_only: When False, also return the unfinished routes, one
-            per search leaf that was never solved. That enumeration is blunt --
-            most such leaves are one step deep -- so filter on ``len(route)``.
+            per search leaf that was never solved. The root is skipped: a search
+            that stopped before its first expansion leaves it childless, and a
+            route of no steps is not a route. That enumeration is blunt -- most
+            such leaves are one step deep -- so filter on ``len(route)``.
         """
 
         node_ids = sorted(set(self.winning_nodes))
@@ -771,7 +773,8 @@ class Tree:
             node_ids += [
                 node_id
                 for node_id in self.nodes
-                if not self.children.get(node_id)
+                if node_id != 1
+                and not self.children.get(node_id)
                 and not self.nodes[node_id].is_solved()
             ]
         routes = [Route.from_tree(self, node_id) for node_id in node_ids]
