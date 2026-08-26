@@ -54,8 +54,12 @@ _EXPORTS = {
     "write_routes_csv": "io",
     "write_routes_json": "io",
     # route facade
+    "Conditions": "route",
+    "MoleculePosition": "route",
     "Route": "route",
+    "RouteProvenance": "route",
     "Step": "route",
+    "StepOrigin": "route",
     # pseudo_atoms (clustering atom primitives)
     "DynamicX": "clustering.pseudo_atoms",
     "Marked": "clustering.pseudo_atoms",

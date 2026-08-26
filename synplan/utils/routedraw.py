@@ -23,6 +23,7 @@ __all__ = [
     "ROLE_STYLE",
     "ROUTE_CSS",
     "draw_route",
+    "drawable_copy",
     "molecule_svg",
     "orient_route",
 ]
@@ -94,20 +95,14 @@ def molecule_svg(mol: MoleculeContainer, px: float = 22.0, cap: float = 300.0) -
     )
 
 
-def orient_route(steps: Any, step_deg: int = 5) -> int:
+def orient_route(mols: Any, step_deg: int = 5) -> int:
     """Rotate every molecule of the route by one shared angle, in place.
 
     Alignment fixes each precursor relative to its product; the absolute angle of the
     whole route is still free, so spend it on the shape this layout stacks best —
     smallest summed height, then smallest column width.
     """
-    mols, seen = [], set()
-    for reaction in steps:
-        for mol in (*reaction.reactants, *reaction.products):
-            if id(mol) not in seen:
-                seen.add(id(mol))
-                mols.append(mol)
-
+    mols = list(mols)
     coords = [[(atom.x, atom.y) for _, atom in mol.atoms()] for mol in mols]
     best = None
     for deg in range(0, 180, step_deg):
@@ -135,13 +130,38 @@ def orient_route(steps: Any, step_deg: int = 5) -> int:
     return deg
 
 
+def drawable_copy(mol: MoleculeContainer) -> MoleculeContainer:
+    """A copy of ``mol`` with a layout of its own.
+
+    A route's molecules are the search tree's own objects, and they carry whatever
+    coordinates the reactor left on them -- for a precursor, the product's layout with
+    the new atoms piled onto one point. Only ``clean2d()`` fixes that, and it mutates,
+    so every drawer lays out a copy and leaves the tree's coordinates alone.
+    """
+    copy = mol.copy()
+    copy.clean2d()
+    return copy
+
+
+def _drawable_copies(steps: Any) -> dict[int, MoleculeContainer]:
+    """One :func:`drawable_copy` per molecule of the route, keyed by original id."""
+    copies: dict[int, MoleculeContainer] = {}
+    for step in steps:
+        for mol in (*step.reaction.reactants, *step.reaction.products):
+            if id(mol) not in copies:
+                copies[id(mol)] = drawable_copy(mol)
+    return copies
+
+
 def _route_tree(steps: Any, unresolved: Any, align: bool) -> tuple[Node, dict]:
+    copies = _drawable_copies(steps)
     if align:
         # leaf-first order, so each disconnection inherits the layout above it
         for step in reversed(steps):
+            product = copies[id(step.product)]
             for precursor in step.reaction.reactants:
-                align_molecule(precursor, step.product)
-        orient_route([step.reaction for step in steps])
+                align_molecule(copies[id(precursor)], product)
+        orient_route(copies.values())
 
     by_product = {
         id(step.product): (number, step) for number, step in enumerate(steps, 1)
@@ -150,7 +170,7 @@ def _route_tree(steps: Any, unresolved: Any, align: bool) -> tuple[Node, dict]:
     depicts = {}
 
     def build(mol: MoleculeContainer) -> Node:
-        svg, box = _depiction(mol)
+        svg, box = _depiction(copies[id(mol)])
         depicts[id(mol)] = (svg, box)
         node = Node(
             key=str(mol),

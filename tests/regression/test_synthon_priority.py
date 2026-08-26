@@ -15,6 +15,7 @@ from chython import smarts, smiles, synthon_smiles
 
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.reactor import apply_reaction_rule
+from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.rules import (
     POLICY_SOURCE_NAME,
     parse_priority_rules,
@@ -33,11 +34,7 @@ from synplan.mcts.config import TreeConfig
 from synplan.mcts.evaluation import RandomEvaluationStrategy
 from synplan.mcts.policy.base import Policy
 from synplan.mcts.tree import Tree
-from synplan.utils.visualisation import (
-    _format_arrow_label,
-    get_route_svg,
-    route_rule_labels,
-)
+from synplan.utils.visualisation import route_rule_labels
 
 AMIDE = "CCNC(=O)c1ccccc1"
 AMISULPRIDE = "CCCN1CCCC1CNC(=O)c1cc(S(C)(=O)=O)c(N)cc1OC"
@@ -326,26 +323,23 @@ def test_a_carbon_nucleophile_caps_to_a_real_reagent() -> None:
         assert "[Mg]." not in capped_smarts(smarts_text, leaving_groups, rule_id)
 
 
-def test_the_route_svg_labels_its_arrows_with_the_reaction_name(
+def test_a_drawn_step_can_be_traced_back_to_its_named_reaction(
     priority_tree: Tree,
 ) -> None:
-    """The name belongs on the arrow, not only in the step list underneath — that is where a
-    reader looks to see which reaction a disconnection stands for.
+    """The drawing numbers each disconnection; `route_rule_labels` says which named reaction a
+    number stands for. Both halves key off the same tree node, or a reader cannot line them up.
     """
     synthon_child = next(
         i
         for i in priority_tree.children[1]
         if priority_tree.nodes[i].rule_source == SYNTHON_SOURCE_NAME
     )
-    svg = get_route_svg(priority_tree, synthon_child, allow_unsolved=True)
+    route = Route.from_tree(priority_tree, synthon_child)
+    labels = route_rule_labels(priority_tree, synthon_child)
     rule = synthon_priority_rules()[SYNTHON_SOURCE_NAME][
         priority_tree.nodes[synthon_child].rule_id
     ]
-    assert rule.rule_id in svg
-    assert "<text" in svg
 
-    # a long name is truncated rather than allowed to run into the neighbouring molecule
-    long_name = _format_arrow_label(
-        None, None, include_rule_key=False, rule_name="R10.1 " + "x" * 80
-    )
-    assert len(long_name) == 25 and long_name.endswith("…")
+    (step,) = route
+    assert labels[step.origin.tree_node_id] == f"{rule.rule_id} — {rule.rule_name}"
+    assert "<svg" in route.svg()

@@ -1,5 +1,6 @@
 import json
 import logging
+from functools import lru_cache
 from itertools import zip_longest
 from typing import TYPE_CHECKING, Any, NamedTuple
 
@@ -116,6 +117,7 @@ def _collect_reactions(tree):
 _STEP_META_KEYS = ("step_id", "tree_node_id", "rule_id", "rule_source", "rule_key")
 
 
+@lru_cache(maxsize=4096)
 def _file_key(smiles: str) -> str:
     """The canonical SMILES of a molecule that is already in a file.
 
@@ -123,6 +125,10 @@ def _file_key(smiles: str) -> str:
     written again, or the same molecule ends up under two names. A node whose
     SMILES will not parse keeps its own string -- it then matches nothing, which
     is what an unreadable node deserves.
+
+    Memoised: one file writes the same building block into hundreds of routes,
+    and re-reading a string to arrive at the same string is the definition of a
+    no-op. String in, string out -- nothing shared across the cache is mutable.
     """
     try:
         return str(safe_canonicalization(read_smiles(smiles)))

@@ -22,7 +22,7 @@ from synplan.chem.reaction.routes.traversal import linearise, root_step
 from synplan.utils.routedraw import ARROW_DEFS, ROUTE_CSS, draw_route
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Callable, Iterator, Sequence
 
     from chython.containers import MoleculeContainer, ReactionContainer
 
@@ -30,11 +30,22 @@ if TYPE_CHECKING:
     from synplan.chem.reaction.routes.representation.container import RouteCGRContainer
     from synplan.mcts.tree import Tree
 
-__all__ = ["Conditions", "Origin", "Position", "Provenance", "Route", "Step"]
+__all__ = [
+    "Conditions",
+    "MoleculePosition",
+    "Route",
+    "RouteProvenance",
+    "Step",
+    "StepOrigin",
+]
 
 
-class Position(str, Enum):
-    """Where a molecule sits in a route. Not whether it can be bought."""
+class MoleculePosition(str, Enum):
+    """Where a molecule sits in a route. Not whether it can be bought.
+
+    Named for the molecule, because the prefix says what the value is about and
+    because a bare ``Position`` would fight the step number, also a position.
+    """
 
     TARGET = "target"
     INTERMEDIATE = "intermediate"
@@ -44,8 +55,12 @@ class Position(str, Enum):
 
 
 @dataclass(frozen=True)
-class Origin:
-    """Where a step came from in the search."""
+class StepOrigin:
+    """Where a step came from in the search.
+
+    Named for the step, so an instance in hand says what it describes without
+    any memory of where it was read from.
+    """
 
     rule_key: str | None = None
     rule_source: str | None = None
@@ -62,8 +77,11 @@ class Conditions:
 
 
 @dataclass(frozen=True)
-class Provenance:
+class RouteProvenance:
     """The run that produced the route, not the route itself.
+
+    Named for the route: bare ``Provenance`` did not say whether it described a
+    step or the whole route, and it describes the run behind the whole route.
 
     :param uncanonical: How many molecules a file the route was read from spelled
         in a way chython cannot canonicalise. They are kept as written, so the
@@ -87,7 +105,7 @@ class Step:
 
     reaction: ReactionContainer
     product: MoleculeContainer
-    origin: Origin | None = None
+    origin: StepOrigin | None = None
     conditions: Conditions | None = None
 
     def __post_init__(self) -> None:
@@ -119,8 +137,8 @@ def _leaves(steps: Sequence[Step]) -> tuple[MoleculeContainer, ...]:
     return tuple(out)
 
 
-def _origin(metadata: dict[str, Any]) -> Origin:
-    return Origin(
+def _origin(metadata: dict[str, Any]) -> StepOrigin:
+    return StepOrigin(
         rule_key=metadata.get("rule_key"),
         rule_source=metadata.get("rule_source"),
         rule_id=metadata.get("rule_id"),
@@ -149,7 +167,7 @@ class Route:
 
     steps: tuple[Step, ...]
     unresolved: frozenset[str] = frozenset()
-    provenance: Provenance | None = None
+    provenance: RouteProvenance | None = None
 
     def __post_init__(self) -> None:
         if not self.steps:
@@ -186,7 +204,7 @@ class Route:
                 molecule_key(precursor.molecule)
                 for precursor in tree.nodes[node_id].precursors_to_expand
             ),
-            provenance=Provenance(tree.route_score(node_id), node_id),
+            provenance=RouteProvenance(tree.route_score(node_id), node_id),
         )
 
     @classmethod
@@ -208,7 +226,7 @@ class Route:
         return cls(
             steps=steps,
             unresolved=frozenset(molecule_key(mol) for mol in parsed.unresolved),
-            provenance=Provenance(uncanonical=parsed.uncanonical),
+            provenance=RouteProvenance(uncanonical=parsed.uncanonical),
         )
 
     # ------------------------------------------------------------------
@@ -226,21 +244,38 @@ class Route:
 
         return _leaves(self.steps)
 
-    def position(self, mol: MoleculeContainer) -> Position:
+    def _place(
+        self, key: str, spelling: Callable[[MoleculeContainer], str]
+    ) -> MoleculePosition | None:
+        """``key`` against every molecule of the route, written by ``spelling``."""
+
+        if key == spelling(self.target):
+            return MoleculePosition.TARGET
+        if any(key == spelling(leaf) for leaf in self.leaves()):
+            return MoleculePosition.LEAF
+        if any(key == spelling(step.product) for step in self.steps):
+            return MoleculePosition.INTERMEDIATE
+        return None
+
+    def position(self, mol: MoleculeContainer) -> MoleculePosition:
         """Where ``mol`` sits in this route. Whether it can be bought is
         :attr:`unresolved`.
+
+        A route's own molecules are canonical, so the lookup is by spelling and
+        costs nothing. Only a molecule spelled some other way is normalised
+        (:func:`molecule_key`) and looked up a second time.
 
         :raises KeyError: if the molecule is not in this route.
         """
 
+        found = self._place(str(mol), str)
+        if found is not None:
+            return found
         key = molecule_key(mol)
-        if key == molecule_key(self.target):
-            return Position.TARGET
-        if key in {molecule_key(leaf) for leaf in self.leaves()}:
-            return Position.LEAF
-        if any(key == molecule_key(step.product) for step in self.steps):
-            return Position.INTERMEDIATE
-        raise KeyError(key)
+        found = self._place(key, molecule_key)
+        if found is None:
+            raise KeyError(key)
+        return found
 
     @property
     def solved(self) -> bool:
@@ -272,7 +307,7 @@ class Route:
     def __repr__(self) -> str:
         unresolved = len(self.unresolved)
         state = "solved" if not unresolved else f"unsolved ({unresolved} unresolved)"
-        provenance = self.provenance or Provenance()
+        provenance = self.provenance or RouteProvenance()
         score = (
             "no score"
             if provenance.search_score is None
@@ -295,9 +330,11 @@ class Route:
             for a page that carries one copy of both itself.
         """
 
-        unresolved = tuple(
-            leaf for leaf in self.leaves() if molecule_key(leaf) in self.unresolved
-        )
+        unresolved: tuple[MoleculeContainer, ...] = ()
+        if self.unresolved:  # nothing is in an empty set: do not key the leaves
+            unresolved = tuple(
+                leaf for leaf in self.leaves() if molecule_key(leaf) in self.unresolved
+            )
         svg = draw_route(self.steps, unresolved, align=align)
         if not standalone:
             return svg
@@ -318,7 +355,7 @@ class Route:
 
         The file's nesting is the route's own structure, so a multi-product step
         writes the product the route actually disconnects. Round trip keeps the
-        steps, the per-step :class:`Origin` and the leaf ``in_stock`` flags, and
+        steps, the per-step :class:`StepOrigin` and the leaf ``in_stock`` flags, and
         therefore :attr:`solved`. It drops :attr:`provenance` (v1 JSON has no
         envelope) and 2D coordinates. Nothing in the route is modified.
 

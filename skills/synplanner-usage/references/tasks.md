@@ -43,8 +43,8 @@ costs roughly three times the search time and changes nothing you can consume.
 Most real requests are a chain, not a single entry.
 
 **"Give me good routes for this molecule"** — the default ask
-Planning setup *with* `route_scorer` → `tree.run()` → `extract_routes` /
-`get_route_svg`. This, not bare planning, is the baseline answer.
+Planning setup *with* `route_scorer` → `tree.run()` → `tree.routes()`. This,
+not bare planning, is the baseline answer.
 
 **"Give me good routes, and show me how they differ"**
 The above, then `export_tree_to_json` and `routes_clustering_report`.
@@ -66,8 +66,8 @@ training**, see "Plan with my own retrosynthetic SMARTS" below.
 ## Finding routes
 
 **Find a synthesis route for a molecule**
-Planning setup with `route_scorer`, then `extract_routes` / `get_route_svg`
-(`synplan.utils.visualisation`).
+Planning setup with `route_scorer`, then `tree.routes()` — `Route` objects,
+best score first, each drawing itself in a notebook.
 Tutorial: `05_Retrosynthetic_Planning`, `ten_minutes`
 Docs: `methods/planning`, `methods/mcts`, `configuration/planning`
 
@@ -139,8 +139,9 @@ Docs: `methods/value`, `configuration/value`
 `{step index: reaction}` shape the dict-driven APIs below take.
 
 **See and export routes**
-`extract_routes`, `get_route_svg`, `generate_results_html`
-(`synplan.utils.visualisation`); `export_tree_to_json`, `export_tree_to_csv`,
+`tree.routes()` / `Route.from_tree` / `Route.from_json`; `extract_routes`,
+`generate_results_html` (`synplan.utils.visualisation`);
+`export_tree_to_json`, `export_tree_to_csv`,
 `make_json`, `read_routes_json` (`synplan.chem.reaction.routes.io`).
 Tutorial: `07_Clustering`
 Docs: `methods/routes` — see "Typed Route APIs"

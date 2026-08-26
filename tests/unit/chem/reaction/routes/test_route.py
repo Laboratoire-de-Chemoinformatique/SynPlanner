@@ -11,7 +11,7 @@ from synplan.chem.precursor import Precursor
 from synplan.chem.reaction.reactor import Reaction
 from synplan.chem.reaction.routes.io.json import molecule_key
 from synplan.chem.reaction.routes.representation.container import RouteCGRContainer
-from synplan.chem.reaction.routes.route import Position, Route, Step
+from synplan.chem.reaction.routes.route import MoleculePosition, Route, Step
 from synplan.chem.utils import safe_canonicalization
 from synplan.mcts.node import Node
 from synplan.mcts.tree import Tree
@@ -298,18 +298,28 @@ def test_steps_that_do_not_make_one_molecule_are_not_a_route():
 def test_position_names_where_a_molecule_sits(solved_route, unsolved_route):
     acid, ethanol, toluene = (read_smiles(s) for s in (ACID, ETHANOL, TOLUENE))
 
-    assert solved_route.position(solved_route.target) is Position.TARGET
-    assert solved_route.position(acid) is Position.INTERMEDIATE
-    assert solved_route.position(toluene) is Position.LEAF
-    assert solved_route.position(ethanol) is Position.LEAF
+    assert solved_route.position(solved_route.target) is MoleculePosition.TARGET
+    assert solved_route.position(acid) is MoleculePosition.INTERMEDIATE
+    assert solved_route.position(toluene) is MoleculePosition.LEAF
+    assert solved_route.position(ethanol) is MoleculePosition.LEAF
 
-    assert unsolved_route.position(unsolved_route.target) is Position.TARGET
-    assert unsolved_route.position(acid) is Position.LEAF
+    assert unsolved_route.position(unsolved_route.target) is MoleculePosition.TARGET
+    assert unsolved_route.position(acid) is MoleculePosition.LEAF
     assert molecule_key(acid) in unsolved_route.unresolved
     assert molecule_key(ethanol) not in unsolved_route.unresolved
 
     with pytest.raises(KeyError):
         solved_route.position(read_smiles("CCCCCCCCCCCC"))
+
+
+def test_position_takes_a_molecule_spelled_another_way(solved_route):
+    """The route spells its molecules canonically; the question need not."""
+
+    kekule = read_smiles("CCOC(=O)C1=CC=CC=C1")
+
+    assert str(kekule) != str(solved_route.target)
+    assert molecule_key(kekule) == molecule_key(solved_route.target)
+    assert solved_route.position(kekule) is MoleculePosition.TARGET
 
 
 def test_json_round_trip_answers_position_identically(solved_route, unsolved_route):
