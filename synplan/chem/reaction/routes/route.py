@@ -7,6 +7,7 @@ Facade only: every method delegates to the route machinery that already exists
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -16,6 +17,7 @@ from synplan.chem.reaction.routes.io.json import (
     read_route_tree,
 )
 from synplan.chem.reaction.routes.representation.route_cgr import build_route_cgr
+from synplan.chem.reaction.routes.traversal import linearise
 from synplan.utils.routedraw import ARROW_DEFS, ROUTE_CSS, draw_route
 
 if TYPE_CHECKING:
@@ -25,7 +27,7 @@ if TYPE_CHECKING:
     from synplan.chem.reaction.routes.representation.container import RouteCGRContainer
     from synplan.mcts.tree import Tree
 
-__all__ = ["Route"]
+__all__ = ["Route", "Step"]
 
 
 def _composition_error(result: RouteCGRBuildResult) -> ValueError:
@@ -36,34 +38,93 @@ def _composition_error(result: RouteCGRBuildResult) -> ValueError:
     return error
 
 
+def _leaves(steps: tuple[ReactionContainer, ...]) -> dict[str, MoleculeContainer]:
+    """``{smiles: molecule}`` for every reactant that is no step's product."""
+
+    products = {str(mol) for step in steps for mol in step.products}
+    leaves: dict[str, MoleculeContainer] = {}
+    for step in steps:
+        for mol in step.reactants:
+            key = str(mol)
+            if key not in products and key not in leaves:
+                leaves[key] = mol
+    return leaves
+
+
+@dataclass(frozen=True)
+class Step:
+    """One step of a route, seen the way a chemist reads it.
+
+    :param route: The route this step belongs to.
+    :param step_id: Index in ``route.steps``, and the key every export writes.
+    """
+
+    route: Route
+    step_id: int
+
+    @property
+    def number(self) -> int:
+        """Display number, ``step_id + 1``: 1 is the first reaction run in the lab,
+        ``len(route)`` the cut from the target. The disc in the drawing carries it."""
+
+        return self.step_id + 1
+
+    @property
+    def reaction(self) -> ReactionContainer:
+        """The reaction itself."""
+
+        return self.route.steps[self.step_id]
+
+    @property
+    def conditions(self) -> Any | None:
+        """Reaction conditions, a property of the reaction, so they travel with it
+        through CSV, JSON and the CGR. ``None`` until something writes them."""
+
+        return self.reaction.meta.get("conditions")
+
+    @property
+    def provenance(self) -> dict[str, Any]:
+        """What produced this step: ``rule_key``, ``rule_source``, ``rule_id``,
+        ``tree_node_id``. Empty when unknown."""
+
+        return self.route.step_meta[self.step_id]
+
+    def __repr__(self) -> str:
+        return f"<Step {self.number}: {self.reaction}>"
+
+
 @dataclass(frozen=True)
 class Route:
-    """A single retrosynthetic route: its steps, its stock, and nothing else.
+    """A single retrosynthetic route: its steps, its verdict, and nothing else.
 
     Holds plain data only, so it outlives the :class:`~synplan.mcts.tree.Tree`
     that produced it and survives pickling. Detached it cannot rescore
     (``Tree.route_score`` sums per-node ``total_value``, which lives only in the
-    tree, so :attr:`score` is carried, not recomputable) and knows nothing about
-    the rest of the search.
+    tree, so :attr:`score` is carried, not recomputable), and it never re-decides
+    which leaves are purchasable: whoever built it already knew.
 
-    :param steps: ``Tree.synthesis_route`` order, deepest step first, so
-        ``steps[-1]`` is the disconnection of the target. Index in this tuple is
-        the ``step_id`` every dict-driven route API expects.
-    :param building_blocks: Stock SMILES the route was judged against.
-    :param min_mol_size: Molecules this size or smaller count as stock regardless
-        of ``building_blocks`` (``Precursor.is_building_block`` semantics).
-    :param step_meta: Per-step rule metadata aligned with ``steps``; keys are
-        those ``io.json`` writes onto a reaction node (``step_id``,
-        ``tree_node_id``, ``rule_id``, ``rule_source``, ``rule_key``). Empty
-        dicts when unknown.
+    Construction re-linearises the steps (:func:`linearise`), so position is the
+    single ordering: ``steps[i]`` is step number ``i + 1``, ``step_id`` ``i``, and
+    the disc numbered ``i + 1`` in the drawing. Iterating yields :class:`Step`
+    views in that order; :meth:`step` takes the number.
+
+    :param steps: The route's reactions. Given in any topological order and
+        stored depth-first from the target, deepest step first, so ``steps[-1]``
+        is the disconnection of the target and each branch of a convergent route
+        is a contiguous block.
+    :param unresolved: SMILES of the leaves that are not purchasable -- the whole
+        stored verdict. Empty on a solved route.
+    :param step_meta: Per-step rule metadata; re-ordered with ``steps`` and padded
+        to the same length. Keys are those ``io.json`` writes onto a reaction node
+        bar ``step_id``, which is the index: ``tree_node_id``, ``rule_id``,
+        ``rule_source``, ``rule_key``.
     :param score: ``Tree.route_score`` at extraction time; ``None`` when the
         route did not come from a tree.
     :param route_id: The terminal node id in the source tree, or the JSON key.
     """
 
     steps: tuple[ReactionContainer, ...]
-    building_blocks: frozenset[str] = frozenset()
-    min_mol_size: int = 6
+    unresolved: frozenset[str] = frozenset()
     step_meta: tuple[dict[str, Any], ...] = ()
     score: float | None = None
     route_id: int | None = None
@@ -71,6 +132,14 @@ class Route:
     def __post_init__(self) -> None:
         if not self.steps:
             raise ValueError("a route needs at least one step")
+        order = linearise(self.steps)
+        meta = (*self.step_meta, *({},) * (len(order) - len(self.step_meta)))
+        object.__setattr__(self, "steps", tuple(self.steps[i] for i in order))
+        object.__setattr__(
+            self,
+            "step_meta",
+            tuple({k: v for k, v in meta[i].items() if k != "step_id"} for i in order),
+        )
 
     # ------------------------------------------------------------------
     # construction
@@ -80,7 +149,8 @@ class Route:
     def from_tree(cls, tree: Tree, node_id: int) -> Route:
         """Pull the route ending at ``node_id`` out of ``tree``.
 
-        Works for any node, solved or not.
+        The node's ``precursors_to_expand`` is the search's own list of leaves it
+        could not buy, so the verdict is read, not recomputed.
 
         :raises KeyError: if ``node_id`` is not in the tree.
         """
@@ -91,8 +161,9 @@ class Route:
         metadata = _route_step_metadata_from_tree(tree, node_id)
         return cls(
             steps=steps,
-            building_blocks=frozenset(tree.building_blocks),
-            min_mol_size=tree.config.min_mol_size,
+            unresolved=frozenset(
+                str(precursor) for precursor in tree.nodes[node_id].precursors_to_expand
+            ),
             step_meta=tuple(metadata.get(step, {}) for step in range(len(steps))),
             score=tree.route_score(node_id),
             route_id=node_id,
@@ -102,18 +173,17 @@ class Route:
     def from_json(cls, route_json: RouteNode, route_id: int | None = None) -> Route:
         """Rebuild a route from one v1 JSON route tree.
 
-        ``building_blocks`` is reconstructed as the leaf SMILES flagged
-        ``in_stock``, with ``min_mol_size=0``, so :attr:`solved` and
-        :attr:`dead_ends` reproduce the exported flags rather than re-deciding
-        them against a stock the file does not carry.
+        The leaves the file flags ``in_stock`` are the purchasable ones; the rest
+        are :attr:`unresolved`, so the exported verdict is reproduced rather than
+        re-decided against a stock the file does not carry.
         """
 
         steps, metadata, in_stock = read_route_tree(route_json)
         order = sorted(steps)
+        ordered = tuple(steps[step] for step in order)
         return cls(
-            steps=tuple(steps[step] for step in order),
-            building_blocks=in_stock,
-            min_mol_size=0,
+            steps=ordered,
+            unresolved=frozenset(_leaves(ordered)) - in_stock,
             step_meta=tuple(metadata[step] for step in order),
             route_id=route_id,
         )
@@ -128,32 +198,38 @@ class Route:
 
         return self.steps[-1].products[0]
 
-    @property
-    def dead_ends(self) -> tuple[MoleculeContainer, ...]:
-        """Terminal precursors that are not building blocks.
+    def role(self, mol: MoleculeContainer | str) -> str:
+        """What ``mol`` is in this route.
 
-        A leaf is a reactant that is no step's product; it is a dead end when it
-        fails the test ``Precursor.is_building_block`` applies. Empty on a solved
-        route by definition. These are the molecules drawn red.
+        ``target``, ``intermediate`` (a product of some step that is not the
+        target), ``building_block`` or ``unresolved`` (a leaf, by the stored
+        verdict).
+
+        :raises KeyError: if the molecule is not in this route.
         """
 
-        products = {str(mol) for step in self.steps for mol in step.products}
-        seen, found = set(), []
-        for step in self.steps:
-            for mol in step.reactants:
-                key = str(mol)
-                if key in products or key in seen:
-                    continue
-                seen.add(key)
-                if len(mol) > self.min_mol_size and key not in self.building_blocks:
-                    found.append(mol)
-        return tuple(found)
+        key = str(mol)
+        if key == str(self.target):
+            return "target"
+        if key in _leaves(self.steps):
+            return "unresolved" if key in self.unresolved else "building_block"
+        if any(key == str(p) for step in self.steps for p in step.products):
+            return "intermediate"
+        raise KeyError(key)
+
+    @property
+    def dead_ends(self) -> tuple[MoleculeContainer, ...]:
+        """The :attr:`unresolved` leaves, in route order. Drawn red."""
+
+        return tuple(
+            mol for key, mol in _leaves(self.steps).items() if key in self.unresolved
+        )
 
     @property
     def solved(self) -> bool:
-        """True when every leaf is a building block. Derived, never stored."""
+        """True when no leaf is unresolved."""
 
-        return not self.dead_ends
+        return not self.unresolved
 
     @property
     def reactions_dict(self) -> dict[int, ReactionContainer]:
@@ -166,13 +242,28 @@ class Route:
 
         return dict(enumerate(self.steps))
 
+    def step(self, number: int) -> Step:
+        """The step with display ``number`` -- 1 is the deepest step, not an index.
+
+        :raises IndexError: if ``number`` is outside ``1..len(route)``.
+        """
+
+        if not 1 <= number <= len(self.steps):
+            raise IndexError(f"step number {number} outside 1..{len(self.steps)}")
+        return Step(self, number - 1)
+
+    def __iter__(self) -> Iterator[Step]:
+        """Steps as views, number 1 first."""
+
+        return (Step(self, step_id) for step_id in range(len(self.steps)))
+
     def __len__(self) -> int:
         """Number of steps."""
 
         return len(self.steps)
 
     def __repr__(self) -> str:
-        dead_ends = len(self.dead_ends)
+        dead_ends = len(self.unresolved)
         state = (
             "solved"
             if not dead_ends
@@ -189,15 +280,13 @@ class Route:
     def svg(self, align: bool = True) -> str:
         """Draw the route as a standalone SVG.
 
-        Dead-end leaves take routedraw's ``oos`` role, which is the red one.
+        Unresolved leaves take routedraw's ``oos`` role, which is the red one.
 
         :param align: Give every precursor its product's orientation.
         :return: A complete SVG document, ``ROUTE_CSS`` and ``ARROW_DEFS`` inlined.
         """
 
-        svg, _ = draw_route(
-            self.steps, self.building_blocks, self.min_mol_size, align=align
-        )
+        svg = draw_route(self.steps, self.unresolved, align=align)
         head = svg.index(">") + 1
         return f"{svg[:head]}<defs>{ARROW_DEFS}</defs><style>{ROUTE_CSS}</style>{svg[head:]}"
 
@@ -213,10 +302,11 @@ class Route:
     def to_json(self, *, reconcile_atom_mapping: bool = False) -> RouteNode:
         """Serialise to one v1 JSON route tree.
 
-        Round trip keeps the steps, the per-step rule metadata and the leaf
-        ``in_stock`` flags, and therefore :attr:`solved`. It drops :attr:`score`
-        and :attr:`route_id` (v1 JSON has no envelope), the real stock set (only
-        the leaves' verdicts survive) and 2D coordinates.
+        ``step_id`` is the index, so the file lists the steps in the order this
+        route does and step 0 is still performed first. Round trip keeps the steps,
+        the per-step rule metadata and the leaf ``in_stock`` flags, and therefore
+        :attr:`solved`. It drops :attr:`score` and :attr:`route_id` (v1 JSON has no
+        envelope) and 2D coordinates.
 
         :param reconcile_atom_mapping: Renumber atoms consistently across steps
             before writing. Off by default because it costs a full RouteCGR
@@ -230,20 +320,14 @@ class Route:
             if not result.ok:
                 raise _composition_error(result)
             steps = dict(result.reactions_dict)
-        metadata = {
-            step: {
-                **(self.step_meta[step] if step < len(self.step_meta) else {}),
-                "step_id": step,
-            }
-            for step in steps
-        }
+        metadata = {step: {**self.step_meta[step], "step_id": step} for step in steps}
         return make_json(
             {0: steps},
             keep_ids=False,
             route_metadata={0: metadata},
             strict=True,
-            building_blocks=self.building_blocks,
-            min_mol_size=self.min_mol_size,
+            building_blocks=frozenset(_leaves(self.steps)) - self.unresolved,
+            min_mol_size=0,
         )[0]
 
     # ------------------------------------------------------------------

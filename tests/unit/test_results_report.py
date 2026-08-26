@@ -141,16 +141,15 @@ def test_step_numbers_match_the_discs(page):
     tree = _FakeTree()
     for node_id, section in zip(tree.winning_nodes, sections(page)):
         n_steps = len(tree.synthesis_route(node_id))
-        discs = _DISC.findall(drawing(section))
-        assert [int(d[4]) for d in discs] == list(range(1, n_steps + 1))
-        assert [int(n) for n in _STEP_NUMBER.findall(section)] == [
-            int(d[4]) for d in discs
-        ]
+        discs = sorted(int(d[4]) for d in _DISC.findall(drawing(section)))
+        assert discs == list(range(1, n_steps + 1))
+        assert [int(n) for n in _STEP_NUMBER.findall(section)] == discs
 
 
-def test_disc_one_is_the_cut_from_the_target(page):
-    """Read from the drawing: disc 1's arrow ends on the box captioned TARGET."""
-    for section in sections(page):
+def test_the_last_disc_is_the_cut_from_the_target(page):
+    """Read from the drawing: the highest-numbered disc's arrow ends on TARGET."""
+    tree = _FakeTree()
+    for node_id, section in zip(tree.winning_nodes, sections(page)):
         svg = drawing(section)
         caption = _TARGET_CAPTION.search(svg)
         assert caption is not None
@@ -164,7 +163,7 @@ def test_disc_one_is_the_cut_from_the_target(page):
         assert len(target_box) == 1
         _, _, _, height = (float(v) for v in target_box[0])
 
-        cx, cy, _, _, number = next(iter(_DISC.findall(svg)))
-        assert int(number) == 1
+        cx, cy, _, _, number = max(_DISC.findall(svg), key=lambda d: int(d[4]))
+        assert int(number) == len(tree.synthesis_route(node_id))
         assert float(cx) < box_x  # the disc sits in the lane left of the target
         assert abs(float(cy) - (box_y + height / 2)) < 0.11

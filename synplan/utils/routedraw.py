@@ -1,8 +1,9 @@
 """Draws one retrosynthetic route as a single SVG.
 
 Boxed chython depictions on a tidy-tree layout, pale role tints, hairline connectors
-and a numbered disc per disconnection, counting back from the target. A page showing
-these must also carry :data:`ROUTE_CSS` and one copy of :data:`ARROW_DEFS`.
+and a numbered disc per disconnection, carrying the step's position in the route. A
+page showing these must also carry :data:`ROUTE_CSS` and one copy of
+:data:`ARROW_DEFS`.
 """
 
 from __future__ import annotations
@@ -134,9 +135,7 @@ def orient_route(steps: Any, step_deg: int = 5) -> int:
     return deg
 
 
-def _route_tree(
-    steps: Any, building_blocks: Any, min_mol_size: int, align: bool
-) -> tuple[Node, dict]:
+def _route_tree(steps: Any, unresolved: Any, align: bool) -> tuple[Node, dict]:
     if align:
         align_route(steps)
         orient_route(steps)
@@ -156,9 +155,7 @@ def _route_tree(
         node.mol = mol
         reaction = by_product.get(key)
         if reaction is None:
-            # Precursor.is_building_block: small enough, or in the catalogue.
-            in_stock = len(mol) <= min_mol_size or key in building_blocks
-            node.role = "bb" if in_stock else "oos"
+            node.role = "oos" if key in unresolved else "bb"
         else:
             node.role = "int"
             node.children = [build(m) for m in reaction.reactants]
@@ -169,7 +166,7 @@ def _route_tree(
     return root, depicts
 
 
-def _to_svg(root: Node, depicts: dict, ranked: list[dict], w: float, h: float) -> str:
+def _to_svg(root: Node, depicts: dict, links: list[dict], w: float, h: float) -> str:
     top = 16.0  # room for the role caption drawn above a box
     margin = 14.0  # frame strokes are centred on the box edge; keep them on the canvas
     width, height = w + 2 * margin, h + top + 2 * margin
@@ -180,7 +177,7 @@ def _to_svg(root: Node, depicts: dict, ranked: list[dict], w: float, h: float) -
         f'<g transform="translate({margin:.0f},{top + margin:.0f})">',
     ]
 
-    for edge in ranked:
+    for edge in links:
         lane, (px, py) = edge["lane"], edge["parent"]
         for cx, cy in edge["children"]:
             dy = py - cy
@@ -221,39 +218,34 @@ def _to_svg(root: Node, depicts: dict, ranked: list[dict], w: float, h: float) -
                 f'fill="{colour}">{caption}</text>'
             )
 
-    for number, edge in enumerate(ranked, 1):
+    for edge in links:
         lane, (_, py) = edge["lane"], edge["parent"]
         parts.append(
             f'<circle cx="{lane:.1f}" cy="{py:.1f}" r="10.5" fill="#2b3440" '
             f'stroke="#ffffff" stroke-width="2"/>'
-            f'<text x="{lane:.1f}" y="{py:.1f}" class="sp-num">{number}</text>'
+            f'<text x="{lane:.1f}" y="{py:.1f}" class="sp-num">{edge["number"]}</text>'
         )
 
     parts.append("</g></svg>")
     return "".join(parts)
 
 
-def draw_route(
-    steps: Any,
-    building_blocks: Any = frozenset(),
-    min_mol_size: int = 6,
-    align: bool = True,
-) -> tuple[str, list[int]]:
+def draw_route(steps: Any, unresolved: Any = frozenset(), align: bool = True) -> str:
     """Draw one route.
 
-    :param steps: The route's reactions, ``Tree.synthesis_route`` order.
-    :param building_blocks: Stock SMILES; a terminal precursor outside it is drawn
-        in the ``oos`` role.
-    :param min_mol_size: Terminal precursors this size or smaller count as stock.
+    Whether a leaf is purchasable is decided by the caller, never here.
+
+    :param steps: The route's reactions, deepest step first. The disc over the
+        disconnection of ``steps[i]`` carries ``i + 1``.
+    :param unresolved: SMILES of the terminal precursors that are not purchasable;
+        they are drawn in the ``oos`` role, every other leaf in ``bb``.
     :param align: If True, give every precursor its product's orientation.
-    :return: ``(svg, order)``, where ``order[i]`` indexes ``steps`` for the disc
-        numbered ``i + 1``, 1 being the cut from the target.
+    :return: The SVG, without ``ROUTE_CSS`` or ``ARROW_DEFS``.
     """
-    root, depicts = _route_tree(steps, building_blocks, min_mol_size, align)
+    root, depicts = _route_tree(steps, unresolved, align)
     width, height, col_x, col_w = layout(root, row_gap=ROW_GAP)
-    ranked = sorted(
-        edges(root, col_x, col_w), key=lambda e: (e["node"].depth, e["parent"][1])
-    )
-    by_product = {str(r.products[0]): i for i, r in enumerate(steps)}
-    order = [by_product[e["node"].key] for e in ranked]
-    return _to_svg(root, depicts, ranked, width, height), order
+    numbers = {str(step.products[0]): i + 1 for i, step in enumerate(steps)}
+    links = edges(root, col_x, col_w)
+    for edge in links:
+        edge["number"] = numbers[edge["node"].key]
+    return _to_svg(root, depicts, links, width, height)

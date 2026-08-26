@@ -22,7 +22,7 @@ from synplan.chem.reaction.routes.representation.depiction import (
     cgr_display,
     depict_custom_reaction,
 )
-from synplan.chem.reaction.routes.traversal import iter_route_steps
+from synplan.chem.reaction.routes.traversal import iter_route_steps, linearise
 from synplan.utils.align2d import align_route
 from synplan.utils.frames import depict_value
 from synplan.utils.routedraw import (
@@ -765,7 +765,7 @@ def generate_results_html(
     """Writes an HTML page with the synthesis routes drawn and listed as SMILES.
 
     Each route gets one drawing and one step list; a step's number is the number on
-    its disc in the drawing, 1 being the cut from the target. The page is
+    its disc in the drawing, 1 being the first reaction performed. The page is
     self-contained: no scripts, no external stylesheets, no fonts to fetch.
 
     :param tree: The built tree.
@@ -785,14 +785,20 @@ def generate_results_html(
     doc = Doc()
     body = []
     for route in routes:
-        steps = tree.synthesis_route(route)
-        svg, order = draw_route(steps, tree.building_blocks, tree.config.min_mol_size)
+        found = tree.synthesis_route(route)
         labels = route_rule_labels(tree, route)
+        order = linearise(found)
+        steps = tuple(found[index] for index in order)
+        svg = draw_route(steps)
         rows = "".join(
             f'<div class="step"><div class="disc">{number}</div><div>'
-            + (f'<div class="lab">{escape(labels[step])}</div>' if labels[step] else "")
-            + f'<div class="rxn mono">{escape(str(steps[step]))}</div></div></div>'
-            for number, step in enumerate(order, 1)
+            + (
+                f'<div class="lab">{escape(labels[index])}</div>'
+                if labels[index]
+                else ""
+            )
+            + f'<div class="rxn mono">{escape(str(found[index]))}</div></div></div>'
+            for number, index in enumerate(order, 1)
         )
         body.append(
             '<section class="route card"><div class="rhead">'
