@@ -767,6 +767,10 @@ class Tree:
         """Given a node_id, return a tuple of reactions that represent the
         retrosynthetic route from the current node.
 
+        Molecules keep the coordinates the reactor gave them, so a precursor still
+        sits where its atoms sat in the product. Callers that need a layout of their
+        own call ``clean2d()`` themselves.
+
         :param node_id: The id of the current node.
         :return: The tuple of extracted reactions representing the synthesis route.
         """
@@ -779,8 +783,6 @@ class Tree:
             for before, after in iter_route_steps(self, node_id)
         ]
 
-        for r in reaction_sequence:
-            r.clean2d()
         return tuple(reversed(reaction_sequence))
 
     def newickify(self, visits_threshold: int = 0, root_node_id: int = 1):
