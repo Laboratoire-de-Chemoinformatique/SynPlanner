@@ -55,6 +55,7 @@ _EXPORTS = {
     "write_routes_json": "io",
     # route facade
     "Route": "route",
+    "Step": "route",
     # pseudo_atoms (clustering atom primitives)
     "DynamicX": "clustering.pseudo_atoms",
     "Marked": "clustering.pseudo_atoms",

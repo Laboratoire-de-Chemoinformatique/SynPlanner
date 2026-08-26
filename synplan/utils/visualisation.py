@@ -22,14 +22,14 @@ from synplan.chem.reaction.routes.representation.depiction import (
     cgr_display,
     depict_custom_reaction,
 )
-from synplan.chem.reaction.routes.traversal import iter_route_steps, linearise
+from synplan.chem.reaction.routes.route import Route
+from synplan.chem.reaction.routes.traversal import iter_route_steps, route_node_ids
 from synplan.utils.align2d import align_route
 from synplan.utils.frames import depict_value
 from synplan.utils.routedraw import (
     ARROW_DEFS,
     ROLE_STYLE,
     ROUTE_CSS,
-    draw_route,
     molecule_svg,
 )
 from synplan.utils.svgslim import Doc, hidden_defs
@@ -657,18 +657,19 @@ def get_route_svg_from_json(
     return _render_route_svg(columns, pred, labeled=labeled)
 
 
-def route_rule_labels(tree: Tree, node_id: int) -> list[str]:
-    """One label per step of `tree.synthesis_route(node_id)`, in the same order.
+def route_rule_labels(tree: Tree, node_id: int) -> dict[int, str]:
+    """`{tree node id: label}` for the steps of the route ending at `node_id`.
 
     Priority rules carry a chemistry name (`rule_name` stamped by their loader); the policy has
-    none, so its steps stay unlabelled rather than being given a meaningless id.
+    none, so its steps stay unlabelled rather than being given a meaningless id. Keyed by node
+    id, so a step finds its label whatever order the route is read in.
     """
-    labels = []
-    for _before, after in iter_route_steps(tree, node_id):
-        rule = _priority_rule(tree, after)
+    labels = {}
+    for route_node_id in route_node_ids(tree.parents, node_id)[1:]:
+        rule = _priority_rule(tree, tree.nodes[route_node_id])
         name = getattr(rule, "rule_name", None)
-        labels.append(f"{rule.rule_id} — {name}" if name else "")
-    return list(reversed(labels))  # synthesis_route reverses; keep the pairing
+        labels[route_node_id] = f"{rule.rule_id} — {name}" if name else ""
+    return labels
 
 
 #: Page chrome for :func:`generate_results_html`. The route drawings bring their own
@@ -778,37 +779,32 @@ def generate_results_html(
     depict_settings(aam=bool(aam))
 
     if extended:
-        routes = [idx for idx, node in tree.nodes.items() if node.is_solved()]
+        node_ids = [idx for idx, node in tree.nodes.items() if node.is_solved()]
     else:
-        routes = list(tree.winning_nodes)
+        node_ids = list(tree.winning_nodes)
 
     doc = Doc()
     body = []
-    for route in routes:
-        found = tree.synthesis_route(route)
-        labels = route_rule_labels(tree, route)
-        order = linearise(found)
-        steps = tuple(found[index] for index in order)
-        svg = draw_route(steps)
-        rows = "".join(
-            f'<div class="step"><div class="disc">{number}</div><div>'
-            + (
-                f'<div class="lab">{escape(labels[index])}</div>'
-                if labels[index]
-                else ""
+    for node_id in node_ids:
+        route = Route.from_tree(tree, node_id)
+        labels = route_rule_labels(tree, node_id)
+        rows = ""
+        for number, step in enumerate(route, 1):
+            label = labels.get(step.origin.tree_node_id, "") if step.origin else ""
+            rows += (
+                f'<div class="step"><div class="disc">{number}</div><div>'
+                + (f'<div class="lab">{escape(label)}</div>' if label else "")
+                + f'<div class="rxn mono">{escape(str(step.reaction))}</div></div></div>'
             )
-            + f'<div class="rxn mono">{escape(str(found[index]))}</div></div></div>'
-            for number, index in enumerate(order, 1)
-        )
         body.append(
             '<section class="route card"><div class="rhead">'
             f'<div class="kv"><div class="eyebrow">Route</div>'
-            f'<div class="v id">{route}</div></div>'
+            f'<div class="v id">{node_id}</div></div>'
             f'<div class="kv"><div class="eyebrow">Steps</div>'
-            f'<div class="v">{len(steps)}</div></div>'
+            f'<div class="v">{len(route)}</div></div>'
             f'<div class="kv"><div class="eyebrow">Cumulated nodes&#39; value</div>'
-            f'<div class="v">{round(tree.route_score(route), 3)}</div></div></div>'
-            f'<div class="draw">{doc.route(svg)}</div>{rows}</section>'
+            f'<div class="v">{round(tree.route_score(node_id), 3)}</div></div></div>'
+            f'<div class="draw">{doc.route(route.svg(standalone=False))}</div>{rows}</section>'
         )
 
     page = (
@@ -818,7 +814,7 @@ def generate_results_html(
         f"<style>{ROUTE_CSS}{_REPORT_CSS}</style>\n</head>\n<body>\n"
         + hidden_defs(ARROW_DEFS, doc.defs())
         + '<div class="wrap">'
-        + _report_header(tree, len(routes))
+        + _report_header(tree, len(node_ids))
         + "".join(body)
         + "</div>\n</body>\n</html>\n"
     )

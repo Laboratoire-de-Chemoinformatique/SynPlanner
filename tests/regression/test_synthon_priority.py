@@ -296,8 +296,8 @@ def test_a_route_report_names_the_reaction_a_priority_rule_applied(
         if priority_tree.nodes[i].rule_source == SYNTHON_SOURCE_NAME
     )
     labels = route_rule_labels(priority_tree, synthon_child)
-    assert any("—" in label for label in labels), labels
-    named = next(label for label in labels if "—" in label)
+    assert any("—" in label for label in labels.values()), labels
+    named = next(label for label in labels.values() if "—" in label)
     rule = rules[priority_tree.nodes[synthon_child].rule_id]
     assert named == f"{rule.rule_id} — {rule.rule_name}"
 

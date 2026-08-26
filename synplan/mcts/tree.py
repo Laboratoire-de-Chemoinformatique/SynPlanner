@@ -778,7 +778,7 @@ class Tree:
                 and not self.nodes[node_id].is_solved()
             ]
         routes = [Route.from_tree(self, node_id) for node_id in node_ids]
-        routes.sort(key=lambda route: route.score, reverse=True)
+        routes.sort(key=lambda route: route.provenance.search_score, reverse=True)
         return routes
 
     def route_to_node(self, node_id: int) -> list[Node,]:

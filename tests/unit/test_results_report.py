@@ -61,6 +61,7 @@ class _FakeTree:
         self.building_blocks = frozenset(str(m) for m in (acid, aniline, alcohol, tail))
         self.nodes = {i: _FakeNode(target if i == 1 else None) for i in (1, 2, 3, 5)}
         self.parents = {1: 0, 2: 1, 3: 2, 5: 1}
+        self.priority_rules = {}
         self.winning_nodes = [3, 5]
         self.visited_nodes = [1, 2, 3, 5]
         self.curr_time = 1.2345
@@ -75,10 +76,17 @@ class _FakeTree:
     def route_score(self, node_id: int) -> float:
         return 0.5
 
+    def route_details(self, node_id: int) -> dict:
+        steps = self._routes[node_id]
+        return {"steps": [{"node_id": node_id} for _ in steps]}
+
 
 class _FakeNode:
     def __init__(self, molecule) -> None:
         self.curr_precursor = molecule
+        self.precursors_to_expand = ()
+        self.rule_source = None
+        self.rule_id = None
 
     def is_solved(self) -> bool:
         return True

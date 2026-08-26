@@ -12,7 +12,7 @@ import re
 from math import cos, radians, sin
 from typing import TYPE_CHECKING, Any
 
-from synplan.utils.align2d import align_route
+from synplan.utils.align2d import align_molecule
 from synplan.utils.routelayout import Node, edges, layout, walk
 
 if TYPE_CHECKING:
@@ -137,31 +137,37 @@ def orient_route(steps: Any, step_deg: int = 5) -> int:
 
 def _route_tree(steps: Any, unresolved: Any, align: bool) -> tuple[Node, dict]:
     if align:
-        align_route(steps)
-        orient_route(steps)
+        # leaf-first order, so each disconnection inherits the layout above it
+        for step in reversed(steps):
+            for precursor in step.reaction.reactants:
+                align_molecule(precursor, step.product)
+        orient_route([step.reaction for step in steps])
 
-    by_product = {str(r.products[0]): r for r in steps}
+    by_product = {
+        id(step.product): (number, step) for number, step in enumerate(steps, 1)
+    }
+    red = {id(mol) for mol in unresolved}
     depicts = {}
 
     def build(mol: MoleculeContainer) -> Node:
-        key = str(mol)
         svg, box = _depiction(mol)
         depicts[id(mol)] = (svg, box)
         node = Node(
-            key=key,
+            key=str(mol),
             w=box[2] * PX_PER_UNIT + 2 * BOX_PAD,
             h=box[3] * PX_PER_UNIT + 2 * BOX_PAD,
         )
         node.mol = mol
-        reaction = by_product.get(key)
-        if reaction is None:
-            node.role = "oos" if key in unresolved else "bb"
+        made = by_product.get(id(mol))
+        if made is None:
+            node.role = "oos" if id(mol) in red else "bb"
         else:
+            node.number, step = made
             node.role = "int"
-            node.children = [build(m) for m in reaction.reactants]
+            node.children = [build(m) for m in step.reaction.reactants]
         return node
 
-    root = build(steps[-1].products[0])
+    root = build(steps[-1].product)
     root.role = "target"
     return root, depicts
 
@@ -230,22 +236,24 @@ def _to_svg(root: Node, depicts: dict, links: list[dict], w: float, h: float) ->
     return "".join(parts)
 
 
-def draw_route(steps: Any, unresolved: Any = frozenset(), align: bool = True) -> str:
+def draw_route(steps: Any, unresolved: Any = (), align: bool = True) -> str:
     """Draw one route.
 
-    Whether a leaf is purchasable is decided by the caller, never here.
+    Whether a leaf is purchasable is decided by the caller, never here. Which step
+    feeds which is read from object identity, so two steps sharing a product SMILES
+    still get a disc each.
 
-    :param steps: The route's reactions, deepest step first. The disc over the
+    :param steps: The route's steps, deepest first; each carries the ``reaction``
+        it runs and the ``product`` it disconnects. The disc over the
         disconnection of ``steps[i]`` carries ``i + 1``.
-    :param unresolved: SMILES of the terminal precursors that are not purchasable;
-        they are drawn in the ``oos`` role, every other leaf in ``bb``.
+    :param unresolved: The terminal precursors that are not purchasable; they are
+        drawn in the ``oos`` role, every other leaf in ``bb``.
     :param align: If True, give every precursor its product's orientation.
     :return: The SVG, without ``ROUTE_CSS`` or ``ARROW_DEFS``.
     """
     root, depicts = _route_tree(steps, unresolved, align)
     width, height, col_x, col_w = layout(root, row_gap=ROW_GAP)
-    numbers = {str(step.products[0]): i + 1 for i, step in enumerate(steps)}
     links = edges(root, col_x, col_w)
     for edge in links:
-        edge["number"] = numbers[edge["node"].key]
+        edge["number"] = edge["node"].number
     return _to_svg(root, depicts, links, width, height)
