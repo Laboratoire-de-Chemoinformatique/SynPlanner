@@ -103,6 +103,42 @@ def _collect_reactions(tree):
     return {i: rxn for i, rxn in enumerate(rxn_list)}
 
 
+#: Per-step rule metadata keys ``_make_json_v1`` writes onto a reaction node.
+_STEP_META_KEYS = ("step_id", "tree_node_id", "rule_id", "rule_source", "rule_key")
+
+
+def read_route_tree(route_json):
+    """Read one v1 route tree into ``(steps, step_metadata, in_stock_leaves)``.
+
+    Unlike :func:`make_dict` this keeps the molecule nodes, so the exported
+    ``in_stock`` verdicts survive, and it honours the ``step_id`` written into the
+    file instead of renumbering the steps by post-order.
+    """
+    steps = {}
+    step_metadata = {}
+    in_stock = set()
+
+    def recurse(node):
+        if not isinstance(node, dict):
+            return
+        children = node.get("children") or ()
+        for child in children:
+            recurse(child)
+        if node.get("type") == "reaction":
+            reaction = read_smiles(node["smiles"])
+            _restore_reaction_metadata(reaction, node.get("meta"))
+            step_id = node.get("step_id")
+            if step_id is None:
+                step_id = len(steps)
+            steps[step_id] = reaction
+            step_metadata[step_id] = {k: node[k] for k in _STEP_META_KEYS if k in node}
+        elif not children and node.get("in_stock"):
+            in_stock.add(node["smiles"])
+
+    recurse(route_json)
+    return steps, step_metadata, frozenset(in_stock)
+
+
 def make_dict(routes_json):
     """
     routes_json : dict or list of tree-dicts as produced by make_json()
@@ -360,6 +396,7 @@ __all__ = [
     "build_route_trees",
     "make_dict",
     "make_json",
+    "read_route_tree",
     "read_routes_json",
     "write_routes_json",
 ]
