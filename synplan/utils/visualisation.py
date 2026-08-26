@@ -785,7 +785,8 @@ def generate_results_html(
     doc = Doc()
     body = []
     for route in routes:
-        svg, order, steps = draw_route(tree, route)
+        steps = tree.synthesis_route(route)
+        svg, order = draw_route(steps, tree.building_blocks, tree.config.min_mol_size)
         labels = route_rule_labels(tree, route)
         rows = "".join(
             f'<div class="step"><div class="disc">{number}</div><div>'

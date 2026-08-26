@@ -36,12 +36,12 @@ ROLE_STYLE = {
     "target": ("#f3f6fb", "#94a6cb", 1.6),
     "bb": ("#f3f8f5", "#9dbcae", 1.0),
     "int": ("#ffffff", "#edeff1", 1.0),
-    "oos": ("#ffffff", "#c9cfd5", 1.0),
+    "oos": ("#fdf2f2", "#d06a6a", 1.4),
 }
 ROLE_CAPTION = {
     "target": ("TARGET", "#41598f"),
     "bb": ("IN STOCK", "#4a7a66"),
-    "oos": ("NOT IN STOCK", "#6b7480"),
+    "oos": ("NOT IN STOCK", "#b13b3b"),
 }
 
 _FONT = "Inter Tight,system-ui,sans-serif"
@@ -134,14 +134,14 @@ def orient_route(steps: Any, step_deg: int = 5) -> int:
     return deg
 
 
-def _route_tree(tree: Any, node_id: int, align: bool) -> tuple[Node, dict, tuple]:
-    steps = tree.synthesis_route(node_id)
+def _route_tree(
+    steps: Any, building_blocks: Any, min_mol_size: int, align: bool
+) -> tuple[Node, dict]:
     if align:
         align_route(steps)
         orient_route(steps)
 
     by_product = {str(r.products[0]): r for r in steps}
-    building_blocks = tree.building_blocks
     depicts = {}
 
     def build(mol: MoleculeContainer) -> Node:
@@ -156,7 +156,9 @@ def _route_tree(tree: Any, node_id: int, align: bool) -> tuple[Node, dict, tuple
         node.mol = mol
         reaction = by_product.get(key)
         if reaction is None:
-            node.role = "bb" if key in building_blocks else "oos"
+            # Precursor.is_building_block: small enough, or in the catalogue.
+            in_stock = len(mol) <= min_mol_size or key in building_blocks
+            node.role = "bb" if in_stock else "oos"
         else:
             node.role = "int"
             node.children = [build(m) for m in reaction.reactants]
@@ -164,7 +166,7 @@ def _route_tree(tree: Any, node_id: int, align: bool) -> tuple[Node, dict, tuple
 
     root = build(steps[-1].products[0])
     root.role = "target"
-    return root, depicts, steps
+    return root, depicts
 
 
 def _to_svg(root: Node, depicts: dict, ranked: list[dict], w: float, h: float) -> str:
@@ -232,22 +234,26 @@ def _to_svg(root: Node, depicts: dict, ranked: list[dict], w: float, h: float) -
 
 
 def draw_route(
-    tree: Any, node_id: int, align: bool = True
-) -> tuple[str, list[int], tuple]:
-    """Draw the route ending at ``node_id``.
+    steps: Any,
+    building_blocks: Any = frozenset(),
+    min_mol_size: int = 6,
+    align: bool = True,
+) -> tuple[str, list[int]]:
+    """Draw one route.
 
-    :param tree: The built tree.
-    :param node_id: The id of the node the route ends at.
+    :param steps: The route's reactions, ``Tree.synthesis_route`` order.
+    :param building_blocks: Stock SMILES; a terminal precursor outside it is drawn
+        in the ``oos`` role.
+    :param min_mol_size: Terminal precursors this size or smaller count as stock.
     :param align: If True, give every precursor its product's orientation.
-    :return: ``(svg, order, steps)``. ``steps`` is ``tree.synthesis_route(node_id)``
-        and ``order[i]`` indexes it for the disc numbered ``i + 1``, 1 being the cut
-        from the target.
+    :return: ``(svg, order)``, where ``order[i]`` indexes ``steps`` for the disc
+        numbered ``i + 1``, 1 being the cut from the target.
     """
-    root, depicts, steps = _route_tree(tree, node_id, align)
+    root, depicts = _route_tree(steps, building_blocks, min_mol_size, align)
     width, height, col_x, col_w = layout(root, row_gap=ROW_GAP)
     ranked = sorted(
         edges(root, col_x, col_w), key=lambda e: (e["node"].depth, e["parent"][1])
     )
     by_product = {str(r.products[0]): i for i, r in enumerate(steps)}
     order = [by_product[e["node"].key] for e in ranked]
-    return _to_svg(root, depicts, ranked, width, height), order, steps
+    return _to_svg(root, depicts, ranked, width, height), order

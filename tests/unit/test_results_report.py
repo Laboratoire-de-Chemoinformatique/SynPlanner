@@ -7,6 +7,7 @@ renderer happened to return.
 from __future__ import annotations
 
 import re
+from types import SimpleNamespace
 
 import pytest
 from chython import smiles as read_smiles
@@ -63,6 +64,7 @@ class _FakeTree:
         self.winning_nodes = [3, 5]
         self.visited_nodes = [1, 2, 3, 5]
         self.curr_time = 1.2345
+        self.config = SimpleNamespace(min_mol_size=0)
 
     def __len__(self) -> int:
         return len(self.nodes)
