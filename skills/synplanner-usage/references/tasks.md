@@ -32,9 +32,9 @@ Docs: `methods/mcts` — "Running a search"
 
 Pass the scorer as `Tree(..., route_scorer=route_scorer)` and it makes
 `tree.route_score(node_id)` quality-aware. It does NOT reorder anything:
-`winning_nodes` stays in discovery order and neither `extract_routes` nor
-`generate_results_html` sorts, so both exports come back unranked and the score is
-not written into either. Sort yourself —
+`winning_nodes` stays in discovery order and `extract_routes` does not sort, so
+that export comes back unranked and the score is not written into it
+(`tree.routes()` does sort, best score first). Sort yourself —
 `sorted(tree.winning_nodes, key=tree.route_score, reverse=True)` — or the scorer
 costs roughly three times the search time and changes nothing you can consume.
 
@@ -140,7 +140,8 @@ Docs: `methods/value`, `configuration/value`
 
 **See and export routes**
 `tree.routes()` / `Route.from_tree` / `Route.from_json`; `extract_routes`,
-`generate_results_html` (`synplan.utils.visualisation`);
+`routes_report_html(routes, path)` — the HTML report, which draws exactly the
+routes handed to it, solved or not (`synplan.utils.visualisation`);
 `export_tree_to_json`, `export_tree_to_csv`,
 `make_json`, `read_routes_json` (`synplan.chem.reaction.routes.io`).
 Tutorial: `07_Clustering`

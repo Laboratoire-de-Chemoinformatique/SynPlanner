@@ -181,13 +181,13 @@ After the search, extract routes and generate an HTML report:
 
 .. code-block:: python
 
-    from synplan.utils.visualisation import extract_routes, generate_results_html
+    from synplan.utils.visualisation import routes_report_html
 
-    routes = extract_routes(tree)   # list of route dicts
+    routes = tree.routes()          # list of Route objects, best score first
     print(f"Found {len(routes)} route(s)")
 
-    # Save an interactive HTML report
-    generate_results_html(tree, html_path="routes.html")
+    # Save a self-contained HTML report of exactly those routes
+    routes_report_html(routes, html_path="routes.html")
 
 Score routes for protection group issues
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -334,9 +334,9 @@ Or generate visualisations from Python:
 
 .. code-block:: python
 
-    from synplan.utils.visualisation import generate_results_html
+    from synplan.utils.visualisation import routes_report_html
 
-    generate_results_html(tree=tree, html_path="routes.html")
+    routes_report_html(tree.routes(), html_path="routes.html")
 
 Next steps
 ----------

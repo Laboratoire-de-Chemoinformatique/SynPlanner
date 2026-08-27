@@ -9,7 +9,6 @@ from html import escape
 from typing import TYPE_CHECKING, Any
 
 from chython import depict_settings
-from chython import smiles as read_smiles
 from chython.containers.molecule import MoleculeContainer
 from IPython.display import HTML, display
 
@@ -18,8 +17,9 @@ from synplan.chem.reaction.routes.representation.depiction import (
     cgr_display,
     depict_custom_reaction,
 )
-from synplan.chem.reaction.routes.route import Route
+from synplan.chem.reaction.routes.route import Route, Step
 from synplan.chem.reaction.routes.traversal import iter_route_steps, route_node_ids
+from synplan.chem.reaction.rules.priority import POLICY_SOURCE_NAME
 from synplan.utils.frames import depict_value
 from synplan.utils.routedraw import (
     ARROW_DEFS,
@@ -31,6 +31,8 @@ from synplan.utils.routedraw import (
 from synplan.utils.svgslim import Doc, hidden_defs
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
     from synplan.mcts.tree import Tree
 
 
@@ -177,7 +179,7 @@ def route_rule_labels(tree: Tree, node_id: int) -> dict[int, str]:
     return labels
 
 
-#: Page chrome for :func:`generate_results_html`. The route drawings bring their own
+#: Page chrome for :func:`routes_report_html`. The route drawings bring their own
 #: rules through :data:`synplan.utils.routedraw.ROUTE_CSS`.
 _REPORT_CSS = """
 :root{--ink:#0f1419;--ink2:#38414a;--ink3:#6b7480;--ink4:#9ba3ad;
@@ -232,25 +234,31 @@ _ROLE_LEGEND = (
 )
 
 
-def _report_header(tree: Tree, n_routes: int, tile: MoleculeContainer | None) -> str:
-    target = tree.nodes[1].curr_precursor
-    if tile is None:  # no route to take the target's shared layout from
-        tile = read_smiles(str(target))
-        tile.clean2d()
+def _report_header(routes: Sequence[Route], tile: MoleculeContainer | None) -> str:
+    scores = [
+        route.provenance.search_score
+        for route in routes
+        if route.provenance is not None and route.provenance.search_score is not None
+    ]
     stats = (
-        ("Tree size", len(tree), " nodes"),
-        ("Visited nodes", len(tree.visited_nodes), ""),
-        ("Found paths", n_routes, ""),
-        ("Time", round(tree.curr_time, 4), " seconds"),
+        ("Routes", len(routes), ""),
+        ("Solved", sum(route.solved for route in routes), f" of {len(routes)}"),
+        ("Longest", max((len(route) for route in routes), default=0), " steps"),
+        ("Best score", round(max(scores), 3) if scores else "—", ""),
+    )
+    target = (
+        ""
+        if tile is None
+        else f'<div class="target"><div class="tile">{molecule_svg(tile)}</div>'
+        '<div><div class="eyebrow">Target molecule</div>'
+        f'<div class="smi mono">{escape(str(tile))}</div></div></div>'
     )
     return (
         '<header class="page card">'
         '<div class="eyebrow">Retrosynthetic routes report</div>'
-        "<h1>Predicted paths</h1>"
-        f'<div class="target"><div class="tile">{molecule_svg(tile)}</div>'
-        '<div><div class="eyebrow">Target molecule</div>'
-        f'<div class="smi mono">{escape(str(target))}</div></div></div>'
-        '<div class="stats">'
+        "<h1>Predicted routes</h1>"
+        + target
+        + '<div class="stats">'
         + "".join(
             f'<div class="stat"><span class="eyebrow">{name}</span>'
             f'<span class="v">{value}<span class="u">{unit}</span></span></div>'
@@ -266,53 +274,73 @@ def _report_header(tree: Tree, n_routes: int, tile: MoleculeContainer | None) ->
     )
 
 
-def generate_results_html(
-    tree: Tree, html_path: str | None, aam: bool = False, extended: bool = False
+def _step_label(step: Step) -> str:
+    """The curated rule behind a step, or "" for one the policy proposed.
+
+    A policy rule's id says nothing to a chemist, so a policy step stays
+    unlabelled; a priority step is named by its ``rule_key`` (``set:id``), the one
+    identifier the detached route carries.
+    """
+
+    origin = step.origin
+    if origin is None or origin.rule_source in (None, POLICY_SOURCE_NAME):
+        return ""
+    return origin.rule_key or ""
+
+
+def routes_report_html(
+    routes: Iterable[Route], html_path: str | None, aam: bool = False
 ) -> str | None:
-    """Writes an HTML page with the synthesis routes drawn and listed as SMILES.
+    """Write an HTML page with the given routes drawn and listed as SMILES.
+
+    Draws exactly the routes it is handed, in the order it is handed them --
+    solved, unsolved, from one tree, from several, or read back out of a file.
+    Which routes are worth a page is the caller's call:
+    ``tree.routes(solved_only=False)`` enumerates one unfinished route per unsolved
+    leaf, and most of those are one step deep, so filter before you draw
+    (``[r for r in tree.routes(solved_only=False) if len(r) > 2]``).
 
     Each route gets one drawing and one step list; a step's number is the number on
-    its disc in the drawing, 1 being the first reaction performed. The page is
-    self-contained: no scripts, no external stylesheets, no fonts to fetch.
+    its disc in the drawing, 1 being the first reaction performed. Unresolved
+    leaves -- the molecules the search could not buy -- are drawn in the red ``oos``
+    role. The page is self-contained: no scripts, no external stylesheets, no fonts
+    to fetch.
 
-    :param tree: The built tree.
+    :param routes: The routes to draw.
     :param html_path: The path to the file where to store resulting HTML. When None,
         the page is returned instead of written.
     :param aam: If True, depict atom-to-atom mapping.
-    :param extended: If True, generates the extended route representation.
     :return: The page when ``html_path`` is None, otherwise None.
     """
     depict_settings(aam=bool(aam))
-
-    if extended:
-        node_ids = [idx for idx, node in tree.nodes.items() if node.is_solved()]
-    else:
-        node_ids = list(tree.winning_nodes)
+    routes = list(routes)
 
     doc = Doc()
     layouts: dict = {}  # one geometry per molecule, so a card matches its neighbours
     body = []
-    target = None
-    for node_id in node_ids:
-        route = Route.from_tree(tree, node_id)
-        target = route.steps[-1].product
-        labels = route_rule_labels(tree, node_id)
+    for index, route in enumerate(routes, 1):
         rows = ""
         for number, step in enumerate(route, 1):
-            label = labels.get(step.origin.tree_node_id, "") if step.origin else ""
+            label = _step_label(step)
             rows += (
                 f'<div class="step"><div class="disc">{number}</div><div>'
                 + (f'<div class="lab">{escape(label)}</div>' if label else "")
                 + f'<div class="rxn mono">{escape(str(step.reaction))}</div></div></div>'
             )
+        provenance = route.provenance
+        node_id = None if provenance is None else provenance.tree_node_id
+        score = None if provenance is None else provenance.search_score
+        unresolved = len(route.unresolved)
         body.append(
             '<section class="route card"><div class="rhead">'
             f'<div class="kv"><div class="eyebrow">Route</div>'
-            f'<div class="v id">{node_id}</div></div>'
+            f'<div class="v id">{index if node_id is None else node_id}</div></div>'
             f'<div class="kv"><div class="eyebrow">Steps</div>'
             f'<div class="v">{len(route)}</div></div>'
-            f'<div class="kv"><div class="eyebrow">Cumulated nodes&#39; value</div>'
-            f'<div class="v">{round(tree.route_score(node_id), 3)}</div></div></div>'
+            f'<div class="kv"><div class="eyebrow">Search score</div>'
+            f'<div class="v">{"—" if score is None else round(score, 3)}</div></div>'
+            f'<div class="kv"><div class="eyebrow">Not in stock</div>'
+            f'<div class="v">{unresolved}</div></div></div>'
             f'<div class="draw">'
             f"{doc.route(route.svg(standalone=False, layouts=layouts))}"
             f"</div>{rows}</section>"
@@ -321,14 +349,13 @@ def generate_results_html(
     page = (
         '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        "<title>Predicted Paths Report</title>\n"
+        "<title>Retrosynthetic Routes Report</title>\n"
         f"<style>{ROUTE_CSS}{_REPORT_CSS}</style>\n</head>\n<body>\n"
         + hidden_defs(ARROW_DEFS, doc.defs())
         + '<div class="wrap">'
         + _report_header(
-            tree,
-            len(node_ids),
-            None if target is None else drawable_copy(target, layouts),
+            routes,
+            drawable_copy(routes[0].target, layouts) if routes else None,
         )
         + "".join(body)
         + "</div>\n</body>\n</html>\n"

@@ -34,7 +34,7 @@ from synplan.utils.loading import (
     load_policy_function,
     load_reaction_rules,
 )
-from synplan.utils.visualisation import extract_routes, generate_results_html
+from synplan.utils.visualisation import extract_routes, routes_report_html
 
 #: Versioned identifier for the public route-export contract emitted by
 #: :func:`export_routes_artifact`. Bump when the envelope/manifest shape changes.
@@ -362,10 +362,9 @@ def run_search(
                 extracted_routes.append(extract_routes(tree))
 
                 # save routes
-                generate_results_html(
-                    tree,
+                routes_report_html(
+                    tree.routes(),
                     os.path.join(routes_folder, f"retroroutes_target_{ti}.html"),
-                    extended=True,
                 )
 
                 # save json routes

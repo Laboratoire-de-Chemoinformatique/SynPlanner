@@ -40,9 +40,9 @@ from synplan.utils.loading import (
     load_reaction_rules,
 )
 from synplan.utils.visualisation import (
-    generate_results_html,
     html_top_routes_cluster,
     routes_clustering_report,
+    routes_report_html,
     routes_subclustering_report,
 )
 
@@ -519,8 +519,8 @@ def download_planning_results():
         try:
             if st.button("Generate full HTML report", key="gen_plan_html"):
                 with st.spinner("Generating HTML report..."):
-                    st.session_state.planning_report_html = generate_results_html(
-                        st.session_state.tree, html_path=None, extended=True
+                    st.session_state.planning_report_html = routes_report_html(
+                        st.session_state.tree.routes(), html_path=None
                     )
 
             if st.session_state.get("planning_report_html"):
