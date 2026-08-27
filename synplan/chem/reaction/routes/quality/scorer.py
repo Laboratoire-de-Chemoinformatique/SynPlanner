@@ -52,19 +52,70 @@ class RouteScorer(ABC):
         return sorted(routes, key=self.score, reverse=True)
 
 
-class ProtectionRouteScorer(RouteScorer):
-    """Route scorer based on competing functional-group incompatibility.
+def _competing_sites(config: ProtectionConfig | None) -> CompetingSitesScore:
+    """The competing-sites machinery both protection scorers are built on."""
+    if config is None:
+        config = ProtectionConfig()
+    return CompetingSitesScore(
+        RouteScanner(
+            FunctionalGroupDetector(config.competing_groups_path),
+            IncompatibilityMatrix(config.incompatibility_path),
+            HalogenDetector(config.halogen_groups_path),
+        )
+    )
 
-    Wraps a :class:`CompetingSitesScore`, so :meth:`rank` orders routes by
-    ``search_score * S(T)``: the paper's re-ranking, unweighted, because the
-    paper has no weight. :meth:`competing_sites_score` is S(T) on its own, for
-    routes no search produced.
+
+class CompetingSitesRouteScorer(RouteScorer):
+    """Judges a route on competing functional groups alone, S(T) in [0, 1].
+
+    1.0 means no competing interactions were detected; lower values mean steps
+    that may need a protecting-group strategy. It never looks at the search, so
+    it ranks routes no search produced -- routes read back out of a file, or
+    from two trees that cannot be compared on their own scores.
 
     :param scorer: A configured :class:`CompetingSitesScore` instance.
     """
 
     def __init__(self, scorer: CompetingSitesScore):
         self._scorer = scorer
+
+    @classmethod
+    def from_config(
+        cls, config: ProtectionConfig | None = None
+    ) -> "CompetingSitesRouteScorer":
+        """Build a scorer from a :class:`ProtectionConfig`.
+
+        :param config: A ProtectionConfig instance. If ``None``, uses the
+            default paths bundled with SynPlanner.
+        :return: Configured CompetingSitesRouteScorer.
+        """
+        return cls(_competing_sites(config))
+
+    def score(self, route: Route) -> float:
+        """S(T) for a route, judged on its own terms.
+
+        :param route: The route to judge.
+        :return: S(T) in [0, 1].
+        """
+        st, _ = self._scorer.score_route(
+            dict(enumerate(step.reaction for step in route))
+        )
+        return st
+
+
+class ProtectionRouteScorer(RouteScorer):
+    """Route scorer based on competing functional-group incompatibility.
+
+    The search's own verdict weighted by :class:`CompetingSitesRouteScorer`'s,
+    which is the re-ranking of Westerlund et al., 2025 -- unweighted, because
+    the paper has no weight. Rank with :class:`CompetingSitesRouteScorer`
+    instead when the routes have no search behind them.
+
+    :param quality: The competing-sites scorer whose verdict is applied.
+    """
+
+    def __init__(self, quality: CompetingSitesRouteScorer):
+        self._quality = quality
 
     @classmethod
     def from_config(
@@ -76,28 +127,7 @@ class ProtectionRouteScorer(RouteScorer):
             default paths bundled with SynPlanner.
         :return: Configured ProtectionRouteScorer.
         """
-        if config is None:
-            config = ProtectionConfig()
-
-        detector = FunctionalGroupDetector(config.competing_groups_path)
-        matrix = IncompatibilityMatrix(config.incompatibility_path)
-        halogen = HalogenDetector(config.halogen_groups_path)
-        scanner = RouteScanner(detector, matrix, halogen)
-        return cls(CompetingSitesScore(scanner))
-
-    def competing_sites_score(self, route: Route) -> float:
-        """The competing-sites score S(T), this scorer's own opinion of a route.
-
-        Judges the route on its own terms, without the search: use it to order
-        routes no search produced, such as routes read back out of a file.
-
-        :param route: The route to judge.
-        :return: S(T) in [0, 1].
-        """
-        st, _ = self._scorer.score_route(
-            dict(enumerate(step.reaction for step in route))
-        )
-        return st
+        return cls(CompetingSitesRouteScorer(_competing_sites(config)))
 
     def score(self, route: Route) -> float:
         """``search_score * S(T)`` -- the re-ranking of Westerlund et al., 2025.
@@ -105,8 +135,8 @@ class ProtectionRouteScorer(RouteScorer):
         The paper weights the search's own state score by the competing sites
         score, so this scorer's verdict is defined only for a route a search
         produced. A route read from a file has no search score and no way to be
-        put on this scale; order those by :meth:`competing_sites_score`, which
-        needs no search behind it.
+        put on this scale; rank those with :class:`CompetingSitesRouteScorer`,
+        which needs no search behind it.
 
         :param route: The route to judge.
         :raises ValueError: If the route carries no search score.
@@ -117,6 +147,6 @@ class ProtectionRouteScorer(RouteScorer):
         if search is None:
             raise ValueError(
                 "this score is the search score weighted by S(T), and the route "
-                "carries no search score; order it by competing_sites_score()."
+                "carries no search score; rank it with CompetingSitesRouteScorer."
             )
-        return search * self.competing_sites_score(route)
+        return search * self._quality.score(route)

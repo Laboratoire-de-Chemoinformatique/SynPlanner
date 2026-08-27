@@ -18,6 +18,7 @@ from synplan.chem.reaction.routes.quality.protection.scanner import (
 )
 from synplan.chem.reaction.routes.quality.protection.scorer import CompetingSitesScore
 from synplan.chem.reaction.routes.quality.scorer import (
+    CompetingSitesRouteScorer,
     ProtectionRouteScorer,
     RouteScorer,
 )
@@ -328,19 +329,17 @@ def test_rank_of_nothing_is_nothing():
 def test_protection_scorer_scores_a_route():
     route = _esterification(0.5)
     scorer = ProtectionRouteScorer.from_config()
-    assert 0.0 <= scorer.competing_sites_score(route) <= 1.0
-    assert scorer.score(route) == pytest.approx(
-        0.5 * scorer.competing_sites_score(route)
-    )
+    quality = CompetingSitesRouteScorer.from_config()
+    assert 0.0 <= quality.score(route) <= 1.0
+    assert scorer.score(route) == pytest.approx(0.5 * quality.score(route))
 
 
 def test_the_paper_s_score_refuses_a_route_with_no_search_behind_it():
     """search_score * S(T) is undefined without a search score; S(T) alone is not."""
-    scorer = ProtectionRouteScorer.from_config()
     route = _esterification(None)
     with pytest.raises(ValueError, match="no search score"):
-        scorer.score(route)
-    assert 0.0 <= scorer.competing_sites_score(route) <= 1.0
+        ProtectionRouteScorer.from_config().score(route)
+    assert 0.0 <= CompetingSitesRouteScorer.from_config().score(route) <= 1.0
 
 
 def test_rerank_routes_basic(scorer):

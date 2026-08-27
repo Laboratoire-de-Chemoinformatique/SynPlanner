@@ -148,7 +148,8 @@ Docs: `methods/routes` — see "Typed Route APIs"
 **Rank routes by quality / avoid protecting-group problems**
 `ProtectionRouteScorer.from_config().rank(routes)`, best first — its `score` is
 `search_score * S(T)`, so it needs routes a search produced. For routes read from
-a file, sort on `competing_sites_score(route)`, which is S(T) on its own. Go lower level only to tune it — `ProtectionConfig`,
+a file, rank with `CompetingSitesRouteScorer.from_config().rank(routes)`, which
+judges on S(T) alone. Go lower level only to tune it — `ProtectionConfig`,
 `FunctionalGroupDetector`, `get_reaction_center_atoms`, `classify_reaction_type`.
 Tutorial: `08_Protection_Scoring`
 

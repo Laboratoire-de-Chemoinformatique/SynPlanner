@@ -211,7 +211,7 @@ Ranking is a second step, after the search:
 
 The score S(T) is in [0, 1]: 1.0 means no competing interactions detected,
 lower values indicate steps that may require protecting group strategies.
-``route_scorer.competing_sites_score(route)`` returns it for one route. The scan is expensive —
+``CompetingSitesRouteScorer.from_config().score(route)`` returns it for one route. The scan is expensive —
 about 64 ms per molecule the cache has not seen — which is why the search does not
 do it, ``tree.routes()`` does not either, and ``rank`` costs tens of seconds on a
 few hundred routes rather than the instant its ``sorted``-like name suggests.
@@ -219,10 +219,12 @@ few hundred routes rather than the instant its ``sorted``-like name suggests.
 ``rank`` orders by whatever the scorer's ``score`` says, and for this scorer that
 is ``search_score * S(T)``, the re-ranking of the paper. It is therefore defined
 only for routes a search produced: a route read back out of a file carries no
-search score, and ``score`` says so rather than inventing one. Order those by
-``competing_sites_score``, which judges a route on its own terms::
+search score, and ``score`` says so rather than inventing one. Rank those with
+``CompetingSitesRouteScorer``, which judges a route on its own terms::
 
-    from_file = sorted(routes, key=route_scorer.competing_sites_score, reverse=True)
+    from synplan.chem.reaction.routes.quality.scorer import CompetingSitesRouteScorer
+
+    from_file = CompetingSitesRouteScorer.from_config().rank(routes)
 
 See :doc:`08_Protection_Scoring` for a detailed walkthrough.
 
