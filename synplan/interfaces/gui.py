@@ -19,6 +19,7 @@ from synplan.chem.reaction.routes.clustering import (
     subcluster_all_clusters,
 )
 from synplan.chem.reaction.routes.io import make_json
+from synplan.chem.reaction.routes.quality.scorer import ProtectionRouteScorer
 from synplan.chem.reaction.routes.representation import (
     compose_all_route_cgrs,
     compose_all_sb_cgrs,
@@ -106,6 +107,12 @@ def download_button(
         + f'<a download="{download_filename}" id="{button_id}" href="data:file/txt;base64,{b64}">{button_text}</a><br></br>'
     )
     return dl_link
+
+
+@st.cache_resource
+def load_route_scorer_cached():
+    """The protection scorer, kept so its 102-pattern cache survives a rerun."""
+    return ProtectionRouteScorer.from_config()
 
 
 @st.cache_resource
@@ -514,9 +521,12 @@ def download_planning_results():
     ):
         try:
             if st.button("Generate full HTML report", key="gen_plan_html"):
-                with st.spinner("Generating HTML report..."):
+                with st.spinner("Ranking routes and generating HTML report..."):
+                    ranked = load_route_scorer_cached().rank(
+                        st.session_state.tree.routes()
+                    )
                     st.session_state.planning_report_html = routes_report_html(
-                        st.session_state.tree.routes(), html_path=None
+                        ranked, html_path=None
                     )
 
             if st.session_state.get("planning_report_html"):

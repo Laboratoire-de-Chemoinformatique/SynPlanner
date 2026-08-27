@@ -7,94 +7,75 @@ implementations for different scoring strategies.
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
+from synplan.chem.reaction.routes.quality.protection.config import ProtectionConfig
+from synplan.chem.reaction.routes.quality.protection.functional_groups import (
+    FunctionalGroupDetector,
+    HalogenDetector,
+)
+from synplan.chem.reaction.routes.quality.protection.scanner import (
+    IncompatibilityMatrix,
+    RouteScanner,
+)
 from synplan.chem.reaction.routes.quality.protection.scorer import CompetingSitesScore
 from synplan.chem.reaction.routes.route import Route
 
 
 class RouteScorer(ABC):
-    """Abstract base for post-search route re-ranking.
+    """Abstract base for judging a finished route.
 
-    Subclasses implement :meth:`score` to evaluate a synthesis route and
-    optionally override :meth:`rescore` to customise how the quality
-    score is blended with the search score the route carries.
+    A scorer stands behind one number. :meth:`score` is it, :meth:`rank` puts
+    routes in order by it, and how the number is arrived at is the scorer's own
+    business -- read the search's verdict and weight it, ignore it, or produce a
+    number from nothing at all. The base class does not decide that for you: a
+    yield or a cost model has no reason to be a multiple of a tree search score.
     """
 
     @abstractmethod
     def score(self, route: Route) -> float:
-        """Evaluate a synthesis route.
+        """The number this scorer stands behind, higher being better.
 
         :param route: The route to judge.
-        :return: Quality score, typically in [0, 1].
+        :return: This scorer's verdict.
         """
-
-    def rescore(self, route: Route) -> float:
-        """Combine the route's search score with this scorer's assessment.
-
-        Default: ``search_score * score(route)`` (multiplicative weighting
-        as in Westerlund et al., 2025).  Override for custom blending.
-
-        :param route: The route to judge.
-        :return: Adjusted score.
-        """
-        return _search_score(route) * self.score(route)
 
     def rank(self, routes: Iterable[Route]) -> list[Route]:
-        """The routes, best :meth:`rescore` first.
+        """The routes, best :meth:`score` first.
 
-        :param routes: Routes from one tree, from several, or read from a file.
+        This scores every route, so it costs one :meth:`score` per route --
+        tens of seconds for a few hundred under :class:`ProtectionRouteScorer`,
+        whose scan runs ~64 ms per molecule its cache has not seen. It is not
+        the cheap ``sorted`` its name suggests.
+
+        :param routes: The routes to order.
         :return: A new list, best first.
         """
-        return sorted(routes, key=self.rescore, reverse=True)
-
-
-def _search_score(route: Route) -> float:
-    """The search's own number, or 1.0 for a route with no search behind it."""
-    provenance = route.provenance
-    if provenance is None or provenance.search_score is None:
-        return 1.0
-    return provenance.search_score
+        return sorted(routes, key=self.score, reverse=True)
 
 
 class ProtectionRouteScorer(RouteScorer):
     """Route scorer based on competing functional-group incompatibility.
 
-    Wraps a :class:`CompetingSitesScore` and applies the paper's
-    re-ranking formula::
-
-        rescored = search_score * ((1 - w) + w * S(T))
-
-    With the default ``weight=1.0`` this reduces to ``search_score * S(T)``.
+    Wraps a :class:`CompetingSitesScore`, so :meth:`rank` orders routes by
+    ``search_score * S(T)``: the paper's re-ranking, unweighted, because the
+    paper has no weight. :meth:`competing_sites_score` is S(T) on its own, for
+    routes no search produced.
 
     :param scorer: A configured :class:`CompetingSitesScore` instance.
-    :param weight: Strength of the protection penalty in [0, 1].
-        1.0 matches the paper exactly; lower values soften the penalty.
     """
 
-    def __init__(self, scorer: CompetingSitesScore, weight: float = 1.0):
+    def __init__(self, scorer: CompetingSitesScore):
         self._scorer = scorer
-        self._weight = weight
 
     @classmethod
-    def from_config(cls, config=None, weight: float = 1.0) -> "ProtectionRouteScorer":
+    def from_config(
+        cls, config: ProtectionConfig | None = None
+    ) -> "ProtectionRouteScorer":
         """Build a scorer from a :class:`ProtectionConfig`.
 
         :param config: A ProtectionConfig instance.  If ``None``, uses
             default paths bundled with SynPlanner.
-        :param weight: Protection penalty weight.
         :return: Configured ProtectionRouteScorer.
         """
-        from synplan.chem.reaction.routes.quality.protection.config import (
-            ProtectionConfig,
-        )
-        from synplan.chem.reaction.routes.quality.protection.functional_groups import (
-            FunctionalGroupDetector,
-            HalogenDetector,
-        )
-        from synplan.chem.reaction.routes.quality.protection.scanner import (
-            IncompatibilityMatrix,
-            RouteScanner,
-        )
-
         if config is None:
             config = ProtectionConfig()
 
@@ -102,11 +83,13 @@ class ProtectionRouteScorer(RouteScorer):
         matrix = IncompatibilityMatrix(config.incompatibility_path)
         halogen = HalogenDetector(config.halogen_groups_path)
         scanner = RouteScanner(detector, matrix, halogen)
-        scorer = CompetingSitesScore(scanner)
-        return cls(scorer, weight=weight)
+        return cls(CompetingSitesScore(scanner))
 
-    def score(self, route: Route) -> float:
-        """Compute the competing-sites score S(T) for a route.
+    def competing_sites_score(self, route: Route) -> float:
+        """The competing-sites score S(T), this scorer's own opinion of a route.
+
+        Judges the route on its own terms, without the search: use it to order
+        routes no search produced, such as routes read back out of a file.
 
         :param route: The route to judge.
         :return: S(T) in [0, 1].
@@ -116,11 +99,24 @@ class ProtectionRouteScorer(RouteScorer):
         )
         return st
 
-    def rescore(self, route: Route) -> float:
-        """Apply weighted protection penalty.
+    def score(self, route: Route) -> float:
+        """``search_score * S(T)`` -- the re-ranking of Westerlund et al., 2025.
+
+        The paper weights the search's own state score by the competing sites
+        score, so this scorer's verdict is defined only for a route a search
+        produced. A route read from a file has no search score and no way to be
+        put on this scale; order those by :meth:`competing_sites_score`, which
+        needs no search behind it.
 
         :param route: The route to judge.
-        :return: ``search_score * ((1 - w) + w * S(T))``.
+        :raises ValueError: If the route carries no search score.
+        :return: The search score weighted by S(T).
         """
-        w = self._weight
-        return _search_score(route) * ((1.0 - w) + w * self.score(route))
+        provenance = route.provenance
+        search = provenance.search_score if provenance is not None else None
+        if search is None:
+            raise ValueError(
+                "this score is the search score weighted by S(T), and the route "
+                "carries no search score; order it by competing_sites_score()."
+            )
+        return search * self.competing_sites_score(route)

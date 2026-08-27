@@ -678,8 +678,8 @@ def routes_clustering_report(
             # 1) SVG from Tree
             route = Route.from_tree(tree, route_id)
             svg = route.svg(layouts=layouts)
-            # 2) Reaction steps & score
-            steps = tree.synthesis_route(route_id)
+            # 2) Reaction steps & score; step order is the drawing's disc order
+            steps = [step.reaction for step in route]
             score = round(route.provenance.search_score, 3)
             # build reaction list
             reac_html = "".join(
@@ -1236,8 +1236,8 @@ def routes_subclustering_report(
             # 1) SVG from Tree
             route = Route.from_tree(tree, route_id)
             svg = route.svg(layouts=layouts)
-            # 2) Reaction steps & score
-            steps = tree.synthesis_route(route_id)
+            # 2) Reaction steps & score; step order is the drawing's disc order
+            steps = [step.reaction for step in route]
             score = round(route.provenance.search_score, 3)
             # build reaction list
             reac_html = "".join(

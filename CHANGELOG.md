@@ -10,17 +10,67 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Route scoring is a post-search step, not something the tree holds. `Tree` no longer
   takes `route_scorer` (it raises `TypeError`), and `Tree.route_score` returns the
   search's own number, always cheap. Rank with
-  `ProtectionRouteScorer.from_config().rank(routes)`, which takes routes from one tree,
-  from several, or read back out of a file, and hands them back best first.
+  `ProtectionRouteScorer.from_config().rank(routes)`, which hands them back best first.
+  A scorer stands behind one number, `score`; `rank` orders by it, and whether that
+  number is built out of the search's is the scorer's own business, not the base
+  class's. For this one it is `search_score * S(T)`, so it needs routes a search
+  produced; `competing_sites_score` is S(T) alone, for routes read from a file.
   **`tree.routes()` now returns search order where a `route_scorer` used to make it
-  protection order, and it says nothing about it.** On a 330-route celecoxib tree the
+  protection order.** On a 330-route celecoxib tree the
   call goes from 33.3s to 0.01s, because the protection scan was 95% of it and nobody
   had asked for it.
 
-- `RouteScorer.rescore` takes a `Route` and reads the search score off it, instead of
-  being handed one; `score` takes a `Route` too. Both were passed raw reaction tuples.
+- **`best_route_score` in `tree_search_stats.csv` is the raw search score now.** With a
+  `route_scorer` configured it used to be the protection-blended number, so the column
+  is silently rescaled across this release and is not comparable with an earlier run's.
+  Nothing else in the CSV changed.
+
+- `RouteScorer.rescore` is `RouteScorer.ranking_score`: nothing is re-scored, it reads
+  the search's number off the route and weights it by `score`, and it reads as what it
+  is at the `key=` it is passed to. It takes a `Route` and reads the search score off
+  it, instead of being handed one; `score` takes a `Route` too. Both were passed raw
+  reaction tuples.
+
+- `rank` no longer lets a route with no search behind it win by default. A search score
+  the route does not carry used to stand in as `1.0`, which is not neutral -- on a
+  330-route celecoxib tree the real search scores run 0.048 to 0.311, so one route read
+  back out of a file ranked first of 331 whatever its quality. A list where nothing
+  carries a search score now ranks on `score` alone, and a list mixing the two raises
+  `ValueError` rather than picking a winner on two scales. `ranking_score` raises on a
+  route with no search score for the same reason. Its docstring stops advertising the
+  mix it could not do.
+
+### Removed
+
+- `CompetingSitesScore.rank_routes`, which had no caller inside SynPlanner and blended
+  by `(1 - w) * normalised_search + w * S(T)` -- an additive formula that is not the
+  paper's. The paper (Westerlund et al., 2025) re-ranks "by using the default state
+  score, weighted by the competing sites score", which is the plain
+  `search_score * S(T)` that `ProtectionRouteScorer` does. Use `rank`, which takes
+  `Route` objects rather than `{route_id: {step_id: ReactionContainer}}` and hands back
+  routes rather than score tuples.
+
+- `ProtectionRouteScorer(weight=...)`, whose `(1 - w) + w * S(T)` softening is nowhere
+  in the paper and which nothing ever set below its `1.0` default, where it is
+  arithmetically the plain product.
+
+- `ProtectionConfig.score_weight` and `ProtectionConfig.enable_reranking`. The weight
+  was `rank_routes`'s, and the flag was never read by anything. A YAML carrying either
+  key is now rejected rather than silently ignored.
 
 ### Fixed
+
+- The GUI's "Generate full HTML report" button lost its protection ranking when the
+  scorer came off the `Tree`, and the report came out in search order with nobody told.
+  It ranks again, behind the button where the wait already sits under a spinner.
+
+- The route lists under the drawings in `routes_clustering_report` and
+  `routes_subclustering_report` were numbered in the tree's step order while the discs
+  in the drawing above them were numbered in the route's, so "Step 3" in the text and
+  the disc marked 3 were different reactions on a convergent route -- 21 of the 330
+  routes of a celecoxib tree. The Tree-sourced half of both reports now reads the
+  route's own steps; the JSON-sourced half, which `synplan clustering` uses, still
+  does not.
 
 - The functional-group detector cached its matches by a SMILES that carries no atom
   numbers while the matches carried them, so two structurally identical molecules
