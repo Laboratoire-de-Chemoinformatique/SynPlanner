@@ -25,6 +25,7 @@ from synplan.utils.routedraw import (
     ARROW_DEFS,
     ROLE_STYLE,
     ROUTE_CSS,
+    drawable_copy,
     molecule_svg,
 )
 from synplan.utils.svgslim import Doc, hidden_defs
@@ -231,10 +232,11 @@ _ROLE_LEGEND = (
 )
 
 
-def _report_header(tree: Tree, n_routes: int) -> str:
+def _report_header(tree: Tree, n_routes: int, tile: MoleculeContainer | None) -> str:
     target = tree.nodes[1].curr_precursor
-    tile = read_smiles(str(target))
-    tile.clean2d()
+    if tile is None:  # no route to take the target's shared layout from
+        tile = read_smiles(str(target))
+        tile.clean2d()
     stats = (
         ("Tree size", len(tree), " nodes"),
         ("Visited nodes", len(tree.visited_nodes), ""),
@@ -288,9 +290,12 @@ def generate_results_html(
         node_ids = list(tree.winning_nodes)
 
     doc = Doc()
+    layouts: dict = {}  # one geometry per molecule, so a card matches its neighbours
     body = []
+    target = None
     for node_id in node_ids:
         route = Route.from_tree(tree, node_id)
+        target = route.steps[-1].product
         labels = route_rule_labels(tree, node_id)
         rows = ""
         for number, step in enumerate(route, 1):
@@ -308,7 +313,9 @@ def generate_results_html(
             f'<div class="v">{len(route)}</div></div>'
             f'<div class="kv"><div class="eyebrow">Cumulated nodes&#39; value</div>'
             f'<div class="v">{round(tree.route_score(node_id), 3)}</div></div></div>'
-            f'<div class="draw">{doc.route(route.svg(standalone=False))}</div>{rows}</section>'
+            f'<div class="draw">'
+            f"{doc.route(route.svg(standalone=False, layouts=layouts))}"
+            f"</div>{rows}</section>"
         )
 
     page = (
@@ -318,7 +325,11 @@ def generate_results_html(
         f"<style>{ROUTE_CSS}{_REPORT_CSS}</style>\n</head>\n<body>\n"
         + hidden_defs(ARROW_DEFS, doc.defs())
         + '<div class="wrap">'
-        + _report_header(tree, len(node_ids))
+        + _report_header(
+            tree,
+            len(node_ids),
+            None if target is None else drawable_copy(target, layouts),
+        )
         + "".join(body)
         + "</div>\n</body>\n</html>\n"
     )
@@ -379,13 +390,14 @@ def html_top_routes_cluster(
     html.append("</tr></thead><tbody>")
 
     # Rows per cluster
+    layouts: dict = {}  # one geometry per molecule, shared by every route on the page
     for cluster_num, group_data in clusters.items():
         route_ids = group_data.get("route_ids", [])
         if not route_ids:
             continue
         route_id = route_ids[0]
         # Get SVGs
-        svg = Route.from_tree(tree, route_id).svg()
+        svg = Route.from_tree(tree, route_id).svg(layouts=layouts)
         r_cgr = group_data.get("sb_cgr")
         r_cgr_svg = None
         if r_cgr:
@@ -633,10 +645,11 @@ def routes_clustering_report(
         </div>
     </td></tr>
     """
+    layouts: dict = {}  # one geometry per molecule, shared by every route on the page
     for route_id in valid_routes:
         if using_tree:
             # 1) SVG from Tree
-            svg = Route.from_tree(tree, route_id).svg()
+            svg = Route.from_tree(tree, route_id).svg(layouts=layouts)
             # 2) Reaction steps & score
             steps = tree.synthesis_route(route_id)
             score = round(tree.route_score(route_id), 3)
@@ -650,7 +663,7 @@ def routes_clustering_report(
             table += f"<tr><td>{reac_html}</td></tr>"
         else:
             # 1) SVG from JSON
-            svg = _json_route(routes_json, route_id).svg()
+            svg = _json_route(routes_json, route_id).svg(layouts=layouts)
             steps = routes_dict[route_id]
             reac_html = "".join(
                 f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in steps.items()
@@ -1189,10 +1202,11 @@ def routes_subclustering_report(
         </div>
     </td></tr>
     """
+    layouts: dict = {}  # one geometry per molecule, shared by every route on the page
     for route_id in valid_routes:
         if using_tree:
             # 1) SVG from Tree
-            svg = Route.from_tree(tree, route_id).svg()
+            svg = Route.from_tree(tree, route_id).svg(layouts=layouts)
             # 2) Reaction steps & score
             steps = tree.synthesis_route(route_id)
             score = round(tree.route_score(route_id), 3)
@@ -1207,7 +1221,7 @@ def routes_subclustering_report(
 
         else:
             # 1) SVG from JSON
-            svg = _json_route(routes_json, route_id).svg()
+            svg = _json_route(routes_json, route_id).svg(layouts=layouts)
             steps = routes_dict[route_id]
             reac_html = "".join(
                 f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in steps.items()

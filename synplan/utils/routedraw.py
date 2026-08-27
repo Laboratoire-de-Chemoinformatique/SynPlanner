@@ -18,10 +18,14 @@ from synplan.utils.routelayout import Node, edges, layout, walk
 if TYPE_CHECKING:
     from chython.containers.molecule import MoleculeContainer
 
+#: One cleaned geometry per molecule: mapped SMILES -> atom number -> (x, y).
+Layouts = dict[str, dict[int, tuple[float, float]]] | None
+
 __all__ = [
     "ARROW_DEFS",
     "ROLE_STYLE",
     "ROUTE_CSS",
+    "Layouts",
     "draw_route",
     "drawable_copy",
     "molecule_svg",
@@ -130,38 +134,64 @@ def orient_route(mols: Any, step_deg: int = 5) -> int:
     return deg
 
 
-def drawable_copy(mol: MoleculeContainer) -> MoleculeContainer:
+def drawable_copy(mol: MoleculeContainer, layouts: Layouts = None) -> MoleculeContainer:
     """A copy of ``mol`` with a layout of its own.
 
     A route's molecules are the search tree's own objects, and they carry whatever
     coordinates the reactor left on them -- for a precursor, the product's layout with
     the new atoms piled onto one point. Only ``clean2d()`` fixes that, and it mutates,
     so every drawer lays out a copy and leaves the tree's coordinates alone.
+
+    ``clean2d()`` is not deterministic: laying the same molecule out again draws it
+    another way. Pass a ``layouts`` dict -- keyed by mapped SMILES, the spelling that
+    also fixes the atom numbers this geometry is stored under -- to lay a molecule out
+    once and reuse that geometry everywhere it turns up.
     """
     copy = mol.copy()
-    copy.clean2d()
+    if layouts is None:
+        copy.clean2d()
+        return copy
+
+    key = format(mol, "m")
+    geometry = layouts.get(key)
+    if geometry is None:
+        copy.clean2d()
+        orient_route([copy])  # so a shared molecule brings a settled angle with it
+        layouts[key] = {number: (atom.x, atom.y) for number, atom in copy.atoms()}
+        return copy
+
+    for number, atom in copy.atoms():
+        atom.xy = geometry[number]
+    # wedges are derived from the coordinates and cached
+    copy.__dict__.pop("_wedge_map", None)
+    copy.__dict__.pop("__cached_method__repr_svg_", None)
     return copy
 
 
-def _drawable_copies(steps: Any) -> dict[int, MoleculeContainer]:
+def _drawable_copies(steps: Any, layouts: Layouts) -> dict[int, MoleculeContainer]:
     """One :func:`drawable_copy` per molecule of the route, keyed by original id."""
     copies: dict[int, MoleculeContainer] = {}
     for step in steps:
         for mol in (*step.reaction.reactants, *step.reaction.products):
             if id(mol) not in copies:
-                copies[id(mol)] = drawable_copy(mol)
+                copies[id(mol)] = drawable_copy(mol, layouts)
     return copies
 
 
-def _route_tree(steps: Any, unresolved: Any, align: bool) -> tuple[Node, dict]:
-    copies = _drawable_copies(steps)
+def _route_tree(
+    steps: Any, unresolved: Any, align: bool, layouts: Layouts = None
+) -> tuple[Node, dict]:
+    copies = _drawable_copies(steps, layouts)
     if align:
         # leaf-first order, so each disconnection inherits the layout above it
         for step in reversed(steps):
             product = copies[id(step.product)]
             for precursor in step.reaction.reactants:
                 align_molecule(copies[id(precursor)], product)
-        orient_route(copies.values())
+        if layouts is None:
+            # shared layouts arrive oriented; turning the route would turn the target
+            # away from the layout every other card of the page shows
+            orient_route(copies.values())
 
     by_product = {
         id(step.product): (number, step) for number, step in enumerate(steps, 1)
@@ -256,7 +286,9 @@ def _to_svg(root: Node, depicts: dict, links: list[dict], w: float, h: float) ->
     return "".join(parts)
 
 
-def draw_route(steps: Any, unresolved: Any = (), align: bool = True) -> str:
+def draw_route(
+    steps: Any, unresolved: Any = (), align: bool = True, layouts: Layouts = None
+) -> str:
     """Draw one route.
 
     Whether a leaf is purchasable is decided by the caller, never here. Which step
@@ -269,9 +301,12 @@ def draw_route(steps: Any, unresolved: Any = (), align: bool = True) -> str:
     :param unresolved: The terminal precursors that are not purchasable; they are
         drawn in the ``oos`` role, every other leaf in ``bb``.
     :param align: If True, give every precursor its product's orientation.
+    :param layouts: A dict shared with the other routes of the same page, so one
+        molecule is laid out once and drawn the same way everywhere. Pass None for a
+        route drawn on its own, which has nothing to share.
     :return: The SVG, without ``ROUTE_CSS`` or ``ARROW_DEFS``.
     """
-    root, depicts = _route_tree(steps, unresolved, align)
+    root, depicts = _route_tree(steps, unresolved, align, layouts)
     width, height, col_x, col_w = layout(root, row_gap=ROW_GAP)
     links = edges(root, col_x, col_w)
     for edge in links:

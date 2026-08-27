@@ -30,6 +30,9 @@ _TARGET_CAPTION = re.compile(
     rf'<text x="{_NUM}" y="{_NUM}" class="sp-tag" fill="[^"]*">TARGET</text>'
 )
 _STEP_NUMBER = re.compile(r'<div class="disc">(\d+)</div>')
+_DEPICTION = re.compile(
+    rf'<svg x="{_NUM}" y="{_NUM}"[^>]*><use xlink:href="#([^"]+)"/>'
+)
 
 
 class _FakeTree:
@@ -175,3 +178,78 @@ def test_the_last_disc_is_the_cut_from_the_target(page):
         assert int(number) == len(tree.synthesis_route(node_id))
         assert float(cx) < box_x  # the disc sits in the lane left of the target
         assert abs(float(cy) - (box_y + height / 2)) < 0.11
+
+
+def _cut(mol, n: int, m: int) -> list:
+    """The two fragments the bond ``n-m`` splits ``mol`` into.
+
+    Substructures, so the atom numbers and coordinates are the target's own, which is
+    what chython's reactor hands back for a real disconnection.
+    """
+    rest = mol.copy()
+    rest.delete_bond(n, m)
+    parts = rest.connected_components
+    assert len(parts) == 2
+    return [mol.substructure(part) for part in parts]
+
+
+class _BigTargetTree(_FakeTree):
+    """Three one-step cuts of a target big enough to expose the layout lottery.
+
+    chython lays this molecule out a fresh way nearly every time it is asked, so a
+    page that lays every card out on its own shows three different targets.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        target = read_smiles("CC(C)(C)OC(=O)NC1(C(=O)O)CCN(C(=O)OCc2ccccc2)CC1")
+        target.clean2d()
+        self.target = target
+        self._routes = {
+            node_id: (Reaction(_cut(target, *bond), [target]),)
+            for node_id, bond in ((3, (6, 8)), (5, (2, 5)), (7, (16, 18)))
+        }
+        self.winning_nodes = list(self._routes)
+        self.visited_nodes = [1, *self._routes]
+        self.parents = {1: 0} | dict.fromkeys(self._routes, 1)
+        self.nodes = {
+            node_id: _FakeNode(target if node_id == 1 else None)
+            for node_id in (1, *self._routes)
+        }
+
+
+@pytest.fixture(scope="module")
+def big_target_page() -> str:
+    return generate_results_html(_BigTargetTree(), None)
+
+
+def test_every_card_draws_the_target_the_same_way(big_target_page):
+    """One layout per molecule, shared by the whole report.
+
+    Read from the page: the depiction sitting inside the TARGET box is the same
+    pooled one on every card, so a chemist scanning the cards compares like with
+    like.
+    """
+    used = set()
+    for section in sections(big_target_page):
+        svg = drawing(section)
+        caption = _TARGET_CAPTION.search(svg)
+        assert caption is not None
+        box_x, box_y = float(caption.group(1)) - 1, float(caption.group(2)) + 5
+        box = [
+            r
+            for r in _RECT.findall(svg)
+            if abs(float(r[0]) - box_x) < 0.11 and abs(float(r[1]) - box_y) < 0.11
+        ]
+        assert len(box) == 1
+        width, height = float(box[0][2]), float(box[0][3])
+        inside = [
+            pool_id
+            for x, y, pool_id in _DEPICTION.findall(svg)
+            if box_x <= float(x) <= box_x + width
+            and box_y <= float(y) <= box_y + height
+        ]
+        assert len(inside) == 1  # the boxes do not overlap
+        used.add(inside[0])
+    assert len(sections(big_target_page)) == 3
+    assert len(used) == 1

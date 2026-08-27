@@ -19,7 +19,7 @@ from synplan.chem.reaction.routes.io.json import (
 from synplan.chem.reaction.routes.io.metadata import reaction_metadata
 from synplan.chem.reaction.routes.representation.route_cgr import build_route_cgr
 from synplan.chem.reaction.routes.traversal import linearise, root_step
-from synplan.utils.routedraw import ARROW_DEFS, ROUTE_CSS, draw_route
+from synplan.utils.routedraw import ARROW_DEFS, ROUTE_CSS, Layouts, draw_route
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Sequence
@@ -320,7 +320,9 @@ class Route:
     # drawing
     # ------------------------------------------------------------------
 
-    def svg(self, align: bool = True, standalone: bool = True) -> str:
+    def svg(
+        self, align: bool = True, standalone: bool = True, layouts: Layouts = None
+    ) -> str:
         """Draw the route as an SVG.
 
         Unresolved leaves take routedraw's ``oos`` role, which is the red one.
@@ -328,6 +330,8 @@ class Route:
         :param align: Give every precursor its product's orientation.
         :param standalone: Inline ``ROUTE_CSS`` and ``ARROW_DEFS``. Turn it off
             for a page that carries one copy of both itself.
+        :param layouts: A dict shared with the other routes of the same page, so a
+            molecule two routes have in common is drawn the same way in both.
         """
 
         unresolved: tuple[MoleculeContainer, ...] = ()
@@ -335,7 +339,7 @@ class Route:
             unresolved = tuple(
                 leaf for leaf in self.leaves() if molecule_key(leaf) in self.unresolved
             )
-        svg = draw_route(self.steps, unresolved, align=align)
+        svg = draw_route(self.steps, unresolved, align=align, layouts=layouts)
         if not standalone:
             return svg
         head = svg.index(">") + 1
