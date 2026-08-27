@@ -676,10 +676,11 @@ def routes_clustering_report(
     for route_id in valid_routes:
         if using_tree:
             # 1) SVG from Tree
-            svg = Route.from_tree(tree, route_id).svg(layouts=layouts)
+            route = Route.from_tree(tree, route_id)
+            svg = route.svg(layouts=layouts)
             # 2) Reaction steps & score
             steps = tree.synthesis_route(route_id)
-            score = round(tree.route_score(route_id), 3)
+            score = round(route.provenance.search_score, 3)
             # build reaction list
             reac_html = "".join(
                 f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in enumerate(steps)
@@ -1233,10 +1234,11 @@ def routes_subclustering_report(
     for route_id in valid_routes:
         if using_tree:
             # 1) SVG from Tree
-            svg = Route.from_tree(tree, route_id).svg(layouts=layouts)
+            route = Route.from_tree(tree, route_id)
+            svg = route.svg(layouts=layouts)
             # 2) Reaction steps & score
             steps = tree.synthesis_route(route_id)
-            score = round(tree.route_score(route_id), 3)
+            score = round(route.provenance.search_score, 3)
             # build reaction list
             reac_html = "".join(
                 f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in enumerate(steps)

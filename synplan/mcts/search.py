@@ -194,8 +194,9 @@ def run_search(
     :param building_blocks_path: The path to the file containing building blocks.
     :param results_root: The name of the folder where the results of the tree search
         will be saved.
-    :param route_scorer: Optional post-search route scorer for re-ranking
-        winning routes (e.g. ProtectionRouteScorer).
+    :param route_scorer: Optional post-search route scorer (e.g.
+        ProtectionRouteScorer). When given, the routes on each target's HTML
+        report come back in its order instead of search order.
     :param priority_rules: Optional mapping of curated rule sets
         (``{set_name: [Reactor, ...]}``) forwarded to every per-target
         :class:`Tree`. See :meth:`Tree.__init__` for the full semantics.
@@ -332,7 +333,6 @@ def run_search(
                     building_blocks=building_blocks,
                     expansion_function=policy_function,
                     evaluation_function=evaluation_function,
-                    route_scorer=route_scorer,
                     priority_rules=priority_rules,
                 )
 
@@ -362,8 +362,11 @@ def run_search(
                 extracted_routes.append(extract_routes(tree))
 
                 # save routes
+                routes = tree.routes()
+                if route_scorer is not None:
+                    routes = route_scorer.rank(routes)
                 routes_report_html(
-                    tree.routes(),
+                    routes,
                     os.path.join(routes_folder, f"retroroutes_target_{ti}.html"),
                 )
 

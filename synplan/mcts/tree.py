@@ -12,7 +12,6 @@ from tqdm.auto import tqdm
 
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
-from synplan.chem.reaction.routes.quality.scorer import RouteScorer
 from synplan.chem.reaction.routes.route import Route
 from synplan.chem.reaction.routes.traversal import (
     iter_route_nodes,
@@ -129,7 +128,6 @@ class Tree:
         building_blocks: set[str],
         expansion_function: Policy,
         evaluation_function: EvaluationStrategy = None,
-        route_scorer: RouteScorer | None = None,
         priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
     ):
         """Initializes a tree object with optional parameters for tree search for target
@@ -142,11 +140,6 @@ class Tree:
         :param expansion_function: A loaded policy function.
         :param evaluation_function: An evaluation strategy. If None, a random
             evaluation strategy is used as default.
-        :param route_scorer: Optional post-search route scorer. When set,
-            :meth:`route_score` delegates to ``route_scorer.rescore(original,
-            route)``. Nothing is reordered — ``winning_nodes`` keeps discovery
-            order and the exporters do not sort, so rank on ``route_score``
-            yourself.
         :param priority_rules: Optional **mapping** of curated rule sets,
             ``{set_name: [Reactor, ...]}``. Each set contributes rules tagged
             with its mapping key as ``rule_source``; e.g.
@@ -223,10 +216,6 @@ class Tree:
                     f"{len(frozenset(rollout.building_blocks))} and "
                     f"min_mol_size={rollout.min_mol_size}."
                 )
-
-        # post-search route scoring; callers rank on route_score themselves
-        self._route_scorer = route_scorer
-        self._rescore_cache: dict[int, float] = {}
 
         # tree initialization
         target_node = self._init_target_node(target)
@@ -732,9 +721,10 @@ class Tree:
         """Calculates the score of a given route from the current node to the root node.
         The score depends on cumulated node values and the route length.
 
-        When a ``route_scorer`` is set, the raw score is passed through
-        ``route_scorer.rescore(original, route)`` (e.g. a protection-group
-        penalty). Sorting on this is the caller's job.
+        This is the search's own number. Judging a finished route by anything else
+        (e.g. a protection-group penalty) is a
+        :class:`~synplan.chem.reaction.routes.quality.scorer.RouteScorer`'s job,
+        after the search.
 
         :param node_id: The id of the current given node.
         :return: The route score.
@@ -744,15 +734,7 @@ class Tree:
         route_length = len(route_nodes)
         cumulated_nodes_value = sum(node.total_value for node in route_nodes)
 
-        original = cumulated_nodes_value / (route_length**2)
-
-        if self._route_scorer is None:
-            return original
-
-        if node_id not in self._rescore_cache:
-            route = self.synthesis_route(node_id)
-            self._rescore_cache[node_id] = self._route_scorer.rescore(original, route)
-        return self._rescore_cache[node_id]
+        return cumulated_nodes_value / (route_length**2)
 
     def routes(self, solved_only: bool = True) -> list["Route"]:
         """The tree's routes as objects, best score first.

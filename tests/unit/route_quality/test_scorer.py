@@ -6,6 +6,7 @@ import pytest
 from chython import smiles
 from pydantic import ValidationError
 
+from synplan.chem.reaction.reactor import Reaction
 from synplan.chem.reaction.routes.quality.protection.config import ProtectionConfig
 from synplan.chem.reaction.routes.quality.protection.functional_groups import (
     FunctionalGroupDetector,
@@ -17,6 +18,11 @@ from synplan.chem.reaction.routes.quality.protection.scanner import (
     RouteScanner,
 )
 from synplan.chem.reaction.routes.quality.protection.scorer import CompetingSitesScore
+from synplan.chem.reaction.routes.quality.scorer import (
+    ProtectionRouteScorer,
+    RouteScorer,
+)
+from synplan.chem.reaction.routes.route import Route, RouteProvenance, Step
 
 
 @pytest.fixture
@@ -379,3 +385,47 @@ def test_config_to_yaml_roundtrip(tmp_path):
     loaded = ProtectionConfig.from_yaml(yaml_path)
     assert loaded.score_weight == cfg.score_weight
     assert loaded.enable_reranking == cfg.enable_reranking
+
+
+# --- RouteScorer: rescore and rank take Route objects ---
+
+# Ethyl benzoate from benzoic acid and ethanol, atom maps shared as a reactor's are.
+_TARGET = "[CH3:1][CH2:2][O:3][C:4](=[O:5])[c:6]1[cH:7][cH:8][cH:9][cH:10][cH:11]1"
+_ACID = "[OH:3][C:4](=[O:5])[c:6]1[cH:7][cH:8][cH:9][cH:10][cH:11]1"
+_ETHANOL = "[CH3:1][CH2:2][OH:12]"
+
+
+def _esterification(search_score):
+    reaction = Reaction([smiles(_ACID), smiles(_ETHANOL)], [smiles(_TARGET)])
+    return Route(
+        steps=(Step(reaction, reaction.products[0]),),
+        provenance=RouteProvenance(search_score),
+    )
+
+
+class _Half(RouteScorer):
+    """Judges every route at 0.5, so the blending is what is under test."""
+
+    def score(self, route):
+        return 0.5
+
+
+def test_rescore_reads_the_search_score_off_the_route():
+    assert _Half().rescore(_esterification(0.8)) == pytest.approx(0.4)
+
+
+def test_rescore_of_a_route_with_no_search_behind_it_is_its_quality():
+    assert _Half().rescore(_esterification(None)) == pytest.approx(0.5)
+
+
+def test_rank_returns_the_routes_best_first():
+    routes = [_esterification(0.1), _esterification(0.9), _esterification(0.5)]
+    ranked = _Half().rank(routes)
+    assert [r.provenance.search_score for r in ranked] == [0.9, 0.5, 0.1]
+
+
+def test_protection_scorer_scores_a_route():
+    route = _esterification(0.5)
+    scorer = ProtectionRouteScorer.from_config()
+    assert 0.0 <= scorer.score(route) <= 1.0
+    assert scorer.rescore(route) == pytest.approx(0.5 * scorer.score(route))

@@ -77,8 +77,6 @@ class _StubTree:
             self.winning_nodes = [3]
         self.building_blocks = frozenset({str(read_smiles(TOLUENE))})
         self.config = SimpleNamespace(min_mol_size=6)
-        self._route_scorer = None
-        self._rescore_cache = {}
 
 
 # Two branches of two steps each, merged and then capped. Given in the order the

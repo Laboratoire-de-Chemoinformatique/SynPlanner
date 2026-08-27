@@ -1,15 +1,14 @@
 """General route scorer interface for post-search re-ranking.
 
-Provides an abstract base class that Tree uses to adjust route scores
-after the search loop, and concrete implementations for different
-scoring strategies.
+Provides an abstract base class for judging finished routes, and concrete
+implementations for different scoring strategies.
 """
 
 from abc import ABC, abstractmethod
-
-from chython.containers import ReactionContainer
+from collections.abc import Iterable
 
 from synplan.chem.reaction.routes.quality.protection.scorer import CompetingSitesScore
+from synplan.chem.reaction.routes.route import Route
 
 
 class RouteScorer(ABC):
@@ -17,32 +16,43 @@ class RouteScorer(ABC):
 
     Subclasses implement :meth:`score` to evaluate a synthesis route and
     optionally override :meth:`rescore` to customise how the quality
-    score is blended with the original tree search score.
+    score is blended with the search score the route carries.
     """
 
     @abstractmethod
-    def score(self, route: tuple[ReactionContainer, ...]) -> float:
+    def score(self, route: Route) -> float:
         """Evaluate a synthesis route.
 
-        :param route: Ordered tuple of reactions (forward direction).
+        :param route: The route to judge.
         :return: Quality score, typically in [0, 1].
         """
 
-    def rescore(
-        self,
-        original_score: float,
-        route: tuple[ReactionContainer, ...],
-    ) -> float:
-        """Combine the original tree score with this scorer's assessment.
+    def rescore(self, route: Route) -> float:
+        """Combine the route's search score with this scorer's assessment.
 
-        Default: ``original * score(route)`` (multiplicative weighting
+        Default: ``search_score * score(route)`` (multiplicative weighting
         as in Westerlund et al., 2025).  Override for custom blending.
 
-        :param original_score: Raw score from the tree search.
-        :param route: Ordered tuple of reactions.
+        :param route: The route to judge.
         :return: Adjusted score.
         """
-        return original_score * self.score(route)
+        return _search_score(route) * self.score(route)
+
+    def rank(self, routes: Iterable[Route]) -> list[Route]:
+        """The routes, best :meth:`rescore` first.
+
+        :param routes: Routes from one tree, from several, or read from a file.
+        :return: A new list, best first.
+        """
+        return sorted(routes, key=self.rescore, reverse=True)
+
+
+def _search_score(route: Route) -> float:
+    """The search's own number, or 1.0 for a route with no search behind it."""
+    provenance = route.provenance
+    if provenance is None or provenance.search_score is None:
+        return 1.0
+    return provenance.search_score
 
 
 class ProtectionRouteScorer(RouteScorer):
@@ -51,9 +61,9 @@ class ProtectionRouteScorer(RouteScorer):
     Wraps a :class:`CompetingSitesScore` and applies the paper's
     re-ranking formula::
 
-        rescored = original * ((1 - w) + w * S(T))
+        rescored = search_score * ((1 - w) + w * S(T))
 
-    With the default ``weight=1.0`` this reduces to ``original * S(T)``.
+    With the default ``weight=1.0`` this reduces to ``search_score * S(T)``.
 
     :param scorer: A configured :class:`CompetingSitesScore` instance.
     :param weight: Strength of the protection penalty in [0, 1].
@@ -95,27 +105,22 @@ class ProtectionRouteScorer(RouteScorer):
         scorer = CompetingSitesScore(scanner)
         return cls(scorer, weight=weight)
 
-    def score(self, route: tuple[ReactionContainer, ...]) -> float:
+    def score(self, route: Route) -> float:
         """Compute the competing-sites score S(T) for a route.
 
-        :param route: Ordered tuple of reactions.
+        :param route: The route to judge.
         :return: S(T) in [0, 1].
         """
-        route_dict = dict(enumerate(route))
-        st, _ = self._scorer.score_route(route_dict)
+        st, _ = self._scorer.score_route(
+            dict(enumerate(step.reaction for step in route))
+        )
         return st
 
-    def rescore(
-        self,
-        original_score: float,
-        route: tuple[ReactionContainer, ...],
-    ) -> float:
+    def rescore(self, route: Route) -> float:
         """Apply weighted protection penalty.
 
-        :param original_score: Raw tree search score.
-        :param route: Ordered tuple of reactions.
-        :return: ``original * ((1 - w) + w * S(T))``.
+        :param route: The route to judge.
+        :return: ``search_score * ((1 - w) + w * S(T))``.
         """
-        st = self.score(route)
         w = self._weight
-        return original_score * ((1.0 - w) + w * st)
+        return _search_score(route) * ((1.0 - w) + w * self.score(route))

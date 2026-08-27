@@ -3,6 +3,36 @@
 All notable changes to SynPlanner are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Route scoring is a post-search step, not something the tree holds. `Tree` no longer
+  takes `route_scorer` (it raises `TypeError`), and `Tree.route_score` returns the
+  search's own number, always cheap. Rank with
+  `ProtectionRouteScorer.from_config().rank(routes)`, which takes routes from one tree,
+  from several, or read back out of a file, and hands them back best first.
+  **`tree.routes()` now returns search order where a `route_scorer` used to make it
+  protection order, and it says nothing about it.** On a 330-route celecoxib tree the
+  call goes from 33.3s to 0.01s, because the protection scan was 95% of it and nobody
+  had asked for it.
+
+- `RouteScorer.rescore` takes a `Route` and reads the search score off it, instead of
+  being handed one; `score` takes a `Route` too. Both were passed raw reaction tuples.
+
+### Fixed
+
+- The functional-group detector cached its matches by a SMILES that carries no atom
+  numbers while the matches carried them, so two structurally identical molecules
+  numbered differently received each other's atom numbers -- indices the queried
+  molecule does not contain. The cache now stores positions in the canonical SMILES
+  order and fills in the queried molecule's numbering on the way out. On a 330-route
+  celecoxib tree the old cache mis-answered 112 of 6105 lookups and changed the
+  reacting group identified on 10 routes; on a larger one it mis-answered 228 and
+  hid real penalties, reporting S(T) 1.00 for routes that score 0.875, which moved
+  the ranking from position 35 down. Whether it changed a score at all depends on
+  the tree.
+
 ## [1.7.0] - 2026-08-25
 
 ### Added

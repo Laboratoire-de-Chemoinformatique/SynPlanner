@@ -19,7 +19,6 @@ from synplan.chem.reaction.routes.clustering import (
     subcluster_all_clusters,
 )
 from synplan.chem.reaction.routes.io import make_json
-from synplan.chem.reaction.routes.quality.scorer import ProtectionRouteScorer
 from synplan.chem.reaction.routes.representation import (
     compose_all_route_cgrs,
     compose_all_sb_cgrs,
@@ -418,8 +417,6 @@ def setup_planning_options():
                     )
                     evaluator = load_evaluation_function(eval_config)
 
-                    route_scorer = ProtectionRouteScorer.from_config()
-
                     tree = Tree(
                         target=target_molecule,
                         config=tree_config,
@@ -427,7 +424,6 @@ def setup_planning_options():
                         building_blocks=building_blocks,
                         expansion_function=policy_function,
                         evaluation_function=evaluator,
-                        route_scorer=route_scorer,
                     )
 
                     mcts_progress_text = "Running MCTS iterations..."

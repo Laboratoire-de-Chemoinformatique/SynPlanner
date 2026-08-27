@@ -30,21 +30,19 @@ does nothing when constructed. Iterate it instead only for per-iteration
 `(is_solved, node_ids)` — progress, or early stopping.
 Docs: `methods/mcts` — "Running a search"
 
-Pass the scorer as `Tree(..., route_scorer=route_scorer)` and it makes
-`tree.route_score(node_id)` quality-aware. It does NOT reorder anything:
-`winning_nodes` stays in discovery order and `extract_routes` does not sort, so
-that export comes back unranked and the score is not written into it
-(`tree.routes()` does sort, best score first). Sort yourself —
-`sorted(tree.winning_nodes, key=tree.route_score, reverse=True)` — or the scorer
-costs roughly three times the search time and changes nothing you can consume.
+Ranking is a step after the search: `route_scorer.rank(tree.routes())` hands
+back the routes best first. `Tree` takes no scorer any more, and
+`tree.route_score(node_id)` is the search's own number. `winning_nodes` stays in
+discovery order and `extract_routes` does not sort, so that export comes back
+unranked either way; `tree.routes()` sorts by search score.
 
 ## Common combinations
 
 Most real requests are a chain, not a single entry.
 
 **"Give me good routes for this molecule"** — the default ask
-Planning setup *with* `route_scorer` → `tree.run()` → `tree.routes()`. This,
-not bare planning, is the baseline answer.
+Planning setup → `tree.run()` → `route_scorer.rank(tree.routes())`. This, not
+bare planning, is the baseline answer.
 
 **"Give me good routes, and show me how they differ"**
 The above, then `export_tree_to_json` and `routes_clustering_report`.
@@ -66,8 +64,8 @@ training**, see "Plan with my own retrosynthetic SMARTS" below.
 ## Finding routes
 
 **Find a synthesis route for a molecule**
-Planning setup with `route_scorer`, then `tree.routes()` — `Route` objects,
-best score first, each drawing itself in a notebook.
+Planning setup, then `tree.routes()` — `Route` objects, best search score
+first, each drawing itself in a notebook — then `route_scorer.rank(...)`.
 Tutorial: `05_Retrosynthetic_Planning`, `ten_minutes`
 Docs: `methods/planning`, `methods/mcts`, `configuration/planning`
 
@@ -148,8 +146,8 @@ Tutorial: `07_Clustering`
 Docs: `methods/routes` — see "Typed Route APIs"
 
 **Rank routes by quality / avoid protecting-group problems**
-Already in the planning setup: `ProtectionRouteScorer.from_config()` passed as
-`Tree(route_scorer=...)`. Go lower level only to tune it — `ProtectionConfig`,
+`ProtectionRouteScorer.from_config().rank(routes)`, best first; `score(route)`
+for one number. Go lower level only to tune it — `ProtectionConfig`,
 `FunctionalGroupDetector`, `get_reaction_center_atoms`, `classify_reaction_type`.
 Tutorial: `08_Protection_Scoring`
 
