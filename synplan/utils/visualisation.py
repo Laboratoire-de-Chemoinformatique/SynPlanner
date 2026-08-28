@@ -6,7 +6,8 @@ import base64
 import contextlib
 from collections import deque
 from datetime import datetime
-from itertools import count, islice, zip_longest
+from html import escape
+from itertools import count, islice, pairwise
 from typing import TYPE_CHECKING, Any
 
 from chython import depict_settings
@@ -15,13 +16,23 @@ from chython.algorithms.depict import _graph_svg, _render_config
 from chython.containers.molecule import MoleculeContainer
 from IPython.display import HTML, display
 
+from synplan.chem.reaction.reactor import Reaction
 from synplan.chem.reaction.routes.io import make_dict
 from synplan.chem.reaction.routes.representation.depiction import (
     cgr_display,
     depict_custom_reaction,
 )
 from synplan.chem.reaction.routes.traversal import iter_route_steps
+from synplan.utils.align2d import align_route
 from synplan.utils.frames import depict_value
+from synplan.utils.routedraw import (
+    ARROW_DEFS,
+    ROLE_STYLE,
+    ROUTE_CSS,
+    draw_route,
+    molecule_svg,
+)
+from synplan.utils.svgslim import Doc, hidden_defs
 
 if TYPE_CHECKING:
     from synplan.mcts.tree import Tree
@@ -172,12 +183,20 @@ def render_svg(pred, columns, box_colors, labeled: bool = False):
         for n, (x, y) in plane.items():
             mol._atoms[n].xy = (x, y)
 
+    def _is_degenerate(plane):
+        """chython's own test for "never laid out": everything on one point."""
+        xs = [x for x, _ in plane.values()]
+        ys = [y for _, y in plane.values()]
+        return max(xs) - min(xs) < 0.01 and max(ys) - min(ys) < 0.01
+
     for ms in columns:
         heights = []
         for m in ms:
             flat_molecules.append(m)
-            m.clean2d()
             plane = _get_plane(m)
+            if len(m) > 1 and _is_degenerate(plane):
+                m.clean2d()
+                plane = _get_plane(m)
             # X-shift for target
             min_x = min(x for x, y in plane.values()) - x_shift
             min_y = min(y for x, y in plane.values())
@@ -496,6 +515,14 @@ def _prepare_tree_route_svg_inputs(
         if layer_precursors:
             columns.append([x.molecule for x in layer_precursors])
 
+    steps = [
+        Reaction(
+            [x.molecule for x in after.new_precursors],
+            [before.curr_precursor.molecule],
+        )
+        for before, after in pairwise(nodes)
+    ]
+    align_route(steps[::-1])  # align_route takes Tree.synthesis_route order, leaf first
     return columns, tuple(pred)
 
 
@@ -644,121 +671,156 @@ def route_rule_labels(tree: Tree, node_id: int) -> list[str]:
     return list(reversed(labels))  # synthesis_route reverses; keep the pairing
 
 
+#: Page chrome for :func:`generate_results_html`. The route drawings bring their own
+#: rules through :data:`synplan.utils.routedraw.ROUTE_CSS`.
+_REPORT_CSS = """
+:root{--ink:#0f1419;--ink2:#38414a;--ink3:#6b7480;--ink4:#9ba3ad;
+--rule:#e6e8eb;--surface:#ffffff;--bg:#fafbfc;--accent:#1e3a8a;--ok:#1f4d3d}
+*,::before,::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;
+font-family:"Inter Tight",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:44px 28px 96px}
+.eyebrow{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--ink3)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:3px}
+header.page{padding:26px 26px 24px}
+header.page h1{margin:.35em 0 0;font-size:21px;font-weight:600;letter-spacing:-.01em}
+.target{display:flex;gap:20px;align-items:center;margin-top:20px}
+.tile{flex:0 0 auto;border:1px solid var(--accent);border-radius:3px;background:#fff;padding:9px 11px}
+.tile svg{display:block}
+.target .smi{font-size:13px;color:var(--ink2);word-break:break-all;margin-top:5px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);margin-top:24px;
+border:1px solid var(--rule);border-radius:3px;overflow:hidden;background:var(--surface)}
+.stat{padding:13px 16px 14px;border-left:1px solid var(--rule)}
+.stat:first-child{border-left:0}
+.stat .v{display:block;margin-top:5px;font-size:27px;font-weight:600;line-height:1.05;letter-spacing:-.02em}
+.stat .u{font-size:12px;font-weight:400;color:var(--ink4);letter-spacing:0}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;background:var(--surface);
+border:1px solid var(--rule);border-radius:3px;font-size:11px;font-weight:600;
+text-transform:uppercase;letter-spacing:.1em;color:var(--ink2)}
+.sw{width:12px;height:12px;border-radius:2px;flex:0 0 auto}
+.route{margin-top:20px}
+.rhead{display:flex;flex-wrap:wrap;gap:34px;padding:13px 18px;border-bottom:1px solid var(--rule)}
+.kv .v{font-size:15px;font-weight:600;margin-top:2px}
+.kv .v.id{color:var(--accent)}
+.draw{padding:20px 18px 22px;overflow-x:auto;display:flex;justify-content:center;
+background:radial-gradient(circle,#e9ecef .9px,transparent .9px) 0 0/30px 30px,#fff}
+.draw > svg{display:block;max-width:100%;height:auto;flex:0 0 auto}
+.step{display:grid;grid-template-columns:22px minmax(0,1fr);gap:0 13px;
+align-items:start;padding:11px 18px;border-top:1px solid var(--rule)}
+.disc{width:22px;height:22px;border-radius:50%;background:#2b3440;color:#fff;
+font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;
+line-height:1;margin-top:1px}
+.lab{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--ok)}
+.rxn{font-size:12px;color:var(--ink2);word-break:break-all;line-height:1.6}
+"""
+
+#: Every role the drawing tints, in reading order.
+_ROLE_LEGEND = (
+    ("target", "Target molecule"),
+    ("int", "Intermediate"),
+    ("oos", "Not in stock"),
+    ("bb", "In stock"),
+)
+
+
+def _report_header(tree: Tree, n_routes: int) -> str:
+    target = tree.nodes[1].curr_precursor
+    tile = read_smiles(str(target))
+    tile.clean2d()
+    stats = (
+        ("Tree size", len(tree), " nodes"),
+        ("Visited nodes", len(tree.visited_nodes), ""),
+        ("Found paths", n_routes, ""),
+        ("Time", round(tree.curr_time, 4), " seconds"),
+    )
+    return (
+        '<header class="page card">'
+        '<div class="eyebrow">Retrosynthetic routes report</div>'
+        "<h1>Predicted paths</h1>"
+        f'<div class="target"><div class="tile">{molecule_svg(tile)}</div>'
+        '<div><div class="eyebrow">Target molecule</div>'
+        f'<div class="smi mono">{escape(str(target))}</div></div></div>'
+        '<div class="stats">'
+        + "".join(
+            f'<div class="stat"><span class="eyebrow">{name}</span>'
+            f'<span class="v">{value}<span class="u">{unit}</span></span></div>'
+            for name, value, unit in stats
+        )
+        + '</div><div class="legend">'
+        + "".join(
+            f'<span class="chip"><span class="sw" style="background:{ROLE_STYLE[role][0]};'
+            f'border:1px solid {ROLE_STYLE[role][1]}"></span>{caption}</span>'
+            for role, caption in _ROLE_LEGEND
+        )
+        + "</div></header>"
+    )
+
+
 def generate_results_html(
-    tree: Tree, html_path: str, aam: bool = False, extended: bool = False
-) -> None:
-    """Writes an HTML page with the synthesis routes in SVG format and corresponding
-    reactions in SMILES format.
+    tree: Tree, html_path: str | None, aam: bool = False, extended: bool = False
+) -> str | None:
+    """Writes an HTML page with the synthesis routes drawn and listed as SMILES.
+
+    Each route gets one drawing and one step list; a step's number is the number on
+    its disc in the drawing, 1 being the cut from the target. The page is
+    self-contained: no scripts, no external stylesheets, no fonts to fetch.
 
     :param tree: The built tree.
-    :param extended: If True, generates the extended route representation.
-    :param html_path: The path to the file where to store resulting HTML.
+    :param html_path: The path to the file where to store resulting HTML. When None,
+        the page is returned instead of written.
     :param aam: If True, depict atom-to-atom mapping.
-    :return: None.
+    :param extended: If True, generates the extended route representation.
+    :return: The page when ``html_path`` is None, otherwise None.
     """
-    if aam:
-        depict_settings(aam=True)
-    else:
-        depict_settings(aam=False)
+    depict_settings(aam=bool(aam))
 
-    routes = []
     if extended:
-        # Gather paths
-        for idx, node in tree.nodes.items():
-            if node.is_solved():
-                routes.append(idx)
+        routes = [idx for idx, node in tree.nodes.items() if node.is_solved()]
     else:
-        routes = tree.winning_nodes
-    # HTML Tags
-    td = '<td style="text-align: left; border: 1px solid black; border-spacing: 0">'
-    font_head = "<font style='font-weight: bold; font-size: 18px'>"
-    font_normal = "<font style='font-weight: normal; font-size: 18px'>"
-    font_close = "</font>"
+        routes = list(tree.winning_nodes)
 
-    template_begin = """
-    <!doctype html>
-    <html lang="en">
-    <head>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-    integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3"
-    crossorigin="anonymous">
-    <script
-    src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
-    integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
-    crossorigin="anonymous">
-    </script>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Predicted Paths Report</title>
-    <meta name="description" content="A simple HTML5 Template for new projects.">
-    <meta name="author" content="SitePoint">
-    </head>
-    <body>
-    """
-    template_end = """
-    </body>
-    </html>
-    """
-    # SVG Template
-    box_mark = """
-    <svg width="30" height="30" viewBox="0 0 1 1" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="0.5" cy="0.5" r="0.5" fill="rgb()" fill-opacity="0.35" />
-    </svg>
-    """
-    # table = f"<table><thead><{th}>Retrosynthetic Routes</th></thead><tbody>"
-    table = """
-    <table class="table table-striped table-hover caption-top">
-    <caption><h3>Retrosynthetic Routes Report</h3></caption>
-    <tbody>"""
-
-    # Gather path data
-    table += f"<tr>{td}{font_normal}Target Molecule: {tree.nodes[1].curr_precursor!s}{font_close}</td></tr>"
-    table += f"<tr>{td}{font_normal}Tree Size: {len(tree)}{font_close} nodes</td></tr>"
-    table += f"<tr>{td}{font_normal}Number of visited nodes: {len(tree.visited_nodes)}{font_close}</td></tr>"
-    table += f"<tr>{td}{font_normal}Found paths: {len(routes)}{font_close}</td></tr>"
-    table += f"<tr>{td}{font_normal}Time: {round(tree.curr_time, 4)}{font_close} seconds</td></tr>"
-    table += f"""
-    <tr>{td}
-                 <div>
-    {box_mark.replace("rgb()", "rgb(152, 238, 255)")}
-    Target Molecule
-    {box_mark.replace("rgb()", "rgb(240, 171, 144)")}
-    Molecule Not In Stock
-    {box_mark.replace("rgb()", "rgb(155, 250, 179)")}
-    Molecule In Stock
-    </div>
-    </td></tr>
-    """
-
+    doc = Doc()
+    body = []
     for route in routes:
-        svg = get_route_svg(tree, route)  # get SVG
-        full_route = tree.synthesis_route(route)  # get route
+        svg, order, steps = draw_route(tree, route)
         labels = route_rule_labels(tree, route)
-        # write SMILES of all reactions in synthesis path
-        step = 1
-        reactions = ""
-        for synth_step, label in zip_longest(full_route, labels):
-            named = f" <i>[{label}]</i>" if label else ""
-            reactions += f"<b>Step {step}:</b>{named} {synth_step!s}<br>"
-            step += 1
-        # Concatenate all content of path
-        route_score = round(tree.route_score(route), 3)
-        table += (
-            f'<tr style="line-height: 250%">{td}{font_head}Route {route}; '
-            f"Steps: {len(full_route)}; "
-            f"Cumulated nodes' value: {route_score}{font_close}</td></tr>"
+        rows = "".join(
+            f'<div class="step"><div class="disc">{number}</div><div>'
+            + (f'<div class="lab">{escape(labels[step])}</div>' if labels[step] else "")
+            + f'<div class="rxn mono">{escape(str(steps[step]))}</div></div></div>'
+            for number, step in enumerate(order, 1)
         )
-        # f"Cumulated nodes' value: {node._probabilities[path]}{font_close}</td></tr>"
-        table += f"<tr>{td}{svg}</td></tr>"
-        table += f"<tr>{td}{reactions}</td></tr>"
-    table += "</tbody>"
+        body.append(
+            '<section class="route card"><div class="rhead">'
+            f'<div class="kv"><div class="eyebrow">Route</div>'
+            f'<div class="v id">{route}</div></div>'
+            f'<div class="kv"><div class="eyebrow">Steps</div>'
+            f'<div class="v">{len(steps)}</div></div>'
+            f'<div class="kv"><div class="eyebrow">Cumulated nodes&#39; value</div>'
+            f'<div class="v">{round(tree.route_score(route), 3)}</div></div></div>'
+            f'<div class="draw">{doc.route(svg)}</div>{rows}</section>'
+        )
+
+    page = (
+        '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        "<title>Predicted Paths Report</title>\n"
+        f"<style>{ROUTE_CSS}{_REPORT_CSS}</style>\n</head>\n<body>\n"
+        + hidden_defs(ARROW_DEFS, doc.defs())
+        + '<div class="wrap">'
+        + _report_header(tree, len(routes))
+        + "".join(body)
+        + "</div>\n</body>\n</html>\n"
+    )
+
     if html_path is None:
-        return table
+        return page
     with open(html_path, "w", encoding="utf-8") as html_file:
-        html_file.write(template_begin)
-        html_file.write(table)
-        html_file.write(template_end)
+        html_file.write(page)
+    return None
 
 
 def html_top_routes_cluster(
