@@ -1,8 +1,9 @@
 """Draws one retrosynthetic route as a single SVG.
 
 Boxed chython depictions on a tidy-tree layout, pale role tints, hairline connectors
-and a numbered disc per disconnection, counting back from the target. A page showing
-these must also carry :data:`ROUTE_CSS` and one copy of :data:`ARROW_DEFS`.
+and a numbered disc per disconnection, carrying the step's position in the route. A
+page showing these must also carry :data:`ROUTE_CSS` and one copy of
+:data:`ARROW_DEFS`.
 """
 
 from __future__ import annotations
@@ -11,17 +12,22 @@ import re
 from math import cos, radians, sin
 from typing import TYPE_CHECKING, Any
 
-from synplan.utils.align2d import align_route
+from synplan.utils.align2d import align_molecule
 from synplan.utils.routelayout import Node, edges, layout, walk
 
 if TYPE_CHECKING:
     from chython.containers.molecule import MoleculeContainer
 
+#: One cleaned geometry per molecule: mapped SMILES -> atom number -> (x, y).
+Layouts = dict[str, dict[int, tuple[float, float]]] | None
+
 __all__ = [
     "ARROW_DEFS",
     "ROLE_STYLE",
     "ROUTE_CSS",
+    "Layouts",
     "draw_route",
+    "drawable_copy",
     "molecule_svg",
     "orient_route",
 ]
@@ -36,12 +42,12 @@ ROLE_STYLE = {
     "target": ("#f3f6fb", "#94a6cb", 1.6),
     "bb": ("#f3f8f5", "#9dbcae", 1.0),
     "int": ("#ffffff", "#edeff1", 1.0),
-    "oos": ("#ffffff", "#c9cfd5", 1.0),
+    "oos": ("#fdf2f2", "#d06a6a", 1.4),
 }
 ROLE_CAPTION = {
     "target": ("TARGET", "#41598f"),
     "bb": ("IN STOCK", "#4a7a66"),
-    "oos": ("NOT IN STOCK", "#6b7480"),
+    "oos": ("NOT IN STOCK", "#b13b3b"),
 }
 
 _FONT = "Inter Tight,system-ui,sans-serif"
@@ -93,20 +99,14 @@ def molecule_svg(mol: MoleculeContainer, px: float = 22.0, cap: float = 300.0) -
     )
 
 
-def orient_route(steps: Any, step_deg: int = 5) -> int:
+def orient_route(mols: Any, step_deg: int = 5) -> int:
     """Rotate every molecule of the route by one shared angle, in place.
 
     Alignment fixes each precursor relative to its product; the absolute angle of the
     whole route is still free, so spend it on the shape this layout stacks best —
     smallest summed height, then smallest column width.
     """
-    mols, seen = [], set()
-    for reaction in steps:
-        for mol in (*reaction.reactants, *reaction.products):
-            if id(mol) not in seen:
-                seen.add(id(mol))
-                mols.append(mol)
-
+    mols = list(mols)
     coords = [[(atom.x, atom.y) for _, atom in mol.atoms()] for mol in mols]
     best = None
     for deg in range(0, 180, step_deg):
@@ -134,40 +134,95 @@ def orient_route(steps: Any, step_deg: int = 5) -> int:
     return deg
 
 
-def _route_tree(tree: Any, node_id: int, align: bool) -> tuple[Node, dict, tuple]:
-    steps = tree.synthesis_route(node_id)
-    if align:
-        align_route(steps)
-        orient_route(steps)
+def drawable_copy(mol: MoleculeContainer, layouts: Layouts = None) -> MoleculeContainer:
+    """A copy of ``mol`` with a layout of its own.
 
-    by_product = {str(r.products[0]): r for r in steps}
-    building_blocks = tree.building_blocks
+    A route's molecules are the search tree's own objects, and they carry whatever
+    coordinates the reactor left on them -- for a precursor, the product's layout with
+    the new atoms piled onto one point. Only ``clean2d()`` fixes that, and it mutates,
+    so every drawer lays out a copy and leaves the tree's coordinates alone.
+
+    ``clean2d()`` is not deterministic: laying the same molecule out again draws it
+    another way. Pass a ``layouts`` dict -- keyed by mapped SMILES, the spelling that
+    also fixes the atom numbers this geometry is stored under -- to lay a molecule out
+    once and reuse that geometry everywhere it turns up.
+    """
+    copy = mol.copy()
+    if layouts is None:
+        copy.clean2d()
+        return copy
+
+    key = format(mol, "m")
+    geometry = layouts.get(key)
+    if geometry is None:
+        copy.clean2d()
+        orient_route([copy])  # so a shared molecule brings a settled angle with it
+        layouts[key] = {number: (atom.x, atom.y) for number, atom in copy.atoms()}
+        return copy
+
+    for number, atom in copy.atoms():
+        atom.xy = geometry[number]
+    # wedges are derived from the coordinates and cached
+    copy.__dict__.pop("_wedge_map", None)
+    copy.__dict__.pop("__cached_method__repr_svg_", None)
+    return copy
+
+
+def _drawable_copies(steps: Any, layouts: Layouts) -> dict[int, MoleculeContainer]:
+    """One :func:`drawable_copy` per molecule of the route, keyed by original id."""
+    copies: dict[int, MoleculeContainer] = {}
+    for step in steps:
+        for mol in (*step.reaction.reactants, *step.reaction.products):
+            if id(mol) not in copies:
+                copies[id(mol)] = drawable_copy(mol, layouts)
+    return copies
+
+
+def _route_tree(
+    steps: Any, unresolved: Any, align: bool, layouts: Layouts = None
+) -> tuple[Node, dict]:
+    copies = _drawable_copies(steps, layouts)
+    if align:
+        # leaf-first order, so each disconnection inherits the layout above it
+        for step in reversed(steps):
+            product = copies[id(step.product)]
+            for precursor in step.reaction.reactants:
+                align_molecule(copies[id(precursor)], product)
+        if layouts is None:
+            # shared layouts arrive oriented; turning the route would turn the target
+            # away from the layout every other card of the page shows
+            orient_route(copies.values())
+
+    by_product = {
+        id(step.product): (number, step) for number, step in enumerate(steps, 1)
+    }
+    red = {id(mol) for mol in unresolved}
     depicts = {}
 
     def build(mol: MoleculeContainer) -> Node:
-        key = str(mol)
-        svg, box = _depiction(mol)
+        svg, box = _depiction(copies[id(mol)])
         depicts[id(mol)] = (svg, box)
         node = Node(
-            key=key,
+            key=str(mol),
             w=box[2] * PX_PER_UNIT + 2 * BOX_PAD,
             h=box[3] * PX_PER_UNIT + 2 * BOX_PAD,
         )
         node.mol = mol
-        reaction = by_product.get(key)
-        if reaction is None:
-            node.role = "bb" if key in building_blocks else "oos"
+        made = by_product.get(id(mol))
+        if made is None:
+            node.role = "oos" if id(mol) in red else "bb"
         else:
+            node.number, step = made
             node.role = "int"
-            node.children = [build(m) for m in reaction.reactants]
+            node.children = [build(m) for m in step.reaction.reactants]
         return node
 
-    root = build(steps[-1].products[0])
+    root = build(steps[-1].product)
     root.role = "target"
-    return root, depicts, steps
+    return root, depicts
 
 
-def _to_svg(root: Node, depicts: dict, ranked: list[dict], w: float, h: float) -> str:
+def _to_svg(root: Node, depicts: dict, links: list[dict], w: float, h: float) -> str:
     top = 16.0  # room for the role caption drawn above a box
     margin = 14.0  # frame strokes are centred on the box edge; keep them on the canvas
     width, height = w + 2 * margin, h + top + 2 * margin
@@ -178,7 +233,7 @@ def _to_svg(root: Node, depicts: dict, ranked: list[dict], w: float, h: float) -
         f'<g transform="translate({margin:.0f},{top + margin:.0f})">',
     ]
 
-    for edge in ranked:
+    for edge in links:
         lane, (px, py) = edge["lane"], edge["parent"]
         for cx, cy in edge["children"]:
             dy = py - cy
@@ -219,12 +274,12 @@ def _to_svg(root: Node, depicts: dict, ranked: list[dict], w: float, h: float) -
                 f'fill="{colour}">{caption}</text>'
             )
 
-    for number, edge in enumerate(ranked, 1):
+    for edge in links:
         lane, (_, py) = edge["lane"], edge["parent"]
         parts.append(
             f'<circle cx="{lane:.1f}" cy="{py:.1f}" r="10.5" fill="#2b3440" '
             f'stroke="#ffffff" stroke-width="2"/>'
-            f'<text x="{lane:.1f}" y="{py:.1f}" class="sp-num">{number}</text>'
+            f'<text x="{lane:.1f}" y="{py:.1f}" class="sp-num">{edge["number"]}</text>'
         )
 
     parts.append("</g></svg>")
@@ -232,22 +287,28 @@ def _to_svg(root: Node, depicts: dict, ranked: list[dict], w: float, h: float) -
 
 
 def draw_route(
-    tree: Any, node_id: int, align: bool = True
-) -> tuple[str, list[int], tuple]:
-    """Draw the route ending at ``node_id``.
+    steps: Any, unresolved: Any = (), align: bool = True, layouts: Layouts = None
+) -> str:
+    """Draw one route.
 
-    :param tree: The built tree.
-    :param node_id: The id of the node the route ends at.
+    Whether a leaf is purchasable is decided by the caller, never here. Which step
+    feeds which is read from object identity, so two steps sharing a product SMILES
+    still get a disc each.
+
+    :param steps: The route's steps, deepest first; each carries the ``reaction``
+        it runs and the ``product`` it disconnects. The disc over the
+        disconnection of ``steps[i]`` carries ``i + 1``.
+    :param unresolved: The terminal precursors that are not purchasable; they are
+        drawn in the ``oos`` role, every other leaf in ``bb``.
     :param align: If True, give every precursor its product's orientation.
-    :return: ``(svg, order, steps)``. ``steps`` is ``tree.synthesis_route(node_id)``
-        and ``order[i]`` indexes it for the disc numbered ``i + 1``, 1 being the cut
-        from the target.
+    :param layouts: A dict shared with the other routes of the same page, so one
+        molecule is laid out once and drawn the same way everywhere. Pass None for a
+        route drawn on its own, which has nothing to share.
+    :return: The SVG, without ``ROUTE_CSS`` or ``ARROW_DEFS``.
     """
-    root, depicts, steps = _route_tree(tree, node_id, align)
+    root, depicts = _route_tree(steps, unresolved, align, layouts)
     width, height, col_x, col_w = layout(root, row_gap=ROW_GAP)
-    ranked = sorted(
-        edges(root, col_x, col_w), key=lambda e: (e["node"].depth, e["parent"][1])
-    )
-    by_product = {str(r.products[0]): i for i, r in enumerate(steps)}
-    order = [by_product[e["node"].key] for e in ranked]
-    return _to_svg(root, depicts, ranked, width, height), order, steps
+    links = edges(root, col_x, col_w)
+    for edge in links:
+        edge["number"] = edge["node"].number
+    return _to_svg(root, depicts, links, width, height)

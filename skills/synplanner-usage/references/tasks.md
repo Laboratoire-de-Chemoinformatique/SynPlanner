@@ -30,21 +30,19 @@ does nothing when constructed. Iterate it instead only for per-iteration
 `(is_solved, node_ids)` — progress, or early stopping.
 Docs: `methods/mcts` — "Running a search"
 
-Pass the scorer as `Tree(..., route_scorer=route_scorer)` and it makes
-`tree.route_score(node_id)` quality-aware. It does NOT reorder anything:
-`winning_nodes` stays in discovery order and neither `extract_routes` nor
-`generate_results_html` sorts, so both exports come back unranked and the score is
-not written into either. Sort yourself —
-`sorted(tree.winning_nodes, key=tree.route_score, reverse=True)` — or the scorer
-costs roughly three times the search time and changes nothing you can consume.
+Ranking is a step after the search: `route_scorer.rank(tree.routes())` hands
+back the routes best first. `Tree` takes no scorer any more, and
+`tree.route_score(node_id)` is the search's own number. `winning_nodes` stays in
+discovery order and `extract_routes` does not sort, so that export comes back
+unranked either way; `tree.routes()` sorts by search score.
 
 ## Common combinations
 
 Most real requests are a chain, not a single entry.
 
 **"Give me good routes for this molecule"** — the default ask
-Planning setup *with* `route_scorer` → `tree.run()` → `extract_routes` /
-`get_route_svg`. This, not bare planning, is the baseline answer.
+Planning setup → `tree.run()` → `route_scorer.rank(tree.routes())`. This, not
+bare planning, is the baseline answer.
 
 **"Give me good routes, and show me how they differ"**
 The above, then `export_tree_to_json` and `routes_clustering_report`.
@@ -66,8 +64,8 @@ training**, see "Plan with my own retrosynthetic SMARTS" below.
 ## Finding routes
 
 **Find a synthesis route for a molecule**
-Planning setup with `route_scorer`, then `extract_routes` / `get_route_svg`
-(`synplan.utils.visualisation`).
+Planning setup, then `tree.routes()` — `Route` objects, best search score
+first, each drawing itself in a notebook — then `route_scorer.rank(...)`.
 Tutorial: `05_Retrosynthetic_Planning`, `ten_minutes`
 Docs: `methods/planning`, `methods/mcts`, `configuration/planning`
 
@@ -129,16 +127,29 @@ Docs: `methods/value`, `configuration/value`
 
 ## Working with routes
 
+**Take one route out of a tree and work on it**
+`tree.routes()` returns `Route` objects, best score first, instead of node ids;
+`tree.routes(solved_only=False)` adds the unfinished ones. A `Route`
+(`synplan.chem.reaction.routes`) carries `steps` (one `Step` each, with the
+`reaction` and the `product` it disconnects), `target`, `leaves`, `solved`,
+`unresolved`, `position`, `svg()`, `to_json()` / `Route.from_json()` and
+`route_cgr()`, and holds no reference to the tree. Its `reactions_dict` is the
+`{step index: reaction}` shape the dict-driven APIs below take.
+
 **See and export routes**
-`extract_routes`, `get_route_svg`, `generate_results_html`
-(`synplan.utils.visualisation`); `export_tree_to_json`, `export_tree_to_csv`,
+`tree.routes()` / `Route.from_tree` / `Route.from_json`; `extract_routes`,
+`routes_report_html(routes, path)` — the HTML report, which draws exactly the
+routes handed to it, solved or not (`synplan.utils.visualisation`);
+`export_tree_to_json`, `export_tree_to_csv`,
 `make_json`, `read_routes_json` (`synplan.chem.reaction.routes.io`).
 Tutorial: `07_Clustering`
 Docs: `methods/routes` — see "Typed Route APIs"
 
 **Rank routes by quality / avoid protecting-group problems**
-Already in the planning setup: `ProtectionRouteScorer.from_config()` passed as
-`Tree(route_scorer=...)`. Go lower level only to tune it — `ProtectionConfig`,
+`ProtectionRouteScorer.from_config().rank(routes)`, best first — its `score` is
+`search_score * S(T)`, so it needs routes a search produced. For routes read from
+a file, rank with `CompetingSitesRouteScorer.from_config().rank(routes)`, which
+judges on S(T) alone. Go lower level only to tune it — `ProtectionConfig`,
 `FunctionalGroupDetector`, `get_reaction_center_atoms`, `classify_reaction_type`.
 Tutorial: `08_Protection_Scoring`
 

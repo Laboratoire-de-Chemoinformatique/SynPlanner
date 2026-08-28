@@ -48,10 +48,18 @@ _EXPORTS = {
     "make_dict": "io",
     "build_route_trees": "io",
     "make_json": "io",
+    "read_route_tree": "io",
     "read_routes_csv": "io",
     "read_routes_json": "io",
     "write_routes_csv": "io",
     "write_routes_json": "io",
+    # route facade
+    "Conditions": "route",
+    "MoleculePosition": "route",
+    "Route": "route",
+    "RouteProvenance": "route",
+    "Step": "route",
+    "StepOrigin": "route",
     # pseudo_atoms (clustering atom primitives)
     "DynamicX": "clustering.pseudo_atoms",
     "Marked": "clustering.pseudo_atoms",

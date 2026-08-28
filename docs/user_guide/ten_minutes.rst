@@ -181,13 +181,13 @@ After the search, extract routes and generate an HTML report:
 
 .. code-block:: python
 
-    from synplan.utils.visualisation import extract_routes, generate_results_html
+    from synplan.utils.visualisation import routes_report_html
 
-    routes = extract_routes(tree)   # list of route dicts
+    routes = tree.routes()          # list of Route objects, best score first
     print(f"Found {len(routes)} route(s)")
 
-    # Save an interactive HTML report
-    generate_results_html(tree, html_path="routes.html")
+    # Save a self-contained HTML report of exactly those routes
+    routes_report_html(routes, html_path="routes.html")
 
 Score routes for protection group issues
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -196,30 +196,36 @@ The protection scoring module flags competing functional groups in a route: step
 a reagent may react with an unintended site, indicating a potential need for protecting groups.
 This follows the methodology of `Westerlund et al. (2025) <https://doi.org/10.26434/chemrxiv-2025-gdrr8>`_.
 
-Pass the scorer to the tree to make ``route_score`` quality-aware. Nothing is
-reordered for you — sort the winning nodes on it yourself:
+Ranking is a second step, after the search:
 
 .. code-block:: python
 
     from synplan.chem.reaction.routes.quality.scorer import ProtectionRouteScorer
 
-    # Build scorer with default configuration (bundled data)
+    # Build scorer with default configuration (bundled data). Keep it: it holds the
+    # cache for 102 SMARTS patterns, which a scorer built per call would throw away.
     route_scorer = ProtectionRouteScorer.from_config()
 
-    tree = Tree(
-        target=target,
-        config=tree_config,
-        reaction_rules=reaction_rules,
-        building_blocks=building_blocks,
-        expansion_function=policy_network,
-        evaluation_function=evaluation_function,
-        route_scorer=route_scorer,   # makes route_score protection-aware; does not sort
-    )
-
-    tree.run()  # run the full search
+    best = route_scorer.rank(tree.routes())     # best first
+    routes_report_html(best[:5], html_path="best.html")
 
 The score S(T) is in [0, 1]: 1.0 means no competing interactions detected,
 lower values indicate steps that may require protecting group strategies.
+``CompetingSitesRouteScorer.from_config().score(route)`` returns it for one route. The scan is expensive —
+about 64 ms per molecule the cache has not seen — which is why the search does not
+do it, ``tree.routes()`` does not either, and ``rank`` costs tens of seconds on a
+few hundred routes rather than the instant its ``sorted``-like name suggests.
+
+``rank`` orders by whatever the scorer's ``score`` says, and for this scorer that
+is ``search_score * S(T)``, the re-ranking of the paper. It is therefore defined
+only for routes a search produced: a route read back out of a file carries no
+search score, and ``score`` says so rather than inventing one. Rank those with
+``CompetingSitesRouteScorer``, which judges a route on its own terms::
+
+    from synplan.chem.reaction.routes.quality.scorer import CompetingSitesRouteScorer
+
+    from_file = CompetingSitesRouteScorer.from_config().rank(routes)
+
 See :doc:`08_Protection_Scoring` for a detailed walkthrough.
 
 Batch planning (many targets)
@@ -334,9 +340,9 @@ Or generate visualisations from Python:
 
 .. code-block:: python
 
-    from synplan.utils.visualisation import generate_results_html
+    from synplan.utils.visualisation import routes_report_html
 
-    generate_results_html(tree=tree, html_path="routes.html")
+    routes_report_html(tree.routes(), html_path="routes.html")
 
 Next steps
 ----------

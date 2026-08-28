@@ -3,6 +3,96 @@
 All notable changes to SynPlanner are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- The reactor no longer puts back aromaticity a `kekule` -> `thiele` round trip
+  dropped. Its test was "these ring atoms were aromatic and are not now", which is
+  equally true when the rule itself made the ring non-aromatic, when
+  `standardize_tautomers` moved to a tautomer that is not, and when the input claimed
+  an aromaticity chython does not perceive -- RDKit aromatises 4-quinolinones and
+  pyrazolones and chython does not, so an RDKit-written SMILES arrives making a claim
+  this model rejects. Restoring produced molecules `canonicalize` rewrites and whose
+  `==` does not match their own canonical form, and those spread: a route's leaf
+  verdict and a search record both read them back differently than they were written.
+  On a celecoxib search this halves the non-canonical precursors and finds **412
+  routes where 330 were found before**, in a smaller tree. Four other targets are
+  unaffected to the node.
+
+- `apply_reaction_rule` reports a precursor the canonicalizer would rewrite, so an
+  uncanonicalized molecule reaching the search can be traced to where it came from.
+  Off unless this module's logger is at `DEBUG`, because the only way to tell is to
+  canonicalize and doing that per precursor costs the search a tenth of its time.
+  Nothing is repaired: a repair hides the origin, which is the thing worth finding.
+
+### Changed
+
+- Route scoring is a post-search step, not something the tree holds. `Tree` no longer
+  takes `route_scorer` (it raises `TypeError`), and `Tree.route_score` returns the
+  search's own number, always cheap. Rank with
+  `ProtectionRouteScorer.from_config().rank(routes)`, which hands them back best first.
+  A scorer stands behind one number, `score`; `rank` orders by it, and whether that
+  number is built out of the search's is the scorer's own business, not the base
+  class's. For this one it is `search_score * S(T)`, so it needs routes a search
+  produced; `CompetingSitesRouteScorer` ranks on S(T) alone, for routes read from a file.
+  **`tree.routes()` now returns search order where a `route_scorer` used to make it
+  protection order.** On a 330-route celecoxib tree the
+  call goes from 33.3s to 0.01s, because the protection scan was 95% of it and nobody
+  had asked for it.
+
+- **`best_route_score` in `tree_search_stats.csv` is the raw search score now.** With a
+  `route_scorer` configured it used to be the protection-blended number, so the column
+  is silently rescaled across this release and is not comparable with an earlier run's.
+  Nothing else in the CSV changed.
+
+- `RouteScorer` stands behind one number. `score` is it and `rank` orders by it;
+  `rescore` and `ranking_score` are gone, and so is the blending the base class used
+  to do on every scorer's behalf -- a yield or a cost model has no reason to be a
+  multiple of a tree search score. `ProtectionRouteScorer.score` is the paper's
+  `search_score * S(T)` and needs a route a search produced; `CompetingSitesRouteScorer`
+  is S(T) on its own and needs nothing. Both take a `Route`, where the old methods took
+  raw reaction tuples.
+
+- `CompetingSitesScore.rank_routes` is `rerank_routes`, which is what it does: it
+  re-ranks an existing order rather than establishing one. It stays, deliberately.
+  Its `(1 - w) * normalised_search + w * S(T)` is not the paper's product and not a
+  duplicate of it -- the product lets either number veto a route and gives back one
+  figure you cannot take apart, while this dials between the two and hands back its
+  components, so you can see why a route ranked where it did. Its docstring now says
+  so. Takes `progress=True` for a bar, since it scans every route.
+
+### Removed
+
+- `ProtectionRouteScorer(weight=...)`, whose `(1 - w) + w * S(T)` softening is nowhere
+  in the paper and which nothing ever set below its `1.0` default, where it is
+  arithmetically the plain product.
+
+### Fixed
+
+- The GUI's "Generate full HTML report" button lost its protection ranking when the
+  scorer came off the `Tree`, and the report came out in search order with nobody told.
+  It ranks again, behind the button where the wait already sits under a spinner.
+
+- The route lists under the drawings in `routes_clustering_report` and
+  `routes_subclustering_report` were numbered in the tree's step order while the discs
+  in the drawing above them were numbered in the route's, so "Step 3" in the text and
+  the disc marked 3 were different reactions on a convergent route -- 21 of the 330
+  routes of a celecoxib tree. The Tree-sourced half of both reports now reads the
+  route's own steps; the JSON-sourced half, which `synplan clustering` uses, still
+  does not.
+
+- The functional-group detector cached its matches by a SMILES that carries no atom
+  numbers while the matches carried them, so two structurally identical molecules
+  numbered differently received each other's atom numbers -- indices the queried
+  molecule does not contain. The cache now stores positions in the canonical SMILES
+  order and fills in the queried molecule's numbering on the way out. On a 330-route
+  celecoxib tree the old cache mis-answered 112 of 6105 lookups and changed the
+  reacting group identified on 10 routes; on a larger one it mis-answered 228 and
+  hid real penalties, reporting S(T) 1.00 for routes that score 0.875, which moved
+  the ranking from position 35 down. Whether it changed a score at all depends on
+  the tree.
+
 ## [1.7.0] - 2026-08-25
 
 ### Added
@@ -259,6 +349,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `test_in_stock_flags` asserted the flag list's length, so inverting every flag passed; it now
   asserts the flags.
 
+- `CompetingSitesScore.rank_routes` is `rerank_routes`, which is what it does: it
+  re-ranks an existing order rather than establishing one. It stays, deliberately.
+  Its `(1 - w) * normalised_search + w * S(T)` is not the paper's product and not a
+  duplicate of it -- the product lets either number veto a route and gives back one
+  figure you cannot take apart, while this dials between the two and hands back its
+  components, so you can see why a route ranked where it did. Its docstring now says
+  so. Takes `progress=True` for a bar, since it scans every route.
+
 ### Removed
 
 - Removed the `cgr_connected_components_config` filter. Everything it caught was
@@ -392,6 +490,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   labels, and dynamic bond semantics.
 - Runtime MHN rule-association caches are bounded and keyed by the ordered rule
   SMARTS plus the rule representation contract.
+
+- `CompetingSitesScore.rank_routes` is `rerank_routes`, which is what it does: it
+  re-ranks an existing order rather than establishing one. It stays, deliberately.
+  Its `(1 - w) * normalised_search + w * S(T)` is not the paper's product and not a
+  duplicate of it -- the product lets either number veto a route and gives back one
+  figure you cannot take apart, while this dials between the two and hands back its
+  components, so you can see why a route ranked where it did. Its docstring now says
+  so. Takes `progress=True` for a bar, since it scans every route.
 
 ### Removed
 
@@ -572,6 +678,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Removed `from __future__ import annotations` from all modules (Dagster
   compatibility)
 - Forward references quoted for self-referencing return types
+
+- `CompetingSitesScore.rank_routes` is `rerank_routes`, which is what it does: it
+  re-ranks an existing order rather than establishing one. It stays, deliberately.
+  Its `(1 - w) * normalised_search + w * S(T)` is not the paper's product and not a
+  duplicate of it -- the product lets either number veto a route and gives back one
+  figure you cannot take apart, while this dials between the two and hands back its
+  components, so you can see why a route ranked where it did. Its docstring now says
+  so. Takes `progress=True` for a bar, since it scans every route.
 
 ### Removed
 - `ray` dependency removed from `pyproject.toml`

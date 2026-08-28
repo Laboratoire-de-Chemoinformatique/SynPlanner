@@ -1,8 +1,9 @@
-"""Competing sites scorer and route re-ranking.
+"""Competing sites scorer.
 
-Computes the S(T) competing sites score for synthesis routes and
-provides combined-score re-ranking that balances the original route
-search score with the protection penalty.
+Computes the S(T) competing sites score for synthesis routes. Blending it
+with the search score and ordering routes on the result is
+:class:`~synplan.chem.reaction.routes.quality.scorer.ProtectionRouteScorer`'s
+job.
 
 The scoring formula is inspired by Eq. 6 of:
 
@@ -18,6 +19,7 @@ many functional groups that each trigger a matrix lookup.
 """
 
 from chython.containers import ReactionContainer
+from tqdm.auto import tqdm
 
 from synplan.chem.reaction.routes.quality.protection.scanner import (
     CompetingInteraction,
@@ -88,15 +90,26 @@ class CompetingSitesScore:
         score = max(1.0 - penalty, 0.0)
         return score, interactions
 
-    def rank_routes(
+    def rerank_routes(
         self,
         routes: dict[int, dict[int, ReactionContainer]],
         existing_scores: dict[int, float] | None = None,
         weight: float = 0.5,
+        progress: bool = False,
     ) -> list[tuple[int, float, float, float]]:
-        """Rank routes by a combined score mixing original and protection scores.
+        """Re-rank routes on a tunable mix of search score and protection score.
 
         combined = (1 - weight) * original_score_normalized + weight * S(T)
+
+        **This is deliberately not the paper's formula, and it is not a
+        duplicate of** :meth:`~synplan.chem.reaction.routes.quality.scorer.ProtectionRouteScorer.score`.
+        The paper multiplies the two numbers, which lets either one veto a
+        route and gives back a single figure you cannot take apart. This
+        blends them additively over a normalised search score, so ``weight``
+        dials between trusting the search and trusting the protection
+        penalty, and the result carries its own components -- you can see
+        *why* a route ranked where it did. Keep both: one reproduces the
+        published method, this one is for looking into it.
 
         If no existing scores are provided, the original score component
         is treated as 0.0 for all routes and only the protection score
@@ -106,6 +119,9 @@ class CompetingSitesScore:
         :param existing_scores: Optional dict mapping route_id -> original
             route score (e.g. from Tree.route_score()).
         :param weight: Weight of the protection score in [0, 1].
+            :attr:`ProtectionConfig.score_weight` holds the configured default.
+        :param progress: Show a progress bar. Scoring is a SMARTS scan per
+            route and runs to tens of seconds over a few hundred of them.
         :return: List of (route_id, combined_score, protection_score,
             original_score) tuples, sorted descending by combined_score.
         """
@@ -122,7 +138,10 @@ class CompetingSitesScore:
             norm_scores = {}
 
         results: list[tuple[int, float, float, float]] = []
-        for route_id, route in routes.items():
+        items = routes.items()
+        if progress:
+            items = tqdm(items, desc="re-ranking routes", unit="route")
+        for route_id, route in items:
             protection_score, _ = self.score_route(route)
             original = norm_scores.get(route_id, 0.0)
             combined = (1.0 - weight) * original + weight * protection_score

@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 from chython.containers import CGRContainer, ReactionContainer
 
+from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.routes.clustering import (
     cluster_routes,
     post_process_subgroup,
@@ -38,7 +39,6 @@ from synplan.chem.reaction.routes.visualisation import (
     depict_custom_reaction,
 )
 from synplan.utils.visualisation import (
-    get_route_svg_from_json,
     routes_clustering_report,
     routes_subclustering_report,
 )
@@ -333,11 +333,11 @@ class TestVisualizationSVG:
         assert isinstance(svg, str)
         assert "<svg" in svg
 
-    def test_get_route_svg_from_json(self, routes_json):
-        """get_route_svg_from_json should produce valid SVG for each route."""
+    def test_a_json_route_draws_itself(self, routes_json):
+        """Route.from_json should produce valid SVG for each route."""
         tested = 0
         for route_id in routes_json:
-            svg = get_route_svg_from_json(routes_json, route_id)
+            svg = Route.from_json(routes_json[route_id]).svg()
             assert isinstance(svg, str), f"Route {route_id}: expected str SVG"
             assert "<svg" in svg, f"Route {route_id}: should contain <svg"
             tested += 1
@@ -520,7 +520,7 @@ class TestFullPipelineSmokeTest:
 
         # Cell: Display route SVGs from JSON
         first_route_id = next(iter(routes_json))
-        route_svg = get_route_svg_from_json(routes_json, first_route_id)
+        route_svg = Route.from_json(routes_json[first_route_id]).svg()
         assert "<svg" in route_svg
 
         # Cell: Cluster

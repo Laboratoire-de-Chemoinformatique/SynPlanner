@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 from chython import smiles
-from pydantic import ValidationError
 
+from synplan.chem.reaction.reactor import Reaction
 from synplan.chem.reaction.routes.quality.protection.config import ProtectionConfig
 from synplan.chem.reaction.routes.quality.protection.functional_groups import (
     FunctionalGroupDetector,
@@ -17,6 +17,12 @@ from synplan.chem.reaction.routes.quality.protection.scanner import (
     RouteScanner,
 )
 from synplan.chem.reaction.routes.quality.protection.scorer import CompetingSitesScore
+from synplan.chem.reaction.routes.quality.scorer import (
+    CompetingSitesRouteScorer,
+    ProtectionRouteScorer,
+    RouteScorer,
+)
+from synplan.chem.reaction.routes.route import Route, RouteProvenance, Step
 
 
 @pytest.fixture
@@ -241,10 +247,102 @@ def test_score_with_halogen_count_partial():
     assert score == pytest.approx(0.5)
 
 
-# --- rank_routes tests ---
+# --- ProtectionConfig tests ---
 
 
-def test_rank_routes_basic(scorer):
+def test_config_defaults():
+    """ProtectionConfig should have sensible defaults."""
+    cfg = ProtectionConfig()
+    assert isinstance(cfg.competing_groups_path, str)
+    assert isinstance(cfg.incompatibility_path, str)
+    assert isinstance(cfg.halogen_groups_path, str)
+
+
+def test_config_from_dict():
+    """ProtectionConfig.from_dict should create a valid config."""
+    cfg = ProtectionConfig.from_dict(
+        {
+            "competing_groups_path": "/tmp/cg.yaml",
+            "incompatibility_path": "/tmp/im.yaml",
+            "halogen_groups_path": "/tmp/hal.yaml",
+        }
+    )
+    assert cfg.competing_groups_path == "/tmp/cg.yaml"
+    assert cfg.halogen_groups_path == "/tmp/hal.yaml"
+
+
+def test_config_to_yaml_roundtrip(tmp_path):
+    """Config should survive a to_yaml -> from_yaml roundtrip."""
+    cfg = ProtectionConfig(halogen_groups_path="/tmp/hal.yaml")
+    yaml_path = str(tmp_path / "rt.yaml")
+    cfg.to_yaml(yaml_path)
+    assert ProtectionConfig.from_yaml(yaml_path) == cfg
+
+
+# --- RouteScorer: score and rank take Route objects ---
+
+# Ethyl benzoate from benzoic acid and ethanol, atom maps shared as a reactor's are.
+_TARGET = "[CH3:1][CH2:2][O:3][C:4](=[O:5])[c:6]1[cH:7][cH:8][cH:9][cH:10][cH:11]1"
+_ACID = "[OH:3][C:4](=[O:5])[c:6]1[cH:7][cH:8][cH:9][cH:10][cH:11]1"
+_ETHANOL = "[CH3:1][CH2:2][OH:12]"
+
+
+def _esterification(search_score):
+    reaction = Reaction([smiles(_ACID), smiles(_ETHANOL)], [smiles(_TARGET)])
+    return Route(
+        steps=(Step(reaction, reaction.products[0]),),
+        provenance=RouteProvenance(search_score),
+    )
+
+
+class _BySearchScore(RouteScorer):
+    """A scorer whose verdict IS the search score, so rank's ordering is under test."""
+
+    def score(self, route):
+        return route.provenance.search_score
+
+
+class _ByStepCount(RouteScorer):
+    """A scorer that never looks at the search, which the base class must allow."""
+
+    def score(self, route):
+        return 1.0 / len(route)
+
+
+def test_rank_orders_by_the_scorer_s_own_number():
+    routes = [_esterification(0.1), _esterification(0.9), _esterification(0.5)]
+    ranked = _BySearchScore().rank(routes)
+    assert [r.provenance.search_score for r in ranked] == [0.9, 0.5, 0.1]
+
+
+def test_a_scorer_that_ignores_the_search_needs_no_search_score():
+    """The base class must not assume every verdict is a multiple of the search's."""
+    good, bad = _esterification(None), _esterification(None)
+    object.__setattr__(bad, "steps", bad.steps * 2)  # a worse route, same provenance
+    assert _ByStepCount().rank([bad, good])[0] is good
+
+
+def test_rank_of_nothing_is_nothing():
+    assert _ByStepCount().rank([]) == []
+
+
+def test_protection_scorer_scores_a_route():
+    route = _esterification(0.5)
+    scorer = ProtectionRouteScorer.from_config()
+    quality = CompetingSitesRouteScorer.from_config()
+    assert 0.0 <= quality.score(route) <= 1.0
+    assert scorer.score(route) == pytest.approx(0.5 * quality.score(route))
+
+
+def test_the_paper_s_score_refuses_a_route_with_no_search_behind_it():
+    """search_score * S(T) is undefined without a search score; S(T) alone is not."""
+    route = _esterification(None)
+    with pytest.raises(ValueError, match="no search score"):
+        ProtectionRouteScorer.from_config().score(route)
+    assert 0.0 <= CompetingSitesRouteScorer.from_config().score(route) <= 1.0
+
+
+def test_rerank_routes_basic(scorer):
     """rank_routes should sort by combined score descending."""
     rxn_a = smiles("[CH3:1][CH3:2]>>[CH4:1].[CH4:2]")
     rxn_b = smiles(
@@ -252,7 +350,7 @@ def test_rank_routes_basic(scorer):
         "[CH3:1][C:2](=[O:3])[O:5][CH2:6][CH2:7][OH:8].[OH2:4]"
     )
     routes = {0: {0: rxn_a}, 1: {0: rxn_b}}
-    ranked = scorer.rank_routes(routes)
+    ranked = scorer.rerank_routes(routes)
     assert isinstance(ranked, list)
     assert len(ranked) == 2
     for entry in ranked:
@@ -260,40 +358,40 @@ def test_rank_routes_basic(scorer):
     assert ranked[0][1] >= ranked[1][1]
 
 
-def test_rank_routes_with_existing_scores(scorer):
+def test_rerank_routes_with_existing_scores(scorer):
     """rank_routes should combine original scores with protection scores."""
     rxn_a = smiles("[CH3:1][CH3:2]>>[CH4:1].[CH4:2]")
     rxn_b = smiles("[CH3:1][CH3:2]>>[CH4:1].[CH4:2]")
     routes = {0: {0: rxn_a}, 1: {0: rxn_b}}
     existing = {0: 0.5, 1: 1.0}
-    ranked = scorer.rank_routes(routes, existing_scores=existing, weight=0.5)
+    ranked = scorer.rerank_routes(routes, existing_scores=existing, weight=0.5)
     assert len(ranked) == 2
     route_ids = [r[0] for r in ranked]
     assert route_ids[0] == 1
 
 
-def test_rank_routes_no_existing_scores(scorer):
+def test_rerank_routes_no_existing_scores(scorer):
     """Without existing scores, ranking uses only protection scores."""
     rxn = smiles("[CH3:1][CH3:2]>>[CH4:1].[CH4:2]")
     routes = {0: {0: rxn}}
-    ranked = scorer.rank_routes(routes)
+    ranked = scorer.rerank_routes(routes)
     assert len(ranked) == 1
     _route_id, combined, protection, original = ranked[0]
     assert original == 0.0
     assert combined == pytest.approx(0.5 * protection)
 
 
-def test_rank_routes_weight_zero(scorer):
+def test_rerank_routes_weight_zero(scorer):
     """With weight=0, only original scores matter."""
     rxn = smiles("[CH3:1][CH3:2]>>[CH4:1].[CH4:2]")
     routes = {0: {0: rxn}, 1: {0: rxn}}
     existing = {0: 0.3, 1: 0.9}
-    ranked = scorer.rank_routes(routes, existing_scores=existing, weight=0.0)
+    ranked = scorer.rerank_routes(routes, existing_scores=existing, weight=0.0)
     route_ids = [r[0] for r in ranked]
     assert route_ids[0] == 1
 
 
-def test_rank_routes_weight_one(scorer):
+def test_rerank_routes_weight_one(scorer):
     """With weight=1, only protection scores matter."""
     rxn_clean = smiles("[CH3:1][CH3:2]>>[CH4:1].[CH4:2]")
     rxn_dirty = smiles(
@@ -302,80 +400,8 @@ def test_rank_routes_weight_one(scorer):
     )
     routes = {0: {0: rxn_clean}, 1: {0: rxn_dirty}}
     existing = {0: 0.1, 1: 1.0}
-    ranked = scorer.rank_routes(routes, existing_scores=existing, weight=1.0)
+    ranked = scorer.rerank_routes(routes, existing_scores=existing, weight=1.0)
     assert ranked[0][0] == 0
 
 
 # --- ProtectionConfig tests ---
-
-
-def test_config_defaults():
-    """ProtectionConfig should have sensible defaults."""
-    cfg = ProtectionConfig()
-    assert cfg.score_weight == 0.5
-    assert cfg.enable_reranking is True
-    assert isinstance(cfg.competing_groups_path, str)
-    assert isinstance(cfg.incompatibility_path, str)
-    assert isinstance(cfg.halogen_groups_path, str)
-
-
-def test_config_from_dict():
-    """ProtectionConfig.from_dict should create a valid config."""
-    d = {
-        "competing_groups_path": "/tmp/cg.yaml",
-        "incompatibility_path": "/tmp/im.yaml",
-        "halogen_groups_path": "/tmp/hal.yaml",
-        "score_weight": 0.7,
-        "enable_reranking": False,
-    }
-    cfg = ProtectionConfig.from_dict(d)
-    assert cfg.score_weight == 0.7
-    assert cfg.enable_reranking is False
-    assert cfg.halogen_groups_path == "/tmp/hal.yaml"
-
-
-def test_config_to_dict():
-    """ProtectionConfig.to_dict should serialize correctly."""
-    cfg = ProtectionConfig(score_weight=0.3)
-    d = cfg.to_dict()
-    assert d["score_weight"] == 0.3
-    assert "competing_groups_path" in d
-    assert "halogen_groups_path" in d
-
-
-def test_config_from_yaml(tmp_path):
-    """ProtectionConfig.from_yaml should load from a YAML file."""
-    yaml_content = (
-        "competing_groups_path: /tmp/cg.yaml\n"
-        "incompatibility_path: /tmp/im.yaml\n"
-        "halogen_groups_path: /tmp/hal.yaml\n"
-        "score_weight: 0.8\n"
-        "enable_reranking: false\n"
-    )
-    cfg_file = tmp_path / "config.yaml"
-    cfg_file.write_text(yaml_content)
-    cfg = ProtectionConfig.from_yaml(str(cfg_file))
-    assert cfg.score_weight == 0.8
-    assert cfg.enable_reranking is False
-
-
-def test_config_invalid_score_weight():
-    """ProtectionConfig should reject score_weight outside [0, 1]."""
-    with pytest.raises(ValidationError):
-        ProtectionConfig(score_weight=1.5)
-
-
-def test_config_invalid_score_weight_negative():
-    """ProtectionConfig should reject negative score_weight."""
-    with pytest.raises(ValidationError):
-        ProtectionConfig(score_weight=-0.1)
-
-
-def test_config_to_yaml_roundtrip(tmp_path):
-    """Config should survive a to_yaml -> from_yaml roundtrip."""
-    cfg = ProtectionConfig(score_weight=0.6, enable_reranking=False)
-    yaml_path = str(tmp_path / "rt.yaml")
-    cfg.to_yaml(yaml_path)
-    loaded = ProtectionConfig.from_yaml(yaml_path)
-    assert loaded.score_weight == cfg.score_weight
-    assert loaded.enable_reranking == cfg.enable_reranking

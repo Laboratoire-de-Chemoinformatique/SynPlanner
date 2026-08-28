@@ -2,13 +2,10 @@ from chython import smiles as read_smiles
 from chython.containers import MoleculeContainer
 
 from synplan.chem.precursor import Precursor
+from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.routes.io import make_json
 from synplan.mcts.node import Node
-from synplan.utils.visualisation import (
-    extract_routes,
-    get_route_svg,
-    get_route_svg_from_json,
-)
+from synplan.utils.visualisation import extract_routes
 
 
 def make_mol(n: int) -> MoleculeContainer:
@@ -24,28 +21,6 @@ def make_mol(n: int) -> MoleculeContainer:
 
 class _MockConfig:
     min_mol_size = 6
-
-
-class _MockTree:
-    def __init__(self):
-        target = Precursor(make_mol(7))
-        intermediate = Precursor(make_mol(8))
-
-        self.config = _MockConfig()
-        self.building_blocks = frozenset()
-        self.nodes = {
-            1: Node(
-                precursors_to_expand=(target,),
-                new_precursors=(target,),
-            ),
-            2: Node(
-                precursors_to_expand=(intermediate,),
-                new_precursors=(intermediate,),
-                rule_key="policy:0",
-            ),
-        }
-        self.parents = {1: 0, 2: 1}
-        self.winning_nodes = []
 
 
 class _MockRouteMetadataTree:
@@ -67,17 +42,6 @@ class _MockRouteMetadataTree:
                 },
             ]
         }
-
-
-def test_get_route_svg_unsolved_is_opt_in():
-    tree = _MockTree()
-
-    assert get_route_svg(tree, 2) is None
-
-    svg = get_route_svg(tree, 2, labeled=True, allow_unsolved=True)
-    assert svg is not None
-    assert "<svg" in svg
-    assert "policy:0" in svg
 
 
 def test_make_json_attaches_rule_metadata_from_tree():
@@ -104,7 +68,9 @@ def test_make_json_attaches_rule_metadata_from_tree():
     assert nested_reaction["rule_key"] == "priority:0"
 
 
-def test_get_route_svg_from_json_can_render_rule_labels():
+def test_a_route_read_back_from_json_keeps_the_rules_that_made_it():
+    """The rule keys `make_json` writes are what a reader needs to know which chemistry a
+    step stands for, so they have to survive the trip back into a `Route`."""
     routes_dict = {
         7: {
             0: read_smiles("[CH4:1].[OH2:2]>>[CH3:1][OH:2]"),
@@ -113,11 +79,10 @@ def test_get_route_svg_from_json_can_render_rule_labels():
     }
 
     routes_json = make_json(routes_dict, tree=_MockRouteMetadataTree())
-    svg = get_route_svg_from_json(routes_json, 7, labeled=True)
+    route = Route.from_json(routes_json[7])
 
-    assert "<svg" in svg
-    assert "policy:42" in svg
-    assert "priority:0" in svg
+    assert [step.origin.rule_key for step in route] == ["priority:0", "policy:42"]
+    assert "<svg" in route.svg()
 
 
 def test_extract_routes_uses_root_to_terminal_steps():

@@ -48,7 +48,8 @@ class FunctionalGroupDetector:
     def __init__(self, config_path: str):
         self._patterns: list[dict] = []
         self._templates: dict[str, tuple[str, str]] = {}
-        self._cache: dict[str, list[FunctionalGroupMatch]] = {}
+        # name, category and atoms as positions in the canonical SMILES order
+        self._cache: dict[str, list[tuple[str, str, tuple[int, ...]]]] = {}
         self._load_config(config_path)
 
     def template_for(self, name: str) -> tuple[str, str] | None:
@@ -102,37 +103,46 @@ class FunctionalGroupDetector:
         Applies every loaded SMARTS pattern and returns deduplicated
         matches (unique by name + sorted atom indices).  Results are
         cached by canonical SMILES so that the same molecule is not
-        re-scanned.
+        re-scanned; this molecule's atom numbers are filled in on the way
+        out, because the key carries none.
 
         :param molecule: A chython MoleculeContainer to search.
         :return: List of FunctionalGroupMatch objects.
         """
+        order = molecule.smiles_atoms_order
         key = self._cache_key(molecule)
         cached = self._cache.get(key)
-        if cached is not None:
-            return cached
+        if cached is None:
+            cached = self._cache[key] = self._scan(molecule, order)
 
-        matches: list[FunctionalGroupMatch] = []
+        return [
+            FunctionalGroupMatch(
+                name=name,
+                category=category,
+                atom_indices=tuple(sorted(order[position] for position in positions)),
+            )
+            for name, category, positions in cached
+        ]
+
+    def _scan(
+        self, molecule: MoleculeContainer, order: tuple[int, ...]
+    ) -> list[tuple[str, str, tuple[int, ...]]]:
+        """Match every pattern, atoms given as positions in ``order``."""
+        position = {atom: index for index, atom in enumerate(order)}
+        found: list[tuple[str, str, tuple[int, ...]]] = []
         seen: set[tuple[str, tuple[int, ...]]] = set()
 
         for pat in self._patterns:
             query = pat["query"]
             for mapping in query.get_mapping(molecule):
-                atom_indices = tuple(sorted(mapping.values()))
-                dedup_key = (pat["name"], atom_indices)
+                positions = tuple(sorted(position[atom] for atom in mapping.values()))
+                dedup_key = (pat["name"], positions)
                 if dedup_key in seen:
                     continue
                 seen.add(dedup_key)
-                matches.append(
-                    FunctionalGroupMatch(
-                        name=pat["name"],
-                        category=pat["category"],
-                        atom_indices=atom_indices,
-                    )
-                )
+                found.append((pat["name"], pat["category"], positions))
 
-        self._cache[key] = matches
-        return matches
+        return found
 
     def detect_competing(
         self,

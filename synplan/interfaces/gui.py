@@ -11,6 +11,7 @@ import streamlit as st
 from huggingface_hub.utils import disable_progress_bars
 from streamlit_ketcher import st_ketcher
 
+from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.routes.clustering import (
     cluster_routes,
     group_by_identical_values,
@@ -39,10 +40,9 @@ from synplan.utils.loading import (
     load_reaction_rules,
 )
 from synplan.utils.visualisation import (
-    generate_results_html,
-    get_route_svg_from_json,
     html_top_routes_cluster,
     routes_clustering_report,
+    routes_report_html,
     routes_subclustering_report,
 )
 
@@ -107,6 +107,12 @@ def download_button(
         + f'<a download="{download_filename}" id="{button_id}" href="data:file/txt;base64,{b64}">{button_text}</a><br></br>'
     )
     return dl_link
+
+
+@st.cache_resource
+def load_route_scorer_cached():
+    """The protection scorer, kept so its 102-pattern cache survives a rerun."""
+    return ProtectionRouteScorer.from_config()
 
 
 @st.cache_resource
@@ -418,8 +424,6 @@ def setup_planning_options():
                     )
                     evaluator = load_evaluation_function(eval_config)
 
-                    route_scorer = ProtectionRouteScorer.from_config()
-
                     tree = Tree(
                         target=target_molecule,
                         config=tree_config,
@@ -427,7 +431,6 @@ def setup_planning_options():
                         building_blocks=building_blocks,
                         expansion_function=policy_function,
                         evaluation_function=evaluator,
-                        route_scorer=route_scorer,
                     )
 
                     mcts_progress_text = "Running MCTS iterations..."
@@ -518,9 +521,12 @@ def download_planning_results():
     ):
         try:
             if st.button("Generate full HTML report", key="gen_plan_html"):
-                with st.spinner("Generating HTML report..."):
-                    st.session_state.planning_report_html = generate_results_html(
-                        st.session_state.tree, html_path=None, extended=True
+                with st.spinner("Ranking routes and generating HTML report..."):
+                    ranked = load_route_scorer_cached().rank(
+                        st.session_state.tree.routes()
+                    )
+                    st.session_state.planning_report_html = routes_report_html(
+                        ranked, html_path=None
                     )
 
             if st.session_state.get("planning_report_html"):
@@ -818,7 +824,7 @@ def display_planning_and_clustering_results_unified():
         try:
             num_steps = len(tree.synthesis_route(route_id))
             route_score = round(tree.route_score(route_id), 3)
-            svg = get_route_svg_from_json(route_json, route_id)
+            svg = Route.from_json(route_json[route_id]).svg()
 
             sb_cgr = group_data.get("sb_cgr")
             sb_cgr_svg = None
@@ -869,7 +875,7 @@ def display_planning_and_clustering_results_unified():
                 try:
                     num_steps = len(tree.synthesis_route(route_id))
                     route_score = round(tree.route_score(route_id), 3)
-                    svg = get_route_svg_from_json(route_json, route_id)
+                    svg = Route.from_json(route_json[route_id]).svg()
 
                     sb_cgr = group_data.get("sb_cgr")
                     sb_cgr_svg = None
@@ -920,7 +926,7 @@ def generate_synthon_reaction_image(_synthon_reaction):
 
 @st.cache_data
 def get_cached_route_svg(_route_json, route_id):
-    return get_route_svg_from_json(_route_json, route_id)
+    return Route.from_json(_route_json[route_id]).svg()
 
 
 @st.cache_data

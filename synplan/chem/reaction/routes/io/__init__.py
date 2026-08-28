@@ -5,6 +5,7 @@ from synplan.chem.reaction.routes.io.json import (
     build_route_trees,
     make_dict,
     make_json,
+    read_route_tree,
     read_routes_json,
     write_routes_json,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "export_tree_to_json",
     "make_dict",
     "make_json",
+    "read_route_tree",
     "read_routes_csv",
     "read_routes_json",
     "write_routes_csv",

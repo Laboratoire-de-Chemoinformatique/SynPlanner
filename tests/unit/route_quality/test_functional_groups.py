@@ -181,7 +181,8 @@ def test_caching(detector):
     mol = smiles("CCO")
     result1 = detector.detect_all(mol)
     result2 = detector.detect_all(mol)
-    assert result1 is result2  # same object from cache
+    assert result1 == result2
+    assert len(detector._cache) == 1  # scanned once
 
 
 def test_clear_cache(detector):
@@ -189,9 +190,22 @@ def test_clear_cache(detector):
     mol = smiles("CCO")
     result1 = detector.detect_all(mol)
     detector.clear_cache()
-    result2 = detector.detect_all(mol)
-    assert result1 is not result2  # new object after cache clear
-    assert len(result1) == len(result2)
+    assert not detector._cache
+    assert detector.detect_all(mol) == result1
+
+
+def test_cache_hit_keeps_the_queried_molecule_numbering(detector):
+    """A renumbered copy shares the cache key and must get its own atom numbers."""
+    mol = smiles("OCCNC(=O)c1ccc(Br)cc1")
+    other = mol.copy()
+    other.remap({n: n + 100 for n in mol})
+
+    detector.detect_all(mol)
+    cached = detector.detect_all(other)
+    assert all(set(m.atom_indices) <= set(other) for m in cached)
+
+    detector.clear_cache()
+    assert cached == detector.detect_all(other)
 
 
 def test_every_shipped_pattern_matches_its_own_example():

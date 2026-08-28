@@ -1,6 +1,8 @@
 import json
 import logging
-from typing import TYPE_CHECKING, Any
+from functools import lru_cache
+from itertools import zip_longest
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from chython import smiles as read_smiles
 from chython.exceptions import InvalidAromaticRing
@@ -16,8 +18,11 @@ from synplan.chem.reaction.routes.io.metadata import (
 from synplan.chem.reaction.routes.io.metadata import (
     restore_reaction_metadata as _restore_reaction_metadata,
 )
+from synplan.chem.utils import safe_canonicalization
 
 if TYPE_CHECKING:
+    from chython.containers import MoleculeContainer, ReactionContainer
+
     from synplan.mcts.tree import Tree
 
 logger = logging.getLogger(__name__)
@@ -47,8 +52,13 @@ def _purchasable(smiles: str, molecule, stock, min_mol_size: int, fallback: bool
     return len(molecule) <= min_mol_size or smiles in stock
 
 
-def _route_molecule_smiles(mol) -> str:
-    """Return the route-IO molecule string using the existing preparation flow."""
+def molecule_key(mol) -> str:
+    """The one SMILES a route keys a molecule by, in stock and in the file alike.
+
+    The normalisation runs on a copy: the caller's molecule is never rewritten,
+    so asking for a key cannot invalidate the route that was asked about.
+    """
+    mol = mol.copy()
     try:
         mol.kekule()
         mol.implicify_hydrogens()
@@ -101,6 +111,162 @@ def _collect_reactions(tree):
 
     recurse(tree)
     return {i: rxn for i, rxn in enumerate(rxn_list)}
+
+
+#: Per-step rule metadata keys ``_make_json_v1`` writes onto a reaction node.
+_STEP_META_KEYS = ("step_id", "tree_node_id", "rule_id", "rule_source", "rule_key")
+
+
+@lru_cache(maxsize=4096)
+def _file_key(smiles: str) -> str:
+    """The canonical SMILES of a molecule that is already in a file.
+
+    Files outlive canonicalisers: a string an older one wrote has to be read and
+    written again, or the same molecule ends up under two names. A node whose
+    SMILES will not parse keeps its own string -- it then matches nothing, which
+    is what an unreadable node deserves.
+
+    Memoised: one file writes the same building block into hundreds of routes,
+    and re-reading a string to arrive at the same string is the definition of a
+    no-op. String in, string out -- nothing shared across the cache is mutable.
+    """
+    try:
+        return str(safe_canonicalization(read_smiles(smiles)))
+    except Exception as error:  # unparseable node: keep the file's own string
+        logger.warning("Route molecule %s could not be re-read: %s", smiles, error)
+        return smiles
+
+
+def _canonicalise(reaction) -> int:
+    """Rewrite ``reaction``'s molecules canonically in place, counting the failures.
+
+    ``safe_canonicalization`` hands back the molecule it was given when chython
+    cannot prepare its aromatic ring, so such a molecule survives exactly as the
+    file wrote it -- readable, drawable, and counted.
+    """
+    kept = 0
+    for attribute in ("_reactants", "_products"):
+        canonical = []
+        for mol in getattr(reaction, attribute):
+            standard = safe_canonicalization(mol)
+            if standard is mol:  # the only way out of the InvalidAromaticRing branch
+                kept += 1
+            canonical.append(standard)
+        setattr(reaction, attribute, tuple(canonical))
+    return kept
+
+
+class RouteRead(NamedTuple):
+    """What one v1 route tree holds, as objects.
+
+    :param steps: One ``(reaction, product, metadata)`` per reaction node,
+        deepest first.
+    :param unresolved: The leaves the file does not call purchasable, by
+        identity -- each one a reactant of a step in ``steps``.
+    :param uncanonical: How many molecules were kept as the file wrote them
+        because chython could not canonicalise them.
+    """
+
+    steps: tuple[tuple["ReactionContainer", "MoleculeContainer", dict[str, Any]], ...]
+    unresolved: tuple["MoleculeContainer", ...]
+    uncanonical: int
+
+
+def read_route_tree(route_json) -> RouteRead:
+    """Read one v1 route tree into molecules, steps and stock verdicts.
+
+    A step's product is the very object the consuming reaction holds as a
+    reactant, so a route read from a file is the same object graph the search
+    hands out and the two behave alike. Unlike :func:`make_dict` this keeps the
+    molecule nodes, so the exported ``in_stock`` verdicts survive.
+
+    Every molecule is canonicalised on the way in: the file may come from an
+    older SynPlanner or another tool, and one spelling per molecule is what makes
+    the rest of this -- and of :class:`~synplan.chem.reaction.routes.route.Route`
+    -- a lookup rather than a guess. Canonicalisation keeps atom mapping.
+    """
+    steps = []
+    unresolved = []
+    uncanonical = 0
+
+    def link(reaction, child_nodes):
+        """Give every reactant its file verdict and, if a step made it, that step.
+
+        Neither side is in a trustworthy order -- a reaction SMILES does not keep
+        its container's molecule order, and an older file's children were never
+        written in one -- so both are sorted by canonical SMILES and paired off.
+        Reactants that share that key are the same molecule, so pairing equals in
+        an arbitrary order is a swap of interchangeable subtrees, not a mismatch.
+        """
+        reactants = list(reaction.reactants)
+        slots = sorted(range(len(reactants)), key=lambda index: str(reactants[index]))
+        nodes = sorted(
+            (node for node in child_nodes if isinstance(node, dict)),
+            key=lambda node: _file_key(node["smiles"]),
+        )
+        for slot, node in zip_longest(slots, nodes):
+            if node is None:  # a reactant the file wrote no node for: no verdict
+                unresolved.append(reactants[slot])
+                continue
+            made = molecule(node)
+            if slot is None:  # a node no reactant claims: keep its steps, drop it
+                continue
+            if made is not None:
+                reactants[slot] = made
+            elif not node.get("in_stock"):
+                unresolved.append(reactants[slot])
+        # splice, rather than rebuild, to keep the parsed reaction's metadata
+        reaction._reactants = tuple(reactants)
+
+    def product_of(reaction, node):
+        """The fragment of ``reaction`` this molecule node stands for."""
+        if len(reaction.products) == 1:
+            return reaction.products[0]
+        smiles = _file_key(node["smiles"])
+        product = next((p for p in reaction.products if str(p) == smiles), None)
+        if product is None:
+            logger.warning(
+                "Route molecule %s is not a product of %s", node["smiles"], reaction
+            )
+            return reaction.products[0]
+        return product
+
+    def molecule(node):
+        """The molecule this node stands for, or None when the file made none."""
+        nonlocal uncanonical
+        if not isinstance(node, dict):
+            return None
+        children = node.get("children") or ()
+        source = next(
+            (
+                c
+                for c in children
+                if isinstance(c, dict) and c.get("type") == "reaction"
+            ),
+            None,
+        )
+        if source is None:  # a leaf: its molecule is the reactant the parent holds
+            return None
+
+        reaction = read_smiles(source["smiles"])
+        _restore_reaction_metadata(reaction, source.get("meta"))
+        uncanonical += _canonicalise(reaction)
+        link(reaction, source.get("children") or ())
+
+        product = product_of(reaction, node)
+        steps.append(
+            (reaction, product, {k: source[k] for k in _STEP_META_KEYS if k in source})
+        )
+        return product
+
+    molecule(route_json)
+    if uncanonical:
+        logger.warning(
+            "%d route molecule(s) could not be canonicalised and were read as the "
+            "file wrote them",
+            uncanonical,
+        )
+    return RouteRead(tuple(steps), tuple(unresolved), uncanonical)
 
 
 def make_dict(routes_json):
@@ -180,7 +346,7 @@ def _make_json_v1(
             prod_map = {}  # smiles -> list of step_ids
             for sid, rxn in steps.items():
                 for prod in rxn.products:
-                    s = _route_molecule_smiles(prod)
+                    s = molecule_key(prod)
                     prod_map.setdefault(s, []).append(sid)
         except Exception as e:
             logger.warning("Error processing route %s: %s", route_id, e)
@@ -207,7 +373,7 @@ def _make_json_v1(
                     (p for p in rxn.products if _atom_nums & p._atoms.keys()), None
                 )
             if product is not None:
-                p_smi = _route_molecule_smiles(product)
+                p_smi = molecule_key(product)
                 return {
                     "type": "mol",
                     "smiles": p_smi,
@@ -236,7 +402,7 @@ def _make_json_v1(
                 node.update(_route_step_metadata[sid])
 
             for react in rxn.reactants:
-                r_smi = _route_molecule_smiles(react)
+                r_smi = molecule_key(react)
                 # Look up any prior step producing this reactant
                 prior = [ps for ps in _prod_map.get(r_smi, []) if ps < sid]
                 if prior:
@@ -357,9 +523,12 @@ def write_routes_json(
 
 
 __all__ = [
+    "RouteRead",
     "build_route_trees",
     "make_dict",
     "make_json",
+    "molecule_key",
+    "read_route_tree",
     "read_routes_json",
     "write_routes_json",
 ]

@@ -4,37 +4,35 @@ from __future__ import annotations
 
 import base64
 import contextlib
-from collections import deque
 from datetime import datetime
 from html import escape
-from itertools import count, islice, pairwise
 from typing import TYPE_CHECKING, Any
 
 from chython import depict_settings
-from chython import smiles as read_smiles
-from chython.algorithms.depict import _graph_svg, _render_config
 from chython.containers.molecule import MoleculeContainer
 from IPython.display import HTML, display
 
-from synplan.chem.reaction.reactor import Reaction
 from synplan.chem.reaction.routes.io import make_dict
 from synplan.chem.reaction.routes.representation.depiction import (
     cgr_display,
     depict_custom_reaction,
 )
-from synplan.chem.reaction.routes.traversal import iter_route_steps
-from synplan.utils.align2d import align_route
+from synplan.chem.reaction.routes.route import Route, Step
+from synplan.chem.reaction.routes.traversal import iter_route_steps, route_node_ids
+from synplan.chem.reaction.rules.priority import POLICY_SOURCE_NAME
 from synplan.utils.frames import depict_value
 from synplan.utils.routedraw import (
     ARROW_DEFS,
     ROLE_STYLE,
     ROUTE_CSS,
-    draw_route,
+    drawable_copy,
     molecule_svg,
 )
 from synplan.utils.svgslim import Doc, hidden_defs
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
     from synplan.mcts.tree import Tree
 
 
@@ -139,234 +137,11 @@ def extract_routes(
     return routes_block
 
 
-def render_svg(pred, columns, box_colors, labeled: bool = False):
-    """
-    Renders an SVG representation of a retrosynthetic route.
-
-    This function takes the predicted reaction steps, the molecules organized
-    into columns representing reaction stages, and a mapping of molecule status
-    to box colors, and generates an SVG string visualizing the route. It
-    calculates positions for molecules and arrows, and constructs the SVG
-    elements.
-
-    Args:
-        pred (tuple): A tuple of tuples representing the predicted reaction
-                      steps. Each inner tuple is (source_molecule_index,
-                      target_molecule_index). The indices correspond to the
-                      flattened list of molecules across all columns.
-        columns (list): A list of lists, where each inner list contains
-                        Molecule objects for a specific stage (column) in the
-                        retrosynthetic route.
-        box_colors (dict): A dictionary mapping molecule status strings (e.g.,
-                          'target', 'mulecule', 'instock') to SVG color strings
-                          for the boxes around the molecules.
-        labeled (bool): If True, upstream preparation may include the full
-                        ``rule_key`` in the rendered arrow labels.
-
-    Returns:
-        str: A string containing the complete SVG code for the retrosynthetic
-             route visualization.
-    """
-    x_shift = 0.0
-    c_max_x = 0.0
-    c_max_y = 0.0
-    render = []
-    flat_molecules = []
-    cx = count()
-    cy = count()
-    arrow_points = {}
-
-    def _get_plane(mol):
-        return {n: (a.x, a.y) for n, a in mol._atoms.items()}
-
-    def _set_plane(mol, plane):
-        for n, (x, y) in plane.items():
-            mol._atoms[n].xy = (x, y)
-
-    def _is_degenerate(plane):
-        """chython's own test for "never laid out": everything on one point."""
-        xs = [x for x, _ in plane.values()]
-        ys = [y for _, y in plane.values()]
-        return max(xs) - min(xs) < 0.01 and max(ys) - min(ys) < 0.01
-
-    for ms in columns:
-        heights = []
-        for m in ms:
-            flat_molecules.append(m)
-            plane = _get_plane(m)
-            if len(m) > 1 and _is_degenerate(plane):
-                m.clean2d()
-                plane = _get_plane(m)
-            # X-shift for target
-            min_x = min(x for x, y in plane.values()) - x_shift
-            min_y = min(y for x, y in plane.values())
-            plane = {n: (x - min_x, y - min_y) for n, (x, y) in plane.items()}
-            _set_plane(m, plane)
-            max_x = max(x for x, y in plane.values())
-
-            c_max_x = max(c_max_x, max_x)
-
-            arrow_points[next(cx)] = [x_shift, max_x]
-            heights.append(max(y for x, y in plane.values()))
-
-        x_shift = c_max_x + 5.0  # between columns gap
-        # calculate Y-shift
-        y_shift = sum(heights) + 3.0 * (len(heights) - 1)
-
-        c_max_y = max(c_max_y, y_shift)
-
-        y_shift /= 2.0
-        for m, h in zip(ms, heights):
-            plane = {n: (x, y - y_shift) for n, (x, y) in _get_plane(m).items()}
-            _set_plane(m, plane)
-
-            # calculate coordinates for boxes
-            max_x = max(x for x, y in plane.values()) + 0.9  # max x
-            min_x = min(x for x, y in plane.values()) - 0.6  # min x
-            max_y = -(max(y for x, y in plane.values()) + 0.45)  # max y
-            min_y = -(min(y for x, y in plane.values()) - 0.45)  # min y
-            x_delta = abs(max_x - min_x)
-            y_delta = abs(max_y - min_y)
-            box = (
-                f'<rect x="{min_x}" y="{max_y}" rx="{y_delta * 0.1}" ry="{y_delta * 0.1}" width="{x_delta}" height="{y_delta}"'
-                f' stroke="black" stroke-width=".0025" fill="{box_colors[m.meta["status"]]}" fill-opacity="0.30"/>'
-            )
-            arrow_points[next(cy)].append(y_shift - h / 2.0)
-            y_shift -= h + 3.0
-            atoms, bonds, define, masks, uid, *_ = m.depict(_embedding=True)
-            depicted_molecule = [atoms, bonds, define, masks, uid]
-            depicted_molecule.append(box)
-            render.append(depicted_molecule)
-
-    # calculate mid-X coordinate to draw square arrows
-    graph = {}
-    for s, p in pred:
-        try:
-            graph[s].append(p)
-        except KeyError:
-            graph[s] = [p]
-    for s, ps in graph.items():
-        mid_x = float("-inf")
-        for p in ps:
-            s_min_x, _s_max, s_y = arrow_points[s][:3]  # s
-            _p_min_x, p_max, p_y = arrow_points[p][:3]  # p
-            p_max += 1
-            mid = p_max + (s_min_x - p_max) / 3
-            mid_x = max(mid_x, mid)
-        for p in ps:
-            arrow_points[p].append(mid_x)
-
-    config = _render_config
-    font_size = config["font_size"]
-    font125 = 1.25 * font_size
-    width = c_max_x + 4.0 * font_size  # 3.0 by default
-    height = c_max_y + 3.5 * font_size  # 2.5 by default
-    box_y = height / 2.0
-    svg = [
-        f'<svg width="{0.6 * width:.2f}cm" height="{0.6 * height:.2f}cm" '
-        f'viewBox="{-font125:.2f} {-box_y:.2f} {width:.2f} '
-        f'{height:.2f}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1">',
-        '  <defs>\n    <marker id="arrow" markerWidth="10" markerHeight="10" '
-        'refX="0" refY="3" orient="auto">\n      <path d="M0,0 L0,6 L9,3"/>\n    </marker>\n  </defs>',
-    ]
-
-    rendered_arrow_labels = set()
-    arrow_label_elements = []
-    for s, p in pred:
-        s_min_x, _s_max, s_y = arrow_points[s][:3]
-        _p_min_x, p_max, p_y = arrow_points[p][:3]
-        p_max += 1
-        mid_x = arrow_points[p][-1]  # p_max + (s_min_x - p_max) / 3
-        arrow = f"""  <polyline points="{p_max:.2f} {p_y:.2f}, {mid_x:.2f} {p_y:.2f}, {mid_x:.2f} {s_y:.2f}, {s_min_x - 1.0:.2f} {s_y:.2f}"
-                fill="none" stroke="black" stroke-width=".04" marker-end="url(#arrow)"/>"""
-        if p_y != s_y:
-            arrow += f'  <circle cx="{mid_x}" cy="{p_y}" r="0.1"/>'
-        svg.append(arrow)
-
-        if s not in rendered_arrow_labels:
-            label_text = flat_molecules[s].meta.get("label")
-            if label_text:
-                # Keep the rule label clear of the arrow head and bend.
-                label_x = ((mid_x + (s_min_x - 1.0)) / 2.0) - 0.45
-                label_y = s_y
-                label_width = max(1.2, 0.18 * len(label_text) + 0.35)
-                label_height = 0.5
-                label_rect = (
-                    f'  <rect x="{label_x - label_width / 2.0:.2f}" '
-                    f'y="{label_y - label_height / 2.0:.2f}" '
-                    f'width="{label_width:.2f}" height="{label_height:.2f}" '
-                    'rx="0.08" ry="0.08" fill="white" stroke="black" '
-                    'stroke-width=".02"/>'
-                )
-                label_svg = (
-                    f'  <text x="{label_x:.2f}" y="{label_y:.2f}" '
-                    'text-anchor="middle" dominant-baseline="central" '
-                    'font-family="monospace" font-size="0.24" fill="black">'
-                    f"{label_text}</text>"
-                )
-                arrow_label_elements.append(label_rect)
-                arrow_label_elements.append(label_svg)
-            rendered_arrow_labels.add(s)
-    svg.extend(arrow_label_elements)
-    for depicted_molecule in render:
-        atoms, bonds, define, masks, uid, box, *extras = depicted_molecule
-        molecule_svg = _graph_svg(
-            atoms, bonds, define, masks, uid, -font125, -box_y, width, height
-        )
-        molecule_svg.insert(0, box)
-        if extras:
-            molecule_svg[1:1] = extras
-        svg.extend(molecule_svg)
-    svg.append("</svg>")
-    return "\n".join(svg)
-
-
-def _route_box_colors() -> dict[str, str]:
-    return {
-        "target": "#98EEFF",
-        "mulecule": "#F0AB90",
-        "instock": "#9BFAB3",
-    }
-
-
-def _mirror_route_layout(columns, pred):
-    """Mirror root-to-leaf route columns so the target stays on the right."""
-    if len(columns) <= 1:
-        return columns, tuple(pred)
-
-    old_to_new = {}
-    new_col_starts = []
-    acc = 0
-    for column in reversed(columns):
-        new_col_starts.append(acc)
-        acc += len(column)
-
-    old_idx = 0
-    for col_idx, column in enumerate(columns):
-        new_start = new_col_starts[len(columns) - 1 - col_idx]
-        for pos_in_col in range(len(column)):
-            old_to_new[old_idx] = new_start + pos_in_col
-            old_idx += 1
-
-    mirrored_columns = list(reversed(columns))
-    mirrored_pred = tuple(
-        (old_to_new[parent_idx], old_to_new[child_idx])
-        for parent_idx, child_idx in pred
-    )
-    return mirrored_columns, mirrored_pred
-
-
-def _render_route_svg(columns, pred, labeled: bool = False) -> str:
-    """Shared backend for prepared route columns and parent->child edges."""
-    columns, pred = _mirror_route_layout(columns, pred)
-    return render_svg(pred, columns, _route_box_colors(), labeled=labeled)
-
-
 def _priority_rule(tree: Tree, node) -> Any | None:
     """The curated rule that produced `node`, or None for a policy step.
 
-    Everything is fetched defensively: this renderer is also driven by JSON routes and by
-    duck-typed stand-ins that carry neither priority rules nor rule ids.
+    Everything is fetched defensively: the lookup is also driven by duck-typed
+    stand-ins that carry neither priority rules nor rule ids.
     """
     rules = getattr(tree, "priority_rules", {}).get(
         getattr(node, "rule_source", None) or "", ()
@@ -377,301 +152,34 @@ def _priority_rule(tree: Tree, node) -> Any | None:
     return rules[rule_id]
 
 
-# an arrow label sits in the 5.0-unit gap between columns, and the renderer sizes its box at
-# 0.18 per character — past this it reaches into the neighbouring molecule
-_ARROW_LABEL_CHARS = 25
+def _json_route(routes_json: dict, route_id: int) -> Route:
+    """One route out of a ``make_json`` mapping, by id.
 
-
-def _format_arrow_label(
-    rule_key: str | None,
-    policy_rank: int | None,
-    *,
-    include_rule_key: bool,
-    rule_name: str | None = None,
-) -> str | None:
-    """Build the per-arrow label text for route SVGs.
-
-    A curated rule has a chemistry name, which is what a reader wants on the arrow; the policy
-    has only a rank. The full untruncated name stays in the step list under the scheme.
+    A mapping that has been through a JSON file spells its ids as strings, so both
+    are tried before giving up.
     """
-
-    parts = []
-    if rule_name:
-        parts.append(
-            rule_name
-            if len(rule_name) <= _ARROW_LABEL_CHARS
-            else rule_name[: _ARROW_LABEL_CHARS - 1].rstrip() + "…"
-        )
-    elif include_rule_key and rule_key:
-        parts.append(rule_key)
-    if policy_rank is not None:
-        parts.append(f"Top-{policy_rank}")
-    if parts:
-        return " | ".join(parts)
-    return None
+    node = routes_json.get(route_id, routes_json.get(str(route_id)))
+    if node is None:
+        raise ValueError(f"Route ID {route_id} not found in routes_json.")
+    return Route.from_json(node)
 
 
-def _prepare_tree_route_svg_inputs(
-    tree: Tree,
-    node_id: int,
-    labeled: bool = False,
-    allow_unsolved: bool = False,
-):
-    if node_id not in tree.nodes:
-        return None
-    if not allow_unsolved and node_id not in tree.winning_nodes:
-        return None
-
-    path_ids = []
-    nid = node_id
-    while nid:
-        path_ids.append(nid)
-        nid = tree.parents[nid]
-    path_ids.reverse()
-
-    nodes = [tree.nodes[i] for i in path_ids]
-
-    # Clear previous route annotations so repeated calls do not leak labels.
-    for node in nodes:
-        curr_precursor = getattr(node, "curr_precursor", None)
-        if curr_precursor is not None and hasattr(curr_precursor, "molecule"):
-            curr_precursor.molecule.meta.pop("label", None)
-            curr_precursor.molecule.meta.pop("status", None)
-
-        for precursor in getattr(node, "new_precursors", ()):
-            if hasattr(precursor, "molecule"):
-                precursor.molecule.meta.pop("label", None)
-                precursor.molecule.meta.pop("status", None)
-
-    for parent_idx in range(len(path_ids) - 1):
-        child_id = path_ids[parent_idx + 1]
-        child_node = tree.nodes[child_id]
-        rule = _priority_rule(tree, child_node)
-        name = getattr(rule, "rule_name", None)
-        label_text = _format_arrow_label(
-            child_node.rule_key,
-            child_node.policy_rank,
-            include_rule_key=labeled,
-            rule_name=f"{rule.rule_id} {name}" if name else None,
-        )
-        if not label_text:
-            continue
-
-        parent_node = nodes[parent_idx]
-        curr_precursor = getattr(parent_node, "curr_precursor", None)
-        if curr_precursor is not None and hasattr(curr_precursor, "molecule"):
-            curr_precursor.molecule.meta["label"] = label_text
-
-    for node in nodes:
-        for precursor in getattr(node, "new_precursors", ()):
-            precursor.molecule.meta["status"] = (
-                "instock"
-                if precursor.is_building_block(
-                    tree.building_blocks, tree.config.min_mol_size
-                )
-                else "mulecule"
-            )
-    nodes[0].curr_precursor.molecule.meta["status"] = "target"
-
-    columns = [[nodes[0].curr_precursor.molecule]]
-    pred = []
-
-    if len(nodes) == 1:
-        return columns, tuple(pred)
-
-    first_layer_precursors = list(nodes[1].new_precursors)
-    columns.append([x.molecule for x in first_layer_precursors])
-    pred.extend((0, idx) for idx in range(1, len(first_layer_precursors) + 1))
-
-    frontier = [
-        idx
-        for idx, precursor in enumerate(first_layer_precursors, 1)
-        if not precursor.is_building_block(
-            tree.building_blocks, tree.config.min_mol_size
-        )
-    ]
-
-    route_iter = iter(nodes[2:])
-    next_idx = count(len(first_layer_precursors) + 1)
-
-    while frontier:
-        parent_indices = list(frontier)
-        frontier = []
-        layer_precursors = []
-
-        for child_node, parent_idx in zip(
-            islice(route_iter, len(parent_indices)), parent_indices
-        ):
-            for precursor in child_node.new_precursors:
-                layer_precursors.append(precursor)
-                child_idx = next(next_idx)
-                pred.append((parent_idx, child_idx))
-
-                if not precursor.is_building_block(
-                    tree.building_blocks, tree.config.min_mol_size
-                ):
-                    frontier.append(child_idx)
-
-        if layer_precursors:
-            columns.append([x.molecule for x in layer_precursors])
-
-    steps = [
-        Reaction(
-            [x.molecule for x in after.new_precursors],
-            [before.curr_precursor.molecule],
-        )
-        for before, after in pairwise(nodes)
-    ]
-    align_route(steps[::-1])  # align_route takes Tree.synthesis_route order, leaf first
-    return columns, tuple(pred)
-
-
-def get_route_svg(
-    tree: Tree,
-    node_id: int,
-    labeled: bool = False,
-    allow_unsolved: bool = False,
-) -> str:
-    """Visualizes the retrosynthetic route.
-
-    :param tree: The built tree.
-    :param node_id: The id of the node from which to visualize the route.
-    :param labeled: If True, include each disconnection's ``Node.rule_key`` in
-        the arrow label. Stored policy ranks are shown as ``Top-N`` whenever
-        available, even when ``labeled`` is False.
-    :param allow_unsolved: If True, also render partial routes ending at non-winning
-        nodes. Default keeps the historical solved-only behavior.
-    :return: The SVG string.
-    """
-    prepared = _prepare_tree_route_svg_inputs(
-        tree,
-        node_id,
-        labeled=labeled,
-        allow_unsolved=allow_unsolved,
-    )
-    if prepared is None:
-        return None
-
-    columns, pred = prepared
-    return _render_route_svg(columns, pred, labeled=labeled)
-
-
-def _get_root(routes_json: dict, route_id: int) -> dict:
-    """
-    Retrieve the root tree for the given route_id, supporting int or str keys.
-    Raises ValueError if not found.
-    """
-    if route_id in routes_json:
-        return routes_json[route_id]
-    if str(route_id) in routes_json:
-        return routes_json[str(route_id)]
-    raise ValueError(f"Route ID {route_id} not found in routes_json.")
-
-
-def _extract_levels_and_parents(root: dict):
-    """
-    BFS traversal of the tree to collect molecules by depth
-    and record parent links for each mol-node.
-
-    Returns (levels, parent_of, outgoing_reaction_of) where:
-      - levels[d] is a list of mol dicts at depth d
-      - parent_of[node_id] = parent_mol_dict or None for root
-      - outgoing_reaction_of[node_id] = reaction dict branching from the mol node
-    """
-    levels = []
-    parent_of = {}
-    outgoing_reaction_of = {}
-    queue = deque([(root, 0, None)])
-
-    while queue:
-        node, depth, parent = queue.popleft()
-        if not isinstance(node, dict) or node.get("type") != "mol":
-            continue
-        # ensure depth list exists
-        if depth >= len(levels):
-            levels.extend([] for _ in range(depth - len(levels) + 1))
-        levels[depth].append(node)
-        parent_of[id(node)] = parent
-        outgoing_reaction_of[id(node)] = None
-
-        # enqueue next-layer molecule children
-        for reaction in node.get("children") or []:
-            if not isinstance(reaction, dict) or reaction.get("type") != "reaction":
-                continue
-            outgoing_reaction_of[id(node)] = reaction
-            for mol_child in reaction.get("children") or []:
-                if isinstance(mol_child, dict) and mol_child.get("type") == "mol":
-                    queue.append((mol_child, depth + 1, node))
-
-    return levels, parent_of, outgoing_reaction_of
-
-
-def _prepare_json_route_svg_inputs(
-    routes_json: dict, route_id: int, labeled: bool = False
-):
-    root = _get_root(routes_json, route_id)
-    levels, parent_of, outgoing_reaction_of = _extract_levels_and_parents(root)
-
-    mol_container = {}
-    for depth, mols in enumerate(levels):
-        for mol in mols:
-            container = read_smiles(mol["smiles"])
-            if depth == 0:
-                container.meta["status"] = "target"
-            else:
-                container.meta["status"] = (
-                    "instock" if mol.get("in_stock") else "mulecule"
-                )
-
-            reaction = outgoing_reaction_of.get(id(mol))
-            label_text = _format_arrow_label(
-                reaction.get("rule_key") if reaction else None,
-                reaction.get("policy_rank") if reaction else None,
-                include_rule_key=labeled,
-            )
-            if label_text:
-                container.meta["label"] = label_text
-
-            mol_container[id(mol)] = container
-
-    pred = []
-    flat_ids = [id(mol) for level in levels for mol in level]
-    index_map = {node_id: idx for idx, node_id in enumerate(flat_ids)}
-    for node_id, parent in parent_of.items():
-        if parent is not None:
-            pred.append((index_map[id(parent)], index_map[node_id]))
-
-    columns = [[mol_container[id(mol)] for mol in level] for level in levels]
-    return columns, tuple(pred)
-
-
-def get_route_svg_from_json(
-    routes_json: dict, route_id: int, labeled: bool = False
-) -> str:
-    """
-    Visualize the retrosynthetic route for routes_json[route_id] as an SVG.
-    """
-    columns, pred = _prepare_json_route_svg_inputs(
-        routes_json, route_id, labeled=labeled
-    )
-    return _render_route_svg(columns, pred, labeled=labeled)
-
-
-def route_rule_labels(tree: Tree, node_id: int) -> list[str]:
-    """One label per step of `tree.synthesis_route(node_id)`, in the same order.
+def route_rule_labels(tree: Tree, node_id: int) -> dict[int, str]:
+    """`{tree node id: label}` for the steps of the route ending at `node_id`.
 
     Priority rules carry a chemistry name (`rule_name` stamped by their loader); the policy has
-    none, so its steps stay unlabelled rather than being given a meaningless id.
+    none, so its steps stay unlabelled rather than being given a meaningless id. Keyed by node
+    id, so a step finds its label whatever order the route is read in.
     """
-    labels = []
-    for _before, after in iter_route_steps(tree, node_id):
-        rule = _priority_rule(tree, after)
+    labels = {}
+    for route_node_id in route_node_ids(tree.parents, node_id)[1:]:
+        rule = _priority_rule(tree, tree.nodes[route_node_id])
         name = getattr(rule, "rule_name", None)
-        labels.append(f"{rule.rule_id} — {name}" if name else "")
-    return list(reversed(labels))  # synthesis_route reverses; keep the pairing
+        labels[route_node_id] = f"{rule.rule_id} — {name}" if name else ""
+    return labels
 
 
-#: Page chrome for :func:`generate_results_html`. The route drawings bring their own
+#: Page chrome for :func:`routes_report_html`. The route drawings bring their own
 #: rules through :data:`synplan.utils.routedraw.ROUTE_CSS`.
 _REPORT_CSS = """
 :root{--ink:#0f1419;--ink2:#38414a;--ink3:#6b7480;--ink4:#9ba3ad;
@@ -726,24 +234,31 @@ _ROLE_LEGEND = (
 )
 
 
-def _report_header(tree: Tree, n_routes: int) -> str:
-    target = tree.nodes[1].curr_precursor
-    tile = read_smiles(str(target))
-    tile.clean2d()
+def _report_header(routes: Sequence[Route], tile: MoleculeContainer | None) -> str:
+    scores = [
+        route.provenance.search_score
+        for route in routes
+        if route.provenance is not None and route.provenance.search_score is not None
+    ]
     stats = (
-        ("Tree size", len(tree), " nodes"),
-        ("Visited nodes", len(tree.visited_nodes), ""),
-        ("Found paths", n_routes, ""),
-        ("Time", round(tree.curr_time, 4), " seconds"),
+        ("Routes", len(routes), ""),
+        ("Solved", sum(route.solved for route in routes), f" of {len(routes)}"),
+        ("Longest", max((len(route) for route in routes), default=0), " steps"),
+        ("Best score", round(max(scores), 3) if scores else "—", ""),
+    )
+    target = (
+        ""
+        if tile is None
+        else f'<div class="target"><div class="tile">{molecule_svg(tile)}</div>'
+        '<div><div class="eyebrow">Target molecule</div>'
+        f'<div class="smi mono">{escape(str(tile))}</div></div></div>'
     )
     return (
         '<header class="page card">'
         '<div class="eyebrow">Retrosynthetic routes report</div>'
-        "<h1>Predicted paths</h1>"
-        f'<div class="target"><div class="tile">{molecule_svg(tile)}</div>'
-        '<div><div class="eyebrow">Target molecule</div>'
-        f'<div class="smi mono">{escape(str(target))}</div></div></div>'
-        '<div class="stats">'
+        "<h1>Predicted routes</h1>"
+        + target
+        + '<div class="stats">'
         + "".join(
             f'<div class="stat"><span class="eyebrow">{name}</span>'
             f'<span class="v">{value}<span class="u">{unit}</span></span></div>'
@@ -759,59 +274,89 @@ def _report_header(tree: Tree, n_routes: int) -> str:
     )
 
 
-def generate_results_html(
-    tree: Tree, html_path: str | None, aam: bool = False, extended: bool = False
+def _step_label(step: Step) -> str:
+    """The curated rule behind a step, or "" for one the policy proposed.
+
+    A policy rule's id says nothing to a chemist, so a policy step stays
+    unlabelled; a priority step is named by its ``rule_key`` (``set:id``), the one
+    identifier the detached route carries.
+    """
+
+    origin = step.origin
+    if origin is None or origin.rule_source in (None, POLICY_SOURCE_NAME):
+        return ""
+    return origin.rule_key or ""
+
+
+def routes_report_html(
+    routes: Iterable[Route], html_path: str | None, aam: bool = False
 ) -> str | None:
-    """Writes an HTML page with the synthesis routes drawn and listed as SMILES.
+    """Write an HTML page with the given routes drawn and listed as SMILES.
+
+    Draws exactly the routes it is handed, in the order it is handed them --
+    solved, unsolved, from one tree, from several, or read back out of a file.
+    Which routes are worth a page is the caller's call:
+    ``tree.routes(solved_only=False)`` enumerates one unfinished route per unsolved
+    leaf, and most of those are one step deep, so filter before you draw
+    (``[r for r in tree.routes(solved_only=False) if len(r) > 2]``).
 
     Each route gets one drawing and one step list; a step's number is the number on
-    its disc in the drawing, 1 being the cut from the target. The page is
-    self-contained: no scripts, no external stylesheets, no fonts to fetch.
+    its disc in the drawing, 1 being the first reaction performed. Unresolved
+    leaves -- the molecules the search could not buy -- are drawn in the red ``oos``
+    role. The page is self-contained: no scripts, no external stylesheets, no fonts
+    to fetch.
 
-    :param tree: The built tree.
+    :param routes: The routes to draw.
     :param html_path: The path to the file where to store resulting HTML. When None,
         the page is returned instead of written.
     :param aam: If True, depict atom-to-atom mapping.
-    :param extended: If True, generates the extended route representation.
     :return: The page when ``html_path`` is None, otherwise None.
     """
     depict_settings(aam=bool(aam))
-
-    if extended:
-        routes = [idx for idx, node in tree.nodes.items() if node.is_solved()]
-    else:
-        routes = list(tree.winning_nodes)
+    routes = list(routes)
 
     doc = Doc()
+    layouts: dict = {}  # one geometry per molecule, so a card matches its neighbours
     body = []
-    for route in routes:
-        svg, order, steps = draw_route(tree, route)
-        labels = route_rule_labels(tree, route)
-        rows = "".join(
-            f'<div class="step"><div class="disc">{number}</div><div>'
-            + (f'<div class="lab">{escape(labels[step])}</div>' if labels[step] else "")
-            + f'<div class="rxn mono">{escape(str(steps[step]))}</div></div></div>'
-            for number, step in enumerate(order, 1)
-        )
+    for index, route in enumerate(routes, 1):
+        rows = ""
+        for number, step in enumerate(route, 1):
+            label = _step_label(step)
+            rows += (
+                f'<div class="step"><div class="disc">{number}</div><div>'
+                + (f'<div class="lab">{escape(label)}</div>' if label else "")
+                + f'<div class="rxn mono">{escape(str(step.reaction))}</div></div></div>'
+            )
+        provenance = route.provenance
+        node_id = None if provenance is None else provenance.tree_node_id
+        score = None if provenance is None else provenance.search_score
+        unresolved = len(route.unresolved)
         body.append(
             '<section class="route card"><div class="rhead">'
             f'<div class="kv"><div class="eyebrow">Route</div>'
-            f'<div class="v id">{route}</div></div>'
+            f'<div class="v id">{index if node_id is None else node_id}</div></div>'
             f'<div class="kv"><div class="eyebrow">Steps</div>'
-            f'<div class="v">{len(steps)}</div></div>'
-            f'<div class="kv"><div class="eyebrow">Cumulated nodes&#39; value</div>'
-            f'<div class="v">{round(tree.route_score(route), 3)}</div></div></div>'
-            f'<div class="draw">{doc.route(svg)}</div>{rows}</section>'
+            f'<div class="v">{len(route)}</div></div>'
+            f'<div class="kv"><div class="eyebrow">Search score</div>'
+            f'<div class="v">{"—" if score is None else round(score, 3)}</div></div>'
+            f'<div class="kv"><div class="eyebrow">Not in stock</div>'
+            f'<div class="v">{unresolved}</div></div></div>'
+            f'<div class="draw">'
+            f"{doc.route(route.svg(standalone=False, layouts=layouts))}"
+            f"</div>{rows}</section>"
         )
 
     page = (
         '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        "<title>Predicted Paths Report</title>\n"
+        "<title>Retrosynthetic Routes Report</title>\n"
         f"<style>{ROUTE_CSS}{_REPORT_CSS}</style>\n</head>\n<body>\n"
         + hidden_defs(ARROW_DEFS, doc.defs())
         + '<div class="wrap">'
-        + _report_header(tree, len(routes))
+        + _report_header(
+            routes,
+            drawable_copy(routes[0].target, layouts) if routes else None,
+        )
         + "".join(body)
         + "</div>\n</body>\n</html>\n"
     )
@@ -872,13 +417,14 @@ def html_top_routes_cluster(
     html.append("</tr></thead><tbody>")
 
     # Rows per cluster
+    layouts: dict = {}  # one geometry per molecule, shared by every route on the page
     for cluster_num, group_data in clusters.items():
         route_ids = group_data.get("route_ids", [])
         if not route_ids:
             continue
         route_id = route_ids[0]
         # Get SVGs
-        svg = get_route_svg(tree, route_id)
+        svg = Route.from_tree(tree, route_id).svg(layouts=layouts)
         r_cgr = group_data.get("sb_cgr")
         r_cgr_svg = None
         if r_cgr:
@@ -1126,13 +672,15 @@ def routes_clustering_report(
         </div>
     </td></tr>
     """
+    layouts: dict = {}  # one geometry per molecule, shared by every route on the page
     for route_id in valid_routes:
         if using_tree:
             # 1) SVG from Tree
-            svg = get_route_svg(tree, route_id)
-            # 2) Reaction steps & score
-            steps = tree.synthesis_route(route_id)
-            score = round(tree.route_score(route_id), 3)
+            route = Route.from_tree(tree, route_id)
+            svg = route.svg(layouts=layouts)
+            # 2) Reaction steps & score; step order is the drawing's disc order
+            steps = [step.reaction for step in route]
+            score = round(route.provenance.search_score, 3)
             # build reaction list
             reac_html = "".join(
                 f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in enumerate(steps)
@@ -1143,7 +691,7 @@ def routes_clustering_report(
             table += f"<tr><td>{reac_html}</td></tr>"
         else:
             # 1) SVG from JSON
-            svg = get_route_svg_from_json(routes_json, route_id)
+            svg = _json_route(routes_json, route_id).svg(layouts=layouts)
             steps = routes_dict[route_id]
             reac_html = "".join(
                 f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in steps.items()
@@ -1682,13 +1230,15 @@ def routes_subclustering_report(
         </div>
     </td></tr>
     """
+    layouts: dict = {}  # one geometry per molecule, shared by every route on the page
     for route_id in valid_routes:
         if using_tree:
             # 1) SVG from Tree
-            svg = get_route_svg(tree, route_id)
-            # 2) Reaction steps & score
-            steps = tree.synthesis_route(route_id)
-            score = round(tree.route_score(route_id), 3)
+            route = Route.from_tree(tree, route_id)
+            svg = route.svg(layouts=layouts)
+            # 2) Reaction steps & score; step order is the drawing's disc order
+            steps = [step.reaction for step in route]
+            score = round(route.provenance.search_score, 3)
             # build reaction list
             reac_html = "".join(
                 f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in enumerate(steps)
@@ -1700,7 +1250,7 @@ def routes_subclustering_report(
 
         else:
             # 1) SVG from JSON
-            svg = get_route_svg_from_json(routes_json, route_id)
+            svg = _json_route(routes_json, route_id).svg(layouts=layouts)
             steps = routes_dict[route_id]
             reac_html = "".join(
                 f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in steps.items()
