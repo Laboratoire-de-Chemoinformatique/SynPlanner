@@ -589,7 +589,7 @@ def create_rule(
         if _skip_full_reaction_validation:
             # TODO: validate component-scoped rules against component-scoped products;
             # full-reaction validation is invalid for a single disconnected CGR center.
-            rule.meta["reactor_validation"] = "failed"
+            rule.meta["reactor_validation"] = "skipped_multicenter_component"
         elif validate_rule(rule, reaction):
             rule.meta["reactor_validation"] = "passed"
         else:
@@ -965,9 +965,12 @@ def _filtered_rule_reason(
 ) -> str:
     """Mirror :func:`sort_rules` for one source reaction's rule occurrence.
 
-    Returns a validation reason, ``"below_min_popularity"``, or ``"retained"``.
+    Returns ``"multicenter"``, a validation reason,
+    ``"below_min_popularity"``, or ``"retained"``.
     """
     cgr_key, validation = occurrence
+    if validation == "skipped_multicenter_component":
+        return "multicenter"
     if validation is not None and validation != "passed":
         return f"reactor_validation_{validation}"
     if len(eligible_rules_statistics.get(cgr_key, [])) < min_popularity:
@@ -998,6 +1001,13 @@ def _make_rule_filter_audit_entry(
     elif set(reason_counts) == {"below_min_popularity"}:
         error_type = "BelowMinPopularity"
         message = f"all extracted rules were below min_popularity={min_popularity}"
+    elif set(reason_counts) == {"multicenter"}:
+        error_type = "MultiCenter"
+        message = (
+            "full-reaction validation was skipped for all component rules "
+            "extracted from a multicenter reaction "
+            f"(rules={reason_counts['multicenter']})"
+        )
     elif all(reason.startswith("reactor_validation_") for reason in reason_counts):
         error_type = "ReactorValidationFailed"
         details = ", ".join(
@@ -1227,7 +1237,10 @@ def print_extraction_summary(
     if total_unique:
         summary_lines.append(f"Rule filtering ({total_unique} unique rules extracted):")
         for key, label in [
-            ("rejected_reactor_validation", "reactor validation failed"),
+            (
+                "rejected_reactor_validation",
+                "no validation-eligible occurrences",
+            ),
             ("rejected_popularity", "below min popularity"),
         ]:
             count = filter_stats.get(key, 0)
