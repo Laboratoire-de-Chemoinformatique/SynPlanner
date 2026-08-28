@@ -45,6 +45,15 @@ ALGORITHMS = {
 logger = logging.getLogger(__name__)
 
 
+def _not_a_node(node_id) -> str:
+    """The message for a route asked about by something that is not a node id."""
+
+    return (
+        f"{node_id!r} is not a node of this tree: a route is identified by the "
+        "id of the node it ends at (tree.winning_nodes), not by its position"
+    )
+
+
 @dataclass
 class PerSourceCounters:
     """Per-priority-set counters within :class:`TreeStats`."""
@@ -728,8 +737,11 @@ class Tree:
 
         :param node_id: The id of the current given node.
         :return: The route score.
+        :raises ValueError: if ``node_id`` is not a node of this tree.
         """
 
+        if node_id not in self.nodes:  # a route of no nodes has no length to divide by
+            raise ValueError(_not_a_node(node_id))
         route_nodes = tuple(iter_route_nodes(self, node_id))
         route_length = len(route_nodes)
         cumulated_nodes_value = sum(node.total_value for node in route_nodes)
@@ -940,7 +952,10 @@ class Tree:
 
         :param node_id: The id of the terminal (winning) node.
         :return: Dict with route_score, route_length, and per-step details.
+        :raises ValueError: if ``node_id`` is not a node of this tree.
         """
+        if node_id not in self.nodes:
+            raise ValueError(_not_a_node(node_id))
         route_ids = route_node_ids(self.parents, node_id)
         steps = []
         for route_node_id in route_ids[1:]:

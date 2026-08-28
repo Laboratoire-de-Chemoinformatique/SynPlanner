@@ -9,6 +9,7 @@ from chython import smiles as read_smiles
 
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction.reactor import Reaction
+from synplan.chem.reaction.routes.io import read_routes_json, write_routes_json
 from synplan.chem.reaction.routes.io.json import molecule_key
 from synplan.chem.reaction.routes.representation.container import RouteCGRContainer
 from synplan.chem.reaction.routes.route import MoleculePosition, Route, Step
@@ -381,6 +382,52 @@ def test_a_pickled_route_does_not_carry_the_catalogue():
     tree.building_blocks = frozenset(f"C{'C' * n}O" for n in range(20_000))
 
     assert len(pickle.dumps(Route.from_tree(tree, 3))) < 100_000
+
+
+# --------------------------------------------------------------------------- #
+# the routes file, in routes and out
+# --------------------------------------------------------------------------- #
+
+
+def test_routes_write_themselves_and_read_back(tmp_path, solved_route, unsolved_route):
+    """No dict of dicts on either side of the file."""
+
+    path = tmp_path / "routes.json"
+    result = write_routes_json([solved_route, unsolved_route], path)
+    assert result.diagnostics == ()
+
+    back = read_routes_json(path, as_routes=True)
+    assert [route.solved for route in back] == [True, False]
+    for one, other in zip((solved_route, unsolved_route), back):
+        assert [str(step.reaction) for step in other] == [
+            str(step.reaction) for step in one
+        ]
+        assert other.unresolved == one.unresolved
+        assert other.steps[0].origin == one.steps[0].origin
+
+
+def test_a_route_carries_its_own_origins(tmp_path, solved_route):
+    with pytest.raises(TypeError, match="already carries its step origins"):
+        write_routes_json([solved_route], tmp_path / "routes.json", tree=_StubTree())
+
+
+def test_the_reader_hands_back_one_shape(tmp_path, solved_route):
+    path = tmp_path / "routes.json"
+    write_routes_json([solved_route], path)
+
+    with pytest.raises(ValueError, match="one shape"):
+        read_routes_json(path, to_dict=True, as_routes=True)
+
+
+def test_a_routes_dict_keyed_by_position_says_what_it_wanted(tmp_path, solved_route):
+    """The keys of a routes_dict exported with a tree are its node ids."""
+
+    with pytest.raises(ValueError, match="not by its position"):
+        write_routes_json(
+            {0: solved_route.reactions_dict},
+            tmp_path / "routes.json",
+            tree=_StubTree(),
+        )
 
 
 # --------------------------------------------------------------------------- #

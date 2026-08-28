@@ -73,7 +73,12 @@ def molecule_key(mol) -> str:
 def _route_step_metadata_from_tree(
     tree: "Tree", route_id: int
 ) -> dict[int, dict[str, Any]]:
-    """Map route step ids from ``extract_reactions`` to tree rule metadata."""
+    """Map route step ids from ``extract_reactions`` to tree rule metadata.
+
+    :raises ValueError: from :meth:`~synplan.mcts.tree.Tree.route_details` if
+        ``route_id`` is not a node of ``tree``. The keys of an exported
+        ``routes_dict`` are tree node ids whenever a tree comes with it.
+    """
     details = tree.route_details(route_id)
     steps = details.get("steps", [])
     total_steps = len(steps)
@@ -294,11 +299,26 @@ def make_dict(routes_json):
     return routes_dict
 
 
-def read_routes_json(file_path="routes.json", to_dict=False):
+def read_routes_json(file_path="routes.json", to_dict=False, *, as_routes=False):
+    """Read a v1 routes file: raw trees, ``{route: {step: Reaction}}``, or routes.
+
+    :param to_dict: Hand back the legacy ``{route_id: {step_id: Reaction}}``.
+    :param as_routes: Hand back :class:`~synplan.chem.reaction.routes.route.Route`
+        objects -- the file's own steps and stock verdicts, with no search behind
+        them.
+    """
+    if to_dict and as_routes:
+        raise ValueError("read_routes_json returns one shape: to_dict or as_routes")
     with open(file_path) as file:
         routes_json = json.load(file)
     if to_dict:
         return make_dict(routes_json)
+    if as_routes:
+        # local: Route is built on this module, so it cannot be imported at the top
+        from synplan.chem.reaction.routes.route import Route
+
+        trees = routes_json.values() if isinstance(routes_json, dict) else routes_json
+        return [Route.from_json(route_tree) for route_tree in trees]
     return routes_json
 
 
@@ -502,21 +522,40 @@ def make_json(
 
 
 def write_routes_json(
-    routes_dict,
+    routes,
     file_path,
     tree: "Tree | None" = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
 ) -> RouteExportResult:
-    """Serialize v1 route trees and return export diagnostics."""
+    """Serialize v1 route trees and return export diagnostics.
 
-    result = build_route_trees(
-        routes_dict,
-        tree=tree,
-        route_metadata=route_metadata,
-        strict=strict,
-    )
+    :param routes: An iterable of :class:`~synplan.chem.reaction.routes.route.Route`
+        -- each writes itself, and the file keys them by position -- or the
+        legacy ``{route_id: {step_id: Reaction}}`` mapping, whose keys are tree
+        node ids when ``tree`` is given.
+    :param tree: The search behind a *mapping* of routes, for per-step rule
+        metadata. A ``Route`` already carries its own.
+    """
+
+    if isinstance(routes, dict):
+        result = build_route_trees(
+            routes,
+            tree=tree,
+            route_metadata=route_metadata,
+            strict=strict,
+        )
+    else:
+        if tree is not None or route_metadata is not None:
+            raise TypeError(
+                "tree= and route_metadata= describe the {route_id: {step_id: "
+                "Reaction}} form; a Route already carries its step origins"
+            )
+        result = RouteExportResult(
+            routes={index: route.to_json() for index, route in enumerate(routes)},
+            diagnostics=(),
+        )
     with open(file_path, "w") as f:
         json.dump(result.routes, f, indent=2)
     return result
