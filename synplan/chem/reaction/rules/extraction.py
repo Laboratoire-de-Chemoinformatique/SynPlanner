@@ -25,6 +25,7 @@ from synplan.chem.reaction.curation.reaction_result import (
 )
 from synplan.chem.reaction.curation.standardizing import RemoveReagentsStandardizer
 from synplan.chem.reaction.rules.config import RuleExtractionConfig
+from synplan.chem.reaction.rules.symmetry import needs_decollapsed_matches
 from synplan.chem.utils import (
     canonical_query_cgr_key,
     reverse_reaction,
@@ -451,7 +452,10 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
         if cost > _ISOMORPHISM_COST_SKIP_THRESHOLD:
             return False
     reactor = CanonicalRetroReactor(
-        patterns=patterns, products=products, delete_atoms=False
+        patterns=patterns,
+        products=products,
+        delete_atoms=False,
+        automorphism_filter=not needs_decollapsed_matches(rule),
     )
     try:
         for result_reaction in reactor(*reaction.reactants):  # unpack here

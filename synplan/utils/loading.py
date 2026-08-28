@@ -13,6 +13,8 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Union
 
 import yaml
+from chython import smarts as smarts_parser
+from chython.containers import ReactionContainer
 from chython.files.SDFrw import SDFRead
 from chython.reactor.reactor import Reactor
 from huggingface_hub import hf_hub_download, snapshot_download
@@ -20,6 +22,7 @@ from tqdm.auto import tqdm
 
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.config import ReactorConfig
+from synplan.chem.reaction.rules.symmetry import needs_decollapsed_matches
 from synplan.chem.utils import (
     AtomMappingCheck,
     reaction_string_mapping_status,
@@ -258,6 +261,7 @@ def load_reaction_rules(
     reactor_config: ReactorConfig | None = None,
     *,
     check_atom_mapping: "AtomMappingCheck" = "reject_unmapped",
+    decollapse_symmetric_matches: bool = True,
 ) -> tuple[CanonicalRetroReactor, ...]:
     """Loads the reaction rules from a TSV or pickle file and converts them into a
     tuple of Reactor objects.
@@ -277,10 +281,14 @@ def load_reaction_rules(
     :param reactor_config: Optional ReactorConfig to control Reactor construction
         (e.g. automorphism_filter, delete_atoms). If None, uses defaults.
     :param check_atom_mapping: atom-mapping inspection mode applied to each
-        SMARTS row before ``Reactor.from_smarts``. ``"reject_unmapped"`` (the
+        SMARTS row before constructing a reactor. ``"reject_unmapped"`` (the
         default) rejects fully unmapped rules and allows partials (legitimate
         leaving/incoming groups). Only honoured for the TSV path; pickled
         rules are pre-compiled Reactor objects that can't be string-checked.
+    :param decollapse_symmetric_matches: when True, detect reaction rules where
+        a non-identity left-hand-side automorphism changes the right-hand-side
+        product rule patch, and disable chython's automorphism filter only for
+        those reactors.
     :return: A tuple of reaction rules as Reactor objects.
     """
     ext = Path(file).suffix.lower()
@@ -289,7 +297,10 @@ def load_reaction_rules(
 
     if ext == ".tsv":
         return _load_rules_tsv(
-            file, reactor_kwargs, check_atom_mapping=check_atom_mapping
+            file,
+            reactor_kwargs,
+            check_atom_mapping=check_atom_mapping,
+            decollapse_symmetric_matches=decollapse_symmetric_matches,
         )
 
     # Legacy pickle path — cannot string-check pre-compiled Reactors.
@@ -301,6 +312,7 @@ def _load_rules_tsv(
     reactor_kwargs: dict | None = None,
     *,
     check_atom_mapping: "AtomMappingCheck" = "reject_unmapped",
+    decollapse_symmetric_matches: bool = True,
 ) -> tuple[CanonicalRetroReactor, ...]:
     """Load reaction rules from a TSV file."""
     if reactor_kwargs is None:
@@ -327,8 +339,25 @@ def _load_rules_tsv(
                         "  set check_atom_mapping='off' to load it anyway."
                     )
             try:
+                reaction_rule = smarts_parser(smarts_str)
+                if not isinstance(reaction_rule, ReactionContainer):
+                    raise ValueError("SMARTS did not parse as ReactionContainer")
+                if reaction_rule.reagents:
+                    raise ValueError("reaction SMARTS with reagents are not supported")
+
+                rule_kwargs = dict(reactor_kwargs)
+                if decollapse_symmetric_matches and needs_decollapsed_matches(
+                    reaction_rule
+                ):
+                    # Chython collapses equivalent target-atom matches. Disable
+                    # it when LHS symmetry changes the RHS rule patch.
+                    rule_kwargs["automorphism_filter"] = False
                 reactors.append(
-                    CanonicalRetroReactor.from_smarts(smarts_str, **reactor_kwargs)
+                    CanonicalRetroReactor(
+                        patterns=tuple(reaction_rule.reactants),
+                        products=tuple(reaction_rule.products),
+                        **rule_kwargs,
+                    )
                 )
             except Exception as err:
                 raise ValueError(
