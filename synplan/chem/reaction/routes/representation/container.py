@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from chython.containers import CGRContainer
 
 
@@ -43,3 +45,15 @@ def enable_route_cgr_container(cgr: CGRContainer) -> RouteCGRContainer:
 
     cgr.__class__ = RouteCGRContainer
     return cgr
+
+
+def unwrap_cgr(value):
+    """The CGR inside a composition result, or ``value`` if it is one already."""
+
+    if isinstance(value, Mapping) and "cgr" in value:
+        return value["cgr"]
+    cgr = getattr(value, "cgr", _MISSING)
+    return value if cgr is _MISSING else cgr
+
+
+_MISSING = object()

@@ -89,18 +89,11 @@ def extract_strat_bonds(target_cgr: CGRContainer):
         list: A sorted list of tuples, where each tuple represents a strategic
               bond by the sorted integer indices of the two atoms involved in the bond.
     """
-    result = []
-    seen = set()
-    for atom1, bond_set in target_cgr._bonds.items():
-        for atom2, bond in bond_set.items():
-            if atom1 >= atom2:
-                continue
-            if bond.order is None and bond.p_order is not None:
-                bond_key = tuple(sorted((atom1, atom2)))
-                if bond_key not in seen:
-                    seen.add(bond_key)
-                    result.append(bond_key)
-    return sorted(result)
+    return sorted(
+        tuple(sorted((atom1, atom2)))
+        for atom1, atom2, bond in target_cgr.bonds()
+        if bond.order is None and bond.p_order is not None
+    )
 
 
 def cluster_routes(sb_cgrs: dict, use_strat=False):

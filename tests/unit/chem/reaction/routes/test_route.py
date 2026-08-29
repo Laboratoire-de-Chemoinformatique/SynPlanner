@@ -10,10 +10,9 @@ from chython import smiles as read_smiles
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction.reactor import Reaction
 from synplan.chem.reaction.routes.io import read_routes_json, write_routes_json
-from synplan.chem.reaction.routes.io.json import molecule_key
 from synplan.chem.reaction.routes.representation.container import RouteCGRContainer
 from synplan.chem.reaction.routes.route import MoleculePosition, Route, Step
-from synplan.chem.utils import safe_canonicalization
+from synplan.chem.utils import molecule_key, safe_canonicalization
 from synplan.mcts.node import Node
 from synplan.mcts.tree import Tree
 from synplan.utils.routedraw import ROLE_STYLE
@@ -32,9 +31,13 @@ _ROUTES_JSON = Path(__file__).resolve().parents[4] / "data" / "routes_mol_1.json
 class _StubTree:
     """Route state only; the Tree methods under test are bound from the real class."""
 
+    route_node_ids = Tree.route_node_ids
+    route_steps = Tree.route_steps
+    route_to_node = Tree.route_to_node
     synthesis_route = Tree.synthesis_route
     route_score = Tree.route_score
     route_details = Tree.route_details
+    step_metadata = Tree.step_metadata
     routes = Tree.routes
 
     def __init__(self, solved: bool = True):

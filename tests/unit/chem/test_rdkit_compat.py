@@ -11,6 +11,7 @@ from synplan.chem.rdkit_compat import (
     route_to_rdkit,
     target_from_rdkit,
 )
+from synplan.mcts.tree import Tree
 
 # ---------------------------------------------------------------------------
 # target_from_rdkit
@@ -113,10 +114,17 @@ class _MockConfig:
 class _MockTree:
     """Minimal mock of Tree for testing route export.
 
+    The route walks are bound from the real class: a mock that walked its own
+    parents would stop testing that they agree.
+
     Builds a 2-step route:
         aspirin (node 1) → [salicylic acid, acetic anhydride] (node 2)
         salicylic acid (node 2) → [phenol, CO2] (node 3)
     """
+
+    route_node_ids = Tree.route_node_ids
+    route_steps = Tree.route_steps
+    route_to_node = Tree.route_to_node
 
     def __init__(self):
         from synplan.chem.precursor import Precursor
@@ -173,14 +181,6 @@ class _MockTree:
         self.parents = {1: 0, 2: 1, 3: 2}
         self.children = {1: {2}, 2: {3}, 3: set()}
         self.winning_nodes = [3]
-
-    def route_to_node(self, node_id):
-        path = []
-        nid = node_id
-        while nid:
-            path.append(nid)
-            nid = self.parents[nid]
-        return [self.nodes[nid] for nid in reversed(path)]
 
 
 class TestRouteToRdkit:

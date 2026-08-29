@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from itertools import permutations, product
 from typing import Any
 
-from synplan.chem.reaction.routes.representation.state import bond_key
+from synplan.chem.reaction.routes.representation.state import bond_key, metadata_set
 
 HASH_SCHEMA = "route-cgr-exact-v2"
 BUCKET_HASH_SCHEMA = "route-cgr-wl-bucket-v2"
@@ -108,16 +108,8 @@ def _stable_digest(value: Any) -> str:
     return hashlib.sha256(_json_label(value).encode()).hexdigest()
 
 
-def _sort_key(value: Any) -> str:
-    return _json_label(value)
-
-
 def _route_orders(value: Any) -> list[Any]:
-    if value is None:
-        return []
-    if isinstance(value, (set, frozenset, list, tuple)):
-        return sorted(value, key=_sort_key)
-    return [value]
+    return sorted(metadata_set(value), key=_json_label)
 
 
 def _atom_state(route_cgr: Any, state_name: str, atom_id: int, fallback: Any) -> Any:
@@ -214,7 +206,7 @@ def route_cgr_graph(
         node_labels=node_labels,
         edge_labels=edge_labels,
         adjacency={
-            atom_id: tuple(sorted(neighbors, key=_sort_key))
+            atom_id: tuple(sorted(neighbors, key=_json_label))
             for atom_id, neighbors in adjacency.items()
         },
     )
@@ -224,7 +216,7 @@ def _route_cgr_components(route_cgr: Any) -> tuple[tuple[int, ...], ...]:
     return tuple(
         sorted(
             (tuple(sorted(component)) for component in route_cgr.connected_components),
-            key=_sort_key,
+            key=_json_label,
         )
     )
 
@@ -273,7 +265,7 @@ def _wl_refinement(
                                 atom_id, ()
                             )
                         ],
-                        key=_sort_key,
+                        key=_json_label,
                     ),
                 ]
             )
@@ -308,7 +300,7 @@ def _component_signatures(
             }
         )
 
-    return sorted(signatures, key=_sort_key)
+    return sorted(signatures, key=_json_label)
 
 
 def _route_cgr_bucket_fingerprint_from_prepared(
@@ -398,7 +390,7 @@ def _component_canonical_encoding(
 
     color_groups = [
         tuple(sorted(groups_by_color[color]))
-        for color in sorted(groups_by_color, key=_sort_key)
+        for color in sorted(groups_by_color, key=_json_label)
     ]
     best_key = None
 
@@ -424,7 +416,7 @@ def _route_cgr_fingerprint_from_prepared(
     return {
         "schema": schema,
         "algorithm": "exact-wl-colored-canonical-adjacency-v1",
-        "components": sorted(component_encodings, key=_sort_key),
+        "components": sorted(component_encodings, key=_json_label),
     }
 
 
@@ -543,50 +535,44 @@ class _RouteCGRHashCache:
             )
         return self._numbered_hash_by_object_id[object_id]
 
-    def bucket(self, route_cgr: Any) -> _RouteCGRBucketResult:
+    def _memoised(self, route_cgr, by_object, by_numbering, compute):
+        """One digest per CGR: by object while it lives, by numbering across copies.
+
+        Two RouteCGRs that number their atoms the same way hash the same, so the
+        numbered hash is what the digests are really keyed by; the ``id()`` layer
+        only saves recomputing that key for a CGR already seen.
+        """
+
         object_id = id(route_cgr)
         numbered_hash = self._numbered_hash(route_cgr)
-        if object_id in self._bucket_by_object_id:
-            return _RouteCGRBucketResult(
-                bucket_hash=self._bucket_by_object_id[object_id],
-                numbered_hash=numbered_hash,
-            )
+        if object_id not in by_object:
+            if numbered_hash not in by_numbering:
+                by_numbering[numbered_hash] = compute(self._prepared(route_cgr))
+            by_object[object_id] = by_numbering[numbered_hash]
+        return by_object[object_id], numbered_hash
 
-        if numbered_hash in self._bucket_by_numbered_hash:
-            bucket_hash = self._bucket_by_numbered_hash[numbered_hash]
-        else:
-            prepared = self._prepared(route_cgr)
-            bucket_hash = _route_cgr_bucket_hash_from_prepared(
-                prepared,
-                schema=self.bucket_hash_schema,
-            )
-            self._bucket_by_numbered_hash[numbered_hash] = bucket_hash
-
-        self._bucket_by_object_id[object_id] = bucket_hash
+    def bucket(self, route_cgr: Any) -> _RouteCGRBucketResult:
+        bucket_hash, numbered_hash = self._memoised(
+            route_cgr,
+            self._bucket_by_object_id,
+            self._bucket_by_numbered_hash,
+            lambda prepared: _route_cgr_bucket_hash_from_prepared(
+                prepared, schema=self.bucket_hash_schema
+            ),
+        )
         return _RouteCGRBucketResult(
-            bucket_hash=bucket_hash,
-            numbered_hash=numbered_hash,
+            bucket_hash=bucket_hash, numbered_hash=numbered_hash
         )
 
     def exact_hash(self, route_cgr: Any) -> str:
-        object_id = id(route_cgr)
-        if object_id in self._exact_by_object_id:
-            return self._exact_by_object_id[object_id]
-
-        numbered_hash = self._numbered_hash(route_cgr)
-        if numbered_hash in self._exact_by_numbered_hash:
-            exact_hash = self._exact_by_numbered_hash[numbered_hash]
-        else:
-            prepared = self._prepared(route_cgr)
-            exact_hash = _stable_digest(
-                _route_cgr_fingerprint_from_prepared(
-                    prepared,
-                    schema=self.hash_schema,
-                )
-            )
-            self._exact_by_numbered_hash[numbered_hash] = exact_hash
-
-        self._exact_by_object_id[object_id] = exact_hash
+        exact_hash, _ = self._memoised(
+            route_cgr,
+            self._exact_by_object_id,
+            self._exact_by_numbered_hash,
+            lambda prepared: _stable_digest(
+                _route_cgr_fingerprint_from_prepared(prepared, schema=self.hash_schema)
+            ),
+        )
         return exact_hash
 
     def hashes(self, route_cgr: Any) -> _RouteCGRHashResult:

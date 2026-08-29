@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 from chython import smiles as read_smiles
 
 from synplan.chem.precursor import Precursor
-from synplan.chem.reaction.routes.io.json import molecule_key
+from synplan.chem.utils import in_atom_order, molecule_key
 from synplan.mcts.node import Node
 from synplan.mcts.tree import Tree
 
@@ -60,9 +60,12 @@ class SearchRecord:
 
     # The Tree readouts that touch nodes and parents only, bound from the real
     # class: a record has to answer them exactly as the search did.
+    route_node_ids = Tree.route_node_ids
+    route_steps = Tree.route_steps
     route_to_node = Tree.route_to_node
     route_score = Tree.route_score
     route_details = Tree.route_details
+    step_metadata = Tree.step_metadata
     synthesis_route = Tree.synthesis_route
     winning_rule_ranks = Tree.winning_rule_ranks
     routes = Tree.routes
@@ -84,21 +87,43 @@ def _open(file_path: str | PathLike[str], mode: str):
     return opener(file_path, mode, encoding="utf-8")
 
 
-def write_search_record(tree: Tree, file_path: str | PathLike[str]) -> Path:
-    """Write ``tree`` as a search record, gzipped when the path ends in ``.gz``.
+def _counters(tree: Tree | SearchRecord) -> dict:
+    """The statistics the node graph cannot recompute, from a search or a record."""
+
+    if isinstance(tree, SearchRecord):
+        return tree.stats
+    return {
+        # winning_rule_ranks is a third of the file and every number in it is on
+        # the nodes, so it is recomputed rather than stored
+        **tree.to_stats_dict(),
+        "branching_profile": tree.branching_profile(),
+        "routes_found_at": tree.stats.routes_found_at,
+    }
+
+
+def write_search_record(
+    tree: Tree | SearchRecord, file_path: str | PathLike[str]
+) -> Path:
+    """Write a search as a record, gzipped when the path ends in ``.gz``.
 
     The routes are not written: a route is a path through the node graph, so
     :meth:`SearchRecord.routes` rebuilds them from the nodes rather than the
     file carrying a second copy of them. Node values are written unrounded, so
     the record scores a route with the number the search scored it with.
 
+    Molecules are written mapped. Atom numbers are what say which reactant atom
+    became which product atom, and a route that lost them would write reactions
+    whose reactants collide on the same numbers into the public v1 file.
+
+    :param tree: A finished :class:`~synplan.mcts.tree.Tree`, or a
+        :class:`SearchRecord` read back from a file.
     :return: The path written.
     """
 
     molecules: dict[str, int] = {}
 
     def index(precursor: Precursor) -> int:
-        key = molecule_key(precursor.molecule)
+        key = format(in_atom_order(precursor.molecule), "m")
         return molecules.setdefault(key, len(molecules))
 
     nodes = [
@@ -126,13 +151,7 @@ def write_search_record(tree: Tree, file_path: str | PathLike[str]) -> Path:
         "molecules": list(molecules),
         "nodes": nodes,
         "winning": list(tree.winning_nodes),
-        "stats": {
-            # only what the node graph cannot recompute: winning_rule_ranks is
-            # a third of the file and every number in it is on the nodes
-            **tree.to_stats_dict(),
-            "branching_profile": tree.branching_profile(),
-            "routes_found_at": tree.stats.routes_found_at,
-        },
+        "stats": _counters(tree),
     }
     with _open(file_path, "wt") as file:
         json.dump(record, file)

@@ -4,7 +4,6 @@ from chython.containers import CGRContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
 
 from synplan.chem.reaction.routes.representation.state import (
-    bond_key,
     remove_transient_bonds,
 )
 
@@ -39,33 +38,21 @@ def compose_sb_cgr(route_cgr: CGRContainer):
     target_product = min(reaction.products, key=lambda mol: min(mol._atoms))
     target_atom_nums = set(target_product._atoms)
 
-    # Iterate over each bond in the target RouteCGR.
-    checked_bonds = set()
-    bond_items = list(target_cgr._bonds.items())
-    for atom1, bond_set in bond_items:
-        bond_set_items = list(bond_set.items())
-        for atom2, bond in bond_set_items:
-            current_bond_key = bond_key(atom1, atom2)
-            if current_bond_key in checked_bonds:
-                continue
-            checked_bonds.add(current_bond_key)
-
-            # Removing bonds corresponding to leaving groups:
-            # If product bond order is None (indicating a leaving group) but an original bond order exists,
-            # delete the bond.
-            if bond.p_order is None and bond.order is not None:
-                target_cgr.delete_bond(atom1, atom2)
-
-            # For bonds that have been modified (not leaving groups) where the new (primary) order is less than the original:
-            # Remove the bond and re-add it using the DynamicBond with the primary order for both bond orders.
-            elif (
-                type(bond.p_order) is int
-                and type(bond.order) is int
-                and bond.p_order != bond.order
-            ):
-                p_order = int(bond.p_order)
-                target_cgr.delete_bond(atom1, atom2)
-                target_cgr.add_bond(atom1, atom2, DynamicBond(p_order, p_order))
+    # a snapshot, because the loop rewrites the bonds it walks; chython yields
+    # each edge once, so there is nothing to deduplicate
+    for atom1, atom2, bond in list(target_cgr.bonds()):
+        # a leaving group: the bond existed and does not survive
+        if bond.p_order is None and bond.order is not None:
+            target_cgr.delete_bond(atom1, atom2)
+        # changed but kept: freeze it at the order it ends up with
+        elif (
+            type(bond.p_order) is int
+            and type(bond.order) is int
+            and bond.p_order != bond.order
+        ):
+            p_order = int(bond.p_order)
+            target_cgr.delete_bond(atom1, atom2)
+            target_cgr.add_bond(atom1, atom2, DynamicBond(p_order, p_order))
 
     # After modifying bonds, extract the target atom substructure.  Selecting
     # connected_components[0] here is order-dependent and can return a detached

@@ -18,7 +18,6 @@ from synplan.chem.reaction.routes.representation.depiction import (
     depict_custom_reaction,
 )
 from synplan.chem.reaction.routes.route import Route, Step
-from synplan.chem.reaction.routes.traversal import iter_route_steps, route_node_ids
 from synplan.chem.reaction.rules.priority import POLICY_SOURCE_NAME
 from synplan.utils.frames import depict_value
 from synplan.utils.routedraw import (
@@ -107,7 +106,7 @@ def extract_routes(
             # Create graph for route
             graph = {}
 
-            for before_node, after_node in iter_route_steps(tree, winning_node):
+            for before_node, after_node in tree.route_steps(winning_node):
                 before = before_node.curr_precursor.molecule
                 graph[before] = {
                     "children": [
@@ -172,7 +171,7 @@ def route_rule_labels(tree: Tree, node_id: int) -> dict[int, str]:
     id, so a step finds its label whatever order the route is read in.
     """
     labels = {}
-    for route_node_id in route_node_ids(tree.parents, node_id)[1:]:
+    for route_node_id in tree.route_node_ids(node_id)[1:]:
         rule = _priority_rule(tree, tree.nodes[route_node_id])
         name = getattr(rule, "rule_name", None)
         labels[route_node_id] = f"{rule.rule_id} — {name}" if name else ""

@@ -11,14 +11,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
 
-from synplan.chem.reaction.routes.io.json import (
-    _route_step_metadata_from_tree,
-    molecule_key,
-    read_route_tree,
-)
+from synplan.chem.reaction.routes.io.json import read_route_tree, route_tree
 from synplan.chem.reaction.routes.io.metadata import reaction_metadata
 from synplan.chem.reaction.routes.representation.route_cgr import build_route_cgr
-from synplan.chem.reaction.routes.traversal import linearise, root_step
+from synplan.chem.reaction.routes.traversal import (
+    linearise,
+    root_step,
+    steps_by_product,
+)
+from synplan.chem.utils import mapped_smiles, molecule_key
 from synplan.utils.routedraw import ARROW_DEFS, ROUTE_CSS, Layouts, draw_route
 
 if TYPE_CHECKING:
@@ -127,7 +128,7 @@ def _composition_error(result: RouteCGRBuildResult) -> ValueError:
 def _leaves(steps: Sequence[Step]) -> tuple[MoleculeContainer, ...]:
     """Every reactant no step produces, in step order."""
 
-    made = {id(step.product) for step in steps}
+    made = steps_by_product(steps)
     out, seen = [], set()
     for step in steps:
         for mol in step.reaction.reactants:
@@ -192,7 +193,7 @@ class Route:
 
         if node_id not in tree.nodes:
             raise KeyError(node_id)
-        metadata = _route_step_metadata_from_tree(tree, node_id)
+        metadata = tree.step_metadata(node_id)
         steps = tuple(
             # one product per step by construction: the precursor being expanded
             Step(reaction, reaction.products[0], _origin(metadata.get(index, {})))
@@ -376,38 +377,32 @@ class Route:
                 raise _composition_error(result)
             reactions = dict(result.reactions_dict)
 
-        made = {id(step.product): index for index, step in enumerate(self.steps)}
+        made = steps_by_product(self.steps)
         stock = frozenset(molecule_key(leaf) for leaf in self.leaves())
         stock -= self.unresolved
 
-        def mol_node(mol: MoleculeContainer) -> RouteNode:
-            key = molecule_key(mol)
-            node: RouteNode = {"type": "mol", "smiles": key}
+        def source_of(mol: MoleculeContainer, consumer: int | None):
+            """Which step makes ``mol`` -- read off identity, never re-derived."""
             index = made.get(id(mol))
-            if index is not None:
-                node["children"] = [reaction_node(index)]
-            node["in_stock"] = key in stock
-            return node
+            return None if index is None else (index, self.steps[index].reaction, mol)
 
-        def reaction_node(index: int) -> RouteNode:
+        def step_fields(index: int) -> tuple[str, dict[str, Any]]:
             step = self.steps[index]
-            node: RouteNode = {
-                "type": "reaction",
-                "smiles": format(reactions[index], "m"),
-                "children": [mol_node(mol) for mol in step.reaction.reactants],
-            }
+            extra: dict[str, Any] = {}
             metadata = reaction_metadata(step.reaction)
             if metadata:
-                node["meta"] = metadata
+                extra["meta"] = metadata
             if step.origin is not None:
-                node["tree_node_id"] = step.origin.tree_node_id
-                node["rule_id"] = step.origin.rule_id
-                node["rule_source"] = step.origin.rule_source
-                node["rule_key"] = step.origin.rule_key
-            node["step_id"] = index
-            return node
+                extra["tree_node_id"] = step.origin.tree_node_id
+                extra["rule_id"] = step.origin.rule_id
+                extra["rule_source"] = step.origin.rule_source
+                extra["rule_key"] = step.origin.rule_key
+            extra["step_id"] = index
+            return mapped_smiles(reactions[index]), extra
 
-        return mol_node(self.target)
+        return route_tree(
+            self.target, source_of, lambda mol, key, leaf: key in stock, step_fields
+        )
 
     # ------------------------------------------------------------------
     # representation

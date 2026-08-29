@@ -13,8 +13,8 @@ import pytest
 from chython import smiles as read_smiles
 
 from synplan.chem.reaction.reactor import Reaction
-from synplan.chem.reaction.routes.io.json import molecule_key
 from synplan.chem.reaction.routes.route import Route, RouteProvenance, Step, StepOrigin
+from synplan.chem.utils import molecule_key
 from synplan.utils.routedraw import ROLE_STYLE
 from synplan.utils.visualisation import routes_report_html
 

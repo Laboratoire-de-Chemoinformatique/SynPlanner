@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 
+from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction.routes.contracts import (
     RouteCGRBuildResult,
     RouteDiagnostic,
@@ -12,9 +13,9 @@ from synplan.chem.reaction.routes.representation.container import (
 )
 from synplan.chem.reaction.routes.representation.state import (
     RouteDynamicBond,
-    _set_symmetric_bond,
     bond_key,
     route_atom,
+    set_symmetric_bond,
     transient_bond,
 )
 
@@ -175,7 +176,7 @@ def _apply_route_orders(
                 route_order,
                 route_step_orders,
             )
-            _set_symmetric_bond(cgr, atom1, atom2, bond)
+            set_symmetric_bond(cgr, atom1, atom2, bond)
         bond.route_bond_step_states = dict(bond_step_states.get(key, {}))
 
     for atom_num in sorted(
@@ -317,10 +318,7 @@ def process_first_reaction(first_react: ReactionContainer, tree: "Tree", route_i
         react_key = tuple(curr_mol._atoms)
         react_key_set = set(react_key)
 
-        if (
-            len(curr_mol) <= tree.config.min_mol_size
-            or str(curr_mol) in tree.building_blocks
-        ):
+        if is_purchasable(curr_mol, tree.building_blocks, tree.config.min_mol_size):
             bb_set = bb_set.union(react_key_set)
 
         if validate_molecule_components(curr_mol, route_id) == 0:
@@ -376,10 +374,7 @@ def update_reaction_dict(
         if validate_molecule_components(curr_mol, route_id) == 0:
             return dict(), set()
 
-        if (
-            len(curr_mol) <= tree.config.min_mol_size
-            or str(curr_mol) in tree.building_blocks
-        ):
+        if is_purchasable(curr_mol, tree.building_blocks, tree.config.min_mol_size):
             bb_set = bb_set.union(react_key_set)
 
         # Filter the mapping to include only keys present in the current react_key
@@ -473,6 +468,75 @@ def _compose_cgrs(
     return composed_cgr
 
 
+class _Fold:
+    """The label bookkeeping a route CGR fold carries, and the CGR it builds up.
+
+    Both folds -- from a tree and from a bare ``{step: reaction}`` dict -- start,
+    label and finish identically; only what happens to a step in between differs.
+    """
+
+    def __init__(self, reactions, return_reactions_dict: bool):
+        self.cgrs = [reaction.compose() for reaction in reactions]
+        # Depth is kept for route interpretation; step order preserves exact
+        # chronological route identity for hashing.
+        self.route_orders = _route_order_depths(reactions)
+        self.step_orders = list(range(1, len(reactions) + 1))
+        self.bond_route_orders = {}
+        self.atom_route_orders = {}
+        self.bond_step_orders = {}
+        self.atom_step_orders = {}
+        self.atom_states = {}
+        self.bond_states = {}
+        self.accum = self.cgrs[-1]
+        self.max_num = _next_atom_number(*self.cgrs)
+        self.reactions_dict = (
+            {len(reactions) - 1: ReactionContainer.from_cgr(self.cgrs[-1])}
+            if return_reactions_dict
+            else None
+        )
+        self.label(len(reactions) - 1, self.cgrs[-1])
+
+    def label(self, step: int, cgr) -> None:
+        """Record one step's deconvolution labels and route orders."""
+
+        _record_deconvolution_labels(
+            cgr, self.step_orders[step], self.atom_states, self.bond_states
+        )
+        _record_route_orders(
+            cgr,
+            self.route_orders[step],
+            self.step_orders[step],
+            self.bond_route_orders,
+            self.atom_route_orders,
+            self.bond_step_orders,
+            self.atom_step_orders,
+        )
+
+    def keep(self, step: int, cgr) -> None:
+        """Hold the step's reaction, when the caller asked for them."""
+
+        if self.reactions_dict is not None:
+            self.reactions_dict[step] = ReactionContainer.from_cgr(cgr)
+
+    def finish(self, preserve_transient_bonds: bool) -> dict:
+        """Stamp the accumulated labels onto the composed CGR and hand it over."""
+
+        _apply_route_orders(
+            self.accum,
+            self.bond_route_orders,
+            self.atom_route_orders,
+            self.bond_step_orders,
+            self.atom_step_orders,
+            self.atom_states,
+            self.bond_states,
+            preserve_transient_bonds,
+        )
+        result = {"cgr": enable_route_cgr_container(self.accum)}
+        if self.reactions_dict is not None:
+            result["reactions_dict"] = self.reactions_dict
+        return result
+
+
 def _compose_route_cgr_legacy(
     tree_or_routes,
     route_id,
@@ -556,131 +620,31 @@ def _compose_route_cgr_legacy(
             raise KeyError(f"Route {route_id} not in provided dict.")
         # grab and sort the ReactionContainers in chronological order
         step_map = routes_dict[route_id]
-        sorted_ids = sorted(step_map)
-        reactions = [step_map[i] for i in sorted_ids]
-        cgrs = [rxn.compose() for rxn in reactions]
-        route_orders = _route_order_depths(reactions)
-        # Depth is kept for route interpretation; step order preserves exact
-        # chronological route identity for hashing.
-        route_step_orders = list(range(1, len(reactions) + 1))
-        bond_route_orders = {}
-        atom_route_orders = {}
-        bond_route_step_orders = {}
-        atom_route_step_orders = {}
-        atom_step_states = {}
-        bond_step_states = {}
-        _record_deconvolution_labels(
-            cgrs[-1],
-            route_step_orders[-1],
-            atom_step_states,
-            bond_step_states,
-        )
-        _record_route_orders(
-            cgrs[-1],
-            route_orders[-1],
-            route_step_orders[-1],
-            bond_route_orders,
-            atom_route_orders,
-            bond_route_step_orders,
-            atom_route_step_orders,
-        )
-
-        # start from the last (final) reaction
-        accum_cgr = cgrs[-1]
-        reactions_dict = (
-            {len(reactions) - 1: ReactionContainer.from_cgr(cgrs[-1])}
-            if return_reactions_dict
-            else None
-        )
-        max_num = _next_atom_number(*cgrs)
-        # now fold backwards through the earlier steps
+        reactions = [step_map[i] for i in sorted(step_map)]
+        fold = _Fold(reactions, return_reactions_dict)
+        # fold backwards through the earlier steps
         for idx in range(len(reactions) - 2, -1, -1):
-            curr_cgr = cgrs[idx]
-            curr_cgr, max_num, _ = remap_composition_conflicts(
-                curr_cgr, accum_cgr, max_num
+            curr_cgr, fold.max_num, _ = remap_composition_conflicts(
+                fold.cgrs[idx], fold.accum, fold.max_num
             )
-            _record_deconvolution_labels(
-                curr_cgr,
-                route_step_orders[idx],
-                atom_step_states,
-                bond_step_states,
-            )
-            _record_route_orders(
-                curr_cgr,
-                route_orders[idx],
-                route_step_orders[idx],
-                bond_route_orders,
-                atom_route_orders,
-                bond_route_step_orders,
-                atom_route_step_orders,
-            )
-            accum_cgr = _compose_cgrs(curr_cgr, accum_cgr, preserve_transient_bonds)
-            if return_reactions_dict:
-                reactions_dict[idx] = ReactionContainer.from_cgr(curr_cgr)
-
-        _apply_route_orders(
-            accum_cgr,
-            bond_route_orders,
-            atom_route_orders,
-            bond_route_step_orders,
-            atom_route_step_orders,
-            atom_step_states,
-            bond_step_states,
-            preserve_transient_bonds,
-        )
-        accum_cgr = enable_route_cgr_container(accum_cgr)
-        result = {"cgr": accum_cgr}
-        if return_reactions_dict:
-            result["reactions_dict"] = reactions_dict
-        return result
+            fold.label(idx, curr_cgr)
+            fold.accum = _compose_cgrs(curr_cgr, fold.accum, preserve_transient_bonds)
+            fold.keep(idx, curr_cgr)
+        return fold.finish(preserve_transient_bonds)
 
     # ----------- tree-based route ------------
     tree = tree_or_routes
     try:
         # original tree-based logic:
         reactions = tree.synthesis_route(route_id)
-        cgrs = [rxn.compose() for rxn in reactions]
-        route_orders = _route_order_depths(reactions)
-        # Depth is kept for route interpretation; step order preserves exact
-        # chronological route identity for hashing.
-        route_step_orders = list(range(1, len(reactions) + 1))
-        bond_route_orders = {}
-        atom_route_orders = {}
-        bond_route_step_orders = {}
-        atom_route_step_orders = {}
-        atom_step_states = {}
-        bond_step_states = {}
-        _record_deconvolution_labels(
-            cgrs[-1],
-            route_step_orders[-1],
-            atom_step_states,
-            bond_step_states,
-        )
-        _record_route_orders(
-            cgrs[-1],
-            route_orders[-1],
-            route_step_orders[-1],
-            bond_route_orders,
-            atom_route_orders,
-            bond_route_step_orders,
-            atom_route_step_orders,
-        )
-
-        first_react = reactions[-1]
-        reactions_dict = (
-            {len(reactions) - 1: ReactionContainer.from_cgr(cgrs[-1])}
-            if return_reactions_dict
-            else None
-        )
-
-        accum_cgr = cgrs[-1]
-        bb_set = process_first_reaction(first_react, tree, route_id)
+        fold = _Fold(reactions, return_reactions_dict)
+        accum_cgr = fold.accum
+        bb_set = process_first_reaction(reactions[-1], tree, route_id)
         react_dict = {}
-        max_num = _next_atom_number(*cgrs)
 
         for step in range(len(reactions) - 2, -1, -1):
             reaction = reactions[step]
-            curr_cgr = cgrs[step]
+            curr_cgr = fold.cgrs[step]
             curr_prod = reaction.products[0]
 
             accum_products = accum_cgr.decompose()[1].split()
@@ -704,8 +668,8 @@ def _compose_route_cgr_legacy(
             mapping = {}
             for atom_num in sorted(target_block):
                 if atom_num in accum_cgr._atoms and atom_num not in mapping:
-                    mapping[atom_num] = max_num
-                    max_num += 1
+                    mapping[atom_num] = fold.max_num
+                    fold.max_num += 1
 
             # carry forward any clean remap on the product itself
             dict_map = {}
@@ -734,45 +698,16 @@ def _compose_route_cgr_legacy(
             if mapping:
                 curr_cgr.remap(mapping, copy=False)
 
-            curr_cgr, max_num, conflict_mapping = remap_composition_conflicts(
-                curr_cgr, accum_cgr, max_num
+            curr_cgr, fold.max_num, conflict_mapping = remap_composition_conflicts(
+                curr_cgr, accum_cgr, fold.max_num
             )
             update_react_remaps_for_conflicts(react_dict, reaction, conflict_mapping)
-            _record_deconvolution_labels(
-                curr_cgr,
-                route_step_orders[step],
-                atom_step_states,
-                bond_step_states,
-            )
-            _record_route_orders(
-                curr_cgr,
-                route_orders[step],
-                route_step_orders[step],
-                bond_route_orders,
-                atom_route_orders,
-                bond_route_step_orders,
-                atom_route_step_orders,
-            )
-
-            if return_reactions_dict:
-                reactions_dict[step] = ReactionContainer.from_cgr(curr_cgr)
+            fold.label(step, curr_cgr)
+            fold.keep(step, curr_cgr)
             accum_cgr = _compose_cgrs(curr_cgr, accum_cgr, preserve_transient_bonds)
 
-        _apply_route_orders(
-            accum_cgr,
-            bond_route_orders,
-            atom_route_orders,
-            bond_route_step_orders,
-            atom_route_step_orders,
-            atom_step_states,
-            bond_step_states,
-            preserve_transient_bonds,
-        )
-        accum_cgr = enable_route_cgr_container(accum_cgr)
-        result = {"cgr": accum_cgr}
-        if return_reactions_dict:
-            result["reactions_dict"] = reactions_dict
-        return result
+        fold.accum = accum_cgr
+        return fold.finish(preserve_transient_bonds)
 
     except Exception as e:
         logger.warning("Error processing route %s: %s", route_id, e)
@@ -910,8 +845,7 @@ def _reactions_dict_from_tree(tree: "Tree", route_id) -> dict:
     consume per-step structure and ``format(rxn, "m")``, so the per-step-local
     numbering is sufficient and avoids the expensive route CGR composition.
     """
-    reactions = tree.synthesis_route(route_id)
-    return {step: reaction for step, reaction in enumerate(reactions)}
+    return dict(enumerate(tree.synthesis_route(route_id)))
 
 
 def extract_reactions(

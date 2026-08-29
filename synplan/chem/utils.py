@@ -214,6 +214,117 @@ class StereoDiscardedWarning(UserWarning):
     """
 
 
+def mol_from_smiles(
+    smiles: str,
+    standardize: bool = True,
+    clean_stereo: bool = True,
+    clean2d: bool = True,
+) -> MoleculeContainer:
+    """Converts a SMILES string to a `MoleculeContainer` object and optionally
+    standardizes, cleans stereochemistry, and cleans 2D coordinates.
+
+    :param smiles: The SMILES string representing the molecule.
+    :param standardize: Whether to standardize the molecule (default is True).
+    :param clean_stereo: Whether to remove the stereo marks on atoms of the molecule (default is True).
+    :param clean2d: Whether to clean the 2D coordinates of the molecule (default is True).
+    :return: The processed molecule object.
+    :raises ValueError: If the SMILES string could not be processed by chython.
+    """
+    molecule = smiles_parser(smiles, ignore=True)
+
+    if not isinstance(molecule, MoleculeContainer):
+        raise ValueError("SMILES string was not processed by chython")
+
+    cleaned = clean_molecule(
+        molecule,
+        standardize=standardize,
+        clean_stereo=clean_stereo,
+        clean2d=clean2d,
+    )
+    if cleaned is molecule:
+        logging.warning(
+            "chython was not able to standardize molecule due to invalid aromatic ring"
+        )
+    return cleaned
+
+
+def unite_molecules(molecules: Iterable[MoleculeContainer]) -> MoleculeContainer:
+    """Unites a list of MoleculeContainer objects into a single MoleculeContainer. This
+    function takes multiple molecules and combines them into one larger molecule. The
+    first molecule in the list is taken as the base, and subsequent molecules are united
+    with it sequentially.
+
+    :param molecules: A list of MoleculeContainer objects to be united.
+    :return: A single MoleculeContainer object representing the union of all input
+        molecules.
+    """
+    new_mol = MoleculeContainer()
+    for mol in molecules:
+        new_mol = new_mol.union(mol)
+    return new_mol
+
+
+def in_atom_order(molecule: MoleculeContainer) -> MoleculeContainer:
+    """A copy whose atoms and bonds are stored in numeric order.
+
+    chython spells a SMILES by walking those two dicts, so the same molecule
+    reached two ways -- out of the reactor, or parsed back from a file -- spells
+    itself the same way only once both are stored the same way. Without it a
+    file rewritten from what it wrote does not match it, and the difference is
+    a permutation of equivalent atoms that means nothing.
+    """
+    molecule = molecule.copy()
+    molecule._atoms = dict(sorted(molecule._atoms.items()))
+    molecule._bonds = {
+        atom: dict(sorted(bonds.items()))
+        for atom, bonds in sorted(molecule._bonds.items())
+    }
+    return molecule
+
+
+def normalise(molecule: MoleculeContainer) -> MoleculeContainer | None:
+    """The one form a route holds a molecule in, or ``None`` when chython cannot.
+
+    Aromaticity is re-perceived rather than trusted, because a file may come from
+    a tool whose model differs. Runs on a copy, so asking cannot rewrite the
+    caller's molecule. Atom order is redone too: it does not change the SMILES of
+    a molecule the reactor built, but it does for one rebuilt from a CGR, where
+    the atoms went in in whatever order the composition left them.
+    """
+    molecule = in_atom_order(molecule)
+    try:
+        molecule.kekule()
+        molecule.implicify_hydrogens()
+        molecule.thiele()
+    except InvalidAromaticRing:
+        return None
+    return molecule
+
+
+def molecule_key(molecule: MoleculeContainer) -> str:
+    """The one SMILES a route keys a molecule by, in stock and in the file alike.
+
+    A molecule chython cannot prepare keeps its own spelling: route export is
+    best-effort.
+    """
+    return str(normalise(molecule) or molecule)
+
+
+def mapped_smiles(reaction: ReactionContainer) -> str:
+    """The mapped SMILES a reaction node carries.
+
+    Written from molecules in atom order, so the file a route writes is the file
+    reading it back writes again -- otherwise every export permutes the atoms of
+    some symmetric group and the two files diff for no chemical reason.
+    """
+    ordered = ReactionContainer(
+        [in_atom_order(molecule) for molecule in reaction.reactants],
+        [in_atom_order(molecule) for molecule in reaction.products],
+        [in_atom_order(molecule) for molecule in reaction.reagents],
+    )
+    return format(ordered, "m")
+
+
 def _warn_stereo_loss(molecule: MoleculeContainer) -> None:
     """Warn once per call site when ``clean_stereo`` is about to discard real stereo marks.
 
@@ -237,14 +348,20 @@ def _warn_stereo_loss(molecule: MoleculeContainer) -> None:
     )
 
 
-def _clean_molecule(
+def clean_molecule(
     molecule: MoleculeContainer,
     *,
     standardize: bool = True,
     clean_stereo: bool = True,
     clean2d: bool = True,
 ) -> MoleculeContainer:
-    """Clean a Chython molecule on a copy while preserving failure semantics."""
+    """Clean a Chython molecule on a copy while preserving failure semantics.
+
+    Returns the molecule it was *given* when chython cannot prepare an aromatic
+    ring, so ``result is molecule`` is how a caller learns that nothing was
+    cleaned. :func:`safe_canonicalization` is this function with ``clean2d``
+    off -- measured identical on every molecule of a real search.
+    """
 
     tmp = molecule.copy()
     try:
@@ -258,76 +375,23 @@ def _clean_molecule(
             tmp.clean2d()
         return tmp
     except InvalidAromaticRing:
-        logging.warning(
-            "chython was not able to standardize molecule due to invalid aromatic ring"
-        )
         return molecule
-
-
-def mol_from_smiles(
-    smiles: str,
-    standardize: bool = True,
-    clean_stereo: bool = True,
-    clean2d: bool = True,
-) -> MoleculeContainer:
-    """Converts a SMILES string to a `MoleculeContainer` object and optionally
-    standardizes, cleans stereochemistry, and cleans 2D coordinates.
-
-    :param smiles: The SMILES string representing the molecule.
-    :param standardize: Whether to standardize the molecule (default is True).
-    :param clean_stereo: Whether to remove the stereo marks on atoms of the molecule (default is True).
-    :param clean2d: Whether to clean the 2D coordinates of the molecule (default is True).
-    :return: The processed molecule object.
-    :raises ValueError: If the SMILES string could not be processed by chython.
-    """
-    molecule = smiles_parser(smiles, ignore=True)
-
-    if not isinstance(molecule, MoleculeContainer):
-        raise ValueError("SMILES string was not processed by chython")
-
-    return _clean_molecule(
-        molecule,
-        standardize=standardize,
-        clean_stereo=clean_stereo,
-        clean2d=clean2d,
-    )
-
-
-def unite_molecules(molecules: Iterable[MoleculeContainer]) -> MoleculeContainer:
-    """Unites a list of MoleculeContainer objects into a single MoleculeContainer. This
-    function takes multiple molecules and combines them into one larger molecule. The
-    first molecule in the list is taken as the base, and subsequent molecules are united
-    with it sequentially.
-
-    :param molecules: A list of MoleculeContainer objects to be united.
-    :return: A single MoleculeContainer object representing the union of all input
-        molecules.
-    """
-    new_mol = MoleculeContainer()
-    for mol in molecules:
-        new_mol = new_mol.union(mol)
-    return new_mol
 
 
 def safe_canonicalization(molecule: MoleculeContainer) -> MoleculeContainer:
-    """Attempts to canonicalize a molecule, handling any exceptions. If the
-    canonicalization process fails due to an InvalidAromaticRing exception, it safely
-    returns the original molecule.
+    """The one spelling of a molecule: canonical, flat, without 2D coordinates.
+
+    The building-block catalogue is written with this, so it is also what a
+    lookup against the catalogue has to be written with.
 
     :param molecule: The given molecule to be canonicalized.
-    :return: The canonicalized molecule if successful, otherwise the original molecule.
+    :return: The canonicalized molecule, or the molecule itself when chython
+        cannot prepare its aromatic ring.
     """
+    # ponytail: sorts the caller's own molecule, not just the copy; callers may
+    # lean on that, so it stays until someone checks
     molecule._atoms = dict(sorted(molecule._atoms.items()))
-
-    molecule_copy = molecule.copy()
-    try:
-        molecule_copy.remove_coordinate_bonds(keep_to_terminal=False)
-        molecule_copy.canonicalize()
-        _warn_stereo_loss(molecule_copy)
-        molecule_copy.clean_stereo()
-        return molecule_copy
-    except InvalidAromaticRing:
-        return molecule
+    return clean_molecule(molecule, clean2d=False)
 
 
 def validate_and_canonicalize(

@@ -1,12 +1,12 @@
 from chython import smiles
 
-from synplan.chem.utils import _clean_molecule
+from synplan.chem.utils import clean_molecule
 
 
 def test_clean_molecule_returns_a_copy_when_no_cleanup_is_requested():
     molecule = smiles("CCO")
 
-    cleaned = _clean_molecule(
+    cleaned = clean_molecule(
         molecule,
         standardize=False,
         clean_stereo=False,
