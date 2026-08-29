@@ -153,6 +153,31 @@ judges on S(T) alone. Go lower level only to tune it — `ProtectionConfig`,
 `FunctionalGroupDetector`, `get_reaction_center_atoms`, `classify_reaction_type`.
 Tutorial: `08_Protection_Scoring`
 
+**Save a finished search and read it back**
+`write_search_record(tree, path)` / `read_search_record(path)`
+(`synplan.mcts.record`). One file: interned molecules, the node graph, the winning
+ids, the statistics. A `.gz` path compresses itself. It carries no routes — a
+route is a path through the graph, so `record.routes()` rebuilds them — and no
+building-block catalogue, which belongs to the run's configuration. The record
+answers the readouts a `Tree` does, but it cannot search.
+Tutorial: `05_Retrosynthetic_Planning` writes, `06_Tree_Analysis` reads
+
+**Remove duplicate routes**
+A reaction condenses into a CGR; a whole route condenses the same way, into one
+graph of the entire synthesis. That makes a route hashable, so duplicates fall out
+of a dict rather than a pairwise comparison. `compose_all_route_cgrs` then
+`route_cgr_hash` is the key to deduplicate on: it includes step order, and step
+order is usually part of what a synthesis is. Only when the sequence provably does
+not matter, `route_cgr_hash_without_route_order` collapses routes differing solely
+in it, and `route_order_variant_sets` names those groups.
+
+One search does not produce duplicates — measured on a celecoxib search, all 330
+winning routes were distinct — so this is for where route sets meet: two searches
+on one target, a search against a literature set, two tools compared. Budget for
+it: composition is milliseconds, hashing is over a second per route.
+Tutorial: `07_Clustering`, `15_Routes_compare`
+Docs: `methods/routes` — "A route as a graph"
+
 **Group similar routes together**
 Planning setup, then export, then `cgr_display`
 (`...routes.representation.depiction`) and `routes_clustering_report`.
@@ -272,8 +297,7 @@ CLI: `value_network_tuning`.
 Docs: `methods/value`, `configuration/value`
 
 **Benchmark planning performance**
-Docs: `configuration/policy` — "Benchmark recipe". Colab:
-`colab/planning_benchmarking.ipynb`.
+Docs: `configuration/policy` — "Benchmark recipe".
 
 **Log training runs**
 Optional extras `wandb` / `mlflow` / `loggers`.

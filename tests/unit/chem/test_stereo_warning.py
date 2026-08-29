@@ -7,7 +7,7 @@ from chython import smiles
 
 from synplan.chem.utils import (
     StereoDiscardedWarning,
-    _clean_molecule,
+    clean_molecule,
     mol_from_smiles,
     safe_canonicalization,
 )
@@ -20,7 +20,7 @@ FLAT = "CN1CCCC(C)C1"
 @pytest.mark.parametrize("smi", [TETRAHEDRAL, GEOMETRIC])
 def test_clean_molecule_warns_before_discarding_stereo(smi: str) -> None:
     with pytest.warns(StereoDiscardedWarning):
-        cleaned = _clean_molecule(smiles(smi))
+        cleaned = clean_molecule(smiles(smi))
     assert not any(a.stereo is not None for _, a in cleaned.atoms())
 
 
@@ -34,7 +34,7 @@ def test_no_warning_for_a_flat_molecule() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error", StereoDiscardedWarning)
         safe_canonicalization(smiles(FLAT))
-        _clean_molecule(smiles(FLAT))
+        clean_molecule(smiles(FLAT))
 
 
 def test_no_warning_when_clean_stereo_is_off() -> None:

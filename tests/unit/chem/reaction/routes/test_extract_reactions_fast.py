@@ -17,9 +17,9 @@ import copy
 from types import SimpleNamespace
 
 from synplan.chem.reaction.routes.io import (
-    _route_tree_has_null_node,
     make_json,
     read_routes_csv,
+    route_tree_has_null_node,
 )
 from synplan.chem.reaction.routes.representation import extract_reactions
 
@@ -83,7 +83,7 @@ def test_fast_default_produces_valid_no_null_tree():
     out = make_json(extract_reactions(_MockTree(copy.deepcopy(data))))
     assert out
     for route_id, tree in out.items():
-        assert not _route_tree_has_null_node(tree), f"route {route_id} has a null node"
+        assert not route_tree_has_null_node(tree), f"route {route_id} has a null node"
         assert tree["type"] == "mol" and tree.get("smiles")
 
 

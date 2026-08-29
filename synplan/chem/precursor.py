@@ -47,10 +47,23 @@ class Precursor:
             min_mol_size it is automatically classified as building block.
         :return: True is Precursor is a building block.
         """
-        if len(self.molecule) <= min_mol_size:
-            return True
+        return is_purchasable(self.molecule, bb_stock, min_mol_size)
 
-        return str(self.molecule) in bb_stock
+
+def is_purchasable(
+    molecule: MoleculeContainer,
+    stock: set[str],
+    min_mol_size: int = 6,
+    *,
+    key: str | None = None,
+) -> bool:
+    """Whether a molecule can be bought: too small to disconnect, or in the catalogue.
+
+    The catalogue is keyed by the molecule's own SMILES, so a caller holding that
+    string already passes it as ``key`` rather than spelling it a second time.
+    """
+
+    return len(molecule) <= min_mol_size or (key or str(molecule)) in stock
 
 
 def compose_precursors(

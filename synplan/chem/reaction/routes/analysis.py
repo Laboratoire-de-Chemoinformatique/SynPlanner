@@ -11,6 +11,7 @@ from chython import smiles as chython_smiles
 from synplan.chem.reaction.routes.representation.components import (
     route_cgr_pseudo_reactants_by_role,
 )
+from synplan.chem.reaction.routes.representation.container import unwrap_cgr
 
 RouteId: TypeAlias = Hashable
 
@@ -24,19 +25,6 @@ __all__ = [
     "route_ids_with_exact_bb",
     "sb_cgr_identity_to_cluster_id",
 ]
-
-_MISSING = object()
-
-
-def _unwrap_route_cgr(value: Any) -> Any:
-    """Accept raw RouteCGRs and historical composition result wrappers."""
-
-    if value is None:
-        return None
-    if isinstance(value, Mapping) and "cgr" in value:
-        return value["cgr"]
-    cgr = getattr(value, "cgr", _MISSING)
-    return value if cgr is _MISSING else cgr
 
 
 def _cluster_sb_cgr(cluster: Any) -> Any:
@@ -151,7 +139,7 @@ def route_ids_with_exact_bb(
     hits = []
 
     for route_id, route_cgr_value in all_route_cgrs.items():
-        route_cgr = _unwrap_route_cgr(route_cgr_value)
+        route_cgr = unwrap_cgr(route_cgr_value)
         if route_cgr is None:
             continue
 
@@ -189,7 +177,7 @@ def collect_bb_usage_stats(all_route_cgrs: Mapping[int, Any]) -> dict[str, Any]:
     }
 
     for route_id, route_cgr_value in all_route_cgrs.items():
-        route_cgr = _unwrap_route_cgr(route_cgr_value)
+        route_cgr = unwrap_cgr(route_cgr_value)
         if route_cgr is None:
             continue
 

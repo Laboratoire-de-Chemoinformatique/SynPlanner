@@ -11,8 +11,7 @@ from collections.abc import Iterable
 
 from chython.containers import MoleculeContainer
 
-from synplan.chem.reaction.routes.traversal import iter_route_steps
-from synplan.chem.utils import _clean_molecule, safe_canonicalization
+from synplan.chem.utils import clean_molecule, safe_canonicalization
 
 
 def target_from_rdkit(
@@ -34,7 +33,7 @@ def target_from_rdkit(
     :return: A standardized MoleculeContainer ready for Tree search.
     """
     molecule = MoleculeContainer.from_rdkit(rdkit_mol)
-    return _clean_molecule(
+    return clean_molecule(
         molecule,
         standardize=standardize,
         clean_stereo=clean_stereo,
@@ -82,7 +81,7 @@ def route_to_rdkit(tree, node_id: int, keep_mapping: bool = True) -> list[dict]:
     :return: List of step dicts ordered from target to building blocks.
     """
     steps = []
-    for before_node, after_node in iter_route_steps(tree, node_id):
+    for before_node, after_node in tree.route_steps(node_id):
         target_mol = before_node.curr_precursor.molecule.to_rdkit(
             keep_mapping=keep_mapping
         )
@@ -156,7 +155,7 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
         graph: dict[MoleculeContainer, dict[str, object]] = {}
         mol_cache: dict[int, object] = {}  # id(MoleculeContainer) → RDKit Mol
 
-        for before_node, after_node in iter_route_steps(tree, winning_node):
+        for before_node, after_node in tree.route_steps(winning_node):
             before_mol = before_node.curr_precursor.molecule
             after_mols = [x.molecule for x in after_node.new_precursors]
             graph[before_mol] = {

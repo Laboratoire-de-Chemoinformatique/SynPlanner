@@ -20,7 +20,7 @@ def bond_key(atom1: int, atom2: int) -> tuple[int, int]:
     return (atom1, atom2) if atom1 <= atom2 else (atom2, atom1)
 
 
-def _set_symmetric_bond(cgr, atom1, atom2, bond):
+def set_symmetric_bond(cgr, atom1, atom2, bond):
     """Store one bond object in both directions of a CGR adjacency map."""
 
     cgr._bonds.setdefault(atom1, {})[atom2] = bond
@@ -44,7 +44,7 @@ class RouteDynamicBond(DynamicBond):
         else:
             super().__init__(order, p_order)
         self.route_order = route_order
-        self.route_step_order = _metadata_set(route_step_order)
+        self.route_step_order = metadata_set(route_step_order)
         self.route_bond_step_states = {}
 
     @classmethod
@@ -55,7 +55,7 @@ class RouteDynamicBond(DynamicBond):
         copy.route_order = (
             getattr(bond, "route_order", None) if route_order is None else route_order
         )
-        copy.route_step_order = _metadata_set(
+        copy.route_step_order = metadata_set(
             getattr(bond, "route_step_order", None)
             if route_step_order is None
             else route_step_order
@@ -70,7 +70,7 @@ class RouteDynamicBond(DynamicBond):
 _ROUTE_ATOM_CLASSES = {}
 
 
-def _metadata_set(value):
+def metadata_set(value):
     if value is None:
         return set()
     if isinstance(value, (set, frozenset, list, tuple)):
@@ -88,17 +88,15 @@ def _route_atom_class_from_class(atom_class, symbol):
         return symbol
 
     def copy(self, *args, **kwargs):
-        copy = object.__new__(self.__class__)
-        copy._isotope = self.isotope
-        copy._charge = self.charge
-        copy._is_radical = self.is_radical
-        copy._p_is_radical = self.p_is_radical
-        copy._p_charge = self.p_charge
-        copy._xy = self._xy.__class__(self._xy.x, self._xy.y)
-        copy.route_order = _metadata_set(getattr(self, "route_order", None))
-        copy.route_step_order = _metadata_set(getattr(self, "route_step_order", None))
-        copy.route_atom_step_states = dict(getattr(self, "route_atom_step_states", {}))
-        return copy
+        duplicate = atom_class.copy(self)
+        duplicate.route_order = metadata_set(getattr(self, "route_order", None))
+        duplicate.route_step_order = metadata_set(
+            getattr(self, "route_step_order", None)
+        )
+        duplicate.route_atom_step_states = dict(
+            getattr(self, "route_atom_step_states", {})
+        )
+        return duplicate
 
     route_atom_class = type(
         class_name,
@@ -137,8 +135,8 @@ def _route_atom_class(atom):
 def route_atom(atom, route_orders, route_step_orders=None):
     """Return an atom copy carrying route-order and step-order metadata."""
 
-    route_orders = _metadata_set(route_orders)
-    route_step_orders = _metadata_set(route_step_orders)
+    route_orders = metadata_set(route_orders)
+    route_step_orders = metadata_set(route_step_orders)
 
     if hasattr(atom, "route_order") and hasattr(atom, "route_step_order"):
         atom.route_order.update(route_orders)
@@ -155,28 +153,22 @@ def route_atom(atom, route_orders, route_step_orders=None):
     new_atom._p_is_radical = atom.p_is_radical
     new_atom._p_charge = atom.p_charge
     new_atom._xy = atom._xy.__class__(atom._xy.x, atom._xy.y)
-    new_atom.route_order = _metadata_set(getattr(atom, "route_order", None))
+    new_atom.route_order = metadata_set(getattr(atom, "route_order", None))
     new_atom.route_order.update(route_orders)
-    new_atom.route_step_order = _metadata_set(getattr(atom, "route_step_order", None))
+    new_atom.route_step_order = metadata_set(getattr(atom, "route_step_order", None))
     new_atom.route_step_order.update(route_step_orders)
     new_atom.route_atom_step_states = dict(getattr(atom, "route_atom_step_states", {}))
     return new_atom
 
 
-def transient_bond():
-    """Build Chython's unsupported ``DynamicBond(None, None)`` route marker.
+def transient_bond() -> RouteDynamicBond:
+    """The route-only marker for a bond that forms and later breaks.
 
-    Chython rejects this state in ``DynamicBond.__init__`` because it is not a
-    normal reaction bond. Route composition uses it only as a sentinel for a
-    transient route bond that forms and later breaks.
+    chython's ``DynamicBond`` rejects ``(None, None)``; ``RouteDynamicBond``
+    accepts it, which is the whole reason the subclass exists.
     """
 
-    bond = object.__new__(RouteDynamicBond)
-    bond._order = bond._p_order = None
-    bond.route_order = None
-    bond.route_step_order = set()
-    bond.route_bond_step_states = {}
-    return bond
+    return RouteDynamicBond()
 
 
 def remove_transient_bonds(cgr):

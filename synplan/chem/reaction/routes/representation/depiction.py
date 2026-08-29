@@ -9,25 +9,19 @@ from typing import Any
 from chython.algorithms.depict import DepictCGR, _render_config
 from chython.containers import CGRContainer, ReactionContainer
 
+from synplan.chem.reaction.routes.representation.container import unwrap_cgr
+
 TRANSIENT_BOND_COLOR = "blue"
 DYNAMIC_BOND_WIDTH_FACTOR = 2.5
 
-_MISSING = object()
-
 
 def _unwrap_cgr(value: Any) -> CGRContainer:
-    """Accept raw CGRs and historical composition result wrappers."""
+    """The CGR to depict, refusing a composition that produced none."""
 
-    if isinstance(value, Mapping) and "cgr" in value:
-        value = value["cgr"]
-    else:
-        cgr = getattr(value, "cgr", _MISSING)
-        if cgr is not _MISSING:
-            value = cgr
-
-    if value is None:
+    cgr = unwrap_cgr(value)
+    if cgr is None:
         raise ValueError("Cannot depict an empty RouteCGR result.")
-    return value
+    return cgr
 
 
 __all__ = [

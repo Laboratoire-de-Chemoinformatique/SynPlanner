@@ -6,7 +6,7 @@ routes where per-step atom-number chaining leaves the relevant fragment numbered
 disjoint from the target, yielding a ``None`` node (JSON ``null``) that
 downstream consumers reject. The fix selects the fragment that *is* the consuming
 reactant by chython structural equality, recovering the route regardless of
-numbering. The drop guard (``_route_tree_has_null_node``) remains as a last-resort
+numbering. The drop guard (``route_tree_has_null_node``) remains as a last-resort
 safety net for any genuinely unrecoverable tree.
 """
 
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from chython import smiles as read_smiles
 
-from synplan.chem.reaction.routes.io import _route_tree_has_null_node, make_json
+from synplan.chem.reaction.routes.io import make_json, route_tree_has_null_node
 
 
 def _disjoint_numbering_route_steps():
@@ -52,11 +52,11 @@ def _assert_well_formed(node, expect="mol"):
 
 
 def test_route_tree_has_null_node_detects_nested_none():
-    assert _route_tree_has_null_node(None) is True
+    assert route_tree_has_null_node(None) is True
     nested = {"type": "mol", "children": [{"type": "reaction", "children": [None]}]}
-    assert _route_tree_has_null_node(nested) is True
+    assert route_tree_has_null_node(nested) is True
     clean = {"type": "mol", "children": [{"type": "reaction", "children": []}]}
-    assert _route_tree_has_null_node(clean) is False
+    assert route_tree_has_null_node(clean) is False
 
 
 def test_make_json_recovers_disjoint_numbering_route():
@@ -67,7 +67,7 @@ def test_make_json_recovers_disjoint_numbering_route():
 
     # Both routes present; neither contains a null node.
     assert 5 in out and 9 in out
-    assert all(not _route_tree_has_null_node(tree) for tree in out.values())
+    assert all(not route_tree_has_null_node(tree) for tree in out.values())
 
     # Recovered route is a well-formed tree with correct mol/reaction alternation.
     _assert_well_formed(out[9], "mol")
@@ -91,7 +91,7 @@ def test_make_json_keep_ids_false_recovers_disjoint_numbering_route():
     out = make_json(routes_dict, keep_ids=False)
     assert isinstance(out, list)
     assert len(out) == 2
-    assert all(not _route_tree_has_null_node(tree) for tree in out)
+    assert all(not route_tree_has_null_node(tree) for tree in out)
     assert {tree["smiles"] for tree in out} == {"CCCN", "O=O"}
 
 
@@ -122,6 +122,6 @@ def test_make_json_drops_route_when_selection_unrecoverable(monkeypatch):
 
     # Route 9 is unrecoverable under forced selection failure -> dropped, not null.
     assert 9 not in out
-    assert all(not _route_tree_has_null_node(tree) for tree in out.values())
+    assert all(not route_tree_has_null_node(tree) for tree in out.values())
     # Valid single-step route still exported.
     assert 5 in out and out[5]["smiles"] == "CCCN"

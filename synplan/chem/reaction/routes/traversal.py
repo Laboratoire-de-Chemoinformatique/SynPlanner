@@ -1,10 +1,19 @@
-"""Internal helpers for traversing Tree-like retrosynthetic routes."""
+"""Ordering the steps of a route. Walking a search tree is the tree's own job."""
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping, Sequence
-from itertools import pairwise
+from collections.abc import Sequence
 from typing import Any
+
+
+def steps_by_product(steps: Sequence[Any]) -> dict[int, int]:
+    """``{id(product): step index}`` -- what makes a route a graph rather than a list.
+
+    Keyed by identity, not by spelling: in a symmetric disconnection two steps
+    make the same SMILES and stay two steps.
+    """
+
+    return {id(step.product): index for index, step in enumerate(steps)}
 
 
 def root_step(steps: Sequence[Any]) -> int:
@@ -38,7 +47,7 @@ def linearise(steps: Sequence[Any]) -> tuple[int, ...]:
     :raises ValueError: if a step is not reachable from the final one.
     """
 
-    by_product = {id(step.product): index for index, step in enumerate(steps)}
+    by_product = steps_by_product(steps)
     order: list[int] = []
     seen: set[int] = set()
 
@@ -58,35 +67,8 @@ def linearise(steps: Sequence[Any]) -> tuple[int, ...]:
     return tuple(order)
 
 
-def route_node_ids(parents: Mapping[int, int], node_id: int) -> tuple[int, ...]:
-    """Return route node IDs from the root to ``node_id``."""
-
-    path = []
-    current_id = node_id
-    while current_id:
-        path.append(current_id)
-        current_id = parents[current_id]
-    path.reverse()
-    return tuple(path)
-
-
-def iter_route_nodes(tree: Any, node_id: int) -> Iterator[Any]:
-    """Yield Tree-like route nodes from the root to ``node_id``."""
-
-    for route_node_id in route_node_ids(tree.parents, node_id):
-        yield tree.nodes[route_node_id]
-
-
-def iter_route_steps(tree: Any, node_id: int) -> Iterator[tuple[Any, Any]]:
-    """Yield chronological ``(before_node, after_node)`` route steps."""
-
-    yield from pairwise(iter_route_nodes(tree, node_id))
-
-
 __all__ = [
-    "iter_route_nodes",
-    "iter_route_steps",
     "linearise",
     "root_step",
-    "route_node_ids",
+    "steps_by_product",
 ]

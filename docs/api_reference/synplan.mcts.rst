@@ -36,6 +36,14 @@ synplan.mcts.node module
    :undoc-members:
    :show-inheritance:
 
+synplan.mcts.record module
+--------------------------
+
+.. automodule:: synplan.mcts.record
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 synplan.mcts.search module
 --------------------------
 

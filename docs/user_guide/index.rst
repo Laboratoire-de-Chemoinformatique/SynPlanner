@@ -13,23 +13,13 @@ What's inside
 Run in Google Colab
 -------------------
 
-Open selected tutorials directly in Google Colab (no local install):
+Every tutorial runs in Google Colab with no local install. Open the tutorial you
+want and click the |Colab| badge at the top of it: the setup cell installs
+SynPlanner and downloads the data it needs, and does nothing when the notebook is
+run locally.
 
-- Retrosynthetic planning |Colab-Retro|
-- SynPlanner benchmarking |Colab-Bench|
-- Route clustering by strategic bonds |Colab-Cluster|
-
-.. |Colab-Retro| image:: https://colab.research.google.com/assets/colab-badge.svg
-   :target: https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb
-   :alt: Open in Colab
-
-.. |Colab-Bench| image:: https://colab.research.google.com/assets/colab-badge.svg
-   :target: https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb
-   :alt: Open in Colab
-
-.. |Colab-Cluster| image:: https://colab.research.google.com/assets/colab-badge.svg
-   :target: https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/routes_clustering.ipynb
-   :alt: Open in Colab
+.. |Colab| image:: https://colab.research.google.com/assets/colab-badge.svg
+   :alt: Open In Colab
 
 Tutorials
 -------------------
@@ -51,7 +41,7 @@ some advanced explanations and configurations, that can be used for both demonst
 - `Retrosynthetic Planning`_ - demonstrates how retrosynthetic planning can be performed for target molecules.
 - `Tree Analysis`_ - demonstrates how to analyze tree search results: policy performance, winning rule ranks, branching profile, and route details.
 - `Clustering`_ - demonstrates how to cluster predicted retrosynthetic routes.
-- `Protection Scoring`_ - demonstrates how to detect competing functional groups and score routes for selectivity issues, inspired by `Westerlund et al. (2025) <https://doi.org/10.26434/chemrxiv-2025-gdrr8>`_.
+- `Protection Scoring`_ - demonstrates how to detect competing functional groups and score routes for selectivity issues, inspired by `Westerlund et al. (2026) <https://doi.org/10.1021/acs.jcim.6c01147>`_.
 
 **Advanced tutorials:**
 

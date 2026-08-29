@@ -1,7 +1,7 @@
 # Reactive functional group SMARTS patterns for protection-group analysis.
 #
-# Converted from Westerlund et al., ChemRxiv, 2025.
-# https://doi.org/10.26434/chemrxiv-2025-gdrr8
+# Converted from Westerlund et al., J. Chem. Inf. Model. 2026, 66, 6361.
+# https://doi.org/10.1021/acs.jcim.6c01147
 #
 # Organised by reactivity category. Each entry has:
 #   name              - unique label, also used as row/column key in the incompatibility matrix

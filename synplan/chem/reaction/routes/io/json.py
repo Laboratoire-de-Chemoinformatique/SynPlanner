@@ -5,30 +5,29 @@ from itertools import zip_longest
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from chython import smiles as read_smiles
-from chython.exceptions import InvalidAromaticRing
 
+from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction.routes.contracts import (
     RouteDiagnostic,
     RouteExportError,
     RouteExportResult,
 )
 from synplan.chem.reaction.routes.io.metadata import (
-    reaction_metadata as _reaction_metadata,
+    reaction_metadata,
+    restore_reaction_metadata,
 )
-from synplan.chem.reaction.routes.io.metadata import (
-    restore_reaction_metadata as _restore_reaction_metadata,
-)
-from synplan.chem.utils import safe_canonicalization
+from synplan.chem.utils import mapped_smiles, molecule_key, normalise
 
 if TYPE_CHECKING:
     from chython.containers import MoleculeContainer, ReactionContainer
 
+    from synplan.chem.reaction.routes.contracts import RouteNode
     from synplan.mcts.tree import Tree
 
 logger = logging.getLogger(__name__)
 
 
-def _route_tree_has_null_node(node) -> bool:
+def route_tree_has_null_node(node) -> bool:
     """Return True if the assembled route tree contains a ``None`` node.
 
     ``build_mol_node`` returns ``None`` when a route is malformed (e.g. a node
@@ -37,7 +36,7 @@ def _route_tree_has_null_node(node) -> bool:
     ``null`` child and corrupt the route.
     """
     return node is None or any(
-        _route_tree_has_null_node(child) for child in node.get("children", ())
+        route_tree_has_null_node(child) for child in node.get("children", ())
     )
 
 
@@ -49,47 +48,7 @@ def _purchasable(smiles: str, molecule, stock, min_mol_size: int, fallback: bool
     """
     if stock is None:
         return fallback
-    return len(molecule) <= min_mol_size or smiles in stock
-
-
-def molecule_key(mol) -> str:
-    """The one SMILES a route keys a molecule by, in stock and in the file alike.
-
-    The normalisation runs on a copy: the caller's molecule is never rewritten,
-    so asking for a key cannot invalidate the route that was asked about.
-    """
-    mol = mol.copy()
-    try:
-        mol.kekule()
-        mol.implicify_hydrogens()
-        mol.thiele()
-    except InvalidAromaticRing:
-        # Keep serializing the original molecule string when aromatic
-        # preparation fails; route export should remain best-effort.
-        pass
-    return str(mol)
-
-
-def _route_step_metadata_from_tree(
-    tree: "Tree", route_id: int
-) -> dict[int, dict[str, Any]]:
-    """Map route step ids from ``extract_reactions`` to tree rule metadata."""
-    details = tree.route_details(route_id)
-    steps = details.get("steps", [])
-    total_steps = len(steps)
-    metadata_by_step_id = {}
-
-    for step_index, step in enumerate(steps):
-        step_id = total_steps - 1 - step_index
-        metadata_by_step_id[step_id] = {
-            "step_id": step_id,
-            "tree_node_id": step.get("node_id"),
-            "rule_id": step.get("rule_id"),
-            "rule_source": step.get("rule_source"),
-            "rule_key": step.get("rule_key"),
-        }
-
-    return metadata_by_step_id
+    return is_purchasable(molecule, stock, min_mol_size, key=smiles)
 
 
 def _collect_reactions(tree):
@@ -106,7 +65,7 @@ def _collect_reactions(tree):
             recurse(child)
         if node.get("type") == "reaction":
             reaction = read_smiles(node["smiles"])
-            _restore_reaction_metadata(reaction, node.get("meta"))
+            restore_reaction_metadata(reaction, node.get("meta"))
             rxn_list.append(reaction)
 
     recurse(tree)
@@ -131,28 +90,30 @@ def _file_key(smiles: str) -> str:
     no-op. String in, string out -- nothing shared across the cache is mutable.
     """
     try:
-        return str(safe_canonicalization(read_smiles(smiles)))
+        return molecule_key(read_smiles(smiles))
     except Exception as error:  # unparseable node: keep the file's own string
         logger.warning("Route molecule %s could not be re-read: %s", smiles, error)
         return smiles
 
 
 def _canonicalise(reaction) -> int:
-    """Rewrite ``reaction``'s molecules canonically in place, counting the failures.
+    """Rewrite ``reaction``'s molecules the way a file writes them, counting failures.
 
-    ``safe_canonicalization`` hands back the molecule it was given when chython
-    cannot prepare its aromatic ring, so such a molecule survives exactly as the
-    file wrote it -- readable, drawable, and counted.
+    The reader normalises with the same function the writer keys by, so a route
+    written and read back comes out spelled as it went in. A molecule chython
+    cannot prepare survives exactly as the file wrote it -- readable, drawable,
+    and counted.
     """
     kept = 0
     for attribute in ("_reactants", "_products"):
-        canonical = []
+        normalised = []
         for mol in getattr(reaction, attribute):
-            standard = safe_canonicalization(mol)
-            if standard is mol:  # the only way out of the InvalidAromaticRing branch
+            standard = normalise(mol)
+            if standard is None:
                 kept += 1
-            canonical.append(standard)
-        setattr(reaction, attribute, tuple(canonical))
+                standard = mol
+            normalised.append(standard)
+        setattr(reaction, attribute, tuple(normalised))
     return kept
 
 
@@ -249,7 +210,7 @@ def read_route_tree(route_json) -> RouteRead:
             return None
 
         reaction = read_smiles(source["smiles"])
-        _restore_reaction_metadata(reaction, source.get("meta"))
+        restore_reaction_metadata(reaction, source.get("meta"))
         uncanonical += _canonicalise(reaction)
         link(reaction, source.get("children") or ())
 
@@ -267,6 +228,57 @@ def read_route_tree(route_json) -> RouteRead:
             uncanonical,
         )
     return RouteRead(tuple(steps), tuple(unresolved), uncanonical)
+
+
+def route_tree(target, source_of, purchasable, step_fields) -> "RouteNode | None":
+    """Unfold a route into one v1 JSON tree, starting from the molecule it makes.
+
+    ``source_of(molecule, consumer)`` answers the only question the callers
+    answer differently: which step makes this molecule, and which of that step's
+    products it is. ``None`` means nothing makes it -- a starting material. A
+    step with no usable product gives ``None`` back in its place, which the drop
+    guard in :func:`make_json` reports.
+
+    :param purchasable: ``(molecule, key, is_leaf) -> bool``.
+    :param step_fields: ``step_id -> (mapped_smiles, extra node keys)``.
+    """
+
+    def mol_node(molecule, consumer):
+        source = source_of(molecule, consumer)
+        if source is None:
+            key = molecule_key(molecule)
+            return {
+                "type": "mol",
+                "smiles": key,
+                "in_stock": purchasable(molecule, key, True),
+            }
+        step_id, reaction, product = source
+        if product is None:
+            return None
+        key = molecule_key(product)
+        return {
+            "type": "mol",
+            "smiles": key,
+            "children": [reaction_node(step_id, reaction)],
+            "in_stock": purchasable(product, key, False),
+        }
+
+    def reaction_node(step_id, reaction):
+        smiles, extra = step_fields(step_id)
+        return {
+            "type": "reaction",
+            "smiles": smiles,
+            # a reaction SMILES does not keep its container's molecule order, so
+            # the reader pairs children with reactants by key rather than by
+            # position; writing them in that order is what makes the file stable
+            "children": sorted(
+                (mol_node(molecule, step_id) for molecule in reaction.reactants),
+                key=lambda child: (child or {}).get("smiles", ""),
+            ),
+            **extra,
+        }
+
+    return mol_node(target, None)
 
 
 def make_dict(routes_json):
@@ -294,11 +306,26 @@ def make_dict(routes_json):
     return routes_dict
 
 
-def read_routes_json(file_path="routes.json", to_dict=False):
+def read_routes_json(file_path="routes.json", to_dict=False, *, as_routes=False):
+    """Read a v1 routes file: raw trees, ``{route: {step: Reaction}}``, or routes.
+
+    :param to_dict: Hand back the legacy ``{route_id: {step_id: Reaction}}``.
+    :param as_routes: Hand back :class:`~synplan.chem.reaction.routes.route.Route`
+        objects -- the file's own steps and stock verdicts, with no search behind
+        them.
+    """
+    if to_dict and as_routes:
+        raise ValueError("read_routes_json returns one shape: to_dict or as_routes")
     with open(file_path) as file:
         routes_json = json.load(file)
     if to_dict:
         return make_dict(routes_json)
+    if as_routes:
+        # local: Route is built on this module, so it cannot be imported at the top
+        from synplan.chem.reaction.routes.route import Route
+
+        trees = routes_json.values() if isinstance(routes_json, dict) else routes_json
+        return [Route.from_json(route_tree) for route_tree in trees]
     return routes_json
 
 
@@ -335,7 +362,7 @@ def _make_json_v1(
             route_metadata.get(route_id) if route_metadata is not None else None
         )
         if route_step_metadata is None and tree is not None:
-            route_step_metadata = _route_step_metadata_from_tree(tree, route_id)
+            route_step_metadata = tree.step_metadata(route_id)
         try:
             # Determine target molecule atoms from the final step of this route
             final_step = max(steps)
@@ -352,79 +379,50 @@ def _make_json_v1(
             logger.warning("Error processing route %s: %s", route_id, e)
             continue
 
-        def build_mol_node(sid, want_react=None, _steps=steps, _atom_nums=atom_nums):
-            """Select the product fragment of step ``sid`` and recurse into its reaction.
+        def source_of(
+            molecule, consumer, _steps=steps, _prod_map=prod_map, _atom_nums=atom_nums
+        ):
+            """The step that makes ``molecule``, matched on spelling.
 
-            ``want_react`` is the consuming reactant of the next step (set by
-            ``build_reaction_node``). Selection is structural first: pick the
-            product fragment that *is* the consuming reactant by chython
-            structural equality. This recovers routes whose per-step atom-number
-            chaining leaves the relevant fragment numbered disjoint from the
-            target. When no reactant context is available (the route root), or
-            no fragment matches structurally, fall back to atom-number overlap
-            with the target.
+            A bare ``{step: reaction}`` carries no link between a step's product
+            and the next step's reactant, so the producer is looked up by
+            canonical SMILES among the steps that ran earlier, and which product
+            fragment it is comes from structural identity with the consuming
+            reactant -- falling back to sharing atom numbers with the target,
+            which is all there is to go on at the root.
             """
-            rxn = _steps[sid]
-            product = None
-            if want_react is not None:
-                product = next((p for p in rxn.products if p == want_react), None)
+            prior = [
+                producer
+                for producer in _prod_map.get(molecule_key(molecule), ())
+                if consumer is None or producer < consumer
+            ]
+            if not prior:
+                return None
+            step_id = max(prior)
+            reaction = _steps[step_id]
+            product = next((p for p in reaction.products if p == molecule), None)
             if product is None:
                 product = next(
-                    (p for p in rxn.products if _atom_nums & p._atoms.keys()), None
+                    (p for p in reaction.products if _atom_nums & p._atoms.keys()), None
                 )
-            if product is not None:
-                p_smi = molecule_key(product)
-                return {
-                    "type": "mol",
-                    "smiles": p_smi,
-                    "children": [build_reaction_node(sid)],
-                    "in_stock": _purchasable(
-                        p_smi, product, building_blocks, min_mol_size, False
-                    ),
-                }
-            # Neither structural identity nor atom-number overlap matched: route
-            # is genuinely unrecoverable; the drop guard in make_json handles it.
-            return None
+            return step_id, reaction, product
 
-        def build_reaction_node(
-            sid,
-            _steps=steps,
-            _route_step_metadata=route_step_metadata,
-            _prod_map=prod_map,
-        ):
-            """Build reaction node and recurse into reactant molecule nodes."""
-            rxn = _steps[sid]
-            node = {"type": "reaction", "smiles": format(rxn, "m"), "children": []}
-            reaction_metadata = _reaction_metadata(rxn)
-            if reaction_metadata:
-                node["meta"] = reaction_metadata
-            if _route_step_metadata and sid in _route_step_metadata:
-                node.update(_route_step_metadata[sid])
+        def purchasable(molecule, key, leaf, _bb=building_blocks, _size=min_mol_size):
+            return _purchasable(key, molecule, _bb, _size, leaf)
 
-            for react in rxn.reactants:
-                r_smi = molecule_key(react)
-                # Look up any prior step producing this reactant
-                prior = [ps for ps in _prod_map.get(r_smi, []) if ps < sid]
-                if prior:
-                    node["children"].append(
-                        build_mol_node(max(prior), want_react=react)
-                    )
-                else:
-                    node["children"].append(
-                        {
-                            "type": "mol",
-                            "smiles": r_smi,
-                            "in_stock": _purchasable(
-                                r_smi, react, building_blocks, min_mol_size, True
-                            ),
-                        }
-                    )
-
-            return node
+        def step_fields(step_id, _steps=steps, _meta=route_step_metadata):
+            reaction = _steps[step_id]
+            extra = {}
+            metadata = reaction_metadata(reaction)
+            if metadata:
+                extra["meta"] = metadata
+            if _meta and step_id in _meta:
+                extra.update(_meta[step_id])
+            return mapped_smiles(reaction), extra
 
         # Build route tree and store
-        route_tree = build_mol_node(final_step)
-        if _route_tree_has_null_node(route_tree):
+        tree_node = route_tree(target, source_of, purchasable, step_fields)
+        if route_tree_has_null_node(tree_node):
             logger.warning(
                 "Dropping malformed route %s from export: route tree contains a "
                 "null node (multiple molecules in one node / malformed route node).",
@@ -432,9 +430,9 @@ def _make_json_v1(
             )
             continue
         if keep_ids:
-            all_routes[int(route_id)] = route_tree
+            all_routes[int(route_id)] = tree_node
         else:
-            all_routes.append(route_tree)
+            all_routes.append(tree_node)
 
     return all_routes
 
@@ -502,21 +500,40 @@ def make_json(
 
 
 def write_routes_json(
-    routes_dict,
+    routes,
     file_path,
     tree: "Tree | None" = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
 ) -> RouteExportResult:
-    """Serialize v1 route trees and return export diagnostics."""
+    """Serialize v1 route trees and return export diagnostics.
 
-    result = build_route_trees(
-        routes_dict,
-        tree=tree,
-        route_metadata=route_metadata,
-        strict=strict,
-    )
+    :param routes: An iterable of :class:`~synplan.chem.reaction.routes.route.Route`
+        -- each writes itself, and the file keys them by position -- or the
+        legacy ``{route_id: {step_id: Reaction}}`` mapping, whose keys are tree
+        node ids when ``tree`` is given.
+    :param tree: The search behind a *mapping* of routes, for per-step rule
+        metadata. A ``Route`` already carries its own.
+    """
+
+    if isinstance(routes, dict):
+        result = build_route_trees(
+            routes,
+            tree=tree,
+            route_metadata=route_metadata,
+            strict=strict,
+        )
+    else:
+        if tree is not None or route_metadata is not None:
+            raise TypeError(
+                "tree= and route_metadata= describe the {route_id: {step_id: "
+                "Reaction}} form; a Route already carries its step origins"
+            )
+        result = RouteExportResult(
+            routes={index: route.to_json() for index, route in enumerate(routes)},
+            diagnostics=(),
+        )
     with open(file_path, "w") as f:
         json.dump(result.routes, f, indent=2)
     return result
@@ -527,7 +544,6 @@ __all__ = [
     "build_route_trees",
     "make_dict",
     "make_json",
-    "molecule_key",
     "read_route_tree",
     "read_routes_json",
     "write_routes_json",

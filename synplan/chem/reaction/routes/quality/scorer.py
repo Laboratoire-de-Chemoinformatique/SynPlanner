@@ -107,7 +107,7 @@ class ProtectionRouteScorer(RouteScorer):
     """Route scorer based on competing functional-group incompatibility.
 
     The search's own verdict weighted by :class:`CompetingSitesRouteScorer`'s,
-    which is the re-ranking of Westerlund et al., 2025 -- unweighted, because
+    which is the re-ranking of Westerlund et al., 2026 -- unweighted, because
     the paper has no weight. Rank with :class:`CompetingSitesRouteScorer`
     instead when the routes have no search behind them.
 
@@ -130,7 +130,7 @@ class ProtectionRouteScorer(RouteScorer):
         return cls(CompetingSitesRouteScorer(_competing_sites(config)))
 
     def score(self, route: Route) -> float:
-        """``search_score * S(T)`` -- the re-ranking of Westerlund et al., 2025.
+        """``search_score * S(T)`` -- the re-ranking of Westerlund et al., 2026.
 
         The paper weights the search's own state score by the competing sites
         score, so this scorer's verdict is defined only for a route a search

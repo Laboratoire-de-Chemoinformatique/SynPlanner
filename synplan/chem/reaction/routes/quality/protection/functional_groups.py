@@ -15,6 +15,43 @@ from pydantic import BaseModel, ConfigDict
 logger = logging.getLogger(__name__)
 
 
+def _load_patterns(entries) -> list[dict]:
+    """Compile ``(name, label, smarts)`` triples, dropping what chython rejects."""
+
+    patterns = []
+    for name, label, smarts_str in entries:
+        try:
+            query = smarts(smarts_str)
+        except Exception as exc:
+            logger.warning(
+                "Could not parse SMARTS for %s (%s): %s", name, smarts_str, exc
+            )
+            continue
+        patterns.append({"name": name, "label": label, "query": query})
+    return patterns
+
+
+def _distinct_matches(patterns, molecule, atoms_of) -> list[tuple]:
+    """Every pattern match once, its atoms written by ``atoms_of``."""
+
+    found, seen = [], set()
+    for pattern in patterns:
+        for mapping in pattern["query"].get_mapping(molecule):
+            atoms = atoms_of(mapping.values())
+            key = (pattern["name"], atoms)
+            if key in seen:
+                continue
+            seen.add(key)
+            found.append((pattern["name"], pattern["label"], atoms))
+    return found
+
+
+def _away_from_centre(matches: list, reaction_center_atoms: set[int]) -> list:
+    """The matches that do not touch the reaction centre: the competing ones."""
+
+    return [m for m in matches if not set(m.atom_indices) & reaction_center_atoms]
+
+
 class FunctionalGroupMatch(BaseModel):
     """A single functional group match in a molecule.
 
@@ -65,37 +102,21 @@ class FunctionalGroupDetector:
         with open(config_path, encoding="utf-8") as fh:
             raw = yaml.safe_load(fh)
 
-        for category, entries in raw.items():
-            for entry in entries:
-                name = entry["name"]
-                smarts_str = entry["smarts"]
-                try:
-                    query = smarts(smarts_str)
-                except Exception as exc:
-                    logger.warning(
-                        "Could not parse SMARTS for %s (%s): %s",
-                        name,
-                        smarts_str,
-                        exc,
-                    )
-                    continue
-                self._patterns.append(
-                    {
-                        "name": name,
-                        "category": category,
-                        "query": query,
-                    }
-                )
-                # Consumed by the protection strategy, not by detection.
-                if entry.get("template_smarts"):
-                    self._templates[name] = (
-                        entry["template_smarts"],
-                        entry.get("modification_type", "label"),
-                    )
-
-    def _cache_key(self, molecule: MoleculeContainer) -> str:
-        """Return a canonical SMILES string suitable as a cache key."""
-        return format(molecule, "h")
+        entries = [
+            (entry, category) for category, group in raw.items() for entry in group
+        ]
+        self._patterns = _load_patterns(
+            (entry["name"], category, entry["smarts"]) for entry, category in entries
+        )
+        # Consumed by the protection strategy, not by detection.
+        self._templates = {
+            entry["name"]: (
+                entry["template_smarts"],
+                entry.get("modification_type", "label"),
+            )
+            for entry, _ in entries
+            if entry.get("template_smarts")
+        }
 
     def detect_all(self, molecule: MoleculeContainer) -> list[FunctionalGroupMatch]:
         """Detect all functional group matches in a molecule.
@@ -110,7 +131,7 @@ class FunctionalGroupDetector:
         :return: List of FunctionalGroupMatch objects.
         """
         order = molecule.smiles_atoms_order
-        key = self._cache_key(molecule)
+        key = format(molecule, "h")
         cached = self._cache.get(key)
         if cached is None:
             cached = self._cache[key] = self._scan(molecule, order)
@@ -129,20 +150,11 @@ class FunctionalGroupDetector:
     ) -> list[tuple[str, str, tuple[int, ...]]]:
         """Match every pattern, atoms given as positions in ``order``."""
         position = {atom: index for index, atom in enumerate(order)}
-        found: list[tuple[str, str, tuple[int, ...]]] = []
-        seen: set[tuple[str, tuple[int, ...]]] = set()
-
-        for pat in self._patterns:
-            query = pat["query"]
-            for mapping in query.get_mapping(molecule):
-                positions = tuple(sorted(position[atom] for atom in mapping.values()))
-                dedup_key = (pat["name"], positions)
-                if dedup_key in seen:
-                    continue
-                seen.add(dedup_key)
-                found.append((pat["name"], pat["category"], positions))
-
-        return found
+        return _distinct_matches(
+            self._patterns,
+            molecule,
+            lambda atoms: tuple(sorted(position[atom] for atom in atoms)),
+        )
 
     def detect_competing(
         self,
@@ -158,10 +170,7 @@ class FunctionalGroupDetector:
         :param reaction_center_atoms: Atom indices of the reaction center.
         :return: List of FunctionalGroupMatch objects for competing FGs.
         """
-        all_matches = self.detect_all(molecule)
-        return [
-            m for m in all_matches if not set(m.atom_indices) & reaction_center_atoms
-        ]
+        return _away_from_centre(self.detect_all(molecule), reaction_center_atoms)
 
     def detect_reacting(
         self,
@@ -177,11 +186,14 @@ class FunctionalGroupDetector:
         :param reaction_center_atoms: Atom indices of the reaction center.
         :return: The FunctionalGroupMatch at the reaction center, or None.
         """
-        all_matches = self.detect_all(molecule)
-        for m in all_matches:
-            if set(m.atom_indices) & reaction_center_atoms:
-                return m
-        return None
+        return next(
+            (
+                m
+                for m in self.detect_all(molecule)
+                if set(m.atom_indices) & reaction_center_atoms
+            ),
+            None,
+        )
 
     def clear_cache(self) -> None:
         """Clear the internal results cache."""
@@ -221,26 +233,9 @@ class HalogenDetector:
         with open(config_path, encoding="utf-8") as fh:
             raw = yaml.safe_load(fh)
 
-        for name, entry in raw.items():
-            smarts_str = entry["smarts"]
-            family = entry["family"]
-            try:
-                query = smarts(smarts_str)
-            except Exception as exc:
-                logger.warning(
-                    "Could not parse halogen SMARTS for %s (%s): %s",
-                    name,
-                    smarts_str,
-                    exc,
-                )
-                continue
-            self._patterns.append(
-                {
-                    "name": name,
-                    "family": family,
-                    "query": query,
-                }
-            )
+        self._patterns = _load_patterns(
+            (name, entry["family"], entry["smarts"]) for name, entry in raw.items()
+        )
 
     def detect_all(self, molecule: MoleculeContainer) -> list[HalogenMatch]:
         """Detect all halogen matches in a molecule.
@@ -248,26 +243,12 @@ class HalogenDetector:
         :param molecule: A chython MoleculeContainer to search.
         :return: List of HalogenMatch objects.
         """
-        matches: list[HalogenMatch] = []
-        seen: set[tuple[str, tuple[int, ...]]] = set()
-
-        for pat in self._patterns:
-            query = pat["query"]
-            for mapping in query.get_mapping(molecule):
-                atom_indices = tuple(sorted(mapping.values()))
-                key = (pat["name"], atom_indices)
-                if key in seen:
-                    continue
-                seen.add(key)
-                matches.append(
-                    HalogenMatch(
-                        name=pat["name"],
-                        family=pat["family"],
-                        atom_indices=atom_indices,
-                    )
-                )
-
-        return matches
+        return [
+            HalogenMatch(name=name, family=family, atom_indices=atoms)
+            for name, family, atoms in _distinct_matches(
+                self._patterns, molecule, lambda atoms: tuple(sorted(atoms))
+            )
+        ]
 
     def detect_competing_halogens(
         self,
@@ -280,10 +261,7 @@ class HalogenDetector:
         :param reaction_center_atoms: Atom indices of the reaction center.
         :return: List of HalogenMatch objects for competing halogens.
         """
-        all_matches = self.detect_all(molecule)
-        return [
-            m for m in all_matches if not set(m.atom_indices) & reaction_center_atoms
-        ]
+        return _away_from_centre(self.detect_all(molecule), reaction_center_atoms)
 
     def detect_reaction_center_halogens(
         self,
@@ -296,8 +274,11 @@ class HalogenDetector:
         :param reaction_center_atoms: Atom indices of the reaction center.
         :return: List of HalogenMatch objects at the reaction center.
         """
-        all_matches = self.detect_all(molecule)
-        return [m for m in all_matches if set(m.atom_indices) & reaction_center_atoms]
+        return [
+            m
+            for m in self.detect_all(molecule)
+            if set(m.atom_indices) & reaction_center_atoms
+        ]
 
     def count_same_family_competing(
         self,

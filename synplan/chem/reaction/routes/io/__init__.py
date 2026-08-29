@@ -29,8 +29,8 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    if name == "_route_tree_has_null_node":
-        from synplan.chem.reaction.routes.io.json import _route_tree_has_null_node
+    if name == "route_tree_has_null_node":
+        from synplan.chem.reaction.routes.io.json import route_tree_has_null_node
 
-        return _route_tree_has_null_node
+        return route_tree_has_null_node
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

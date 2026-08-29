@@ -2,26 +2,23 @@
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Mapping
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 
 def reaction_metadata(reaction) -> dict[str, Any]:
-    metadata = getattr(reaction, "meta", None)
-    return dict(metadata) if isinstance(metadata, Mapping) else {}
+    """The reaction's metadata as a plain dict, detached from the reaction."""
+
+    return dict(reaction.meta)
 
 
 def restore_reaction_metadata(reaction, metadata: Any) -> None:
-    if not isinstance(metadata, Mapping):
-        return
-    existing = getattr(reaction, "meta", None)
-    if isinstance(existing, dict):
-        existing.update(metadata)
-        return
-    try:
-        reaction.meta = dict(metadata)
-    except (AttributeError, TypeError):
-        logger.warning("Route reaction metadata could not be attached")
+    """Put a file's metadata back on a reaction.
+
+    ``chython`` exposes ``meta`` as a lazily built dict with no setter, so this
+    updates rather than assigns. Anything the file wrote that is not a mapping is
+    ignored -- the metadata block is the one part of a route node with no shape.
+    """
+
+    if isinstance(metadata, Mapping):
+        reaction.meta.update(metadata)

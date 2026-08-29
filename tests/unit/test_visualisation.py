@@ -5,6 +5,7 @@ from synplan.chem.precursor import Precursor
 from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.routes.io import make_json
 from synplan.mcts.node import Node
+from synplan.mcts.tree import Tree
 from synplan.utils.visualisation import extract_routes
 
 
@@ -24,6 +25,8 @@ class _MockConfig:
 
 
 class _MockRouteMetadataTree:
+    step_metadata = Tree.step_metadata
+
     def route_details(self, node_id: int) -> dict:
         assert node_id == 7
         return {
@@ -88,7 +91,15 @@ def test_a_route_read_back_from_json_keeps_the_rules_that_made_it():
 def test_extract_routes_uses_root_to_terminal_steps():
     target = Precursor(make_mol(7))
     product = Precursor(make_mol(8))
-    tree = type("RouteTree", (), {})()
+    tree = type(
+        "RouteTree",
+        (),
+        {
+            "route_node_ids": Tree.route_node_ids,
+            "route_steps": Tree.route_steps,
+            "route_to_node": Tree.route_to_node,
+        },
+    )()
     tree.config = _MockConfig()
     tree.building_blocks = frozenset()
     tree.nodes = {

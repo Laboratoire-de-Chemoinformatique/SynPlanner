@@ -3,7 +3,9 @@
 import logging
 import pickle
 from collections import deque
+from collections.abc import Iterator
 from dataclasses import dataclass, field, fields
+from itertools import pairwise
 from os import PathLike
 from time import time
 
@@ -13,11 +15,6 @@ from tqdm.auto import tqdm
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
 from synplan.chem.reaction.routes.route import Route
-from synplan.chem.reaction.routes.traversal import (
-    iter_route_nodes,
-    iter_route_steps,
-    route_node_ids,
-)
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
 from synplan.mcts.config import TreeConfig
 from synplan.mcts.evaluation import EvaluationStrategy
@@ -43,6 +40,15 @@ ALGORITHMS = {
 }
 
 logger = logging.getLogger(__name__)
+
+
+def _not_a_node(node_id) -> str:
+    """The message for a route asked about by something that is not a node id."""
+
+    return (
+        f"{node_id!r} is not a node of this tree: a route is identified by the "
+        "id of the node it ends at (tree.winning_nodes), not by its position"
+    )
 
 
 @dataclass
@@ -728,9 +734,12 @@ class Tree:
 
         :param node_id: The id of the current given node.
         :return: The route score.
+        :raises ValueError: if ``node_id`` is not a node of this tree.
         """
 
-        route_nodes = tuple(iter_route_nodes(self, node_id))
+        if node_id not in self.nodes:  # a route of no nodes has no length to divide by
+            raise ValueError(_not_a_node(node_id))
+        route_nodes = tuple(self.route_to_node(node_id))
         route_length = len(route_nodes)
         cumulated_nodes_value = sum(node.total_value for node in route_nodes)
 
@@ -763,6 +772,24 @@ class Tree:
         routes.sort(key=lambda route: route.provenance.search_score, reverse=True)
         return routes
 
+    def route_node_ids(self, node_id: int) -> tuple[int, ...]:
+        """The ids from the root down to ``node_id``.
+
+        :raises KeyError: if a node on the way up is not in this tree.
+        """
+
+        path = []
+        while node_id:
+            path.append(node_id)
+            node_id = self.parents[node_id]
+        path.reverse()
+        return tuple(path)
+
+    def route_steps(self, node_id: int) -> Iterator[tuple[Node, Node]]:
+        """Chronological ``(before, after)`` pairs down to ``node_id``."""
+
+        return pairwise(self.route_to_node(node_id))
+
     def route_to_node(self, node_id: int) -> list[Node,]:
         """Returns the route (list of id of nodes) to from the node current node to the
         root node.
@@ -771,7 +798,7 @@ class Tree:
         :return: The list of nodes.
         """
 
-        return list(iter_route_nodes(self, node_id))
+        return [self.nodes[i] for i in self.route_node_ids(node_id)]
 
     def synthesis_route(self, node_id: int) -> tuple[Reaction,]:
         """Given a node_id, return a tuple of reactions that represent the
@@ -790,7 +817,7 @@ class Tree:
                 [x.molecule for x in after.new_precursors],
                 [before.curr_precursor.molecule],
             )
-            for before, after in iter_route_steps(self, node_id)
+            for before, after in self.route_steps(node_id)
         ]
 
         return tuple(reversed(reaction_sequence))
@@ -935,13 +962,38 @@ class Tree:
             for depth, counts in sorted(depth_children.items())
         }
 
+    def step_metadata(self, node_id: int) -> dict[int, dict]:
+        """The rule behind each step of a route, keyed by step number.
+
+        :meth:`route_details` numbers steps from the target down; a route numbers
+        them from the deepest step up, so the two run opposite ways and this is
+        where they are reconciled.
+
+        :raises ValueError: if ``node_id`` is not a node of this tree.
+        """
+
+        steps = self.route_details(node_id).get("steps", [])
+        return {
+            len(steps) - 1 - index: {
+                "step_id": len(steps) - 1 - index,
+                "tree_node_id": step.get("node_id"),
+                "rule_id": step.get("rule_id"),
+                "rule_source": step.get("rule_source"),
+                "rule_key": step.get("rule_key"),
+            }
+            for index, step in enumerate(steps)
+        }
+
     def route_details(self, node_id: int) -> dict:
         """Get full details about a route ending at the given node.
 
         :param node_id: The id of the terminal (winning) node.
         :return: Dict with route_score, route_length, and per-step details.
+        :raises ValueError: if ``node_id`` is not a node of this tree.
         """
-        route_ids = route_node_ids(self.parents, node_id)
+        if node_id not in self.nodes:
+            raise ValueError(_not_a_node(node_id))
+        route_ids = self.route_node_ids(node_id)
         steps = []
         for route_node_id in route_ids[1:]:
             node = self.nodes[route_node_id]

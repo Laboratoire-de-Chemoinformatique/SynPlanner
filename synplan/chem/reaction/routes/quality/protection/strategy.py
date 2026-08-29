@@ -1,7 +1,7 @@
 """Protection-group strategy: choose a protecting group and splice it into a route.
 
-Implements the corrective half of Westerlund et al., *ChemRxiv*, 2025
-(https://doi.org/10.26434/chemrxiv-2025-gdrr8): the scanner reports competing
+Implements the corrective half of Westerlund et al., *J. Chem. Inf. Model.* 2026
+(https://doi.org/10.1021/acs.jcim.6c01147): the scanner reports competing
 sites, this module decides what to protect, builds the protection /
 deprotection pair, and rewrites the route around the affected steps.
 

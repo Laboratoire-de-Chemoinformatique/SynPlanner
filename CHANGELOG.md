@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `write_search_record(tree, path)` / `read_search_record(path)` write a finished
+  search to one file and read it back: the molecules interned into one list, the node
+  graph holding indices into it, the ids of the winning nodes, and the statistics the
+  graph cannot recompute. It carries **no routes section** -- a route is a path through
+  the nodes, so `record.routes()` rebuilds them, and on a 330-route celecoxib tree the
+  routes would have cost another 1.22 MB against the whole file's 0.56 MB (0.08 MB
+  gzipped, or write a `.json.gz` and get it). The catalogue is not in it either; that belongs to
+  the run's configuration. What comes back is a `SearchRecord`, not a `Tree`: the
+  policy, the rules and the evaluator are machinery, and the file cannot resume a
+  search. Tutorial 05 writes one instead of hand-assembling a CSV and a
+  `tree_analysis.json`, and tutorial 06 reads it.
+
+- `write_routes_json` takes an iterable of `Route`, each writing itself, and
+  `read_routes_json(..., as_routes=True)` hands `Route` objects back. The
+  `{route_id: {step_id: Reaction}}` mapping still works and the v1 file is unchanged.
+
 ### Changed
 
 - The reactor no longer puts back aromaticity a `kekule` -> `thiele` round trip
@@ -69,6 +87,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   arithmetically the plain product.
 
 ### Fixed
+
+- `write_routes_json(routes_dict, path, tree=tree)` reads the mapping's keys as tree
+  node ids, and an `enumerate` index instead raised `ZeroDivisionError: division by
+  zero` from inside `route_score`, because a route of no nodes has no length to divide
+  by. `Tree.route_score` and `Tree.route_details` now say what they wanted: *"0 is not
+  a node of this tree: a route is identified by the id of the node it ends at
+  (tree.winning_nodes), not by its position"*.
 
 - The GUI's "Generate full HTML report" button lost its protection ranking when the
   scorer came off the `Tree`, and the report came out in search order with nobody told.

@@ -7,8 +7,8 @@ their severity using an FG x FG incompatibility matrix.
 The competing-sites identification approach is inspired by the methodology of:
 
     Westerlund et al., "Toward lab-ready AI synthesis plans with protection
-    strategies and route scoring", *ChemRxiv*, 2025.
-    https://doi.org/10.26434/chemrxiv-2025-gdrr8
+    strategies and route scoring", *J. Chem. Inf. Model.* 2026, 66, 6361.
+    https://doi.org/10.1021/acs.jcim.6c01147
 """
 
 import csv
@@ -67,14 +67,13 @@ class IncompatibilityMatrix:
     def __init__(self, config_path: str):
         self._matrix: dict[str, dict[str, int]] = {}
         with open(config_path, encoding="utf-8") as fh:
-            reader = csv.reader(fh, delimiter="\t")
-            header = next(reader)
-            col_names = header[1:]  # skip empty first cell
+            reader = csv.DictReader(fh, delimiter="\t")
+            names = reader.fieldnames[0]  # the header's empty first cell
             for row in reader:
-                row_name = row[0]
-                self._matrix[row_name] = {
-                    col_names[i]: int(row[i + 1])
-                    for i in range(min(len(col_names), len(row) - 1))
+                self._matrix[row[names]] = {
+                    column: int(severity)
+                    for column, severity in row.items()
+                    if column != names and column is not None and severity is not None
                 }
 
     def lookup(self, competing_fg: str, reacting_fg: str) -> str:

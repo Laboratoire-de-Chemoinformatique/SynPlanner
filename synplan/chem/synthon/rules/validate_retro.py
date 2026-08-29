@@ -36,6 +36,7 @@ from chython.containers import MoleculeContainer
 
 from synplan.chem.reaction.reactor import apply_reaction_rule
 from synplan.chem.reaction.rules import parse_priority_rules, rule_query_pattern
+from synplan.chem.utils import safe_canonicalization
 
 RING_RULES_PATH = Path(__file__).with_name("ring_rules.json")
 STOCK_PATH = (
@@ -88,11 +89,7 @@ def _rhs_maps(rhs_text: str) -> list[int]:
 
 def _canonical(smi: str) -> str:
     """One spelling for both sides of the identity comparison."""
-    molecule = smiles(smi)
-    molecule.canonicalize()
-    molecule.clean_stereo()
-    molecule.canonicalize()
-    return str(molecule)
+    return str(safe_canonicalization(smiles(smi)))
 
 
 def _tautomer_ambiguous(target: MoleculeContainer) -> bool:
@@ -156,8 +153,7 @@ def check_retro_rule(record: dict, stock: frozenset[str] = frozenset()) -> Retro
             rule_id, False, "no query pattern; PriorityPolicy would gate it off forever"
         )
 
-    target = smiles(record["example_target"])
-    target.canonicalize()
+    target = safe_canonicalization(smiles(record["example_target"]))
     products = [list(group) for group in apply_reaction_rule(target, rule)]
     if not products:
         return RetroCheck(
