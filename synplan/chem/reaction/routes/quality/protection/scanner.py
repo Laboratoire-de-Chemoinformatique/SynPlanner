@@ -7,8 +7,8 @@ their severity using an FG x FG incompatibility matrix.
 The competing-sites identification approach is inspired by the methodology of:
 
     Westerlund et al., "Toward lab-ready AI synthesis plans with protection
-    strategies and route scoring", *ChemRxiv*, 2025.
-    https://doi.org/10.26434/chemrxiv-2025-gdrr8
+    strategies and route scoring", *J. Chem. Inf. Model.* 2026, 66, 6361.
+    https://doi.org/10.1021/acs.jcim.6c01147
 """
 
 import csv

@@ -194,7 +194,7 @@ Score routes for protection group issues
 
 The protection scoring module flags competing functional groups in a route: steps where
 a reagent may react with an unintended site, indicating a potential need for protecting groups.
-This follows the methodology of `Westerlund et al. (2025) <https://doi.org/10.26434/chemrxiv-2025-gdrr8>`_.
+This follows the methodology of `Westerlund et al. (2026) <https://doi.org/10.1021/acs.jcim.6c01147>`_.
 
 Ranking is a second step, after the search:
 
