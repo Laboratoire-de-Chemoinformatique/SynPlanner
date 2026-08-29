@@ -396,21 +396,27 @@ class Route:
                         f"step {index} no longer makes {step.product} after composition"
                     )
                 products[index] = composed
-            made: dict[str, list[int]] = {}
-            for index, product in products.items():
-                made.setdefault(str(product), []).append(index)
             target = products[root_step(self.steps)]
 
             def source_of(mol: MoleculeContainer, consumer: int | None):
-                """Which earlier step makes ``mol`` -- matched on spelling."""
-                earlier = [
-                    index
-                    for index in made.get(str(mol), ())
-                    if consumer is None or index < consumer
-                ]
-                if not earlier:
+                """Which earlier step makes ``mol`` -- by the atoms they share.
+
+                Composition numbers every step onto one graph, so the step whose
+                product is built from these atoms is the one that made it. Two
+                steps making the same molecule are still two steps, and spelling
+                could not tell them apart.
+                """
+                atoms = frozenset(mol)
+                shared, index = max(
+                    (
+                        (len(atoms & frozenset(product)), earlier)
+                        for earlier, product in products.items()
+                        if consumer is None or earlier < consumer
+                    ),
+                    default=(0, None),
+                )
+                if not shared:
                     return None
-                index = max(earlier)
                 return index, reactions[index], products[index]
         else:
             reactions = self.reactions_dict
