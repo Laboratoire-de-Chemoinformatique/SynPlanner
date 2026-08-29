@@ -25,6 +25,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The reactor no longer puts back aromaticity a `kekule` -> `thiele` round trip
+  dropped. Its test was "these ring atoms were aromatic and are not now", which is
+  equally true when the rule itself made the ring non-aromatic, when
+  `standardize_tautomers` moved to a tautomer that is not, and when the input claimed
+  an aromaticity chython does not perceive -- RDKit aromatises 4-quinolinones and
+  pyrazolones and chython does not, so an RDKit-written SMILES arrives making a claim
+  this model rejects. Restoring produced molecules `canonicalize` rewrites and whose
+  `==` does not match their own canonical form, and those spread: a route's leaf
+  verdict and a search record both read them back differently than they were written.
+  On a celecoxib search this halves the non-canonical precursors and finds **412
+  routes where 330 were found before**, in a smaller tree. Four other targets are
+  unaffected to the node.
+
+- `apply_reaction_rule` reports a precursor the canonicalizer would rewrite, so an
+  uncanonicalized molecule reaching the search can be traced to where it came from.
+  Off unless this module's logger is at `DEBUG`, because the only way to tell is to
+  canonicalize and doing that per precursor costs the search a tenth of its time.
+  Nothing is repaired: a repair hides the origin, which is the thing worth finding.
+
+### Changed
+
 - Route scoring is a post-search step, not something the tree holds. `Tree` no longer
   takes `route_scorer` (it raises `TypeError`), and `Tree.route_score` returns the
   search's own number, always cheap. Rank with

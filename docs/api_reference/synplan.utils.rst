@@ -44,6 +44,30 @@ synplan.utils.logging module
    :undoc-members:
    :show-inheritance:
 
+synplan.utils.align2d module
+----------------------------
+
+.. automodule:: synplan.utils.align2d
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+synplan.utils.routedraw module
+------------------------------
+
+.. automodule:: synplan.utils.routedraw
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+synplan.utils.routelayout module
+--------------------------------
+
+.. automodule:: synplan.utils.routelayout
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 synplan.utils.visualisation module
 ----------------------------------
 

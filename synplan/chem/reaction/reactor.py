@@ -8,12 +8,8 @@ from typing import Any
 from chython.containers import MoleculeContainer, ReactionContainer, SynthonContainer
 from chython.exceptions import InvalidAromaticRing
 from chython.reactor import Reactor
-from chython.reactor.base import (
-    restore_aromaticity,
-    snapshot_aromaticity_subset,
-)
 
-from synplan.chem.utils import validate_and_canonicalize
+from synplan.chem.utils import safe_canonicalization, validate_and_canonicalize
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +45,6 @@ class CanonicalRetroReactor(Reactor):
     ) -> MoleculeContainer:
         new = super()._patcher(structure, mapping)
 
-        # Bug-6 protection: snapshot pre-kekule aromatic atoms.
-        pre_aromatic = {n for n, a in new.atoms() if a.hybridization == 4}
-        snapshot = (
-            snapshot_aromaticity_subset(new, pre_aromatic) if pre_aromatic else None
-        )
-
         try:
             new.kekule(ignore_pyrrole_hydrogen=self._fix_broken_pyrroles)
         except InvalidAromaticRing:
@@ -69,10 +59,6 @@ class CanonicalRetroReactor(Reactor):
             new.implicify_hydrogens(_fix_stereo=False)
             if not new.thiele(fix_tautomers=self._fix_tautomers):
                 new.fix_stereo()
-            if pre_aromatic:
-                post_aromatic = {n for n, a in new.atoms() if a.hybridization == 4}
-                if not pre_aromatic.issubset(post_aromatic):
-                    restore_aromaticity(new, snapshot)
             new.standardize_charges(prepare_molecule=False)
             new.standardize_tautomers(prepare_molecule=False)
             new.clean_stereo()
@@ -275,6 +261,7 @@ def apply_reaction_rule(
 
                 if rm_dup:
                     seen_reactants.add(reactants_key)
+                _warn_if_not_canonical(merged_reactants)
                 yield merged_reactants
 
                 if multirule and reactants_key not in expanded_keys:
@@ -340,3 +327,51 @@ def reaction_rules_appliance(
             continue
 
     return applied_rules, priority_rules
+
+
+def _warn_if_not_canonical(precursors: list[MoleculeContainer]) -> None:
+    """Report a precursor this library would not have written itself.
+
+    Off unless this module's logger is set to ``DEBUG``: the only way to tell is to
+    canonicalize, and canonicalizing every precursor costs the search about a tenth
+    of its time. Turn it on when hunting::
+
+        logging.getLogger("synplan.chem.reaction.reactor").setLevel(logging.DEBUG)
+
+    The reactor canonicalizes the whole patched molecule, but what is yielded are
+    its fragments, and a fragment on its own does not always canonicalize the way
+    it did inside the whole -- three per celecoxib search, all of them a ring
+    hydrogen the canonicalizer puts on the other nitrogen, e.g.
+    ``FC(F)(F)c1[nH]nc(-c2ccc(cc2)C)c1``. Aromatic either way, so no aromaticity
+    check can see them.
+
+    Nothing is repaired here. A repair hides where the molecule came from, and the
+    point of saying so is to be able to go and look -- at a building-block file, a
+    target, or a rule's own SMILES.
+
+    Aromaticity is the usual suspect and is usually innocent. None of these is
+    reported, because each comes out canonical:
+
+    * ``OCc1cc(=O)c2ccccc2n1C`` with ``[C:1]-[O;h1:2]>>[C:1]=[O:2]`` --
+      1-methyl-2-(hydroxymethyl)quinolin-4(1H)-one. The pyridinone ring comes out
+      kekulized because RDKit aromatises 4-quinolinones and chython does not, so
+      the input arrived claiming an aromaticity this model rejects. This is the
+      case the old aromaticity restorer existed for, and restoring it produced a
+      molecule ``canonicalize`` disagreed with.
+    * ``FC(F)(F)c1[nH]nc(c1Br)C`` with ``[c:1]-[Br:2]>>[c:1]-[O:2]`` -- the rule
+      itself turns the pyrazole into a pyrazolone, which chython does not hold
+      aromatic.
+    * ``FC(F)(F)c1cc(OS(=O)(=O)C(F)(F)F)n(n1)-c2ccc(cc2)S(=O)(=O)N`` losing its
+      triflate -- the patcher leaves an aromatic 5-hydroxypyrazole and
+      ``standardize_tautomers`` moves it to the pyrazolone.
+    """
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    for molecule in precursors:
+        canonical = str(safe_canonicalization(molecule))
+        if str(molecule) != canonical:
+            logger.debug(
+                "precursor %s is not canonical; the canonicalizer writes it %s",
+                molecule,
+                canonical,
+            )
