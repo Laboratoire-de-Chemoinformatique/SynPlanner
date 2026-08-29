@@ -370,21 +370,58 @@ class Route:
             a RouteCGR, or the per-step-local numbering fuses distinct atoms.
         """
 
-        reactions = self.reactions_dict
+        stock = frozenset(molecule_key(leaf) for leaf in self.leaves())
+        stock -= self.unresolved
+        target = self.target
+
         if reconcile_atom_mapping:
-            result = build_route_cgr({0: reactions}, 0, include_reactions=True)
+            result = build_route_cgr(
+                {0: self.reactions_dict}, 0, include_reactions=True
+            )
             if not result.ok:
                 raise _composition_error(result)
             reactions = dict(result.reactions_dict)
+            # Composition rewrites every step: it renumbers them onto one atom
+            # numbering and hands back the by-products the search's steps left
+            # out. Neither the objects nor the numbering survive, so the link
+            # falls back to spelling, the way a route read out of a file is
+            # linked -- an earlier step that makes what this one consumes.
+            products = {}
+            for index, step in enumerate(self.steps):
+                composed = next(
+                    (p for p in reactions[index].products if p == step.product), None
+                )
+                if composed is None:
+                    raise ValueError(
+                        f"step {index} no longer makes {step.product} after composition"
+                    )
+                products[index] = composed
+            made: dict[str, list[int]] = {}
+            for index, product in products.items():
+                made.setdefault(str(product), []).append(index)
+            target = products[root_step(self.steps)]
 
-        made = steps_by_product(self.steps)
-        stock = frozenset(molecule_key(leaf) for leaf in self.leaves())
-        stock -= self.unresolved
+            def source_of(mol: MoleculeContainer, consumer: int | None):
+                """Which earlier step makes ``mol`` -- matched on spelling."""
+                earlier = [
+                    index
+                    for index in made.get(str(mol), ())
+                    if consumer is None or index < consumer
+                ]
+                if not earlier:
+                    return None
+                index = max(earlier)
+                return index, reactions[index], products[index]
+        else:
+            reactions = self.reactions_dict
+            made = steps_by_product(self.steps)
 
-        def source_of(mol: MoleculeContainer, consumer: int | None):
-            """Which step makes ``mol`` -- read off identity, never re-derived."""
-            index = made.get(id(mol))
-            return None if index is None else (index, self.steps[index].reaction, mol)
+            def source_of(mol: MoleculeContainer, consumer: int | None):
+                """Which step makes ``mol`` -- read off identity, never re-derived."""
+                index = made.get(id(mol))
+                return (
+                    None if index is None else (index, self.steps[index].reaction, mol)
+                )
 
         def step_fields(index: int) -> tuple[str, dict[str, Any]]:
             step = self.steps[index]
@@ -401,7 +438,7 @@ class Route:
             return mapped_smiles(reactions[index]), extra
 
         return route_tree(
-            self.target, source_of, lambda mol, key, leaf: key in stock, step_fields
+            target, source_of, lambda mol, key, leaf: key in stock, step_fields
         )
 
     # ------------------------------------------------------------------
