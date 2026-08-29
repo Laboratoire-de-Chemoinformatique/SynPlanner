@@ -1,5 +1,3 @@
-import pickle
-
 import pytest
 from chython import smiles
 from chython.containers import CGRContainer, ReactionContainer
@@ -9,20 +7,30 @@ from synplan.chem.reaction.routes.clustering import (
     subcluster_all_clusters,
     subcluster_one_cluster,
 )
+from synplan.chem.reaction.routes.io import read_routes_json
+from synplan.chem.reaction.routes.representation import compose_all_sb_cgrs
 
-
-@pytest.fixture(scope="module")
-def sb_cgrs_dict():
-    """Load precomputed SB-CGRs from pickle."""
-    with open("tests/data/sb_cgrs_1_1.pkl", "rb") as f:
-        return pickle.load(f)
+#: 28 routes for one target, generated with seeded MCTS; see
+#: ``tests/data/clustering/README.md`` for the target and the tree config.
+ROUTES = "tests/data/clustering/routes_mol_medium.json"
 
 
 @pytest.fixture(scope="module")
 def routes_cgrs_dict():
-    """Load precomputed RouteCGRs from pickle."""
-    with open("tests/data/route_cgrs_1_1.pkl", "rb") as f:
-        return pickle.load(f)
+    """RouteCGRs composed from the committed routes.
+
+    Composed here rather than read from a pickled snapshot: the routes are
+    readable, their provenance is written down, and a regression in composition
+    shows up as a clustering failure instead of hiding behind a stale binary.
+    """
+    routes = read_routes_json(ROUTES, as_routes=True)
+    return {index: route.route_cgr() for index, route in enumerate(routes)}
+
+
+@pytest.fixture(scope="module")
+def sb_cgrs_dict(routes_cgrs_dict):
+    """The strategic-bond reduction of the same routes."""
+    return compose_all_sb_cgrs(routes_cgrs_dict)
 
 
 def test_cluster_routes_empty():
@@ -40,7 +48,7 @@ def test_cluster_routes_valid(sb_cgrs_dict):
     total = sum(len(cluster["route_ids"]) for cluster in clusters.values())
     assert total == len(sb_cgrs_dict)
 
-    expected_keys = ["2.1", "3.1", "3.2", "4.1", "4.2", "4.3"]
+    expected_keys = ["3.1", "3.2", "4.1", "5.1", "5.2", "5.3", "5.4"]
     assert list(clusters.keys()) == expected_keys
     for route_id, value in clusters.items():
         assert isinstance(route_id, str)
