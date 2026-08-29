@@ -5,6 +5,8 @@ from chython.containers import MoleculeContainer
 from chython.files import smarts
 from chython.reactor import Transformer
 
+from synplan.chem.utils import safe_canonicalization
+
 # six PG/LG removals applied to fixpoint, so a di-Cbz piperazine loses both. Each deletes the
 # WHOLE group and caps with H; Boc is absent because plain Murcko already removes it.
 PG_RULES = (
@@ -76,15 +78,12 @@ def murcko_scaffold(molecule: MoleculeContainer, strip: bool = True) -> str:
     core = murcko_atoms(stripped)
     if not core:
         return LINEAR
-    scaffold = stripped.substructure(core)
-    scaffold.canonicalize()
+    scaffold = safe_canonicalization(stripped.substructure(core))
     return str(scaffold)
 
 
 def scaffold_smiles(smi: str, strip: bool = True) -> str:
-    molecule = smiles(smi)
-    molecule.canonicalize()
-    return murcko_scaffold(molecule, strip)
+    return murcko_scaffold(safe_canonicalization(smiles(smi)), strip)
 
 
 __all__ = [
