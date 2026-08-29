@@ -10,21 +10,11 @@ Get started
 Run in Google Colab
 -------------------
 
-Run selected tutorials directly in Google Colab (no local install):
+Every tutorial runs in Google Colab with no local install. Open the tutorial you
+want and click the |Colab| badge at the top of it: the setup cell installs
+SynPlanner and downloads the data it needs, and does nothing when the notebook is
+run locally.
 
-- Retrosynthetic planning |Colab-Retro|
-- SynPlanner benchmarking |Colab-Bench|
-- Route clustering by strategic bonds |Colab-Cluster|
-
-.. |Colab-Retro| image:: https://colab.research.google.com/assets/colab-badge.svg
-   :target: https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb
-   :alt: Open in Colab
-
-.. |Colab-Bench| image:: https://colab.research.google.com/assets/colab-badge.svg
-   :target: https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb
-   :alt: Open in Colab
-
-.. |Colab-Cluster| image:: https://colab.research.google.com/assets/colab-badge.svg
-   :target: https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/routes_clustering.ipynb
-   :alt: Open in Colab
+.. |Colab| image:: https://colab.research.google.com/assets/colab-badge.svg
+   :alt: Open In Colab
 

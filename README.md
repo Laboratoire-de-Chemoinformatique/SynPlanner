@@ -30,8 +30,8 @@ the synthesizability of intermediate products (value network).
 - Rule extraction: extract reaction templates with configurable specificity
 - Model training: train policy and value networks (supervised + RL)
 - Retrosynthesis: MCTS-based planning with multiple search strategies
-- Route quality: competing-sites scoring for functional group selectivity ([Westerlund et al.](https://chemrxiv.org/engage/chemrxiv/article-details/68ff62f6ef936fb4a29b02d8))
-- Route clustering: group routes by strategic bonds ([Gilmullin et al.](https://chemrxiv.org/doi/full/10.26434/chemrxiv-2025-lnkz6-vz))
+- Route quality: competing-sites scoring for functional group selectivity ([Westerlund et al.](https://doi.org/10.1021/acs.jcim.6c01147))
+- Route clustering: group routes by strategic bonds ([Gilmullin et al.](https://doi.org/10.1021/acs.jcim.6c00489))
 - Visualization: HTML route reports and interactive GUI
 
 ## Installation
@@ -73,14 +73,13 @@ synplan planning \
 Paths above are what `synplanner-gps` writes — the download command prints each one.
 
 > [!TIP]
-> Try it in the browser, no installation required:
-> [Retrosynthetic planning](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/retrosynthetic_planning.ipynb) &middot;
-> [Benchmarking](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/planning_benchmarking.ipynb) &middot;
-> [Route clustering](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/colab/routes_clustering.ipynb)
+> **Every tutorial runs in your browser.** Open the
+> [tutorial index](https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials) and click the ![Colab](https://colab.research.google.com/assets/colab-badge.svg) badge next to the one you
+> want — it installs SynPlanner and downloads its data for you. Nothing to set up.
 
 The full CLI includes commands for every pipeline step: `reaction_mapping`, `reaction_standardizing`, `reaction_filtering`, `rule_extracting`, `ranking_policy_training`, `planning`, `clustering`, and more. Run `synplan --help` for the complete list.
 
-For local tutorials covering all steps from data curation to protection scoring, see the [tutorials/](https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials) directory and the [documentation](https://synplanner.readthedocs.io/).
+The [tutorials](https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials) cover every step from data curation to protection scoring, route clustering and library design; the [documentation](https://synplanner.readthedocs.io/) explains the methods behind them.
 
 ## Using SynPlanner with an AI agent
 
@@ -117,14 +116,14 @@ If you use `SynPlanner` in your research, please cite:
 
 If you use route clustering, please also cite:
 
-> Gilmullin, A.; Akhmetshin, T.; Madzhidov, T.; Varnek, A.
-> **Route Clustering by Strategic Bonds.**
-> *ChemRxiv*, 2025.
-> [doi:10.26434/chemrxiv-2025-lnkz6-vz](https://chemrxiv.org/doi/full/10.26434/chemrxiv-2025-lnkz6-vz)
+> Gilmullin, A.; Akhmetshin, T.; Zankov, D.; Klimchuk, O.; Horvath, D.; Madzhidov, T.; Varnek, A.
+> **Leveraging the Condensed Graph of Reaction for Clustering Retrosynthetic Pathways.**
+> *J. Chem. Inf. Model.* **2026**, ASAP.
+> [doi:10.1021/acs.jcim.6c00489](https://doi.org/10.1021/acs.jcim.6c00489)
 
 If you use the protection / route quality scoring, please also cite:
 
-> Westerlund, A. M. et al.
+> Westerlund, A. M.; Sigmund, L. M.; Mijangos, M. V.; Kannas, C.; Genheden, S.; Kabeshov, M.
 > **Toward Lab-Ready AI Synthesis Plans with Protection Strategies and Route Scoring.**
-> *ChemRxiv*, 2025.
-> [doi:10.26434/chemrxiv-2025-68ff6](https://chemrxiv.org/engage/chemrxiv/article-details/68ff62f6ef936fb4a29b02d8)
+> *J. Chem. Inf. Model.* **2026**, *66* (11), 6361–6375.
+> [doi:10.1021/acs.jcim.6c01147](https://doi.org/10.1021/acs.jcim.6c01147)
