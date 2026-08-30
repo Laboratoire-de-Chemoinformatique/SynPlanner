@@ -20,7 +20,7 @@ constructs that context from each :class:`~synplan.chem.reaction.routes.route.St
 * the disconnected product is ``step.product``;
 * the forward reaction's reactants are ``step.reaction.reactants``;
 * availability comes from ``route.leaves()`` and ``route.unresolved``;
-* rule provenance comes from ``step.origin`` through an injected resolver.
+* ``step.origin.rule_id`` indexes the supplied reaction-rule collection.
 
 This distinction matters for reactions with more than one product: the route
 records which product the step actually disconnects instead of assuming the
@@ -41,8 +41,9 @@ with an equal fraction of the product's heavy atoms:
 -----------
 
 The available-substances score is the fraction of a step's precursors that are
-purchasable route leaves. It reads the verdict stored by ``Route`` and does not
-query the original tree or repeat a building-block catalogue lookup.
+purchasable route leaves. One available precursor therefore scores ``1 / 1 =
+1``. It reads the verdict stored by ``Route`` and does not query the original
+tree or repeat a building-block catalogue lookup.
 
 ``RDScore``
 -----------
@@ -51,12 +52,12 @@ The ring-disconnection score is one when the product has more rings than all
 precursors together, and zero otherwise.
 
 ``STScore`` -- provisional
--------------------------
+---------------------------
 
 The existing STScore matching formula is known to be incorrect. It is retained
 locally as work in progress but is disabled by default and must be corrected
-before this feature is published. Enabling it requires a resolver from a route
-``Step`` to its canonical retro reactor.
+before this feature is published. Enabling it requires the ordered reaction-rule
+collection whose indices match each route ``Step``'s ``origin.rule_id``.
 
 Normalized aggregation
 ======================

@@ -81,9 +81,6 @@ def calculate_stscore(
 
     :returns: STScore value, Range: (0, 1]
     """
-    # TODO: Replace this implementation once the corrected STScore definition
-    # and matching semantics are agreed. Route integration deliberately keeps
-    # rule resolution separate so that correction does not depend on Tree.
     if rule is None:
         logger.warning("Rule is None. Cannot compute STScore.")
         return UNAVAILABLE

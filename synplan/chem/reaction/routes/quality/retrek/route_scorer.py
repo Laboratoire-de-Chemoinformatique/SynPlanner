@@ -1,7 +1,7 @@
 """ReTReK route-level scorer."""
 
 import math
-from collections.abc import Callable
+from collections.abc import Sequence
 
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.routes.quality.retrek.config import RetrekRouteScoringConfig
@@ -32,24 +32,24 @@ class RetrekRouteScorer(RouteScorer):
     step, computes its normalized weighted score, and returns the arithmetic
     mean over the route.
 
-    STScore requires a rule resolver to map each route step to a
-    CanonicalRetroReactor. When no resolver is given (default), STScore
-    cannot be enabled.
+    STScore reads ``step.origin.rule_id`` and uses it to index an ordered
+    collection of canonical retro reactors. When no collection is given
+    (default), STScore cannot be enabled.
 
     :param config: RetrekRouteScoringConfig instance.
-    :param rule_resolver: Optional callable that maps a Step
-        to a CanonicalRetroReactor or None.
+    :param reaction_rules: Optional ordered collection of reaction rules whose
+        indices match ``Step.origin.rule_id``.
     """
 
     def __init__(
         self,
         config: RetrekRouteScoringConfig | None = None,
-        rule_resolver: Callable[[Step], "CanonicalRetroReactor | None"] | None = None,
+        reaction_rules: Sequence[CanonicalRetroReactor] | None = None,
     ) -> None:
         self._config = config or RetrekRouteScoringConfig()
-        if "st" in self._config.enabled_scores and rule_resolver is None:
-            raise ValueError("STScore requires a rule_resolver for Route steps")
-        self._rule_resolver = rule_resolver
+        if "st" in self._config.enabled_scores and reaction_rules is None:
+            raise ValueError("STScore requires reaction_rules for Route steps")
+        self._reaction_rules = reaction_rules
         self._scorers_and_weights = [
             (_SCORERS[name](), self._config.weights[name])
             for name in self._config.enabled_scores
@@ -64,7 +64,16 @@ class RetrekRouteScorer(RouteScorer):
         :param available_leaf_ids: Identities of purchasable route leaves.
         :return: ReactionScoreContext for scoring.
         """
-        rule = self._rule_resolver(step) if self._rule_resolver is not None else None
+        rule = None
+        if self._reaction_rules is not None:
+            if step.origin is None or step.origin.rule_id is None:
+                raise ValueError("STScore requires Step.origin.rule_id")
+            rule_id = step.origin.rule_id
+            if not 0 <= rule_id < len(self._reaction_rules):
+                raise IndexError(
+                    f"reaction rule {rule_id} is outside the supplied rule collection"
+                )
+            rule = self._reaction_rules[rule_id]
 
         return ReactionScoreContext(
             product=step.product,

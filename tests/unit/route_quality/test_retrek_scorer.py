@@ -13,7 +13,7 @@ from synplan.chem.reaction.routes.quality.retrek import (
     RetrekRouteScoringConfig,
     STRouteScorer,
 )
-from synplan.chem.reaction.routes.route import Route, RouteProvenance, Step
+from synplan.chem.reaction.routes.route import Route, RouteProvenance, Step, StepOrigin
 from synplan.chem.utils import molecule_key
 
 
@@ -49,6 +49,25 @@ def test_asscore_reads_leaf_availability_from_the_route():
     assert ASRouteScorer().score(route) == 0.5
 
 
+def test_asscore_counts_route_leaves_but_not_synthesized_intermediates():
+    first_leaf = smiles("CC")
+    second_leaf = smiles("CO")
+    final_leaf = smiles("N")
+    intermediate = smiles("CCO")
+    target = smiles("CCON")
+
+    make_intermediate = Reaction([first_leaf, second_leaf], [intermediate])
+    make_target = Reaction([intermediate, final_leaf], [target])
+    route = Route(
+        steps=(
+            Step(make_intermediate, intermediate),
+            Step(make_target, target),
+        )
+    )
+
+    assert ASRouteScorer().step_scores(route) == (1.0, 0.5)
+
+
 def test_route_score_is_independent_of_search_provenance():
     low, _, _ = _one_step_route(search_score=0.1)
     high, _, _ = _one_step_route(search_score=0.9)
@@ -65,9 +84,28 @@ def test_route_scorer_ranks_route_objects_by_its_own_score():
     assert ASRouteScorer().rank([unsolved, solved]) == [solved, unsolved]
 
 
-def test_stscore_requires_an_explicit_step_resolver():
-    with pytest.raises(ValueError, match="rule_resolver"):
+def test_stscore_requires_reaction_rules():
+    with pytest.raises(ValueError, match="reaction_rules"):
         STRouteScorer()
+
+
+def test_stscore_indexes_reaction_rules_with_the_step_rule_id():
+    class AlwaysMatchingPattern:
+        @staticmethod
+        def get_mapping(_reactant):
+            yield {}
+
+    class Rule:
+        _products = (AlwaysMatchingPattern(),)
+
+    precursor = smiles("CC")
+    target = smiles("CCO")
+    reaction = Reaction([precursor], [target])
+    route = Route(
+        steps=(Step(reaction, target, StepOrigin(rule_id=1)),),
+    )
+
+    assert STRouteScorer(reaction_rules=(object(), Rule())).score(route) == 1.0
 
 
 def test_example_config_loads_with_route_defaults():

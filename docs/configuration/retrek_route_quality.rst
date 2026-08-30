@@ -42,3 +42,5 @@ must be positive. The defaults enable CDScore, ASScore and RDScore.
 
     STScore is disabled by default because its current formula is known to be
     incorrect. It must not be enabled for published results until corrected.
+    When enabled for development, pass the ordered ``reaction_rules`` collection
+    to the scorer; each ``Step.origin.rule_id`` indexes that collection directly.
