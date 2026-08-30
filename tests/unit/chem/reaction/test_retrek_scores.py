@@ -51,6 +51,26 @@ def test_asscore_uses_the_aligned_availability_verdict():
     assert ASScore().compute(_context(available_precursors=(True, False))) == 0.5
 
 
+@pytest.mark.parametrize(
+    ("available", "expected"),
+    [
+        (True, 1.0),
+        (False, 0.0),
+    ],
+)
+def test_asscore_scores_one_precursor_from_its_availability(available, expected):
+    context = _context(precursors=("CC",), available_precursors=(available,))
+
+    assert ASScore().compute(context) == expected
+
+
+def test_asscore_rejects_an_empty_precursor_list():
+    context = _context(precursors=(), available_precursors=())
+
+    with pytest.raises(ValueError, match="At least one precursor"):
+        ASScore().compute(context)
+
+
 def test_asscore_is_unavailable_without_an_availability_verdict():
     assert math.isnan(ASScore().compute(_context()))
 

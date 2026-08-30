@@ -49,8 +49,8 @@ def calculate_asscore(
     :returns: ASScore value, Range: [0, 1]
     """
     k = len(available_precursors)
-    if k <= 1:
-        return 0.0
+    if k == 0:
+        raise ValueError("At least one precursor is required.")
     return sum(available_precursors) / k
 
 
