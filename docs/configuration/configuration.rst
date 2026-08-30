@@ -26,3 +26,4 @@ For the conceptual background of each stage, see :doc:`/methods/methods`. For ho
     value
     planning
     synthonisation
+    retrek_route_quality
