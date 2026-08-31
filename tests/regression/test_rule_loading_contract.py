@@ -21,8 +21,10 @@ import pickle
 from pathlib import Path
 
 import pytest
+from chython import smiles as smiles_parser
 from chython.reactor.reactor import Reactor
 
+from synplan.chem.reaction import apply_reaction_rule
 from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions
 from synplan.utils.loading import load_reaction_rules
 
@@ -142,10 +144,22 @@ def test_load_reaction_rules_legacy_pickle_unpacks_priority_tuples(tmp_path: Pat
         )
 
 
-def test_load_reaction_rules_preserves_component_local_cxsmarts(tmp_path: Path):
-    """CXSMARTS indices emitted per component must stay component-local."""
-    rule_smarts = "[C:1]-[O:2]>>[C:1].[C:3]-[O:2] |^1:1|"
-    rules_path = tmp_path / "radical_rule.tsv"
+def test_shipped_tempo_rule_keeps_radical_on_tempo_oxygen(tmp_path: Path):
+    """The shipped rule must return benzyl alcohol plus the TEMPO radical.
+
+    This is data row 3555 of ``supervised_gps/v1/reaction_rules.tsv`` (16
+    source reactions), copied verbatim. Its CXSMARTS index is local to the
+    second product: atom 4 in that component is the TEMPO oxygen, map 8.
+    Parsing the complete reaction instead makes a carbon in the first product
+    radical and the rule no longer applies to benzoic acid.
+    """
+    rule_smarts = (
+        "[c:1]-[C:2](-[O:3])=[O:8]>>"
+        "[c:1]-[C:2]-[O:3]."
+        "[C:4]-[C:5]-1(-[C:6])-[N:7](-[O:8])-[C:9](-[C:10])(-[C:11])-"
+        "[C:12]-[C:13]-[C:14]-1 |^1:4|"
+    )
+    rules_path = tmp_path / "tempo_oxidation_rule.tsv"
     rules_path.write_text(
         f"rule_smarts\tpopularity\treaction_indices\n{rule_smarts}\t1\t0\n",
         encoding="utf-8",
@@ -169,4 +183,15 @@ def test_load_reaction_rules_preserves_component_local_cxsmarts(tmp_path: Path):
     ]
 
     assert pattern_radicals == []
-    assert product_radicals == [(2, "O")]
+    assert product_radicals == [(8, "O")]
+
+    precursor_sets = list(
+        apply_reaction_rule(
+            smiles_parser("O=C(O)c1ccccc1"), reactor, top_reactions_num=10
+        )
+    )
+    assert len(precursor_sets) == 1
+    assert sorted(
+        tuple(atom.atomic_symbol for _, atom in precursor.atoms() if atom.is_radical)
+        for precursor in precursor_sets[0]
+    ) == [(), ("O",)]

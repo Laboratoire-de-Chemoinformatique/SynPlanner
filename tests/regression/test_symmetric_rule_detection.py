@@ -141,8 +141,19 @@ def test_symmetric_lhs_with_equivalent_rhs_handles_is_not_decollapsed():
     assert not _needs_decollapsed_matches(rule_smarts)
 
 
-def test_overlapping_asymmetric_lhs_query_keeps_distinct_precursors():
-    rule_smarts = "[C:1]-[C;H2,H3:2]>>[C:1]-[Cl:3].[C:2]-[Br:4]"
+def test_degree_refined_suzuki_query_keeps_both_disconnections():
+    """A redundant degree constraint must not hide a real Suzuki route.
+
+    This is the shipped Suzuki rule at data row 76 (1,931 source reactions),
+    with only ``D3`` added to one coupling carbon. Both coupling carbons
+    already have three neighbours in the query, so the predicates overlap for
+    every match even though their SMARTS labels are not textually equal.
+    """
+    rule_smarts = (
+        "[c:1]:[c:2](:[c:3])-[c;D3:5](:[c:4]):[c:6]>>"
+        "[c:4]:[c:5](:[c:6])-[B:8](-[O:9])-[O:10]."
+        "[c:1]:[c:2](:[c:3])-[I:7]"
+    )
     reactor = CanonicalRetroReactor.from_smarts(
         rule_smarts,
         delete_atoms=False,
@@ -152,23 +163,30 @@ def test_overlapping_asymmetric_lhs_query_keeps_distinct_precursors():
     precursor_sets = {
         tuple(sorted(str(precursor) for precursor in precursors))
         for precursors in apply_reaction_rule(
-            mol_from_smiles("CC(C)CC"), reactor, top_reactions_num=100
+            mol_from_smiles("C1=CC(C2C=CC=NC=2)=CC(C)=C1"),
+            reactor,
+            top_reactions_num=100,
         )
     }
 
     assert precursor_sets == {
-        ("CBr", "CC(C)CCl"),
-        ("CBr", "CCC(Cl)C"),
-        ("CC(C)CBr", "ClC"),
-        ("CC(C)Cl", "CCBr"),
+        ("Cc1cc(I)ccc1", "OB(O)c1cnccc1"),
+        ("Ic1cccnc1", "OB(O)c1cccc(C)c1"),
     }
 
 
-def test_lhs_bond_stereo_does_not_hide_a_valid_match_orientation():
+def test_mixed_e_z_dienyl_suzuki_keeps_valid_match_orientation():
+    """Stereo must not make the only valid Suzuki orientation disappear.
+
+    Chython deduplicates the two orientations by matched atom set before it
+    validates the E/Z constraints. With filtering enabled it can retain the
+    orientation that fails stereo and discard the valid vinyl iodide/boronate
+    disconnection.
+    """
     rule_smarts = (
-        "[F:1]/[C:2]([Cl:9])=[C:3](/[Br:10])-[C:4]-[C:5]-"
-        "[C:6](/[Br:11])=[C:7]([Cl:12])/[F:8]>>"
-        "[C:4]-[I:13].[C:5]-[B:14]"
+        "[c:1]/[CH:2]=[CH:3]/[CH:4]=[CH:5]\\[c:6]>>"
+        "[c:1]/[CH:2]=[CH:3]/[I:7]."
+        "[B:8](-[O:9])(-[O:10])/[CH:4]=[CH:5]\\[c:6]"
     )
     reactor = CanonicalRetroReactor.from_smarts(
         rule_smarts,
@@ -176,15 +194,17 @@ def test_lhs_bond_stereo_does_not_hide_a_valid_match_orientation():
         automorphism_filter=not _needs_decollapsed_matches(rule_smarts),
     )
 
-    reactions = list(reactor(smiles_parser("F/C(Cl)=C(/Br)-C-C-C(/Br)=C(Cl)/F")))
+    reactions = list(reactor(smiles_parser("c1ccccc1/C=C/C=C\\c1ccccc1")))
 
     assert len(reactions) == 1
 
 
-def test_lhs_atom_stereo_does_not_hide_a_valid_match_orientation():
+def test_chiral_alkyl_suzuki_keeps_valid_match_orientation():
+    """Atom stereo must not erase a valid stereospecific C-C disconnection."""
     rule_smarts = (
-        "[CH3:5]-[C@H:1]([F:3])-[CH:2]([F:4])-[CH3:6]>>"
-        "[CH3:5]-[CH:1]([F:3])-[CH:2]([Cl:7])-[CH3:6].[F:4]"
+        "[CH3:5]-[C@H:1]([c:3])-[CH:2]([c:4])-[CH3:6]>>"
+        "[CH3:5]-[CH:1]([c:3])-[I:7]."
+        "[CH3:6]-[CH:2]([c:4])-[B:8](-[O:9])-[O:10]"
     )
     reactor = CanonicalRetroReactor.from_smarts(
         rule_smarts,
@@ -192,7 +212,7 @@ def test_lhs_atom_stereo_does_not_hide_a_valid_match_orientation():
         automorphism_filter=not _needs_decollapsed_matches(rule_smarts),
     )
 
-    reactions = list(reactor(smiles_parser("C[C@H](F)[C@H](F)C")))
+    reactions = list(reactor(smiles_parser("C[C@H](c1ccccc1)[C@H](c1ccccc1)C")))
 
     assert len(reactions) == 1
 
