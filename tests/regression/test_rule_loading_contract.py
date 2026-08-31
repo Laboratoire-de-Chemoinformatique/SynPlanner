@@ -140,3 +140,33 @@ def test_load_reaction_rules_legacy_pickle_unpacks_priority_tuples(tmp_path: Pat
             "Downstream MCTS code will fail with 'tuple object is not "
             "callable' when it tries to apply the rule."
         )
+
+
+def test_load_reaction_rules_preserves_component_local_cxsmarts(tmp_path: Path):
+    """CXSMARTS indices emitted per component must stay component-local."""
+    rule_smarts = "[C:1]-[O:2]>>[C:1].[C:3]-[O:2] |^1:1|"
+    rules_path = tmp_path / "radical_rule.tsv"
+    rules_path.write_text(
+        f"rule_smarts\tpopularity\treaction_indices\n{rule_smarts}\t1\t0\n",
+        encoding="utf-8",
+    )
+
+    load_reaction_rules.cache_clear()
+    (reactor,) = load_reaction_rules(str(rules_path))
+    load_reaction_rules.cache_clear()
+
+    pattern_radicals = [
+        (number, atom.atomic_symbol)
+        for pattern in reactor._patterns
+        for number, atom in pattern.atoms()
+        if atom.is_radical
+    ]
+    product_radicals = [
+        (number, atom.atomic_symbol)
+        for product in reactor._products
+        for number, atom in product.atoms()
+        if atom.is_radical
+    ]
+
+    assert pattern_radicals == []
+    assert product_radicals == [(2, "O")]

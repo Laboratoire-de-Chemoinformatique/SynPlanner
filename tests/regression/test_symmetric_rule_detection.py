@@ -3,6 +3,7 @@ import sys
 
 import pytest
 from chython import smarts as smarts_parser
+from chython import smiles as smiles_parser
 
 from synplan.chem.reaction import CanonicalRetroReactor, apply_reaction_rule
 from synplan.chem.reaction.rules import (
@@ -140,10 +141,60 @@ def test_symmetric_lhs_with_equivalent_rhs_handles_is_not_decollapsed():
     assert not _needs_decollapsed_matches(rule_smarts)
 
 
-def test_overlapping_asymmetric_lhs_query_is_outside_formal_symmetry_scope():
+def test_overlapping_asymmetric_lhs_query_keeps_distinct_precursors():
     rule_smarts = "[C:1]-[C;H2,H3:2]>>[C:1]-[Cl:3].[C:2]-[Br:4]"
+    reactor = CanonicalRetroReactor.from_smarts(
+        rule_smarts,
+        delete_atoms=False,
+        automorphism_filter=not _needs_decollapsed_matches(rule_smarts),
+    )
 
-    assert not _needs_decollapsed_matches(rule_smarts)
+    precursor_sets = {
+        tuple(sorted(str(precursor) for precursor in precursors))
+        for precursors in apply_reaction_rule(
+            mol_from_smiles("CC(C)CC"), reactor, top_reactions_num=100
+        )
+    }
+
+    assert precursor_sets == {
+        ("CBr", "CC(C)CCl"),
+        ("CBr", "CCC(Cl)C"),
+        ("CC(C)CBr", "ClC"),
+        ("CC(C)Cl", "CCBr"),
+    }
+
+
+def test_lhs_bond_stereo_does_not_hide_a_valid_match_orientation():
+    rule_smarts = (
+        "[F:1]/[C:2]([Cl:9])=[C:3](/[Br:10])-[C:4]-[C:5]-"
+        "[C:6](/[Br:11])=[C:7]([Cl:12])/[F:8]>>"
+        "[C:4]-[I:13].[C:5]-[B:14]"
+    )
+    reactor = CanonicalRetroReactor.from_smarts(
+        rule_smarts,
+        delete_atoms=False,
+        automorphism_filter=not _needs_decollapsed_matches(rule_smarts),
+    )
+
+    reactions = list(reactor(smiles_parser("F/C(Cl)=C(/Br)-C-C-C(/Br)=C(Cl)/F")))
+
+    assert len(reactions) == 1
+
+
+def test_lhs_atom_stereo_does_not_hide_a_valid_match_orientation():
+    rule_smarts = (
+        "[CH3:5]-[C@H:1]([F:3])-[CH:2]([F:4])-[CH3:6]>>"
+        "[CH3:5]-[CH:1]([F:3])-[CH:2]([Cl:7])-[CH3:6].[F:4]"
+    )
+    reactor = CanonicalRetroReactor.from_smarts(
+        rule_smarts,
+        delete_atoms=False,
+        automorphism_filter=not _needs_decollapsed_matches(rule_smarts),
+    )
+
+    reactions = list(reactor(smiles_parser("C[C@H](F)[C@H](F)C")))
+
+    assert len(reactions) == 1
 
 
 def test_whole_fragment_detects_downstream_handle_difference():
