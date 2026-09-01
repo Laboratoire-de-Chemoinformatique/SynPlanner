@@ -6,6 +6,7 @@ import re
 import warnings
 from collections.abc import Iterable
 from io import StringIO
+from pathlib import Path
 from typing import Literal
 
 from chython import smiles as smiles_parser
@@ -339,10 +340,9 @@ def _warn_stereo_loss(molecule: MoleculeContainer) -> None:
     ):
         return
     warnings.warn(
-        "Input stereochemistry is being discarded: SynPlanner's rule application "
-        "and its synthon/building-block stock are keyed on flat structures, so "
-        "any route proposed for this molecule is racemic / relative configuration "
-        "not determined.",
+        "Input stereochemistry is being discarded because this caller requested "
+        "clean_stereo=True. Pass clean_stereo=False for stereo-aware planning or "
+        "InChIKey catalogue preparation.",
         StereoDiscardedWarning,
         stacklevel=3,
     )
@@ -378,7 +378,9 @@ def clean_molecule(
         return molecule
 
 
-def safe_canonicalization(molecule: MoleculeContainer) -> MoleculeContainer:
+def safe_canonicalization(
+    molecule: MoleculeContainer, *, clean_stereo: bool = True
+) -> MoleculeContainer:
     """The one spelling of a molecule: canonical, flat, without 2D coordinates.
 
     The building-block catalogue is written with this, so it is also what a
@@ -388,10 +390,13 @@ def safe_canonicalization(molecule: MoleculeContainer) -> MoleculeContainer:
     :return: The canonicalized molecule, or the molecule itself when chython
         cannot prepare its aromatic ring.
     """
-    # ponytail: sorts the caller's own molecule, not just the copy; callers may
-    # lean on that, so it stays until someone checks
+    molecule = molecule.copy()
     molecule._atoms = dict(sorted(molecule._atoms.items()))
-    return clean_molecule(molecule, clean2d=False)
+    return clean_molecule(
+        molecule,
+        clean_stereo=clean_stereo,
+        clean2d=False,
+    )
 
 
 def validate_and_canonicalize(
@@ -406,9 +411,8 @@ def validate_and_canonicalize(
     For user inputs (targets, building blocks), use the permissive
     ``safe_canonicalization`` instead.
     """
-    # Atom-key sort, idempotent across calls.
-    molecule._atoms = dict(sorted(molecule._atoms.items()))
     tmp = molecule.copy()
+    tmp._atoms = dict(sorted(tmp._atoms.items()))
     try:
         tmp.remove_coordinate_bonds(keep_to_terminal=False)
         tmp.kekule()
@@ -419,7 +423,7 @@ def validate_and_canonicalize(
         tmp.thiele(fix_tautomers=True)
         tmp.standardize_charges(prepare_molecule=False)
         tmp.standardize_tautomers(prepare_molecule=False)
-        tmp.clean_stereo()
+        tmp.fix_stereo()
         return tmp
     except InvalidAromaticRing:
         return None
@@ -435,6 +439,11 @@ def standardize_building_blocks(input_file: str, output_file: str) -> str:
     """
     if input_file == output_file:
         raise ValueError("input_file name and output_file name cannot be the same.")
+
+    if Path(output_file).suffix.lower() == ".json":
+        from synplan.chem.building_blocks import standardize_building_block_catalogue
+
+        return standardize_building_block_catalogue(input_file, output_file)
 
     with (
         MoleculeReader(input_file) as inp_file,

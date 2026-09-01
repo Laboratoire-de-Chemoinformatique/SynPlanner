@@ -1,0 +1,91 @@
+import json
+
+import pytest
+from click.testing import CliRunner
+from frozendict import frozendict
+
+from synplan.chem.building_blocks import (
+    BuildingBlock,
+    load_building_block_indexes,
+)
+from synplan.chem.utils import standardize_building_blocks
+from synplan.interfaces.cli import synplan
+
+CATALOGUE = """SMILES\tLN_ppg\tSA_ppg
+F[C@H](Cl)Br\t10\t0
+F[C@@H](Cl)Br\t5\t7
+F/C=C/F\t8\t0
+F/C=C\\F\t9\t0
+CCO\t4\t0
+OCC\t2\t3
+"""
+
+
+def test_standardize_json_preserves_stereo_and_merges_vendor_prices(tmp_path):
+    source = tmp_path / "blocks.tsv"
+    output = tmp_path / "blocks.json"
+    source.write_text(CATALOGUE)
+
+    assert standardize_building_blocks(str(source), str(output)) == str(output)
+
+    raw = json.loads(output.read_text())
+    assert len(raw) == 5
+    stereo_records = [record for record in raw.values() if record["has_stereo"]]
+    assert len(stereo_records) == 4
+    assert sum("@" in record["smiles"] for record in stereo_records) == 2
+    assert sum(
+        "/" in record["smiles"] or "\\" in record["smiles"]
+        for record in stereo_records
+    ) == 2
+    ethanol = next(record for record in raw.values() if record["smiles"] == "CCO")
+    assert ethanol == {
+        "smiles": "CCO",
+        "vendors": {"LN": 2.0, "SA": 3.0},
+        "has_stereo": False,
+    }
+
+    by_key, candidates = load_building_block_indexes(output)
+    assert isinstance(by_key, frozendict)
+    assert isinstance(candidates, frozendict)
+    assert all(isinstance(block, BuildingBlock) for block in by_key.values())
+    assert all(block in candidates[block.inchikey[:14]] for block in by_key.values())
+
+
+def test_standardize_json_is_atomic_and_reports_every_bad_row(tmp_path):
+    source = tmp_path / "blocks.tsv"
+    output = tmp_path / "blocks.json"
+    output.write_text('{"old":true}\n')
+    source.write_text(
+        "SMILES\tLN_ppg\nCCO\tnot-a-price\n\t3\nCCN\t-1\nCCCC\tinf\n"
+    )
+
+    with pytest.raises(ValueError, match="4 invalid row"):
+        standardize_building_blocks(str(source), str(output))
+
+    assert output.read_text() == '{"old":true}\n'
+    report = (tmp_path / "blocks.json.errors.tsv").read_text()
+    assert "not numeric" in report
+    assert "SMILES is empty" in report
+    assert "finite and non-negative" in report
+
+
+def test_existing_cli_and_python_function_produce_identical_json(tmp_path):
+    source = tmp_path / "blocks.tsv"
+    direct = tmp_path / "direct.json"
+    cli = tmp_path / "cli.json"
+    source.write_text(CATALOGUE)
+    standardize_building_blocks(str(source), str(direct))
+
+    result = CliRunner().invoke(
+        synplan,
+        [
+            "building_blocks_standardizing",
+            "--input",
+            str(source),
+            "--output",
+            str(cli),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert cli.read_bytes() == direct.read_bytes()
