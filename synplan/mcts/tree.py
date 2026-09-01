@@ -12,6 +12,11 @@ from time import time
 from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
+from synplan.chem.building_blocks import (
+    BuildingBlockCandidateIndex,
+    BuildingBlocksByInchiKey,
+    molecule_has_stereo,
+)
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
 from synplan.chem.reaction.routes.route import Route
@@ -131,10 +136,11 @@ class Tree:
         target: MoleculeContainer,
         config: TreeConfig,
         reaction_rules: list[CanonicalRetroReactor],
-        building_blocks: set[str],
+        building_blocks: set[str] | frozenset[str] | BuildingBlocksByInchiKey,
         expansion_function: Policy,
         evaluation_function: EvaluationStrategy = None,
         priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
+        building_block_candidates: BuildingBlockCandidateIndex | None = None,
     ):
         """Initializes a tree object with optional parameters for tree search for target
         molecule.
@@ -172,7 +178,18 @@ class Tree:
 
         # building blocks and reaction reaction_rules
         self.reaction_rules = tuple(reaction_rules)
-        self.building_blocks = frozenset(building_blocks)
+        if building_block_candidates is None:
+            self.building_blocks = frozenset(building_blocks)
+            self.building_block_candidates = None
+            self.use_full_inchikey = False
+        else:
+            if self.config.direction == "forward":
+                raise ValueError(
+                    "JSON building-block catalogues are supported only for retrosynthesis"
+                )
+            self.building_blocks = building_blocks
+            self.building_block_candidates = building_block_candidates
+            self.use_full_inchikey = molecule_has_stereo(target)
         self.priority_rules: dict[str, tuple[CanonicalRetroReactor, ...]] = {
             name: tuple(rules) for name, rules in (priority_rules or {}).items()
         }
@@ -198,6 +215,7 @@ class Tree:
 
         assert evaluation_function is not None, "Evaluation function is required"
         self.evaluator = evaluation_function
+        rollout = getattr(self.evaluator, "rollout", None)
 
         # A forward search only makes sense if the tree and its evaluator share a finish line. The
         # tree stops on `building_blocks`; a rollout evaluator carries its OWN copy and rewards
@@ -210,7 +228,6 @@ class Tree:
                     "config.direction='forward' but building_blocks is empty; in forward mode "
                     "it is the GOAL to reach, so an empty set can never be satisfied."
                 )
-            rollout = getattr(self.evaluator, "rollout", None)
             if rollout is not None and (
                 frozenset(rollout.building_blocks) != self.building_blocks
                 or rollout.min_mol_size != self.config.min_mol_size
@@ -222,6 +239,11 @@ class Tree:
                     f"{len(frozenset(rollout.building_blocks))} and "
                     f"min_mol_size={rollout.min_mol_size}."
                 )
+
+        if rollout is not None:
+            rollout.building_blocks = self.building_blocks
+            rollout.building_block_candidates = self.building_block_candidates
+            rollout.use_full_inchikey = self.use_full_inchikey
 
         # tree initialization
         target_node = self._init_target_node(target)
@@ -534,7 +556,10 @@ class Tree:
                 x
                 for x in new_precursor
                 if not x.is_building_block(
-                    self.building_blocks, self.config.min_mol_size
+                    self.building_blocks,
+                    self.config.min_mol_size,
+                    building_block_candidates=self.building_block_candidates,
+                    use_full_inchikey=self.use_full_inchikey,
                 )
             ),
         )

@@ -1,6 +1,8 @@
 import pytest
 from chython import smiles
+from frozendict import frozendict
 
+from synplan.chem.building_blocks import BuildingBlock, molecule_to_inchikey
 from synplan.chem.precursor import Precursor
 
 
@@ -65,3 +67,60 @@ def test_precursor_inequality(simple_molecule, complex_molecule):
 def test_precursor_with_invalid_input():
     with pytest.raises(Exception):  # noqa: B017
         Precursor(None)
+
+
+def _stereo_block(smiles_value: str) -> BuildingBlock:
+    molecule = smiles(smiles_value, ignore_stereo=False)
+    return BuildingBlock(
+        smiles=str(molecule),
+        inchikey=molecule_to_inchikey(molecule),
+        vendors=frozendict({"vendor": 1.0}),
+        has_stereo=True,
+    )
+
+
+def test_full_inchikey_membership_separates_stereoisomers():
+    r_block = _stereo_block("C[C@H](O)C(=O)O")
+    s_precursor = Precursor(smiles("C[C@@H](O)C(=O)O", ignore_stereo=False))
+    full_index = frozendict({r_block.inchikey: r_block})
+    candidates = frozendict({r_block.inchikey[:14]: (r_block,)})
+
+    assert not s_precursor.is_building_block(
+        full_index,
+        min_mol_size=0,
+        building_block_candidates=candidates,
+        use_full_inchikey=True,
+    )
+    assert s_precursor.is_building_block(
+        full_index,
+        min_mol_size=0,
+        building_block_candidates=candidates,
+        use_full_inchikey=False,
+    )
+
+
+def test_precursor_generates_its_inchikey_only_once(monkeypatch):
+    import synplan.chem.precursor as precursor_module
+
+    block = _stereo_block("C[C@H](O)C(=O)O")
+    full_index = frozendict({block.inchikey: block})
+    candidates = frozendict({block.inchikey[:14]: (block,)})
+    original = precursor_module.molecule_to_inchikey
+    calls = 0
+
+    def counted(molecule):
+        nonlocal calls
+        calls += 1
+        return original(molecule)
+
+    monkeypatch.setattr(precursor_module, "molecule_to_inchikey", counted)
+    precursor = Precursor(smiles("C[C@H](O)C(=O)O", ignore_stereo=False))
+    for _ in range(3):
+        assert precursor.is_building_block(
+            full_index,
+            min_mol_size=0,
+            building_block_candidates=candidates,
+            use_full_inchikey=True,
+        )
+
+    assert calls == 1

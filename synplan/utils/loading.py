@@ -784,6 +784,7 @@ def load_evaluation_function(eval_config) -> "EvaluationStrategy":
             max_depth=eval_config.max_depth,
             normalize=eval_config.normalize,
             stochastic=eval_config.stochastic,
+            building_block_candidates=eval_config.building_block_candidates,
         )
 
     elif isinstance(eval_config, ValueNetworkEvaluationConfig):

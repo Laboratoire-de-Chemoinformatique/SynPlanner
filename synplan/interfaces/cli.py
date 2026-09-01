@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 import yaml
 
+from synplan.chem.building_blocks import load_building_block_indexes
 from synplan.chem.reaction.curation.filtering import (
     ReactionFilterConfig,
     filter_reactions_from_file,
@@ -138,7 +139,7 @@ def download_all_data_cli(save_to: str = ".") -> None:
     help="Path to the file where standardized building blocks will be stored.",
 )
 def building_blocks_standardizing_cli(input_file: str, output_file: str) -> None:
-    """Standardizes building blocks."""
+    """Standardize molecular files or prepare a vendor-aware JSON catalogue."""
     standardize_building_blocks(input_file=input_file, output_file=output_file)
 
 
@@ -853,11 +854,20 @@ def planning_cli(
         # Rollout evaluation - need to load resources
         policy_function = load_policy_function(weights_path=policy_network)
         reaction_rules_list = load_reaction_rules(reaction_rules)
-        building_blocks_set = load_building_blocks(building_blocks, standardize=False)
+        if Path(building_blocks).suffix.lower() == ".json":
+            building_blocks_set, building_block_candidates = (
+                load_building_block_indexes(building_blocks)
+            )
+        else:
+            building_blocks_set = load_building_blocks(
+                building_blocks, standardize=False
+            )
+            building_block_candidates = None
         evaluation_config = RolloutEvaluationConfig(
             policy_network=policy_function,
             reaction_rules=reaction_rules_list,
             building_blocks=building_blocks_set,
+            building_block_candidates=building_block_candidates,
             min_mol_size=search_config.get("min_mol_size", 6),
             max_depth=search_config.get("max_depth", 6),
             normalize=node_evaluation.get("normalize", False),

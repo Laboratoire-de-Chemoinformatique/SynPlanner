@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from synplan.chem.building_blocks import BuildingBlockCandidateIndex
 from synplan.chem.precursor import Precursor, compose_precursors
 from synplan.chem.rdkit_utils import RDKitScore
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
@@ -39,6 +40,8 @@ class RolloutSimulator:
         min_mol_size: int,
         max_depth: int,
         stochastic: bool = False,
+        building_block_candidates: BuildingBlockCandidateIndex | None = None,
+        use_full_inchikey: bool = False,
     ) -> None:
         """Initialize the rollout simulator.
 
@@ -56,6 +59,8 @@ class RolloutSimulator:
         self.min_mol_size = min_mol_size
         self.max_depth = max_depth
         self.stochastic = stochastic
+        self.building_block_candidates = building_block_candidates
+        self.use_full_inchikey = use_full_inchikey
 
     def _select_reaction(self, current_precursor: Precursor) -> tuple[bool, any, int]:
         """Select a reaction rule to apply.
@@ -141,7 +146,12 @@ class RolloutSimulator:
         """
         max_depth = self.max_depth - current_depth
 
-        if precursor.is_building_block(self.building_blocks, self.min_mol_size):
+        if precursor.is_building_block(
+            self.building_blocks,
+            self.min_mol_size,
+            building_block_candidates=self.building_block_candidates,
+            use_full_inchikey=self.use_full_inchikey,
+        ):
             return 1.0
 
         occurred_precursor = set()
@@ -182,7 +192,10 @@ class RolloutSimulator:
                         x
                         for x in products
                         if not x.is_building_block(
-                            self.building_blocks, self.min_mol_size
+                            self.building_blocks,
+                            self.min_mol_size,
+                            building_block_candidates=self.building_block_candidates,
+                            use_full_inchikey=self.use_full_inchikey,
                         )
                     ]
                 )
@@ -272,6 +285,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         max_depth: int,
         normalize: bool = False,
         stochastic: bool = False,
+        building_block_candidates: BuildingBlockCandidateIndex | None = None,
     ) -> None:
         """Initialize rollout evaluation strategy.
 
@@ -291,6 +305,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
             min_mol_size=min_mol_size,
             max_depth=max_depth,
             stochastic=stochastic,
+            building_block_candidates=building_block_candidates,
         )
         self.normalize = normalize
 
