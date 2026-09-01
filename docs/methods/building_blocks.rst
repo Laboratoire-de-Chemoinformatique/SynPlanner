@@ -36,9 +36,12 @@ price per vendor. This is deliberate: Standard InChI may merge some tautomeric
 representations, and the initial implementation does not preserve their
 alternative SMILES.
 
-The complete catalogue is published atomically only if every row succeeds.
-Failures are collected in ``building_blocks.json.errors.tsv`` and an existing
-JSON output is left untouched.
+Every invalid row is omitted and recorded in
+``building_blocks.json.errors.tsv``. If at least one row succeeds, all valid
+records are published atomically and the function returns the JSON path. If no
+row succeeds, the error report is written, an existing JSON output is left
+untouched, and preparation raises ``ValueError``. A clean run removes a stale
+error report.
 
 The on-disk shape is:
 

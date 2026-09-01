@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import functools
 import json
+import logging
 import math
 import os
 import tempfile
@@ -20,16 +21,18 @@ from frozendict import frozendict
 
 from synplan.chem.utils import safe_canonicalization
 
+from .core import (
+    BuildingBlock,
+    BuildingBlockCandidateIndex,
+    BuildingBlocksByInchiKey,
+)
 from .identity import (
     molecule_has_stereo,
     molecule_to_inchikey,
     validate_standard_inchikey,
 )
-from .model import (
-    BuildingBlock,
-    BuildingBlockCandidateIndex,
-    BuildingBlocksByInchiKey,
-)
+
+logger = logging.getLogger(__name__)
 
 
 def _write_tsv_atomic(path: Path, rows: list[tuple[int, str]]) -> None:
@@ -82,8 +85,9 @@ def standardize_building_block_catalogue(
 ) -> str:
     """Convert a vendor-price TSV into a stereo-preserving Chython JSON catalogue.
 
-    The output is replaced atomically only when every row is valid. All row-level
-    failures are collected in ``<output>.errors.tsv``.
+    Valid rows are published atomically even when other rows fail. All row-level
+    failures are collected in ``<output>.errors.tsv``. If no row is valid, the
+    report is written but an existing output is left untouched.
     """
 
     source = Path(input_file)
@@ -172,14 +176,27 @@ def standardize_building_block_catalogue(
     error_path = Path(f"{output}.errors.tsv")
     if not records and not errors:
         errors.append((1, "catalogue contains no data rows"))
-    if errors:
+    if not records:
         _write_tsv_atomic(error_path, errors)
         raise ValueError(
-            f"{source}: {len(errors)} invalid row(s); details written to {error_path}"
+            f"{source}: no valid rows; {len(errors)} invalid row(s) reported in "
+            f"{error_path}"
         )
 
+    if errors:
+        _write_tsv_atomic(error_path, errors)
     _write_json_atomic(output, records)
-    error_path.unlink(missing_ok=True)
+    if errors:
+        logger.warning(
+            "Published %d building blocks to %s after dropping %d invalid row(s); "
+            "details written to %s",
+            len(records),
+            output,
+            len(errors),
+            error_path,
+        )
+    else:
+        error_path.unlink(missing_ok=True)
     return str(output)
 
 

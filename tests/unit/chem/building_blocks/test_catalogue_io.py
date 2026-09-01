@@ -1,4 +1,6 @@
 import json
+import logging
+from importlib import import_module
 
 import pytest
 from click.testing import CliRunner
@@ -8,6 +10,7 @@ from synplan.chem.building_blocks import (
     BuildingBlock,
     load_building_block_indexes,
 )
+from synplan.chem.building_blocks import io as catalogue_io
 from synplan.chem.utils import standardize_building_blocks
 from synplan.interfaces.cli import synplan
 
@@ -19,6 +22,14 @@ F/C=C\\F\t9\t0
 CCO\t4\t0
 OCC\t2\t3
 """
+
+
+def test_building_block_is_publicly_reexported_from_core():
+    from synplan.chem.building_blocks.core import BuildingBlock as CoreBuildingBlock
+
+    assert BuildingBlock is CoreBuildingBlock
+    with pytest.raises(ModuleNotFoundError):
+        import_module("synplan.chem.building_blocks.model")
 
 
 def test_standardize_json_preserves_stereo_and_merges_vendor_prices(tmp_path):
@@ -51,22 +62,85 @@ def test_standardize_json_preserves_stereo_and_merges_vendor_prices(tmp_path):
     assert all(block in candidates[block.inchikey[:14]] for block in by_key.values())
 
 
-def test_standardize_json_is_atomic_and_reports_every_bad_row(tmp_path):
+def test_standardize_json_publishes_valid_rows_and_reports_every_bad_row(
+    tmp_path, caplog
+):
     source = tmp_path / "blocks.tsv"
     output = tmp_path / "blocks.json"
     output.write_text('{"old":true}\n')
     source.write_text(
-        "SMILES\tLN_ppg\nCCO\tnot-a-price\n\t3\nCCN\t-1\nCCCC\tinf\n"
+        "SMILES\tLN_ppg\n"
+        "CCO\t2\n"
+        "CCN\tnot-a-price\n"
+        "\t3\n"
+        "CCCC\t-1\n"
+        "CCCl\tinf\n"
+        "C1CC\t2\n"
+        "CCC\n"
     )
 
-    with pytest.raises(ValueError, match="4 invalid row"):
-        standardize_building_blocks(str(source), str(output))
+    with caplog.at_level(logging.WARNING):
+        assert standardize_building_blocks(str(source), str(output)) == str(output)
 
-    assert output.read_text() == '{"old":true}\n'
+    raw = json.loads(output.read_text())
+    assert len(raw) == 1
+    assert next(iter(raw.values()))["smiles"] == "CCO"
     report = (tmp_path / "blocks.json.errors.tsv").read_text()
     assert "not numeric" in report
     assert "SMILES is empty" in report
     assert "finite and non-negative" in report
+    assert "row does not match the header column count" in report
+    assert len(report.splitlines()) == 7
+    assert "dropping 6 invalid row(s)" in caplog.text
+
+
+def test_all_invalid_rows_preserve_existing_json(tmp_path):
+    source = tmp_path / "blocks.tsv"
+    output = tmp_path / "blocks.json"
+    output.write_text('{"old":true}\n')
+    source.write_text("SMILES\tLN_ppg\nCCO\tnot-a-price\n\t3\nCCN\t-1\n")
+
+    with pytest.raises(ValueError, match="no valid rows; 3 invalid row"):
+        standardize_building_blocks(str(source), str(output))
+
+    assert output.read_text() == '{"old":true}\n'
+    assert len((tmp_path / "blocks.json.errors.tsv").read_text().splitlines()) == 4
+
+
+def test_partial_publication_preserves_json_if_atomic_replace_fails(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "blocks.tsv"
+    output = tmp_path / "blocks.json"
+    source.write_text("SMILES\tLN_ppg\nCCO\t2\nCCN\tbad-price\n")
+    output.write_text('{"old":true}\n')
+    real_replace = catalogue_io.os.replace
+
+    def fail_json_replace(source_path, destination_path):
+        if destination_path == output:
+            raise OSError("simulated atomic publication failure")
+        real_replace(source_path, destination_path)
+
+    monkeypatch.setattr(catalogue_io.os, "replace", fail_json_replace)
+
+    with pytest.raises(OSError, match="simulated atomic publication failure"):
+        standardize_building_blocks(str(source), str(output))
+
+    assert output.read_text() == '{"old":true}\n'
+    assert not tuple(tmp_path.glob(".blocks.json.*.tmp"))
+
+
+def test_clean_run_removes_a_stale_error_report(tmp_path):
+    source = tmp_path / "blocks.tsv"
+    output = tmp_path / "blocks.json"
+    error_path = tmp_path / "blocks.json.errors.tsv"
+    source.write_text("SMILES\tLN_ppg\nCCO\t2\n")
+    error_path.write_text("stale\n")
+
+    standardize_building_blocks(str(source), str(output))
+
+    assert output.exists()
+    assert not error_path.exists()
 
 
 def test_existing_cli_and_python_function_produce_identical_json(tmp_path):

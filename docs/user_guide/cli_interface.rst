@@ -80,6 +80,10 @@ The Python equivalent is
 See :doc:`/methods/building_blocks` for validation, stereo matching, route
 costing, and compatibility details.
 
+Invalid TSV rows are omitted and reported in ``<output>.errors.tsv`` while
+valid records are still published. Preparation fails without replacing an
+existing JSON only when no row is valid.
+
 Synthon workflows
 -----------------
 The Synt-On workflows share ``configs/synthonisation.yaml``, whose parameters are
