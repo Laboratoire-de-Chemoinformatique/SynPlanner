@@ -28,6 +28,21 @@ from synplan.chem.reaction import apply_reaction_rule
 from synplan.chem.reaction_rules.extraction import extract_rules_from_reactions
 from synplan.utils.loading import load_reaction_rules
 
+_SHIPPED_COMPONENT_LOCAL_CX_RULES = (
+    "[c:1]-[C:2](-[O:3])=[O:8]>>[c:1]-[C:2]-[O:3]."
+    "[C:4]-[C:5]-1(-[C:6])-[N:7](-[O:8])-[C:9](-[C:10])"
+    "(-[C:11])-[C:12]-[C:13]-[C:14]-1 |^1:4|",
+    "[C:1]-[C:2](=[O:3])-[O:8]>>[C:1]-[C:2]-[O:3]."
+    "[C:4]-[C:5]-1(-[C:6])-[N:7](-[O:8])-[C:9](-[C:10])"
+    "(-[C:11])-[C:12]-[C:13]-[C:14]-1 |^1:4|",
+)
+
+
+def _write_rules_tsv(path: Path, rules: tuple[str, ...]) -> None:
+    rows = ["rule_smarts\tpopularity\treaction_indices"]
+    rows.extend(f"{rule}\t1\t{index}" for index, rule in enumerate(rules))
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
 
 @pytest.fixture
 def real_rules_tsv(tmp_path: Path, sample_reactions_file, rule_cfg_factory) -> Path:
@@ -195,3 +210,73 @@ def test_shipped_tempo_rule_keeps_radical_on_tempo_oxygen(tmp_path: Path):
         tuple(atom.atomic_symbol for _, atom in precursor.atoms() if atom.is_radical)
         for precursor in precursor_sets[0]
     ) == [(), ("O",)]
+
+
+def test_loader_preserves_component_local_cx_radicals(tmp_path: Path):
+    """CX radical indices in shipped rules are local to their component."""
+    rules_path = tmp_path / "component_local_cx_rules.tsv"
+    _write_rules_tsv(rules_path, _SHIPPED_COMPONENT_LOCAL_CX_RULES)
+
+    load_reaction_rules.cache_clear()
+    loaded = load_reaction_rules(str(rules_path))
+    load_reaction_rules.cache_clear()
+
+    assert tuple(map(str, loaded)) == _SHIPPED_COMPONENT_LOCAL_CX_RULES
+
+
+def test_loader_accepts_side_global_cx_radical_block(tmp_path: Path):
+    """Fall back to whole-reaction parsing for side-global CX atom indices."""
+    side_global_rule = "[C;D1:1].[C;D1:2] |^1:1|>>[C:1]-[C:2]"
+    rules_path = tmp_path / "side_global_cx_rule.tsv"
+    _write_rules_tsv(rules_path, (side_global_rule,))
+
+    load_reaction_rules.cache_clear()
+    (loaded,) = load_reaction_rules(str(rules_path))
+    load_reaction_rules.cache_clear()
+
+    assert str(loaded) == "[C;D1:1].[C;D1:2] |^1:0|>>[C:1]-[C:2]"
+
+
+def test_loader_assigns_reaction_wide_numbers_to_unmapped_atoms(tmp_path: Path):
+    """Bare atoms must not collide with explicit maps in other components."""
+    partially_mapped_rule = "[O].[C:1]>>[N]-[C:1]"
+    rules_path = tmp_path / "partially_mapped_rule.tsv"
+    _write_rules_tsv(rules_path, (partially_mapped_rule,))
+
+    load_reaction_rules.cache_clear()
+    (loaded,) = load_reaction_rules(str(rules_path))
+    load_reaction_rules.cache_clear()
+
+    assert tuple(tuple(query.atoms_numbers) for query in loaded._patterns) == (
+        (2,),
+        (1,),
+    )
+    assert tuple(tuple(query.atoms_numbers) for query in loaded._products) == ((3, 1),)
+
+
+def test_loader_numbers_unmapped_atoms_after_reaction_cx_fallback(tmp_path: Path):
+    """Whole-reaction CX parsing must use the same global number allocator."""
+    partially_mapped_rule = "[O].[C:1] |^1:1|>>[N]-[C:1]"
+    rules_path = tmp_path / "partially_mapped_cx_rule.tsv"
+    _write_rules_tsv(rules_path, (partially_mapped_rule,))
+
+    load_reaction_rules.cache_clear()
+    (loaded,) = load_reaction_rules(str(rules_path))
+    load_reaction_rules.cache_clear()
+
+    assert tuple(tuple(query.atoms_numbers) for query in loaded._patterns) == (
+        (2,),
+        (1,),
+    )
+    assert tuple(tuple(query.atoms_numbers) for query in loaded._products) == ((3, 1),)
+
+
+def test_loader_rejects_reaction_smarts_with_reagents(tmp_path: Path):
+    """The component parser must preserve the loader's reagent rejection."""
+    rules_path = tmp_path / "rule_with_reagent.tsv"
+    _write_rules_tsv(rules_path, ("[C:1]>[O]>[C:1]",))
+
+    load_reaction_rules.cache_clear()
+    with pytest.raises(ValueError, match="reagents are not supported"):
+        load_reaction_rules(str(rules_path))
+    load_reaction_rules.cache_clear()

@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Union
 import yaml
 from chython import smarts as smarts_parser
 from chython.containers import ReactionContainer
+from chython.files.daylight.tokenize import smarts_tokenize
 from chython.files.SDFrw import SDFRead
 from chython.reactor.reactor import Reactor
 from huggingface_hub import hf_hub_download, snapshot_download
@@ -55,6 +56,7 @@ if TYPE_CHECKING:
 
 REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner-data"
 LEGACY_REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
+_MAX_REGULAR_ATOM_NUMBER = 10**9
 logger = logging.getLogger(__name__)
 
 
@@ -278,17 +280,22 @@ def load_reaction_rules(
     cached value.
 
     :param file: The path to the file that stores the reaction rules.
-    :param reactor_config: Optional ReactorConfig to control Reactor construction
-        (e.g. automorphism_filter, delete_atoms). If None, uses defaults.
+    :param reactor_config: Optional ReactorConfig providing baseline Reactor
+        settings. In particular, ``automorphism_filter=False`` disables match
+        deduplication for every rule. If None, uses defaults.
     :param check_atom_mapping: atom-mapping inspection mode applied to each
         SMARTS row before constructing a reactor. ``"reject_unmapped"`` (the
         default) rejects fully unmapped rules and allows partials (legitimate
         leaving/incoming groups). Only honoured for the TSV path; pickled
         rules are pre-compiled Reactor objects that can't be string-checked.
-    :param decollapse_symmetric_matches: when True, detect reaction rules where
-        a non-identity left-hand-side automorphism changes the right-hand-side
-        product rule patch, and disable chython's automorphism filter only for
-        those reactors.
+    :param decollapse_symmetric_matches: Loader-level policy, separate from the
+        baseline ``ReactorConfig.automorphism_filter`` setting. When True (the
+        default), detect rules where a non-identity left-hand-side automorphism
+        changes the right-hand-side product patch and disable Chython's filter
+        only for those reactors. When False, use the configured baseline
+        unchanged; with ``automorphism_filter=True``, this can omit chemically
+        distinct precursor orientations. Only honoured for TSV rules; pickled
+        reactors are returned unchanged.
     :return: A tuple of reaction rules as Reactor objects.
     """
     ext = Path(file).suffix.lower()
@@ -339,12 +346,7 @@ def _load_rules_tsv(
                         "  set check_atom_mapping='off' to load it anyway."
                     )
             try:
-                reaction_rule = smarts_parser(smarts_str)
-                if not isinstance(reaction_rule, ReactionContainer):
-                    raise ValueError("SMARTS did not parse as ReactionContainer")
-                if reaction_rule.reagents:
-                    raise ValueError("reaction SMARTS with reagents are not supported")
-
+                reaction_rule = _parse_reaction_rule(smarts_str)
                 rule_kwargs = dict(reactor_kwargs)
                 if decollapse_symmetric_matches and needs_decollapsed_matches(
                     reaction_rule
@@ -366,6 +368,103 @@ def _load_rules_tsv(
                     f"  error: {type(err).__name__}: {err}"
                 ) from err
     return tuple(reactors)
+
+
+def _parse_reaction_rule(smarts_str: str) -> ReactionContainer:
+    """Parse a reaction SMARTS while preserving component-local CXSMARTS.
+
+    Chython serializes reactor components independently, so CXSMARTS atom
+    indices in rule files are normally local to the component carrying the
+    extension. Prefer that interpretation. If it is invalid, fall back to
+    whole-reaction parsing to retain compatibility with side-global CXSMARTS.
+    """
+    sides = smarts_str.split(">")
+    if len(sides) != 3:
+        raise ValueError("reaction SMARTS must contain exactly one reaction arrow")
+    reactants_str, reagents_str, products_str = sides
+    if reagents_str.strip():
+        raise ValueError("reaction SMARTS with reagents are not supported")
+    if not reactants_str.strip() or not products_str.strip():
+        raise ValueError("empty patterns or products")
+
+    reactant_components = tuple(
+        component.strip() for component in reactants_str.split(".") if component.strip()
+    )
+    product_components = tuple(
+        component.strip() for component in products_str.split(".") if component.strip()
+    )
+
+    try:
+        reactants = tuple(map(smarts_parser, reactant_components))
+        products = tuple(map(smarts_parser, product_components))
+    except Exception as component_error:
+        if "|" not in smarts_str:
+            raise
+        reaction_rule = smarts_parser(smarts_str)
+        if not isinstance(reaction_rule, ReactionContainer):
+            raise ValueError(
+                "SMARTS did not parse as ReactionContainer"
+            ) from component_error
+        if reaction_rule.reagents:
+            raise ValueError(
+                "reaction SMARTS with reagents are not supported"
+            ) from component_error
+        _assign_unique_unmapped_atom_numbers(
+            reaction_rule, reactant_components, product_components
+        )
+        return reaction_rule
+
+    if not reactants or not products:
+        raise ValueError("empty patterns or products")
+    reaction_rule = ReactionContainer(reactants, products)
+    _assign_unique_unmapped_atom_numbers(
+        reaction_rule, reactant_components, product_components
+    )
+    return reaction_rule
+
+
+def _assign_unique_unmapped_atom_numbers(
+    reaction_rule: ReactionContainer,
+    reactant_components: tuple[str, ...],
+    product_components: tuple[str, ...],
+) -> None:
+    """Give originally unmapped atoms unique reaction-wide numbers."""
+    queries = (*reaction_rule.reactants, *reaction_rule.products)
+    component_texts = (*reactant_components, *product_components)
+    if len(queries) != len(component_texts):
+        raise ValueError("parsed component count does not match reaction SMARTS")
+
+    component_maps = tuple(_component_atom_maps(text) for text in component_texts)
+    explicit_numbers = {
+        number for atom_maps in component_maps for number in atom_maps if number
+    }
+    next_number = max(explicit_numbers, default=0) + 1
+
+    for query, atom_maps in zip(queries, component_maps, strict=True):
+        atom_numbers = tuple(query.atoms_numbers)
+        if len(atom_numbers) != len(atom_maps):
+            raise ValueError("parsed atom count does not match reaction SMARTS")
+
+        remapping = {}
+        for atom_number, explicit_number in zip(atom_numbers, atom_maps, strict=True):
+            if explicit_number:
+                continue
+            if next_number > _MAX_REGULAR_ATOM_NUMBER:
+                raise ValueError("no regular atom numbers remain for unmapped atoms")
+            remapping[atom_number] = next_number
+            next_number += 1
+        if remapping:
+            query.remap(remapping)
+
+
+def _component_atom_maps(component: str) -> tuple[int | None, ...]:
+    """Return explicit map numbers in component atom order."""
+    component_smarts = component.split(maxsplit=1)[0]
+    return tuple(
+        payload.get("parsed_mapping")
+        for token_type, payload in smarts_tokenize(component_smarts)
+        if token_type in (0, 8) and isinstance(payload, dict)
+    )
 
 
 def _load_rules_pickle(file: str) -> tuple[CanonicalRetroReactor, ...]:
