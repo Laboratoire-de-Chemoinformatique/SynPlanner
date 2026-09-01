@@ -1,15 +1,13 @@
-"""Module containing functions for analysis and visualization of the built tree."""
+"""Reports over clustered routes: one page per cluster, one per subcluster."""
 
 from __future__ import annotations
 
 import base64
 import contextlib
 from datetime import datetime
-from html import escape
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from chython import depict_settings
-from chython.containers.molecule import MoleculeContainer
 from IPython.display import HTML, display
 
 from synplan.chem.reaction.routes.io import make_dict
@@ -17,138 +15,16 @@ from synplan.chem.reaction.routes.representation.depiction import (
     cgr_display,
     depict_custom_reaction,
 )
-from synplan.chem.reaction.routes.route import Route, Step
-from synplan.chem.reaction.rules.priority import POLICY_SOURCE_NAME
+from synplan.chem.reaction.routes.route import Route
 from synplan.utils.frames import depict_value
-from synplan.utils.routedraw import (
-    ARROW_DEFS,
-    ROLE_STYLE,
-    ROUTE_CSS,
-    drawable_copy,
-    molecule_svg,
+from synplan.utils.visualisation.assets import (
+    BOOTSTRAP_PAGE_HEAD,
+    BOOTSTRAP_PAGE_TAIL,
+    BOX_MARK,
 )
-from synplan.utils.svgslim import Doc, hidden_defs
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
-
     from synplan.mcts.tree import Tree
-
-
-def get_child_nodes(
-    tree: Tree,
-    molecule: MoleculeContainer,
-    graph: dict[MoleculeContainer, dict[str, Any]],
-) -> dict[str, Any]:
-    """Extracts the child nodes of the given molecule.
-
-    :param tree: The built tree.
-    :param molecule: The molecule in the tree from which to extract child nodes.
-    :param graph: The relationship between the given molecule and the reaction
-        metadata for its child nodes.
-    :return: The dict with extracted child nodes.
-    """
-
-    reaction = graph.get(molecule)
-    if reaction is None:
-        return []
-
-    nodes = []
-    for precursor in reaction["children"]:
-        temp_obj = {
-            "smiles": str(precursor),
-            "type": "mol",
-            "in_stock": str(precursor) in tree.building_blocks,
-        }
-        node = get_child_nodes(tree, precursor, graph)
-        if node:
-            temp_obj["children"] = [node]
-        nodes.append(temp_obj)
-
-    reaction_node = {"type": "reaction", "children": nodes}
-    if reaction.get("rule_key"):
-        reaction_node["rule_key"] = reaction["rule_key"]
-    if reaction.get("policy_rank") is not None:
-        reaction_node["policy_rank"] = reaction["policy_rank"]
-    return reaction_node
-
-
-def extract_routes(
-    tree: Tree, extended: bool = False, min_mol_size: int = 0
-) -> list[dict[str, Any]]:
-    """Takes the target and the dictionary of successors and predecessors and returns a
-    list of dictionaries that contain the target and the list of successors.
-
-    :param tree: The built tree.
-    :param extended: If True, generates the extended route representation.
-    :param min_mol_size: If the size of the Precursor is equal or smaller than
-            min_mol_size it is automatically classified as building block.
-    :return: A list of dictionaries. Each dictionary contains a target, a list of
-        children, and a boolean indicating whether the target is in building_blocks.
-    """
-    target = tree.nodes[1].precursors_to_expand[0].molecule
-    target_in_stock = tree.nodes[1].curr_precursor.is_building_block(
-        tree.building_blocks, min_mol_size
-    )
-
-    # append encoded routes to list
-    routes_block = []
-    winning_nodes = []
-    if extended:
-        # collect routes
-        for i, node in tree.nodes.items():
-            if node.is_solved():
-                winning_nodes.append(i)
-    else:
-        winning_nodes = tree.winning_nodes
-    if winning_nodes:
-        for winning_node in winning_nodes:
-            # Create graph for route
-            graph = {}
-
-            for before_node, after_node in tree.route_steps(winning_node):
-                before = before_node.curr_precursor.molecule
-                graph[before] = {
-                    "children": [
-                        precursor.molecule for precursor in after_node.new_precursors
-                    ],
-                    "rule_key": after_node.rule_key,
-                    "policy_rank": after_node.policy_rank,
-                }
-
-            routes_block.append(
-                {
-                    "type": "mol",
-                    "smiles": str(target),
-                    "in_stock": target_in_stock,
-                    "children": [get_child_nodes(tree, target, graph)],
-                }
-            )
-    else:
-        routes_block = [
-            {
-                "type": "mol",
-                "smiles": str(target),
-                "in_stock": target_in_stock,
-                "children": [],
-            }
-        ]
-    return routes_block
-
-
-def _priority_rule(tree: Tree, node) -> Any | None:
-    """The curated rule that produced `node`, or None for a policy step.
-
-    Everything is fetched defensively: the lookup is also driven by duck-typed
-    stand-ins that carry neither priority rules nor rule ids.
-    """
-    rules = getattr(tree, "priority_rules", {}).get(
-        getattr(node, "rule_source", None) or "", ()
-    )
-    rule_id = getattr(node, "rule_id", None)
-    if rule_id is None or rule_id >= len(rules):
-        return None
-    return rules[rule_id]
 
 
 def _json_route(routes_json: dict, route_id: int) -> Route:
@@ -161,210 +37,6 @@ def _json_route(routes_json: dict, route_id: int) -> Route:
     if node is None:
         raise ValueError(f"Route ID {route_id} not found in routes_json.")
     return Route.from_json(node)
-
-
-def route_rule_labels(tree: Tree, node_id: int) -> dict[int, str]:
-    """`{tree node id: label}` for the steps of the route ending at `node_id`.
-
-    Priority rules carry a chemistry name (`rule_name` stamped by their loader); the policy has
-    none, so its steps stay unlabelled rather than being given a meaningless id. Keyed by node
-    id, so a step finds its label whatever order the route is read in.
-    """
-    labels = {}
-    for route_node_id in tree.route_node_ids(node_id)[1:]:
-        rule = _priority_rule(tree, tree.nodes[route_node_id])
-        name = getattr(rule, "rule_name", None)
-        labels[route_node_id] = f"{rule.rule_id} — {name}" if name else ""
-    return labels
-
-
-#: Page chrome for :func:`routes_report_html`. The route drawings bring their own
-#: rules through :data:`synplan.utils.routedraw.ROUTE_CSS`.
-_REPORT_CSS = """
-:root{--ink:#0f1419;--ink2:#38414a;--ink3:#6b7480;--ink4:#9ba3ad;
---rule:#e6e8eb;--surface:#ffffff;--bg:#fafbfc;--accent:#1e3a8a;--ok:#1f4d3d}
-*,::before,::after{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;
-font-family:"Inter Tight",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
-.wrap{max-width:1180px;margin:0 auto;padding:44px 28px 96px}
-.eyebrow{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--ink3)}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
-.card{background:var(--surface);border:1px solid var(--rule);border-radius:3px}
-header.page{padding:26px 26px 24px}
-header.page h1{margin:.35em 0 0;font-size:21px;font-weight:600;letter-spacing:-.01em}
-.target{display:flex;gap:20px;align-items:center;margin-top:20px}
-.tile{flex:0 0 auto;border:1px solid var(--accent);border-radius:3px;background:#fff;padding:9px 11px}
-.tile svg{display:block}
-.target .smi{font-size:13px;color:var(--ink2);word-break:break-all;margin-top:5px}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);margin-top:24px;
-border:1px solid var(--rule);border-radius:3px;overflow:hidden;background:var(--surface)}
-.stat{padding:13px 16px 14px;border-left:1px solid var(--rule)}
-.stat:first-child{border-left:0}
-.stat .v{display:block;margin-top:5px;font-size:27px;font-weight:600;line-height:1.05;letter-spacing:-.02em}
-.stat .u{font-size:12px;font-weight:400;color:var(--ink4);letter-spacing:0}
-.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
-.chip{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;background:var(--surface);
-border:1px solid var(--rule);border-radius:3px;font-size:11px;font-weight:600;
-text-transform:uppercase;letter-spacing:.1em;color:var(--ink2)}
-.sw{width:12px;height:12px;border-radius:2px;flex:0 0 auto}
-.route{margin-top:20px}
-.rhead{display:flex;flex-wrap:wrap;gap:34px;padding:13px 18px;border-bottom:1px solid var(--rule)}
-.kv .v{font-size:15px;font-weight:600;margin-top:2px}
-.kv .v.id{color:var(--accent)}
-.draw{padding:20px 18px 22px;overflow-x:auto;display:flex;justify-content:center;
-background:radial-gradient(circle,#e9ecef .9px,transparent .9px) 0 0/30px 30px,#fff}
-.draw > svg{display:block;max-width:100%;height:auto;flex:0 0 auto}
-.step{display:grid;grid-template-columns:22px minmax(0,1fr);gap:0 13px;
-align-items:start;padding:11px 18px;border-top:1px solid var(--rule)}
-.disc{width:22px;height:22px;border-radius:50%;background:#2b3440;color:#fff;
-font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;
-line-height:1;margin-top:1px}
-.lab{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--ok)}
-.rxn{font-size:12px;color:var(--ink2);word-break:break-all;line-height:1.6}
-"""
-
-#: Every role the drawing tints, in reading order.
-_ROLE_LEGEND = (
-    ("target", "Target molecule"),
-    ("int", "Intermediate"),
-    ("oos", "Not in stock"),
-    ("bb", "In stock"),
-)
-
-
-def _report_header(routes: Sequence[Route], tile: MoleculeContainer | None) -> str:
-    scores = [
-        route.provenance.search_score
-        for route in routes
-        if route.provenance is not None and route.provenance.search_score is not None
-    ]
-    stats = (
-        ("Routes", len(routes), ""),
-        ("Solved", sum(route.solved for route in routes), f" of {len(routes)}"),
-        ("Longest", max((len(route) for route in routes), default=0), " steps"),
-        ("Best score", round(max(scores), 3) if scores else "—", ""),
-    )
-    target = (
-        ""
-        if tile is None
-        else f'<div class="target"><div class="tile">{molecule_svg(tile)}</div>'
-        '<div><div class="eyebrow">Target molecule</div>'
-        f'<div class="smi mono">{escape(str(tile))}</div></div></div>'
-    )
-    return (
-        '<header class="page card">'
-        '<div class="eyebrow">Retrosynthetic routes report</div>'
-        "<h1>Predicted routes</h1>"
-        + target
-        + '<div class="stats">'
-        + "".join(
-            f'<div class="stat"><span class="eyebrow">{name}</span>'
-            f'<span class="v">{value}<span class="u">{unit}</span></span></div>'
-            for name, value, unit in stats
-        )
-        + '</div><div class="legend">'
-        + "".join(
-            f'<span class="chip"><span class="sw" style="background:{ROLE_STYLE[role][0]};'
-            f'border:1px solid {ROLE_STYLE[role][1]}"></span>{caption}</span>'
-            for role, caption in _ROLE_LEGEND
-        )
-        + "</div></header>"
-    )
-
-
-def _step_label(step: Step) -> str:
-    """The curated rule behind a step, or "" for one the policy proposed.
-
-    A policy rule's id says nothing to a chemist, so a policy step stays
-    unlabelled; a priority step is named by its ``rule_key`` (``set:id``), the one
-    identifier the detached route carries.
-    """
-
-    origin = step.origin
-    if origin is None or origin.rule_source in (None, POLICY_SOURCE_NAME):
-        return ""
-    return origin.rule_key or ""
-
-
-def routes_report_html(
-    routes: Iterable[Route], html_path: str | None, aam: bool = False
-) -> str | None:
-    """Write an HTML page with the given routes drawn and listed as SMILES.
-
-    Draws exactly the routes it is handed, in the order it is handed them --
-    solved, unsolved, from one tree, from several, or read back out of a file.
-    Which routes are worth a page is the caller's call:
-    ``tree.routes(solved_only=False)`` enumerates one unfinished route per unsolved
-    leaf, and most of those are one step deep, so filter before you draw
-    (``[r for r in tree.routes(solved_only=False) if len(r) > 2]``).
-
-    Each route gets one drawing and one step list; a step's number is the number on
-    its disc in the drawing, 1 being the first reaction performed. Unresolved
-    leaves -- the molecules the search could not buy -- are drawn in the red ``oos``
-    role. The page is self-contained: no scripts, no external stylesheets, no fonts
-    to fetch.
-
-    :param routes: The routes to draw.
-    :param html_path: The path to the file where to store resulting HTML. When None,
-        the page is returned instead of written.
-    :param aam: If True, depict atom-to-atom mapping.
-    :return: The page when ``html_path`` is None, otherwise None.
-    """
-    depict_settings(aam=bool(aam))
-    routes = list(routes)
-
-    doc = Doc()
-    layouts: dict = {}  # one geometry per molecule, so a card matches its neighbours
-    body = []
-    for index, route in enumerate(routes, 1):
-        rows = ""
-        for number, step in enumerate(route, 1):
-            label = _step_label(step)
-            rows += (
-                f'<div class="step"><div class="disc">{number}</div><div>'
-                + (f'<div class="lab">{escape(label)}</div>' if label else "")
-                + f'<div class="rxn mono">{escape(str(step.reaction))}</div></div></div>'
-            )
-        provenance = route.provenance
-        node_id = None if provenance is None else provenance.tree_node_id
-        score = None if provenance is None else provenance.search_score
-        unresolved = len(route.unresolved)
-        body.append(
-            '<section class="route card"><div class="rhead">'
-            f'<div class="kv"><div class="eyebrow">Route</div>'
-            f'<div class="v id">{index if node_id is None else node_id}</div></div>'
-            f'<div class="kv"><div class="eyebrow">Steps</div>'
-            f'<div class="v">{len(route)}</div></div>'
-            f'<div class="kv"><div class="eyebrow">Search score</div>'
-            f'<div class="v">{"—" if score is None else round(score, 3)}</div></div>'
-            f'<div class="kv"><div class="eyebrow">Not in stock</div>'
-            f'<div class="v">{unresolved}</div></div></div>'
-            f'<div class="draw">'
-            f"{doc.route(route.svg(standalone=False, layouts=layouts))}"
-            f"</div>{rows}</section>"
-        )
-
-    page = (
-        '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        "<title>Retrosynthetic Routes Report</title>\n"
-        f"<style>{ROUTE_CSS}{_REPORT_CSS}</style>\n</head>\n<body>\n"
-        + hidden_defs(ARROW_DEFS, doc.defs())
-        + '<div class="wrap">'
-        + _report_header(
-            routes,
-            drawable_copy(routes[0].target, layouts) if routes else None,
-        )
-        + "".join(body)
-        + "</div>\n</body>\n</html>\n"
-    )
-
-    if html_path is None:
-        return page
-    with open(html_path, "w", encoding="utf-8") as html_file:
-        html_file.write(page)
-    return None
 
 
 def html_top_routes_cluster(
@@ -552,18 +224,6 @@ def routes_clustering_report(
         </body></html>
         """
 
-    # --- Boilerplate HTML head/tail omitted for brevity ---
-    template_begin = (
-        """<!doctype html><html><head>…</head><body><div class="container">"""
-    )
-    template_end = """</div></body></html>"""
-
-    table = f"""
-      <table class="table">
-        <caption><h3>Cluster {group_index} Routes</h3></caption>
-        <tbody>
-    """
-
     # show target
     if using_tree:
         try:
@@ -584,44 +244,7 @@ def routes_clustering_report(
     font_normal = "<font style='font-weight: normal; font-size: 18px'>"
     font_close = "</font>"
 
-    template_begin = f"""
-    <!doctype html>
-    <html lang="en">
-    <head>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-    integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3"
-    crossorigin="anonymous">
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Cluster {group_index} Routes Report</title>
-    <style>
-        /* Optional: Add some basic styling */
-        .table {{ border-collapse: collapse; width: 100%; }}
-        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-        tr:nth-child(even) {{ background-color: #ffffff; }}
-        caption {{ caption-side: top; font-size: 1.5em; margin: 1em 0; }}
-        svg {{ max-width: 100%; height: auto; }}
-    </style>
-    </head>
-    <body>
-    <div class="container"> """
-
-    template_end = """
-    </div> <script
-    src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
-    integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
-    crossorigin="anonymous">
-    </script>
-    </body>
-    </html>
-    """
-
-    box_mark = """
-    <svg width="30" height="30" viewBox="0 0 1 1" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 5px;">
-    <circle cx="0.5" cy="0.5" r="0.5" fill="rgb()" fill-opacity="0.35" />
-    </svg>
-    """
+    page_head = BOOTSTRAP_PAGE_HEAD.format(title=f"Cluster {group_index} Routes Report")
 
     # --- Build HTML Table ---
     table = f"""
@@ -665,9 +288,9 @@ def routes_clustering_report(
     table += f"""
     <tr>{td}
         <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
-            <span>{box_mark.replace("rgb()", "rgb(152, 238, 255)")} Target Molecule</span>
-            <span>{box_mark.replace("rgb()", "rgb(240, 171, 144)")} Molecule Not In Stock</span>
-            <span>{box_mark.replace("rgb()", "rgb(155, 250, 179)")} Molecule In Stock</span>
+            <span>{BOX_MARK.replace("rgb()", "rgb(152, 238, 255)")} Target Molecule</span>
+            <span>{BOX_MARK.replace("rgb()", "rgb(240, 171, 144)")} Molecule Not In Stock</span>
+            <span>{BOX_MARK.replace("rgb()", "rgb(155, 250, 179)")} Molecule In Stock</span>
         </div>
     </td></tr>
     """
@@ -703,7 +326,7 @@ def routes_clustering_report(
 
     table += "</tbody></table>"
 
-    html = template_begin + table + template_end
+    html = page_head + table + BOOTSTRAP_PAGE_TAIL
 
     if html_path:
         with open(html_path, "w", encoding="utf-8") as f:
@@ -1065,18 +688,6 @@ def routes_subclustering_report(
         <p>No valid/solved routes found for this cluster.</p>
         </body></html>"""
 
-    # --- Boilerplate HTML head/tail omitted for brevity ---
-    template_begin = (
-        """<!doctype html><html><head>…</head><body><div class="container">"""
-    )
-    template_end = """</div></body></html>"""
-
-    table = f"""
-      <table class="table">
-        <caption><h3>Cluster {group_index} Routes</h3></caption>
-        <tbody>
-    """
-
     # show target
     if using_tree:
         try:
@@ -1099,44 +710,9 @@ def routes_subclustering_report(
     font_normal = "<font style='font-weight: normal; font-size: 18px'>"
     font_close = "</font>"
 
-    template_begin = f"""
-    <!doctype html>
-    <html lang="en">
-    <head>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-    integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3"
-    crossorigin="anonymous">
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SubCluster {group_index}.{cluster_num} Routes Report</title>
-    <style>
-        /* Optional: Add some basic styling */
-        .table {{ border-collapse: collapse; width: 100%; }}
-        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-        tr:nth-child(even) {{ background-color: #ffffff; }}
-        caption {{ caption-side: top; font-size: 1.5em; margin: 1em 0; }}
-        svg {{ max-width: 100%; height: auto; }}
-    </style>
-    </head>
-    <body>
-    <div class="container"> """
-
-    template_end = """
-    </div> <script
-    src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
-    integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
-    crossorigin="anonymous">
-    </script>
-    </body>
-    </html>
-    """
-
-    box_mark = """
-    <svg width="30" height="30" viewBox="0 0 1 1" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 5px;">
-    <circle cx="0.5" cy="0.5" r="0.5" fill="rgb()" fill-opacity="0.35" />
-    </svg>
-    """
+    page_head = BOOTSTRAP_PAGE_HEAD.format(
+        title=f"SubCluster {group_index}.{cluster_num} Routes Report"
+    )
 
     # --- Build HTML Table ---
     table = f"""
@@ -1223,9 +799,9 @@ def routes_subclustering_report(
     table += f"""
     <tr>{td}
         <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
-            <span>{box_mark.replace("rgb()", "rgb(152, 238, 255)")} Target Molecule</span>
-            <span>{box_mark.replace("rgb()", "rgb(240, 171, 144)")} Molecule Not In Stock</span>
-            <span>{box_mark.replace("rgb()", "rgb(155, 250, 179)")} Molecule In Stock</span>
+            <span>{BOX_MARK.replace("rgb()", "rgb(152, 238, 255)")} Target Molecule</span>
+            <span>{BOX_MARK.replace("rgb()", "rgb(240, 171, 144)")} Molecule Not In Stock</span>
+            <span>{BOX_MARK.replace("rgb()", "rgb(155, 250, 179)")} Molecule In Stock</span>
         </div>
     </td></tr>
     """
@@ -1262,7 +838,7 @@ def routes_subclustering_report(
 
     table += "</tbody></table>"
 
-    html = template_begin + table + template_end
+    html = page_head + table + BOOTSTRAP_PAGE_TAIL
 
     if html_path:
         with open(html_path, "w", encoding="utf-8") as f:
