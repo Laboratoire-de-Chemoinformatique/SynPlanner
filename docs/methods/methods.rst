@@ -13,6 +13,7 @@ Practical usage is covered in :doc:`/configuration/configuration` and :doc:`/use
     :titlesonly:
 
     standardization
+    building_blocks
     rebalancing
     synthons
     filtration
