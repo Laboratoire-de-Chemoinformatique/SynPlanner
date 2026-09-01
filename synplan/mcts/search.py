@@ -297,6 +297,9 @@ def run_search(
     # Public route-export accumulator keyed by RDKit-canonical target SMILES:
     # {canonical_target_smiles: [route_tree, ...]}.
     exported_routes: dict[str, list[dict]] = {}
+    # CLI runs may contain many targets whose per-tree node IDs overlap, so the
+    # sidecar is target-keyed before it is route-node-keyed.
+    route_costs: dict[str, dict[str, dict]] = {}
     n_in_stock = 0
 
     tree_config = TreeConfig.from_dict(search_config)
@@ -312,6 +315,8 @@ def run_search(
             bar_format="{desc}{n} [{elapsed}]",
         ):
             target_smi = target_smi.strip()
+            if building_block_candidates is not None:
+                route_costs[target_smi] = {}
             # Key the export dict by the RDKit-canonical target SMILES so keys
             # match retrocast's Target.smiles byte-for-byte. Every target starts
             # empty; only a solved one overwrites it.
@@ -388,6 +393,13 @@ def run_search(
                 routes = tree.routes()
                 if route_scorer is not None:
                     routes = route_scorer.rank(routes)
+                if building_block_candidates is not None:
+                    route_costs[target_smi] = {
+                        str(route.provenance.tree_node_id): route.calculate_cost(
+                            building_block_candidates
+                        )
+                        for route in routes
+                    }
                 routes_report_html(
                     routes,
                     os.path.join(routes_folder, f"retroroutes_target_{ti}.html"),
@@ -424,6 +436,11 @@ def run_search(
 
     if export_routes:
         export_routes_artifact(exported_routes, results_root, filename=routes_filename)
+    if building_block_candidates is not None:
+        with open(
+            results_root.joinpath("route_costs.json"), "w", encoding="utf-8"
+        ) as file:
+            json.dump(route_costs, file, indent=2)
 
     print(f"Number of solved target molecules: {n_solved}")
     if n_in_stock:

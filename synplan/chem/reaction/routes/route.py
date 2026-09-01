@@ -9,8 +9,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from math import fsum
 from typing import TYPE_CHECKING, Any, Literal
 
+from synplan.chem.building_blocks import (
+    BuildingBlockCandidateIndex,
+    molecule_has_stereo,
+    molecule_to_inchikey,
+)
 from synplan.chem.reaction.routes.io.json import read_route_tree, route_tree
 from synplan.chem.reaction.routes.io.metadata import reaction_metadata
 from synplan.chem.reaction.routes.representation.route_cgr import build_route_cgr
@@ -294,6 +300,124 @@ class Route:
         """
 
         return {index: step.reaction for index, step in enumerate(self.steps)}
+
+    def calculate_cost(
+        self,
+        building_block_candidates: BuildingBlockCandidateIndex,
+    ) -> dict[str, Any]:
+        """Price terminal materials against a vendor-aware catalogue.
+
+        A stereo-labelled target selects exact full-InChIKey matching for every
+        leaf. A target without explicit stereo uses the connectivity prefix and
+        may therefore select the cheapest priced stereoisomer in that bucket.
+        Prices are treated exactly as supplied: raw price per gram, one molar
+        equivalent per leaf occurrence, and 100% yield at every step.
+
+        The result is JSON-compatible. It is calculated from the detached route
+        and the supplied immutable index; neither is mutated or retained.
+        """
+
+        target = self.target.copy()
+        exact = molecule_has_stereo(target)
+        grouped: dict[str, tuple[MoleculeContainer, int]] = {}
+        for leaf in self.leaves():
+            leaf = leaf.copy()
+            key = molecule_to_inchikey(leaf)
+            if key in grouped:
+                molecule, equivalents = grouped[key]
+                grouped[key] = molecule, equivalents + 1
+            else:
+                grouped[key] = leaf, 1
+
+        rows: list[dict[str, Any]] = []
+        missing: list[str] = []
+        unpriced: list[str] = []
+        priced_per_mol: list[float] = []
+
+        for leaf_key, (leaf, equivalents) in grouped.items():
+            leaf_smiles = str(leaf)
+            molecular_weight = float(leaf.molecular_mass)
+            bucket = building_block_candidates.get(leaf_key[:14], ())
+            candidates = (
+                tuple(block for block in bucket if block.inchikey == leaf_key)
+                if exact
+                else bucket
+            )
+            offers = sorted(
+                (
+                    price,
+                    vendor,
+                    block.inchikey,
+                    block.smiles,
+                )
+                for block in candidates
+                for vendor, price in block.vendors.items()
+            )
+
+            row: dict[str, Any] = {
+                "smiles": leaf_smiles,
+                "leaf_inchikey": leaf_key,
+                "selected_inchikey": None,
+                "selected_smiles": None,
+                "equivalents": equivalents,
+                "molecular_weight": molecular_weight,
+                "vendor": None,
+                "price_per_gram": None,
+                "contribution_per_mol": None,
+                "contribution_per_gram": None,
+                "status": "missing",
+            }
+            if not candidates:
+                missing.append(leaf_smiles)
+                rows.append(row)
+                continue
+            if not offers:
+                row["status"] = "unpriced"
+                unpriced.append(leaf_smiles)
+                rows.append(row)
+                continue
+
+            price, vendor, selected_key, selected_smiles = offers[0]
+            contribution = equivalents * molecular_weight * price
+            priced_per_mol.append(contribution)
+            row.update(
+                {
+                    "selected_inchikey": selected_key,
+                    "selected_smiles": selected_smiles,
+                    "vendor": vendor,
+                    "price_per_gram": price,
+                    "contribution_per_mol": contribution,
+                    "status": "priced",
+                }
+            )
+            rows.append(row)
+
+        target_weight = float(target.molecular_mass)
+        priced_cost_per_mol = fsum(priced_per_mol)
+        priced_cost_per_gram = (
+            priced_cost_per_mol / target_weight if target_weight > 0.0 else None
+        )
+        for row in rows:
+            contribution = row["contribution_per_mol"]
+            if contribution is not None and target_weight > 0.0:
+                row["contribution_per_gram"] = contribution / target_weight
+
+        complete = not missing and not unpriced
+        return {
+            "complete": complete,
+            "cost_per_mol": priced_cost_per_mol if complete else None,
+            "cost_per_gram": priced_cost_per_gram if complete else None,
+            "priced_cost_per_mol": priced_cost_per_mol,
+            "priced_cost_per_gram": priced_cost_per_gram,
+            "cost_units": {
+                "catalogue_price": "raw_price_per_gram",
+                "cost_per_mol": "raw_price_units_per_mol",
+                "cost_per_gram": "raw_price_units_per_gram_of_target",
+            },
+            "leaves": rows,
+            "missing_leaves": missing,
+            "unpriced_leaves": unpriced,
+        }
 
     def __iter__(self) -> Iterator[Step]:
         """Steps, the deepest one first."""
