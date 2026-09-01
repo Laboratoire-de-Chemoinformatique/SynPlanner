@@ -34,6 +34,8 @@ _TARGET_CAPTION = re.compile(
 )
 _STEP_NUMBER = re.compile(r'<div class="disc">(\d+)</div>')
 _STEP_LABEL = re.compile(r'<div class="lab">([^<]*)</div>')
+#: Every id a drawing reaches for: a pooled molecule, or the shared arrowhead.
+_REFERENCE = re.compile(r'(?:xlink:)?href="#([^"]+)"|url\(#([^"]+)\)')
 _DEPICTION = re.compile(
     rf'<svg x="{_NUM}" y="{_NUM}"[^>]*><use xlink:href="#([^"]+)"/>'
 )
@@ -116,23 +118,48 @@ def test_page_is_self_contained(page):
         page = page.replace(namespace, "")
     assert "http://" not in page
     assert "https://" not in page
-    assert "<script" not in page
+    assert "<script src" not in page
+
+
+def test_each_route_offers_export_and_a_zoomable_drawing(page):
+    """Zoom has no button of its own -- the drawing is the control."""
+    for section in sections(page):
+        for action in ("svg", "png"):
+            assert f'data-act="{action}"' in section
+        assert 'data-act="zoom"' not in section
+    assert ".draw{cursor:zoom-in}" in page
+
+
+def test_every_drawing_reference_is_defined_on_the_page(page):
+    """Export re-inlines what a drawing points at, so nothing may point off-page."""
+    defined = set(re.findall(r'<(?:g|marker)[^>]*\bid="([^"]+)"', page))
+    for section in sections(page):
+        found = {a or b for a, b in _REFERENCE.findall(drawing(section))}
+        assert found
+        assert found <= defined
 
 
 def test_page_summarises_the_routes_it_was_handed(page, routes):
     assert "Retrosynthetic Routes Report" in page
-    assert "Retrosynthetic routes report" in page
+    assert "<h1>SynPlanner retrosynthesis results</h1>" in page
     assert str(routes[0].target) in page
     for label, value in (
         ("Routes", len(routes)),
-        ("Solved", sum(route.solved for route in routes)),
-        ("Longest", max(len(route) for route in routes)),
+        ("Shortest route", min(len(route) for route in routes)),
         ("Best score", 0.5),
     ):
         assert label in page
         assert f">{value}<" in page
     for role in ("Target molecule", "Intermediate", "Not in stock", "In stock"):
         assert role in page
+
+
+def test_search_time_comes_from_the_search_not_the_routes(routes):
+    """Routes carry no clock, so the page shows a time only when it is handed one."""
+    assert ">—<" in routes_report_html(routes, None).split('<div class="legend">')[0]
+    page = routes_report_html(routes, None, stats={"search_time": 63.4})
+    assert ">63<" in page
+    assert ">0.4<" in routes_report_html(routes, None, stats={"search_time": 0.42})
 
 
 def test_one_drawing_per_route(page, routes):
@@ -146,10 +173,17 @@ def test_one_drawing_per_route(page, routes):
         assert f'<div class="v">{route.provenance.search_score}</div>' in section
 
 
-def test_step_numbers_match_the_discs(page, routes):
+def test_discs_number_the_steps_of_the_route(page, routes):
     for route, section in zip(routes, sections(page)):
         discs = sorted(int(d[4]) for d in _DISC.findall(drawing(section)))
         assert discs == list(range(1, len(route) + 1))
+
+
+def test_the_smiles_list_is_off_until_it_is_asked_for(routes):
+    """The drawing says what the SMILES say; the discs keep the numbering either way."""
+    assert _STEP_NUMBER.findall(routes_report_html(routes, None)) == []
+    for section in sections(routes_report_html(routes, None, show_steps=True)):
+        discs = sorted(int(d[4]) for d in _DISC.findall(drawing(section)))
         assert [int(n) for n in _STEP_NUMBER.findall(section)] == discs
 
 
@@ -190,7 +224,7 @@ def test_a_route_with_nothing_behind_it_still_draws(routes):
     (section,) = sections(page)
     assert '<div class="v id">1</div>' in section  # its position on the page
     assert section.count("—") == 1  # no search score on the card
-    assert page.count("—") == 2  # nor in the summary
+    assert page.count("—") == 3  # nor a best score or a search time in the summary
 
 
 def test_the_report_names_the_curated_rule_behind_a_step(routes):
@@ -204,7 +238,8 @@ def test_the_report_names_the_curated_rule_behind_a_step(routes):
             StepOrigin(rule_key="policy:412", rule_source="policy", rule_id=412),
         ],
     )
-    assert _STEP_LABEL.findall(routes_report_html([labelled], None)) == ["ugi:7"]
+    page = routes_report_html([labelled], None, show_steps=True)
+    assert _STEP_LABEL.findall(page) == ["ugi:7"]
 
 
 def unsolved_route() -> tuple[Route, tuple]:
@@ -225,7 +260,7 @@ def unsolved_page() -> str:
 
 
 def test_an_unsolved_route_shows_its_dead_ends(unsolved_page):
-    """The leaf the search could not buy is drawn in the red role and counted."""
+    """The drawing is the only place a dead end is reported: red role, red caption."""
     route, unresolved = unsolved_route()
     assert not route.solved
     (section,) = sections(unsolved_page)
@@ -234,8 +269,6 @@ def test_an_unsolved_route_shows_its_dead_ends(unsolved_page):
     assert svg.count(f'stroke="{red}"') == len(unresolved)
     assert svg.count(">NOT IN STOCK</text>") == len(unresolved)
     assert svg.count(">IN STOCK</text>") == 1  # the other leaf is purchasable
-    assert f'<div class="v">{len(unresolved)}</div>' in section  # "Not in stock"
-    assert ">0<" in unsolved_page  # nothing solved, in the summary
 
 
 def _cut(mol, n: int, m: int) -> list:
