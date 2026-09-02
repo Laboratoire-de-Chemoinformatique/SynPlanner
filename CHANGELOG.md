@@ -130,6 +130,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A generated precursor that Chython cannot convert to InChI no longer aborts
+  JSON-catalogue planning. Its failed identity attempt is cached and it is
+  conservatively treated as not purchasable.
+
 - `write_routes_json(routes_dict, path, tree=tree)` reads the mapping's keys as tree
   node ids, and an `enumerate` index instead raised `ZeroDivisionError: division by
   zero` from inside `route_score`, because a route of no nodes has no length to divide

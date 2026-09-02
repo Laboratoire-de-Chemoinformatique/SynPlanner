@@ -3,9 +3,11 @@ the search tree."""
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Set
 
 from chython.containers import MoleculeContainer
+from chython.exceptions import InvalidAromaticRing
 
 from synplan.chem.building_blocks import (
     BuildingBlockCatalogue,
@@ -13,6 +15,8 @@ from synplan.chem.building_blocks import (
     molecule_to_inchikey,
 )
 from synplan.chem.utils import safe_canonicalization
+
+logger = logging.getLogger(__name__)
 
 
 class Precursor:
@@ -27,6 +31,7 @@ class Precursor:
         self.molecule = safe_canonicalization(molecule) if canonicalize else molecule
         self.prev_precursors = []
         self._inchi_key: str | None = None
+        self._inchi_key_error: tuple[type[Exception], str] | None = None
 
     def __len__(self) -> int:
         """Return the number of atoms in Precursor."""
@@ -52,8 +57,21 @@ class Precursor:
     def inchi_key(self) -> str:
         """Return the full Chython Standard InChIKey, generated once."""
 
+        if failure := getattr(self, "_inchi_key_error", None):
+            error_type, message = failure
+            raise error_type(message)
         if getattr(self, "_inchi_key", None) is None:
-            self._inchi_key = molecule_to_inchikey(self.molecule)
+            try:
+                self._inchi_key = molecule_to_inchikey(self.molecule)
+            except (InvalidAromaticRing, ValueError) as error:
+                self._inchi_key_error = type(error), str(error)
+                logger.warning(
+                    "Chython cannot generate an InChIKey for precursor %s; "
+                    "treating it as not purchasable: %s",
+                    self.molecule,
+                    error,
+                )
+                raise
         return self._inchi_key
 
     def is_building_block(
@@ -70,15 +88,17 @@ class Precursor:
             min_mol_size it is automatically classified as building block.
         :return: True is Precursor is a building block.
         """
+        precursor_inchikey = None
+        if isinstance(bb_stock, Mapping) and len(self.molecule) > min_mol_size:
+            try:
+                precursor_inchikey = self.inchi_key
+            except (InvalidAromaticRing, ValueError):
+                return False
         return is_purchasable(
             self.molecule,
             bb_stock,
             min_mol_size,
-            inchikey=(
-                self.inchi_key
-                if isinstance(bb_stock, Mapping) and len(self.molecule) > min_mol_size
-                else None
-            ),
+            inchikey=precursor_inchikey,
         )
 
 
@@ -100,7 +120,16 @@ def is_purchasable(
     if len(molecule) <= min_mol_size:
         return True
     if isinstance(stock, Mapping):
-        identity = inchikey or molecule_to_inchikey(molecule)
+        try:
+            identity = inchikey or molecule_to_inchikey(molecule)
+        except (InvalidAromaticRing, ValueError) as error:
+            logger.warning(
+                "Chython cannot generate an InChIKey for molecule %s; "
+                "treating it as not purchasable: %s",
+                molecule,
+                error,
+            )
+            return False
         return bool(match_building_blocks(stock, identity))
     return (key or str(molecule)) in stock
 

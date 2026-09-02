@@ -199,13 +199,18 @@ def standardize_building_block_catalogue(
     return str(output)
 
 
-@functools.cache
 def load_building_block_catalogue(
     path_value: str | Path,
 ) -> BuildingBlockCatalogue:
+    """Load one immutable catalogue, cached by its resolved filesystem path."""
+
+    return _load_building_block_catalogue(Path(path_value).resolve(strict=True))
+
+
+@functools.cache
+def _load_building_block_catalogue(path: Path) -> BuildingBlockCatalogue:
     """Stream a prepared full-keyed JSON file into one immutable catalogue."""
 
-    path = Path(path_value).resolve(strict=True)
     candidate_groups: dict[str, list[BuildingBlock]] = defaultdict(list)
     try:
         with path.open("rb") as stream:

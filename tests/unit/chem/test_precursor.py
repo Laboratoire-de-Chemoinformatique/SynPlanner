@@ -1,5 +1,8 @@
+import logging
+
 import pytest
 from chython import smiles
+from chython.exceptions import InvalidAromaticRing
 from frozendict import frozendict
 
 from synplan.chem.building_blocks import BuildingBlock, molecule_to_inchikey
@@ -85,9 +88,7 @@ def test_inchikey_membership_is_connectivity_only():
     catalogue = frozendict({r_block.inchikey[:14]: (r_block,)})
 
     assert s_precursor.is_building_block(catalogue, min_mol_size=0)
-    assert not any(
-        atom.stereo is not None for _, atom in s_precursor.molecule.atoms()
-    )
+    assert not any(atom.stereo is not None for _, atom in s_precursor.molecule.atoms())
     assert s_precursor.inchi_key[:14] == r_block.inchikey[:14]
     assert s_precursor.inchi_key != r_block.inchikey
 
@@ -111,3 +112,28 @@ def test_precursor_generates_its_inchikey_only_once(monkeypatch):
         assert precursor.is_building_block(catalogue, min_mol_size=0)
 
     assert calls == 1
+
+
+def test_unrepresentable_inchikey_is_cached_and_not_purchasable(monkeypatch, caplog):
+    import synplan.chem.precursor as precursor_module
+
+    molecule = smiles("c1c(O)[n-]ccc1", ignore=True)
+    precursor = Precursor(molecule)
+    original = precursor_module.molecule_to_inchikey
+    calls = 0
+
+    def counted(candidate):
+        nonlocal calls
+        calls += 1
+        return original(candidate)
+
+    monkeypatch.setattr(precursor_module, "molecule_to_inchikey", counted)
+    catalogue = frozendict()
+    with caplog.at_level(logging.WARNING):
+        assert not precursor.is_building_block(catalogue, min_mol_size=0)
+        assert not precursor.is_building_block(catalogue, min_mol_size=0)
+
+    assert calls == 1
+    assert caplog.text.count("treating it as not purchasable") == 1
+    with pytest.raises(InvalidAromaticRing):
+        _ = precursor.inchi_key

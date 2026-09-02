@@ -76,7 +76,10 @@ protonation information.
 
 Each finalized ``Precursor`` generates its Chython InChIKey at most once.
 Every subsequent stock check slices the connectivity prefix from that cached
-key. Legacy SMILES/SDF/CSV/TSV stock and
+key. If Chython cannot generate an InChIKey for a malformed aromatic precursor,
+the failed attempt is cached, a warning is logged, and the precursor is
+conservatively treated as not purchasable instead of aborting the search.
+Legacy SMILES/SDF/CSV/TSV stock and
 ``Tree(building_blocks=set(...))`` callers continue to use canonical-SMILES
 membership. JSON catalogues are restricted to retrosynthesis; forward search
 keeps the legacy path.

@@ -35,7 +35,9 @@ def test_building_block_is_publicly_reexported_from_core():
         import_module("synplan.chem.building_blocks.model")
 
 
-def test_standardize_json_preserves_stereo_and_merges_vendor_prices(tmp_path):
+def test_standardize_json_preserves_stereo_and_merges_vendor_prices(
+    tmp_path, monkeypatch
+):
     source = tmp_path / "blocks.tsv"
     output = tmp_path / "blocks.json"
     source.write_text(CATALOGUE)
@@ -85,17 +87,14 @@ def test_standardize_json_preserves_stereo_and_merges_vendor_prices(tmp_path):
         key for prefix in expected_prefixes for key in raw if key[:14] == prefix
     ]
     assert load_building_block_catalogue(output) is catalogue
+    monkeypatch.chdir(tmp_path)
+    assert load_building_block_catalogue("blocks.json") is catalogue
+    assert load_building_block_catalogue(output.resolve()) is catalogue
 
     first_key = next(iter(raw))
     assert len(catalogue[first_key[:14]]) == 2
-    assert (
-        match_building_blocks(catalogue, first_key)
-        is catalogue[first_key[:14]]
-    )
-    assert (
-        match_building_blocks(catalogue, "AAAAAAAAAAAAAA-UHFFFAOYSA-N")
-        == ()
-    )
+    assert match_building_blocks(catalogue, first_key) is catalogue[first_key[:14]]
+    assert match_building_blocks(catalogue, "AAAAAAAAAAAAAA-UHFFFAOYSA-N") == ()
 
     with pytest.raises(TypeError):
         catalogue["AAAAAAAAAAAAAA"] = ()
