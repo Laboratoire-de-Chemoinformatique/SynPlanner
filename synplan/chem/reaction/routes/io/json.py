@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 from chython import smiles as read_smiles
 
+from synplan.chem.building_blocks import BuildingBlockCatalogue
 from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction.routes.contracts import (
     RouteDiagnostic,
@@ -46,8 +47,6 @@ def _purchasable(
     stock,
     min_mol_size: int,
     fallback: bool,
-    building_block_candidates=None,
-    use_full_inchikey: bool = False,
 ):
     """``Precursor.is_building_block`` on an already-serialised molecule.
 
@@ -61,8 +60,6 @@ def _purchasable(
         stock,
         min_mol_size,
         key=smiles,
-        building_block_candidates=building_block_candidates,
-        use_full_inchikey=use_full_inchikey,
     )
 
 
@@ -349,10 +346,8 @@ def _make_json_v1(
     keep_ids=True,
     tree: "Tree | None" = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
-    building_blocks: frozenset[str] | set[str] | None = None,
+    building_blocks: frozenset[str] | set[str] | BuildingBlockCatalogue | None = None,
     min_mol_size: int = 6,
-    building_block_candidates=None,
-    use_full_inchikey: bool = False,
 ):
     """
     Convert routes into a nested JSON tree of reaction and molecule nodes.
@@ -369,6 +364,12 @@ def _make_json_v1(
     Returns:
         list or dict: JSON-like tree(s) of routes.
     """
+    if tree is not None and building_blocks is None:
+        building_blocks = getattr(tree, "building_blocks", None)
+        tree_config = getattr(tree, "config", None)
+        if tree_config is not None:
+            min_mol_size = tree_config.min_mol_size
+
     # Prepare output
     all_routes = {} if keep_ids else []
 
@@ -430,10 +431,8 @@ def _make_json_v1(
             leaf,
             _bb=building_blocks,
             _size=min_mol_size,
-            _candidates=building_block_candidates,
-            _full=use_full_inchikey,
         ):
-            return _purchasable(key, molecule, _bb, _size, leaf, _candidates, _full)
+            return _purchasable(key, molecule, _bb, _size, leaf)
 
         def step_fields(step_id, _steps=steps, _meta=route_step_metadata):
             reaction = _steps[step_id]
@@ -469,10 +468,8 @@ def build_route_trees(
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
-    building_blocks: frozenset[str] | set[str] | None = None,
+    building_blocks: frozenset[str] | set[str] | BuildingBlockCatalogue | None = None,
     min_mol_size: int = 6,
-    building_block_candidates=None,
-    use_full_inchikey: bool = False,
 ) -> RouteExportResult:
     """Build v1 route trees with explicit diagnostics for skipped routes."""
 
@@ -483,8 +480,6 @@ def build_route_trees(
         route_metadata=route_metadata,
         building_blocks=building_blocks,
         min_mol_size=min_mol_size,
-        building_block_candidates=building_block_candidates,
-        use_full_inchikey=use_full_inchikey,
     )
     diagnostics = tuple(
         RouteDiagnostic(
@@ -508,10 +503,8 @@ def make_json(
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
-    building_blocks: frozenset[str] | set[str] | None = None,
+    building_blocks: frozenset[str] | set[str] | BuildingBlockCatalogue | None = None,
     min_mol_size: int = 6,
-    building_block_candidates=None,
-    use_full_inchikey: bool = False,
 ):
     """Convert routes into v1 JSON trees.
 
@@ -527,8 +520,6 @@ def make_json(
         strict=strict,
         building_blocks=building_blocks,
         min_mol_size=min_mol_size,
-        building_block_candidates=building_block_candidates,
-        use_full_inchikey=use_full_inchikey,
     ).routes
 
 

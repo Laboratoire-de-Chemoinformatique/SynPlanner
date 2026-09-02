@@ -1,8 +1,12 @@
-"""Behavior and rejection tests for
+"""Behavior-equivalence and rejection tests for
 :func:`synplan.chem.utils.validate_and_canonicalize`.
 
-The merged validate+canonicalize pipeline must preserve the legacy structure
-while retaining valid atom/bond stereo for stereo-aware MCTS.
+The merged validate+canonicalize pipeline must produce **byte-identical**
+canonical SMILES to the legacy two-pass sequence
+(``kekule + check_valence`` followed by ``safe_canonicalization``) on
+every molecule SynPlanner can realistically encounter — otherwise the
+``Precursor.__hash__`` / ``__eq__`` dedup that drives MCTS would diverge
+between the two flows.
 """
 
 from __future__ import annotations
@@ -50,7 +54,10 @@ _REPRESENTATIVE_SMILES = [
 
 @pytest.mark.parametrize("smi", _REPRESENTATIVE_SMILES)
 def test_byte_identical_to_legacy_flow(smi):
-    """The merged pipeline keeps legacy connectivity and valid stereo."""
+    """Canonical SMILES from the merged pipeline must match the legacy
+    two-pass result for all representative molecules. This is the
+    contract that lets us swap one for the other in production without
+    breaking MCTS state-dedup."""
     mol = smiles(smi)
     legacy = _legacy_validate_and_canonicalize(mol)
     merged = validate_and_canonicalize(mol)
@@ -59,10 +66,9 @@ def test_byte_identical_to_legacy_flow(smi):
         f"acceptance disagrees on {smi!r}: legacy={legacy}, merged={merged}"
     )
     if legacy is not None:
-        flattened = safe_canonicalization(merged)
-        assert str(legacy) == str(flattened), (
-            f"canonical connectivity disagrees on {smi!r}:\n"
-            f"  legacy: {legacy}\n  merged flattened: {flattened}"
+        assert str(legacy) == str(merged), (
+            f"canonical SMILES disagrees on {smi!r}:\n"
+            f"  legacy: {legacy}\n  merged: {merged}"
         )
 
 
@@ -160,7 +166,11 @@ def test_rdkit_roundtrip_stable_under_merged_pipeline(smi):
 
 @pytest.mark.parametrize("smi", _RDKIT_SMILES)
 def test_rdkit_input_byte_identical_to_legacy(smi):
-    """RDKit inputs keep legacy connectivity while retaining stereo."""
+    """For an RDKit-originated molecule, the merged pipeline must
+    produce the same canonical SMILES as the legacy
+    ``safe_canonicalization``. This is the harder contract: it
+    ensures the legacy ``target_from_rdkit`` → ``Precursor`` path and
+    the new merged path agree on every RDKit input."""
     pytest.importorskip("rdkit")
     from chython.containers import MoleculeContainer
     from rdkit import Chem
@@ -176,8 +186,7 @@ def test_rdkit_input_byte_identical_to_legacy(smi):
         f"acceptance disagrees for {smi!r}: legacy={legacy}, merged={merged}"
     )
     if legacy is not None:
-        flattened = safe_canonicalization(merged)
-        assert str(legacy) == str(flattened), (
-            f"canonical connectivity disagrees for {smi!r}:\n"
-            f"  legacy: {legacy}\n  merged flattened: {flattened}"
+        assert str(legacy) == str(merged), (
+            f"canonical SMILES disagrees for {smi!r}:\n"
+            f"  legacy: {legacy}\n  merged: {merged}"
         )

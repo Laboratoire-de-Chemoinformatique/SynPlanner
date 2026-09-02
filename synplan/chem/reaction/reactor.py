@@ -3,127 +3,15 @@ rules."""
 
 import logging
 from collections.abc import Iterator
-from dataclasses import dataclass
 from typing import Any
 
 from chython.containers import MoleculeContainer, ReactionContainer, SynthonContainer
-from chython.exceptions import InvalidAromaticRing, IsChiral, NotChiral, ValenceError
+from chython.exceptions import InvalidAromaticRing
 from chython.reactor import Reactor
 
 from synplan.chem.utils import safe_canonicalization, validate_and_canonicalize
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True, slots=True)
-class _AtomStereoDescriptor:
-    center: int
-    environment: tuple[int, ...]
-    mark: bool
-
-
-@dataclass(frozen=True, slots=True)
-class _CisTransStereoDescriptor:
-    first_terminal: int
-    second_terminal: int
-    first_neighbor: int
-    second_neighbor: int
-    mark: bool
-
-
-def _snapshot_product_stereo(
-    products: tuple[MoleculeContainer, ...],
-) -> tuple[tuple[_AtomStereoDescriptor, ...], tuple[_CisTransStereoDescriptor, ...]]:
-    atom_descriptors: list[_AtomStereoDescriptor] = []
-    bond_descriptors: list[_CisTransStereoDescriptor] = []
-    for product in products:
-        tetrahedrons = product.stereogenic_tetrahedrons
-        allenes = product.stereogenic_allenes
-        for center, atom in product.atoms():
-            if atom.stereo is None:
-                continue
-            if center in tetrahedrons:
-                environment = tetrahedrons[center]
-            elif center in allenes:
-                environment = allenes[center][:2]
-            else:
-                continue
-            atom_descriptors.append(
-                _AtomStereoDescriptor(center, tuple(environment), atom.stereo)
-            )
-
-        cis_trans_paths = {
-            frozenset((path[0], path[-1])): path
-            for path in product.cumulenes
-            if not len(path) % 2
-        }
-        for (first, second), environment in product.stereogenic_cis_trans.items():
-            path = cis_trans_paths[frozenset((first, second))]
-            middle = len(path) // 2
-            mark = product.bond(path[middle - 1], path[middle]).stereo
-            if mark is not None:
-                bond_descriptors.append(
-                    _CisTransStereoDescriptor(
-                        first, second, environment[0], environment[1], mark
-                    )
-                )
-    return tuple(atom_descriptors), tuple(bond_descriptors)
-
-
-def _restore_product_stereo(
-    molecule: MoleculeContainer,
-    atom_descriptors: tuple[_AtomStereoDescriptor, ...],
-    bond_descriptors: tuple[_CisTransStereoDescriptor, ...],
-) -> None:
-    atom_numbers = set(molecule.atoms_numbers)
-    pending: list[_AtomStereoDescriptor | _CisTransStereoDescriptor] = [
-        descriptor
-        for descriptor in atom_descriptors
-        if descriptor.center in atom_numbers
-        and set(descriptor.environment).issubset(atom_numbers)
-    ]
-    pending.extend(
-        descriptor
-        for descriptor in bond_descriptors
-        if {
-            descriptor.first_terminal,
-            descriptor.second_terminal,
-            descriptor.first_neighbor,
-            descriptor.second_neighbor,
-        }.issubset(atom_numbers)
-    )
-
-    while pending:
-        unresolved: list[_AtomStereoDescriptor | _CisTransStereoDescriptor] = []
-        applied = False
-        for descriptor in pending:
-            try:
-                if isinstance(descriptor, _AtomStereoDescriptor):
-                    molecule.add_atom_stereo(
-                        descriptor.center,
-                        descriptor.environment,
-                        descriptor.mark,
-                        clean_cache=False,
-                    )
-                else:
-                    molecule.add_cis_trans_stereo(
-                        descriptor.first_terminal,
-                        descriptor.second_terminal,
-                        descriptor.first_neighbor,
-                        descriptor.second_neighbor,
-                        descriptor.mark,
-                        clean_cache=False,
-                    )
-            except NotChiral:
-                unresolved.append(descriptor)
-            except (IsChiral, KeyError, ValueError, ValenceError):
-                continue
-            applied = True
-        if not applied:
-            break
-        molecule.flush_stereo_cache()
-        pending = unresolved
-    molecule.fix_stereo()
 
 
 class Reaction(ReactionContainer):
@@ -173,7 +61,7 @@ class CanonicalRetroReactor(Reactor):
                 new.fix_stereo()
             new.standardize_charges(prepare_molecule=False)
             new.standardize_tautomers(prepare_molecule=False)
-            new.fix_stereo()
+            new.clean_stereo()
         except InvalidAromaticRing:
             raise  # reject half-canonicalized output
 
@@ -318,7 +206,6 @@ def apply_reaction_rule(
         if rebuild_with_cgr:
             # CGR recovery path bypasses _patcher; canonicalize per fragment.
             # chython.compose raises ValueError on element-substitution rules.
-            atom_stereo, bond_stereo = _snapshot_product_stereo(reaction.products)
             try:
                 cgr = reaction.compose()
                 reactants = cgr.decompose()[1].split()
@@ -331,7 +218,6 @@ def apply_reaction_rule(
                 if c is None:
                     return None
                 c.meta.update(mol.meta)
-                _restore_product_stereo(c, atom_stereo, bond_stereo)
                 canon.append(c)
             return canon
 

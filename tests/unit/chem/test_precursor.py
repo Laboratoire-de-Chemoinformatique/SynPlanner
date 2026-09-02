@@ -79,32 +79,24 @@ def _stereo_block(smiles_value: str) -> BuildingBlock:
     )
 
 
-def test_full_inchikey_membership_separates_stereoisomers():
+def test_inchikey_membership_is_connectivity_only():
     r_block = _stereo_block("C[C@H](O)C(=O)O")
     s_precursor = Precursor(smiles("C[C@@H](O)C(=O)O", ignore_stereo=False))
-    full_index = frozendict({r_block.inchikey: r_block})
-    candidates = frozendict({r_block.inchikey[:14]: (r_block,)})
+    catalogue = frozendict({r_block.inchikey[:14]: (r_block,)})
 
-    assert not s_precursor.is_building_block(
-        full_index,
-        min_mol_size=0,
-        building_block_candidates=candidates,
-        use_full_inchikey=True,
+    assert s_precursor.is_building_block(catalogue, min_mol_size=0)
+    assert not any(
+        atom.stereo is not None for _, atom in s_precursor.molecule.atoms()
     )
-    assert s_precursor.is_building_block(
-        full_index,
-        min_mol_size=0,
-        building_block_candidates=candidates,
-        use_full_inchikey=False,
-    )
+    assert s_precursor.inchi_key[:14] == r_block.inchikey[:14]
+    assert s_precursor.inchi_key != r_block.inchikey
 
 
 def test_precursor_generates_its_inchikey_only_once(monkeypatch):
     import synplan.chem.precursor as precursor_module
 
     block = _stereo_block("C[C@H](O)C(=O)O")
-    full_index = frozendict({block.inchikey: block})
-    candidates = frozendict({block.inchikey[:14]: (block,)})
+    catalogue = frozendict({block.inchikey[:14]: (block,)})
     original = precursor_module.molecule_to_inchikey
     calls = 0
 
@@ -116,11 +108,6 @@ def test_precursor_generates_its_inchikey_only_once(monkeypatch):
     monkeypatch.setattr(precursor_module, "molecule_to_inchikey", counted)
     precursor = Precursor(smiles("C[C@H](O)C(=O)O", ignore_stereo=False))
     for _ in range(3):
-        assert precursor.is_building_block(
-            full_index,
-            min_mol_size=0,
-            building_block_candidates=candidates,
-            use_full_inchikey=True,
-        )
+        assert precursor.is_building_block(catalogue, min_mol_size=0)
 
     assert calls == 1

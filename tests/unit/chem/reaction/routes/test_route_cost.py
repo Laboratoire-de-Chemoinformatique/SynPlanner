@@ -37,31 +37,20 @@ def _route(target_smiles: str, *leaf_smiles: str) -> Route:
     return Route((Step(reaction, target),))
 
 
-def test_exact_costing_selects_the_matching_stereoisomer():
-    r_block = _block(R_LACTIC, exact_vendor=5.0)
-    s_block = _block(S_LACTIC, cheaper_wrong_stereo=1.0)
-    route = _route("C[C@H](F)Cl", R_LACTIC)
-
-    result = route.calculate_cost(_index(s_block, r_block))
-
-    assert result["complete"]
-    assert result["leaves"][0]["selected_inchikey"] == r_block.inchikey
-    assert result["leaves"][0]["vendor"] == "exact_vendor"
-    assert result["cost_per_mol"] == pytest.approx(
-        route.leaves()[0].molecular_mass * 5.0
-    )
-
-
-def test_relaxed_costing_selects_the_cheapest_offer_in_the_prefix_bucket():
+@pytest.mark.parametrize("target_smiles", ["C[C@H](F)Cl", "CC(F)Cl"])
+def test_costing_is_connectivity_only_and_selects_the_cheapest_offer(target_smiles):
     r_block = _block(R_LACTIC, expensive=5.0)
     s_block = _block(S_LACTIC, inexpensive=1.0)
-    route = _route("CCO", R_LACTIC)
+    route = _route(target_smiles, R_LACTIC)
 
     result = route.calculate_cost(_index(r_block, s_block))
 
     assert result["complete"]
     assert result["leaves"][0]["selected_inchikey"] == s_block.inchikey
     assert result["leaves"][0]["vendor"] == "inexpensive"
+    assert result["cost_per_mol"] == pytest.approx(
+        route.leaves()[0].molecular_mass * 1.0
+    )
 
 
 def test_repeated_leaves_are_grouped_as_equivalents():

@@ -1,4 +1,4 @@
-"""The public building-block record and immutable index types."""
+"""The public building-block record and immutable runtime catalogue."""
 
 from __future__ import annotations
 
@@ -18,12 +18,25 @@ class BuildingBlock:
     has_stereo: bool
 
 
-BuildingBlocksByInchiKey: TypeAlias = frozendict[str, BuildingBlock]
-BuildingBlockCandidateIndex: TypeAlias = frozendict[str, tuple[BuildingBlock, ...]]
+BuildingBlockCatalogue: TypeAlias = frozendict[str, tuple[BuildingBlock, ...]]
+
+
+def match_building_blocks(
+    catalogue: BuildingBlockCatalogue,
+    inchikey: str,
+) -> tuple[BuildingBlock, ...]:
+    """Return all catalogue records sharing an InChIKey connectivity block.
+
+    Search is intentionally stereo-agnostic and therefore uses only the first
+    14 characters. Complete keys and stereo metadata remain on each record for
+    future use.
+    """
+
+    return catalogue.get(inchikey[:14], ())
 
 
 __all__ = [
     "BuildingBlock",
-    "BuildingBlockCandidateIndex",
-    "BuildingBlocksByInchiKey",
+    "BuildingBlockCatalogue",
+    "match_building_blocks",
 ]

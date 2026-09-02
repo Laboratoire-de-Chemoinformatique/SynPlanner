@@ -3,7 +3,7 @@
 import logging
 import pickle
 from collections import deque
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, fields
 from itertools import pairwise
 from os import PathLike
@@ -13,9 +13,7 @@ from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
 from synplan.chem.building_blocks import (
-    BuildingBlockCandidateIndex,
-    BuildingBlocksByInchiKey,
-    molecule_has_stereo,
+    BuildingBlockCatalogue,
 )
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
@@ -136,11 +134,10 @@ class Tree:
         target: MoleculeContainer,
         config: TreeConfig,
         reaction_rules: list[CanonicalRetroReactor],
-        building_blocks: set[str] | frozenset[str] | BuildingBlocksByInchiKey,
+        building_blocks: set[str] | frozenset[str] | BuildingBlockCatalogue,
         expansion_function: Policy,
         evaluation_function: EvaluationStrategy = None,
         priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
-        building_block_candidates: BuildingBlockCandidateIndex | None = None,
     ):
         """Initializes a tree object with optional parameters for tree search for target
         molecule.
@@ -178,18 +175,20 @@ class Tree:
 
         # building blocks and reaction reaction_rules
         self.reaction_rules = tuple(reaction_rules)
-        if building_block_candidates is None:
-            self.building_blocks = frozenset(building_blocks)
-            self.building_block_candidates = None
-            self.use_full_inchikey = False
-        else:
+        if isinstance(building_blocks, Mapping):
             if self.config.direction == "forward":
                 raise ValueError(
                     "JSON building-block catalogues are supported only for retrosynthesis"
                 )
             self.building_blocks = building_blocks
-            self.building_block_candidates = building_block_candidates
-            self.use_full_inchikey = molecule_has_stereo(target)
+            self._building_block_count = sum(
+                len(bucket) for bucket in building_blocks.values()
+            )
+            self._building_block_bucket_count: int | None = len(building_blocks)
+        else:
+            self.building_blocks = frozenset(building_blocks)
+            self._building_block_count = len(self.building_blocks)
+            self._building_block_bucket_count = None
         self.priority_rules: dict[str, tuple[CanonicalRetroReactor, ...]] = {
             name: tuple(rules) for name, rules in (priority_rules or {}).items()
         }
@@ -242,8 +241,6 @@ class Tree:
 
         if rollout is not None:
             rollout.building_blocks = self.building_blocks
-            rollout.building_block_candidates = self.building_block_candidates
-            rollout.use_full_inchikey = self.use_full_inchikey
 
         # tree initialization
         target_node = self._init_target_node(target)
@@ -286,7 +283,8 @@ class Tree:
         priority_rules_total = sum(len(rules) for rules in self.priority_rules.values())
         logger.debug(
             f"Tree init: target={str(target)[:50]}, "
-            f"building_blocks={len(self.building_blocks)}, "
+            f"building_blocks={self._building_block_count}, "
+            f"building_block_buckets={self._building_block_bucket_count}, "
             f"reaction_rules={len(self.reaction_rules)}, "
             f"priority_rules={priority_rules_total} across "
             f"{len(self.priority_rules)} sets {list(self.priority_rules)}, "
@@ -558,8 +556,6 @@ class Tree:
                 if not x.is_building_block(
                     self.building_blocks,
                     self.config.min_mol_size,
-                    building_block_candidates=self.building_block_candidates,
-                    use_full_inchikey=self.use_full_inchikey,
                 )
             ),
         )

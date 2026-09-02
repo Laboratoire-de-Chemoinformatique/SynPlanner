@@ -1,9 +1,9 @@
-"""Vendor-aware ordinary building blocks and their immutable lookup indexes."""
+"""Vendor-aware ordinary building blocks and their immutable runtime catalogue."""
 
 from .core import (
     BuildingBlock,
-    BuildingBlockCandidateIndex,
-    BuildingBlocksByInchiKey,
+    BuildingBlockCatalogue,
+    match_building_blocks,
 )
 from .identity import (
     molecule_has_stereo,
@@ -11,15 +11,15 @@ from .identity import (
     validate_standard_inchikey,
 )
 from .io import (
-    load_building_block_indexes,
+    load_building_block_catalogue,
     standardize_building_block_catalogue,
 )
 
 __all__ = [
     "BuildingBlock",
-    "BuildingBlockCandidateIndex",
-    "BuildingBlocksByInchiKey",
-    "load_building_block_indexes",
+    "BuildingBlockCatalogue",
+    "load_building_block_catalogue",
+    "match_building_blocks",
     "molecule_has_stereo",
     "molecule_to_inchikey",
     "standardize_building_block_catalogue",

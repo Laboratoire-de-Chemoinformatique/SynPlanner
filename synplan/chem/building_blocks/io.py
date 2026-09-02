@@ -23,8 +23,7 @@ from synplan.chem.utils import safe_canonicalization
 
 from .core import (
     BuildingBlock,
-    BuildingBlockCandidateIndex,
-    BuildingBlocksByInchiKey,
+    BuildingBlockCatalogue,
 )
 from .identity import (
     molecule_has_stereo,
@@ -201,20 +200,23 @@ def standardize_building_block_catalogue(
 
 
 @functools.cache
-def load_building_block_indexes(
+def load_building_block_catalogue(
     path_value: str | Path,
-) -> tuple[BuildingBlocksByInchiKey, BuildingBlockCandidateIndex]:
-    """Stream a prepared JSON catalogue and build its two immutable indexes."""
+) -> BuildingBlockCatalogue:
+    """Stream a prepared full-keyed JSON file into one immutable catalogue."""
 
     path = Path(path_value).resolve(strict=True)
-    building_blocks_by_inchikey: dict[str, BuildingBlock] = {}
     candidate_groups: dict[str, list[BuildingBlock]] = defaultdict(list)
     try:
         with path.open("rb") as stream:
             for key, raw_record in ijson.kvitems(stream, ""):
                 location = f"{path}:{key}"
                 key = validate_standard_inchikey(key, context=str(path))
-                if key in building_blocks_by_inchikey:
+                prefix = key[:14]
+                bucket = candidate_groups.get(prefix)
+                if bucket is not None and any(
+                    block.inchikey == key for block in bucket
+                ):
                     raise ValueError(f"{location}: duplicate InChIKey")
                 if not isinstance(raw_record, dict):
                     raise ValueError(f"{location}: record must be a JSON object")
@@ -253,21 +255,20 @@ def load_building_block_indexes(
                     vendors=frozendict(vendors),
                     has_stereo=has_stereo,
                 )
-                building_blocks_by_inchikey[key] = block
-                candidate_groups[key[:14]].append(block)
+                candidate_groups[prefix].append(block)
     except (OSError, ijson.JSONError) as error:
         raise ValueError(
             f"Could not read building-block catalogue {path}: {error}"
         ) from error
 
-    if not building_blocks_by_inchikey:
+    if not candidate_groups:
         raise ValueError(f"{path}: building-block catalogue is empty")
-    return frozendict(building_blocks_by_inchikey), frozendict(
+    return frozendict(
         (prefix, tuple(blocks)) for prefix, blocks in candidate_groups.items()
     )
 
 
 __all__ = [
-    "load_building_block_indexes",
+    "load_building_block_catalogue",
     "standardize_building_block_catalogue",
 ]

@@ -6,7 +6,7 @@ from pathlib import Path
 import click
 import yaml
 
-from synplan.chem.building_blocks import load_building_block_indexes
+from synplan.chem.building_blocks import load_building_block_catalogue
 from synplan.chem.reaction.curation.filtering import (
     ReactionFilterConfig,
     filter_reactions_from_file,
@@ -855,19 +855,15 @@ def planning_cli(
         policy_function = load_policy_function(weights_path=policy_network)
         reaction_rules_list = load_reaction_rules(reaction_rules)
         if Path(building_blocks).suffix.lower() == ".json":
-            building_blocks_set, building_block_candidates = (
-                load_building_block_indexes(building_blocks)
-            )
+            building_blocks_set = load_building_block_catalogue(building_blocks)
         else:
             building_blocks_set = load_building_blocks(
                 building_blocks, standardize=False
             )
-            building_block_candidates = None
         evaluation_config = RolloutEvaluationConfig(
             policy_network=policy_function,
             reaction_rules=reaction_rules_list,
             building_blocks=building_blocks_set,
-            building_block_candidates=building_block_candidates,
             min_mol_size=search_config.get("min_mol_size", 6),
             max_depth=search_config.get("max_depth", 6),
             normalize=node_evaluation.get("normalize", False),

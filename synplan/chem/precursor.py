@@ -8,8 +8,8 @@ from collections.abc import Mapping, Set
 from chython.containers import MoleculeContainer
 
 from synplan.chem.building_blocks import (
-    BuildingBlock,
-    BuildingBlockCandidateIndex,
+    BuildingBlockCatalogue,
+    match_building_blocks,
     molecule_to_inchikey,
 )
 from synplan.chem.utils import safe_canonicalization
@@ -24,11 +24,7 @@ class Precursor:
 
         :param molecule: A molecule.
         """
-        self.molecule = (
-            safe_canonicalization(molecule, clean_stereo=False)
-            if canonicalize
-            else molecule
-        )
+        self.molecule = safe_canonicalization(molecule) if canonicalize else molecule
         self.prev_precursors = []
         self._inchi_key: str | None = None
 
@@ -62,16 +58,14 @@ class Precursor:
 
     def is_building_block(
         self,
-        bb_stock: Set[str] | Mapping[str, BuildingBlock],
+        bb_stock: Set[str] | BuildingBlockCatalogue,
         min_mol_size: int = 6,
-        *,
-        building_block_candidates: BuildingBlockCandidateIndex | None = None,
-        use_full_inchikey: bool = False,
     ) -> bool:
         """Checks if a Precursor is a building block.
 
         :param bb_stock: The list of building blocks. Each building block is represented
-            by a canonical SMILES in legacy mode or a full InChIKey in JSON mode.
+            by a canonical SMILES in legacy mode. JSON mode uses an immutable
+            prefix-bucket catalogue whose records retain their full InChIKeys.
         :param min_mol_size: If the size of the Precursor is equal or smaller than
             min_mol_size it is automatically classified as building block.
         :return: True is Precursor is a building block.
@@ -80,12 +74,9 @@ class Precursor:
             self.molecule,
             bb_stock,
             min_mol_size,
-            building_block_candidates=building_block_candidates,
-            use_full_inchikey=use_full_inchikey,
             inchikey=(
                 self.inchi_key
-                if building_block_candidates is not None
-                and len(self.molecule) > min_mol_size
+                if isinstance(bb_stock, Mapping) and len(self.molecule) > min_mol_size
                 else None
             ),
         )
@@ -93,27 +84,24 @@ class Precursor:
 
 def is_purchasable(
     molecule: MoleculeContainer,
-    stock: Set[str] | Mapping[str, BuildingBlock],
+    stock: Set[str] | BuildingBlockCatalogue,
     min_mol_size: int = 6,
     *,
     key: str | None = None,
-    building_block_candidates: BuildingBlockCandidateIndex | None = None,
-    use_full_inchikey: bool = False,
     inchikey: str | None = None,
 ) -> bool:
     """Whether a molecule can be bought: too small to disconnect, or in the catalogue.
 
-    The catalogue is keyed by the molecule's own SMILES, so a caller holding that
-    string already passes it as ``key`` rather than spelling it a second time.
+    A legacy stock is keyed by the molecule's canonical SMILES, so a caller
+    holding that string can pass it as ``key``. A JSON catalogue uses the
+    molecule's Chython Standard InChIKey instead.
     """
 
     if len(molecule) <= min_mol_size:
         return True
-    if building_block_candidates is not None:
+    if isinstance(stock, Mapping):
         identity = inchikey or molecule_to_inchikey(molecule)
-        if use_full_inchikey:
-            return identity in stock
-        return identity[:14] in building_block_candidates
+        return bool(match_building_blocks(stock, identity))
     return (key or str(molecule)) in stock
 
 

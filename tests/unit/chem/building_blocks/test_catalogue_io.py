@@ -1,6 +1,7 @@
 import json
 import logging
 from importlib import import_module
+from typing import get_origin
 
 import pytest
 from click.testing import CliRunner
@@ -8,7 +9,9 @@ from frozendict import frozendict
 
 from synplan.chem.building_blocks import (
     BuildingBlock,
-    load_building_block_indexes,
+    BuildingBlockCatalogue,
+    load_building_block_catalogue,
+    match_building_blocks,
 )
 from synplan.chem.building_blocks import io as catalogue_io
 from synplan.chem.utils import standardize_building_blocks
@@ -44,10 +47,13 @@ def test_standardize_json_preserves_stereo_and_merges_vendor_prices(tmp_path):
     stereo_records = [record for record in raw.values() if record["has_stereo"]]
     assert len(stereo_records) == 4
     assert sum("@" in record["smiles"] for record in stereo_records) == 2
-    assert sum(
-        "/" in record["smiles"] or "\\" in record["smiles"]
-        for record in stereo_records
-    ) == 2
+    assert (
+        sum(
+            "/" in record["smiles"] or "\\" in record["smiles"]
+            for record in stereo_records
+        )
+        == 2
+    )
     ethanol = next(record for record in raw.values() if record["smiles"] == "CCO")
     assert ethanol == {
         "smiles": "CCO",
@@ -55,11 +61,60 @@ def test_standardize_json_preserves_stereo_and_merges_vendor_prices(tmp_path):
         "has_stereo": False,
     }
 
-    by_key, candidates = load_building_block_indexes(output)
-    assert isinstance(by_key, frozendict)
-    assert isinstance(candidates, frozendict)
-    assert all(isinstance(block, BuildingBlock) for block in by_key.values())
-    assert all(block in candidates[block.inchikey[:14]] for block in by_key.values())
+    catalogue = load_building_block_catalogue(output)
+    assert isinstance(catalogue, frozendict)
+    assert get_origin(BuildingBlockCatalogue) is frozendict
+    assert sum(map(len, catalogue.values())) == len(raw)
+    assert all(isinstance(bucket, tuple) for bucket in catalogue.values())
+    assert all(
+        isinstance(block, BuildingBlock)
+        for bucket in catalogue.values()
+        for block in bucket
+    )
+    loaded = {
+        block.inchikey: block for bucket in catalogue.values() for block in bucket
+    }
+    assert set(loaded) == set(raw)
+    for key, record in raw.items():
+        assert loaded[key].smiles == record["smiles"]
+        assert dict(loaded[key].vendors) == record["vendors"]
+        assert loaded[key].has_stereo is record["has_stereo"]
+    expected_prefixes = list(dict.fromkeys(key[:14] for key in raw))
+    assert list(catalogue) == expected_prefixes
+    assert [block.inchikey for bucket in catalogue.values() for block in bucket] == [
+        key for prefix in expected_prefixes for key in raw if key[:14] == prefix
+    ]
+    assert load_building_block_catalogue(output) is catalogue
+
+    first_key = next(iter(raw))
+    assert len(catalogue[first_key[:14]]) == 2
+    assert (
+        match_building_blocks(catalogue, first_key)
+        is catalogue[first_key[:14]]
+    )
+    assert (
+        match_building_blocks(catalogue, "AAAAAAAAAAAAAA-UHFFFAOYSA-N")
+        == ()
+    )
+
+    with pytest.raises(TypeError):
+        catalogue["AAAAAAAAAAAAAA"] = ()
+    with pytest.raises(TypeError):
+        catalogue[first_key[:14]][0].vendors["new"] = 1.0
+
+
+def test_loader_rejects_duplicate_full_keys_within_a_bucket(tmp_path):
+    output = tmp_path / "duplicate.json"
+    record = '{"smiles":"CCO","vendors":{"LN":2.0},"has_stereo":false}'
+    output.write_text(
+        '{"LFQSCWFLJHTTHZ-UHFFFAOYSA-N":'
+        f"{record},"
+        '"LFQSCWFLJHTTHZ-UHFFFAOYSA-N":'
+        f"{record}}}\n"
+    )
+
+    with pytest.raises(ValueError, match="duplicate InChIKey"):
+        load_building_block_catalogue(output)
 
 
 def test_standardize_json_publishes_valid_rows_and_reports_every_bad_row(

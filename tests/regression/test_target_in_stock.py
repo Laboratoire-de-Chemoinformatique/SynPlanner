@@ -58,11 +58,10 @@ def test_json_catalogue_skip_still_writes_the_cost_sidecar(tmp_path, monkeypatch
         vendors=frozendict({"vendor": 2.0}),
         has_stereo=False,
     )
-    full = frozendict({key: block})
-    candidates = frozendict({key[:14]: (block,)})
+    catalogue_index = frozendict({key[:14]: (block,)})
     monkeypatch.setattr(
-        "synplan.mcts.search.load_building_block_indexes",
-        lambda *args, **kwargs: (full, candidates),
+        "synplan.mcts.search.load_building_block_catalogue",
+        lambda *args, **kwargs: catalogue_index,
     )
     monkeypatch.setattr("synplan.mcts.search.load_reaction_rules", lambda *a, **k: [])
     monkeypatch.setattr(

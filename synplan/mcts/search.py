@@ -15,8 +15,8 @@ from tqdm.auto import tqdm
 
 from synplan import __version__
 from synplan.chem.building_blocks import (
-    load_building_block_indexes,
-    molecule_has_stereo,
+    load_building_block_catalogue,
+    match_building_blocks,
     molecule_to_inchikey,
 )
 from synplan.chem.reaction import CanonicalRetroReactor
@@ -126,8 +126,6 @@ def build_target_routes(tree, reactions: dict | None = None) -> list[dict]:
             keep_ids=True,
             building_blocks=tree.building_blocks,
             min_mol_size=tree.config.min_mol_size,
-            building_block_candidates=tree.building_block_candidates,
-            use_full_inchikey=tree.use_full_inchikey,
         ).values()
     )
 
@@ -280,11 +278,9 @@ def run_search(
     else:
         policy_function = load_policy_function(policy_config=policy_config)
     reaction_rules = load_reaction_rules(reaction_rules_path)
-    building_block_candidates = None
-    if Path(building_blocks_path).suffix.lower() == ".json":
-        building_blocks, building_block_candidates = load_building_block_indexes(
-            building_blocks_path
-        )
+    is_json_catalogue = Path(building_blocks_path).suffix.lower() == ".json"
+    if is_json_catalogue:
+        building_blocks = load_building_block_catalogue(building_blocks_path)
     else:
         building_blocks = load_building_blocks(building_blocks_path, standardize=False)
 
@@ -315,7 +311,7 @@ def run_search(
             bar_format="{desc}{n} [{elapsed}]",
         ):
             target_smi = target_smi.strip()
-            if building_block_candidates is not None:
+            if is_json_catalogue:
                 route_costs[target_smi] = {}
             # Key the export dict by the RDKit-canonical target SMILES so keys
             # match retrocast's Target.smiles byte-for-byte. Every target starts
@@ -325,18 +321,16 @@ def run_search(
                 export_key = _canonical_target_key(target_smi)
                 exported_routes[export_key] = []
             try:
-                target_mol = mol_from_smiles(target_smi, clean_stereo=False)
-                # exact catalogue membership, not is_building_block: that also passes
+                target_mol = mol_from_smiles(target_smi, clean_stereo=True)
+                # Catalogue membership, not is_building_block: that also passes
                 # anything under min_mol_size, which is right for a precursor and wrong
                 # for a target -- a small target is small, not purchasable.
-                if building_block_candidates is None:
+                if not is_json_catalogue:
                     target_in_stock = str(target_mol) in building_blocks
                 else:
                     target_key = molecule_to_inchikey(target_mol)
-                    target_in_stock = (
-                        target_key in building_blocks
-                        if molecule_has_stereo(target_mol)
-                        else target_key[:14] in building_block_candidates
+                    target_in_stock = bool(
+                        match_building_blocks(building_blocks, target_key)
                     )
                 if target_in_stock:
                     n_in_stock += 1
@@ -361,7 +355,6 @@ def run_search(
                     expansion_function=policy_function,
                     evaluation_function=evaluation_function,
                     priority_rules=priority_rules,
-                    building_block_candidates=building_block_candidates,
                 )
 
                 tree.run()
@@ -393,10 +386,10 @@ def run_search(
                 routes = tree.routes()
                 if route_scorer is not None:
                     routes = route_scorer.rank(routes)
-                if building_block_candidates is not None:
+                if is_json_catalogue:
                     route_costs[target_smi] = {
                         str(route.provenance.tree_node_id): route.calculate_cost(
-                            building_block_candidates
+                            building_blocks
                         )
                         for route in routes
                     }
@@ -419,7 +412,9 @@ def run_search(
 
                 # save mapped reactions (JSON)
                 write_routes_json(
-                    routes_dict, os.path.join(routes_folder, f"mapped_routes_{ti}.json")
+                    routes_dict,
+                    os.path.join(routes_folder, f"mapped_routes_{ti}.json"),
+                    tree=tree,
                 )
 
                 # public route export (reuse extract_reactions result)
@@ -436,7 +431,7 @@ def run_search(
 
     if export_routes:
         export_routes_artifact(exported_routes, results_root, filename=routes_filename)
-    if building_block_candidates is not None:
+    if is_json_catalogue:
         with open(
             results_root.joinpath("route_costs.json"), "w", encoding="utf-8"
         ) as file:

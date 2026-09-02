@@ -83,7 +83,7 @@ def test_cgr_rebuild_yields_canonical_precursors(rule_str, target_smi, label):
     for products in apply_reaction_rule(target, reactor, rebuild_with_cgr=True):
         fired = True
         for p in products:
-            again = safe_canonicalization(p.copy(), clean_stereo=False)
+            again = safe_canonicalization(p.copy())
             assert str(p) == str(again), (
                 f"CGR-rebuilt precursor not canonical on {label!r}:\n"
                 f"  yielded:    {p}\n"
@@ -118,75 +118,3 @@ def test_cgr_rebuild_matches_direct_path(rule_str, target_smi, label):
         f"  direct:       {direct}\n"
         f"  cgr-rebuild:  {cgr_rebuilt}"
     )
-
-
-@pytest.mark.parametrize("target_smi", ["F[C@H](Cl)CCO", "F[C@@H](Cl)CCO"])
-def test_cgr_rebuild_preserves_unaffected_tetrahedral_stereo(target_smi):
-    rule = smarts("[C:1]-[O:2]>>[C:1].[O:2]")
-    target = smiles(target_smi, ignore_stereo=False)
-    original = str(target)
-    reactor = CanonicalRetroReactor(
-        patterns=tuple(rule.reactants),
-        products=tuple(rule.products),
-        delete_atoms=False,
-    )
-
-    direct = [
-        tuple(sorted(str(product) for product in products))
-        for products in apply_reaction_rule(target, reactor)
-    ]
-    rebuilt = [
-        tuple(sorted(str(product) for product in products))
-        for products in apply_reaction_rule(target, reactor, rebuild_with_cgr=True)
-    ]
-
-    assert rebuilt == direct
-    assert any("@" in product for product in rebuilt[0])
-    assert str(target) == original
-
-
-@pytest.mark.parametrize("target_smi", ["C/C=C/CCO", "C/C=C\\CCO"])
-def test_cgr_rebuild_preserves_unaffected_cis_trans_stereo(target_smi):
-    rule = smarts("[C:1]-[O:2]>>[C:1].[O:2]")
-    target = smiles(target_smi, ignore_stereo=False)
-    original = str(target)
-    reactor = CanonicalRetroReactor(
-        patterns=tuple(rule.reactants),
-        products=tuple(rule.products),
-        delete_atoms=False,
-    )
-
-    direct = [
-        tuple(sorted(str(product) for product in products))
-        for products in apply_reaction_rule(target, reactor)
-    ]
-    rebuilt = [
-        tuple(sorted(str(product) for product in products))
-        for products in apply_reaction_rule(target, reactor, rebuild_with_cgr=True)
-    ]
-
-    assert rebuilt == direct
-    assert any("/" in product or "\\" in product for product in rebuilt[0])
-    assert str(target) == original
-
-
-def test_cgr_rebuild_does_not_restore_an_invalidated_stereocentre():
-    rule = smarts("[C:1]-[F:2]>>[C:1].[F:2]")
-    target = smiles("F[C@H](Cl)CCO", ignore_stereo=False)
-    reactor = CanonicalRetroReactor(
-        patterns=tuple(rule.reactants),
-        products=tuple(rule.products),
-        delete_atoms=False,
-    )
-
-    direct = [
-        tuple(sorted(str(product) for product in products))
-        for products in apply_reaction_rule(target, reactor)
-    ]
-    rebuilt = [
-        tuple(sorted(str(product) for product in products))
-        for products in apply_reaction_rule(target, reactor, rebuild_with_cgr=True)
-    ]
-
-    assert rebuilt == direct
-    assert all("@" not in product for product in rebuilt[0])

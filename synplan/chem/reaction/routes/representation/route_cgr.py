@@ -322,8 +322,6 @@ def process_first_reaction(first_react: ReactionContainer, tree: "Tree", route_i
             curr_mol,
             tree.building_blocks,
             tree.config.min_mol_size,
-            building_block_candidates=getattr(tree, "building_block_candidates", None),
-            use_full_inchikey=getattr(tree, "use_full_inchikey", False),
         ):
             bb_set = bb_set.union(react_key_set)
 
@@ -384,8 +382,6 @@ def update_reaction_dict(
             curr_mol,
             tree.building_blocks,
             tree.config.min_mol_size,
-            building_block_candidates=getattr(tree, "building_block_candidates", None),
-            use_full_inchikey=getattr(tree, "use_full_inchikey", False),
         ):
             bb_set = bb_set.union(react_key_set)
 

@@ -64,10 +64,6 @@ def get_child_nodes(
                 tree.building_blocks,
                 min_mol_size=0,
                 key=str(precursor),
-                building_block_candidates=getattr(
-                    tree, "building_block_candidates", None
-                ),
-                use_full_inchikey=getattr(tree, "use_full_inchikey", False),
             ),
         }
         node = get_child_nodes(tree, precursor, graph)
@@ -100,8 +96,6 @@ def extract_routes(
     target_in_stock = tree.nodes[1].curr_precursor.is_building_block(
         tree.building_blocks,
         min_mol_size,
-        building_block_candidates=getattr(tree, "building_block_candidates", None),
-        use_full_inchikey=getattr(tree, "use_full_inchikey", False),
     )
 
     # append encoded routes to list

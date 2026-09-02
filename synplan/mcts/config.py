@@ -138,8 +138,7 @@ class RolloutEvaluationConfig(BaseConfigModel):
 
     policy_network: Any  # Policy - using Any to avoid circular import
     reaction_rules: Any  # List[Reactor]
-    building_blocks: Any  # Set[str]
-    building_block_candidates: Any | None = None
+    building_blocks: Any  # Set[str] or BuildingBlockCatalogue
     min_mol_size: int = Field(default=0, ge=0)
     max_depth: int = Field(default=6, gt=0)
     normalize: bool = False

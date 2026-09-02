@@ -11,6 +11,7 @@ from collections.abc import Iterable
 
 from chython.containers import MoleculeContainer
 
+from synplan.chem.precursor import is_purchasable
 from synplan.chem.utils import clean_molecule, safe_canonicalization
 
 
@@ -94,10 +95,6 @@ def route_to_rdkit(tree, node_id: int, keep_mapping: bool = True) -> list[dict]:
                 p.is_building_block(
                     tree.building_blocks,
                     tree.config.min_mol_size,
-                    building_block_candidates=getattr(
-                        tree, "building_block_candidates", None
-                    ),
-                    use_full_inchikey=getattr(tree, "use_full_inchikey", False),
                 )
             )
 
@@ -144,8 +141,6 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
     target_in_stock = tree.nodes[1].curr_precursor.is_building_block(
         tree.building_blocks,
         tree.config.min_mol_size,
-        building_block_candidates=getattr(tree, "building_block_candidates", None),
-        use_full_inchikey=getattr(tree, "use_full_inchikey", False),
     )
 
     if not tree.winning_nodes:
@@ -194,8 +189,12 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
                 "type": "mol",
                 "smiles": smi,
                 "mol": rdkit_mol,
-                "in_stock": smi in tree.building_blocks
-                or len(molecule) <= tree.config.min_mol_size,
+                "in_stock": is_purchasable(
+                    molecule,
+                    tree.building_blocks,
+                    tree.config.min_mol_size,
+                    key=smi,
+                ),
             }
             reaction = _graph.get(molecule)
             if reaction is not None:

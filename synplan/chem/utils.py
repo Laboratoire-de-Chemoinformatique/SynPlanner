@@ -340,9 +340,9 @@ def _warn_stereo_loss(molecule: MoleculeContainer) -> None:
     ):
         return
     warnings.warn(
-        "Input stereochemistry is being discarded because this caller requested "
-        "clean_stereo=True. Pass clean_stereo=False for stereo-aware planning or "
-        "InChIKey catalogue preparation.",
+        "Input stereochemistry is being discarded: SynPlanner's rule application "
+        "and search identity are connectivity-only. Pass clean_stereo=False only "
+        "when preparing stereo metadata, such as an InChIKey catalogue.",
         StereoDiscardedWarning,
         stacklevel=3,
     )
@@ -423,7 +423,7 @@ def validate_and_canonicalize(
         tmp.thiele(fix_tautomers=True)
         tmp.standardize_charges(prepare_molecule=False)
         tmp.standardize_tautomers(prepare_molecule=False)
-        tmp.fix_stereo()
+        tmp.clean_stereo()
         return tmp
     except InvalidAromaticRing:
         return None

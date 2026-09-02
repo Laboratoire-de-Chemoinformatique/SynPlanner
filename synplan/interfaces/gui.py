@@ -12,7 +12,7 @@ import streamlit as st
 from huggingface_hub.utils import disable_progress_bars
 from streamlit_ketcher import st_ketcher
 
-from synplan.chem.building_blocks import load_building_block_indexes
+from synplan.chem.building_blocks import load_building_block_catalogue
 from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.routes.clustering import (
     cluster_routes,
@@ -380,7 +380,7 @@ def setup_planning_options():
         st.session_state.target_smiles = active_smile_code
 
         try:
-            target_molecule = mol_from_smiles(active_smile_code, clean_stereo=False)
+            target_molecule = mol_from_smiles(active_smile_code, clean_stereo=True)
             if target_molecule is None:
                 st.error(f"Could not parse the input SMILES: {active_smile_code}")
             else:
@@ -393,14 +393,13 @@ def setup_planning_options():
                     with st.status("Loading resources...", expanded=False) as status:
                         st.write("Loading building blocks...")
                         if Path(building_blocks_path).suffix.lower() == ".json":
-                            building_blocks, building_block_candidates = (
-                                load_building_block_indexes(building_blocks_path)
+                            building_blocks = load_building_block_catalogue(
+                                building_blocks_path
                             )
                         else:
                             building_blocks = load_building_blocks(
                                 building_blocks_path, standardize=False
                             )
-                            building_block_candidates = None
                         st.write("Loading reaction rules...")
                         reaction_rules = load_reaction_rules(reaction_rules_path)
                         st.write("Loading policy network...")
@@ -427,7 +426,6 @@ def setup_planning_options():
                         policy_network=policy_function,
                         reaction_rules=reaction_rules,
                         building_blocks=building_blocks,
-                        building_block_candidates=building_block_candidates,
                         min_mol_size=tree_config.min_mol_size,
                         max_depth=tree_config.max_depth,
                     )
@@ -440,7 +438,6 @@ def setup_planning_options():
                         building_blocks=building_blocks,
                         expansion_function=policy_function,
                         evaluation_function=evaluator,
-                        building_block_candidates=building_block_candidates,
                     )
 
                     mcts_progress_text = "Running MCTS iterations..."
@@ -623,7 +620,10 @@ def run_clustering_core():
             st.session_state.sb_cgrs_dict = sb_cgrs_dict
             st.write("Extracting reactions...")
             st.session_state.reactions_dict = extract_reactions(current_tree)
-            st.session_state.route_json = make_json(st.session_state.reactions_dict)
+            st.session_state.route_json = make_json(
+                st.session_state.reactions_dict,
+                tree=current_tree,
+            )
 
             if (
                 st.session_state.clusters is not None

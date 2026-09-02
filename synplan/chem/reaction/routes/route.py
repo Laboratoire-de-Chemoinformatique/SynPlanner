@@ -13,8 +13,8 @@ from math import fsum
 from typing import TYPE_CHECKING, Any, Literal
 
 from synplan.chem.building_blocks import (
-    BuildingBlockCandidateIndex,
-    molecule_has_stereo,
+    BuildingBlockCatalogue,
+    match_building_blocks,
     molecule_to_inchikey,
 )
 from synplan.chem.reaction.routes.io.json import read_route_tree, route_tree
@@ -303,22 +303,21 @@ class Route:
 
     def calculate_cost(
         self,
-        building_block_candidates: BuildingBlockCandidateIndex,
+        building_blocks: BuildingBlockCatalogue,
     ) -> dict[str, Any]:
         """Price terminal materials against a vendor-aware catalogue.
 
-        A stereo-labelled target selects exact full-InChIKey matching for every
-        leaf. A target without explicit stereo uses the connectivity prefix and
-        may therefore select the cheapest priced stereoisomer in that bucket.
-        Prices are treated exactly as supplied: raw price per gram, one molar
-        equivalent per leaf occurrence, and 100% yield at every step.
+        Every leaf uses the connectivity block of its InChIKey and may therefore
+        select the cheapest priced stereoisomer or other prefix-collapsed record
+        in that bucket. Prices are treated exactly as supplied: raw price per
+        gram, one molar equivalent per leaf occurrence, and 100% yield at every
+        step.
 
         The result is JSON-compatible. It is calculated from the detached route
-        and the supplied immutable index; neither is mutated or retained.
+        and the supplied immutable catalogue; neither is mutated or retained.
         """
 
         target = self.target.copy()
-        exact = molecule_has_stereo(target)
         grouped: dict[str, tuple[MoleculeContainer, int]] = {}
         for leaf in self.leaves():
             leaf = leaf.copy()
@@ -337,12 +336,7 @@ class Route:
         for leaf_key, (leaf, equivalents) in grouped.items():
             leaf_smiles = str(leaf)
             molecular_weight = float(leaf.molecular_mass)
-            bucket = building_block_candidates.get(leaf_key[:14], ())
-            candidates = (
-                tuple(block for block in bucket if block.inchikey == leaf_key)
-                if exact
-                else bucket
-            )
+            candidates = match_building_blocks(building_blocks, leaf_key)
             offers = sorted(
                 (
                     price,
