@@ -15,8 +15,9 @@ Run in Google Colab
 
 Every tutorial runs in Google Colab with no local install. Open the tutorial you
 want and click the |Colab| badge at the top of it: the setup cell installs
-SynPlanner and downloads the data it needs, and does nothing when the notebook is
-run locally.
+SynPlanner and downloads the public data it needs, and does nothing when the
+notebook is run locally. Tutorial 20 additionally requires a prepared
+vendor-aware InChIKey JSON catalogue.
 
 .. |Colab| image:: https://colab.research.google.com/assets/colab-badge.svg
    :alt: Open In Colab
@@ -55,6 +56,7 @@ some advanced explanations and configurations, that can be used for both demonst
 - `Building Block Search`_ - demonstrates building-block search utilities.
 - `Synthon-Based Library Design`_ - demonstrates the synthon subsystem: building-block classification and synthonisation, target fragmentation, availability against a synthon stock, library and analogue enumeration, positional analogue scanning, and ring closure.
 - `Retrosynthesis with Synthon Priority Rules`_ - demonstrates how the shipped synthon disconnections steer an MCTS search as a curated priority-rule set.
+- `InChIKey Building-Block Catalogue`_ - uses a prepared vendor-aware JSON catalogue for stereo-aware Boceprevir MCTS and detached route costing.
 
 .. _Welcome to Chython: 00_Welcome_to_Chython.ipynb
 .. _Coming from RDKit: 01_Coming_from_RDKit.ipynb
@@ -76,6 +78,7 @@ some advanced explanations and configurations, that can be used for both demonst
 .. _Building Block Search: 16_Building_block_search.ipynb
 .. _Synthon-Based Library Design: 17_Synthon_Based_Design.ipynb
 .. _Retrosynthesis with Synthon Priority Rules: 18_Retrosynthesis_With_Synthon_Priority_Rules.ipynb
+.. _InChIKey Building-Block Catalogue: 20_InChIKey_Building_Block_Catalogue.ipynb
 
 .. toctree::
    :hidden:
@@ -105,5 +108,6 @@ some advanced explanations and configurations, that can be used for both demonst
    16_Building_block_search
    17_Synthon_Based_Design
    18_Retrosynthesis_With_Synthon_Priority_Rules
+   20_InChIKey_Building_Block_Catalogue
    ../configuration/configuration
    ../methods/methods

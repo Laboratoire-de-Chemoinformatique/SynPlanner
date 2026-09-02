@@ -7,14 +7,27 @@ from synplan.chem.building_blocks import (
     molecule_has_stereo,
     molecule_to_inchikey,
 )
+from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.config import TreeConfig
 from synplan.mcts.evaluation import RolloutEvaluationStrategy
 from synplan.mcts.tree import Tree
+
+BOCEPREVIR_SMILES = (
+    "CC1([C@@H]2[C@H]1[C@H](N(C2)C(=O)[C@H](C(C)(C)C)"
+    "NC(=O)NC(C)(C)C)C(=O)NC(CC3CCC3)C(=O)C(=O)N)C"
+)
 
 
 class _EmptyPolicy:
     def predict_reaction_rules(self, precursor, reaction_rules):
         return iter(())
+
+
+def test_boceprevir_preserves_stereo_and_uses_the_expected_full_key():
+    molecule = mol_from_smiles(BOCEPREVIR_SMILES, clean_stereo=False)
+
+    assert molecule_has_stereo(molecule)
+    assert molecule_to_inchikey(molecule) == "LHHCSNFAOIFYRV-DOVBMPENSA-N"
 
 
 def _catalogue():
