@@ -77,7 +77,7 @@ TSV with ``SMILES`` and ``*_ppg`` vendor-price columns and select JSON output:
 
 The Python equivalent is
 ``standardize_building_blocks("building_blocks.tsv", "building_blocks.json")``.
-See :doc:`/methods/building_blocks` for validation, stereo matching, route
+See :doc:`/methods/building_blocks` for validation, retained stereo metadata, route
 costing, and compatibility details.
 
 Invalid TSV rows are omitted and reported in ``<output>.errors.tsv`` while

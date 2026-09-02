@@ -56,7 +56,7 @@ some advanced explanations and configurations, that can be used for both demonst
 - `Building Block Search`_ - demonstrates building-block search utilities.
 - `Synthon-Based Library Design`_ - demonstrates the synthon subsystem: building-block classification and synthonisation, target fragmentation, availability against a synthon stock, library and analogue enumeration, positional analogue scanning, and ring closure.
 - `Retrosynthesis with Synthon Priority Rules`_ - demonstrates how the shipped synthon disconnections steer an MCTS search as a curated priority-rule set.
-- `InChIKey Building-Block Catalogue`_ - uses a prepared vendor-aware JSON catalogue for stereo-aware Boceprevir MCTS and detached route costing.
+- `InChIKey Building-Block Catalogue`_ - uses a prepared vendor-aware JSON catalogue for connectivity-only Boceprevir MCTS and detached route costing.
 
 .. _Welcome to Chython: 00_Welcome_to_Chython.ipynb
 .. _Coming from RDKit: 01_Coming_from_RDKit.ipynb
