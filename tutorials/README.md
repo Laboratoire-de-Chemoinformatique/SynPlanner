@@ -39,6 +39,7 @@ top of each notebook does nothing outside Colab.
 | [Building block search](16_Building_block_search.ipynb) | which catalogue molecules a route set actually reaches for | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/16_Building_block_search.ipynb) |
 | [Synthon-based library design](17_Synthon_Based_Design.ipynb) | fragment molecules into synthons, enumerate libraries and analogues | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/17_Synthon_Based_Design.ipynb) |
 | [Retrosynthesis with synthon priority rules](18_Retrosynthesis_With_Synthon_Priority_Rules.ipynb) | the shipped synthon disconnections as a curated rule set | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/18_Retrosynthesis_With_Synthon_Priority_Rules.ipynb) |
+| [ReTReK route scoring](19_Retrek_Route_Scoring.ipynb) | rank detached routes after search with CD, AS and RD reaction scores | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/19_Retrek_Route_Scoring.ipynb) |
 
 ## Data used by the tutorials
 

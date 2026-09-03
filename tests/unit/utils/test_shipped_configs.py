@@ -11,6 +11,7 @@ import yaml
 
 from synplan.chem.reaction.curation.filtering import ReactionFilterConfig
 from synplan.chem.reaction.curation.standardizing import ReactionStandardizationConfig
+from synplan.chem.reaction.routes.quality.retrek import RetrekRouteScoringConfig
 from synplan.chem.reaction.rules.config import RuleExtractionConfig
 from synplan.chem.synthon.config import SynthonConfig
 from synplan.mcts.config import (
@@ -34,6 +35,7 @@ FLAT = {
     "policy_training.yaml": PolicyNetworkConfig,
     "mhn_ranking_policy_training.yaml": PolicyNetworkConfig,
     "combined_ranking_filtering_policy.yaml": CombinedPolicyConfig,
+    "retrek_route_quality.yaml": RetrekRouteScoringConfig,
     "synthonisation.yaml": SynthonConfig,
 }
 
