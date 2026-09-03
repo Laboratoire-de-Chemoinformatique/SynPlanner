@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from synplan.chem import building_blocks as building_block_types
 from synplan.chem.precursor import Precursor, compose_precursors
 from synplan.chem.rdkit_utils import RDKitScore
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
@@ -35,7 +36,9 @@ class RolloutSimulator:
         self,
         policy_network: "Policy",
         reaction_rules,
-        building_blocks: set[str],
+        building_blocks: set[str]
+        | frozenset[str]
+        | building_block_types.BuildingBlockCatalogue,
         min_mol_size: int,
         max_depth: int,
         stochastic: bool = False,
@@ -141,7 +144,10 @@ class RolloutSimulator:
         """
         max_depth = self.max_depth - current_depth
 
-        if precursor.is_building_block(self.building_blocks, self.min_mol_size):
+        if precursor.is_building_block(
+            self.building_blocks,
+            self.min_mol_size,
+        ):
             return 1.0
 
         occurred_precursor = set()
@@ -182,7 +188,8 @@ class RolloutSimulator:
                         x
                         for x in products
                         if not x.is_building_block(
-                            self.building_blocks, self.min_mol_size
+                            self.building_blocks,
+                            self.min_mol_size,
                         )
                     ]
                 )
@@ -267,7 +274,9 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         self,
         policy_network: "Policy",
         reaction_rules,
-        building_blocks: set[str],
+        building_blocks: set[str]
+        | frozenset[str]
+        | building_block_types.BuildingBlockCatalogue,
         min_mol_size: int,
         max_depth: int,
         normalize: bool = False,

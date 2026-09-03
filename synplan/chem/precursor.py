@@ -1,9 +1,22 @@
 """Module containing a class Precursor that represents a precursor (extend molecule object) in
 the search tree."""
 
-from chython.containers import MoleculeContainer
+from __future__ import annotations
 
+import logging
+from collections.abc import Mapping, Set
+
+from chython.containers import MoleculeContainer
+from chython.exceptions import InvalidAromaticRing
+
+from synplan.chem.building_blocks import (
+    BuildingBlockCatalogue,
+    match_building_blocks,
+    molecule_to_inchikey,
+)
 from synplan.chem.utils import safe_canonicalization
+
+logger = logging.getLogger(__name__)
 
 
 class Precursor:
@@ -17,6 +30,8 @@ class Precursor:
         """
         self.molecule = safe_canonicalization(molecule) if canonicalize else molecule
         self.prev_precursors = []
+        self._inchi_key: str | None = None
+        self._inchi_key_error: tuple[type[Exception], str] | None = None
 
     def __len__(self) -> int:
         """Return the number of atoms in Precursor."""
@@ -30,7 +45,7 @@ class Precursor:
         """Returns a SMILES of the Precursor."""
         return str(self.molecule)
 
-    def __eq__(self, other: "Precursor") -> bool:
+    def __eq__(self, other: Precursor) -> bool:
         """Checks if the current Precursor is equal to another Precursor."""
         return self.molecule == other.molecule
 
@@ -38,32 +53,85 @@ class Precursor:
         """Returns a SMILES of the Precursor."""
         return str(self.molecule)
 
-    def is_building_block(self, bb_stock: set[str], min_mol_size: int = 6) -> bool:
+    @property
+    def inchi_key(self) -> str:
+        """Return the full Chython Standard InChIKey, generated once."""
+
+        if failure := getattr(self, "_inchi_key_error", None):
+            error_type, message = failure
+            raise error_type(message)
+        if getattr(self, "_inchi_key", None) is None:
+            try:
+                self._inchi_key = molecule_to_inchikey(self.molecule)
+            except (InvalidAromaticRing, ValueError) as error:
+                self._inchi_key_error = type(error), str(error)
+                logger.warning(
+                    "Chython cannot generate an InChIKey for precursor %s; "
+                    "treating it as not purchasable: %s",
+                    self.molecule,
+                    error,
+                )
+                raise
+        return self._inchi_key
+
+    def is_building_block(
+        self,
+        bb_stock: Set[str] | BuildingBlockCatalogue,
+        min_mol_size: int = 6,
+    ) -> bool:
         """Checks if a Precursor is a building block.
 
         :param bb_stock: The list of building blocks. Each building block is represented
-            by a canonical SMILES.
+            by a canonical SMILES in legacy mode. JSON mode uses an immutable
+            prefix-bucket catalogue whose records retain their full InChIKeys.
         :param min_mol_size: If the size of the Precursor is equal or smaller than
             min_mol_size it is automatically classified as building block.
         :return: True is Precursor is a building block.
         """
-        return is_purchasable(self.molecule, bb_stock, min_mol_size)
+        precursor_inchikey = None
+        if isinstance(bb_stock, Mapping) and len(self.molecule) > min_mol_size:
+            try:
+                precursor_inchikey = self.inchi_key
+            except (InvalidAromaticRing, ValueError):
+                return False
+        return is_purchasable(
+            self.molecule,
+            bb_stock,
+            min_mol_size,
+            inchikey=precursor_inchikey,
+        )
 
 
 def is_purchasable(
     molecule: MoleculeContainer,
-    stock: set[str],
+    stock: Set[str] | BuildingBlockCatalogue,
     min_mol_size: int = 6,
     *,
     key: str | None = None,
+    inchikey: str | None = None,
 ) -> bool:
     """Whether a molecule can be bought: too small to disconnect, or in the catalogue.
 
-    The catalogue is keyed by the molecule's own SMILES, so a caller holding that
-    string already passes it as ``key`` rather than spelling it a second time.
+    A legacy stock is keyed by the molecule's canonical SMILES, so a caller
+    holding that string can pass it as ``key``. A JSON catalogue uses the
+    molecule's Chython Standard InChIKey instead.
     """
 
-    return len(molecule) <= min_mol_size or (key or str(molecule)) in stock
+    if len(molecule) <= min_mol_size:
+        return True
+    if isinstance(stock, Mapping):
+        try:
+            identity = inchikey or molecule_to_inchikey(molecule)
+        except (InvalidAromaticRing, ValueError) as error:
+            logger.warning(
+                "Chython cannot generate an InChIKey for molecule %s; "
+                "treating it as not purchasable: %s",
+                molecule,
+                error,
+            )
+            return False
+        return bool(match_building_blocks(stock, identity))
+    return (key or str(molecule)) in stock
 
 
 def compose_precursors(

@@ -41,6 +41,8 @@ dependencies = [
   "pyyaml>=6.0",
   "safetensors>=0.4",
   "protobuf>=6.0",
+  "frozendict>=2.4.6",
+  "ijson>=3.4.0",
 ]
 
 # Extras to select PyTorch variant - required for uv users

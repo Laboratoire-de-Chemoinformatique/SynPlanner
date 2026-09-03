@@ -7,6 +7,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added a vendor-aware `BuildingBlock` model and immutable
+  `BuildingBlockCatalogue`. Prepared JSON catalogues retain canonical SMILES,
+  full Chython Standard InChIKeys, vendor prices, and stereo metadata while
+  grouping runtime records by the first 14 InChIKey characters.
+
+- `standardize_building_blocks()` and the `building_blocks_standardizing` CLI
+  now produce vendor-aware JSON catalogues when the output extension is `.json`.
+  Invalid rows are omitted and reported in `<output>.errors.tsv`; valid records
+  are published atomically. Duplicate full InChIKeys merge the lowest positive
+  offer from each vendor.
+
+- Retrosynthetic MCTS can use a JSON `BuildingBlockCatalogue` for stock
+  membership. Each finalized `Precursor` calculates and caches its Chython
+  InChIKey once, after which membership uses the cached 14-character
+  connectivity block.
+
+- Added `Route.calculate_cost(building_blocks)`, which prices terminal route
+  materials using catalogue vendor offers. It reports complete and partial
+  totals, repeated-leaf equivalents, selected vendors, molecular weights, and
+  missing or unpriced leaves. CLI searches using JSON catalogues write these
+  results to `route_costs.json`.
+
+- Added `BBSynthoniser.synthonise_building_block()` as a thin adapter that
+  processes a `BuildingBlock` through its stored SMILES without coupling the
+  Synthonizer to MCTS.
+
+- Added an InChIKey catalogue tutorial and a Chython-only identity benchmark
+  demonstrating catalogue loading, connectivity-prefix matching, MCTS use,
+  and post-search route costing.
+
 - `write_search_record(tree, path)` / `read_search_record(path)` write a finished
   search to one file and read it back: the molecules interned into one list, the node
   graph holding indices into it, the ids of the winning nodes, and the statistics the
@@ -24,6 +54,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `{route_id: {step_id: Reaction}}` mapping still works and the v1 file is unchanged.
 
 ### Changed
+
+- JSON-catalogue planning always matches the first 14 InChIKey characters.
+  Search and route costing therefore intentionally ignore stereochemistry,
+  isotope, and protonation differences. Full InChIKeys and stereo information
+  remain catalogue metadata for future use but do not affect current MCTS
+  decisions.
+
+- JSON catalogues are supported only for retrosynthesis. Existing
+  SMILES/SDF/CSV/TSV stocks and `Tree(building_blocks=set(...))` callers retain
+  canonical-SMILES membership, and forward search retains its existing stock
+  handling.
+
+- Route JSON and visualization schemas remain unchanged; vendor costs are
+  emitted as a separate `route_costs.json` file.
 
 - The reactor no longer puts back aromaticity a `kekule` -> `thiele` round trip
   dropped. Its test was "these ring atoms were aromatic and are not now", which is
@@ -43,8 +87,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Off unless this module's logger is at `DEBUG`, because the only way to tell is to
   canonicalize and doing that per precursor costs the search a tenth of its time.
   Nothing is repaired: a repair hides the origin, which is the thing worth finding.
-
-### Changed
 
 - Route scoring is a post-search step, not something the tree holds. `Tree` no longer
   takes `route_scorer` (it raises `TypeError`), and `Tree.route_score` returns the
@@ -87,6 +129,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   arithmetically the plain product.
 
 ### Fixed
+
+- A generated precursor that Chython cannot convert to InChI no longer aborts
+  JSON-catalogue planning. Its failed identity attempt is cached and it is
+  conservatively treated as not purchasable.
 
 - `write_routes_json(routes_dict, path, tree=tree)` reads the mapping's keys as tree
   node ids, and an `enumerate` index instead raised `ZeroDivisionError: division by

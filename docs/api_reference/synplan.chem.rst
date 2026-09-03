@@ -30,6 +30,14 @@ synplan.chem.precursor module
    :undoc-members:
    :show-inheritance:
 
+synplan.chem.building\_blocks package
+-------------------------------------
+
+.. automodule:: synplan.chem.building_blocks
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 synplan.chem.reaction package
 -----------------------------
 

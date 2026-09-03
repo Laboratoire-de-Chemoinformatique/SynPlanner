@@ -1,7 +1,9 @@
 # SynPlanner tutorials
 
 Every tutorial here runs in Google Colab — click a badge and it installs
-SynPlanner, downloads the data it needs, and runs. Nothing to set up locally.
+SynPlanner and downloads the public data it needs. Tutorial 20 additionally
+requires the prepared vendor-aware InChIKey JSON catalogue to be uploaded or
+mounted.
 
 Locally they run the same way once SynPlanner is installed; the setup cell at the
 top of each notebook does nothing outside Colab.
@@ -39,10 +41,13 @@ top of each notebook does nothing outside Colab.
 | [Building block search](16_Building_block_search.ipynb) | which catalogue molecules a route set actually reaches for | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/16_Building_block_search.ipynb) |
 | [Synthon-based library design](17_Synthon_Based_Design.ipynb) | fragment molecules into synthons, enumerate libraries and analogues | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/17_Synthon_Based_Design.ipynb) |
 | [Retrosynthesis with synthon priority rules](18_Retrosynthesis_With_Synthon_Priority_Rules.ipynb) | the shipped synthon disconnections as a curated rule set | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/18_Retrosynthesis_With_Synthon_Priority_Rules.ipynb) |
+| [InChIKey building-block catalogue](20_InChIKey_Building_Block_Catalogue.ipynb) | run connectivity-only MCTS for Boceprevir and calculate vendor costs from a prepared JSON catalogue | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/20_InChIKey_Building_Block_Catalogue.ipynb) |
 
 ## Data used by the tutorials
 
 Most tutorials call `download_preset("synplanner-gps")`, which fetches models,
 rules and a building-block catalogue from HuggingFace into `synplan_data/`. Files
 that are small enough to keep in the repository live in `data/`, and a notebook
-downloads them when it is running somewhere the repository is not.
+downloads them when it is running somewhere the repository is not. Tutorial 20
+uses the preset models and rules but requires a separately prepared InChIKey JSON
+catalogue.

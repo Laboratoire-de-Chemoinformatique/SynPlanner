@@ -14,6 +14,11 @@ from rdkit import Chem
 from tqdm.auto import tqdm
 
 from synplan import __version__
+from synplan.chem.building_blocks import (
+    load_building_block_catalogue,
+    match_building_blocks,
+    molecule_to_inchikey,
+)
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.routes.io import (
     make_json,
@@ -273,7 +278,11 @@ def run_search(
     else:
         policy_function = load_policy_function(policy_config=policy_config)
     reaction_rules = load_reaction_rules(reaction_rules_path)
-    building_blocks = load_building_blocks(building_blocks_path, standardize=False)
+    is_json_catalogue = Path(building_blocks_path).suffix.lower() == ".json"
+    if is_json_catalogue:
+        building_blocks = load_building_block_catalogue(building_blocks_path)
+    else:
+        building_blocks = load_building_blocks(building_blocks_path, standardize=False)
 
     # Create evaluation strategy from config
     evaluation_function = load_evaluation_function(evaluation_config)
@@ -284,6 +293,9 @@ def run_search(
     # Public route-export accumulator keyed by RDKit-canonical target SMILES:
     # {canonical_target_smiles: [route_tree, ...]}.
     exported_routes: dict[str, list[dict]] = {}
+    # CLI runs may contain many targets whose per-tree node IDs overlap, so the
+    # sidecar is target-keyed before it is route-node-keyed.
+    route_costs: dict[str, dict[str, dict]] = {}
     n_in_stock = 0
 
     tree_config = TreeConfig.from_dict(search_config)
@@ -299,6 +311,8 @@ def run_search(
             bar_format="{desc}{n} [{elapsed}]",
         ):
             target_smi = target_smi.strip()
+            if is_json_catalogue:
+                route_costs[target_smi] = {}
             # Key the export dict by the RDKit-canonical target SMILES so keys
             # match retrocast's Target.smiles byte-for-byte. Every target starts
             # empty; only a solved one overwrites it.
@@ -307,11 +321,18 @@ def run_search(
                 export_key = _canonical_target_key(target_smi)
                 exported_routes[export_key] = []
             try:
-                target_mol = mol_from_smiles(target_smi)
-                # exact catalogue membership, not is_building_block: that also passes
+                target_mol = mol_from_smiles(target_smi, clean_stereo=True)
+                # Catalogue membership, not is_building_block: that also passes
                 # anything under min_mol_size, which is right for a precursor and wrong
                 # for a target -- a small target is small, not purchasable.
-                if str(target_mol) in building_blocks:
+                if not is_json_catalogue:
+                    target_in_stock = str(target_mol) in building_blocks
+                else:
+                    target_key = molecule_to_inchikey(target_mol)
+                    target_in_stock = bool(
+                        match_building_blocks(building_blocks, target_key)
+                    )
+                if target_in_stock:
                     n_in_stock += 1
                     tqdm.write(
                         f"{target_smi} is already in the building blocks - "
@@ -365,6 +386,13 @@ def run_search(
                 routes = tree.routes()
                 if route_scorer is not None:
                     routes = route_scorer.rank(routes)
+                if is_json_catalogue:
+                    route_costs[target_smi] = {
+                        str(route.provenance.tree_node_id): route.calculate_cost(
+                            building_blocks
+                        )
+                        for route in routes
+                    }
                 routes_report_html(
                     routes,
                     os.path.join(routes_folder, f"retroroutes_target_{ti}.html"),
@@ -384,7 +412,9 @@ def run_search(
 
                 # save mapped reactions (JSON)
                 write_routes_json(
-                    routes_dict, os.path.join(routes_folder, f"mapped_routes_{ti}.json")
+                    routes_dict,
+                    os.path.join(routes_folder, f"mapped_routes_{ti}.json"),
+                    tree=tree,
                 )
 
                 # public route export (reuse extract_reactions result)
@@ -401,6 +431,11 @@ def run_search(
 
     if export_routes:
         export_routes_artifact(exported_routes, results_root, filename=routes_filename)
+    if is_json_catalogue:
+        with open(
+            results_root.joinpath("route_costs.json"), "w", encoding="utf-8"
+        ) as file:
+            json.dump(route_costs, file, indent=2)
 
     print(f"Number of solved target molecules: {n_solved}")
     if n_in_stock:
