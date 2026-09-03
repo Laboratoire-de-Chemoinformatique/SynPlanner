@@ -38,9 +38,6 @@ Load and use it from Python:
 score must have a finite, non-negative weight, and at least one enabled weight
 must be positive. The defaults enable CDScore, ASScore and RDScore.
 
-.. warning::
-
-    STScore is disabled by default because its current formula is known to be
-    incorrect. It must not be enabled for published results until corrected.
-    When enabled for development, pass the ordered ``reaction_rules`` collection
-    to the scorer; each ``Step.origin.rule_id`` indexes that collection directly.
+STScore is disabled by default so the scorer can be used without loading reaction
+rules. To enable it, pass the ordered ``reaction_rules`` collection to the scorer;
+each ``Step.origin.rule_id`` indexes that collection directly.

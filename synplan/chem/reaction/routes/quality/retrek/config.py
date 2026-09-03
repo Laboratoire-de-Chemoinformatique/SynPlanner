@@ -20,8 +20,8 @@ DEFAULT_RETREK_WEIGHTS: dict[ScoreName, float] = {
 class RetrekRouteScoringConfig(BaseConfigModel):
     """Configuration for RetrekRouteScorer.
 
-    :param enabled_scores: Scores applied to every route step. STScore is
-        provisional and is not enabled by default.
+    :param enabled_scores: Scores applied to every route step. STScore is not
+        enabled by default because it requires the reaction-rule collection.
     :param weights: Relative importance of each score. Aggregation divides by
         the sum of weights for scores available on the current step.
     """

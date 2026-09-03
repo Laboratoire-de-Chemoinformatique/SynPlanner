@@ -144,7 +144,7 @@ class RDRouteScorer(RetrekRouteScorer):
 
 
 class STRouteScorer(RetrekRouteScorer):
-    """RetrekRouteScorer using the provisional STScore only."""
+    """RetrekRouteScorer using STScore only."""
 
     def __init__(self, **kwargs):
         config = RetrekRouteScoringConfig(enabled_scores=("st",))

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from chython import smiles
 
-from synplan.chem.reaction.reactor import Reaction
+from synplan.chem.reaction.reactor import CanonicalRetroReactor, Reaction
 from synplan.chem.reaction.routes.quality.retrek import (
     ASRouteScorer,
     RDRouteScorer,
@@ -90,22 +90,15 @@ def test_stscore_requires_reaction_rules():
 
 
 def test_stscore_indexes_reaction_rules_with_the_step_rule_id():
-    class AlwaysMatchingPattern:
-        @staticmethod
-        def get_mapping(_reactant):
-            yield {}
-
-    class Rule:
-        _products = (AlwaysMatchingPattern(),)
-
     precursor = smiles("CC")
     target = smiles("CCO")
     reaction = Reaction([precursor], [target])
+    rule = CanonicalRetroReactor.from_smarts("[C:1]-[O:2]>>[C:1]")
     route = Route(
         steps=(Step(reaction, target, StepOrigin(rule_id=1)),),
     )
 
-    assert STRouteScorer(reaction_rules=(object(), Rule())).score(route) == 1.0
+    assert STRouteScorer(reaction_rules=(object(), rule)).score(route) == 1.0
 
 
 def test_example_config_loads_with_route_defaults():
