@@ -1,8 +1,8 @@
 """PR #104 contracts using verbatim, mapped USPTO records from local datasets.
 
 See tests/data/regression/pr104_uspto.md for provenance and template derivation.
-The validation-enabled and default-filter cases intentionally expose unresolved
-regressions; their paired controls verify that the source chemistry is usable.
+The validation-enabled and default-filter cases cover previously lost mappings;
+their paired controls verify that the source chemistry is usable.
 """
 
 import json

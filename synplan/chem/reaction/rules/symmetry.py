@@ -1,6 +1,7 @@
 """Symmetry helpers for reaction-rule SMARTS."""
 
 from collections.abc import Iterator
+from itertools import chain
 
 # Chython 1.105 exposes automorphisms only for molecules, so query graphs must
 # supply their own comparison labels to the shared private graph search.
@@ -28,7 +29,21 @@ def needs_decollapsed_matches(rule: ReactionContainer) -> bool:
     required_maps = _lhs_target_maps(rule.reactants, targets)
     if not required_maps:
         return False
+    # Chython's atom-set filter can keep a stereo-invalid orientation and
+    # discard the valid one, even when the RHS topology is invariant.
+    for reactant in rule.reactants:
+        atoms = (atom for _, atom in reactant.atoms())
+        bonds = (bond for _, _, bond in reactant.bonds())
+        if any(item.stereo is not None for item in chain(atoms, bonds)):
+            return True
     return not _rhs_realizes_target_maps(rule.products, targets, required_maps)
+
+
+def _predicate_values(value) -> tuple:
+    """Query predicates are tuples; concrete molecule properties are scalars."""
+    if value is None:
+        return ()
+    return (value,) if isinstance(value, int) else tuple(value)
 
 
 def _lhs_target_maps(
@@ -123,9 +138,11 @@ def _query_automorphisms(query: QueryContainer) -> Iterator[dict[int, int]]:
             for atom_number, atom in atoms.items()
         ) and all(
             (
-                8 in bond.order
-                or 8 in mapped_bond.order
-                or not set(bond.order).isdisjoint(mapped_bond.order)
+                8 in _predicate_values(bond.order)
+                or 8 in _predicate_values(mapped_bond.order)
+                or not set(_predicate_values(bond.order)).isdisjoint(
+                    _predicate_values(mapped_bond.order)
+                )
             )
             and (
                 bond.in_ring is None
@@ -184,8 +201,8 @@ def _query_atoms_overlap(left, right) -> bool:
         "ring_connectivity",
         "ring_sizes",
     ):
-        left_values = getattr(left, field, ())
-        right_values = getattr(right, field, ())
+        left_values = _predicate_values(getattr(left, field, ()))
+        right_values = _predicate_values(getattr(right, field, ()))
         if left_values and right_values and set(left_values).isdisjoint(right_values):
             return False
     return True
