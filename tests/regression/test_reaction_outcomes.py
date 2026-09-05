@@ -5,11 +5,12 @@ from pathlib import Path
 
 import pytest
 
+from synplan.chem.precursor import Precursor
 from synplan.chem.utils import mol_from_smiles
-from synplan.mcts.config import TreeConfig
+from synplan.mcts.config import RolloutEvaluationConfig, TreeConfig
 from synplan.mcts.evaluation import RandomEvaluationStrategy
 from synplan.mcts.tree import Tree
-from synplan.utils.loading import load_reaction_rules
+from synplan.utils.loading import load_evaluation_function, load_reaction_rules
 
 CASES = json.loads(
     (Path(__file__).parents[1] / "data/regression/reaction_outcomes.json").read_text()
@@ -17,7 +18,8 @@ CASES = json.loads(
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: str(case["step"]))
-def test_configured_outcome_budget_and_selective_symmetry(case, tmp_path):
+@pytest.mark.parametrize("engine", ["tree", "rollout"])
+def test_configured_outcome_budget_and_selective_symmetry(case, engine, tmp_path):
     path = tmp_path / "rules.tsv"
     path.write_text(f"rule_smarts\tpopularity\n{case['smarts']}\t1\n")
     rules = load_reaction_rules(path)
@@ -31,8 +33,24 @@ def test_configured_outcome_budget_and_selective_symmetry(case, tmp_path):
     )
 
     def outcomes(budget):
+        target = mol_from_smiles(case["product"], clean2d=False)
+        if engine == "rollout":
+            evaluator = load_evaluation_function(
+                RolloutEvaluationConfig(
+                    policy_network=Policy(),
+                    reaction_rules=rules,
+                    building_blocks=set(),
+                    max_reaction_outcomes=budget,
+                )
+            )
+            return {
+                tuple(sorted(str(product) for product in products))
+                for products in evaluator.rollout._apply_rule(
+                    Precursor(target), rules[0]
+                )
+            }
         tree = Tree(
-            mol_from_smiles(case["product"], clean2d=False),
+            target,
             TreeConfig(max_reaction_outcomes=budget, min_mol_size=0, silent=True),
             rules,
             set(),
@@ -45,8 +63,5 @@ def test_configured_outcome_budget_and_selective_symmetry(case, tmp_path):
             for child in tree.children[1]
         }
 
-    if case["step"] == 389:
-        assert expected not in outcomes(5)
-        assert expected in outcomes(20)
-    else:
-        assert expected in outcomes(5)
+    assert expected not in outcomes(case["below_budget"])
+    assert expected in outcomes(case["budget"])

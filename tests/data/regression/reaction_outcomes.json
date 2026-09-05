@@ -1,5 +1,4 @@
 {
-  "source": "mkt-cnv-160 / supervised_gps/v1; observed September 2026",
   "cases": [
     {
       "step": 389,
@@ -9,7 +8,9 @@
       "gold": [
         "CCOC(=O)CCCCCOS(C)(=O)=O",
         "OCCOCCOCCOCCOCCOCCOCc1ccccc1"
-      ]
+      ],
+      "budget": 20,
+      "below_budget": 5
     },
     {
       "step": 708,
@@ -18,7 +19,9 @@
       "product": "O=C1CCc2c1ccc1[nH]c3ccccc3c21",
       "gold": [
         "O=C1CCc2c1cccc2-c1ccccc1[N+](=O)[O-]"
-      ]
+      ],
+      "budget": 5,
+      "below_budget": 1
     }
   ]
 }

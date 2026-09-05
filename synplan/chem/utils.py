@@ -465,25 +465,18 @@ def standardize_building_blocks(input_file: str, output_file: str) -> str:
 
 
 def _standardize_one_smiles(
-    smiles_str: str, *, failures: list[dict] | None = None
+    smiles_str: str, *, failures: list[dict] | None = None, record: int | None = None
 ) -> str | None:
     try:
         mol = smiles_parser(smiles_str, ignore=True)
         canonical = safe_canonicalization(mol)
-        if failures is not None and canonical is mol:
-            failures.append(
-                {
-                    "smiles": smiles_str,
-                    "retained": True,
-                    "error": "safe_canonicalization retained the original aromatic structure",
-                }
-            )
         return str(canonical)
     except Exception as error:
         if failures is not None:
             failures.append(
                 {
                     "smiles": smiles_str,
+                    "record": record,
                     "retained": False,
                     "error": f"{type(error).__name__}: {error}",
                 }
@@ -529,16 +522,13 @@ def standardize_smiles_batch(
 ) -> list[str]:
     """Standardize SMILES using safe_canonicalization, optionally reporting failures.
 
-    Reports use 1-based input record numbers. The existing permissive behavior
-    is preserved: aromatic canonicalization fallbacks are retained and marked
-    ``retained=True``; exceptions drop the input and are marked ``retained=False``.
+    Reports use 1-based input record numbers for inputs dropped on exceptions.
+    The permissive aromatic fallback in safe_canonicalization is preserved;
+    that helper does not expose whether a fallback occurred.
     """
     out: list[str] = []
     for index, smiles_str in enumerate(batch, start=1):
-        before = len(failures) if failures is not None else 0
-        res = _standardize_one_smiles(smiles_str, failures=failures)
-        if failures is not None and len(failures) > before:
-            failures[-1]["record"] = index
+        res = _standardize_one_smiles(smiles_str, failures=failures, record=index)
         if res:
             out.append(res)
     return out

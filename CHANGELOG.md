@@ -11,17 +11,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   discovered routes by the sum of unscaled policy log probabilities before
   retaining candidates. `Node.policy_probability` and search-record schema 2
   preserve those probabilities; schema 1 remains readable.
-- `max_reaction_outcomes` configures rule mapping limits in both tree expansion
-  and rollout evaluation (default 5). `root_balanced` is an opt-in search that
-  shares expansions across first disconnections and orders each frontier by
-  pathway likelihood. It requires policy rules and disables shared-state pruning.
+- `max_reaction_outcomes` configures rule mapping limits in tree expansion and
+  rollout evaluation (default 5).
 - Search statistics count distinct expanded molecules and states, iterations
   without expansion, root diversity, and newly discovered routes with timestamps.
-  `Tree.expansion_actions()` exposes discovered reactions for later diagnostics.
-- `synplan.chem.stock.load_stock_cache()` keys stock caches by source content,
-  Chython version and normalization implementation, verifies cached contents,
-  and records failed conversions. `synplan.utils.provenance` fingerprints loaded
-  source and model files for reproducible planning.
+- `standardize_smiles_batch(..., failures=[])` optionally reports rejected inputs
+  without changing safe canonicalization or its permissive aromatic fallback.
 
 - Added `synplan.chem.reaction.rules.symmetry` with
   `needs_decollapsed_matches()` for detecting reaction SMARTS where a compatible

@@ -32,7 +32,6 @@ from .algorithm import (
     BreadthFirst,
     LazyNestedMonteCarlo,
     NestedMonteCarlo,
-    RootBalancedBestFirst,
 )
 
 ALGORITHMS = {
@@ -42,7 +41,6 @@ ALGORITHMS = {
     "uct": UCT,
     "nmcs": NestedMonteCarlo,
     "lazy_nmcs": LazyNestedMonteCarlo,
-    "root_balanced": RootBalancedBestFirst,
 }
 
 logger = logging.getLogger(__name__)
@@ -88,8 +86,6 @@ class TreeStats:
     first_solution_iteration: int | None = None
     first_solution_time: float | None = None
     routes_found_at: list[tuple[int, float]] = field(default_factory=list)
-    unique_expanded_molecules: int = 0
-    unique_expanded_states: int = 0
     iterations_without_expansion: int = 0
 
     def __getitem__(self, key: str):
@@ -428,8 +424,6 @@ class Tree:
         self._expanded_state_keys.add(
             tuple(sorted(str(p.molecule) for p in curr_node.precursors_to_expand))
         )
-        self.stats.unique_expanded_molecules = len(self._expanded_molecule_keys)
-        self.stats.unique_expanded_states = len(self._expanded_state_keys)
 
         # Deduplicate accepted complete precursor multisets, including multiplicity.
         tmp_products = set()
@@ -813,30 +807,6 @@ class Tree:
             score += log(probability) if probability else -float("inf")
         return score
 
-    def expansion_actions(self) -> list[dict]:
-        """Distinct discovered reactions for post-search diagnostics.
-
-        Contains no reference information; callers can compare these actions to
-        held-out pathways after the search has finished.
-        """
-        actions = {}
-        for node_id, node in self.nodes.items():
-            if node_id == 1:
-                continue
-            parent = self.nodes[self.parents[node_id]]
-            product = str(parent.curr_precursor.molecule)
-            precursors = tuple(sorted(str(p.molecule) for p in node.new_precursors))
-            actions.setdefault(
-                (product, precursors),
-                {
-                    "product": product,
-                    "precursors": precursors,
-                    "rule_key": node.rule_key,
-                    "policy_probability": node.policy_probability,
-                },
-            )
-        return list(actions.values())
-
     def routes(self, solved_only: bool = True) -> list["Route"]:
         """The tree's routes as objects, best score first.
 
@@ -1178,8 +1148,8 @@ class Tree:
             "solved": len(self.winning_nodes) > 0,
             # Policy performance
             "expansion_calls": self.stats.expansion_calls,
-            "unique_expanded_molecules": self.stats.unique_expanded_molecules,
-            "unique_expanded_states": self.stats.unique_expanded_states,
+            "unique_expanded_molecules": len(self._expanded_molecule_keys),
+            "unique_expanded_states": len(self._expanded_state_keys),
             "iterations_without_expansion": self.stats.iterations_without_expansion,
             "root_disconnections": len(self.children[1]),
             "solved_root_disconnections": len(

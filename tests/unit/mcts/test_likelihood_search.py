@@ -1,4 +1,4 @@
-"""Likelihood ranking, root allocation, and discovery telemetry contracts."""
+"""Likelihood ranking and discovery telemetry contracts."""
 
 from math import log
 from types import SimpleNamespace
@@ -68,39 +68,6 @@ def test_likelihood_scorer_uses_policy_instead_of_search_values():
     assert scorer.rank([low, high])[:1] == [high]
     with pytest.raises(ValueError, match="recorded policy probabilities"):
         scorer.score(SimpleNamespace(provenance=RouteProvenance()))
-
-
-def test_root_balanced_search_serves_each_root_before_revisiting(monkeypatch):
-    tree = make_tree(algorithm="root_balanced", max_depth=5)
-    expanded = []
-
-    def expand(node_id):
-        expanded.append(node_id)
-        if node_id == 1:
-            add_child(tree, node_id, 0.9)
-            add_child(tree, node_id, 0.01)
-        else:
-            add_child(tree, node_id, 0.99)
-
-    monkeypatch.setattr(tree, "_expand_node", expand)
-    for _ in range(4):
-        tree.algorithm.step()
-    assert expanded[:3] == [1, 2, 3]
-    assert expanded[3] == 4
-    assert len(set(expanded)) == len(expanded)
-
-
-def test_root_balanced_marks_all_solved_children_and_stops(monkeypatch):
-    tree = make_tree(algorithm="root_balanced")
-
-    def expand(node_id):
-        add_child(tree, node_id, 0.4, solved=True)
-        add_child(tree, node_id, 0.3, solved=True)
-
-    monkeypatch.setattr(tree, "_expand_node", expand)
-    tree.run()
-    assert tree.winning_nodes == [2, 3]
-    assert len(tree.stats.routes_found_at) == 2
 
 
 def test_repeated_solution_notifications_are_not_new_discoveries(monkeypatch):
