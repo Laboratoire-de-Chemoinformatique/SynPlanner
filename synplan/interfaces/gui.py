@@ -5,12 +5,14 @@ import pickle
 import re
 import uuid
 import zipfile
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 from huggingface_hub.utils import disable_progress_bars
 from streamlit_ketcher import st_ketcher
 
+from synplan.chem.building_blocks import load_building_block_catalogue
 from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.routes.clustering import (
     cluster_routes,
@@ -390,9 +392,14 @@ def setup_planning_options():
                 with st.spinner("Running retrosynthetic planning..."):
                     with st.status("Loading resources...", expanded=False) as status:
                         st.write("Loading building blocks...")
-                        building_blocks = load_building_blocks(
-                            building_blocks_path, standardize=False
-                        )
+                        if Path(building_blocks_path).suffix.lower() == ".json":
+                            building_blocks = load_building_block_catalogue(
+                                building_blocks_path
+                            )
+                        else:
+                            building_blocks = load_building_blocks(
+                                building_blocks_path, standardize=False
+                            )
                         st.write("Loading reaction rules...")
                         reaction_rules = load_reaction_rules(reaction_rules_path)
                         st.write("Loading policy network...")
@@ -613,7 +620,10 @@ def run_clustering_core():
             st.session_state.sb_cgrs_dict = sb_cgrs_dict
             st.write("Extracting reactions...")
             st.session_state.reactions_dict = extract_reactions(current_tree)
-            st.session_state.route_json = make_json(st.session_state.reactions_dict)
+            st.session_state.route_json = make_json(
+                st.session_state.reactions_dict,
+                tree=current_tree,
+            )
 
             if (
                 st.session_state.clusters is not None

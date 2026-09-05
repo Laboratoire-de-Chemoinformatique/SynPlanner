@@ -12,6 +12,7 @@ from chython import depict_settings
 from chython.containers.molecule import MoleculeContainer
 from IPython.display import HTML, display
 
+from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction.routes.io import make_dict
 from synplan.chem.reaction.routes.representation.depiction import (
     cgr_display,
@@ -58,7 +59,12 @@ def get_child_nodes(
         temp_obj = {
             "smiles": str(precursor),
             "type": "mol",
-            "in_stock": str(precursor) in tree.building_blocks,
+            "in_stock": is_purchasable(
+                precursor,
+                tree.building_blocks,
+                min_mol_size=0,
+                key=str(precursor),
+            ),
         }
         node = get_child_nodes(tree, precursor, graph)
         if node:
@@ -88,7 +94,8 @@ def extract_routes(
     """
     target = tree.nodes[1].precursors_to_expand[0].molecule
     target_in_stock = tree.nodes[1].curr_precursor.is_building_block(
-        tree.building_blocks, min_mol_size
+        tree.building_blocks,
+        min_mol_size,
     )
 
     # append encoded routes to list
