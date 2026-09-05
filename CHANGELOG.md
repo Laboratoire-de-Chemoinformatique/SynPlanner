@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added `synplan.chem.reaction.rules.symmetry` with
+  `needs_decollapsed_matches()` for detecting reaction SMARTS where a compatible
+  non-identity LHS permutation is not realized by the exact RHS product patch.
+
 - `write_search_record(tree, path)` / `read_search_record(path)` write a finished
   search to one file and read it back: the molecules interned into one list, the node
   graph holding indices into it, the ids of the winning nodes, and the statistics the
@@ -24,6 +28,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `{route_id: {step_id: Reaction}}` mapping still works and the v1 file is unchanged.
 
 ### Changed
+
+- `load_reaction_rules()` now disables Chython's `automorphism_filter` only
+  when a compatible LHS permutation is not realized by the exact RHS product
+  patch. Callers can retain the configured baseline with
+  `decollapse_symmetric_matches=False`; pickle loading is unchanged.
+
+- Rule extraction now derives popularity, retained reaction indices, the
+  representative rule, and policy-training rows only from occurrences where
+  reactor validation is disabled or passed. Failed and deliberately skipped
+  validation occurrences remain auditable but do not contribute support, so
+  results are independent of ingestion order.
 
 - The reactor no longer puts back aromaticity a `kekule` -> `thiele` round trip
   dropped. Its test was "these ring atoms were aromatic and are not now", which is
@@ -87,6 +102,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   arithmetically the plain product.
 
 ### Fixed
+
+- Fixed symmetric SMARTS loading where Chython treated two assignments to the
+  same target atoms as duplicates even when they generated chemically distinct
+  precursors. For Suzuki retrosynthesis, one orientation puts the halide on the
+  first aryl fragment and the boronic-acid handle on the second, while the other
+  swaps them. SynPlanner now accepts compatible LHS predicates such as `[c]` and
+  `[c;D3]` and ignores LHS atom/bond stereo when finding permutations, while
+  requiring the RHS product hub to remain exact. Only affected rules disable
+  Chython's filter, preserving ordinary deduplication elsewhere.
+
+- TSV rule loading now preserves component-local CXSMARTS annotations, including
+  the TEMPO radical in shipped GPS rules, while retaining a fallback for
+  side-global CX blocks. Originally unmapped atoms receive reaction-wide unique
+  numbers, preventing collisions with explicit maps in partially mapped rules.
+
+- The deprecated `synplan.chem.reaction_rules` compatibility package again
+  forwards `rule_query_pattern` and lists it in `__all__`; the symmetry helper
+  remains canonical-package-only.
+
+- Extraction audits now report rejection cause rather than source topology:
+  combined multicenter rules that run and fail validation are
+  `ReactorValidationFailed`; only split component rules whose full-reaction
+  validation is deliberately skipped are `MultiCenter`.
 
 - `write_routes_json(routes_dict, path, tree=tree)` reads the mapping's keys as tree
   node ids, and an `enumerate` index instead raised `ZeroDivisionError: division by

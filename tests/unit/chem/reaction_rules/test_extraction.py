@@ -198,12 +198,19 @@ def test_process_extraction_result_uses_worker_serialized_rule(monkeypatch):
         n_multi_product=0,
     )
     rules_statistics = defaultdict(list)
+    eligible_rules_statistics = defaultdict(list)
     cgr_to_rule = {}
 
-    count = process_extraction_result(result, rules_statistics, cgr_to_rule)
+    count = process_extraction_result(
+        result,
+        rules_statistics,
+        eligible_rules_statistics,
+        cgr_to_rule,
+    )
 
     assert count == 1
     assert rules_statistics["stable-cgr"] == [7]
+    assert eligible_rules_statistics["stable-cgr"] == [7]
     assert cgr_to_rule["stable-cgr"].rule_smarts == "[C:1]>>[O:1]"
 
 
@@ -298,3 +305,22 @@ def test_print_extraction_summary_includes_error_count(capsys):
     output = capsys.readouterr().out
     assert "Finished: processed 10, extracted 1 rules" in output
     assert "failed 2" in output
+
+
+def test_print_extraction_summary_uses_neutral_validation_label(capsys):
+    """The aggregate label must cover failures and deliberately skipped validation."""
+    print_extraction_summary(
+        n_processed=1,
+        sorted_rules=[],
+        filter_stats={
+            "total_unique_rules": 1,
+            "rejected_reactor_validation": 1,
+            "passed": 0,
+        },
+        error_counts=Counter(),
+        error_file_path=None,
+    )
+
+    output = capsys.readouterr().out
+    assert "no validation-eligible occurrences: 1 (100.0%)" in output
+    assert "reactor validation failed" not in output
