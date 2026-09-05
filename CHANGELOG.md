@@ -7,6 +7,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `PolicyLikelihoodScorer().rank(tree.routes())` ranks all
+  discovered routes by the sum of unscaled policy log probabilities before
+  retaining candidates. `Node.policy_probability` and search-record schema 2
+  preserve those probabilities; schema 1 remains readable.
+- `max_reaction_outcomes` configures rule mapping limits in both tree expansion
+  and rollout evaluation (default 5). `root_balanced` is an opt-in search that
+  shares expansions across first disconnections and orders each frontier by
+  pathway likelihood. It requires policy rules and disables shared-state pruning.
+- Search statistics count distinct expanded molecules and states, iterations
+  without expansion, root diversity, and newly discovered routes with timestamps.
+  `Tree.expansion_actions()` exposes discovered reactions for later diagnostics.
+- `synplan.chem.stock.load_stock_cache()` keys stock caches by source content,
+  Chython version and normalization implementation, verifies cached contents,
+  and records failed conversions. `synplan.utils.provenance` fingerprints loaded
+  source and model files for reproducible planning.
+
 - Added `synplan.chem.reaction.rules.symmetry` with
   `needs_decollapsed_matches()` for detecting reaction SMARTS where a compatible
   non-identity LHS permutation is not realized by the exact RHS product patch.
@@ -56,6 +72,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `write_routes_json` takes an iterable of `Route`, each writing itself, and
   `read_routes_json(..., as_routes=True)` hands `Route` objects back. The
   `{route_id: {step_id: Reaction}}` mapping still works and the v1 file is unchanged.
+
+### Fixed
+
+- Deduplicate accepted complete precursor multisets, including multiplicity.
+  An earlier ester-plus-hydroxide outcome no longer suppresses an ester-only
+  alternative, and rejected cyclic outcomes cannot suppress later valid ones.
+- Symmetry detection accepts concrete molecule properties and preserves
+  stereo-valid mappings even when the product topology is symmetric.
+- Honor `stop_at_first` from configuration and check current elapsed time before
+  starting another iteration. Repeated visits to solved nodes no longer count
+  as new route discoveries.
 
 ### Changed
 
