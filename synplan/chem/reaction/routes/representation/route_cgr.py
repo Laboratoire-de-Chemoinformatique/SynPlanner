@@ -318,7 +318,11 @@ def process_first_reaction(first_react: ReactionContainer, tree: "Tree", route_i
         react_key = tuple(curr_mol._atoms)
         react_key_set = set(react_key)
 
-        if is_purchasable(curr_mol, tree.building_blocks, tree.config.min_mol_size):
+        if is_purchasable(
+            curr_mol,
+            tree.building_blocks,
+            tree.config.min_mol_size,
+        ):
             bb_set = bb_set.union(react_key_set)
 
         if validate_molecule_components(curr_mol, route_id) == 0:
@@ -374,7 +378,11 @@ def update_reaction_dict(
         if validate_molecule_components(curr_mol, route_id) == 0:
             return dict(), set()
 
-        if is_purchasable(curr_mol, tree.building_blocks, tree.config.min_mol_size):
+        if is_purchasable(
+            curr_mol,
+            tree.building_blocks,
+            tree.config.min_mol_size,
+        ):
             bb_set = bb_set.union(react_key_set)
 
         # Filter the mapping to include only keys present in the current react_key

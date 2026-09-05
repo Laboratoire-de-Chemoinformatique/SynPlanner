@@ -3,7 +3,7 @@
 import logging
 import pickle
 from collections import deque
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, fields
 from itertools import pairwise
 from os import PathLike
@@ -12,6 +12,9 @@ from time import time
 from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
+from synplan.chem.building_blocks import (
+    BuildingBlockCatalogue,
+)
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
 from synplan.chem.reaction.routes.route import Route
@@ -131,7 +134,7 @@ class Tree:
         target: MoleculeContainer,
         config: TreeConfig,
         reaction_rules: list[CanonicalRetroReactor],
-        building_blocks: set[str],
+        building_blocks: set[str] | frozenset[str] | BuildingBlockCatalogue,
         expansion_function: Policy,
         evaluation_function: EvaluationStrategy = None,
         priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
@@ -172,7 +175,20 @@ class Tree:
 
         # building blocks and reaction reaction_rules
         self.reaction_rules = tuple(reaction_rules)
-        self.building_blocks = frozenset(building_blocks)
+        if isinstance(building_blocks, Mapping):
+            if self.config.direction == "forward":
+                raise ValueError(
+                    "JSON building-block catalogues are supported only for retrosynthesis"
+                )
+            self.building_blocks = building_blocks
+            self._building_block_count = sum(
+                len(bucket) for bucket in building_blocks.values()
+            )
+            self._building_block_bucket_count: int | None = len(building_blocks)
+        else:
+            self.building_blocks = frozenset(building_blocks)
+            self._building_block_count = len(self.building_blocks)
+            self._building_block_bucket_count = None
         self.priority_rules: dict[str, tuple[CanonicalRetroReactor, ...]] = {
             name: tuple(rules) for name, rules in (priority_rules or {}).items()
         }
@@ -198,6 +214,7 @@ class Tree:
 
         assert evaluation_function is not None, "Evaluation function is required"
         self.evaluator = evaluation_function
+        rollout = getattr(self.evaluator, "rollout", None)
 
         # A forward search only makes sense if the tree and its evaluator share a finish line. The
         # tree stops on `building_blocks`; a rollout evaluator carries its OWN copy and rewards
@@ -210,7 +227,6 @@ class Tree:
                     "config.direction='forward' but building_blocks is empty; in forward mode "
                     "it is the GOAL to reach, so an empty set can never be satisfied."
                 )
-            rollout = getattr(self.evaluator, "rollout", None)
             if rollout is not None and (
                 frozenset(rollout.building_blocks) != self.building_blocks
                 or rollout.min_mol_size != self.config.min_mol_size
@@ -222,6 +238,9 @@ class Tree:
                     f"{len(frozenset(rollout.building_blocks))} and "
                     f"min_mol_size={rollout.min_mol_size}."
                 )
+
+        if rollout is not None:
+            rollout.building_blocks = self.building_blocks
 
         # tree initialization
         target_node = self._init_target_node(target)
@@ -264,7 +283,8 @@ class Tree:
         priority_rules_total = sum(len(rules) for rules in self.priority_rules.values())
         logger.debug(
             f"Tree init: target={str(target)[:50]}, "
-            f"building_blocks={len(self.building_blocks)}, "
+            f"building_blocks={self._building_block_count}, "
+            f"building_block_buckets={self._building_block_bucket_count}, "
             f"reaction_rules={len(self.reaction_rules)}, "
             f"priority_rules={priority_rules_total} across "
             f"{len(self.priority_rules)} sets {list(self.priority_rules)}, "
@@ -534,7 +554,8 @@ class Tree:
                 x
                 for x in new_precursor
                 if not x.is_building_block(
-                    self.building_blocks, self.config.min_mol_size
+                    self.building_blocks,
+                    self.config.min_mol_size,
                 )
             ),
         )

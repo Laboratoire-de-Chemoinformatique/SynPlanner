@@ -44,6 +44,17 @@ def test_no_warning_when_clean_stereo_is_off() -> None:
     assert any(a.stereo is not None for _, a in kept.atoms())
 
 
+def test_safe_canonicalization_flag_controls_stereo_preservation() -> None:
+    molecule = smiles(TETRAHEDRAL, ignore_stereo=False)
+    with pytest.warns(StereoDiscardedWarning):
+        flattened = safe_canonicalization(molecule)
+    preserved = safe_canonicalization(molecule, clean_stereo=False)
+
+    assert not any(atom.stereo is not None for _, atom in flattened.atoms())
+    assert any(atom.stereo is not None for _, atom in preserved.atoms())
+    assert any(atom.stereo is not None for _, atom in molecule.atoms())
+
+
 def test_the_warning_can_be_promoted_to_a_refusal() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error", StereoDiscardedWarning)

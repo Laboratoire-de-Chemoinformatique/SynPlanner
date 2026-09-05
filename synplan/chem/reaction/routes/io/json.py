@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 from chython import smiles as read_smiles
 
+from synplan.chem.building_blocks import BuildingBlockCatalogue
 from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction.routes.contracts import (
     RouteDiagnostic,
@@ -40,7 +41,13 @@ def route_tree_has_null_node(node) -> bool:
     )
 
 
-def _purchasable(smiles: str, molecule, stock, min_mol_size: int, fallback: bool):
+def _purchasable(
+    smiles: str,
+    molecule,
+    stock,
+    min_mol_size: int,
+    fallback: bool,
+):
     """``Precursor.is_building_block`` on an already-serialised molecule.
 
     Without a stock the caller gets the old positional answer, so an export that never
@@ -48,7 +55,12 @@ def _purchasable(smiles: str, molecule, stock, min_mol_size: int, fallback: bool
     """
     if stock is None:
         return fallback
-    return is_purchasable(molecule, stock, min_mol_size, key=smiles)
+    return is_purchasable(
+        molecule,
+        stock,
+        min_mol_size,
+        key=smiles,
+    )
 
 
 def _collect_reactions(tree):
@@ -334,7 +346,7 @@ def _make_json_v1(
     keep_ids=True,
     tree: "Tree | None" = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
-    building_blocks: frozenset[str] | set[str] | None = None,
+    building_blocks: frozenset[str] | set[str] | BuildingBlockCatalogue | None = None,
     min_mol_size: int = 6,
 ):
     """
@@ -352,6 +364,12 @@ def _make_json_v1(
     Returns:
         list or dict: JSON-like tree(s) of routes.
     """
+    if tree is not None and building_blocks is None:
+        building_blocks = getattr(tree, "building_blocks", None)
+        tree_config = getattr(tree, "config", None)
+        if tree_config is not None:
+            min_mol_size = tree_config.min_mol_size
+
     # Prepare output
     all_routes = {} if keep_ids else []
 
@@ -407,7 +425,13 @@ def _make_json_v1(
                 )
             return step_id, reaction, product
 
-        def purchasable(molecule, key, leaf, _bb=building_blocks, _size=min_mol_size):
+        def purchasable(
+            molecule,
+            key,
+            leaf,
+            _bb=building_blocks,
+            _size=min_mol_size,
+        ):
             return _purchasable(key, molecule, _bb, _size, leaf)
 
         def step_fields(step_id, _steps=steps, _meta=route_step_metadata):
@@ -444,7 +468,7 @@ def build_route_trees(
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
-    building_blocks: frozenset[str] | set[str] | None = None,
+    building_blocks: frozenset[str] | set[str] | BuildingBlockCatalogue | None = None,
     min_mol_size: int = 6,
 ) -> RouteExportResult:
     """Build v1 route trees with explicit diagnostics for skipped routes."""
@@ -479,7 +503,7 @@ def make_json(
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
-    building_blocks: frozenset[str] | set[str] | None = None,
+    building_blocks: frozenset[str] | set[str] | BuildingBlockCatalogue | None = None,
     min_mol_size: int = 6,
 ):
     """Convert routes into v1 JSON trees.

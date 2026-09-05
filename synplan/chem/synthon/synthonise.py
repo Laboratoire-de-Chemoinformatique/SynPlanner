@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from chython import smarts, smiles, synthon_smiles
 from chython.containers import MoleculeContainer, SynthonContainer
 
+from synplan.chem.building_blocks import BuildingBlock
 from synplan.chem.synthon.classify import BBClassifier, SynthonDataError
 from synplan.chem.synthon.config import SynthonConfig, load_data
 from synplan.chem.synthon.transformer import SynthonTransformer
@@ -523,6 +524,17 @@ class BBSynthoniser:
                 )
                 record["classes"].update(classes)
         return out
+
+    def synthonise_building_block(self, block: BuildingBlock) -> dict[str, dict]:
+        """Synthonise a catalogue record through the existing SMILES entry point.
+
+        Identity, vendor offers, and stereo metadata stay on ``block``; the
+        synthon pipeline keeps its established component-aware behavior.
+        """
+
+        if not isinstance(block, BuildingBlock):
+            raise TypeError("block must be a BuildingBlock")
+        return self.synthonise_smiles(block.smiles)
 
 
 def synthonise_batch(batch: list[str]) -> list[tuple[str, dict[str, dict]]]:

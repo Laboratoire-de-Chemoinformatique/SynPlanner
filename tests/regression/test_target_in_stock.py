@@ -1,7 +1,12 @@
 """A target already in the catalogue must be reported, not planned."""
 
 import csv
+import json
 
+from chython import smiles
+from frozendict import frozendict
+
+from synplan.chem.building_blocks import BuildingBlock, molecule_to_inchikey
 from synplan.mcts.search import run_search
 
 
@@ -42,3 +47,43 @@ def test_purchasable_target_is_skipped_and_flagged(tmp_path, monkeypatch):
     stats = list(csv.DictReader((tmp_path / "out" / "tree_search_stats.csv").open()))
     assert stats[0]["target_in_stock"] == "True"
     assert stats[0]["num_routes"] == "0"
+
+
+def test_json_catalogue_skip_still_writes_the_cost_sidecar(tmp_path, monkeypatch):
+    molecule = smiles("CCN")
+    key = molecule_to_inchikey(molecule)
+    block = BuildingBlock(
+        smiles=str(molecule),
+        inchikey=key,
+        vendors=frozendict({"vendor": 2.0}),
+        has_stereo=False,
+    )
+    catalogue_index = frozendict({key[:14]: (block,)})
+    monkeypatch.setattr(
+        "synplan.mcts.search.load_building_block_catalogue",
+        lambda *args, **kwargs: catalogue_index,
+    )
+    monkeypatch.setattr("synplan.mcts.search.load_reaction_rules", lambda *a, **k: [])
+    monkeypatch.setattr(
+        "synplan.mcts.search.load_policy_function", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        "synplan.mcts.search.load_evaluation_function", lambda *a, **k: None
+    )
+
+    targets = tmp_path / "targets.smi"
+    targets.write_text("CCN\n")
+    catalogue = tmp_path / "blocks.json"
+    catalogue.write_text("{}\n")
+    output = tmp_path / "out"
+    run_search(
+        targets_path=str(targets),
+        search_config={"max_iterations": 1, "silent": True},
+        policy_config=None,
+        evaluation_config=None,
+        reaction_rules_path="unused",
+        building_blocks_path=str(catalogue),
+        results_root=str(output),
+    )
+
+    assert json.loads((output / "route_costs.json").read_text()) == {"CCN": {}}
