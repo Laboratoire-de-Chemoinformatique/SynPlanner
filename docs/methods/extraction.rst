@@ -72,9 +72,21 @@ and validated by application of the final reaction rule to the original reaction
 
 **10. Reaction rule validation**
 
-Finally, the extracted rules are filtered by popularity, which is defined by the ``min_popularity`` parameter.
-For example, ``min_popularity:3`` means, that only rules observed in not less than 3 reactions from the reaction dataset are remained.
+When ``reactor_validation`` is enabled, each complete extracted rule is applied
+to its source reactants and is eligible only when it reproduces the source
+products. Only validation-passed occurrences contribute to a rule's popularity,
+retained reaction indices, representative SMARTS, and policy-training rows.
+When validation is disabled, occurrences have no validation result and remain
+eligible. Thus ``min_popularity: 3`` requires three validation-eligible
+occurrences, not merely three extracted occurrences.
 
+When ``multicenter_rules=False``, one rule is extracted for each disconnected
+reaction-center component. A component rule is not expected to reproduce the
+products of the complete multicenter reaction, so full-reaction validation is
+deliberately skipped and recorded as ``skipped_multicenter_component``. The
+reaction audit reports this as ``MultiCenter``. A combined multicenter rule
+(``multicenter_rules=True``) is validated normally; if it runs and fails, the
+audit reports ``ReactorValidationFailed``.
 
 Functional groups
 -----------------------------
