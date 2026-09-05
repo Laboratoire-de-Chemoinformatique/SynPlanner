@@ -464,12 +464,30 @@ def standardize_building_blocks(input_file: str, output_file: str) -> str:
     return output_file
 
 
-def _standardize_one_smiles(smiles_str: str) -> str | None:
+def _standardize_one_smiles(
+    smiles_str: str, *, failures: list[dict] | None = None
+) -> str | None:
     try:
         mol = smiles_parser(smiles_str, ignore=True)
-        mol = safe_canonicalization(mol)
-        return str(mol)
-    except Exception:
+        canonical = safe_canonicalization(mol)
+        if failures is not None and canonical is mol:
+            failures.append(
+                {
+                    "smiles": smiles_str,
+                    "retained": True,
+                    "error": "safe_canonicalization retained the original aromatic structure",
+                }
+            )
+        return str(canonical)
+    except Exception as error:
+        if failures is not None:
+            failures.append(
+                {
+                    "smiles": smiles_str,
+                    "retained": False,
+                    "error": f"{type(error).__name__}: {error}",
+                }
+            )
         return None
 
 
@@ -506,11 +524,21 @@ def standardize_sdf_text(block: str) -> list[str]:
     return out
 
 
-def standardize_smiles_batch(batch: list[str]) -> list[str]:
-    """Standardize a batch of SMILES strings and return valid results."""
+def standardize_smiles_batch(
+    batch: list[str], *, failures: list[dict] | None = None
+) -> list[str]:
+    """Standardize SMILES using safe_canonicalization, optionally reporting failures.
+
+    Reports use 1-based input record numbers. The existing permissive behavior
+    is preserved: aromatic canonicalization fallbacks are retained and marked
+    ``retained=True``; exceptions drop the input and are marked ``retained=False``.
+    """
     out: list[str] = []
-    for smiles_str in batch:
-        res = _standardize_one_smiles(smiles_str)
+    for index, smiles_str in enumerate(batch, start=1):
+        before = len(failures) if failures is not None else 0
+        res = _standardize_one_smiles(smiles_str, failures=failures)
+        if failures is not None and len(failures) > before:
+            failures[-1]["record"] = index
         if res:
             out.append(res)
     return out
