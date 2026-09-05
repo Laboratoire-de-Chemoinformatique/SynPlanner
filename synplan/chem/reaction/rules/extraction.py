@@ -25,6 +25,7 @@ from synplan.chem.reaction.curation.reaction_result import (
 )
 from synplan.chem.reaction.curation.standardizing import RemoveReagentsStandardizer
 from synplan.chem.reaction.rules.config import RuleExtractionConfig
+from synplan.chem.reaction.rules.symmetry import needs_decollapsed_matches
 from synplan.chem.utils import (
     canonical_query_cgr_key,
     reverse_reaction,
@@ -42,6 +43,8 @@ from synplan.utils.files import (
 from synplan.utils.parallel import graceful_shutdown, process_pool_map_stream
 
 logger = logging.getLogger(__name__)
+
+RuleOccurrence = tuple[str, str | None]
 
 
 def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
@@ -451,7 +454,10 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
         if cost > _ISOMORPHISM_COST_SKIP_THRESHOLD:
             return False
     reactor = CanonicalRetroReactor(
-        patterns=patterns, products=products, delete_atoms=False
+        patterns=patterns,
+        products=products,
+        delete_atoms=False,
+        automorphism_filter=not needs_decollapsed_matches(rule),
     )
     try:
         for result_reaction in reactor(*reaction.reactants):  # unpack here
@@ -583,7 +589,7 @@ def create_rule(
         if _skip_full_reaction_validation:
             # TODO: validate component-scoped rules against component-scoped products;
             # full-reaction validation is invalid for a single disconnected CGR center.
-            rule.meta["reactor_validation"] = "failed"
+            rule.meta["reactor_validation"] = "skipped_multicenter_component"
         elif validate_rule(rule, reaction):
             rule.meta["reactor_validation"] = "passed"
         else:
@@ -804,45 +810,50 @@ def _extract_rules_batch_worker(
 
 
 def _update_rules_statistics(
-    rules_statistics: dict,
+    all_rules_statistics: dict,
+    eligible_rules_statistics: dict,
     cgr_to_rule: dict,
     index: int,
     rule_records: list[ExtractedRuleRecord],
 ) -> None:
-    """Update rules statistics with the indices of reactions they came from.
+    """Update all-occurrence and eligible-occurrence rule support.
 
     Deduplication is performed by ``cgr_key``, which is canonical with
     respect to atom numbering (see
     :func:`synplan.chem.utils.canonical_query_cgr_key`) — so chemically
     identical rules from different workers collapse here at ingest time.
-    The parent never parses rule SMARTS back into ReactionContainers; that
-    keeps aggregation cheap and avoids parser round-trip failures for query
-    SMARTS.
+    All occurrences are retained for unique-rule/filter accounting. Only
+    occurrences with validation disabled or passed contribute to popularity
+    and output indices. The first such eligible record becomes the canonical
+    representative, so a failed first occurrence cannot poison later support.
     """
     for rule_record in rule_records:
-        prev_stats_len = len(rules_statistics)
-        rules_statistics[rule_record.cgr_key].append(index)
-        if len(rules_statistics) != prev_stats_len:
-            cgr_to_rule[rule_record.cgr_key] = rule_record
+        cgr_key = rule_record.cgr_key
+        all_rules_statistics[cgr_key].append(index)
+        if rule_record.reactor_validation in (None, "passed"):
+            eligible_rules_statistics[cgr_key].append(index)
+            cgr_to_rule.setdefault(cgr_key, rule_record)
 
 
 def process_extraction_result(
     result: ExtractionBatchResult,
-    rules_statistics: dict,
+    all_rules_statistics: dict,
+    eligible_rules_statistics: dict,
     cgr_to_rule: dict,
     error_file: TextIOWrapper | None = None,
     error_counts: Counter | None = None,
     multi_product_count: list[int] | None = None,
     products_file: TextIOWrapper | None = None,
     audit_entries_by_index: dict[int, ErrorEntry] | None = None,
-    reaction_rule_keys_by_index: dict[int, list[str]] | None = None,
+    reaction_rule_occurrences_by_index: dict[int, list[RuleOccurrence]] | None = None,
     audit_counts: Counter | None = None,
 ) -> int:
     """Process a single ExtractionBatchResult, updating rules statistics.
 
     :param result: ExtractionBatchResult returned by a worker.
-    :param rules_statistics: Dict mapping CGR key strings to lists of reaction indices.
-    :param cgr_to_rule: Dict mapping CGR key strings to the first rule seen.
+    :param all_rules_statistics: All reaction indices observed for each CGR key.
+    :param eligible_rules_statistics: Validation-eligible indices for each CGR key.
+    :param cgr_to_rule: CGR keys mapped to their first eligible rule record.
     :param error_file: Optional file handle to write failed reactions.
     :param error_counts: Optional counter to accumulate error categories.
     :param multi_product_count: Single-element list used as mutable accumulator.
@@ -850,18 +861,25 @@ def process_extraction_result(
     :param audit_entries_by_index: Optional mapping populated with informational
         per-reaction audit entries (multi-product skips, no-rules-extracted,
         parse errors). Used to build the final audit file in input-line order.
-    :param reaction_rule_keys_by_index: Optional mapping from reaction index to
-        the canonical CGR keys of the rules it produced. Used after
-        :func:`sort_rules` to attribute final filtering reasons back to the
-        source reaction.
+    :param reaction_rule_occurrences_by_index: Optional compact per-reaction
+        occurrence metadata. Each tuple stores the rule CGR key and validation
+        outcome. Used after :func:`sort_rules` to attribute filtering to each
+        occurrence.
     :param audit_counts: Optional counter to accumulate audit-entry categories.
     :return: Number of reactions processed in this batch (for progress bar).
     """
     for index, rule_records, product_smi in result.rule_records:
-        _update_rules_statistics(rules_statistics, cgr_to_rule, index, rule_records)
-        if reaction_rule_keys_by_index is not None:
-            reaction_rule_keys_by_index[index] = [
-                rule_record.cgr_key for rule_record in rule_records
+        _update_rules_statistics(
+            all_rules_statistics,
+            eligible_rules_statistics,
+            cgr_to_rule,
+            index,
+            rule_records,
+        )
+        if reaction_rule_occurrences_by_index is not None:
+            reaction_rule_occurrences_by_index[index] = [
+                (rule_record.cgr_key, rule_record.reactor_validation)
+                for rule_record in rule_records
             ]
         if products_file is not None:
             products_file.write(f"{index}\t{product_smi}\n")
@@ -894,20 +912,19 @@ def process_extraction_result(
 
 
 def sort_rules(
-    rules_stats: dict,
+    all_rules_stats: dict,
+    eligible_rules_stats: dict,
     cgr_to_rule: dict,
     min_popularity: int,
 ) -> tuple[list[tuple[ExtractedRuleRecord, list[int]]], dict[str, int]]:
     """
-    Sorts reaction rules based on their popularity and validation status. This
-    function sorts the given rules according to their popularity (i.e., the number of
-    times they have been applied) and filters out rules that haven't passed reactor
-    validation or are less popular than the specified minimum popularity threshold.
+    Sort rules using eligible support while accounting for every canonical key.
 
-    :param rules_stats: A dictionary where each key is a rule CGR and the value is
-        a list of integers. Each integer represents an index where the rule was applied.
-    :param cgr_to_rule: A dictionary mapping rule CGRs to the first serialized
-        rule record seen for that CGR.
+    :param all_rules_stats: Every occurrence index for each canonical rule CGR.
+        This collection determines the number of unique extracted rules.
+    :param eligible_rules_stats: Occurrence indices with validation disabled or
+        passed. Only these indices determine popularity and output support.
+    :param cgr_to_rule: Rule CGRs mapped to their first eligible serialized record.
     :param min_popularity: The minimum number of times a rule must be applied to be
         considered. Default is 3.
 
@@ -925,58 +942,56 @@ def sort_rules(
         "passed": 0,
     }
 
-    for cgr, indices in rules_stats.items():
-        rule = cgr_to_rule[cgr]
+    for cgr in all_rules_stats:
         filter_stats["total_unique_rules"] += 1
-        # Reject only rules that explicitly failed validation; ``None`` means
-        # validation was disabled, so those rules pass through unfiltered.
-        if rule.reactor_validation == "failed":
+        eligible_indices = eligible_rules_stats.get(cgr, [])
+        if not eligible_indices:
             filter_stats["rejected_reactor_validation"] += 1
             continue
-        if len(indices) < min_popularity:
+        if len(eligible_indices) < min_popularity:
             filter_stats["rejected_popularity"] += 1
             continue
         filter_stats["passed"] += 1
-        passed.append((rule, indices))
+        passed.append((cgr_to_rule[cgr], eligible_indices))
 
     passed.sort(key=lambda x: -len(x[1]))
     return passed, filter_stats
 
 
 def _filtered_rule_reason(
-    cgr_key: str,
-    rules_statistics: dict,
-    cgr_to_rule: dict,
+    occurrence: RuleOccurrence,
+    eligible_rules_statistics: dict,
     min_popularity: int,
 ) -> str:
-    """Mirror :func:`sort_rules`' filtering decision for one rule key.
+    """Mirror :func:`sort_rules` for one source reaction's rule occurrence.
 
-    Returns one of ``"reactor_validation_failed"``,
-    ``"reactor_validation_<state>"`` (for non-passed sentinels),
-    ``"below_min_popularity"`` or ``"retained"``.
+    Returns ``"multicenter"``, a validation reason,
+    ``"below_min_popularity"``, or ``"retained"``.
     """
-    rule = cgr_to_rule[cgr_key]
-    validation = rule.reactor_validation
-    if validation == "failed":
-        return "reactor_validation_failed"
+    cgr_key, validation = occurrence
+    if validation == "skipped_multicenter_component":
+        return "multicenter"
     if validation is not None and validation != "passed":
         return f"reactor_validation_{validation}"
-    if len(rules_statistics[cgr_key]) < min_popularity:
+    if len(eligible_rules_statistics.get(cgr_key, [])) < min_popularity:
         return "below_min_popularity"
     return "retained"
 
 
 def _make_rule_filter_audit_entry(
     index: int,
-    rule_keys: list[str],
-    rules_statistics: dict,
-    cgr_to_rule: dict,
+    rule_occurrences: list[RuleOccurrence],
+    eligible_rules_statistics: dict,
     min_popularity: int,
 ) -> ErrorEntry:
     """Build an audit entry for a reaction whose extracted rules all got filtered."""
     reason_counts = Counter(
-        _filtered_rule_reason(cgr_key, rules_statistics, cgr_to_rule, min_popularity)
-        for cgr_key in rule_keys
+        _filtered_rule_reason(
+            occurrence,
+            eligible_rules_statistics,
+            min_popularity,
+        )
+        for occurrence in rule_occurrences
     )
     reason_counts.pop("retained", None)
 
@@ -986,6 +1001,13 @@ def _make_rule_filter_audit_entry(
     elif set(reason_counts) == {"below_min_popularity"}:
         error_type = "BelowMinPopularity"
         message = f"all extracted rules were below min_popularity={min_popularity}"
+    elif set(reason_counts) == {"multicenter"}:
+        error_type = "MultiCenter"
+        message = (
+            "full-reaction validation was skipped for all component rules "
+            "extracted from a multicenter reaction "
+            f"(rules={reason_counts['multicenter']})"
+        )
     elif all(reason.startswith("reactor_validation_") for reason in reason_counts):
         error_type = "ReactorValidationFailed"
         details = ", ".join(
@@ -1011,10 +1033,9 @@ def _make_rule_filter_audit_entry(
 
 def _add_rule_filter_audit_entries(
     audit_entries_by_index: dict[int, ErrorEntry],
-    reaction_rule_keys_by_index: dict[int, list[str]],
+    reaction_rule_occurrences_by_index: dict[int, list[RuleOccurrence]],
     retained_reaction_indices: set[int],
-    rules_statistics: dict,
-    cgr_to_rule: dict,
+    eligible_rules_statistics: dict,
     min_popularity: int,
     audit_counts: Counter | None = None,
 ) -> None:
@@ -1025,14 +1046,13 @@ def _add_rule_filter_audit_entries(
     silently dropped from the output. This sweep adds an audit entry
     explaining the rejection so users can debug their config.
     """
-    for index, rule_keys in reaction_rule_keys_by_index.items():
+    for index, rule_occurrences in reaction_rule_occurrences_by_index.items():
         if index in retained_reaction_indices or index in audit_entries_by_index:
             continue
         entry = _make_rule_filter_audit_entry(
             index,
-            rule_keys,
-            rules_statistics,
-            cgr_to_rule,
+            rule_occurrences,
+            eligible_rules_statistics,
             min_popularity,
         )
         audit_entries_by_index[index] = entry
@@ -1079,7 +1099,8 @@ def _write_reaction_audit_file(
 def _extract_rules_serial(
     config: RuleExtractionConfig,
     reaction_data_path: str,
-    rules_statistics: dict,
+    all_rules_statistics: dict,
+    eligible_rules_statistics: dict,
     cgr_to_rule: dict,
     *,
     ignore_errors: bool = False,
@@ -1088,7 +1109,7 @@ def _extract_rules_serial(
     products_file: TextIOWrapper | None = None,
     fmt: str = "smi",
     audit_entries_by_index: dict[int, ErrorEntry] | None = None,
-    reaction_rule_keys_by_index: dict[int, list[str]] | None = None,
+    reaction_rule_occurrences_by_index: dict[int, list[RuleOccurrence]] | None = None,
     audit_counts: Counter | None = None,
 ) -> tuple[int, int]:
     """Serial rules extraction path used when a single CPU is requested.
@@ -1126,10 +1147,10 @@ def _extract_rules_serial(
                 if audit_counts is not None:
                     audit_counts[(entry.stage, entry.error_type)] += 1
                 continue
-            rule_smarts = [
+            rule_records = [
                 _make_extracted_rule_record(rule) for rule in extracted_rules
             ]
-            if not rule_smarts:
+            if not rule_records:
                 entry = _make_audit_entry(
                     index,
                     raw_item,
@@ -1143,10 +1164,17 @@ def _extract_rules_serial(
                 if audit_counts is not None:
                     audit_counts[(entry.stage, entry.error_type)] += 1
                 continue
-            _update_rules_statistics(rules_statistics, cgr_to_rule, index, rule_smarts)
-            if reaction_rule_keys_by_index is not None:
-                reaction_rule_keys_by_index[index] = [
-                    rule_record.cgr_key for rule_record in rule_smarts
+            _update_rules_statistics(
+                all_rules_statistics,
+                eligible_rules_statistics,
+                cgr_to_rule,
+                index,
+                rule_records,
+            )
+            if reaction_rule_occurrences_by_index is not None:
+                reaction_rule_occurrences_by_index[index] = [
+                    (rule_record.cgr_key, rule_record.reactor_validation)
+                    for rule_record in rule_records
                 ]
             if products_file is not None:
                 products_file.write(f"{index}\t{product_smi}\n")
@@ -1209,7 +1237,10 @@ def print_extraction_summary(
     if total_unique:
         summary_lines.append(f"Rule filtering ({total_unique} unique rules extracted):")
         for key, label in [
-            ("rejected_reactor_validation", "reactor validation failed"),
+            (
+                "rejected_reactor_validation",
+                "no validation-eligible occurrences",
+            ),
             ("rejected_popularity", "below min popularity"),
         ]:
             count = filter_stats.get(key, 0)
@@ -1277,8 +1308,9 @@ def extract_rules_from_reactions(
     """
 
     reaction_rules_path_base, _ = splitext(reaction_rules_path)
-    extracted_rules_and_statistics = defaultdict(list)  # CGR -> list[int]
-    cgr_to_rule: dict = {}  # CGR -> first ReactionContainer seen
+    all_rules_statistics = defaultdict(list)  # CGR -> every occurrence index
+    eligible_rules_statistics = defaultdict(list)  # CGR -> eligible indices
+    cgr_to_rule: dict = {}  # CGR -> first eligible ExtractedRuleRecord
 
     # Resolve error file path
     _error_path: Path | None = None
@@ -1297,7 +1329,7 @@ def extract_rules_from_reactions(
     error_counts: Counter = Counter()
     audit_counts: Counter = Counter()
     audit_entries_by_index: dict[int, ErrorEntry] = {}
-    reaction_rule_keys_by_index: dict[int, list[str]] = {}
+    reaction_rule_occurrences_by_index: dict[int, list[RuleOccurrence]] = {}
     error_file = None
     if _error_path is not None:
         error_file = open(_error_path, "w", encoding="utf-8")
@@ -1321,7 +1353,8 @@ def extract_rules_from_reactions(
             n_processed, n_multi_product = _extract_rules_serial(
                 config,
                 reaction_data_path,
-                extracted_rules_and_statistics,
+                all_rules_statistics,
+                eligible_rules_statistics,
                 cgr_to_rule,
                 ignore_errors=ignore_errors,
                 error_file=error_file,
@@ -1329,7 +1362,7 @@ def extract_rules_from_reactions(
                 products_file=products_tmp,
                 fmt=fmt,
                 audit_entries_by_index=audit_entries_by_index,
-                reaction_rule_keys_by_index=reaction_rule_keys_by_index,
+                reaction_rule_occurrences_by_index=reaction_rule_occurrences_by_index,
                 audit_counts=audit_counts,
             )
         else:
@@ -1396,14 +1429,15 @@ def extract_rules_from_reactions(
 
                     batch_count = process_extraction_result(
                         result,
-                        extracted_rules_and_statistics,
+                        all_rules_statistics,
+                        eligible_rules_statistics,
                         cgr_to_rule,
                         error_file=error_file,
                         error_counts=error_counts,
                         multi_product_count=multi_product_count,
                         products_file=products_tmp,
                         audit_entries_by_index=audit_entries_by_index,
-                        reaction_rule_keys_by_index=reaction_rule_keys_by_index,
+                        reaction_rule_occurrences_by_index=reaction_rule_occurrences_by_index,
                         audit_counts=audit_counts,
                     )
                     n_processed += batch_count
@@ -1417,7 +1451,8 @@ def extract_rules_from_reactions(
         products_tmp.close()
 
     sorted_rules, filter_stats = sort_rules(
-        extracted_rules_and_statistics,
+        all_rules_statistics,
+        eligible_rules_statistics,
         cgr_to_rule,
         min_popularity=config.min_popularity,
     )
@@ -1430,10 +1465,9 @@ def extract_rules_from_reactions(
     }
     _add_rule_filter_audit_entries(
         audit_entries_by_index,
-        reaction_rule_keys_by_index,
+        reaction_rule_occurrences_by_index,
         retained_reaction_indices,
-        extracted_rules_and_statistics,
-        cgr_to_rule,
+        eligible_rules_statistics,
         config.min_popularity,
         audit_counts=audit_counts,
     )
