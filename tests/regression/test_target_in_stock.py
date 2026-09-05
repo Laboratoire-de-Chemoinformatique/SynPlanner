@@ -87,3 +87,38 @@ def test_json_catalogue_skip_still_writes_the_cost_sidecar(tmp_path, monkeypatch
     )
 
     assert json.loads((output / "route_costs.json").read_text()) == {"CCN": {}}
+
+
+def test_searched_target_exports_expansion_statistics(tmp_path, monkeypatch):
+    from synplan.mcts.evaluation import RandomEvaluationStrategy
+
+    class EmptyPolicy:
+        def predict_reaction_rules(self, *args):
+            return iter(())
+
+    monkeypatch.setattr(
+        "synplan.mcts.search.load_building_blocks", lambda *a, **k: set()
+    )
+    monkeypatch.setattr("synplan.mcts.search.load_reaction_rules", lambda *a, **k: [])
+    monkeypatch.setattr(
+        "synplan.mcts.search.load_policy_function", lambda *a, **k: EmptyPolicy()
+    )
+    monkeypatch.setattr(
+        "synplan.mcts.search.load_evaluation_function",
+        lambda *a, **k: RandomEvaluationStrategy(),
+    )
+    targets = tmp_path / "targets.smi"
+    targets.write_text("CCCCCC\n")
+    run_search(
+        targets_path=str(targets),
+        search_config={"max_iterations": 1, "silent": True, "min_mol_size": 0},
+        policy_config=None,
+        evaluation_config=None,
+        reaction_rules_path="unused",
+        building_blocks_path="unused",
+        results_root=str(tmp_path / "out"),
+    )
+    stats = list(csv.DictReader((tmp_path / "out/tree_search_stats.csv").open()))
+    assert stats[0]["unique_expanded_molecules"] == "1"
+    assert stats[0]["unique_expanded_states"] == "1"
+    assert stats[0]["root_disconnections"] == "0"

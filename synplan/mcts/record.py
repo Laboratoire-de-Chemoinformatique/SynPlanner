@@ -33,7 +33,7 @@ __all__ = [
 ]
 
 #: Versioned identifier for the search-record file. Bump when the shape changes.
-SEARCH_RECORD_SCHEMA = "synplan-tree/1"
+SEARCH_RECORD_SCHEMA = "synplan-tree/2"
 
 
 @dataclass
@@ -64,6 +64,7 @@ class SearchRecord:
     route_steps = Tree.route_steps
     route_to_node = Tree.route_to_node
     route_score = Tree.route_score
+    route_log_likelihood = Tree.route_log_likelihood
     route_details = Tree.route_details
     step_metadata = Tree.step_metadata
     synthesis_route = Tree.synthesis_route
@@ -135,6 +136,7 @@ def write_search_record(
             "value": node.total_value,
             "init": node.init_value,
             "prob": node.prob,
+            "policy_probability": node.policy_probability,
             "rule": node.rule_key,
             "rank": node.policy_rank,
             "new": [index(precursor) for precursor in node.new_precursors],
@@ -181,7 +183,7 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
 
     with _open(file_path, "rt") as file:
         raw = json.load(file)
-    if raw.get("schema") != SEARCH_RECORD_SCHEMA:
+    if raw.get("schema") not in {"synplan-tree/1", SEARCH_RECORD_SCHEMA}:
         raise ValueError(
             f"{file_path} is {raw.get('schema')!r}, not a {SEARCH_RECORD_SCHEMA} "
             "search record"
@@ -230,6 +232,7 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             rule_source=rule_source,
             rule_key=entry["rule"],
             policy_rank=entry["rank"],
+            policy_probability=entry.get("policy_probability"),
         )
         parents[node_id] = parent_id
         unexpanded[node_id] = tuple(entry["expand"])

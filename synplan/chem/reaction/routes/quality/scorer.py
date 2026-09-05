@@ -52,6 +52,19 @@ class RouteScorer(ABC):
         return sorted(routes, key=self.score, reverse=True)
 
 
+class PolicyLikelihoodScorer(RouteScorer):
+    """Rank finished routes by their unscaled policy log probabilities.
+
+    This uses only the model's predictions, independent of search values and
+    reference pathways. Rank the complete pool before retaining candidates.
+    """
+
+    def score(self, route: Route) -> float:
+        if route.provenance is None or route.provenance.policy_log_likelihood is None:
+            raise ValueError("Route likelihood requires recorded policy probabilities.")
+        return route.provenance.policy_log_likelihood
+
+
 def _competing_sites(config: ProtectionConfig | None) -> CompetingSitesScore:
     """The competing-sites machinery both protection scorers are built on."""
     if config is None:

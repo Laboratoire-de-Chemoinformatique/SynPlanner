@@ -22,6 +22,7 @@ class Node:
         rule_source: str | None = None,
         rule_key: str | None = None,
         policy_rank: int | None = None,
+        policy_probability: float | None = None,
     ) -> None:
         """Initialize the Node object.
 
@@ -60,6 +61,8 @@ class Node:
             or ``None`` whenever either component is missing.
         :param policy_rank: 1-indexed Top-N position from the policy network for
             policy-source rules; ``None`` for priority-source rules and the root.
+        :param policy_probability: Unscaled policy output used for pathway
+            likelihood; ``None`` for rules without a model probability.
         """
 
         self.precursors_to_expand = precursors_to_expand
@@ -82,6 +85,8 @@ class Node:
         self.rule_source = rule_source
         self.rule_key = rule_key
         self.policy_rank = policy_rank
+        # Unscaled model output, distinct from the fragment-weighted UCB prior.
+        self.policy_probability = policy_probability
 
     def __len__(self) -> int:
         """Returns the number of precursor in the node to expand."""

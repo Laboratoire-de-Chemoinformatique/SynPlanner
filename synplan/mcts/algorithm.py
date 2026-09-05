@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from bisect import bisect_right
+from heapq import heappop, heappush
 from math import sqrt
 from random import choice, uniform
 from time import time
@@ -45,6 +46,67 @@ class ScoredFrontierMixin:
         keys = [(-entry[1], entry[0]) for entry in self.frontier]
         idx = bisect_right(keys, (-score, node_id))
         self.frontier.insert(idx, [node_id, score, depth, is_expanded])
+
+
+class RootBalancedBestFirst(BaseSearchStrategy):
+    """Experimental likelihood search with equal work across first disconnections.
+
+    Each root child owns a frontier ordered by cumulative negative log policy
+    probability. Expand the least-served nonempty frontier; likelihood and node
+    id break ties. Solved and depth-limited nodes are consumed once. This uses
+    neither reference routes nor evaluator rewards. Curated rules and shared
+    state pruning are unsupported because their path probabilities are undefined.
+    """
+
+    def __init__(self, tree):
+        super().__init__(tree)
+        if tree.config.use_priority or tree.config.enable_pruning:
+            raise ValueError(
+                "root_balanced requires policy rules and enable_pruning=False."
+            )
+        self.frontiers: dict[int, list[tuple[float, int]]] = {}
+        self.expansions: dict[int, int] = {}
+        self.seeded = False
+
+    def _enqueue(self, node_id: int, root_id: int) -> bool:
+        if self.tree.nodes[node_id].is_solved():
+            self._mark_solved(node_id)
+            return True
+        if self.tree.nodes[node_id].depth < self.tree.config.max_depth:
+            heappush(
+                self.frontiers[root_id],
+                (-self.tree.route_log_likelihood(node_id), node_id),
+            )
+        return False
+
+    def step(self) -> tuple[bool, list[int]]:
+        if not self.seeded:
+            node_id, root_id = 1, None
+            self.seeded = True
+        else:
+            active = [root for root, frontier in self.frontiers.items() if frontier]
+            if not active:
+                raise StopIteration("All likelihood frontiers exhausted.")
+            root_id = min(
+                active,
+                key=lambda root: (self.expansions[root], self.frontiers[root][0], root),
+            )
+            _, node_id = heappop(self.frontiers[root_id])
+            self.expansions[root_id] += 1
+
+        self.tree.visited_nodes.add(node_id)
+        self.tree._update_visits(node_id)
+        self.tree._expand_node(node_id)
+        self.tree.expanded_nodes.add(node_id)
+        solved = []
+        for child in sorted(self.tree.children[node_id]):
+            branch = child if root_id is None else root_id
+            if root_id is None:
+                self.frontiers[branch] = []
+                self.expansions[branch] = 0
+            if self._enqueue(child, branch):
+                solved.append(child)
+        return bool(solved), solved or [node_id]
 
 
 class DepthThresholdsMixin:

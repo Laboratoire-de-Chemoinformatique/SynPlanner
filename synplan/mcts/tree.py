@@ -6,6 +6,7 @@ from collections import deque
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, fields
 from itertools import pairwise
+from math import log
 from os import PathLike
 from time import time
 
@@ -31,6 +32,7 @@ from .algorithm import (
     BreadthFirst,
     LazyNestedMonteCarlo,
     NestedMonteCarlo,
+    RootBalancedBestFirst,
 )
 
 ALGORITHMS = {
@@ -40,6 +42,7 @@ ALGORITHMS = {
     "uct": UCT,
     "nmcs": NestedMonteCarlo,
     "lazy_nmcs": LazyNestedMonteCarlo,
+    "root_balanced": RootBalancedBestFirst,
 }
 
 logger = logging.getLogger(__name__)
@@ -85,6 +88,9 @@ class TreeStats:
     first_solution_iteration: int | None = None
     first_solution_time: float | None = None
     routes_found_at: list[tuple[int, float]] = field(default_factory=list)
+    unique_expanded_molecules: int = 0
+    unique_expanded_states: int = 0
+    iterations_without_expansion: int = 0
 
     def __getitem__(self, key: str):
         if key in {f.name for f in fields(self)}:
@@ -265,12 +271,14 @@ class Tree:
         self._tqdm = True  # needed to disable tqdm with multiprocessing module
 
         # other tree search algorithms
-        self.stop_at_first = False
+        self.stop_at_first = config.stop_at_first
         self.found_a_route = False
         self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks = {}
 
         # search statistics
         self.stats: TreeStats = TreeStats()
+        self._expanded_molecule_keys: set[str] = set()
+        self._expanded_state_keys: set[tuple[str, ...]] = set()
 
         # choose search algorithm (normalize key)
         algo_key = str(config.algorithm).lower()
@@ -340,7 +348,7 @@ class Tree:
             raise StopIteration("Iterations limit exceeded.")
         if self.curr_tree_size >= self.config.max_tree_size:
             raise StopIteration("Max tree size exceeded or all possible routes found.")
-        if self.curr_time >= self.config.max_time:
+        if time() - self.start_time >= self.config.max_time:
             raise StopIteration("Time limit exceeded.")
         if self.stop_at_first and self.found_a_route:
             raise StopIteration("Already found a route.")
@@ -352,11 +360,18 @@ class Tree:
         if self._tqdm:
             self._tqdm.update()
 
+        previous_routes = len(self.winning_nodes)
+        previous_expansions = self.stats.expansion_calls
         is_solved, last_node_id = self.algorithm.step()
+        self.curr_time = time() - self.start_time
+        self.stats.iterations_without_expansion += (
+            self.stats.expansion_calls == previous_expansions
+        )
 
-        if is_solved:
-            self.stats.routes_found_at.append(
-                (self.curr_iteration, round(self.curr_time, 4))
+        new_routes = len(self.winning_nodes) - previous_routes
+        if new_routes:
+            self.stats.routes_found_at.extend(
+                [(self.curr_iteration, round(self.curr_time, 4))] * new_routes
             )
             if self.stats.first_solution_iteration is None:
                 self.stats.first_solution_iteration = self.curr_iteration
@@ -409,7 +424,14 @@ class Tree:
         curr_node = self.nodes[node_id]
         prev_precursor = curr_node.curr_precursor.prev_precursors
 
-        # Track raw product molecules to avoid repeating equivalent expansions
+        self._expanded_molecule_keys.add(str(curr_node.curr_precursor.molecule))
+        self._expanded_state_keys.add(
+            tuple(sorted(str(p.molecule) for p in curr_node.precursors_to_expand))
+        )
+        self.stats.unique_expanded_molecules = len(self._expanded_molecule_keys)
+        self.stats.unique_expanded_states = len(self._expanded_state_keys)
+
+        # Deduplicate accepted complete precursor multisets, including multiplicity.
         tmp_products = set()
         context = _ExpansionContext(
             node_id=node_id,
@@ -430,6 +452,7 @@ class Tree:
             for products in apply_reaction_rule(
                 curr_node.curr_precursor.molecule,
                 candidate.rule,
+                top_reactions_num=self.config.max_reaction_outcomes,
                 multirule=enable_multirule,
                 rm_dup=enable_multirule,
             ):
@@ -521,9 +544,9 @@ class Tree:
         policy_rank = candidate.policy_rank
         rule_source = candidate.rule_source
 
-        if not products or not (set(products) - tmp_products):
+        product_key = tuple(sorted(str(molecule) for molecule in products))
+        if not product_key or product_key in tmp_products:
             return False
-        tmp_products.update(products)
 
         rule_key = self._make_rule_key(rule_source, rule_id)
         for molecule in products:
@@ -570,6 +593,7 @@ class Tree:
                     precursors_to_expand
                 ]
                 self.redundant_children[node_id].add(existing_id)
+                tmp_products.add(product_key)
                 return True
 
             self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[
@@ -591,7 +615,9 @@ class Tree:
             rule_id=rule_id,
             policy_rank=policy_rank,
             rule_source=rule_source,
+            policy_probability=prob if rule_source == POLICY_SOURCE_NAME else None,
         )
+        tmp_products.add(product_key)
         return True
 
     def _increment_rule_stats(
@@ -648,6 +674,7 @@ class Tree:
         rule_id: int | None = None,
         policy_rank: int | None = None,
         rule_source: str | None = None,
+        policy_probability: float | None = None,
     ) -> None:
         """Adds a new node to the tree with probability of reaction rules predicted by
         policy function and applied to the parent node of the new node.
@@ -668,6 +695,7 @@ class Tree:
         new_node.rule_source = rule_source
         new_node.rule_key = self._make_rule_key(rule_source, rule_id)
         new_node.policy_rank = policy_rank
+        new_node.policy_probability = policy_probability
         new_node.depth = self.nodes[node_id].depth + 1
 
         self.nodes[new_node_id] = new_node
@@ -765,6 +793,49 @@ class Tree:
         cumulated_nodes_value = sum(node.total_value for node in route_nodes)
 
         return cumulated_nodes_value / (route_length**2)
+
+    def route_log_likelihood(self, node_id: int) -> float:
+        """Sum the unscaled policy log probabilities along a route or partial path.
+
+        This score uses no reference route and no search values. A zero probability
+        gives negative infinity. Rules without a policy probability (including
+        curated priority rules and old records) cannot be scored this way.
+        """
+        if node_id not in self.nodes:
+            raise ValueError(_not_a_node(node_id))
+        score = 0.0
+        for node in self.route_to_node(node_id)[1:]:
+            probability = node.policy_probability
+            if probability is None or not 0 <= probability <= 1:
+                raise ValueError(
+                    "Route likelihood requires policy probabilities in [0, 1]."
+                )
+            score += log(probability) if probability else -float("inf")
+        return score
+
+    def expansion_actions(self) -> list[dict]:
+        """Distinct discovered reactions for post-search diagnostics.
+
+        Contains no reference information; callers can compare these actions to
+        held-out pathways after the search has finished.
+        """
+        actions = {}
+        for node_id, node in self.nodes.items():
+            if node_id == 1:
+                continue
+            parent = self.nodes[self.parents[node_id]]
+            product = str(parent.curr_precursor.molecule)
+            precursors = tuple(sorted(str(p.molecule) for p in node.new_precursors))
+            actions.setdefault(
+                (product, precursors),
+                {
+                    "product": product,
+                    "precursors": precursors,
+                    "rule_key": node.rule_key,
+                    "policy_probability": node.policy_probability,
+                },
+            )
+        return list(actions.values())
 
     def routes(self, solved_only: bool = True) -> list["Route"]:
         """The tree's routes as objects, best score first.
@@ -1107,6 +1178,17 @@ class Tree:
             "solved": len(self.winning_nodes) > 0,
             # Policy performance
             "expansion_calls": self.stats.expansion_calls,
+            "unique_expanded_molecules": self.stats.unique_expanded_molecules,
+            "unique_expanded_states": self.stats.unique_expanded_states,
+            "iterations_without_expansion": self.stats.iterations_without_expansion,
+            "root_disconnections": len(self.children[1]),
+            "solved_root_disconnections": len(
+                {
+                    self.route_node_ids(node_id)[1]
+                    for node_id in self.winning_nodes
+                    if node_id != 1
+                }
+            ),
             "expansion_successes": self.stats.expansion_successes,
             "total_rules_tried": self.stats.total_rules_tried,
             "total_rules_succeeded": self.stats.total_rules_succeeded,

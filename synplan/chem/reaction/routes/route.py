@@ -98,6 +98,7 @@ class RouteProvenance:
     search_score: float | None = None
     tree_node_id: int | None = None
     uncanonical: int = 0
+    policy_log_likelihood: float | None = None
 
 
 @dataclass(frozen=True)
@@ -200,6 +201,11 @@ class Route:
         if node_id not in tree.nodes:
             raise KeyError(node_id)
         metadata = tree.step_metadata(node_id)
+        try:
+            likelihood = tree.route_log_likelihood(node_id)
+        except ValueError:
+            # Old records and curated rules have no policy probability.
+            likelihood = None
         steps = tuple(
             # one product per step by construction: the precursor being expanded
             Step(reaction, reaction.products[0], _origin(metadata.get(index, {})))
@@ -211,7 +217,11 @@ class Route:
                 molecule_key(precursor.molecule)
                 for precursor in tree.nodes[node_id].precursors_to_expand
             ),
-            provenance=RouteProvenance(tree.route_score(node_id), node_id),
+            provenance=RouteProvenance(
+                search_score=tree.route_score(node_id),
+                tree_node_id=node_id,
+                policy_log_likelihood=likelihood,
+            ),
         )
 
     @classmethod

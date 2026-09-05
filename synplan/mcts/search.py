@@ -245,6 +245,11 @@ def run_search(
         # Policy performance
         "expansion_calls",
         "expansion_successes",
+        "unique_expanded_molecules",
+        "unique_expanded_states",
+        "iterations_without_expansion",
+        "root_disconnections",
+        "solved_root_disconnections",
         "total_rules_tried",
         "total_rules_succeeded",
         "rule_applicability_rate",

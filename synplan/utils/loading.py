@@ -912,6 +912,7 @@ def load_evaluation_function(eval_config) -> "EvaluationStrategy":
             max_depth=eval_config.max_depth,
             normalize=eval_config.normalize,
             stochastic=eval_config.stochastic,
+            max_reaction_outcomes=eval_config.max_reaction_outcomes,
         )
 
     elif isinstance(eval_config, ValueNetworkEvaluationConfig):

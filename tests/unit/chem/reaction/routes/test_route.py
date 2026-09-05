@@ -36,6 +36,7 @@ class _StubTree:
     route_to_node = Tree.route_to_node
     synthesis_route = Tree.synthesis_route
     route_score = Tree.route_score
+    route_log_likelihood = Tree.route_log_likelihood
     route_details = Tree.route_details
     step_metadata = Tree.step_metadata
     routes = Tree.routes
@@ -57,6 +58,7 @@ class _StubTree:
                 rule_id=1,
                 rule_source="policy",
                 rule_key="policy:1",
+                policy_probability=0.4,
             ),
         }
         self.parents = {1: 0, 2: 1}
@@ -74,6 +76,7 @@ class _StubTree:
                 rule_id=2,
                 rule_source="policy",
                 rule_key="policy:2",
+                policy_probability=0.2,
             )
             self.parents[3] = 2
             self.children[2] = {3}
@@ -168,6 +171,9 @@ def test_route_from_tree_carries_steps_stock_and_score(solved_route):
     assert str(solved_route.target) == str(read_smiles(TARGET))
     assert solved_route.provenance.tree_node_id == 3
     assert solved_route.provenance.search_score == pytest.approx(tree.route_score(3))
+    assert solved_route.provenance.policy_log_likelihood == pytest.approx(
+        tree.route_log_likelihood(3)
+    )
     assert [step.reaction for step in solved_route] == list(tree.synthesis_route(3))
     assert solved_route.steps[0].origin.rule_key == "policy:2"
     assert solved_route.steps[1].origin.rule_key == "policy:1"

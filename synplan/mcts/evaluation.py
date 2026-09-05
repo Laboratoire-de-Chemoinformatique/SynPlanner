@@ -42,6 +42,7 @@ class RolloutSimulator:
         min_mol_size: int,
         max_depth: int,
         stochastic: bool = False,
+        max_reaction_outcomes: int = 5,
     ) -> None:
         """Initialize the rollout simulator.
 
@@ -59,6 +60,7 @@ class RolloutSimulator:
         self.min_mol_size = min_mol_size
         self.max_depth = max_depth
         self.stochastic = stochastic
+        self.max_reaction_outcomes = max_reaction_outcomes
 
     def _select_reaction(self, current_precursor: Precursor) -> tuple[bool, any, int]:
         """Select a reaction rule to apply.
@@ -197,12 +199,15 @@ class RolloutSimulator:
 
         return 1.0
 
-    @staticmethod
-    def _apply_rule(precursor_mol, rule):
+    def _apply_rule(self, precursor_mol, rule):
         # Local import to avoid circular dependency
         from synplan.chem.reaction import apply_reaction_rule
 
-        return apply_reaction_rule(precursor_mol.molecule, rule)
+        return apply_reaction_rule(
+            precursor_mol.molecule,
+            rule,
+            top_reactions_num=self.max_reaction_outcomes,
+        )
 
 
 class EvaluationStrategy(ABC):
@@ -281,6 +286,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         max_depth: int,
         normalize: bool = False,
         stochastic: bool = False,
+        max_reaction_outcomes: int = 5,
     ) -> None:
         """Initialize rollout evaluation strategy.
 
@@ -300,6 +306,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
             min_mol_size=min_mol_size,
             max_depth=max_depth,
             stochastic=stochastic,
+            max_reaction_outcomes=max_reaction_outcomes,
         )
         self.normalize = normalize
 
