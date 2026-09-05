@@ -368,6 +368,7 @@ def run_search(
                 routes_report_html(
                     routes,
                     os.path.join(routes_folder, f"retroroutes_target_{ti}.html"),
+                    stats=tree.to_stats_dict(),
                 )
 
                 # save json routes

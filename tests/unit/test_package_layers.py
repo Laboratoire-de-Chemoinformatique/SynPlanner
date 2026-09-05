@@ -20,7 +20,8 @@ KNOWN_VIOLATIONS = {
     # Belongs in `interfaces`, moves once the CLI stops importing it as a util.
     "utils/loading.py",
     # Route and tree rendering; belongs under `chem/reaction/routes`.
-    "utils/visualisation.py",
+    "utils/visualisation/routes.py",
+    "utils/visualisation/clustering.py",
     # `parse_reaction(check_atom_mapping=...)` calls chem.utils through a
     # function-level import placed there to dodge this rule. The check is
     # chemistry and belongs in `chem`, not in the file handler.

@@ -526,7 +526,9 @@ def download_planning_results():
                         st.session_state.tree.routes()
                     )
                     st.session_state.planning_report_html = routes_report_html(
-                        ranked, html_path=None
+                        ranked,
+                        html_path=None,
+                        stats=st.session_state.tree.to_stats_dict(),
                     )
 
             if st.session_state.get("planning_report_html"):
