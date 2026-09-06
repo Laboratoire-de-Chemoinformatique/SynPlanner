@@ -85,7 +85,6 @@ class CanonicalRetroReactor(Reactor):
                 new.fix_stereo()
             new.standardize_charges(prepare_molecule=False)
             new.standardize_tautomers(prepare_molecule=False)
-            new.fix_stereo()
             if patched is not None:
                 assert_stereo_preserved(patched, new)
         except InvalidAromaticRing:
