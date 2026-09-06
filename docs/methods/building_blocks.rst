@@ -67,16 +67,18 @@ arbitrary stereoisomer.
 
 ``match_building_blocks(catalogue, inchikey)`` always returns the complete
 connectivity-prefix bucket. Full InChIKeys and ``has_stereo`` remain catalogue
-metadata for future use; they do not change current planning behavior.
+metadata used by stereo-compatible stock selection.
 
-MCTS is intentionally stereo-agnostic. Targets and generated precursors follow
-the normal stereo-cleaning chemistry path, and stock membership always uses the
-first 14 InChIKey characters. This also intentionally collapses isotope and
-protonation information.
+MCTS preserves stereo. The first 14 InChIKey characters retrieve candidates;
+Chython then checks identity and specified tetrahedral, E/Z and allene requirements.
+Wrong and unspecified configurations cannot fulfill a specified request.
+Relative groups and mixture records require assessment. Small molecules also
+require actual stock records. Existing stereo-free policy weights use a separate
+connectivity projection; this projection never decides stock membership.
 
 Each finalized ``Precursor`` generates its Chython InChIKey at most once.
-Every subsequent stock check slices the connectivity prefix from that cached
-key. If Chython cannot generate an InChIKey for a malformed aromatic precursor,
+Repeated checks reuse the result for that precursor and immutable catalogue.
+If Chython cannot generate an InChIKey for a malformed aromatic precursor,
 the failed attempt is cached, a warning is logged, and the precursor is
 conservatively treated as not purchasable instead of aborting the search.
 Legacy SMILES/SDF/CSV/TSV stock and
@@ -96,8 +98,8 @@ when a cost is needed:
     routes = tree.routes()
     cost = routes[0].calculate_cost(building_blocks)
 
-The method always considers the complete connectivity-prefix bucket and selects
-the cheapest positive vendor offer, irrespective of target stereo. Repeated
+The method considers compatible records and honors the full record selected by
+the route audit. An opposite isomer's cheaper offer cannot price the route. Repeated
 leaves are counted as molar equivalents. It assumes one equivalent per leaf and
 100% reaction yield, and treats each catalogue number as an unnormalised raw
 price per gram. Missing and catalogue-present-but-unpriced leaves are reported

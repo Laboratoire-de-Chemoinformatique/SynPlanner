@@ -1,0 +1,103 @@
+"""Compatible records from the existing immutable InChIKey catalogue."""
+
+from functools import lru_cache
+
+from synplan.chem.building_blocks.identity import molecule_to_inchikey
+from synplan.chem.mapping import MappingBudgetExceeded, bounded_mappings, mapping_budget
+from synplan.chem.stereo import (
+    _requirements,
+    _sign,
+    has_stereo_groups,
+    parse_smiles_preserving_stereo,
+)
+
+
+@lru_cache(maxsize=8192)
+def _record_molecule(smiles_text, key):
+    from synplan.chem.utils import safe_canonicalization
+
+    candidate = safe_canonicalization(parse_smiles_preserving_stereo(smiles_text))
+    if molecule_to_inchikey(candidate) != key:
+        raise ValueError("catalogue record SMILES and InChIKey disagree")
+    return candidate
+
+
+def compatible_records(
+    molecule,
+    catalogue,
+    *,
+    inchikey=None,
+    max_records=256,
+    max_mapping_work=100_000,
+    diagnostics=None,
+):
+    """Return compatible explicit records; unspecified stereo never means racemic.
+
+    Retrieval is indexed. Each explicit candidate is checked at most once; any
+    correspondence work is separately bounded. Empty results after a budget
+    exception are incomplete, not proof that compatible stock does not exist.
+    """
+    key = inchikey or molecule_to_inchikey(molecule)
+    if has_stereo_groups(molecule):
+        if diagnostics is not None:
+            diagnostics.append(
+                {
+                    "reason": "relative_or_mixture_stereo",
+                    "detail": "exact material semantics require review",
+                }
+            )
+        return ()
+    bucket = catalogue.get(key[:14], ())
+    if len(bucket) > max_records:
+        if diagnostics is not None:
+            diagnostics.append(
+                {
+                    "reason": "stock_assessment_incomplete",
+                    "detail": f"bucket exceeds {max_records} records",
+                }
+            )
+        return ()
+    requirements = _requirements(molecule)
+    compatible = []
+    try:
+        with mapping_budget(max_mapping_work):
+            for record in bucket:
+                try:
+                    candidate = _record_molecule(record.smiles, record.inchikey)
+                except ValueError:
+                    continue
+                # OR is unresolved absolute identity; AND is a material mixture.
+                # Neither satisfies a request for the depicted absolute isomer.
+                if has_stereo_groups(candidate) or len(candidate) != len(molecule):
+                    continue
+                if str(candidate) == str(molecule):
+                    compatible.append(record)
+                    continue
+                for mapping in bounded_mappings(molecule, candidate):
+                    try:
+                        if all(
+                            _sign(candidate, req.remap(mapping)) == req.sign
+                            for req in requirements
+                        ):
+                            compatible.append(record)
+                            break
+                    except (KeyError, ValueError):
+                        continue
+    except MappingBudgetExceeded as error:
+        if diagnostics is not None:
+            diagnostics.append(
+                {"reason": "stock_assessment_incomplete", "detail": str(error)}
+            )
+        # Already verified records remain valid existential matches. Never claim
+        # that the incomplete set contains the globally cheapest supplier.
+    return tuple(compatible)
+
+
+def selected_record(record):
+    return {
+        "inchikey": record.inchikey,
+        "smiles": record.smiles,
+        "vendors": dict(record.vendors),
+        "price": min(record.vendors.values()) if record.vendors else None,
+        "basis": "explicit_compatible_catalogue_record",
+    }

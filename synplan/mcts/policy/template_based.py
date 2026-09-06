@@ -62,6 +62,7 @@ class TemplateBasedPolicy(Policy):
         self.top_rules = top_rules
         self.rule_prob_threshold = rule_prob_threshold
         self.priority_rules_fraction = priority_rules_fraction
+        self._proposal_cache = OrderedDict()
 
     @property
     def architecture(self) -> str:
@@ -75,7 +76,7 @@ class TemplateBasedPolicy(Policy):
 
     def _get_graph(self, precursor: Precursor) -> torch_geometric.data.Data | None:
         """Convert a precursor molecule to a PyG graph."""
-        return mol_to_pyg(precursor.molecule, canonicalize=False)
+        return mol_to_pyg(precursor.policy_molecule, canonicalize=False)
 
     @abstractmethod
     def get_logits(self, precursor: Precursor) -> torch.Tensor | None:
@@ -97,6 +98,24 @@ class TemplateBasedPolicy(Policy):
                 "version of the policy network. Be sure to retain the policy network "
                 "with the current set of reaction rules"
             )
+        if (
+            self.architecture == "mhn_ranking"
+            and getattr(self, "_rule_associations", None) is None
+        ):
+            raise ValueError(
+                "mhn_ranking rules are prepared by predict_reaction_rules()."
+            )
+        key = (
+            str(precursor.policy_molecule),
+            n_rules,
+            self.top_rules,
+            self.rule_prob_threshold,
+            self.priority_rules_fraction,
+            getattr(self, "_rule_representation_digest", None),
+        )
+        if key in self._proposal_cache:
+            self._proposal_cache.move_to_end(key)
+            return self._proposal_cache[key]
         probs = self.get_probs(precursor)
         if probs is None:
             return None
@@ -104,7 +123,11 @@ class TemplateBasedPolicy(Policy):
         sorted_probs, sorted_rules = torch.topk(probs, k=k, sorted=True)
         if getattr(self.policy_net, "policy_type", "ranking") == "filtering":
             sorted_probs = torch.softmax(sorted_probs, -1)
-        return sorted_probs, sorted_rules
+        result = sorted_probs, sorted_rules
+        self._proposal_cache[key] = result
+        if len(self._proposal_cache) > 256:
+            self._proposal_cache.popitem(last=False)
+        return result
 
     def predict_reaction_rules(
         self,
@@ -112,6 +135,15 @@ class TemplateBasedPolicy(Policy):
         reaction_rules: Sequence[CanonicalRetroReactor],
     ) -> Iterator[tuple[float, CanonicalRetroReactor, int]]:
         """Yield ``(prob, reaction_rule, rule_id)`` above the threshold."""
+        digest = getattr(reaction_rules, "vocabulary_digest", None)
+        if (
+            digest
+            and self.architecture != "mhn_ranking"
+            and getattr(self.policy_net, "rule_vocabulary_digest", None) != digest
+        ):
+            raise ValueError(
+                "This extracted rule vocabulary requires its matching trained policy checkpoint; equal rule counts are insufficient."
+            )
         result = self._predict_rules_common(precursor, len(reaction_rules))
         if result is None:
             return
@@ -294,12 +326,25 @@ class PriorityPolicy(Policy):
     @staticmethod
     def _rule_applies(rule: CanonicalRetroReactor, precursor: Precursor) -> bool:
         """Return whether a curated rule's LHS query pattern matches ``precursor``."""
+        from synplan.chem.mapping import MappingBudgetExceeded
+
         pattern = rule_query_pattern(rule)
         if pattern is None:
             return False
         try:
             return pattern < precursor.molecule
         except TypeError:
+            return False
+        except MappingBudgetExceeded as error:
+            precursor.molecule.meta.setdefault(
+                "query_assessment_diagnostics", []
+            ).append(
+                {
+                    "reason": "mapping_budget_exceeded",
+                    "detail": str(error),
+                    "rule": str(rule),
+                }
+            )
             return False
 
     def predict_reaction_rules(

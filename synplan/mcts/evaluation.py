@@ -173,6 +173,12 @@ class RolloutSimulator:
             if not reaction_applied:
                 return -1.0
 
+            from synplan.chem.stereo import assess_inheritance
+
+            assessment = assess_inheritance(current_precursor.molecule, products)
+            if assessment["obligations"]:
+                return 0.0
+
             history[rollout_depth]["rule_index"] = rule_id
             # ``apply_reaction_rule`` already validated + canonicalized each
             # product in a single kekule pass.
@@ -318,6 +324,8 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
     ) -> float:
         """Evaluate node using rollout simulation."""
         current_depth = nodes[node_id].depth
+        if getattr(node, "stereo_obligations", ()):
+            return 0.5 if self.normalize else 0.0
         raw = min(
             (
                 self.rollout.simulate_precursor(precursor, current_depth=current_depth)

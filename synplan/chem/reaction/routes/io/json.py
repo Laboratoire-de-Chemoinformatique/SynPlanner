@@ -4,8 +4,6 @@ from functools import lru_cache
 from itertools import zip_longest
 from typing import TYPE_CHECKING, Any, NamedTuple
 
-from chython import smiles as read_smiles
-
 from synplan.chem.building_blocks import BuildingBlockCatalogue
 from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction.routes.contracts import (
@@ -17,6 +15,8 @@ from synplan.chem.reaction.routes.io.metadata import (
     reaction_metadata,
     restore_reaction_metadata,
 )
+from synplan.chem.stereo import has_stereo
+from synplan.chem.stereo import parse_smiles_preserving_stereo as read_smiles
 from synplan.chem.utils import mapped_smiles, molecule_key, normalise
 
 if TYPE_CHECKING:
@@ -162,6 +162,15 @@ def read_route_tree(route_json) -> RouteRead:
     unresolved = []
     uncanonical = 0
 
+    def check_stereo_node(mol, node):
+        expected = read_smiles(node["smiles"])
+        if (has_stereo(mol) or has_stereo(expected)) and molecule_key(
+            mol
+        ) != molecule_key(expected):
+            raise ValueError(
+                "inconsistent stereo in adjacent route molecule and reaction records"
+            )
+
     def link(reaction, child_nodes):
         """Give every reactant its file verdict and, if a step made it, that step.
 
@@ -184,20 +193,31 @@ def read_route_tree(route_json) -> RouteRead:
             made = molecule(node)
             if slot is None:  # a node no reactant claims: keep its steps, drop it
                 continue
+            check_stereo_node(reactants[slot], node)
             if made is not None:
+                check_stereo_node(made, node)
                 reactants[slot] = made
             elif not node.get("in_stock"):
                 unresolved.append(reactants[slot])
+            if node.get("selected_stock"):
+                reactants[slot].meta["selected_stock"] = dict(node["selected_stock"])
         # splice, rather than rebuild, to keep the parsed reaction's metadata
         reaction._reactants = tuple(reactants)
 
     def product_of(reaction, node):
         """The fragment of ``reaction`` this molecule node stands for."""
         if len(reaction.products) == 1:
+            check_stereo_node(reaction.products[0], node)
             return reaction.products[0]
         smiles = _file_key(node["smiles"])
         product = next((p for p in reaction.products if str(p) == smiles), None)
         if product is None:
+            if any(has_stereo(p) for p in reaction.products) or has_stereo(
+                read_smiles(node["smiles"])
+            ):
+                raise ValueError(
+                    "route molecule stereo does not match a reaction product"
+                )
             logger.warning(
                 "Route molecule %s is not a product of %s", node["smiles"], reaction
             )
@@ -263,6 +283,11 @@ def route_tree(target, source_of, purchasable, step_fields) -> "RouteNode | None
                 "type": "mol",
                 "smiles": key,
                 "in_stock": purchasable(molecule, key, True),
+                **(
+                    {"selected_stock": dict(molecule.meta["selected_stock"])}
+                    if "selected_stock" in molecule.meta
+                    else {}
+                ),
             }
         step_id, reaction, product = source
         if product is None:
@@ -446,6 +471,17 @@ def _make_json_v1(
 
         # Build route tree and store
         tree_node = route_tree(target, source_of, purchasable, step_fields)
+        if tree_node is not None and tree is not None:
+            summary = getattr(
+                getattr(tree, "nodes", {}).get(route_id), "stereo_summary", None
+            )
+            if summary:
+                tree_node["stereo"] = summary
+                tree_node["stereo_status"] = summary["stereo_status"]
+                tree_node["connectivity_solved"] = tree.nodes[route_id].is_terminal()
+                tree_node["selectivity_evidence_status"] = summary[
+                    "selectivity_evidence_status"
+                ]
         if route_tree_has_null_node(tree_node):
             logger.warning(
                 "Dropping malformed route %s from export: route tree contains a "

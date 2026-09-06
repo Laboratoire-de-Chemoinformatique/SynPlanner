@@ -282,7 +282,7 @@ def test_ignore_stereo_allows_validation_of_stereo_cleaned_rules():
     no_stereo_cfg = RuleExtractionConfig(**base, ignore_stereo=True)
     no_stereo_rules, _ = extract_rules(no_stereo_cfg, smiles(rxn_smi))
 
-    assert stereo_rules[0].meta["reactor_validation"] == "failed"
+    assert stereo_rules[0].meta["reactor_validation"] == "passed"
     assert no_stereo_rules[0].meta["reactor_validation"] == "passed"
 
 

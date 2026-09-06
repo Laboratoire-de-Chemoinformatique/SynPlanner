@@ -15,10 +15,10 @@ from pathlib import Path
 from typing import Any
 
 import ijson
-from chython import smiles as smiles_parser
 from chython.containers import MoleculeContainer
 from frozendict import frozendict
 
+from synplan.chem.stereo import parse_smiles_preserving_stereo
 from synplan.chem.utils import safe_canonicalization
 
 from .core import (
@@ -140,11 +140,7 @@ def standardize_building_block_catalogue(
                     if price > 0.0:
                         vendors[column[: -len("_ppg")]] = price
 
-                molecule = smiles_parser(
-                    raw_smiles,
-                    ignore=True,
-                    ignore_stereo=False,
-                )
+                molecule = parse_smiles_preserving_stereo(raw_smiles)
                 if not isinstance(molecule, MoleculeContainer):
                     raise ValueError("SMILES does not describe one molecule")
                 molecule = safe_canonicalization(molecule, clean_stereo=False)

@@ -38,7 +38,7 @@ def _route(target_smiles: str, *leaf_smiles: str) -> Route:
 
 
 @pytest.mark.parametrize("target_smiles", ["C[C@H](F)Cl", "CC(F)Cl"])
-def test_costing_is_connectivity_only_and_selects_the_cheapest_offer(target_smiles):
+def test_costing_selects_compatible_stereoisomer_for_the_leaf(target_smiles):
     r_block = _block(R_LACTIC, expensive=5.0)
     s_block = _block(S_LACTIC, inexpensive=1.0)
     route = _route(target_smiles, R_LACTIC)
@@ -46,10 +46,10 @@ def test_costing_is_connectivity_only_and_selects_the_cheapest_offer(target_smil
     result = route.calculate_cost(_index(r_block, s_block))
 
     assert result["complete"]
-    assert result["leaves"][0]["selected_inchikey"] == s_block.inchikey
-    assert result["leaves"][0]["vendor"] == "inexpensive"
+    assert result["leaves"][0]["selected_inchikey"] == r_block.inchikey
+    assert result["leaves"][0]["vendor"] == "expensive"
     assert result["cost_per_mol"] == pytest.approx(
-        route.leaves()[0].molecular_mass * 1.0
+        route.leaves()[0].molecular_mass * 5.0
     )
 
 

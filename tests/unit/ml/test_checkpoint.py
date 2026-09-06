@@ -27,6 +27,34 @@ def _save(tmp_path, hyper_parameters, state_dict):
     return str(path)
 
 
+def test_training_vocabulary_survives_checkpoint_save_load_and_resave(tmp_path):
+    import json
+    from hashlib import sha256
+    from types import SimpleNamespace
+
+    from synplan.chem.reaction.rules.vocabulary import bind_training_vocabulary
+    from synplan.ml.training.trainers import LitRankingPolicy
+
+    rules = tmp_path / "rules.tsv"
+    rules.write_text("[C:1][O:2]>>[C:1]=[O:2]\n")
+    digest = sha256(rules.read_bytes()).hexdigest()
+    rules.with_suffix(".manifest.json").write_text(
+        json.dumps({"schema": "synplan-rules/2", "rules_sha256": digest})
+    )
+    net = bind_training_vocabulary(
+        _ranking_net(1),
+        SimpleNamespace(policy_data_path=tmp_path / "rules_policy_data.tsv"),
+    )
+    wrapped = LitRankingPolicy(net)
+    checkpoint = {"state_dict": wrapped.state_dict()}
+    wrapped.on_save_checkpoint(checkpoint)
+    path = _save(tmp_path, checkpoint["hyper_parameters"], checkpoint["state_dict"])
+    loaded = load_network_from_checkpoint(RankingPolicyNetwork, path)
+    assert loaded.rule_vocabulary_digest == digest
+    # Fine-tuning/resaving must not erase the vocabulary binding.
+    assert loaded.hparams["rule_vocabulary_digest"] == digest
+
+
 def test_loads_pre_redesign_flat_policy_checkpoint(tmp_path):
     """Old flat-hparam policy checkpoints adapt into the config-based network."""
     net = _ranking_net(7)

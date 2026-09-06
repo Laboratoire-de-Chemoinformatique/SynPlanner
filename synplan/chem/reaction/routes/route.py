@@ -7,14 +7,14 @@ from SMILES.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from copy import deepcopy
+from dataclasses import dataclass, replace
 from enum import Enum
 from math import fsum
 from typing import TYPE_CHECKING, Any, Literal
 
 from synplan.chem.building_blocks import (
     BuildingBlockCatalogue,
-    match_building_blocks,
     molecule_to_inchikey,
 )
 from synplan.chem.reaction.routes.io.json import read_route_tree, route_tree
@@ -176,6 +176,7 @@ class Route:
     steps: tuple[Step, ...]
     unresolved: frozenset[str] = frozenset()
     provenance: RouteProvenance | None = None
+    stereo: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not self.steps:
@@ -211,7 +212,7 @@ class Route:
             Step(reaction, reaction.products[0], _origin(metadata.get(index, {})))
             for index, reaction in enumerate(tree.synthesis_route(node_id))
         )
-        return cls(
+        route = cls(
             steps=steps,
             unresolved=frozenset(
                 molecule_key(precursor.molecule)
@@ -222,7 +223,29 @@ class Route:
                 tree_node_id=node_id,
                 policy_log_likelihood=likelihood,
             ),
+            stereo=deepcopy(getattr(tree.nodes[node_id], "stereo_summary", None)),
         )
+        if route.stereo is None:
+            from synplan.chem.stereo_evidence import route_stereo_summary
+
+            node = tree.nodes[node_id]
+            from synplan.chem.stereo import has_stereo
+
+            status = "pending"
+            if node.is_terminal() and not any(
+                has_stereo(m) for s in route for m in s.reaction.molecules()
+            ):
+                status = "fulfilled"
+            route = replace(
+                route,
+                stereo=route_stereo_summary(
+                    route,
+                    original_target=getattr(tree, "original_target", route.target),
+                    status=status,
+                    obligations=getattr(node, "stereo_obligations", ()),
+                ),
+            )
+        return route
 
     @classmethod
     def from_json(cls, route_json: RouteNode) -> Route:
@@ -244,6 +267,7 @@ class Route:
             steps=steps,
             unresolved=frozenset(molecule_key(mol) for mol in parsed.unresolved),
             provenance=RouteProvenance(uncanonical=parsed.uncanonical),
+            stereo=deepcopy(route_json.get("stereo")),
         )
 
     # ------------------------------------------------------------------
@@ -298,7 +322,27 @@ class Route:
     def solved(self) -> bool:
         """True when no leaf is unresolved."""
 
+        from synplan.chem.stereo import has_stereo
+
+        if self.stereo is None:
+            return not self.unresolved and not any(
+                has_stereo(m) for s in self.steps for m in s.reaction.molecules()
+            )
+        return not self.unresolved and self.stereo_status == "fulfilled"
+
+    @property
+    def connectivity_solved(self) -> bool:
         return not self.unresolved
+
+    @property
+    def stereo_status(self) -> str:
+        from synplan.chem.stereo_evidence import route_context
+
+        if self.stereo is None:
+            return "not_assessed"
+        if self.stereo.get("context") != route_context(self):
+            return "needs_reassessment"
+        return self.stereo["stereo_status"]
 
     @property
     def reactions_dict(self) -> dict[int, ReactionContainer]:
@@ -317,9 +361,9 @@ class Route:
     ) -> dict[str, Any]:
         """Price terminal materials against a vendor-aware catalogue.
 
-        Every leaf uses the connectivity block of its InChIKey and may therefore
-        select the cheapest priced stereoisomer or other prefix-collapsed record
-        in that bucket. Prices are treated exactly as supplied: raw price per
+        Every leaf uses an explicitly compatible full record from its InChIKey
+        bucket, honoring the material selected by route verification. Opposite
+        isomers cannot substitute cheaper prices. Prices are raw price per
         gram, one molar equivalent per leaf occurrence, and 100% yield at every
         step.
 
@@ -346,7 +390,20 @@ class Route:
         for leaf_key, (leaf, equivalents) in grouped.items():
             leaf_smiles = str(leaf)
             molecular_weight = float(leaf.molecular_mass)
-            candidates = match_building_blocks(building_blocks, leaf_key)
+            from synplan.chem.building_blocks.stereo import compatible_records
+
+            diagnostics = []
+            candidates = compatible_records(
+                leaf, building_blocks, inchikey=leaf_key, diagnostics=diagnostics
+            )
+            selected = leaf.meta.get("selected_stock")
+            if selected:
+                candidates = tuple(
+                    c
+                    for c in candidates
+                    if c.inchikey == selected["inchikey"]
+                    and c.smiles == selected["smiles"]
+                )
             offers = sorted(
                 (
                     price,
@@ -370,6 +427,7 @@ class Route:
                 "contribution_per_mol": None,
                 "contribution_per_gram": None,
                 "status": "missing",
+                "stereo_diagnostics": diagnostics,
             }
             if not candidates:
                 missing.append(leaf_smiles)
@@ -571,9 +629,20 @@ class Route:
             extra["step_id"] = index
             return mapped_smiles(reactions[index]), extra
 
-        return route_tree(
+        result = route_tree(
             target, source_of, lambda mol, key, leaf: key in stock, step_fields
         )
+        if result is not None and self.stereo is not None:
+            result["stereo"] = {
+                **deepcopy(self.stereo),
+                "stereo_status": self.stereo_status,
+            }
+            result["connectivity_solved"] = self.connectivity_solved
+            result["stereo_status"] = self.stereo_status
+            result["selectivity_evidence_status"] = self.stereo.get(
+                "selectivity_evidence_status", "not_evaluated"
+            )
+        return result
 
     # ------------------------------------------------------------------
     # representation

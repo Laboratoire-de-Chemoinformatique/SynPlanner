@@ -27,9 +27,9 @@ def match_building_blocks(
 ) -> tuple[BuildingBlock, ...]:
     """Return all catalogue records sharing an InChIKey connectivity block.
 
-    Search is intentionally stereo-agnostic and therefore uses only the first
-    14 characters. Complete keys and stereo metadata remain on each record for
-    future use.
+    This is candidate retrieval only. Search uses ``compatible_records`` to
+    check molecular identity and every specified stereo requirement before
+    choosing a full record from this bucket.
     """
 
     return catalogue.get(inchikey[:14], ())

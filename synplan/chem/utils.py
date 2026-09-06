@@ -218,7 +218,7 @@ class StereoDiscardedWarning(UserWarning):
 def mol_from_smiles(
     smiles: str,
     standardize: bool = True,
-    clean_stereo: bool = True,
+    clean_stereo: bool = False,
     clean2d: bool = True,
 ) -> MoleculeContainer:
     """Converts a SMILES string to a `MoleculeContainer` object and optionally
@@ -226,12 +226,14 @@ def mol_from_smiles(
 
     :param smiles: The SMILES string representing the molecule.
     :param standardize: Whether to standardize the molecule (default is True).
-    :param clean_stereo: Whether to remove the stereo marks on atoms of the molecule (default is True).
+    :param clean_stereo: Whether to remove stereo marks (default is False).
     :param clean2d: Whether to clean the 2D coordinates of the molecule (default is True).
     :return: The processed molecule object.
     :raises ValueError: If the SMILES string could not be processed by chython.
     """
-    molecule = smiles_parser(smiles, ignore=True)
+    from synplan.chem.stereo import parse_smiles_preserving_stereo
+
+    molecule = parse_smiles_preserving_stereo(smiles)
 
     if not isinstance(molecule, MoleculeContainer):
         raise ValueError("SMILES string was not processed by chython")
@@ -274,12 +276,19 @@ def in_atom_order(molecule: MoleculeContainer) -> MoleculeContainer:
     file rewritten from what it wrote does not match it, and the difference is
     a permutation of equivalent atoms that means nothing.
     """
+    from synplan.chem.stereo import _assign, _requirements
+
+    requirements = _requirements(molecule)
     molecule = molecule.copy()
     molecule._atoms = dict(sorted(molecule._atoms.items()))
     molecule._bonds = {
         atom: dict(sorted(bonds.items()))
         for atom, bonds in sorted(molecule._bonds.items())
     }
+    if requirements:
+        molecule.clean_stereo()
+        for requirement in requirements:
+            _assign(molecule, requirement)
     return molecule
 
 
@@ -323,7 +332,9 @@ def mapped_smiles(reaction: ReactionContainer) -> str:
         [in_atom_order(molecule) for molecule in reaction.products],
         [in_atom_order(molecule) for molecule in reaction.reagents],
     )
-    return format(ordered, "m")
+    from synplan.chem.stereo import reaction_smiles
+
+    return reaction_smiles(ordered)
 
 
 def _warn_stereo_loss(molecule: MoleculeContainer) -> None:
@@ -340,9 +351,7 @@ def _warn_stereo_loss(molecule: MoleculeContainer) -> None:
     ):
         return
     warnings.warn(
-        "Input stereochemistry is being discarded: SynPlanner's rule application "
-        "and search identity are connectivity-only. Pass clean_stereo=False only "
-        "when preparing stereo metadata, such as an InChIKey catalogue.",
+        "Input stereochemistry is being discarded by an explicit clean_stereo=True request.",
         StereoDiscardedWarning,
         stacklevel=3,
     )
@@ -352,7 +361,7 @@ def clean_molecule(
     molecule: MoleculeContainer,
     *,
     standardize: bool = True,
-    clean_stereo: bool = True,
+    clean_stereo: bool = False,
     clean2d: bool = True,
 ) -> MoleculeContainer:
     """Clean a Chython molecule on a copy while preserving failure semantics.
@@ -371,6 +380,10 @@ def clean_molecule(
         if clean_stereo:
             _warn_stereo_loss(tmp)
             tmp.clean_stereo()
+        if not clean_stereo:
+            from synplan.chem.stereo import assert_stereo_preserved
+
+            assert_stereo_preserved(molecule, tmp)
         if clean2d:
             tmp.clean2d()
         return tmp
@@ -379,9 +392,9 @@ def clean_molecule(
 
 
 def safe_canonicalization(
-    molecule: MoleculeContainer, *, clean_stereo: bool = True
+    molecule: MoleculeContainer, *, clean_stereo: bool = False
 ) -> MoleculeContainer:
-    """The one spelling of a molecule: canonical, flat, without 2D coordinates.
+    """The one spelling of a molecule: canonical, with stereo, without 2D coordinates.
 
     The building-block catalogue is written with this, so it is also what a
     lookup against the catalogue has to be written with.
@@ -423,7 +436,10 @@ def validate_and_canonicalize(
         tmp.thiele(fix_tautomers=True)
         tmp.standardize_charges(prepare_molecule=False)
         tmp.standardize_tautomers(prepare_molecule=False)
-        tmp.clean_stereo()
+        tmp.fix_stereo()
+        from synplan.chem.stereo import assert_stereo_preserved
+
+        assert_stereo_preserved(molecule, tmp)
         return tmp
     except InvalidAromaticRing:
         return None

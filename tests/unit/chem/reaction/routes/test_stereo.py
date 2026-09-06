@@ -104,7 +104,7 @@ def test_real_small_diol_cannot_use_wrong_or_unspecified_stock(mode, fixtures, s
     from synplan.chem.precursor import is_purchasable
 
     assert len(mol) == 6
-    assert is_purchasable(mol, frozendict(), min_mol_size=6)
+    assert not is_purchasable(mol, frozendict(), min_mol_size=6)
     prefix = molecule_to_inchikey(mol)[:14]
     replacement = dict(stock)
     if mode == "absent":

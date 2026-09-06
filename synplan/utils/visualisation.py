@@ -92,6 +92,12 @@ def extract_routes(
     :return: A list of dictionaries. Each dictionary contains a target, a list of
         children, and a boolean indicating whether the target is in building_blocks.
     """
+    from synplan.mcts.tree import Tree
+
+    if isinstance(tree, Tree) and tree.winning_nodes:
+        return [
+            Route.from_tree(tree, node_id).to_json() for node_id in tree.winning_nodes
+        ]
     target = tree.nodes[1].precursors_to_expand[0].molecule
     target_in_stock = tree.nodes[1].curr_precursor.is_building_block(
         tree.building_blocks,
@@ -326,17 +332,62 @@ def routes_report_html(
     body = []
     for index, route in enumerate(routes, 1):
         rows = ""
+        step_by_node = {
+            s.origin.tree_node_id: i for i, s in enumerate(route.steps) if s.origin
+        }
+        issues_by_step = {}
+        for obligation in (route.stereo or {}).get("obligations", ()):
+            responsible = obligation.get("step")
+            if responsible is None:
+                responsible = step_by_node.get(obligation.get("tree_node_id"))
+            issues_by_step.setdefault(responsible, []).append(
+                obligation.get("detail")
+                or obligation.get("reason", "Stereo assessment needed")
+            )
         for number, step in enumerate(route, 1):
             label = _step_label(step)
+            stereo_note = "".join(
+                f'<div class="lab">Stereo: {escape(detail.replace("_", " "))}</div>'
+                for detail in issues_by_step.get(number - 1, ())
+            )
             rows += (
                 f'<div class="step"><div class="disc">{number}</div><div>'
                 + (f'<div class="lab">{escape(label)}</div>' if label else "")
+                + stereo_note
                 + f'<div class="rxn mono">{escape(str(step.reaction))}</div></div></div>'
             )
         provenance = route.provenance
         node_id = None if provenance is None else provenance.tree_node_id
         score = None if provenance is None else provenance.search_score
         unresolved = len(route.unresolved)
+        stereo_labels = {
+            "fulfilled": "Stereo requirements fulfilled",
+            "strategy_needed": "Stereo strategy needed",
+            "could_not_be_assessed": "Stereo could not be assessed",
+            "pending": "Stereo assessment pending",
+            "not_assessed": "Stereo not assessed",
+            "needs_reassessment": "Stereo needs reassessment after edits",
+        }
+        stereo_text = stereo_labels.get(route.stereo_status, route.stereo_status)
+        stereo_detail = ""
+        if route.stereo:
+            step_by_node = {
+                s.origin.tree_node_id: i for i, s in enumerate(route.steps) if s.origin
+            }
+            for obligation in route.stereo.get("obligations", ()):
+                step_number = obligation.get("step")
+                if step_number is None:
+                    node = obligation.get("tree_node_id")
+                    step_number = step_by_node.get(node)
+                location = (
+                    f"Step {step_number + 1}: " if step_number is not None else ""
+                )
+                detail = obligation.get("detail", obligation.get("reason", "")).replace(
+                    "_", " "
+                )
+                stereo_detail += f"<p>{escape(location + detail)}</p>"
+            evidence = route.stereo.get("selectivity_evidence_status", "not assessed")
+            stereo_detail += f"<p>Selectivity evidence: {escape(evidence.replace('_', ' '))}. Structural labels do not establish ee, er or dr.</p>"
         body.append(
             '<section class="route card"><div class="rhead">'
             f'<div class="kv"><div class="eyebrow">Route</div>'
@@ -347,7 +398,7 @@ def routes_report_html(
             f'<div class="v">{"—" if score is None else round(score, 3)}</div></div>'
             f'<div class="kv"><div class="eyebrow">Not in stock</div>'
             f'<div class="v">{unresolved}</div></div></div>'
-            f'<div class="draw">'
+            f'<p>{escape(stereo_text)}</p>{stereo_detail}<div class="draw">'
             f"{doc.route(route.svg(standalone=False, layouts=layouts))}"
             f"</div>{rows}</section>"
         )

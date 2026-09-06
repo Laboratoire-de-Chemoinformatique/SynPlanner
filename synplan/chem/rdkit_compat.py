@@ -18,7 +18,7 @@ from synplan.chem.utils import clean_molecule, safe_canonicalization
 def target_from_rdkit(
     rdkit_mol,
     standardize: bool = True,
-    clean_stereo: bool = True,
+    clean_stereo: bool = False,
     clean2d: bool = True,
 ) -> MoleculeContainer:
     """Convert an RDKit Mol to a chython MoleculeContainer for use as a

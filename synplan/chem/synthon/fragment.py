@@ -394,10 +394,9 @@ class Fragmenter:
         return parts[0]
 
     def _prepare(self, target: MoleculeContainer) -> SynthonContainer:
-        """Drop the counter-ion and stereo, neutralise carboxylates, canonicalise. chython does not
+        """Drop the counter-ion, preserve stereo, neutralise carboxylates, canonicalise. chython does not
         aromatise on parse, so 15 of the rule LHS would silently never match without this."""
         prepared = synthon_smiles(str(self._parent(target)))
-        prepared.clean_stereo()
         for neutral in self._carboxylate(prepared):
             prepared = neutral
             break

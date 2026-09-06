@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from copy import deepcopy
 
 from chython.containers import CGRContainer
 
@@ -18,6 +19,43 @@ class RouteCGRContainer(CGRContainer):
     """
 
     __slots__ = ()
+
+    def flush_cache(self):
+        stereo = self.__dict__.get("route_stereo_steps")
+        super().flush_cache()
+        if stereo is not None:
+            self.route_stereo_steps = stereo
+
+    def copy(self, **kwargs):
+        result = super().copy(**kwargs)
+        if hasattr(self, "route_stereo_steps"):
+            result.route_stereo_steps = deepcopy(self.route_stereo_steps)
+        return result
+
+    def substructure(self, atoms, **kwargs):
+        result = super().substructure(atoms, **kwargs)
+        if hasattr(self, "route_stereo_steps"):
+            result.route_stereo_steps = deepcopy(self.route_stereo_steps)
+        return result
+
+    def remap(self, mapping, *, copy=False):
+        snapshots = None
+        if hasattr(self, "route_stereo_steps"):
+            from .deconvolution import reactions_from_route_cgr
+            from .stereo import snapshot
+
+            snapshots = {}
+            for step, reaction in reactions_from_route_cgr(self).items():
+                for molecule in reaction.molecules():
+                    molecule.remap(
+                        {n: m for n, m in mapping.items() if n in molecule._atoms}
+                    )
+                reaction.flush_cache()
+                snapshots[str(step + 1)] = snapshot(reaction, reaction.compose())
+        result = super().remap(mapping, copy=copy)
+        if snapshots is not None:
+            (result if copy else self).route_stereo_steps = snapshots
+        return result
 
     def depict(self, *args, **kwargs):
         from synplan.chem.reaction.routes.representation.depiction import (

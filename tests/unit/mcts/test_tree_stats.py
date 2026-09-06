@@ -88,7 +88,9 @@ def build_tree(algorithm="breadth_first", rules=None, **kwargs):
     evaluator = kwargs.pop("evaluator", None)
     policy_cls = kwargs.pop("policy_cls", FakePolicy)
     search_strategy = kwargs.pop("search_strategy", "expansion_first")
-    building_blocks = kwargs.pop("building_blocks", set())
+    building_blocks = kwargs.pop(
+        "building_blocks", {str(make_mol(n)) for n in range(1, 7)}
+    )
     cfg = TreeConfig(
         algorithm=algorithm,
         max_iterations=max_iterations,

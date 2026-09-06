@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from synplan.chem.precursor import Precursor
 from synplan.chem.reaction.routes.quality import PolicyLikelihoodScorer
 from synplan.chem.reaction.routes.route import RouteProvenance
 from synplan.chem.utils import mol_from_smiles
@@ -32,7 +33,7 @@ def make_tree(**kwargs):
 
 
 def add_child(tree, parent, probability, *, solved=False):
-    precursor = tree.nodes[1].curr_precursor
+    precursor = Precursor(mol_from_smiles("C" * (7 + len(tree.nodes)), clean2d=False))
     child = Node(
         precursors_to_expand=() if solved else (precursor,), new_precursors=(precursor,)
     )

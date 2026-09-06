@@ -1,60 +1,173 @@
-Stereo inherited from stock: route audit
+Stereo constraints in search and routes
 =======================================
 
-``audit_stereo_inheritance`` is an opt-in route-level prototype. It traces
-specified target configurations through unchanged mapped environments and checks
-every leaf against an explicit compatible catalogue record. Existing search,
-canonicalisation, stock lookup and route export defaults are unchanged.
+SynPlanner preserves specified stereo during preparation, rule extraction,
+reaction application, search, stock selection and route export. Chython supplies
+all production stereo operations. Existing policy weights receive a separate
+connectivity projection; their proposals are checked against the authoritative
+stereo-bearing molecules before acceptance.
+
+Supported scope
+---------------
+
+.. list-table:: Structural support and its limits
+   :header-rows: 1
+   :widths: 25 40 35
+
+   * - Stereo
+     - Supported
+     - Requires further evidence or implementation
+   * - Carbon tetrahedra (R/S)
+     - Mapped orientation, inheritance, explicit query constraints, stock checks
+     - Selectivity of a newly formed center; epimerization under a procedure
+   * - Ordinary double bonds (E/Z)
+     - The same constraints, stock selection and coherent forward reconstruction
+     - E:Z ratio and stability under a procedure
+   * - Allene axial chirality
+     - Both termini and their references, stock selection and route reconstruction
+     - Experimental selectivity and stability; general cumulenes
+   * - Enhanced ABS / OR / AND groups
+     - Preservation in CXSMILES and V3000; absolute assignments can be checked
+     - Fulfillment of relative or mixture semantics requires assessment
+   * - Atropisomers, planar/helical and other non-tetrahedral stereo
+     - Explicit unsupported-input diagnostics for recognized encodings
+     - Deferred; no silent conversion to an absolute tetrahedron
+
+Mapped orientation is the reference, not a CIP letter comparison. R can become S
+when substituent priorities change while spatial configuration is retained.
+Unspecified stereo is unknown. OR represents relative stereo with unresolved
+absolute identity; AND represents a mixture and does not imply a 50:50 ratio.
+A structural label never establishes ee, er, dr, E:Z or isolated purity.
+
+Planning behavior
+-----------------
+
+The default ``TreeConfig(stereo_mode="proposal")`` keeps useful paths that still
+need a stereo strategy. ``stereo_mode="strict"`` excludes outcomes with unresolved
+stereo obligations. Finding every starting material makes a path
+``connectivity_solved``; it becomes a winning route only after its stereo
+requirements and coherent forward reconstruction also pass.
+
+Creating a required stereocenter, double bond or allene axis produces an explicit
+obligation. SynPlanner does not choose an arbitrary configuration or enumerate all
+stereoisomers. The route identifies the required geometry, responsible step and
+next action: a compatible chiral precursor, supported transformation or documented
+separation. Known contradictory configurations are rejected. Mapping exhaustion,
+relative/mixture requirements and unsupported stereo remain unassessed.
 
 .. code-block:: python
 
-   from chython import smiles
-   from synplan.chem.reaction.routes.stereo import audit_stereo_inheritance
-   from synplan.chem.reaction.routes.stereo_io import read_stereo_route
+   tree.run()
+   fulfilled = tree.routes()
+   proposals = [Route.from_tree(tree, n) for n in tree.proposal_nodes]
+   proposal = proposals[0]
+   assert proposal.connectivity_solved and not proposal.solved
+   print(proposal.stereo_status)
+   print(proposal.to_json()["stereo"]["first_responsible"])
 
-   # Preserve the original target and source tree before any stereo removal.
-   route, mapping_sources = read_stereo_route(saved_route_tree)
-   result = audit_stereo_inheritance(
-       route, smiles(original_target_smiles), catalogue,
-       mapping_sources=mapping_sources,
+Import ``Route`` from ``synplan.chem.reaction.routes.route``. CLI runs write
+``stereo_proposals_<target index>.json`` and ``.html`` beside normal route reports,
+including when no stereo-fulfilled route was found. HTML reports show stereo and
+selectivity-evidence status separately. Search records preserve the same verdict.
+
+Exact materials and evidence
+----------------------------
+
+The existing InChIKey catalogue stays indexed by connectivity prefix. Each
+candidate retains its full key, stereo-bearing SMILES and vendor offers. Chython
+checks the explicit required geometry before a record is selected. Opposite and
+unspecified isomers cannot satisfy a specified request. Partially specified
+requests may accept an explicit material satisfying all specified requirements.
+Every leaf needs actual stock, including small reagents. Cost uses the selected
+compatible record; an opposite isomer's price cannot be substituted.
+
+Evidence is attached to the particular reactants, products, agents and procedure.
+It is not a patent lookup that universally assigns a template's stereochemical
+outcome. ``attach_stereo_evidence`` accepts source observations and keeps their
+measurement stage, mixture composition, yield basis and other supplied fields.
+Unreviewed observations cannot discharge strategy obligations.
+
+.. code-block:: python
+
+   from synplan.chem.stereo_evidence import review_stereo_route
+
+   reviewed = review_stereo_route(
+       proposal, step_index=0,
+       source="Procedure and analytical record identifier",
+       observation={"er": "98:2", "stage": "isolated", "yield_basis": "desired isomer"},
+       reviewer="Responsible chemist",
+       reason="Reviewed this exact substrate, procedure and desired configuration",
+       catalogue=building_blocks,
    )
-   evidence = result.to_dict()
-   if result.supported:
-       reconstructed_route = result.route
 
-Callers already holding a detached ``Route`` may pass it directly, with the source
-of its current reaction atom maps for every zero-based step. Local numbers
-invented by parsing unmapped SMILES are not mapping evidence. The strict import
-adapter checks molecule/reaction node agreement before linking objects, rebases
-local maps, and preserves original reaction strings and source identifiers. Its
-``strip_stereo=True`` option is for explicit recovery experiments only.
+Review returns a copy and reruns whole-route inheritance, mapping and stock checks.
+It can accept a specific transformation; it cannot approve away missing stock,
+contradictory geometry or broken mapping. Without a catalogue, only the explicit
+stock records pinned to the route are available for rechecking. Editing the
+structures, maps, procedure, evidence or selected materials reopens the assessment.
+``TreeConfig.stereo_assessments`` can carry the scoped records into another search.
+The default pipeline does not predict catalysts or extract patent prose.
 
-The audit supports carbon tetrahedra and ordinary double bonds. It compares
-orientations in mapped neighbour frames, so changing CIP priority does not imply
-inversion. New centres, changed local environments, contradictory configurations,
-unsupported stereo types and uncertain mappings remain unresolved proposals.
-Symmetry enumeration is bounded (256 mappings by default); reaching the bound
-abstains. The import adapter conservatively checks possible carbon requirements
-before it has target-specific obligations and may abstain unnecessarily.
+Extraction, persistence and compatibility
+-----------------------------------------
 
-Connectivity keys only identify catalogue candidates. A compatible full record
-must specify every required configuration; wrong and unspecified stereoisomers
-cannot satisfy a requirement. All other leaves also need actual records, with
-no small-molecule shortcut. When offers are present, the reported price belongs
-to the selected compatible record. Input molecules, route provenance, conditions
-and catalogue objects remain unchanged.
+``RuleExtractionConfig.ignore_stereo`` now defaults to False. Query conversion
+preserves parity in the retained reference frame and includes the needed stereo
+references. Stereo-only changes survive extraction. Rule identities distinguish
+opposite stereo while tolerating atom renumbering. Source-event records distinguish
+creation/destruction, retention/inversion, changed reference environments and
+annotation gain/loss. Untrusted atom maps produce an unassessed event.
 
-Only complete reconstructions have ``supported=True`` and a returned ``Route``.
-The forward check preserves shared adjacent molecule objects and reproduces all
-target-linked configurations from assigned stock. The machine-readable ledger
-identifies original target atoms, mapped paths, selected records and the first
-responsible step/leaf. Inferred labels are explicitly marked as reconstructed.
-Use ``to_dict()['reconstructed_steps']`` to retain mapped stereo; legacy export
-normalisation is outside this prototype's contract.
+Extraction writes ``<rules>.stereo.jsonl`` with one source record per parsed
+reaction and ``<rules>.manifest.json`` with input/rule hashes and schema versions.
+The existing failure/audit files account for failed parsing. New rule vocabularies
+must be paired with their trained fixed-output policy; matching rule counts are
+insufficient. New ranking/filtering checkpoints retain the vocabulary digest.
+MHN policies bind runtime rule representations separately. Legacy assets lacking
+a manifest retain the existing compatibility checks; their provenance cannot be
+recovered from a weight tensor. Rebuild cached training datasets when rules change.
 
-This is graph inheritance, not a reaction selectivity or laboratory certificate.
-Conditions remain unassessed. Alpha-carbonyl stereocentres receive a structural
-review flag rather than a predicted epimerization outcome. Protection edits must
-be audited again with valid updated maps. Search-state requirements, caches,
-deduplication, exact stock termination and standard export integration require a
-separate change.
+Search records use ``synplan-tree/3`` and still read schemas 1 and 2. Public route
+artifacts use ``synplan-routes/2``: target keys are now Chython canonical SMILES,
+including stereo. External evaluation adapters must normalize these keys in their
+own boundary code. Core search no longer uses RDKit to create an export key.
+SMILES retains CX groups and SDF/RDF writers use V3000. RouteCGR keeps checked
+source stereo snapshots beside its connectivity graph; changed graphs require
+reassessment before those snapshots can be restored.
+
+Runtime and backend
+-------------------
+
+Stock retrieval and finalized-precursor caching use indexed lookups. Opposite
+stereo requirements can reuse policy proposals while their search constraints
+remain separate. Search obligations use persistent local records, so expanding a
+node does not copy its complete stereo history. Export and context checks traverse
+the route records. No automatic stereoisomer enumeration is performed.
+
+``max_mapping_work`` bounds correspondence work (default 100,000 candidate/check
+units), including failed and recursive matches. Stock buckets and route alignment
+also have explicit caps. Exhaustion reports an incomplete assessment. These are
+bounds on added correspondence work, not a claim that Chython perception,
+canonicalization or arbitrary graph isomorphism is linear.
+
+The paired Chython patch adds native shared work limits, strict SMILES/MDL stereo
+parsing, checked SMARTS constraints, enhanced reaction CXSMILES and stereo
+validation before atom-set deduplication. Its MDL writers prepare and check 2D
+geometry, and mark unspecified double bonds explicitly. Drawing never changes
+the caller's molecule. Unsupported group queries fail instead of silently
+matching absolute configurations.
+
+The compiled matcher enforces the shared budget for representable queries;
+extended predicates retain the Python path. Recursive constraints share the
+same budget. Rebuild the Chython Cython extensions to enable this fast path:
+an older binary automatically uses the bounded Python fallback. No runtime
+dependency was added for the optimization.
+
+SynPlanner uses these APIs when available and retains a bounded fallback for
+released Chython 1.105. Full MDL preservation requires the paired backend:
+the fallback verifies each written structure and can refuse a depiction that
+1.105 cannot preserve. CXSMILES remains available. Strict rejection of malformed
+MDL stereo is provided by the updated backend; this is separate from the checked
+SMILES parser available on both versions. Existing installed dependencies and
+model weights are not modified by selecting the worktree.
+Atropisomer planning and general conditions/selectivity prediction remain deferred.

@@ -585,6 +585,11 @@ class RemoveReagentsStandardizer(BaseStandardizer):
         not_changed_molecules = set(rxn.reactants).intersection(rxn.products)
         cgr = ~rxn
         center_atoms = set(cgr.center_atoms)
+        from synplan.chem.stereo import stereo_events
+
+        for event in stereo_events(rxn):
+            if event["event"] not in ("retained", "unspecified"):
+                center_atoms.update(event["atoms"])
 
         new_reactants = []
         new_products = []

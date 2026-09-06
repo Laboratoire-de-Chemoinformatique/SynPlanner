@@ -66,7 +66,9 @@ def test_tree_and_rollout_share_one_connectivity_catalogue(target_smiles):
     assert not hasattr(evaluator.rollout, "use_full_inchikey")
     assert tree.building_blocks is blocks
     assert evaluator.rollout.building_blocks is blocks
-    assert not molecule_has_stereo(tree.nodes[1].curr_precursor.molecule)
+    assert molecule_has_stereo(tree.nodes[1].curr_precursor.molecule) == (
+        "@" in target_smiles
+    )
 
 
 def test_json_catalogue_is_rejected_for_forward_search():

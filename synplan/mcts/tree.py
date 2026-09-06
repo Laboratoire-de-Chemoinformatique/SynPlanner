@@ -1,10 +1,12 @@
 """Module containing a class Tree that used for tree search of retrosynthetic routes."""
 
+import json
 import logging
 import pickle
 from collections import deque
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, fields
+from hashlib import sha256
 from itertools import pairwise
 from math import log
 from os import PathLike
@@ -20,6 +22,14 @@ from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
 from synplan.chem.reaction.routes.route import Route
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
+from synplan.chem.stereo import (
+    StereoObligations,
+    _requirements,
+    _Unresolved,
+    assess_inheritance,
+    has_stereo,
+    has_stereo_groups,
+)
 from synplan.mcts.config import TreeConfig
 from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.node import Node
@@ -87,6 +97,9 @@ class TreeStats:
     first_solution_time: float | None = None
     routes_found_at: list[tuple[int, float]] = field(default_factory=list)
     iterations_without_expansion: int = 0
+    stereo_incompatible_outcomes: int = 0
+    stereo_unresolved_outcomes: int = 0
+    stereo_incomplete_assessments: int = 0
 
     def __getitem__(self, key: str):
         if key in {f.name for f in fields(self)}:
@@ -174,6 +187,11 @@ class Tree:
 
         # tree config parameters
         self.config = config
+        self._stereo_assessments = {}
+        for record in config.stereo_assessments:
+            self._stereo_assessments.setdefault(record.get("context"), []).append(
+                record
+            )
 
         # building blocks and reaction reaction_rules
         self.reaction_rules = tuple(reaction_rules)
@@ -251,6 +269,8 @@ class Tree:
         self.redundant_children: dict[int, set[int]] = {1: set()}
         self.children: dict[int, set[int]] = {1: set()}
         self.winning_nodes: list[int] = []
+        self.proposal_nodes: list[int] = []
+        self.stereo_diagnostics: list[dict] = []
         self.visited_nodes: set[int] = set()
         self.expanded_nodes: set[int] = set()
 
@@ -403,10 +423,25 @@ class Tree:
         )
         assert len(target) > 3, "Target molecule has less than 3 atoms"
 
+        self.original_target = target.copy()
         target_molecule = Precursor(target)
+        obligations = []
+        try:
+            _requirements(target_molecule.molecule)
+            if has_stereo_groups(target_molecule.molecule):
+                obligations.append(
+                    {
+                        "reason": "relative_or_mixture_stereo",
+                        "detail": "Target group semantics require assessment; original CXSMILES is preserved.",
+                    }
+                )
+        except _Unresolved as error:
+            obligations.append({"reason": error.reason, "detail": str(error)})
         target_molecule.prev_precursors.append(Precursor(target))
         target_node = Node(
-            precursors_to_expand=(target_molecule,), new_precursors=(target_molecule,)
+            precursors_to_expand=(target_molecule,),
+            new_precursors=(target_molecule,),
+            stereo_obligations=tuple(obligations),
         )
 
         return target_node
@@ -418,6 +453,8 @@ class Tree:
         :return: None.
         """
         curr_node = self.nodes[node_id]
+        if curr_node.is_terminal():
+            return
         prev_precursor = curr_node.curr_precursor.prev_precursors
 
         self._expanded_molecule_keys.add(str(curr_node.curr_precursor.molecule))
@@ -443,21 +480,40 @@ class Tree:
                 candidate.rule_source != POLICY_SOURCE_NAME
                 and self.config.priority_rule_multiapplication
             )
+            diagnostics = []
             for products in apply_reaction_rule(
                 curr_node.curr_precursor.molecule,
                 candidate.rule,
                 top_reactions_num=self.config.max_reaction_outcomes,
                 multirule=enable_multirule,
                 rm_dup=enable_multirule,
+                max_mapping_work=self.config.max_mapping_work,
+                diagnostics=diagnostics,
             ):
                 if self._add_child_if_new(context, products, candidate):
                     rule_produced = True
                     expanded = True
+            for diagnostic in diagnostics:
+                self.stereo_diagnostics.append(
+                    {
+                        "node": node_id,
+                        "rule_key": self._make_rule_key(
+                            candidate.rule_source, candidate.rule_id
+                        ),
+                        **diagnostic,
+                    }
+                )
+                self.stats.stereo_incomplete_assessments += 1
 
             if rule_produced:
                 self._increment_rule_stats(candidate.rule_source, succeeded=1)
 
         # update statistics
+        for diagnostic in curr_node.curr_precursor.molecule.meta.pop(
+            "query_assessment_diagnostics", ()
+        ):
+            self.stereo_diagnostics.append({"node": node_id, **diagnostic})
+            self.stats.stereo_incomplete_assessments += 1
         self.stats.expansion_calls += 1
         if expanded:
             self.stats.expansion_successes += 1
@@ -538,8 +594,60 @@ class Tree:
         policy_rank = candidate.policy_rank
         rule_source = candidate.rule_source
 
+        products = [m.copy() for m in products]
+        assessment = assess_inheritance(curr_node.curr_precursor.molecule, products)
+        if self.config.direction == "forward" and any(
+            has_stereo(m) for m in (curr_node.curr_precursor.molecule, *products)
+        ):
+            assessment["obligations"].append(
+                {
+                    "reason": "forward_stereo_not_assessed",
+                    "detail": "Stereo route fulfillment currently supports retrosynthetic search.",
+                }
+            )
+        from synplan.chem.stereo_evidence import (
+            apply_chemistry_assessment,
+            reaction_context,
+        )
+
+        forward = Reaction(products, [curr_node.curr_precursor.molecule])
+        evidence = self._stereo_assessments.get(reaction_context(forward), ())
+        forward.meta["stereo_evidence"] = list(evidence)
+        decision = apply_chemistry_assessment(assessment, forward)
+        if decision == "rejected":
+            self.stats.stereo_incompatible_outcomes += 1
+            return False
+        if decision == "conflicting":
+            assessment["obligations"].append(
+                {
+                    "reason": "conflicting_chemistry_assessments",
+                    "detail": "Recorded assessments disagree for this exact context.",
+                }
+            )
+        if any(
+            o["reason"] == "configuration_contradicted"
+            for o in assessment["obligations"]
+        ):
+            self.stats.stereo_incompatible_outcomes += 1
+            return False
+        if assessment["obligations"]:
+            self.stats.stereo_unresolved_outcomes += 1
+            if self.config.stereo_mode == "strict":
+                return False
+        obligations = curr_node.stereo_obligations.extend(
+            {
+                **o,
+                "tree_node_id": self.curr_tree_size,
+                "rule_key": self._make_rule_key(rule_source, rule_id),
+            }
+            for o in assessment["obligations"]
+        )
         product_key = tuple(sorted(str(molecule) for molecule in products))
-        if not product_key or product_key in tmp_products:
+        # Identical precursors can arise from different stereo operations or
+        # evidence. Keep those alternatives and their provenance distinct.
+        if obligations or assessment["events"]:
+            product_key = (product_key, self._make_rule_key(rule_source, rule_id))
+        if not products or product_key in tmp_products:
             return False
 
         rule_key = self._make_rule_key(rule_source, rule_id)
@@ -577,26 +685,57 @@ class Tree:
             ),
         )
 
+        # Pruning must retain path obligations and stereo operation provenance.
+        for precursor in new_precursor:
+            for diagnostic in precursor.stock_diagnostics:
+                self.stereo_diagnostics.append(
+                    {
+                        "node": node_id,
+                        "rule_key": rule_key,
+                        "molecule": str(precursor),
+                        **diagnostic,
+                    }
+                )
+                self.stats.stereo_incomplete_assessments += 1
+        # State comparison is linear in explicitly stored records, never in all
+        # possible stereoisomer assignments.
+        history = curr_node.stereo_history
+        if assessment["events"] or evidence:
+            local = {
+                "products": [str(p) for p in new_precursor],
+                "rule": rule_key,
+                "events": assessment["events"],
+                "evidence": evidence,
+                "stock": [p.selected_stock for p in new_precursor],
+            }
+            history = sha256(
+                (history + json.dumps(local, sort_keys=True)).encode()
+            ).hexdigest()
+        pruning_key = (precursors_to_expand, obligations.key, history)
         if self.config.enable_pruning:
             if (
                 precursors_to_expand != ()
-                and precursors_to_expand
+                and pruning_key
                 in self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks
             ):
                 existing_id = self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[
-                    precursors_to_expand
+                    pruning_key
                 ]
                 self.redundant_children[node_id].add(existing_id)
                 tmp_products.add(product_key)
                 return True
 
             self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks[
-                precursors_to_expand
+                pruning_key
             ] = self.curr_tree_size
 
         child_node = Node(
             precursors_to_expand=precursors_to_expand,
             new_precursors=new_precursor,
+            stereo_obligations=obligations,
+            stereo_events=tuple(assessment["events"]),
+            stereo_evidence=tuple(evidence),
+            stereo_history=history,
         )
 
         for np in new_precursor:
@@ -698,6 +837,10 @@ class Tree:
         self.children[node_id].add(new_node_id)
         self.children[new_node_id] = set()
         self.curr_tree_size += 1
+        if new_node.is_terminal():
+            self._audit_terminal(new_node_id)
+        if new_node.is_terminal() and not new_node.is_solved():
+            self.proposal_nodes.append(new_node_id)
 
         if self.config.search_strategy == "evaluation_first":
             node_value = self._get_node_value(new_node_id)
@@ -706,6 +849,88 @@ class Tree:
 
         new_node.init_value = node_value
         new_node.total_value = node_value
+
+    def _audit_terminal(self, node_id):
+        """Whole-route verification precedes any winning-node flag or reward."""
+        from frozendict import frozendict
+
+        from synplan.chem.building_blocks import BuildingBlock, molecule_to_inchikey
+        from synplan.chem.mapping import MappingBudgetExceeded, mapping_budget
+        from synplan.chem.reaction.routes.stereo import audit_stereo_inheritance
+        from synplan.chem.stereo_evidence import route_stereo_summary
+
+        node = self.nodes[node_id]
+        try:
+            route = Route.from_tree(self, node_id)
+        except ValueError as error:
+            node.stereo_obligations = node.stereo_obligations.extend(
+                (
+                    {
+                        "reason": "mapping_or_representation_unresolved",
+                        "detail": str(error),
+                    },
+                )
+            )
+            return
+        audit = None
+        carries_stereo = any(
+            has_stereo(mol)
+            for step in route.steps
+            for mol in (*step.reaction.reactants, *step.reaction.products)
+        )
+        if not node.stereo_obligations and carries_stereo:
+            catalogue = self.building_blocks
+            if not isinstance(catalogue, Mapping):
+                buckets = {}
+                for leaf in route.leaves():
+                    if str(leaf) in catalogue:
+                        key = molecule_to_inchikey(leaf)
+                        buckets.setdefault(key[:14], []).append(
+                            BuildingBlock(str(leaf), key, frozendict(), False)
+                        )
+                catalogue = frozendict(
+                    {key: tuple(records) for key, records in buckets.items()}
+                )
+            try:
+                with mapping_budget(self.config.max_mapping_work):
+                    audit = audit_stereo_inheritance(
+                        route,
+                        self.original_target,
+                        catalogue,
+                        mapping_sources={
+                            i: f"search:{step.origin.rule_key}"
+                            for i, step in enumerate(route.steps)
+                        },
+                        allow_unconstrained_target=True,
+                    )
+                if audit.supported:
+                    node.reconstructed_route = route = audit.route
+                else:
+                    node.stereo_obligations = StereoObligations().extend(audit.issues)
+            except (MappingBudgetExceeded, ValueError, KeyError) as error:
+                node.stereo_obligations = StereoObligations().extend(
+                    (
+                        {
+                            "reason": "mapping_or_representation_unresolved",
+                            "detail": str(error),
+                        },
+                    )
+                )
+        node.stereo_summary = route_stereo_summary(
+            route,
+            original_target=self.original_target,
+            status=node.stereo_status,
+            obligations=node.stereo_obligations,
+            audit=audit.to_dict() if audit else None,
+        )
+        if any(step.reaction.meta.get("stereo_evidence") for step in route.steps):
+            node.stereo_summary["selectivity_evidence_status"] = (
+                "scoped_chemist_assessment_present"
+            )
+            if node.is_solved():
+                node.stereo_summary["basis"] = (
+                    "reviewed_transformations_and_inherited_stock"
+                )
 
     def _get_node_value(self, node_id: int) -> float:
         """Calculates the value for the given node (for example with rollout or value
@@ -716,12 +941,16 @@ class Tree:
         """
 
         node = self.nodes[node_id]
+        if node.is_terminal() and not node.is_solved():
+            return 0.0
         node_value = self.evaluator.evaluate_node(
             node=node,
             node_id=node_id,
             nodes=self.nodes,
         )
-        return node_value
+        # Heuristic values are proposal scores. An unresolved stereo operation
+        # must not receive the same maximal value as a fulfilled route.
+        return min(node_value, 0.5) if node.stereo_obligations else node_value
 
     def _log_final_stats(self, reason: str = "completed") -> None:
         """Logs final tree statistics after search completes.
@@ -874,12 +1103,25 @@ class Tree:
         :return: The tuple of extracted reactions representing the synthesis route.
         """
 
+        reconstructed = getattr(self.nodes[node_id], "reconstructed_route", None)
+        if reconstructed is not None:
+            return tuple(step.reaction for step in reconstructed.steps)
         reaction_sequence = [
             Reaction(
                 [x.molecule for x in after.new_precursors],
                 [before.curr_precursor.molecule],
+                meta={
+                    "stereo_events": list(after.stereo_events),
+                    "stereo_obligations": list(after.stereo_obligations.local)
+                    if after.stereo_obligations is not before.stereo_obligations
+                    else [],
+                    "stereo_evidence": list(after.stereo_evidence),
+                    "selectivity_evidence_status": "not_evaluated",
+                },
             )
-            for before, after in self.route_steps(node_id)
+            for after_node_id, (before, after) in zip(
+                self.route_node_ids(node_id)[1:], self.route_steps(node_id)
+            )
         ]
 
         return tuple(reversed(reaction_sequence))
@@ -1146,6 +1388,10 @@ class Tree:
             ),
             "search_time": round(self.curr_time, 1),
             "solved": len(self.winning_nodes) > 0,
+            "stereo_proposals": len(self.proposal_nodes),
+            "stereo_incompatible_outcomes": self.stats.stereo_incompatible_outcomes,
+            "stereo_unresolved_outcomes": self.stats.stereo_unresolved_outcomes,
+            "stereo_incomplete_assessments": self.stats.stereo_incomplete_assessments,
             # Policy performance
             "expansion_calls": self.stats.expansion_calls,
             "unique_expanded_molecules": len(self._expanded_molecule_keys),

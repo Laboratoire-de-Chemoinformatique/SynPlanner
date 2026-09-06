@@ -104,6 +104,12 @@ class TreeConfig(BaseConfigModel):
     use_priority: bool = False
     priority_rule_multiapplication: bool = False
 
+    # Stereo remains authoritative in both modes. Strict mode excludes proposals
+    # whose requested configuration cannot yet be justified.
+    stereo_mode: Literal["proposal", "strict"] = "proposal"
+    max_mapping_work: int = Field(default=100_000, gt=0)
+    stereo_assessments: list[dict[str, Any]] = Field(default_factory=list)
+
     # UCT configuration
     search_strategy: Literal["expansion_first", "evaluation_first"] = "expansion_first"
     ucb_type: Literal["uct", "puct", "value"] = "uct"

@@ -9,7 +9,6 @@ from collections.abc import Callable, Iterable
 from io import StringIO
 
 from chython.containers import ReactionContainer
-from chython.files.RDFrw import RDFWrite
 
 from synplan.chem.reaction.curation.reaction_result import (
     BatchResult,
@@ -18,6 +17,7 @@ from synplan.chem.reaction.curation.reaction_result import (
     PipelineSummary,
 )
 from synplan.utils.files import to_reaction_smiles_record, write_error_row
+from synplan.utils.stereo_io import RDFWrite
 
 
 def reaction_cgr_key(rxn: ReactionContainer) -> str | None:

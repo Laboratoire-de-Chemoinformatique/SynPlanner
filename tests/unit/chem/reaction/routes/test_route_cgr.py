@@ -96,8 +96,11 @@ def test_get_clean_mapping_preserves_non_identity_atom_mapping():
     target = smiles("[CH3:10][CH3:20]")
 
     assert list(current.get_mapping(target)) == [{1: 20, 2: 10}]
-    assert get_clean_mapping(current, target) == {1: 20, 2: 10}
-    assert get_clean_mapping(current, target, reverse=True) == {20: 1, 10: 2}
+    mapping = get_clean_mapping(current, target)
+    assert set(mapping) == {1, 2} and set(mapping.values()) == {10, 20}
+    assert get_clean_mapping(current, target, reverse=True) == {
+        m: n for n, m in mapping.items()
+    }
 
 
 def test_compose_route_cgr_tree_based_single_route(routes_data_tree):

@@ -18,6 +18,11 @@ from synplan.chem.reaction.routes.representation.state import (
     set_symmetric_bond,
     transient_bond,
 )
+from synplan.chem.reaction.routes.representation.stereo import (
+    remap_source_cgr,
+    snapshot,
+)
+from synplan.chem.stereo import has_stereo
 
 if TYPE_CHECKING:
     from synplan.mcts.tree import Tree
@@ -225,7 +230,29 @@ def get_clean_mapping(
               if no mapping is found or if the initial mapping is empty.
     """
     dict_map = {}
-    rr = next(iter(curr_prod.get_mapping(prod)), None)
+    from synplan.chem.mapping import bounded_mappings
+    from synplan.chem.stereo import _requirements, _sign
+
+    requirements = _requirements(curr_prod)
+    rr = None
+    orientation = None
+    for candidate in bounded_mappings(curr_prod, prod):
+        translated = tuple(r.remap(candidate) for r in requirements)
+        if any(_sign(prod, r) not in (None, r.sign) for r in translated):
+            continue
+        if requirements:
+            from synplan.chem.reaction.routes.stereo import _orientation_key
+
+            key = _orientation_key(prod, translated, by_requirement=True)
+            if orientation is not None and key != orientation:
+                raise ValueError(
+                    "ambiguous stereo correspondence requires reassessment"
+                )
+            orientation = key
+        if rr is None:
+            rr = candidate
+        if not requirements:
+            break
     if rr is None:
         return dict_map
 
@@ -485,6 +512,13 @@ class _Fold:
 
     def __init__(self, reactions, return_reactions_dict: bool):
         self.cgrs = [reaction.compose() for reaction in reactions]
+        self.stereo_sources = {}
+        self.preserve_stereo = any(
+            has_stereo(m) for r in reactions for m in r.molecules()
+        )
+        if self.preserve_stereo:
+            for cgr, reaction in zip(self.cgrs, reactions):
+                cgr._stereo_source = reaction.copy()
         # Depth is kept for route interpretation; step order preserves exact
         # chronological route identity for hashing.
         self.route_orders = _route_order_depths(reactions)
@@ -498,7 +532,13 @@ class _Fold:
         self.accum = self.cgrs[-1]
         self.max_num = _next_atom_number(*self.cgrs)
         self.reactions_dict = (
-            {len(reactions) - 1: ReactionContainer.from_cgr(self.cgrs[-1])}
+            {
+                len(reactions) - 1: (
+                    reactions[-1].copy()
+                    if self.preserve_stereo
+                    else ReactionContainer.from_cgr(self.cgrs[-1])
+                )
+            }
             if return_reactions_dict
             else None
         )
@@ -506,6 +546,9 @@ class _Fold:
 
     def label(self, step: int, cgr) -> None:
         """Record one step's deconvolution labels and route orders."""
+
+        if self.preserve_stereo:
+            self.stereo_sources[str(step + 1)] = snapshot(cgr._stereo_source, cgr)
 
         _record_deconvolution_labels(
             cgr, self.step_orders[step], self.atom_states, self.bond_states
@@ -524,7 +567,11 @@ class _Fold:
         """Hold the step's reaction, when the caller asked for them."""
 
         if self.reactions_dict is not None:
-            self.reactions_dict[step] = ReactionContainer.from_cgr(cgr)
+            self.reactions_dict[step] = (
+                cgr._stereo_source.copy()
+                if self.preserve_stereo
+                else ReactionContainer.from_cgr(cgr)
+            )
 
     def finish(self, preserve_transient_bonds: bool) -> dict:
         """Stamp the accumulated labels onto the composed CGR and hand it over."""
@@ -540,6 +587,9 @@ class _Fold:
             preserve_transient_bonds,
         )
         result = {"cgr": enable_route_cgr_container(self.accum)}
+        self.accum.__dict__.pop("_stereo_source", None)
+        if self.preserve_stereo:
+            self.accum.route_stereo_steps = self.stereo_sources
         if self.reactions_dict is not None:
             result["reactions_dict"] = self.reactions_dict
         return result
@@ -605,7 +655,7 @@ def _compose_route_cgr_legacy(
             next_num += 1
 
         if remap:
-            curr_cgr = curr_cgr.remap(remap, copy=True)
+            curr_cgr = remap_source_cgr(curr_cgr, remap)
         return curr_cgr, next_num, remap
 
     def update_react_remaps_for_conflicts(react_dict, reaction, remap):
@@ -663,7 +713,7 @@ def _compose_route_cgr_legacy(
             prev_remap = react_dict.get(tuple_atoms, {})
 
             if prev_remap:
-                curr_cgr = curr_cgr.remap(prev_remap, copy=True)
+                curr_cgr = remap_source_cgr(curr_cgr, prev_remap)
 
             # identify new atom-numbers for any overlap
             target_block = process_target_blocks(
@@ -693,7 +743,7 @@ def _compose_route_cgr_legacy(
                     if source in curr_cgr._atoms and target not in curr_cgr._atoms
                 }
             if dict_map:
-                curr_cgr.remap(dict_map, copy=False)
+                curr_cgr = remap_source_cgr(curr_cgr, dict_map, copy=False)
 
             # update our react_dict & bb_set
             react_dict, bb_set = update_reaction_dict(
@@ -704,7 +754,7 @@ def _compose_route_cgr_legacy(
 
             # apply the new overlap-mapping
             if mapping:
-                curr_cgr.remap(mapping, copy=False)
+                curr_cgr = remap_source_cgr(curr_cgr, mapping, copy=False)
 
             curr_cgr, fold.max_num, conflict_mapping = remap_composition_conflicts(
                 curr_cgr, accum_cgr, fold.max_num

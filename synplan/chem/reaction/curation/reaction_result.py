@@ -114,6 +114,7 @@ class ExtractionBatchResult:
     errors: list[ErrorEntry]
     n_multi_product: int
     audit_entries: list[ErrorEntry] = field(default_factory=list)
+    stereo_records: list[dict] = field(default_factory=list)
 
 
 @dataclass

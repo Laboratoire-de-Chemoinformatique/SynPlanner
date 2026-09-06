@@ -182,7 +182,51 @@ def _query_cgr_order_encoding(
     return atom_labels, tuple(sorted(bond_labels, key=repr))
 
 
-def canonical_query_cgr_key(query_cgr: QueryCGRContainer) -> str:
+def _stereo_encoding(rule, order):
+    """Query-local parity expressed in canonical atom positions on both sides."""
+    position = {n: i for i, n in enumerate(order)}
+    sides = []
+    for side in (rule.reactants, rule.products):
+        labels = []
+        for mol in side:
+            for n, atom in mol.atoms():
+                sign = getattr(atom, "stereo", None)
+                if sign is None:
+                    continue
+                neighbours = list(mol._bonds[n])
+                if len(neighbours) == 2 and all(b == 2 for b in mol._bonds[n].values()):
+                    flips = 0
+                    for terminal in neighbours:
+                        refs = [m for m in mol._bonds[terminal] if m != n]
+                        flips += refs.index(min(refs, key=position.__getitem__))
+                    label = ("allene", position[n], bool(sign) ^ bool(flips % 2))
+                else:
+                    sequence = [position[m] for m in neighbours]
+                    flips = sum(
+                        a > b for i, a in enumerate(sequence) for b in sequence[i + 1 :]
+                    )
+                    label = ("tetrahedron", position[n], bool(sign) ^ bool(flips % 2))
+                labels.append(label)
+            for n, m, bond in mol.bonds():
+                if bond.stereo is None:
+                    continue
+                flips = 0
+                for terminal, other in ((n, m), (m, n)):
+                    refs = [k for k in mol._bonds[terminal] if k != other]
+                    flips += refs.index(min(refs, key=position.__getitem__))
+                labels.append(
+                    (
+                        "double_bond",
+                        min(position[n], position[m]),
+                        max(position[n], position[m]),
+                        bool(bond.stereo) ^ bool(flips % 2),
+                    )
+                )
+        sides.append(tuple(sorted(labels)))
+    return tuple(sides)
+
+
+def canonical_query_cgr_key(query_cgr: QueryCGRContainer, *, stereo_rule=None) -> str:
     """Atom-numbering-invariant canonical key for a QueryCGRContainer.
 
     Use when you need to deduplicate query rules that are chemically the same
@@ -206,6 +250,14 @@ def canonical_query_cgr_key(query_cgr: QueryCGRContainer) -> str:
     if not atoms:
         return repr(((), ()))
 
+    def encode(order):
+        graph = _query_cgr_order_encoding(query_cgr, order)
+        return (
+            (graph, _stereo_encoding(stereo_rule, order))
+            if stereo_rule is not None
+            else graph
+        )
+
     colors = _refined_query_cgr_colors(query_cgr)
     color_groups = []
     for color in sorted(set(colors.values())):
@@ -217,8 +269,7 @@ def canonical_query_cgr_key(query_cgr: QueryCGRContainer) -> str:
 
     if permutation_count <= _MAX_CANONICAL_PERMUTATIONS:
         encodings = (
-            _query_cgr_order_encoding(
-                query_cgr,
+            encode(
                 tuple(atom for group_order in group_orders for atom in group_order),
             )
             for group_orders in product(
@@ -239,7 +290,7 @@ def canonical_query_cgr_key(query_cgr: QueryCGRContainer) -> str:
             ),
         )
     )
-    return repr(_query_cgr_order_encoding(query_cgr, order))
+    return repr(encode(order))
 
 
 __all__ = [

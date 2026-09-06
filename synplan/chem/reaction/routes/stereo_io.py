@@ -9,8 +9,6 @@ from __future__ import annotations
 import re
 from copy import deepcopy
 
-from chython import smiles
-
 from synplan.chem.reaction.routes.route import Route, Step, StepOrigin
 from synplan.chem.reaction.routes.stereo import (
     StereoRequirement,
@@ -23,6 +21,7 @@ from synplan.chem.reaction.routes.stereo import (
     _Unresolved,
     _validate_mapping,
 )
+from synplan.chem.stereo import parse_smiles_preserving_stereo as smiles
 
 
 def read_stereo_route(

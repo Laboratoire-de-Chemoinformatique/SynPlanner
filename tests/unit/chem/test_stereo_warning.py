@@ -20,14 +20,14 @@ FLAT = "CN1CCCC(C)C1"
 @pytest.mark.parametrize("smi", [TETRAHEDRAL, GEOMETRIC])
 def test_clean_molecule_warns_before_discarding_stereo(smi: str) -> None:
     with pytest.warns(StereoDiscardedWarning):
-        cleaned = clean_molecule(smiles(smi))
+        cleaned = clean_molecule(smiles(smi), clean_stereo=True)
     assert not any(a.stereo is not None for _, a in cleaned.atoms())
 
 
 @pytest.mark.parametrize("smi", [TETRAHEDRAL, GEOMETRIC])
 def test_safe_canonicalization_warns_too(smi: str) -> None:
     with pytest.warns(StereoDiscardedWarning):
-        safe_canonicalization(smiles(smi))
+        safe_canonicalization(smiles(smi), clean_stereo=True)
 
 
 def test_no_warning_for_a_flat_molecule() -> None:
@@ -47,7 +47,7 @@ def test_no_warning_when_clean_stereo_is_off() -> None:
 def test_safe_canonicalization_flag_controls_stereo_preservation() -> None:
     molecule = smiles(TETRAHEDRAL, ignore_stereo=False)
     with pytest.warns(StereoDiscardedWarning):
-        flattened = safe_canonicalization(molecule)
+        flattened = safe_canonicalization(molecule, clean_stereo=True)
     preserved = safe_canonicalization(molecule, clean_stereo=False)
 
     assert not any(atom.stereo is not None for _, atom in flattened.atoms())
@@ -59,4 +59,4 @@ def test_the_warning_can_be_promoted_to_a_refusal() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error", StereoDiscardedWarning)
         with pytest.raises(StereoDiscardedWarning):
-            mol_from_smiles(TETRAHEDRAL)
+            mol_from_smiles(TETRAHEDRAL, clean_stereo=True)

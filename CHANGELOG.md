@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Chython stereo constraints for carbon tetrahedra, E/Z and allene axes across
+  preparation, extraction, stock selection, search and route reconstruction.
+  Unresolved stereo strategies remain proposals; they cannot receive solved
+  rewards. Scoped chemist reviews preserve their source and reopen after edits.
+- Bounded mapping work, persistent stereo obligations, source-reaction event
+  ledgers and rule-vocabulary manifests checked against fixed-output policies.
+- Enhanced-group CXSMILES and checked V3000 export, stereo-preserving RouteCGR
+  snapshots and search-record schema 3 (schemas 1 and 2 remain readable).
+
 - `PolicyLikelihoodScorer().rank(tree.routes())` ranks all
   discovered routes by the sum of unscaled policy log probabilities before
   retaining candidates. `Node.policy_probability` and search-record schema 2
@@ -92,19 +101,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   validation occurrences remain auditable but do not contribute support, so
   results are independent of ingestion order.
 
-- JSON-catalogue planning always matches the first 14 InChIKey characters.
-  Search and route costing therefore intentionally ignore stereochemistry,
-  isotope, and protonation differences. Full InChIKeys and stereo information
-  remain catalogue metadata for future use but do not affect current MCTS
-  decisions.
+- JSON-catalogue planning retrieves candidates by the first 14 InChIKey
+  characters, then verifies compatible explicit structures and configurations.
+  Search and cost pin the selected full material record. Opposite or unspecified
+  stereo cannot satisfy a specified requirement; every leaf requires stock.
 
 - JSON catalogues are supported only for retrosynthesis. Existing
   SMILES/SDF/CSV/TSV stocks and `Tree(building_blocks=set(...))` callers retain
   canonical-SMILES membership, and forward search retains its existing stock
   handling.
 
-- Route JSON and visualization schemas remain unchanged; vendor costs are
-  emitted as a separate `route_costs.json` file.
+- Route JSON includes stereo status, obligations, context and selected materials.
+  Public route artifacts use schema 2 and Chython target keys; vendor costs are
+  emitted as a separate `route_costs.json` file. Rebuild caches and train matching
+  weights when changing a manifested rule vocabulary.
 
 - The reactor no longer puts back aromaticity a `kekule` -> `thiele` round trip
   dropped. Its test was "these ring atoms were aromatic and are not now", which is

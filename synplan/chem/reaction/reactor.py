@@ -3,12 +3,25 @@ rules."""
 
 import logging
 from collections.abc import Iterator
+from copy import copy
 from typing import Any
 
 from chython.containers import MoleculeContainer, ReactionContainer, SynthonContainer
 from chython.exceptions import InvalidAromaticRing
 from chython.reactor import Reactor
 
+from synplan.chem.mapping import (
+    MappingBudget,
+    MappingBudgetExceeded,
+    bounded_query,
+    mapping_budget,
+)
+from synplan.chem.stereo import (
+    _assign,
+    _requirements,
+    assert_stereo_preserved,
+    has_stereo,
+)
 from synplan.chem.utils import safe_canonicalization, validate_and_canonicalize
 
 logger = logging.getLogger(__name__)
@@ -38,12 +51,23 @@ class CanonicalRetroReactor(Reactor):
     def __init__(self, *args, **kwargs):
         kwargs["fix_tautomers"] = True
         kwargs["fix_aromatic_rings"] = False  # we run all aromatization in _patcher
+        if args:
+            args = (tuple(bounded_query(q) for q in args[0]), *args[1:])
+        elif "patterns" in kwargs:
+            kwargs["patterns"] = tuple(bounded_query(q) for q in kwargs["patterns"])
         super().__init__(*args, **kwargs)
 
     def _patcher(
         self, structure: MoleculeContainer, mapping: dict[int, int]
     ) -> MoleculeContainer:
+        from synplan.chem.mapping import backend_preparation
+
+        with backend_preparation():
+            return self._canonical_patch(structure, mapping)
+
+    def _canonical_patch(self, structure, mapping):
         new = super()._patcher(structure, mapping)
+        patched = new.copy() if has_stereo(new) else None
 
         try:
             new.kekule(ignore_pyrrole_hydrogen=self._fix_broken_pyrroles)
@@ -61,7 +85,9 @@ class CanonicalRetroReactor(Reactor):
                 new.fix_stereo()
             new.standardize_charges(prepare_molecule=False)
             new.standardize_tautomers(prepare_molecule=False)
-            new.clean_stereo()
+            new.fix_stereo()
+            if patched is not None:
+                assert_stereo_preserved(patched, new)
         except InvalidAromaticRing:
             raise  # reject half-canonicalized output
 
@@ -107,6 +133,8 @@ def apply_reaction_rule(
     multirule: bool = False,
     rm_dup: bool = False,
     co_reactants: tuple[MoleculeContainer, ...] = (),
+    max_mapping_work: int = 100_000,
+    diagnostics: list[dict] | None = None,
 ) -> Iterator[list[MoleculeContainer,]]:
     """Applies a reaction rule to a given molecule.
 
@@ -163,31 +191,42 @@ def apply_reaction_rule(
             f"synthon {molecule}: it would silently strip the labels"
         )
 
+    work_budget = MappingBudget(max_mapping_work)
+    if isinstance(reaction_rule, Reactor) and not isinstance(
+        reaction_rule, CanonicalRetroReactor
+    ):
+        reaction_rule = copy(reaction_rule)
+        reaction_rule._patterns = tuple(
+            bounded_query(q) for q in reaction_rule._patterns
+        )
+
     def _collect_reactions(
         current_molecule: MoleculeContainer,
     ) -> list[ReactionContainer]:
         reactants = add_small_mols(current_molecule, small_molecules=co_reactants)
+        reactions = []
         try:
-            if sort_reactions:
-                unsorted_reactions = list(reaction_rule(*reactants))
-                sorted_reactions = sorted(
-                    unsorted_reactions,
-                    key=lambda react: len(
-                        [mol for mol in react.products if len(mol) > 6]
-                    ),
-                    reverse=True,
+            # The budget applies before any successful match/product is yielded.
+            with mapping_budget(max_mapping_work, budget=work_budget):
+                for reaction in reaction_rule(*reactants):
+                    reactions.append(reaction)
+                    if not sort_reactions and len(reactions) == top_reactions_num:
+                        break
+        except MappingBudgetExceeded as error:
+            if diagnostics is not None:
+                diagnostics.append(
+                    {"reason": "mapping_budget_exceeded", "detail": str(error)}
                 )
-                return sorted_reactions[:top_reactions_num]
-
-            reactions = []
-            for reaction in reaction_rule(*reactants):
-                reactions.append(reaction)
-                if len(reactions) == top_reactions_num:
-                    break
-            return reactions
+            else:
+                logger.warning("Incomplete rule application: %s", error)
         except (IndexError, InvalidAromaticRing, ValueError):
-            # chython's stereo handling raises these on misaligned templates.
-            return []
+            pass
+        # Earlier valid outcomes survive exhaustion or a later invalid match.
+        if sort_reactions:
+            reactions.sort(
+                key=lambda react: sum(len(m) > 6 for m in react.products), reverse=True
+            )
+        return reactions[:top_reactions_num]
 
     def _prepare_reactants(
         reaction: ReactionContainer,
@@ -214,6 +253,12 @@ def apply_reaction_rule(
             reactants = [mol for mol in reactants if len(mol) > 0]
             canon = []
             for mol in reactants:
+                # A CGR contains bond edits, not stereo. Restore the mapped
+                # direct output before normalizing or accepting this recovery.
+                for original in reaction.products:
+                    for req in _requirements(original):
+                        if all(n in mol._atoms for n in (*req.atoms, *req.environment)):
+                            _assign(mol, req)
                 c = validate_and_canonicalize(mol)
                 if c is None:
                     return None

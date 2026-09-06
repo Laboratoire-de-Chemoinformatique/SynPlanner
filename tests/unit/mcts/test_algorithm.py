@@ -94,7 +94,7 @@ def build_tree(
         target=target,
         config=cfg,
         reaction_rules=reactors,
-        building_blocks=set(),
+        building_blocks={str(make_mol(n)) for n in range(1, min_mol_size + 1)},
         expansion_function=fake_policy,
         evaluation_function=evaluator,
     )

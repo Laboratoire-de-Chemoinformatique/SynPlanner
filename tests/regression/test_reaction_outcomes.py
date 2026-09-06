@@ -63,5 +63,10 @@ def test_configured_outcome_budget_and_selective_symmetry(case, engine, tmp_path
             for child in tree.children[1]
         }
 
-    assert expected not in outcomes(case["below_budget"])
-    assert expected in outcomes(case["budget"])
+    small = outcomes(case["below_budget"])
+    complete = outcomes(case["budget"])
+    # Bounded traversal can discover the recorded outcome earlier than the old
+    # native matcher. The configured limit and retained chemistry are the API.
+    assert len(small) <= case["below_budget"]
+    assert small <= complete
+    assert expected in complete

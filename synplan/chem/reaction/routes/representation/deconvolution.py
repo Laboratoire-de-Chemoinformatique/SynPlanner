@@ -77,11 +77,18 @@ def _step_cgr(route_cgr: CGRContainer, step: int) -> CGRContainer:
 
 def reactions_from_route_cgr(route_cgr: CGRContainer) -> dict[int, ReactionContainer]:
     """Reconstruct mapped reaction steps from native RouteCGR labels."""
+    from synplan.chem.reaction.routes.representation.stereo import restore
 
-    return {
-        step - 1: ReactionContainer.from_cgr(_step_cgr(route_cgr, step))
-        for step in _step_ids(route_cgr)
-    }
+    snapshots = getattr(route_cgr, "route_stereo_steps", None)
+    reactions = {}
+    for step in _step_ids(route_cgr):
+        cgr = _step_cgr(route_cgr, step)
+        reactions[step - 1] = (
+            restore(snapshots[str(step)], cgr)
+            if snapshots is not None
+            else ReactionContainer.from_cgr(cgr)
+        )
+    return reactions
 
 
 def routes_dict_from_route_cgrs(

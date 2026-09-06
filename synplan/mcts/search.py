@@ -10,15 +10,14 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from chython.containers import MoleculeContainer
-from rdkit import Chem
 from tqdm.auto import tqdm
 
 from synplan import __version__
 from synplan.chem.building_blocks import (
     load_building_block_catalogue,
-    match_building_blocks,
     molecule_to_inchikey,
 )
+from synplan.chem.building_blocks.stereo import compatible_records
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.routes.io import (
     make_json,
@@ -43,27 +42,20 @@ from synplan.utils.visualisation import extract_routes, routes_report_html
 
 #: Versioned identifier for the public route-export contract emitted by
 #: :func:`export_routes_artifact`. Bump when the envelope/manifest shape changes.
-ROUTE_EXPORT_SCHEMA_VERSION = "synplan-routes/1"
+ROUTE_EXPORT_SCHEMA_VERSION = "synplan-routes/2"
 
 
 def _canonical_target_key(smiles: str) -> str:
-    """Canonical SMILES key for the route-export artifact.
-
-    Mirrors retrocast's ``canonicalize_smiles`` default flags so keys match
-    ``retrocast.curation...Target.smiles`` byte-for-byte: RDKit
-    ``MolFromSmiles`` (sanitize=True) then ``MolToSmiles(canonical=True,
-    isomericSmiles=True)``, with atom mapping left intact. Falls back to the raw
-    string (with a warning) when RDKit cannot parse the input.
-    """
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
+    """Chython canonical stereo-preserving key (route export schema 2)."""
+    try:
+        return str(mol_from_smiles(smiles, clean2d=False))
+    except ValueError:
         logging.warning(
-            "Could not RDKit-canonicalize target SMILES %r for route export; "
+            "Could not Chython-canonicalize target SMILES %r for route export; "
             "keying by the raw string.",
             smiles,
         )
         return smiles
-    return Chem.MolToSmiles(mol, canonical=True, isomericSmiles=True)
 
 
 def _iter_target_smiles(targets_path: str) -> Iterator[str]:
@@ -160,6 +152,8 @@ def export_routes_artifact(
 
     manifest = {
         "schema_version": ROUTE_EXPORT_SCHEMA_VERSION,
+        "target_key_backend": "chython_canonical_stereo_smiles",
+        "stereo_schema": 1,
         "synplan_version": __version__,
         "directives": {
             "adapter": "synplanner",
@@ -254,6 +248,10 @@ def run_search(
         "total_rules_succeeded",
         "rule_applicability_rate",
         "dead_end_nodes",
+        "stereo_proposals",
+        "stereo_incompatible_outcomes",
+        "stereo_unresolved_outcomes",
+        "stereo_incomplete_assessments",
         # Search dynamics
         "first_solution_iteration",
         "first_solution_time",
@@ -326,7 +324,7 @@ def run_search(
                 export_key = _canonical_target_key(target_smi)
                 exported_routes[export_key] = []
             try:
-                target_mol = mol_from_smiles(target_smi, clean_stereo=True)
+                target_mol = mol_from_smiles(target_smi, clean_stereo=False)
                 # Catalogue membership, not is_building_block: that also passes
                 # anything under min_mol_size, which is right for a precursor and wrong
                 # for a target -- a small target is small, not purchasable.
@@ -335,7 +333,9 @@ def run_search(
                 else:
                     target_key = molecule_to_inchikey(target_mol)
                     target_in_stock = bool(
-                        match_building_blocks(building_blocks, target_key)
+                        compatible_records(
+                            target_mol, building_blocks, inchikey=target_key
+                        )
                     )
                 if target_in_stock:
                     n_in_stock += 1
@@ -429,6 +429,19 @@ def run_search(
                     )
 
             # save stats
+            if tree.proposal_nodes:
+                from synplan.chem.reaction.routes.route import Route
+
+                proposals = [
+                    Route.from_tree(tree, node_id) for node_id in tree.proposal_nodes
+                ]
+                proposal_path = Path(routes_folder) / f"stereo_proposals_{ti}.json"
+                proposal_path.write_text(
+                    json.dumps([r.to_json() for r in proposals], indent=2)
+                )
+                routes_report_html(
+                    proposals, str(Path(routes_folder) / f"stereo_proposals_{ti}.html")
+                )
             stats_row = extract_tree_stats(tree, target_smi)
             stats_row["target_in_stock"] = False
             statswriter.writerow(stats_row)
