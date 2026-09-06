@@ -14,14 +14,26 @@ _TargetMap = tuple[tuple[int, int], ...]
 _IDENTITY_TARGET_MAP: _TargetMap = ()
 _HUB_ATOM_LABEL = ("__synplan_product_hub__",)
 _HUB_BOND_LABEL = ("__synplan_product_hub_bond__",)
+_ANY_BOND_ORDER = 8
 
 
 def needs_decollapsed_matches(rule: ReactionContainer) -> bool:
-    """Return True when LHS symmetry is broken on the product side.
+    """Return True when deduplicating LHS matches can lose valid outcomes.
 
     Chython may deduplicate matches on the same target atoms. This is safe only
-    when the RHS realizes every compatible LHS permutation.
+    when stereo cannot reject the retained match and the RHS realizes every
+    compatible LHS permutation.
     """
+    # Chython's atom-set filter can keep a stereo-invalid orientation and
+    # discard the valid one, even when the RHS omits the permuted atoms.
+    for reactant in rule.reactants:
+        atoms = (atom for _, atom in reactant.atoms())
+        bonds = (bond for _, _, bond in reactant.bonds())
+        if any(
+            getattr(item, "stereo", None) is not None for item in chain(atoms, bonds)
+        ):
+            return True
+
     targets = _shared_atom_numbers(rule.reactants, rule.products)
     if len(targets) < 2:
         return False
@@ -29,13 +41,6 @@ def needs_decollapsed_matches(rule: ReactionContainer) -> bool:
     required_maps = _lhs_target_maps(rule.reactants, targets)
     if not required_maps:
         return False
-    # Chython's atom-set filter can keep a stereo-invalid orientation and
-    # discard the valid one, even when the RHS topology is invariant.
-    for reactant in rule.reactants:
-        atoms = (atom for _, atom in reactant.atoms())
-        bonds = (bond for _, _, bond in reactant.bonds())
-        if any(item.stereo is not None for item in chain(atoms, bonds)):
-            return True
     return not _rhs_realizes_target_maps(rule.products, targets, required_maps)
 
 
@@ -137,27 +142,28 @@ def _query_automorphisms(query: QueryContainer) -> Iterator[dict[int, int]]:
             _query_atoms_overlap(atom, atoms[mapping[atom_number]])
             for atom_number, atom in atoms.items()
         ) and all(
-            (
-                8 in _predicate_values(bond.order)
-                or 8 in _predicate_values(mapped_bond.order)
-                or not set(_predicate_values(bond.order)).isdisjoint(
-                    _predicate_values(mapped_bond.order)
-                )
-            )
-            and (
-                bond.in_ring is None
-                or mapped_bond.in_ring is None
-                or bond.in_ring == mapped_bond.in_ring
-            )
+            _query_bonds_overlap(bond, query._bonds[mapping[atom_1]][mapping[atom_2]])
             for atom_1, atom_2, bond in query.bonds()
-            for mapped_bond in (query._bonds[mapping[atom_1]][mapping[atom_2]],)
         ):
             yield mapping
 
 
+def _query_bonds_overlap(left, right) -> bool:
+    """Return whether two LHS bond predicates can match the same bond."""
+    left_orders = set(_predicate_values(left.order))
+    right_orders = set(_predicate_values(right.order))
+    return (
+        _ANY_BOND_ORDER in left_orders
+        or _ANY_BOND_ORDER in right_orders
+        or not left_orders.isdisjoint(right_orders)
+    ) and (
+        left.in_ring is None or right.in_ring is None or left.in_ring == right.in_ring
+    )
+
+
 def _query_atoms_overlap(left, right) -> bool:
     """Return whether two LHS atom predicates can match the same atom."""
-    if left.is_radical != right.is_radical:
+    if getattr(left, "is_radical", None) != getattr(right, "is_radical", None):
         return False
     symbols = left.atomic_symbol, right.atomic_symbol
     if "M" in symbols and symbols[0] != symbols[1]:
@@ -170,11 +176,6 @@ def _query_atoms_overlap(left, right) -> bool:
             atom_elements = () if atomic_number is None else (atomic_number,)
         elements.append(set(atom_elements))
     if elements[0] and elements[1] and elements[0].isdisjoint(elements[1]):
-        return False
-
-    left_isotope = getattr(left, "isotope", None)
-    right_isotope = getattr(right, "isotope", None)
-    if None not in (left_isotope, right_isotope) and left_isotope != right_isotope:
         return False
 
     charges = []
@@ -191,6 +192,7 @@ def _query_atoms_overlap(left, right) -> bool:
         return False
 
     for field in (
+        "isotope",
         "neighbors",
         "hybridization",
         "implicit_hydrogens",
@@ -204,7 +206,9 @@ def _query_atoms_overlap(left, right) -> bool:
         left_values = _predicate_values(getattr(left, field, ()))
         right_values = _predicate_values(getattr(right, field, ()))
         if left_values and right_values and set(left_values).isdisjoint(right_values):
-            return False
+            # A fused-ring atom can satisfy different positive ring sizes.
+            if field != "ring_sizes" or 0 in left_values or 0 in right_values:
+                return False
     return True
 
 

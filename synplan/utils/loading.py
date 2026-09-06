@@ -431,9 +431,6 @@ def _assign_unique_unmapped_atom_numbers(
     """Give originally unmapped atoms unique reaction-wide numbers."""
     queries = (*reaction_rule.reactants, *reaction_rule.products)
     component_texts = (*reactant_components, *product_components)
-    if len(queries) != len(component_texts):
-        raise ValueError("parsed component count does not match reaction SMARTS")
-
     component_maps = tuple(_component_atom_maps(text) for text in component_texts)
     explicit_numbers = {
         number for atom_maps in component_maps for number in atom_maps if number
@@ -442,9 +439,6 @@ def _assign_unique_unmapped_atom_numbers(
 
     for query, atom_maps in zip(queries, component_maps, strict=True):
         atom_numbers = tuple(query.atoms_numbers)
-        if len(atom_numbers) != len(atom_maps):
-            raise ValueError("parsed atom count does not match reaction SMARTS")
-
         remapping = {}
         for atom_number, explicit_number in zip(atom_numbers, atom_maps, strict=True):
             if explicit_number:

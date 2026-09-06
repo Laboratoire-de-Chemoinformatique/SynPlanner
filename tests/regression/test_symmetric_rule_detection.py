@@ -175,6 +175,61 @@ def test_degree_refined_suzuki_query_keeps_both_disconnections():
     }
 
 
+@pytest.mark.parametrize("decollapse", [False, True], ids=["control", "default"])
+def test_any_metal_query_loads(tmp_path, decollapse):
+    """AnyMetal supports neither the radical nor the stereo query property."""
+    rule_smarts = "[M:1]-[M:2]>>[Fe:1].[Cu:2]"
+    rules_path = tmp_path / "metal.tsv"
+    rules_path.write_text(
+        f"rule_smarts\tpopularity\treaction_indices\n{rule_smarts}\t1\t0\n",
+        encoding="utf-8",
+    )
+    try:
+        (reactor,) = load_reaction_rules(
+            str(rules_path), decollapse_symmetric_matches=decollapse
+        )
+        precursor_sets = {
+            tuple(sorted(str(molecule) for molecule in result.products))
+            for result in reactor(smiles_parser("[Fe][Fe]"))
+        }
+    finally:
+        load_reaction_rules.cache_clear()
+
+    assert precursor_sets == {("[Cu]", "[Fe]")}
+
+
+def test_fused_ring_predicates_keep_both_junction_orientations():
+    """Both junction atoms belong to a five- and a six-membered ring."""
+    rule_smarts = "[C;r5;R2:1]-[C;r6;R2:2]>>[C:1]-[O:3].[C:2]-[N:4]"
+    target = smiles_parser("C1CCC2CCCC2C1C")
+    (pattern,) = smarts_parser(rule_smarts).reactants
+    mappings = list(pattern.get_mapping(target, automorphism_filter=False))
+    assert len(mappings) == 2
+    assert set(mappings[0].values()) == set(mappings[1].values())
+
+    reactor = CanonicalRetroReactor.from_smarts(
+        rule_smarts,
+        delete_atoms=False,
+        automorphism_filter=not _needs_decollapsed_matches(rule_smarts),
+    )
+    precursor_sets = {
+        tuple(sorted(str(molecule) for molecule in result.products))
+        for result in reactor(target)
+    }
+
+    assert precursor_sets == {
+        ("C1CCC(O)C(C)CCCC1N",),
+        ("C1(C(C)CCCC(CCC1)O)N",),
+    }
+
+
+@pytest.mark.parametrize(("left", "right"), [(0, 5), (5, 0)])
+def test_ring_and_acyclic_predicates_do_not_overlap(left, right):
+    rule_smarts = f"[C;r{left}:1]-[C;r{right}:2]>>[C:1]-[O:3].[C:2]-[N:4]"
+
+    assert not _needs_decollapsed_matches(rule_smarts)
+
+
 def test_mixed_e_z_dienyl_suzuki_keeps_valid_match_orientation():
     """Stereo must not make the only valid Suzuki orientation disappear.
 

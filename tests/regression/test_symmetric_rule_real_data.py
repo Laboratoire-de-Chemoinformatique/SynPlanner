@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 import pytest
-from chython import smiles
+from chython import smarts, smiles
 
 from synplan.chem.reaction.config import ReactorConfig
 from synplan.chem.reaction.rules.config import RuleExtractionConfig
@@ -57,16 +57,20 @@ def test_molecule_rule_extraction_from_uspto_cyanamide_methanol(
 
 
 @pytest.mark.parametrize("disable_filter", [True, False], ids=["control", "default"])
+@pytest.mark.parametrize(
+    "rhs_atoms",
+    [None, (4, 14), (14,)],
+    ids=["full-rhs", "partial-rhs", "single-atom-rhs"],
+)
 def test_stereo_nitrile_reduction_keeps_recorded_precursor(
-    uspto_records, tmp_path, disable_filter
+    uspto_records, tmp_path, disable_filter, rhs_atoms
 ):
     """US03950405: the reverse of a recorded nitrile-to-amine reduction.
 
-    Keep the mapped product and contributing substrate verbatim as SMARTS.
-    Remove only ammonia/water and the catalyst; no atom, bond, map or stereo
-    annotation is invented or changed. Symmetric ring paths allow Chython's
-    filter to discard the only stereo-valid match even though the RHS is
-    invariant under the path exchange.
+    Keep the mapped product verbatim as SMARTS. The RHS is the contributing
+    substrate, its nitrile group, or just its nitrogen (an unchanged patch).
+    Symmetric ring paths allow Chython's filter to discard the only
+    stereo-valid match even though the RHS is invariant under the path exchange.
     """
     source_smiles = uspto_records["stereo_nitrile_reduction"]["source_line"].split(
         "\t"
@@ -82,7 +86,13 @@ def test_stereo_nitrile_reduction_keeps_recorded_precursor(
     assert len(contributing_substrates) == 1
     (substrate,) = contributing_substrates
     assert sum(atom.stereo is not None for _, atom in target.atoms()) == 2
-    rule_smarts = f"{product}>>{substrate}"
+    replacement = substrate
+    if rhs_atoms is not None:
+        patch = smarts(substrate)
+        for number in set(patch.atoms_numbers) - set(rhs_atoms):
+            patch.delete_atom(number)
+        replacement = format(patch, "m")
+    rule_smarts = f"{product}>>{replacement}"
     rules_path = tmp_path / "nitrile_reduction.tsv"
     rules_path.write_text(
         f"rule_smarts\tpopularity\treaction_indices\n{rule_smarts}\t1\t0\n",
@@ -102,8 +112,8 @@ def test_stereo_nitrile_reduction_keeps_recorded_precursor(
     finally:
         load_reaction_rules.cache_clear()
 
-    # CanonicalRetroReactor emits flat precursors; compare against the actual
-    # source substrate with that same documented output normalization.
-    expected = smiles(substrate)
+    # The nitrogen-only patch leaves the target unchanged. Compare with the
+    # recorded molecules using CanonicalRetroReactor's flat-output contract.
+    expected = smiles(product if rhs_atoms == (14,) else substrate)
     expected.clean_stereo()
     assert precursor_sets == {(str(expected),)}

@@ -13,48 +13,30 @@ the large source datasets nor network access is required.
 
 ## Molecule-container extraction
 
-The first reaction adds methanol to cyanamide, producing methyl carbamimidate.
-All five heavy atoms are mapped and retained. The test passes the source reaction
-directly to `extract_rules` with the documented `as_query_container=False` option.
-No reaction edits or template substitutions are made.
-
-The control disables reactor validation and checks that the reverse rule retains
-the exact source product and both starting materials. The regression enables
-validation and additionally requires `reactor_validation == "passed"`.
-At PR commit `8f0b80c`, validation instead raises
-`TypeError: 'int' object is not iterable` inside `_query_atoms_overlap`.
-Both extraction cases pass against the code archived from `origin/main` commit
-`0598e7a9adfaf1d642934f09ceb29ffd9cd60a1d`, using the same Python environment.
+The unmodified cyanamide/methanol reaction is passed to `extract_rules` with
+`as_query_container=False`. With validation enabled or disabled, the reverse rule
+must retain the recorded product and both starting materials. The enabled case
+also requires `reactor_validation == "passed"`.
 
 ## Stereo-valid match retention
 
-The second reaction reduces a nitrile substituent on a stereochemically specified
-1,4-disubstituted cyclohexane to an aminomethyl group. Its input row contains the
-nitrile substrate, two ammonia molecules, water, and a cobalt catalyst.
-
-The test derives a full-substrate reverse SMARTS directly from the mapped source:
+The nitrile reduction tests derive reverse templates from the mapped source:
 
 1. Use the recorded product string verbatim as the pattern, preserving both
    stereo annotations and atom order.
 2. Retain the source reactant component that shares atom maps with the product.
    This removes only ammonia/water and excludes the reagent-side catalyst.
-3. Use that substrate string verbatim as the replacement template. No atoms,
-   bonds, maps, substituents, or stereo annotations are added or rewritten.
-4. Load the template through the public TSV loader and apply it to the recorded
-   product. Compare the result with the recorded nitrile substrate after removing
-   stereo, matching `CanonicalRetroReactor`'s flat-output contract.
+3. Use the substrate verbatim as the full RHS, or retain only its nitrile atoms
+   (maps 4 and 14) for a partial RHS. A nitrogen-only RHS (map 14) leaves the
+   target unchanged and covers the single-shared-atom case.
+4. Load each template through the public TSV loader with default filtering and
+   with `automorphism_filter=False`. Both must return the recorded substrate
+   (or unchanged target for the nitrogen-only patch), after removing stereo to
+   match `CanonicalRetroReactor`'s flat-output contract.
 
-At `8f0b80c`, the explicit `automorphism_filter=False` control produces the
-recorded nitrile precursor; default loading produces no reaction. The symmetry
-detector accepts an exchange of the cyclohexane paths as RHS-preserving, but
-Chython can keep a stereo-invalid match and discard the valid one before stereo
-validation. The test therefore exercises the same missing-match issue as the
-review's constructed example using an actual reaction and unchanged structures.
-
-This is a template derived from raw USPTO data, not a claim that a stereo-bearing
-template exists in the bundled GPS/GCN rule TSVs. Those files contain no stereo
-annotations. It is a remaining gap in the PR's new detection policy; the
-molecule-container crash is a regression relative to `main`.
+These are templates derived from raw USPTO data, not entries from the bundled
+GPS/GCN rule TSVs. The symmetric ring paths expose loss of the only stereo-valid
+match, including when the permuted atoms are absent from the RHS.
 
 ## Running
 
@@ -63,11 +45,3 @@ From `SynPlanner`:
 ```sh
 uv run pytest -o addopts='' -q tests/regression/test_symmetric_rule_real_data.py
 ```
-
-The expected result on the reviewed commit is **two passed controls and two
-failed regression contracts**. The failures are deliberately not marked xfail:
-they should turn green when the defects are fixed.
-
-Together with the existing rule-loading, symmetry-detection, extraction-audit,
-and extraction-unit suites, validation produced **78 passed and these two
-failures**. Ruff lint and formatting checks passed.
