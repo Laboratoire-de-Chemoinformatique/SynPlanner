@@ -1,0 +1,8 @@
+# ReTReK route-quality scorer — applied to detached Route objects after search.
+# STScore remains disabled until its corrected definition is implemented.
+enabled_scores: ["cd", "as", "rd"]
+weights:
+  cd: 5.0
+  as: 0.5
+  rd: 2.0
+  st: 2.0
