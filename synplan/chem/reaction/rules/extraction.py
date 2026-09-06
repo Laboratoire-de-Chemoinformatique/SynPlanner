@@ -1,6 +1,5 @@
 """Module containing functions for protocol of reaction rules extraction."""
 
-import hashlib
 import json
 import logging
 import tempfile
@@ -30,6 +29,7 @@ from synplan.chem.reaction.curation.reaction_result import (
 from synplan.chem.reaction.curation.standardizing import RemoveReagentsStandardizer
 from synplan.chem.reaction.rules.config import RuleExtractionConfig
 from synplan.chem.reaction.rules.symmetry import needs_decollapsed_matches
+from synplan.chem.reaction.rules.vocabulary import file_digest
 from synplan.chem.stereo import (
     _requirements,
     has_stereo,
@@ -700,6 +700,11 @@ def extract_rules(
 
     """
 
+    return _extract_rules(config, reaction, as_records=False)
+
+
+def _extract_rules(config, reaction, *, as_records):
+    """Share component deduplication records with serial/worker aggregation."""
     if config.ignore_stereo:
         reaction = reaction.copy()
         reaction.clean_stereo()
@@ -712,7 +717,8 @@ def extract_rules(
         return [], True
 
     if config.multicenter_rules:
-        return [create_rule(config, reaction)], False
+        rule = create_rule(config, reaction)
+        return [_make_extracted_rule_record(rule) if as_records else rule], False
 
     # extract one rule per disconnected reaction-center component, dedup by CGR
     cgr = ~reaction
@@ -735,9 +741,9 @@ def extract_rules(
             _restrict_center_atoms=component,
             _skip_full_reaction_validation=skip_full_validation,
         )
-        rule_cgr = _make_extracted_rule_record(rule).cgr_key
-        if rule_cgr not in seen_cgrs:
-            seen_cgrs[rule_cgr] = rule
+        record = _make_extracted_rule_record(rule)
+        if record.cgr_key not in seen_cgrs:
+            seen_cgrs[record.cgr_key] = record if as_records else rule
 
     return list(seen_cgrs.values()), False
 
@@ -765,9 +771,10 @@ def _make_extracted_rule_record(rule: ReactionContainer) -> ExtractedRuleRecord:
     """
     query_cgr = ~rule
     smarts = _rule_to_reactor_smarts(rule)
-    key = canonical_query_cgr_key(query_cgr)
     if any(has_stereo(m) for m in (*rule.reactants, *rule.products)):
         key = "stereo-v1:" + canonical_query_cgr_key(query_cgr, stereo_rule=rule)
+    else:
+        key = canonical_query_cgr_key(query_cgr)
     return ExtractedRuleRecord(
         cgr_key=key,
         rule_smarts=smarts,
@@ -871,7 +878,7 @@ def _extract_rules_batch_worker(
             )
             stereo_records.append(_source_stereo_record(reaction, index))
             product_smi = str(unite_molecules(reaction.products))
-            extracted_rules, skipped = extract_rules(config, reaction)
+            rules_payload, skipped = _extract_rules(config, reaction, as_records=True)
             if skipped:
                 n_multi_product += 1
                 audit_entries.append(
@@ -886,9 +893,6 @@ def _extract_rules_batch_worker(
                     )
                 )
                 continue
-            rules_payload = [
-                _make_extracted_rule_record(rule) for rule in extracted_rules
-            ]
             if not rules_payload:
                 audit_entries.append(
                     _make_audit_entry(
@@ -1261,7 +1265,7 @@ def _extract_rules_serial(
                     + "\n"
                 )
             product_smi = str(unite_molecules(reaction.products))
-            extracted_rules, skipped = extract_rules(config, reaction)
+            rule_records, skipped = _extract_rules(config, reaction, as_records=True)
             if skipped:
                 n_multi_product += 1
                 entry = _make_audit_entry(
@@ -1278,9 +1282,6 @@ def _extract_rules_serial(
                 if audit_counts is not None:
                     audit_counts[(entry.stage, entry.error_type)] += 1
                 continue
-            rule_records = [
-                _make_extracted_rule_record(rule) for rule in extracted_rules
-            ]
             if not rule_records:
                 entry = _make_audit_entry(
                     index,
@@ -1625,20 +1626,13 @@ def extract_rules_from_reactions(
                 f"{rule.rule_smarts}\t{len(indices)}\t{','.join(map(str, indices))}\n"
             )
 
-    def digest(path):
-        result = hashlib.sha256()
-        with open(path, "rb") as stream:
-            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-                result.update(chunk)
-        return result.hexdigest()
-
     manifest = {
         "schema": "synplan-rules/2",
         "stereo_schema": 1,
         "preserve_stereo": not config.ignore_stereo,
         "chython_version": version("chython-synplan"),
-        "input_sha256": digest(reaction_data_path),
-        "rules_sha256": digest(rules_tsv_path),
+        "input_sha256": file_digest(reaction_data_path),
+        "rules_sha256": file_digest(rules_tsv_path),
         "source_stereo_file": f"{reaction_rules_path_base}.stereo.jsonl",
         "rule_count": len(sorted_rules),
         "policy_compatibility": "requires the exact ordered rule vocabulary used for training",

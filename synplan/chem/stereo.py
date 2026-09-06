@@ -22,7 +22,12 @@ _STRICT_BACKEND = "strict_stereo" in signature(_read_smiles).parameters
 def reaction_smiles(reaction, spec="m"):
     """Serialize enhanced reaction groups, including with released Chython 1.105."""
     text = format(reaction, spec)
-    if "!x" in spec or "!s" in spec or re.search(r"[&o]\d+:", text):
+    if (
+        getattr(reaction, "_supports_stereo_groups", False)
+        or "!x" in spec
+        or "!s" in spec
+        or re.search(r"[&o]\d+:", text)
+    ):
         return text
     groups, offset = {}, 0
     for side in (reaction.reactants, reaction.reagents, reaction.products):

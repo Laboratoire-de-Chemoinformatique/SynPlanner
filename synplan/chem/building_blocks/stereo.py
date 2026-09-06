@@ -2,6 +2,8 @@
 
 from functools import lru_cache
 
+from chython.containers import MoleculeContainer
+
 from synplan.chem.building_blocks.identity import molecule_to_inchikey
 from synplan.chem.mapping import MappingBudgetExceeded, bounded_mappings, mapping_budget
 from synplan.chem.stereo import (
@@ -16,7 +18,10 @@ from synplan.chem.stereo import (
 def _record_molecule(smiles_text, key):
     from synplan.chem.utils import safe_canonicalization
 
-    candidate = safe_canonicalization(parse_smiles_preserving_stereo(smiles_text))
+    candidate = parse_smiles_preserving_stereo(smiles_text)
+    if not isinstance(candidate, MoleculeContainer):
+        raise ValueError("catalogue record must contain a molecule")
+    candidate = safe_canonicalization(candidate)
     if molecule_to_inchikey(candidate) != key:
         raise ValueError("catalogue record SMILES and InChIKey disagree")
     return candidate

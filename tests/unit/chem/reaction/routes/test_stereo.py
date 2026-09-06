@@ -328,3 +328,49 @@ def test_stereo_preserving_import_rejects_conflicting_node(fixtures):
     tree["children"][0]["smiles"] = format(reaction, "m")
     with pytest.raises(ValueError, match="opposite mapped configuration"):
         read_stereo_route(tree)
+
+
+def test_exports_read_live_stereo_status_once_and_recheck_edits(
+    fixtures, stock, monkeypatch
+):
+    from dataclasses import replace
+
+    from synplan.chem import stereo_evidence
+    from synplan.chem.reaction.routes.route import Route
+    from synplan.utils.visualisation import routes_report_html
+
+    _, audit = run(fixtures["source:n5-02322"], stock)
+    route = audit.route
+    route = replace(
+        route, stereo=stereo_evidence.route_stereo_summary(route, status="fulfilled")
+    )
+    status, calls = Route.stereo_status.fget, []
+
+    def tracked(self):
+        calls.append(self)
+        return status(self)
+
+    monkeypatch.setattr(Route, "stereo_status", property(tracked))
+    exported = route.to_json()
+    assert len(calls) == 1
+    assert (
+        exported["stereo_status"] == exported["stereo"]["stereo_status"] == "fulfilled"
+    )
+    calls.clear()
+    assert "Stereo requirements fulfilled" in routes_report_html([route], None)
+    assert len(calls) == 1
+    context = route.stereo["context"]
+    restored = Route.from_json(exported)
+    assert stereo_evidence.route_context(restored) == context
+    for mutate in (
+        lambda r: r.steps[0].reaction.meta.update(procedure="changed"),
+        lambda r: r.steps[0].reaction.meta.update(
+            stereo_evidence=[{"source": "changed"}]
+        ),
+        lambda r: r.leaves()[0].meta["selected_stock"].update(price=42),
+        lambda r: r.target.clean_stereo(),
+    ):
+        changed = deepcopy(route)
+        mutate(changed)
+        assert changed.stereo_status == "needs_reassessment"
+        assert changed.to_json()["stereo_status"] == "needs_reassessment"

@@ -606,14 +606,19 @@ class Tree:
                 }
             )
         from synplan.chem.stereo_evidence import (
+            _chemistry_assessment,
             apply_chemistry_assessment,
             reaction_context,
         )
 
-        forward = Reaction(products, [curr_node.curr_precursor.molecule])
-        evidence = self._stereo_assessments.get(reaction_context(forward), ())
-        forward.meta["stereo_evidence"] = list(evidence)
-        decision = apply_chemistry_assessment(assessment, forward)
+        evidence, decision = (), "unreviewed"
+        if self._stereo_assessments:
+            forward = Reaction(products, [curr_node.curr_precursor.molecule])
+            evidence_context = reaction_context(forward)
+            evidence = self._stereo_assessments.get(evidence_context, ())
+            decision = apply_chemistry_assessment(
+                assessment, _chemistry_assessment(evidence, evidence_context)
+            )
         if decision == "rejected":
             self.stats.stereo_incompatible_outcomes += 1
             return False

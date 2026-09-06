@@ -5,6 +5,15 @@ from hashlib import sha256
 from pathlib import Path
 
 
+def file_digest(path):
+    """Hash the complete ordered asset without loading it into memory."""
+    result = sha256()
+    with open(path, "rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            result.update(chunk)
+    return result.hexdigest()
+
+
 def manifest_digest(path):
     path = Path(path)
     manifest = path.with_suffix(".manifest.json")
@@ -13,7 +22,7 @@ def manifest_digest(path):
     metadata = json.loads(manifest.read_text())
     if metadata.get("schema") != "synplan-rules/2":
         raise ValueError(f"unsupported rule manifest schema in {manifest}")
-    digest = sha256(path.read_bytes()).hexdigest()
+    digest = file_digest(path)
     if digest != metadata["rules_sha256"]:
         raise ValueError(
             "rule file changed since extraction; regenerate its vocabulary and policy assets"

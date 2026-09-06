@@ -246,7 +246,9 @@ _ROLE_LEGEND = (
 )
 
 
-def _report_header(routes: Sequence[Route], tile: MoleculeContainer | None) -> str:
+def _report_header(
+    routes: Sequence[Route], tile: MoleculeContainer | None, solved: int
+) -> str:
     scores = [
         route.provenance.search_score
         for route in routes
@@ -254,7 +256,7 @@ def _report_header(routes: Sequence[Route], tile: MoleculeContainer | None) -> s
     ]
     stats = (
         ("Routes", len(routes), ""),
-        ("Solved", sum(route.solved for route in routes), f" of {len(routes)}"),
+        ("Solved", solved, f" of {len(routes)}"),
         ("Longest", max((len(route) for route in routes), default=0), " steps"),
         ("Best score", round(max(scores), 3) if scores else "—", ""),
     )
@@ -330,6 +332,7 @@ def routes_report_html(
     doc = Doc()
     layouts: dict = {}  # one geometry per molecule, so a card matches its neighbours
     body = []
+    solved = 0
     for index, route in enumerate(routes, 1):
         rows = ""
         step_by_node = {
@@ -368,7 +371,13 @@ def routes_report_html(
             "not_assessed": "Stereo not assessed",
             "needs_reassessment": "Stereo needs reassessment after edits",
         }
-        stereo_text = stereo_labels.get(route.stereo_status, route.stereo_status)
+        stereo_status = route.stereo_status
+        solved += (
+            not unresolved and stereo_status == "fulfilled"
+            if route.stereo is not None
+            else route.solved
+        )
+        stereo_text = stereo_labels.get(stereo_status, stereo_status)
         stereo_detail = ""
         if route.stereo:
             step_by_node = {
@@ -413,6 +422,7 @@ def routes_report_html(
         + _report_header(
             routes,
             drawable_copy(routes[0].target, layouts) if routes else None,
+            solved,
         )
         + "".join(body)
         + "</div>\n</body>\n</html>\n"

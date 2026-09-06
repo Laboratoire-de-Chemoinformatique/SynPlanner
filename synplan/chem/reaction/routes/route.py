@@ -633,12 +633,13 @@ class Route:
             target, source_of, lambda mol, key, leaf: key in stock, step_fields
         )
         if result is not None and self.stereo is not None:
+            stereo_status = self.stereo_status
             result["stereo"] = {
                 **deepcopy(self.stereo),
-                "stereo_status": self.stereo_status,
+                "stereo_status": stereo_status,
             }
             result["connectivity_solved"] = self.connectivity_solved
-            result["stereo_status"] = self.stereo_status
+            result["stereo_status"] = stereo_status
             result["selectivity_evidence_status"] = self.stereo.get(
                 "selectivity_evidence_status", "not_evaluated"
             )

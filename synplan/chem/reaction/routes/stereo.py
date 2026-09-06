@@ -14,10 +14,10 @@ from dataclasses import dataclass, field
 from itertools import islice
 from typing import Any
 
-from chython import smiles
 from chython.containers import MoleculeContainer, ReactionContainer
 
 from synplan.chem.building_blocks import BuildingBlockCatalogue, molecule_to_inchikey
+from synplan.chem.building_blocks.stereo import _record_molecule
 from synplan.chem.mapping import MappingBudgetExceeded, bounded_mappings
 from synplan.chem.reaction.routes.route import Route, Step
 from synplan.chem.stereo import (
@@ -84,14 +84,14 @@ def _connectivity(mol: MoleculeContainer) -> str:
 def _mappings(
     source: MoleculeContainer, dest: MoleculeContainer, cap: int
 ) -> list[dict[int, int]]:
-    if _connectivity(source) != _connectivity(dest):
+    a, b = source.copy(), dest.copy()
+    a.clean_stereo()
+    b.clean_stereo()
+    if str(a) != str(b):
         raise _Unresolved(
             "mapping_or_representation_unresolved",
             "inconsistent adjacent molecule structures",
         )
-    a, b = source.copy(), dest.copy()
-    a.clean_stereo()
-    b.clean_stereo()
     try:
         mappings = list(islice(bounded_mappings(a, b), cap + 1))
     except MappingBudgetExceeded as error:
@@ -229,19 +229,25 @@ def _stock_match(
         raise _Unresolved(
             "relative_or_mixture_stereo", "material/group semantics require review"
         )
+    connectivity = _connectivity(mol)
     for record in bucket:
-        candidate = smiles(record.smiles)
+        try:
+            candidate = _record_molecule(record.smiles, record.inchikey)
+        except ValueError as error:
+            rejected.append(
+                {
+                    "inchikey": record.inchikey,
+                    "reason": "invalid_stock_record",
+                    "detail": str(error),
+                }
+            )
+            continue
         if has_stereo_groups(candidate):
             rejected.append(
                 {"inchikey": record.inchikey, "reason": "relative_or_mixture_stock"}
             )
             continue
-        if molecule_to_inchikey(candidate) != record.inchikey:
-            rejected.append(
-                {"inchikey": record.inchikey, "reason": "record_identity_mismatch"}
-            )
-            continue
-        if _connectivity(candidate) != _connectivity(mol):
+        if _connectivity(candidate) != connectivity:
             rejected.append(
                 {"inchikey": record.inchikey, "reason": "connectivity_bucket_only"}
             )
@@ -253,22 +259,22 @@ def _stock_match(
                 compatible.append(mapping)
         if compatible:
             # Extra configurations are retained from the selected actual record.
-            versions = {}
+            candidate_reqs = _requirements(candidate)
+            orientations = set()
             for mapping in compatible:
-                selected = candidate.copy()
-                selected.remap({v: k for k, v in mapping.items()})
-                versions.setdefault(format(selected, "m"), selected)
-            if (
-                len(
-                    {_orientation_key(mol, _requirements(v)) for v in versions.values()}
+                inverse = {v: k for k, v in mapping.items()}
+                orientations.add(
+                    _orientation_key(
+                        mol, tuple(r.remap(inverse) for r in candidate_reqs)
+                    )
                 )
-                > 1
-            ):
+            if len(orientations) > 1:
                 raise _Unresolved(
                     "mapping_or_representation_unresolved",
                     "stock record has stereo-distinct alignments",
                 )
-            selected = next(iter(versions.values()))
+            selected = candidate.copy()
+            selected.remap({v: k for k, v in compatible[0].items()})
             record_data = {
                 "inchikey": record.inchikey,
                 "smiles": record.smiles,

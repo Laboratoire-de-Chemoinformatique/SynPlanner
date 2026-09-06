@@ -363,7 +363,10 @@ def test_completed_outcomes_survive_later_mapping_exhaustion():
 
 
 @pytest.mark.parametrize("workers", [1, 2])
-def test_extraction_source_evidence_and_rule_manifest_roundtrip(workers, tmp_path):
+@pytest.mark.parametrize("multicenter", [True, False])
+def test_extraction_source_evidence_and_rule_manifest_roundtrip(
+    workers, multicenter, tmp_path
+):
     from synplan.chem.reaction.rules.extraction import extract_rules_from_reactions
     from synplan.utils.loading import load_reaction_rules
 
@@ -375,7 +378,7 @@ def test_extraction_source_evidence_and_rule_manifest_roundtrip(workers, tmp_pat
     input_file.write_text(source + "\n" + source + "\n")
     rules_file = tmp_path / "rules.tsv"
     extract_rules_from_reactions(
-        RuleExtractionConfig(min_popularity=1),
+        RuleExtractionConfig(min_popularity=1, multicenter_rules=multicenter),
         str(input_file),
         str(rules_file),
         workers,
@@ -391,6 +394,7 @@ def test_extraction_source_evidence_and_rule_manifest_roundtrip(workers, tmp_pat
     manifest = json.loads((tmp_path / "rules.manifest.json").read_text())
     rules = load_reaction_rules(str(rules_file))
     assert rules and rules.vocabulary_digest == manifest["rules_sha256"]
+    assert rules_file.read_text().splitlines()[1].split("\t")[1:] == ["2", "0,1"]
 
 
 def test_new_vocabulary_cannot_relabel_old_policy_outputs():
@@ -514,3 +518,294 @@ def test_enhanced_reaction_json_keeps_groups_unassessed():
     restored = Route.from_json(route.to_json())
     assert str(restored.target) == str(molecule)
     assert not restored.solved
+
+
+@pytest.mark.parametrize("multicenter", [True, False])
+def test_patent_rule_record_is_canonicalized_once(multicenter, monkeypatch):
+    from hashlib import sha256
+    from unittest.mock import Mock
+
+    from synplan.chem.reaction.rules import extraction
+    from synplan.utils.files import parse_reaction
+
+    records = json.loads(
+        (Path(__file__).parents[1] / "data/regression/pr104_uspto.json").read_text()
+    )
+    reaction = parse_reaction(records["stereo_nitrile_reduction"]["source_line"], "smi")
+    canonicalize = Mock(wraps=extraction.canonical_query_cgr_key)
+    monkeypatch.setattr(extraction, "canonical_query_cgr_key", canonicalize)
+    (record,), skipped = extraction._extract_rules(
+        RuleExtractionConfig(multicenter_rules=multicenter), reaction, as_records=True
+    )
+    assert not skipped and canonicalize.call_count == 1
+    # Frozen from the pre-refactor US03950405 key and exact TSV SMARTS.
+    assert sha256(
+        (record.cgr_key + "\n" + record.rule_smarts).encode()
+    ).hexdigest() == (
+        "8fca1a7ab106bc7e2df1b3b9dadab178d77a7d7548e2582b5a20527c24b1c1b1"
+    )
+
+
+@pytest.mark.parametrize("text", [*STEREO, "C[C@H](O)[C@@H](O)C", "C[C@H](O)[C@H](O)C"])
+@pytest.mark.parametrize("extra_stereo", [True, False])
+def test_stock_signatures_match_materialized_alignments(
+    text, extra_stereo, monkeypatch
+):
+    from unittest.mock import Mock
+
+    from chython.containers import MoleculeContainer
+
+    from synplan.chem.building_blocks.stereo import _record_molecule
+    from synplan.chem.reaction.routes.stereo import (
+        _mappings,
+        _orientation_key,
+        _stock_match,
+    )
+    from synplan.chem.stereo import _Unresolved
+
+    stock = catalogue((text, 9))
+    (record,) = next(iter(stock.values()))
+    candidate = _record_molecule(record.smiles, record.inchikey)
+    molecule = candidate.copy()
+    molecule.remap({n: 100 - n for n in molecule})
+    if extra_stereo:
+        molecule.clean_stereo()
+    before = format(molecule, "m"), format(candidate, "m"), dict(candidate.meta)
+    required = _requirements(molecule)
+    compatible = [
+        m
+        for m in _mappings(molecule, candidate, 256)
+        if all(_sign(candidate, r.remap(m)) == r.sign for r in required)
+    ]
+    # Reference behavior before the refactor: copy and remap every alignment.
+    versions = []
+    for mapping in compatible:
+        version = candidate.copy()
+        version.remap({v: k for k, v in mapping.items()})
+        versions.append(version)
+    orientations = {_orientation_key(molecule, _requirements(v)) for v in versions}
+    remap = Mock(side_effect=MoleculeContainer.remap)
+    monkeypatch.setattr(
+        MoleculeContainer, "remap", lambda self, *a, **kw: remap(self, *a, **kw)
+    )
+    if len(orientations) > 1:
+        with pytest.raises(_Unresolved, match="stereo-distinct alignments"):
+            _stock_match(molecule, required, stock, 256)
+        assert remap.call_count == 0
+    else:
+        selected, detail = _stock_match(molecule, required, stock, 256)
+        assert remap.call_count == 1
+        assert format(selected, "m") == format(versions[0], "m")
+        assert detail["compatible_mapping_count"] == len(compatible)
+        assert detail["vendors"] == {"supplier": 9} and detail["price"] == 9
+    assert before == (
+        format(molecule, "m"),
+        format(candidate, "m"),
+        dict(candidate.meta),
+    )
+
+
+def test_stock_audit_shares_strict_preparation_and_keeps_pinned_record():
+    from synplan.chem.building_blocks.stereo import _record_molecule
+    from synplan.chem.reaction.routes.stereo import _stock_match
+    from synplan.chem.stereo import _Unresolved
+
+    # Kekule/aromatic encodings of the same 1-phenylethanol record.
+    molecule = mol_from_smiles("C[C@H](O)c1ccccc1")
+    key = molecule_to_inchikey(molecule)
+    invalid = ["bad", "CC>>CC", "C[C@H](C)O", "C[C@@H](O)c1ccccc1"]
+    valid = BuildingBlock("C[C@H](O)C1=CC=CC=C1", key, frozendict(pinned=7), True)
+    bucket = (
+        *(BuildingBlock(s, key, frozendict(cheap=1), True) for s in invalid),
+        valid,
+    )
+    stock = frozendict({key[:14]: bucket})
+    assert compatible_records(molecule, stock) == (valid,)
+    selected, detail = _stock_match(molecule, _requirements(molecule), stock, 256)
+    assert len(detail["rejected_candidates"]) == len(invalid)
+    assert detail["smiles"] == valid.smiles and detail["price"] == 7
+    assert str(selected) == str(_record_molecule(valid.smiles, key)) == str(molecule)
+    molecule.meta["selected_stock"] = {"inchikey": key, "smiles": invalid[-1]}
+    with pytest.raises(_Unresolved, match="no explicit compatible record"):
+        _stock_match(molecule, _requirements(molecule), stock, 256)
+
+
+def test_raw_native_mapping_keeps_compiled_query_and_shared_budget(monkeypatch):
+    from chython import smarts
+
+    from synplan.chem import mapping
+
+    if not mapping._native_budget:
+        pytest.skip("paired Chython native dispatch control")
+
+    def no_wrap(*args, **kwargs):
+        pytest.fail("native raw queries must retain their compiled caches")
+
+    monkeypatch.setattr(mapping, "bounded_query", no_wrap)
+    query, molecule = smarts("[$(CC)]"), smiles("CCC")
+    first = list(bounded_mappings(query, molecule))
+    assert len(first) == 3 and first == list(bounded_mappings(query, molecule))
+    with mapping_budget(1), pytest.raises(MappingBudgetExceeded):
+        list(bounded_mappings(query, molecule))
+
+
+@pytest.mark.parametrize("spec", ["m", "!cm", "!xm", "!sm"])
+def test_reaction_group_fallback_matches_native_formatting(spec, monkeypatch):
+    from synplan.chem.stereo import reaction_smiles
+
+    reaction = smiles("C[C@H](O)N.[CH3]>O>C[C@H](O)Cl |o1:1,&2:7|")
+    encoded = reaction_smiles(reaction, spec)
+    if getattr(ReactionContainer, "_supports_stereo_groups", False):
+        original = ReactionContainer.__format__
+
+        # Emulate the released reaction writer: keep radicals, omit groups.
+        def released_format(self, fmt):
+            import re
+
+            return re.sub(r",?[&o]\d+:\d+(?:,\d+)*", "", original(self, fmt))
+
+        monkeypatch.setattr(ReactionContainer, "__format__", released_format)
+        monkeypatch.setattr(ReactionContainer, "_supports_stereo_groups", False)
+        assert reaction_smiles(reaction, spec) == encoded
+    if "!s" not in spec and "!x" not in spec:
+        assert "o1:" in encoded and "&2:" in encoded and "^1:" in encoded
+
+
+def test_native_ungrouped_reaction_formats_components_once(monkeypatch):
+    from chython.containers import MoleculeContainer
+
+    from synplan.chem.stereo import reaction_smiles
+
+    if not getattr(ReactionContainer, "_supports_stereo_groups", False):
+        pytest.skip("paired Chython writer capability control")
+    reaction = smiles("CCO>>CC=O")
+    original, calls = MoleculeContainer.__format__, []
+
+    def tracked(self, *args, **kwargs):
+        calls.append(self)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(MoleculeContainer, "__format__", tracked)
+    reaction_smiles(reaction)
+    assert len(calls) == 2
+
+
+def test_evidence_decisions_do_not_copy_observations_and_expire():
+    from copy import deepcopy
+
+    from synplan.chem.stereo_evidence import chemistry_assessment
+
+    class NoCopy:
+        def __deepcopy__(self, memo):
+            pytest.fail("internal decision copied an observation")
+
+    reaction = smiles("CC=O>>CCO")
+    record = attach_stereo_evidence(
+        reaction,
+        source="control",
+        observation={},
+        assessment="accepted",
+        reviewer="chemist",
+        reason="control",
+    )
+    reaction.meta["stereo_evidence"][0]["observation"] = NoCopy()
+    assert chemistry_assessment(reaction) == "accepted"
+    rejected = deepcopy(record)
+    rejected["assessment"] = "rejected"
+    reaction.meta["stereo_evidence"].append(rejected)
+    assert chemistry_assessment(reaction) == "conflicting"
+    reaction.meta["stereo_evidence"].pop(0)
+    assert chemistry_assessment(reaction) == "rejected"
+    reaction.meta["procedure"] = "changed"
+    assert chemistry_assessment(reaction) == "unreviewed"
+
+
+def test_empty_assessment_index_skips_context_lookup(monkeypatch):
+    from synplan.mcts import tree as tree_module
+
+    tree = tree_for(
+        STEREO[0],
+        CanonicalRetroReactor.from_smarts("[C:1]-[O:2]>>[C:1]=[O:2]"),
+        catalogue(("CC(=O)C(=O)O", 1)),
+        algorithm="breadth_first",
+    )
+
+    original = tree_module.Reaction
+
+    def no_context(*args, **kwargs):
+        assert "meta" in kwargs, (
+            "empty evidence index must skip the assessment reaction"
+        )
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(tree_module, "Reaction", no_context)
+    tree.run()
+    assert tree.proposal_nodes and not tree.winning_nodes
+    assert tree._get_node_value(tree.proposal_nodes[0]) == 0
+
+
+@pytest.mark.parametrize("decision", ["accepted", "rejected", "conflicting", "stale"])
+@pytest.mark.parametrize("strict", [True, False])
+def test_indexed_evidence_controls_search_outcomes(decision, strict):
+    rule = CanonicalRetroReactor.from_smarts("[C:1]-[O:2]>>[C:1]=[O:2]")
+    stock = catalogue(("CC(=O)C(=O)O", 1))
+    initial = tree_for(STEREO[0], rule, stock, algorithm="breadth_first")
+    initial.run()
+    reaction = Route.from_tree(initial, initial.proposal_nodes[0]).steps[0].reaction
+    decisions = (
+        ["accepted", "rejected"]
+        if decision == "conflicting"
+        else ["accepted" if decision == "stale" else decision]
+    )
+    records = [
+        attach_stereo_evidence(
+            reaction,
+            source="control",
+            observation={},
+            assessment=d,
+            reviewer="chemist",
+            reason="control",
+        )
+        for d in decisions
+    ]
+    if decision == "stale":
+        records[0]["context"] = "expired"
+    tree = tree_for(
+        STEREO[0],
+        rule,
+        stock,
+        algorithm="breadth_first",
+        stereo_mode="strict" if strict else "proposal",
+        stereo_assessments=records,
+    )
+    tree.run()
+    assert bool(tree.winning_nodes) == (decision == "accepted")
+    assert bool(tree.proposal_nodes) == (
+        not strict and decision in {"conflicting", "stale"}
+    )
+    for node in tree.proposal_nodes:
+        assert tree._get_node_value(node) == 0
+
+
+def test_vocabulary_streaming_digest_rejects_content_edits(tmp_path, monkeypatch):
+    from hashlib import sha256
+
+    from synplan.chem.reaction.rules.vocabulary import file_digest, manifest_digest
+
+    source = b"rule1\nrule2\n" * 100_000
+    path = tmp_path / "rules.tsv"
+    path.write_bytes(source)
+    expected = sha256(source).hexdigest()
+    path.with_suffix(".manifest.json").write_text(
+        json.dumps({"schema": "synplan-rules/2", "rules_sha256": expected})
+    )
+
+    def no_read_bytes(*args):
+        pytest.fail("vocabulary hashing must stream the complete file")
+
+    monkeypatch.setattr(Path, "read_bytes", no_read_bytes)
+    assert file_digest(path) == manifest_digest(path) == expected
+    for edited in (source.replace(b"rule1", b"rule3"), b"rule2\nrule1\n" * 100_000):
+        path.write_bytes(edited)
+        with pytest.raises(ValueError, match="rule file changed"):
+            manifest_digest(path)

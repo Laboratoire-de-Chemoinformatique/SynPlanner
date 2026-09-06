@@ -75,10 +75,19 @@ def assessed_evidence(reaction) -> list[dict]:
 
 def chemistry_assessment(reaction) -> str:
     """A matching explicit review may discharge a strategy obligation."""
+    records = reaction.meta.get("stereo_evidence", ())
+    return (
+        _chemistry_assessment(records, reaction_context(reaction))
+        if records
+        else "unreviewed"
+    )
+
+
+def _chemistry_assessment(records, context) -> str:
     decisions = {
         r.get("assessment")
-        for r in assessed_evidence(reaction)
-        if r["applicability"] == "current"
+        for r in records
+        if r.get("context") == context
         and r.get("reviewer")
         and r.get("reason")
         and r.get("source")
@@ -90,9 +99,8 @@ def chemistry_assessment(reaction) -> str:
     return "accepted" if "accepted" in decisions else "unreviewed"
 
 
-def apply_chemistry_assessment(assessment, reaction):
+def apply_chemistry_assessment(assessment, decision):
     """Review supports only assessed transformations, never broken mapping/stock."""
-    decision = chemistry_assessment(reaction)
     if decision == "accepted":
         dischargeable = {
             "requires_stereo_forming_step",
@@ -240,16 +248,11 @@ def route_context(route) -> str:
     # Leaves can be emitted in a different order by the SMILES/JSON writer.
     # An additive digest retains multiplicity in linear work without sorting
     # every material record. Normalize JSON keys before hashing map metadata.
-    material_sum, material_count = 0, 0
-    for leaf in route.leaves():
-        material = [str(leaf), leaf.meta.get("selected_stock")]
-        material = json.loads(json.dumps(material))
-        encoded = json.dumps(material, sort_keys=True, separators=(",", ":"))
-        material_sum = (
-            material_sum + int.from_bytes(sha256(encoded.encode()).digest())
-        ) % (1 << 256)
-        material_count += 1
-    payload.append((material_count, hex(material_sum)))
+    payload.append(
+        multiset(
+            [str(leaf), leaf.meta.get("selected_stock")] for leaf in route.leaves()
+        )
+    )
     payload = json.loads(json.dumps(payload))
     return sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()

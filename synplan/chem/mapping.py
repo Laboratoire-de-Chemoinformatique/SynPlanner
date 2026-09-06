@@ -92,8 +92,6 @@ def bounded_mappings(
     queries, sharing the same work budget as the enclosing correspondence.
     """
     budget = budget or _budget.get() or MappingBudget()
-    if isinstance(query, QueryContainer) and not isinstance(query, BoundedQuery):
-        query = bounded_query(query)
     if _native_budget:
         from chython.algorithms.isomorphism import Isomorphism
 
@@ -112,6 +110,8 @@ def bounded_mappings(
                 **({"_cython": _cython} if compiled else {}),
             )
         return
+    if isinstance(query, QueryContainer) and not isinstance(query, BoundedQuery):
+        query = bounded_query(query)
     with mapping_budget(budget=budget):
         recursive = (
             query._precompute_recursive(molecule)
