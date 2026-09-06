@@ -1,0 +1,19 @@
+{
+  "scan_limit": 100000,
+  "scanned": 561,
+  "stereo_rows": 18,
+  "elapsed": 0.5719310829999813,
+  "cip_method": "RDKit rdCIPLabeler.AssignCIPLabels (legacy mapped atom CIP codes are unsuitable)",
+  "cases": [
+    {
+      "source": "SynPlanner/local/uspto_full_mapped.smi",
+      "line": 561,
+      "source_line": "[ClH:29].[Na+:28].[O:24]=[C:23]1[C@H:13]([CH2:14]/[CH:15]=[CH:16]\\[CH2:17][CH2:18][CH2:19][C:20](=[O:22])[OH:21])[C@H:12]([CH:26]=[CH:25]1)/[CH:11]=[CH:10]/[C@@H:8]([OH:9])[CH2:7][CH2:6][CH2:5][CH2:4][CH3:3].[OH-:27].[OH:1][OH:2]>[CH3:54][OH:55]>[CH2:25]1[C@@H:26]([C@H:12](/[CH:11]=[CH:10]/[C@@H:8]([OH:9])[CH2:7][CH2:6][CH2:5][CH2:4][CH3:3])[C@@H:13]([CH2:14]/[CH:15]=[CH:16]\\[CH2:17][CH2:18][CH2:19][C:20](=[O:22])[OH:21])[C:23]1=[O:24])[OH:1].[CH2:41]1[C@H:40]([C@H:39](/[CH:38]=[CH:37]/[C@@H:36]([OH:53])[CH2:35][CH2:34][CH2:33][CH2:32][CH3:31])[C@@H:44]([CH2:45]/[CH:46]=[CH:47]\\[CH2:48][CH2:49][CH2:50][C:51](=[O:2])[OH:52])[C:42]1=[O:43])[OH:30]\t561\tUS03931283,US03931284,US03933891,US03948981",
+      "sha256": "901b8966a3c5a994365d6fe3c6b64f2c3c0fcb3712b76342eb8c90d74ba4ff6a",
+      "atom": 12,
+      "precursor_CIP": "S",
+      "product_CIP": "R"
+    }
+  ],
+  "role": "Single-step sourced regression only; excluded from the 30-route coverage denominator."
+}
