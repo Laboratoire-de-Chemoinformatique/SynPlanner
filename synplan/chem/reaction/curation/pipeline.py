@@ -9,6 +9,7 @@ from collections.abc import Callable, Iterable
 from io import StringIO
 
 from chython.containers import ReactionContainer
+from chython.files.RDFrw import ERDFWrite
 
 from synplan.chem.reaction.curation.reaction_result import (
     BatchResult,
@@ -17,7 +18,6 @@ from synplan.chem.reaction.curation.reaction_result import (
     PipelineSummary,
 )
 from synplan.utils.files import to_reaction_smiles_record, write_error_row
-from synplan.utils.stereo_io import RDFWrite
 
 
 def reaction_cgr_key(rxn: ReactionContainer) -> str | None:
@@ -38,7 +38,7 @@ def serialize_reaction(rxn: ReactionContainer, fmt: str) -> str:
 
     ``SMI`` output returns a tab-separated SMILES record with meta fields.
     ``RDF`` output returns one RDF record block as a string without the file
-    header or footer, produced via ``StringIO`` and ``RDFWrite(append=True)``.
+    header or footer, produced via ``StringIO`` and ``ERDFWrite(append=True)``.
 
     Called inside worker processes so serialization runs in parallel.
     The parent only writes the returned string to disk.
@@ -47,7 +47,7 @@ def serialize_reaction(rxn: ReactionContainer, fmt: str) -> str:
         return to_reaction_smiles_record(rxn)
     if fmt == "rdf":
         buf = StringIO()
-        with RDFWrite(buf, append=True) as w:
+        with ERDFWrite(buf, append=True) as w:
             w.write(rxn)
         return buf.getvalue()
     raise ValueError(f"Unsupported output format: {fmt!r}")

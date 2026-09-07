@@ -11,13 +11,9 @@ from chython import smiles
 from frozendict import frozendict
 
 from synplan.chem.building_blocks import BuildingBlock, molecule_to_inchikey
-from synplan.chem.reaction.routes.stereo import (
-    _requirements,
-    _sign,
-    _transfer,
-    audit_stereo_inheritance,
-)
+from synplan.chem.reaction.routes.stereo import audit_stereo_inheritance
 from synplan.chem.reaction.routes.stereo_io import read_stereo_route
+from synplan.chem.stereo import stereo_requirements, stereo_sign, transfer_stereo
 
 DATA = Path(__file__).resolve().parents[4] / "data" / "stereo"
 
@@ -55,7 +51,7 @@ def test_multistep_inheritance_whole_route_and_stock(name, fixtures, stock):
     assert audit.supported, audit.issues
     assert len(audit.route.steps) == len(original.steps) >= 4
     assert audit.assigned_stereo == "inferred_during_reconstruction"
-    assert all(not _requirements(s.product) for s in original.steps)
+    assert all(not stereo_requirements(s.product) for s in original.steps)
     assert molecule_to_inchikey(audit.route.target) == molecule_to_inchikey(
         smiles(fixtures[name]["original_target"])
     )
@@ -239,8 +235,8 @@ def test_real_uspto_cip_change_without_inversion():
     reaction = smiles(case["source_line"].split()[0])
     product = next(m for m in reaction.products if m.has_atom(case["atom"]))
     precursor = next(m for m in reaction.reactants if m.has_atom(case["atom"]))
-    req = next(r for r in _requirements(product) if r.atoms == (case["atom"],))
-    assert _sign(precursor, req) == req.sign
+    req = next(r for r in stereo_requirements(product) if r.atoms == (case["atom"],))
+    assert stereo_sign(precursor, req) == req.sign
 
     def cip(mol):
         rd_mol = Chem.MolFromSmiles(format(mol, "m"))
@@ -253,22 +249,22 @@ def test_real_uspto_cip_change_without_inversion():
     reactants = tuple(m.copy() for m in reaction.reactants)
     for mol in reactants:
         mol.clean_stereo()
-    slot = _transfer(product, reactants, req)
-    assert _sign(reactants[slot], req) == req.sign
+    slot = transfer_stereo(product, reactants, req)
+    assert stereo_sign(reactants[slot], req) == req.sign
 
 
 def test_real_uspto_double_bond_inheritance():
     case = json.loads((DATA / "cip_change.json").read_text())["cases"][0]
     reaction = smiles(case["source_line"].split()[0])
     product = next(m for m in reaction.products if m.has_atom(case["atom"]))
-    reqs = [r for r in _requirements(product) if r.kind == "double_bond"]
+    reqs = [r for r in stereo_requirements(product) if r.kind == "double_bond"]
     assert len(reqs) == 2
     for req in reqs:
         reactants = tuple(m.copy() for m in reaction.reactants)
         for mol in reactants:
             mol.clean_stereo()
-        slot = _transfer(product, reactants, req)
-        assert _sign(reactants[slot], req) == req.sign
+        slot = transfer_stereo(product, reactants, req)
+        assert stereo_sign(reactants[slot], req) == req.sign
 
 
 def test_stereo_lost_and_recreated_at_an_intermediate_is_unresolved(fixtures, stock):
@@ -315,14 +311,14 @@ def test_stereo_preserving_import_retains_source_configuration(fixtures):
     assert molecule_to_inchikey(route.target) == molecule_to_inchikey(
         smiles(case["original_target"])
     )
-    assert _requirements(route.leaves()[1])
+    assert stereo_requirements(route.leaves()[1])
 
 
 def test_stereo_preserving_import_rejects_conflicting_node(fixtures):
     tree = deepcopy(fixtures["source:n5-02322"]["tree"])
     reaction = smiles(tree["children"][0]["smiles"])
     product = reaction.products[0]
-    req = _requirements(product)[0]
+    req = stereo_requirements(product)[0]
     product.clean_stereo()
     product.add_atom_stereo(req.atoms[0], req.environment, not req.sign)
     tree["children"][0]["smiles"] = format(reaction, "m")

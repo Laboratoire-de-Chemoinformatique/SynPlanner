@@ -8,6 +8,8 @@ import json
 from copy import deepcopy
 from hashlib import sha256
 
+from synplan.chem.stereo import REVIEWABLE_STEREO_REASONS, UNASSESSED_STEREO_REASONS
+
 
 def reaction_context(reaction) -> str:
     """Versioned dependency key; substrate, products, agents and procedure matter."""
@@ -77,13 +79,13 @@ def chemistry_assessment(reaction) -> str:
     """A matching explicit review may discharge a strategy obligation."""
     records = reaction.meta.get("stereo_evidence", ())
     return (
-        _chemistry_assessment(records, reaction_context(reaction))
+        assess_chemistry_records(records, reaction_context(reaction))
         if records
         else "unreviewed"
     )
 
 
-def _chemistry_assessment(records, context) -> str:
+def assess_chemistry_records(records, context) -> str:
     decisions = {
         r.get("assessment")
         for r in records
@@ -102,15 +104,13 @@ def _chemistry_assessment(records, context) -> str:
 def apply_chemistry_assessment(assessment, decision):
     """Review supports only assessed transformations, never broken mapping/stock."""
     if decision == "accepted":
-        dischargeable = {
-            "requires_stereo_forming_step",
-            "requires_explicit_resolution_or_inversion_strategy",
-        }
         assessment["obligations"] = [
-            o for o in assessment["obligations"] if o["reason"] not in dischargeable
+            o
+            for o in assessment["obligations"]
+            if o["reason"] not in REVIEWABLE_STEREO_REASONS
         ]
         for event in assessment["events"]:
-            if event.get("reason") in dischargeable:
+            if event.get("reason") in REVIEWABLE_STEREO_REASONS:
                 event.update(
                     event="reviewed_transformation", basis="scoped_chemist_assessment"
                 )
@@ -145,14 +145,7 @@ def review_stereo_route(
         belongs = obligation.get("step") == step_index or (
             step.origin and obligation.get("tree_node_id") == step.origin.tree_node_id
         )
-        if not (
-            belongs
-            and obligation["reason"]
-            in {
-                "requires_stereo_forming_step",
-                "requires_explicit_resolution_or_inversion_strategy",
-            }
-        ):
+        if not (belongs and obligation["reason"] in REVIEWABLE_STEREO_REASONS):
             remaining.append(obligation)
     if not remaining and reviewed.connectivity_solved:
         from frozendict import frozendict
@@ -184,12 +177,10 @@ def review_stereo_route(
             reviewed = audit.route
         else:
             remaining.extend(audit.issues)
-    from synplan.chem.stereo import StereoObligations
-
     status = (
         (
             "could_not_be_assessed"
-            if StereoObligations().extend(remaining).unassessed
+            if any(o["reason"] in UNASSESSED_STEREO_REASONS for o in remaining)
             else "strategy_needed"
         )
         if remaining
@@ -203,27 +194,31 @@ def review_stereo_route(
     return replace(reviewed, stereo=summary)
 
 
+def record_digest(record):
+    """Hash JSON-normalized records, including integer atom-map keys."""
+    record = json.loads(json.dumps(record))
+    return sha256(
+        json.dumps(record, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
+def multiset_digest(records):
+    """Keep record multiplicity without depending on branch traversal order."""
+    total, count = 0, 0
+    for record in records:
+        total = (total + int(record_digest(record), 16)) % (1 << 256)
+        count += 1
+    return count, hex(total)
+
+
 def route_context(route) -> str:
     """Invalidate route-level fulfillment after any structural/procedure edit."""
     from synplan.chem.utils import mapped_smiles
 
-    def digest(record):
-        record = json.loads(json.dumps(record))
-        return sha256(
-            json.dumps(record, sort_keys=True, separators=(",", ":")).encode()
-        ).hexdigest()
-
-    def multiset(records):
-        total, count = 0, 0
-        for record in records:
-            total = (total + int(digest(record), 16)) % (1 << 256)
-            count += 1
-        return count, hex(total)
-
     # Independent branches can change traversal order on JSON import. Include
     # their actual producer/consumer links instead of relying on list positions.
     steps = [
-        digest(
+        record_digest(
             [
                 reaction_context(s.reaction),
                 mapped_smiles(s.reaction),
@@ -242,21 +237,18 @@ def route_context(route) -> str:
     payload = [
         str(route.target),
         producers.get(id(route.target)),
-        multiset(steps),
-        multiset(edges),
+        multiset_digest(steps),
+        multiset_digest(edges),
     ]
     # Leaves can be emitted in a different order by the SMILES/JSON writer.
     # An additive digest retains multiplicity in linear work without sorting
     # every material record. Normalize JSON keys before hashing map metadata.
     payload.append(
-        multiset(
+        multiset_digest(
             [str(leaf), leaf.meta.get("selected_stock")] for leaf in route.leaves()
         )
     )
-    payload = json.loads(json.dumps(payload))
-    return sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    return record_digest(payload)
 
 
 def route_stereo_summary(

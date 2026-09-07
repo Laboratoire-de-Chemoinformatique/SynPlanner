@@ -31,10 +31,8 @@ def graph_digest(cgr):
 
 
 def snapshot(reaction, cgr):
-    from synplan.chem.stereo import reaction_smiles
-
     return {
-        "reaction": reaction_smiles(reaction),
+        "reaction": format(reaction, "m"),
         "graph": graph_digest(cgr),
         "metadata": deepcopy(reaction.meta),
     }

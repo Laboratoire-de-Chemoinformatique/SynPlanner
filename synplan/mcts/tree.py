@@ -24,11 +24,11 @@ from synplan.chem.reaction.routes.route import Route
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
 from synplan.chem.stereo import (
     StereoObligations,
-    _requirements,
-    _Unresolved,
+    UnresolvedStereo,
     assess_inheritance,
     has_stereo,
     has_stereo_groups,
+    stereo_requirements,
 )
 from synplan.mcts.config import TreeConfig
 from synplan.mcts.evaluation import EvaluationStrategy
@@ -427,7 +427,7 @@ class Tree:
         target_molecule = Precursor(target)
         obligations = []
         try:
-            _requirements(target_molecule.molecule)
+            stereo_requirements(target_molecule.molecule)
             if has_stereo_groups(target_molecule.molecule):
                 obligations.append(
                     {
@@ -435,7 +435,7 @@ class Tree:
                         "detail": "Target group semantics require assessment; original CXSMILES is preserved.",
                     }
                 )
-        except _Unresolved as error:
+        except UnresolvedStereo as error:
             obligations.append({"reason": error.reason, "detail": str(error)})
         target_molecule.prev_precursors.append(Precursor(target))
         target_node = Node(
@@ -606,8 +606,8 @@ class Tree:
                 }
             )
         from synplan.chem.stereo_evidence import (
-            _chemistry_assessment,
             apply_chemistry_assessment,
+            assess_chemistry_records,
             reaction_context,
         )
 
@@ -617,7 +617,7 @@ class Tree:
             evidence_context = reaction_context(forward)
             evidence = self._stereo_assessments.get(evidence_context, ())
             decision = apply_chemistry_assessment(
-                assessment, _chemistry_assessment(evidence, evidence_context)
+                assessment, assess_chemistry_records(evidence, evidence_context)
             )
         if decision == "rejected":
             self.stats.stereo_incompatible_outcomes += 1
@@ -843,7 +843,7 @@ class Tree:
         self.children[new_node_id] = set()
         self.curr_tree_size += 1
         if new_node.is_terminal():
-            self._audit_terminal(new_node_id)
+            self.audit_terminal_stereo(new_node_id)
         if new_node.is_terminal() and not new_node.is_solved():
             self.proposal_nodes.append(new_node_id)
 
@@ -855,7 +855,7 @@ class Tree:
         new_node.init_value = node_value
         new_node.total_value = node_value
 
-    def _audit_terminal(self, node_id):
+    def audit_terminal_stereo(self, node_id):
         """Whole-route verification precedes any winning-node flag or reward."""
         from frozendict import frozendict
 

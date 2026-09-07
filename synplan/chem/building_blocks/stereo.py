@@ -7,15 +7,15 @@ from chython.containers import MoleculeContainer
 from synplan.chem.building_blocks.identity import molecule_to_inchikey
 from synplan.chem.mapping import MappingBudgetExceeded, bounded_mappings, mapping_budget
 from synplan.chem.stereo import (
-    _requirements,
-    _sign,
     has_stereo_groups,
     parse_smiles_preserving_stereo,
+    stereo_requirements,
+    stereo_sign,
 )
 
 
 @lru_cache(maxsize=8192)
-def _record_molecule(smiles_text, key):
+def record_molecule(smiles_text, key):
     from synplan.chem.utils import safe_canonicalization
 
     candidate = parse_smiles_preserving_stereo(smiles_text)
@@ -62,13 +62,13 @@ def compatible_records(
                 }
             )
         return ()
-    requirements = _requirements(molecule)
+    requirements = stereo_requirements(molecule)
     compatible = []
     try:
         with mapping_budget(max_mapping_work):
             for record in bucket:
                 try:
-                    candidate = _record_molecule(record.smiles, record.inchikey)
+                    candidate = record_molecule(record.smiles, record.inchikey)
                 except ValueError:
                     continue
                 # OR is unresolved absolute identity; AND is a material mixture.
@@ -81,7 +81,7 @@ def compatible_records(
                 for mapping in bounded_mappings(molecule, candidate):
                     try:
                         if all(
-                            _sign(candidate, req.remap(mapping)) == req.sign
+                            stereo_sign(candidate, req.remap(mapping)) == req.sign
                             for req in requirements
                         ):
                             compatible.append(record)

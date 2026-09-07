@@ -2,13 +2,11 @@
 
 import json
 from collections import defaultdict
-from io import StringIO
 from pathlib import Path
 
 import pytest
 from chython import smiles
 from chython.containers import ReactionContainer
-from chython.files.SDFrw import ESDFWrite, SDFRead
 from frozendict import frozendict
 
 from synplan.chem.building_blocks import BuildingBlock, molecule_to_inchikey
@@ -23,13 +21,21 @@ from synplan.chem.reaction.rules.extraction import (
     extract_rules,
     molecule_substructure_as_query,
 )
-from synplan.chem.stereo import _requirements, _sign, stereo_events
+from synplan.chem.stereo import stereo_events, stereo_requirements, stereo_sign
 from synplan.chem.stereo_evidence import assessed_evidence, attach_stereo_evidence
 from synplan.chem.utils import in_atom_order, mol_from_smiles, safe_canonicalization
 from synplan.mcts.config import TreeConfig
 from synplan.mcts.evaluation import EvaluationStrategy, RolloutSimulator
 from synplan.mcts.tree import Tree
-from synplan.utils.files import split_smiles_record
+from synplan.utils.files import (
+    MoleculeReader,
+    MoleculeWriter,
+    ReactionReader,
+    ReactionWriter,
+    parse_reaction,
+    split_smiles_record,
+    to_reaction_smiles_record,
+)
 
 # Lactic acid / crotonic acid structures and an allene API control. These are
 # representation controls, not claims of experimental allene synthesis.
@@ -43,7 +49,10 @@ def catalogue(*entries):
         key = molecule_to_inchikey(mol)
         buckets[key[:14]].append(
             BuildingBlock(
-                str(mol), key, frozendict({"supplier": price}), bool(_requirements(mol))
+                str(mol),
+                key,
+                frozendict({"supplier": price}),
+                bool(stereo_requirements(mol)),
             )
         )
     return frozendict({key: tuple(value) for key, value in buckets.items()})
@@ -52,11 +61,11 @@ def catalogue(*entries):
 @pytest.mark.parametrize("text", STEREO)
 def test_default_preservation_and_query_positive_negative(text):
     mol = mol_from_smiles(text)
-    (req,) = _requirements(mol)
+    (req,) = stereo_requirements(mol)
     prepared = Precursor(mol).molecule
-    assert _sign(prepared, req) == req.sign
+    assert stereo_sign(prepared, req) == req.sign
     ordered = in_atom_order(mol)
-    assert _sign(ordered, req) == req.sign
+    assert stereo_sign(ordered, req) == req.sign
     query = molecule_substructure_as_query(mol, mol)
     from synplan.chem.mapping import bounded_query
 
@@ -80,15 +89,16 @@ def test_default_preservation_and_query_positive_negative(text):
 
 
 @pytest.mark.parametrize("group", ["a:1,3", "o1:1,3", "&1:1,3"])
-def test_enhanced_group_cxsmiles_v3000_and_stock_semantics(group):
+def test_enhanced_group_cxsmiles_v3000_and_stock_semantics(group, tmp_path):
     text = f"C[C@H](O)[C@H](N)C(=O)O |{group}|"
     assert split_smiles_record(text + "\tsource")[0] == text
     assert split_smiles_record(text + " source")[0] == text
     molecule = mol_from_smiles(text)
-    output = StringIO()
-    writer = ESDFWrite(output)
-    writer.write(molecule)
-    restored = next(iter(SDFRead(StringIO(output.getvalue()), ignore=False)))
+    output = tmp_path / "stereo.sdf"
+    with MoleculeWriter(output) as writer:
+        writer.write(molecule)
+    with MoleculeReader(output, ignore=False) as reader:
+        restored = next(iter(reader))
     assert str(restored) == str(molecule)
     stock = catalogue((text, 1))
     assert bool(compatible_records(molecule, stock)) == group.startswith("a:")
@@ -178,14 +188,14 @@ def test_reactor_direct_and_cgr_preserve_remote_stereo(text, rebuild):
     mol.add_atom("C", next_atom)
     mol.add_atom("O", next_atom + 1)
     mol.add_bond(next_atom, next_atom + 1, 1)
-    original = _requirements(mol)
+    original = stereo_requirements(mol)
     rule = CanonicalRetroReactor.from_smarts("[C;h3:1]-[O;h1:2]>>[C:1]=[O:2]")
     groups = list(apply_reaction_rule(mol, rule, rebuild_with_cgr=rebuild))
     assert groups
     for products in groups:
         for req in original:
             owner = next(p for p in products if p.has_atom(req.atoms[0]))
-            assert _sign(owner, req) == req.sign
+            assert stereo_sign(owner, req) == req.sign
 
 
 def test_real_patent_step_search_inheritance_export_price_and_invalidation():
@@ -450,17 +460,20 @@ def test_rule_validation_budget_is_incomplete_not_contradicted(monkeypatch):
     assert rule.meta["reactor_validation"] == "could_not_be_assessed"
 
 
-def test_v3000_reaction_roundtrip_preserves_enhanced_groups():
-    from chython.files.RDFrw import RDFRead
-
-    from synplan.utils.stereo_io import RDFWrite
+def test_v3000_reaction_roundtrip_preserves_enhanced_groups(tmp_path):
+    from synplan.chem.reaction.curation.pipeline import serialize_reaction
 
     molecule = smiles("C[C@H](O)[C@H](N)C(=O)O |&1:1,3|")
     reaction = ReactionContainer((molecule,), (molecule.copy(),))
-    stream = StringIO()
-    RDFWrite(stream).write(reaction)
-    restored = next(iter(RDFRead(StringIO(stream.getvalue()), ignore=False)))
+    output = tmp_path / "stereo.rdf"
+    with ReactionWriter(output) as writer:
+        writer.write(reaction)
+    with ReactionReader(output, ignore=False) as reader:
+        restored = next(iter(reader))
     assert str(restored) == str(reaction)
+    assert str(parse_reaction(serialize_reaction(reaction, "rdf"), fmt="rdf")) == str(
+        reaction
+    )
     assert [a.extended_stereo for _, a in restored.products[0].atoms()] == [
         a.extended_stereo for _, a in molecule.atoms()
     ]
@@ -495,8 +508,6 @@ def test_multibranch_source_route_fulfillment_survives_json_order():
 
 @pytest.mark.parametrize("text", STEREO)
 def test_json_rejects_conflicting_molecule_and_reaction_stereo(text):
-    from synplan.chem.stereo import reaction_smiles
-
     molecule = smiles(text)
     reaction = ReactionContainer((molecule,), (molecule.copy(),))
     flat = molecule.copy()
@@ -507,7 +518,7 @@ def test_json_rejects_conflicting_molecule_and_reaction_stereo(text):
         "children": [
             {
                 "type": "reaction",
-                "smiles": reaction_smiles(reaction),
+                "smiles": format(reaction, "m"),
                 "children": [
                     {"type": "mol", "smiles": str(molecule), "in_stock": True}
                 ],
@@ -519,8 +530,6 @@ def test_json_rejects_conflicting_molecule_and_reaction_stereo(text):
 
 
 def test_enhanced_reaction_json_keeps_groups_unassessed():
-    from synplan.chem.stereo import reaction_smiles
-
     text = "C[C@H](F)Cl |&1:1|"
     molecule = smiles(text)
     reaction = ReactionContainer((molecule,), (molecule.copy(),))
@@ -530,7 +539,7 @@ def test_enhanced_reaction_json_keeps_groups_unassessed():
         "children": [
             {
                 "type": "reaction",
-                "smiles": reaction_smiles(reaction),
+                "smiles": format(reaction, "m"),
                 "children": [
                     {"type": "mol", "smiles": str(molecule), "in_stock": True}
                 ],
@@ -558,7 +567,7 @@ def test_patent_rule_record_is_canonicalized_once(multicenter, monkeypatch):
     reaction = parse_reaction(records["stereo_nitrile_reduction"]["source_line"], "smi")
     canonicalize = Mock(wraps=extraction.canonical_query_cgr_key)
     monkeypatch.setattr(extraction, "canonical_query_cgr_key", canonicalize)
-    (record,), skipped = extraction._extract_rules(
+    (record,), skipped = extraction.extract_rule_components(
         RuleExtractionConfig(multicenter_rules=multicenter), reaction, as_records=True
     )
     assert not skipped and canonicalize.call_count == 1
@@ -579,27 +588,27 @@ def test_stock_signatures_match_materialized_alignments(
 
     from chython.containers import MoleculeContainer
 
-    from synplan.chem.building_blocks.stereo import _record_molecule
+    from synplan.chem.building_blocks.stereo import record_molecule
     from synplan.chem.reaction.routes.stereo import (
-        _mappings,
-        _orientation_key,
-        _stock_match,
+        match_stereo_stock,
+        molecule_mappings,
+        orientation_key,
     )
-    from synplan.chem.stereo import _Unresolved
+    from synplan.chem.stereo import UnresolvedStereo
 
     stock = catalogue((text, 9))
     (record,) = next(iter(stock.values()))
-    candidate = _record_molecule(record.smiles, record.inchikey)
+    candidate = record_molecule(record.smiles, record.inchikey)
     molecule = candidate.copy()
     molecule.remap({n: 100 - n for n in molecule})
     if extra_stereo:
         molecule.clean_stereo()
     before = format(molecule, "m"), format(candidate, "m"), dict(candidate.meta)
-    required = _requirements(molecule)
+    required = stereo_requirements(molecule)
     compatible = [
         m
-        for m in _mappings(molecule, candidate, 256)
-        if all(_sign(candidate, r.remap(m)) == r.sign for r in required)
+        for m in molecule_mappings(molecule, candidate, 256)
+        if all(stereo_sign(candidate, r.remap(m)) == r.sign for r in required)
     ]
     # Reference behavior before the refactor: copy and remap every alignment.
     versions = []
@@ -607,17 +616,17 @@ def test_stock_signatures_match_materialized_alignments(
         version = candidate.copy()
         version.remap({v: k for k, v in mapping.items()})
         versions.append(version)
-    orientations = {_orientation_key(molecule, _requirements(v)) for v in versions}
+    orientations = {orientation_key(molecule, stereo_requirements(v)) for v in versions}
     remap = Mock(side_effect=MoleculeContainer.remap)
     monkeypatch.setattr(
         MoleculeContainer, "remap", lambda self, *a, **kw: remap(self, *a, **kw)
     )
     if len(orientations) > 1:
-        with pytest.raises(_Unresolved, match="stereo-distinct alignments"):
-            _stock_match(molecule, required, stock, 256)
+        with pytest.raises(UnresolvedStereo, match="stereo-distinct alignments"):
+            match_stereo_stock(molecule, required, stock, 256)
         assert remap.call_count == 0
     else:
-        selected, detail = _stock_match(molecule, required, stock, 256)
+        selected, detail = match_stereo_stock(molecule, required, stock, 256)
         assert remap.call_count == 1
         assert format(selected, "m") == format(versions[0], "m")
         assert detail["compatible_mapping_count"] == len(compatible)
@@ -630,9 +639,9 @@ def test_stock_signatures_match_materialized_alignments(
 
 
 def test_stock_audit_shares_strict_preparation_and_keeps_pinned_record():
-    from synplan.chem.building_blocks.stereo import _record_molecule
-    from synplan.chem.reaction.routes.stereo import _stock_match
-    from synplan.chem.stereo import _Unresolved
+    from synplan.chem.building_blocks.stereo import record_molecule
+    from synplan.chem.reaction.routes.stereo import match_stereo_stock
+    from synplan.chem.stereo import UnresolvedStereo
 
     # Kekule/aromatic encodings of the same 1-phenylethanol record.
     molecule = mol_from_smiles("C[C@H](O)c1ccccc1")
@@ -645,63 +654,59 @@ def test_stock_audit_shares_strict_preparation_and_keeps_pinned_record():
     )
     stock = frozendict({key[:14]: bucket})
     assert compatible_records(molecule, stock) == (valid,)
-    selected, detail = _stock_match(molecule, _requirements(molecule), stock, 256)
+    selected, detail = match_stereo_stock(
+        molecule, stereo_requirements(molecule), stock, 256
+    )
     assert len(detail["rejected_candidates"]) == len(invalid)
     assert detail["smiles"] == valid.smiles and detail["price"] == 7
-    assert str(selected) == str(_record_molecule(valid.smiles, key)) == str(molecule)
+    assert str(selected) == str(record_molecule(valid.smiles, key)) == str(molecule)
     molecule.meta["selected_stock"] = {"inchikey": key, "smiles": invalid[-1]}
-    with pytest.raises(_Unresolved, match="no explicit compatible record"):
-        _stock_match(molecule, _requirements(molecule), stock, 256)
+    with pytest.raises(UnresolvedStereo, match="no explicit compatible record"):
+        match_stereo_stock(molecule, stereo_requirements(molecule), stock, 256)
 
 
-def test_raw_native_mapping_keeps_compiled_query_and_shared_budget(monkeypatch):
+@pytest.mark.parametrize("cython", [True, False])
+def test_raw_native_mapping_keeps_compiled_query_and_shared_budget(monkeypatch, cython):
     from chython import smarts
 
     from synplan.chem import mapping
-
-    if not mapping._native_budget:
-        pytest.skip("paired Chython native dispatch control")
 
     def no_wrap(*args, **kwargs):
         pytest.fail("native raw queries must retain their compiled caches")
 
     monkeypatch.setattr(mapping, "bounded_query", no_wrap)
     query, molecule = smarts("[$(CC)]"), smiles("CCC")
-    first = list(bounded_mappings(query, molecule))
-    assert len(first) == 3 and first == list(bounded_mappings(query, molecule))
+    first = list(bounded_mappings(query, molecule, _cython=cython))
+    assert len(first) == 3 and first == list(
+        bounded_mappings(query, molecule, _cython=cython)
+    )
     with mapping_budget(1), pytest.raises(MappingBudgetExceeded):
-        list(bounded_mappings(query, molecule))
+        list(bounded_mappings(query, molecule, _cython=cython))
 
 
 @pytest.mark.parametrize("spec", ["m", "!cm", "!xm", "!sm"])
-def test_reaction_group_fallback_matches_native_formatting(spec, monkeypatch):
-    from synplan.chem.stereo import reaction_smiles
-
+def test_reaction_format_preserves_enhanced_groups(spec):
     reaction = smiles("C[C@H](O)N.[CH3]>O>C[C@H](O)Cl |o1:1,&2:7|")
-    encoded = reaction_smiles(reaction, spec)
-    if getattr(ReactionContainer, "_supports_stereo_groups", False):
-        original = ReactionContainer.__format__
-
-        # Emulate the released reaction writer: keep radicals, omit groups.
-        def released_format(self, fmt):
-            import re
-
-            return re.sub(r",?[&o]\d+:\d+(?:,\d+)*", "", original(self, fmt))
-
-        monkeypatch.setattr(ReactionContainer, "__format__", released_format)
-        monkeypatch.setattr(ReactionContainer, "_supports_stereo_groups", False)
-        assert reaction_smiles(reaction, spec) == encoded
+    encoded = format(reaction, spec)
+    if spec == "m":
+        assert split_smiles_record(to_reaction_smiles_record(reaction))[0] == encoded
+    restored = smiles(encoded, strict_stereo=True)
+    groups = {
+        n: a.extended_stereo
+        for molecule in restored.molecules()
+        for n, a in molecule.atoms()
+        if a.extended_stereo
+    }
     if "!s" not in spec and "!x" not in spec:
         assert "o1:" in encoded and "&2:" in encoded and "^1:" in encoded
+        assert groups == {2: -1, 7: 2}
+    else:
+        assert not groups
 
 
 def test_native_ungrouped_reaction_formats_components_once(monkeypatch):
     from chython.containers import MoleculeContainer
 
-    from synplan.chem.stereo import reaction_smiles
-
-    if not getattr(ReactionContainer, "_supports_stereo_groups", False):
-        pytest.skip("paired Chython writer capability control")
     reaction = smiles("CCO>>CC=O")
     original, calls = MoleculeContainer.__format__, []
 
@@ -710,7 +715,7 @@ def test_native_ungrouped_reaction_formats_components_once(monkeypatch):
         return original(self, *args, **kwargs)
 
     monkeypatch.setattr(MoleculeContainer, "__format__", tracked)
-    reaction_smiles(reaction)
+    to_reaction_smiles_record(reaction)
     assert len(calls) == 2
 
 

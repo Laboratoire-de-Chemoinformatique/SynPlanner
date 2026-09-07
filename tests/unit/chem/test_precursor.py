@@ -71,7 +71,7 @@ def test_precursor_with_invalid_input():
         Precursor(None)
 
 
-def _stereo_block(smiles_value: str) -> BuildingBlock:
+def stereo_block(smiles_value: str) -> BuildingBlock:
     molecule = smiles(smiles_value, ignore_stereo=False)
     return BuildingBlock(
         smiles=str(molecule),
@@ -82,7 +82,7 @@ def _stereo_block(smiles_value: str) -> BuildingBlock:
 
 
 def test_inchikey_bucket_does_not_satisfy_opposite_stereo():
-    r_block = _stereo_block("C[C@H](O)C(=O)O")
+    r_block = stereo_block("C[C@H](O)C(=O)O")
     s_precursor = Precursor(smiles("C[C@@H](O)C(=O)O", ignore_stereo=False))
     catalogue = frozendict({r_block.inchikey[:14]: (r_block,)})
 
@@ -95,7 +95,7 @@ def test_inchikey_bucket_does_not_satisfy_opposite_stereo():
 def test_precursor_generates_its_inchikey_only_once(monkeypatch):
     import synplan.chem.precursor as precursor_module
 
-    block = _stereo_block("C[C@H](O)C(=O)O")
+    block = stereo_block("C[C@H](O)C(=O)O")
     catalogue = frozendict({block.inchikey[:14]: (block,)})
     original = precursor_module.molecule_to_inchikey
     calls = 0
