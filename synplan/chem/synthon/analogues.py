@@ -6,8 +6,6 @@ from collections.abc import Iterable
 from chython import synthon_smiles
 from chython.containers import SynthonContainer
 
-from synplan.chem.graph import neighbors
-
 # the four elements the reference lets an analogue gain or lose
 _SWAPPABLE = frozenset({"C", "F", "N", "O"})
 
@@ -29,7 +27,7 @@ def analogue_key(synthon: SynthonContainer) -> tuple[tuple, tuple]:
     # degree 2, and they are not interchangeable
     signature = tuple(
         sorted(
-            (a.atomic_symbol, len(neighbors(synthon, n)))
+            (a.atomic_symbol, len(synthon.neighbor_numbers(n)))
             for n, a in synthon.atoms()
             if getattr(a, "_label", None) is not None
         )

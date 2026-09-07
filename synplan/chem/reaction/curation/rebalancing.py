@@ -17,8 +17,6 @@ from chython import smiles as smiles_chython
 from chython.containers import MoleculeContainer, ReactionContainer
 from chython.exceptions import InvalidAromaticRing
 
-from synplan.chem.graph import neighbors, ordered_copy
-
 MAX_RADIUS = 4
 _MAX_CANDIDATES = 60
 _MAX_SEARCH_NODES = 5_000
@@ -289,7 +287,7 @@ def _has_broken_valence(molecule: MoleculeContainer) -> bool:
     itself a broken structure.  Only the verdict is wanted, so none of the
     canonicalisation that follows a valence check elsewhere is done here.
     """
-    kekulized = ordered_copy(molecule)
+    kekulized = molecule.ordered_copy()
     try:
         kekulized.remove_coordinate_bonds(keep_to_terminal=False)
         kekulized.kekule()
@@ -389,7 +387,7 @@ def _side_of_cuts(molecule: MoleculeContainer, start: int, cuts) -> set[int]:
     queue = [start]
     while queue:
         atom = queue.pop()
-        for neighbour in neighbors(molecule, atom):
+        for neighbour in molecule.neighbor_numbers(atom):
             if neighbour in seen or frozenset((atom, neighbour)) in cuts:
                 continue
             seen.add(neighbour)
@@ -794,7 +792,7 @@ def _ketones(molecules) -> int:
             carbon = left if molecule.atom(left).atomic_symbol == "C" else right
             if all(
                 molecule.atom(neighbour).atomic_symbol == "C"
-                for neighbour in neighbors(molecule, carbon)
+                for neighbour in molecule.neighbor_numbers(carbon)
                 if neighbour not in (left, right)
             ):
                 total += 1

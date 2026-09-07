@@ -16,8 +16,6 @@ from inspect import signature
 from chython import smiles as _read_smiles
 from chython.containers import MoleculeContainer
 
-from synplan.chem.graph import bond_items, get_bond, neighbors
-
 _STRICT_BACKEND = "strict_stereo" in signature(_read_smiles).parameters
 
 
@@ -178,8 +176,8 @@ def _requirements(mol: MoleculeContainer) -> tuple[StereoRequirement, ...]:
                 f"bond {n}-{m}: cumulene or unsupported stereo",
             )
         env = (
-            next(k for k in neighbors(mol, n) if k != m),
-            next(k for k in neighbors(mol, m) if k != n),
+            next(k for k in mol.neighbor_numbers(n) if k != m),
+            next(k for k in mol.neighbor_numbers(m) if k != n),
         )
         out.append(
             StereoRequirement(
@@ -241,7 +239,7 @@ def _local_environment(mol: MoleculeContainer, n: int) -> tuple:
     return (
         _atom_identity(atom),
         atom.implicit_hydrogens,
-        tuple(sorted((k, int(b)) for k, b in bond_items(mol, n))),
+        tuple(sorted((k, int(b)) for k, b in mol.bond_items(n))),
     )
 
 
@@ -285,7 +283,7 @@ def _transfer(
             )
             or (
                 req.kind == "double_bond"
-                and int(get_bond(precursor, req.atoms[0], req.atoms[1], 0)) != 2
+                and int(precursor.get_bond(req.atoms[0], req.atoms[1], 0)) != 2
             )
         ):
             reason = "requires_stereo_forming_step"
@@ -485,7 +483,7 @@ def stereo_events(reaction) -> list[dict]:
             keys += [
                 ("double_bond", (n, m))
                 for n, m in mol.chiral_cis_trans
-                if m in neighbors(mol, n)
+                if m in mol.neighbor_numbers(n)
             ]
             for kind, atoms in keys:
                 key = (

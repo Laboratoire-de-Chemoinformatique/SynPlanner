@@ -11,7 +11,6 @@ from chython.containers import MoleculeContainer, SynthonContainer
 from chython.exceptions import InvalidAromaticRing
 from chython.periodictable.base.synthon import BIVALENT_LABELS
 
-from synplan.chem.graph import bond_items, neighbors
 from synplan.chem.synthon.config import SynthonConfig, load_data
 from synplan.chem.synthon.stock import label_keys
 
@@ -69,9 +68,9 @@ def _lend_hydrogen(molecule: SynthonContainer, atom: int, order: int) -> None:
     shift = next(
         (
             (middle, donor)
-            for middle, to_middle in bond_items(molecule, atom)
+            for middle, to_middle in molecule.bond_items(atom)
             if int(to_middle) == 2
-            for donor, to_donor in bond_items(molecule, middle)
+            for donor, to_donor in molecule.bond_items(middle)
             if donor != atom
             and int(to_donor) == 1
             and molecule.atom(donor).atomic_symbol in PROTIC
@@ -189,7 +188,7 @@ def ring_size(
     for distance in range(1, limit):
         nxt = []
         for n in frontier:
-            for m in neighbors(molecule, n):
+            for m in molecule.neighbor_numbers(n):
                 if m == end:
                     return distance + 1
                 if m not in seen:

@@ -5,7 +5,6 @@ from chython import smiles
 from chython.containers import CGRContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
 
-from synplan.chem.graph import get_bond
 from synplan.chem.reaction.routes.io import (
     make_dict,
     read_routes_csv,
@@ -158,7 +157,7 @@ def test_compose_route_cgr_preserves_formed_then_broken_bond():
 
     assert isinstance(default_cgr, RouteCGRContainer)
     assert isinstance(transient_cgr, RouteCGRContainer)
-    assert get_bond(default_cgr, 1, 2) is None
+    assert default_cgr.get_bond(1, 2) is None
     assert transient_cgr.connected_components == [{1, 2, 3}]
     assert str(compose_sb_cgr(transient_cgr)) == str(compose_sb_cgr(default_cgr))
 

@@ -11,8 +11,6 @@ from torch import Tensor
 from torch_geometric.data.data import Data
 from torch_geometric.transforms import ToUndirected
 
-from synplan.chem.graph import bond_items
-
 
 def atom_to_vector(atom: Any) -> Tensor:
     """Given an atom, return a vector of length 8 with the following
@@ -56,7 +54,7 @@ def bonds_to_vector(molecule: MoleculeContainer, atom_ind: int) -> Tensor:
     """
 
     vector = torch.zeros(3, dtype=torch.uint8)
-    for _, b_order in bond_items(molecule, atom_ind):
+    for _, b_order in molecule.bond_items(atom_ind):
         vector[int(b_order) - 1] += 1
     return vector
 

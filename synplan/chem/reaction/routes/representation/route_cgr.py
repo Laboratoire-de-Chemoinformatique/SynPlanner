@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING
 
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 
-from synplan.chem.graph import get_bond, replace_atom
 from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction.routes.contracts import (
     RouteCGRBuildResult,
@@ -189,8 +188,7 @@ def _apply_route_orders(
         set(atom_route_orders) | set(atom_route_step_orders) | set(atom_step_states)
     ):
         if cgr.has_atom(atom_num):
-            replace_atom(
-                cgr,
+            cgr.replace_atom(
                 atom_num,
                 route_atom(
                     cgr.atom(atom_num),
@@ -479,7 +477,7 @@ def _compose_cgrs(
         return composed_cgr
 
     for atom1, atom2, bond in curr_cgr.bonds():
-        next_bond = get_bond(accum_cgr, atom1, atom2)
+        next_bond = accum_cgr.get_bond(atom1, atom2)
         if (
             bond.order is None
             and (
@@ -490,7 +488,7 @@ def _compose_cgrs(
                     and next_bond.p_order is None
                 )
             )
-            and get_bond(composed_cgr, atom1, atom2) is None
+            and composed_cgr.get_bond(atom1, atom2) is None
         ):
             if bond.p_order is None:
                 composed_cgr.add_bond(atom1, atom2, bond)
@@ -501,7 +499,7 @@ def _compose_cgrs(
         if (
             bond.order is None
             and bond.p_order is None
-            and get_bond(composed_cgr, atom1, atom2) is None
+            and composed_cgr.get_bond(atom1, atom2) is None
         ):
             composed_cgr.add_bond(atom1, atom2, bond)
 

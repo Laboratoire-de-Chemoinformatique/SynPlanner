@@ -12,7 +12,6 @@ from typing import Any
 from chython.algorithms.fingerprints import MorganFingerprint
 from chython.containers import QueryCGRContainer, ReactionContainer
 
-from synplan.chem.graph import neighbors
 from synplan.chem.reaction.rules.representation.query_cgr import (
     query_cgr_atom_label,
     query_cgr_bond_label,
@@ -119,7 +118,7 @@ class QueryCGRMorganFingerprintAdapter(MorganFingerprint):
                 neighbor: _FingerprintBond(
                     _stable_hash(query_cgr_bond_label(query_cgr, atom, neighbor))
                 )
-                for neighbor in neighbors(query_cgr, atom)
+                for neighbor in query_cgr.neighbor_numbers(atom)
             }
             for atom in query_cgr
         }

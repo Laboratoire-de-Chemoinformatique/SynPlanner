@@ -5,7 +5,6 @@ from chython.containers import MoleculeContainer
 from chython.files import smarts
 from chython.reactor import Transformer
 
-from synplan.chem.graph import bond_items, neighbors
 from synplan.chem.utils import safe_canonicalization
 
 # six PG/LG removals applied to fixpoint, so a di-Cbz piperazine loses both. Each deletes the
@@ -60,13 +59,13 @@ def murcko_atoms(molecule: MoleculeContainer) -> set[int]:
         drop = {
             n
             for n in core
-            if n not in keep and len(set(neighbors(molecule, n)) & core) <= 1
+            if n not in keep and len(set(molecule.neighbor_numbers(n)) & core) <= 1
         }
         if not drop:
             break
         core -= drop
     return core | {
-        other for n in core for other, bond in bond_items(molecule, n) if int(bond) > 1
+        other for n in core for other, bond in molecule.bond_items(n) if int(bond) > 1
     }
 
 

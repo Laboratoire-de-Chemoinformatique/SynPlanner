@@ -11,7 +11,6 @@ from chython import smarts
 from chython.containers import QueryCGRContainer, ReactionContainer
 from torch_geometric.data import Data
 
-from synplan.chem.graph import neighbors
 from synplan.chem.reaction.rules.representation.config import (
     RULE_GRAPH_CHARGE_OFFSET,
     RULE_GRAPH_COUNT_LABELS,
@@ -161,7 +160,7 @@ def _canonical_atom_order(
             (item for item in atoms if colors[item] == color),
             key=lambda item: (
                 repr(labels[item]),
-                len(neighbors(query_cgr, item)),
+                len(query_cgr.neighbor_numbers(item)),
                 item,
             ),
         )
@@ -181,7 +180,7 @@ def _node_features(
         _charge_feature(label[4]),
         float(label[5]),
         float(label[6]),
-        float(len(neighbors(query_cgr, atom))),
+        float(len(query_cgr.neighbor_numbers(atom))),
     ]
     features.extend(_numeric_set_features(label[7], _COUNT_LABELS))
     features.extend(_numeric_set_features(label[8], _COUNT_LABELS))
@@ -257,7 +256,7 @@ def query_cgr_to_pyg(
     edge_index = []
     edge_attr = []
     for atom in order:
-        for neighbor in neighbors(query_cgr, atom):
+        for neighbor in query_cgr.neighbor_numbers(atom):
             edge_index.append([positions[atom], positions[neighbor]])
             edge_attr.append(_edge_features(query_cgr, atom, neighbor))
 

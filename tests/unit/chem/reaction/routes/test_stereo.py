@@ -11,7 +11,6 @@ from chython import smiles
 from frozendict import frozendict
 
 from synplan.chem.building_blocks import BuildingBlock, molecule_to_inchikey
-from synplan.chem.graph import neighbors
 from synplan.chem.reaction.routes.stereo import (
     _requirements,
     _sign,
@@ -284,7 +283,7 @@ def test_stereo_lost_and_recreated_at_an_intermediate_is_unresolved(fixtures, st
     original, sources = read_stereo_route(case["tree"], strip_stereo=True)
     leaf = original.leaves()[1]
     n = next(iter(leaf.chiral_tetrahedrons))
-    o = next(k for k in neighbors(leaf, n) if leaf.atom(k).atomic_number == 8)
+    o = next(k for k in leaf.neighbor_numbers(n) if leaf.atom(k).atomic_number == 8)
     ketone = leaf.copy()
     ketone.bond(n, o)._order = 2
     ketone.atom(n)._implicit_hydrogens = 0

@@ -22,7 +22,6 @@ from typing import NamedTuple
 from chython import smarts
 from chython.containers import MoleculeContainer, ReactionContainer
 
-from synplan.chem.graph import bond_items, neighbors
 from synplan.chem.synthon.config import SynthonConfig, load_data
 from synplan.chem.synthon.transformer import (
     RULE_NUCLEOPHILE_CAPS,
@@ -139,7 +138,7 @@ def _departing(
     """Heavy neighbours of *number* that never reach the product, and whether a pi bond dropped."""
     departing: set[str] = set()
     pi_reduced = False
-    for neighbour, bond in bond_items(molecule, number):
+    for neighbour, bond in molecule.bond_items(number):
         if neighbour not in product_numbers:
             departing.add(molecule.atom(neighbour).atomic_symbol)
         elif bond.order > 1 and molecule.atom(neighbour).atomic_symbol != "C":
@@ -167,7 +166,7 @@ def _formed_bonds(
     for a, b, _ in product.bonds():
         if a not in left or b not in left:
             continue  # unmapped in the product: cannot tell, do not guess
-        if left[a] is left[b] and b in neighbors(left[a], a):
+        if left[a] is left[b] and b in left[a].neighbor_numbers(a):
             continue
         formed.add(frozenset((a, b)))
     return formed

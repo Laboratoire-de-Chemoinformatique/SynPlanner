@@ -19,7 +19,6 @@ from chython.exceptions import InvalidAromaticRing
 from chython.periodictable import QueryElement
 from tqdm.auto import tqdm
 
-from synplan.chem.graph import neighbors
 from synplan.chem.mapping import MappingBudgetExceeded
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.curation.reaction_result import (
@@ -99,27 +98,27 @@ def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
                 continue
             references = set(req.atoms)
             for n in req.atoms:
-                references.update(neighbors(mol, n))
+                references.update(mol.neighbor_numbers(n))
             if not references <= atoms:
                 raise ValueError(
                     f"incomplete {req.kind} reference environment in query at {req.atoms}"
                 )
             if req.kind == "tetrahedron":
                 q.atom(req.atoms[0]).stereo = mol._translate_tetrahedron_sign(
-                    req.atoms[0], tuple(neighbors(q, req.atoms[0]))
+                    req.atoms[0], tuple(q.neighbor_numbers(req.atoms[0]))
                 )
             elif req.kind == "allene":
                 center, left, right = req.atoms
                 env = (
-                    next(n for n in neighbors(q, left) if n != center),
-                    next(n for n in neighbors(q, right) if n != center),
+                    next(n for n in q.neighbor_numbers(left) if n != center),
+                    next(n for n in q.neighbor_numbers(right) if n != center),
                 )
                 q.atom(center).stereo = mol._translate_allene_sign(center, *env)
             else:
                 n, m = req.atoms
                 env = (
-                    next(k for k in neighbors(q, n) if k != m),
-                    next(k for k in neighbors(q, m) if k != n),
+                    next(k for k in q.neighbor_numbers(n) if k != m),
+                    next(k for k in q.neighbor_numbers(m) if k != n),
                 )
                 q.bond(n, m).stereo = mol._translate_cis_trans_sign(n, m, *env)
     return q
@@ -448,7 +447,7 @@ def _isomorphism_cost_estimate(query, target) -> float:
         a = mol.atom(n)
         return (
             a.atomic_symbol,
-            len(neighbors(mol, n)),
+            len(mol.neighbor_numbers(n)),
             getattr(a, "hybridization", None) == 4,
         )
 
@@ -615,7 +614,7 @@ def create_rule(
         for req in _requirements(mol):
             needed = set(req.atoms)
             for n in req.atoms:
-                needed.update(neighbors(mol, n))
+                needed.update(mol.neighbor_numbers(n))
             for n in req.atoms:
                 references.setdefault(n, []).append(needed)
     pending = deque(rule_atoms)

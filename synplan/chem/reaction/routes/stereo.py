@@ -18,7 +18,6 @@ from chython.containers import MoleculeContainer, ReactionContainer
 
 from synplan.chem.building_blocks import BuildingBlockCatalogue, molecule_to_inchikey
 from synplan.chem.building_blocks.stereo import _record_molecule
-from synplan.chem.graph import bond_items, neighbors
 from synplan.chem.mapping import MappingBudgetExceeded, bounded_mappings
 from synplan.chem.reaction.routes.route import Route, Step
 from synplan.chem.stereo import (
@@ -138,8 +137,8 @@ def _orientation_key(
             n1, n2 = req.environment
             native = mol._translate_cis_trans_sign(start, end, n1, n2, req.sign)
             env = (
-                min(k for k in neighbors(mol, n) if k != m),
-                min(k for k in neighbors(mol, m) if k != n),
+                min(k for k in mol.neighbor_numbers(n) if k != m),
+                min(k for k in mol.neighbor_numbers(m) if k != n),
             )
             sign = mol._translate_cis_trans_sign(n, m, *env, native)
         out.append((req.target_atoms if by_requirement else (), req.kind, atoms, sign))
@@ -317,9 +316,9 @@ def _chemistry_flags(
             product.atom(k).atomic_number == 6
             and any(
                 int(b) == 2 and product.atom(j).atomic_number == 8
-                for j, b in bond_items(product, k)
+                for j, b in product.bond_items(k)
             )
-            for k in neighbors(product, n)
+            for k in product.neighbor_numbers(n)
         ):
             flags.append(
                 {

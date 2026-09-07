@@ -15,7 +15,6 @@ from chython.containers import (
     ReactionContainer,
 )
 
-from synplan.chem.graph import neighbors
 from synplan.chem.reaction.curation.reaction_result import (
     ExtractedRuleRecord,
     ExtractionBatchResult,
@@ -46,7 +45,7 @@ def default_config() -> RuleExtractionConfig:
 
 def _neighbours(mol: MoleculeContainer | CGRContainer, idx: int) -> set[int]:
     """Return immediate neighbour atom numbers for *idx*."""
-    return set(neighbors(mol, idx))
+    return set(mol.neighbor_numbers(idx))
 
 
 # ---------------------------------------------------------------------------

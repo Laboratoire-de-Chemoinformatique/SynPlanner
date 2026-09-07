@@ -4,7 +4,6 @@ import pytest
 from chython import smiles, synthon_smiles
 from chython._engine import native_graph
 
-from synplan.chem.graph import bond_items, neighbors, ordered_copy
 from synplan.chem.stereo import assert_stereo_preserved
 from synplan.chem.utils import in_atom_order, safe_canonicalization
 
@@ -27,11 +26,11 @@ def test_ordered_molecules_keep_native_storage_and_stereo(text):
         atom.xy = (n / 10, -n / 10)
         coordinates[n] = tuple(atom.xy)
     order = tuple(molecule)
-    environments = {n: tuple(neighbors(molecule, n)) for n in molecule}
-    result = ordered_copy(molecule)
+    environments = {n: tuple(molecule.neighbor_numbers(n)) for n in molecule}
+    result = molecule.ordered_copy()
     assert native_graph(result) is not None
     assert tuple(result) == tuple(sorted(molecule))
-    assert {n: tuple(neighbors(result, n)) for n in result} == environments
+    assert {n: tuple(result.neighbor_numbers(n)) for n in result} == environments
     assert {n: tuple(a.xy) for n, a in result.atoms()} == coordinates
     assert result.name == molecule.name
     assert result.meta == molecule.meta and result.meta is not molecule.meta
@@ -39,19 +38,20 @@ def test_ordered_molecules_keep_native_storage_and_stereo(text):
     ordered = in_atom_order(molecule)
     assert native_graph(ordered) is not None
     assert all(
-        tuple(neighbors(ordered, n)) == tuple(sorted(environments[n])) for n in ordered
+        tuple(ordered.neighbor_numbers(n)) == tuple(sorted(environments[n]))
+        for n in ordered
     )
     assert_stereo_preserved(molecule, ordered)
     canonical = safe_canonicalization(molecule)
     assert native_graph(canonical) is not None
     assert_stereo_preserved(molecule, canonical)
     assert tuple(molecule) == order
-    assert {n: tuple(neighbors(molecule, n)) for n in molecule} == environments
+    assert {n: tuple(molecule.neighbor_numbers(n)) for n in molecule} == environments
 
 
 def test_ordered_synthon_keeps_attachment_labels():
     molecule = synthon_smiles("[NH_nuc:9][CH3:2]", remap=False)
-    result = ordered_copy(molecule)
+    result = molecule.ordered_copy()
     assert native_graph(result) is not None
     assert result.atom(9).label == molecule.atom(9).label == "nuc"
     assert result.atom(9).implicit_hydrogens == molecule.atom(9).implicit_hydrogens
@@ -80,8 +80,8 @@ def test_cgr_neighbors_include_both_states_and_keep_shared_bonds():
     cgr = ~smiles("[CH3:9][OH:2].[Cl-:5]>>[CH3:9][Cl:5].[OH-:2]", remap=False)
     backend = native_graph(cgr)
     assert backend is not None
-    assert set(neighbors(cgr, 9)) == {2, 5}
-    assert {(n, b.order, b.p_order) for n, b in bond_items(cgr, 9)} == {
+    assert set(cgr.neighbor_numbers(9)) == {2, 5}
+    assert {(n, b.order, b.p_order) for n, b in cgr.bond_items(9)} == {
         (2, 1, None),
         (5, None, 1),
     }

@@ -5,7 +5,6 @@ from typing import Any
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
 
-from synplan.chem.graph import bond_items, neighbors, ordered_copy
 from synplan.chem.reaction.routes.clustering.pseudo_atoms import (
     DynamicX,
     MarkedAt,
@@ -39,7 +38,7 @@ def lg_process_reset(lg_cgr: CGRContainer, atom_num: int):
         flagged as a radical.
     """
     for atom1 in lg_cgr:
-        for atom2, bond in list(bond_items(lg_cgr, atom1)):
+        for atom2, bond in list(lg_cgr.bond_items(atom1)):
             if bond.p_order is None and bond.order is not None:
                 order = int(bond.order)
                 lg_cgr.delete_bond(atom1, atom2)
@@ -77,7 +76,7 @@ def lg_replacer(route_cgr: CGRContainer):
     cgr_prods = [route_cgr.substructure(c) for c in route_cgr.connected_components]
     target_cgr = cgr_prods[0]
 
-    rows = [(n, list(bond_items(target_cgr, n))) for n in target_cgr]
+    rows = [(n, list(target_cgr.bond_items(n))) for n in target_cgr]
     reaction = ReactionContainer.from_cgr(target_cgr)
     target_mol = reaction.products[0]
     max_in_target_mol = max(target_mol)
@@ -191,7 +190,7 @@ def lg_reaction_replacer(
                     if atom_num == val[1]:
                         lg.mark = k
                         lg.isotope = k
-                        atom1 = next(iter(neighbors(reactant, atom_num)))
+                        atom1 = next(iter(reactant.neighbor_numbers(atom_num)))
                         bond = reactant.bond(atom_num, atom1)
                         reactant.delete_bond(atom1, atom_num)
                         reactant.delete_atom(atom_num)
@@ -520,7 +519,7 @@ def replace_leaving_groups_in_synthon(subgroup, to_remove):
 
         if current_mark in to_remove:
             # Remove old LG (X): delete bond and atom
-            adjacent = list(neighbors(updated_cgr, atom_idx))
+            adjacent = list(updated_cgr.neighbor_numbers(atom_idx))
             if adjacent:
                 neighbor_idx = adjacent[0]
                 bond = updated_cgr.bond(atom_idx, neighbor_idx)
@@ -546,7 +545,7 @@ def replace_leaving_groups_in_synthon(subgroup, to_remove):
             new_lgs[adjusted_mark] = atom_idx
 
     # Reorder atoms dict and update 2D coordinates for depiction
-    updated_cgr = ordered_copy(updated_cgr)
+    updated_cgr = updated_cgr.ordered_copy()
 
     return updated_cgr, new_lgs
 
