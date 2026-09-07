@@ -94,8 +94,14 @@ _EXPORTS = {
     "depict_custom_reaction": "representation.depiction",
     "wide_cgr_renderer": "representation.depiction",
     # quality
+    "ASRouteScorer": "quality.retrek",
+    "CDRouteScorer": "quality.retrek",
     "ProtectionRouteScorer": "quality.scorer",
+    "RDRouteScorer": "quality.retrek",
+    "RetrekRouteScorer": "quality.retrek",
+    "RetrekRouteScoringConfig": "quality.retrek",
     "RouteScorer": "quality.scorer",
+    "STRouteScorer": "quality.retrek",
 }
 
 _LEGACY_EXPORTS = frozenset(
