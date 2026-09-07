@@ -4,6 +4,7 @@ from typing import Any
 
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
+from tqdm.auto import tqdm
 
 from synplan.chem.reaction.routes.clustering.pseudo_atoms import (
     DynamicX,
@@ -409,7 +410,9 @@ def group_routes_by_synthon_detail(
     return final_groups
 
 
-def subcluster_all_clusters(groups, sb_cgrs_dict, route_cgrs_dict):
+def subcluster_all_clusters(
+    groups, sb_cgrs_dict, route_cgrs_dict, *, silent: bool = True
+):
     """
     Subdivide each reaction cluster into detailed synthon-based subgroups.
 
@@ -424,6 +427,8 @@ def subcluster_all_clusters(groups, sb_cgrs_dict, route_cgrs_dict):
         Dictionary of SB-CGRs
     route_cgrs_dict : dict
         Dictionary of RoteCGRs
+    silent : bool
+        Set False to show one progress bar for all clusters.
 
     Returns
     -------
@@ -432,7 +437,9 @@ def subcluster_all_clusters(groups, sb_cgrs_dict, route_cgrs_dict):
         or None if any cluster fails to subcluster.
     """
     all_subgroups = {}
-    for group_index, group in groups.items():
+    for group_index, group in tqdm(
+        groups.items(), desc="Subclustering", unit="cluster", disable=silent
+    ):
         group_synthons = _build_subcluster_route_data(
             group, sb_cgrs_dict, route_cgrs_dict
         )

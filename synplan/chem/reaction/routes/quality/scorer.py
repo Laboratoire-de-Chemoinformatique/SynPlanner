@@ -7,6 +7,8 @@ implementations for different scoring strategies.
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
+from tqdm.auto import tqdm
+
 from synplan.chem.reaction.routes.quality.protection.config import ProtectionConfig
 from synplan.chem.reaction.routes.quality.protection.functional_groups import (
     FunctionalGroupDetector,
@@ -38,18 +40,28 @@ class RouteScorer(ABC):
         :return: This scorer's verdict.
         """
 
-    def rank(self, routes: Iterable[Route]) -> list[Route]:
+    def rank(self, routes: Iterable[Route], *, silent: bool = True) -> list[Route]:
         """The routes, best :meth:`score` first.
 
-        This scores every route, so it costs one :meth:`score` per route --
-        tens of seconds for a few hundred under :class:`ProtectionRouteScorer`,
-        whose scan runs ~64 ms per molecule its cache has not seen. It is not
-        the cheap ``sorted`` its name suggests.
+        This scores every route, including functional-group scans for molecules
+        the protection scorer's cache has not seen.
 
         :param routes: The routes to order.
+        :param silent: Set False to show one bar counting completed scores, with
+            elapsed time, throughput and estimated time remaining.
         :return: A new list, best first.
         """
-        return sorted(routes, key=self.score, reverse=True)
+        routes = list(routes)
+        with tqdm(
+            total=len(routes), desc="Ranking routes", unit="route", disable=silent
+        ) as bar:
+
+            def score(route):
+                value = self.score(route)
+                bar.update()
+                return value
+
+            return sorted(routes, key=score, reverse=True)
 
 
 class PolicyLikelihoodScorer(RouteScorer):
