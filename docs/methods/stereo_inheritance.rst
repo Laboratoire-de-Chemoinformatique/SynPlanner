@@ -67,8 +67,9 @@ relative/mixture requirements and unsupported stereo remain unassessed.
 
 Import ``Route`` from ``synplan.chem.reaction.routes.route``. CLI runs write
 ``stereo_proposals_<target index>.json`` and ``.html`` beside normal route reports,
-including when no stereo-fulfilled route was found. HTML reports show stereo and
-selectivity-evidence status separately. Search records preserve the same verdict.
+including when no stereo-fulfilled route was found. HTML reports place unresolved
+stereo requirements beside the responsible steps. Route JSON and search records
+retain structural and selectivity-evidence status separately.
 
 Exact materials and evidence
 ----------------------------
@@ -150,7 +151,7 @@ also have explicit caps. Exhaustion reports an incomplete assessment. These are
 bounds on added correspondence work, not a claim that Chython perception,
 canonicalization or arbitrary graph isomorphism is linear.
 
-The paired Chython patch adds native shared work limits, strict SMILES/MDL stereo
+The pinned Chython backend supplies native shared work limits, strict SMILES/MDL stereo
 parsing, checked SMARTS constraints, enhanced reaction CXSMILES and stereo
 validation before atom-set deduplication. Its MDL writers prepare and check 2D
 geometry, and mark unspecified double bonds explicitly. Drawing never changes
@@ -159,15 +160,10 @@ matching absolute configurations.
 
 The compiled matcher enforces the shared budget for representable queries;
 extended predicates retain the Python path. Recursive constraints share the
-same budget. Rebuild the Chython Cython extensions to enable this fast path:
-an older binary automatically uses the bounded Python fallback. No runtime
-dependency was added for the optimization.
+same budget. Published wheels include these compiled operations. SynPlanner uses
+public graph APIs to preserve native storage during graph edits and rule application.
 
-SynPlanner uses these APIs when available and retains a bounded fallback for
-released Chython 1.105. Full MDL preservation requires the paired backend:
-the fallback verifies each written structure and can refuse a depiction that
-1.105 cannot preserve. CXSMILES remains available. Strict rejection of malformed
-MDL stereo is provided by the updated backend; this is separate from the checked
-SMILES parser available on both versions. Existing installed dependencies and
-model weights are not modified by selecting the worktree.
+Chython 1.108 draws specified configurations with filled or aligned hashed wedges
+and unspecified configurations with compact, tapered waves. Molecule, reaction
+and route depictions share these symbols without changing stored stereochemistry.
 Atropisomer planning and general conditions/selectivity prediction remain deferred.

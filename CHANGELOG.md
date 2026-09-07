@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Optional progress bars for route ranking and clustering through `silent=False`.
 - Chython stereo constraints for carbon tetrahedra, E/Z and allene axes across
   preparation, extraction, stock selection, search and route reconstruction.
   Unresolved stereo strategies remain proposals; they cannot receive solved
@@ -90,6 +91,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Pin Chython 1.108 for compiled graph and stereo operations, public graph APIs,
+  the macOS InChI loader fix, and clearer filled, hashed and unspecified stereo bonds.
 - `load_reaction_rules()` now disables Chython's `automorphism_filter` only
   when a compatible LHS permutation is not realized by the exact RHS product
   patch. Callers can retain the configured baseline with

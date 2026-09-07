@@ -357,7 +357,7 @@ def test_exports_read_live_stereo_status_once_and_recheck_edits(
         exported["stereo_status"] == exported["stereo"]["stereo_status"] == "fulfilled"
     )
     calls.clear()
-    assert "Stereo requirements fulfilled" in routes_report_html([route], None)
+    assert '<div class="draw">' in routes_report_html([route], None)
     assert len(calls) == 1
     context = route.stereo["context"]
     restored = Route.from_json(exported)

@@ -189,6 +189,8 @@ def test_reactor_direct_and_cgr_preserve_remote_stereo(text, rebuild):
 
 
 def test_real_patent_step_search_inheritance_export_price_and_invalidation():
+    from synplan.utils.visualisation import routes_report_html
+
     cases = json.loads(
         (Path(__file__).parents[1] / "data/stereo/routes.json").read_text()
     )
@@ -210,8 +212,14 @@ def test_real_patent_step_search_inheritance_export_price_and_invalidation():
     assert restored.solved and restored.stereo_status == "fulfilled"
     assert molecule_to_inchikey(restored.target) == molecule_to_inchikey(target)
     assert all(m.meta.get("selected_stock") for m in restored.leaves())
+    page = routes_report_html([restored], None)
+    assert "Stereo requirements fulfilled" not in page
+    assert "Selectivity evidence:" not in page
+    assert "Stereo:" not in page
+    assert "Selected building block:" not in page
     route.steps[0].reaction.meta["procedure"] = "changed workup"
     assert route.stereo_status == "needs_reassessment" and not route.solved
+    assert "Stereo needs reassessment after edits" in routes_report_html([route], None)
 
 
 def test_source_annotation_gain_differs_from_creation_and_stereo_only_rules_survive():
@@ -256,12 +264,14 @@ def test_discarded_stereo_is_an_explicit_parse_failure(text):
 @pytest.mark.parametrize("text", ["OCC[C@H](F)Cl", "OCC/C=C/C", "OCC=[C@]=CC"])
 def test_complete_family_route_stock_record_and_cgr_roundtrip(text, tmp_path):
     import pickle
+    from html import escape
 
     from synplan.chem.reaction.routes.representation.deconvolution import (
         reactions_from_route_cgr,
     )
     from synplan.chem.reaction.routes.representation.route_cgr import build_route_cgr
     from synplan.mcts.record import read_search_record, write_search_record
+    from synplan.utils.visualisation import routes_report_html
 
     rule = CanonicalRetroReactor.from_smarts("[C;h2:1]-[O;h1:2]>>[C:1]-[Cl:3].[O:2]")
     stock = catalogue((text.replace("O", "Cl", 1), 4), ("O", 0.1))
@@ -274,6 +284,14 @@ def test_complete_family_route_stock_record_and_cgr_roundtrip(text, tmp_path):
     (restored,) = record.routes()
     assert restored.solved and restored.to_json()["stereo_status"] == "fulfilled"
     assert str(restored.target) == str(route.target)
+    before = [format(step.reaction, "m") for step in restored]
+    page = routes_report_html([restored], None)
+    assert "Stereo:" not in page
+    assert "Selected building block:" not in page
+    assert escape(str(restored.steps[0].reaction)) in page
+    if "@" in text:  # Chython draws both tetrahedral and allene stereo as wedges.
+        assert ' Z"' in page or 'data-stereo="hashed"' in page
+    assert [format(step.reaction, "m") for step in restored] == before
     cgr = build_route_cgr({0: route.reactions_dict}, 0, include_reactions=True).cgr
     for variant in (cgr, cgr.copy(), pickle.loads(pickle.dumps(cgr))):
         steps = reactions_from_route_cgr(variant)
@@ -302,7 +320,13 @@ def test_proposal_review_and_search_record_keep_outstanding_strategy(tmp_path):
     assert not record.winning_nodes and record.proposal_nodes
     route = Route.from_tree(record, record.proposal_nodes[0])
     assert route.stereo_status == "strategy_needed"
-    assert "Stereo strategy needed" in routes_report_html([route], None)
+    page = routes_report_html([route], None)
+    assert "Selectivity evidence:" not in page
+    assert (
+        "Required stereochemistry must be established at this step"
+        in page.split('<div class="step">')[1]
+    )
+    assert "Required configuration is inherited" not in page
     reviewed = review_stereo_route(
         route,
         0,

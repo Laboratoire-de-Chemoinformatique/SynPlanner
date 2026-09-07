@@ -335,6 +335,7 @@ def routes_report_html(
     solved = 0
     for index, route in enumerate(routes, 1):
         rows = ""
+        stereo_status = route.stereo_status
         step_by_node = {
             s.origin.tree_node_id: i for i, s in enumerate(route.steps) if s.origin
         }
@@ -344,14 +345,23 @@ def routes_report_html(
             if responsible is None:
                 responsible = step_by_node.get(obligation.get("tree_node_id"))
             issues_by_step.setdefault(responsible, []).append(
-                obligation.get("detail")
+                {
+                    "requires_stereo_forming_step": "Required stereochemistry must be established at this step; selectivity is unassessed.",
+                    "requires_explicit_resolution_or_inversion_strategy": "An explicit stereo inversion or separation strategy is needed.",
+                }.get(obligation.get("reason"))
+                or obligation.get("detail")
                 or obligation.get("reason", "Stereo assessment needed")
             )
         for number, step in enumerate(route, 1):
             label = _step_label(step)
+            notes = list(issues_by_step.get(number - 1, ()))
+            if stereo_status == "needs_reassessment" and (
+                notes or step.reaction.meta.get("stereo_events")
+            ):
+                notes = ["Stereo needs reassessment after edits."]
             stereo_note = "".join(
-                f'<div class="lab">Stereo: {escape(detail.replace("_", " "))}</div>'
-                for detail in issues_by_step.get(number - 1, ())
+                f'<div class="rxn">Stereo: {escape(detail.replace("_", " "))}</div>'
+                for detail in dict.fromkeys(notes)
             )
             rows += (
                 f'<div class="step"><div class="disc">{number}</div><div>'
@@ -363,40 +373,11 @@ def routes_report_html(
         node_id = None if provenance is None else provenance.tree_node_id
         score = None if provenance is None else provenance.search_score
         unresolved = len(route.unresolved)
-        stereo_labels = {
-            "fulfilled": "Stereo requirements fulfilled",
-            "strategy_needed": "Stereo strategy needed",
-            "could_not_be_assessed": "Stereo could not be assessed",
-            "pending": "Stereo assessment pending",
-            "not_assessed": "Stereo not assessed",
-            "needs_reassessment": "Stereo needs reassessment after edits",
-        }
-        stereo_status = route.stereo_status
         solved += (
             not unresolved and stereo_status == "fulfilled"
             if route.stereo is not None
             else route.solved
         )
-        stereo_text = stereo_labels.get(stereo_status, stereo_status)
-        stereo_detail = ""
-        if route.stereo:
-            step_by_node = {
-                s.origin.tree_node_id: i for i, s in enumerate(route.steps) if s.origin
-            }
-            for obligation in route.stereo.get("obligations", ()):
-                step_number = obligation.get("step")
-                if step_number is None:
-                    node = obligation.get("tree_node_id")
-                    step_number = step_by_node.get(node)
-                location = (
-                    f"Step {step_number + 1}: " if step_number is not None else ""
-                )
-                detail = obligation.get("detail", obligation.get("reason", "")).replace(
-                    "_", " "
-                )
-                stereo_detail += f"<p>{escape(location + detail)}</p>"
-            evidence = route.stereo.get("selectivity_evidence_status", "not assessed")
-            stereo_detail += f"<p>Selectivity evidence: {escape(evidence.replace('_', ' '))}. Structural labels do not establish ee, er or dr.</p>"
         body.append(
             '<section class="route card"><div class="rhead">'
             f'<div class="kv"><div class="eyebrow">Route</div>'
@@ -407,7 +388,7 @@ def routes_report_html(
             f'<div class="v">{"—" if score is None else round(score, 3)}</div></div>'
             f'<div class="kv"><div class="eyebrow">Not in stock</div>'
             f'<div class="v">{unresolved}</div></div></div>'
-            f'<p>{escape(stereo_text)}</p>{stereo_detail}<div class="draw">'
+            f'<div class="draw">'
             f"{doc.route(route.svg(standalone=False, layouts=layouts))}"
             f"</div>{rows}</section>"
         )
