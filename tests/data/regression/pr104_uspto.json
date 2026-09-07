@@ -1,0 +1,19 @@
+{
+  "cyanamide_methanol": {
+    "source_path": "data_repo/SynPlanner/uspto/uspto_standardized.zip",
+    "archive_member": "uspto_standardized.smi",
+    "line_number": 552,
+    "record_id": "581",
+    "patent": "US03931316",
+    "source_line_sha256": "76572f0bb39de1f84962504c333a8100f3438de06d7d9469d61b88ab11db2d00",
+    "source_line": "[NH2:5][C:3]#[N:4].[OH:2][CH3:1]>>[NH2:5][C:3](=[NH:4])[O:2][CH3:1]\t581\tUS03931316/US03931316"
+  },
+  "stereo_nitrile_reduction": {
+    "source_path": "SynPlanner/local/uspto_full_mapped.smi",
+    "line_number": 4509,
+    "record_id": "4509",
+    "patent": "US03950405",
+    "source_line_sha256": "67c364a9be9caedc7f1a1ef0c45b4fd8b8807c67551c260f29a702435ce2e16d",
+    "source_line": "[CH2:7]1[CH2:6][C@@H:5]([CH2:13][CH2:12][C@H:8]1[C:9]([OH:10])=[O:11])[C:4]#[N:14].[NH3:2].[NH3:3].[OH2:1]>[Co:15]>[CH2:7]1[CH2:6][C@@H:5]([CH2:13][CH2:12][C@H:8]1[C:9](=[O:11])[OH:10])[CH2:4][NH2:14]\t4509\tUS03950405"
+  }
+}

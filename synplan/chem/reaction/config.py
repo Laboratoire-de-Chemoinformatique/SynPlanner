@@ -11,9 +11,11 @@ class ReactorConfig(BaseConfigModel):
     Controls how Reactor objects are created when loading reaction rules.
     Intended for programmatic use, not config files.
 
-    :param automorphism_filter: If True, skip substructure matches to the same
-        set of atoms. Should be False for asymmetric product templates (e.g.
-        Suzuki) where different match orientations produce different products.
+    :param automorphism_filter: Baseline Chython match-deduplication setting.
+        If True, duplicate matches are filtered for ordinary rules, while
+        :func:`synplan.utils.loading.load_reaction_rules` may selectively
+        override it for symmetry-breaking rules. If False, filtering is
+        disabled for every rule.
     :param delete_atoms: If True, atoms in reactants but not in products are removed.
     :param one_shot: If True, do only single reaction center per application.
 
