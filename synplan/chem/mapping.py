@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from chython.algorithms.isomorphism import QueryIsomorphism
 from chython.containers import QueryContainer
 
+from synplan.chem.graph import bond_items, neighbors
 from synplan.chem.stereo import has_stereo
 
 
@@ -140,9 +141,7 @@ def bounded_mappings(
             yield mapping.copy()
             return
         number, back, atom, _ = order[depth]
-        candidates = (
-            molecule._bonds[mapping[back]] if back in mapping else molecule._atoms
-        )
+        candidates = neighbors(molecule, mapping[back]) if back in mapping else molecule
         for target in candidates:
             budget.consume()
             if (
@@ -154,9 +153,9 @@ def bounded_mappings(
             if number in recursive and target not in recursive[number]:
                 continue
             expected = {
-                mapping[n]: b for n, b in query._bonds[number].items() if n in mapping
+                mapping[n]: b for n, b in bond_items(query, number) if n in mapping
             }
-            actual = {n: b for n, b in molecule._bonds[target].items() if n in reverse}
+            actual = {n: b for n, b in bond_items(molecule, target) if n in reverse}
             budget.consume(len(expected) + len(actual))
             if expected.keys() != actual.keys() or any(
                 b != actual[n] for n, b in expected.items()

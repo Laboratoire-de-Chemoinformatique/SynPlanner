@@ -184,7 +184,7 @@ def test_reactor_direct_and_cgr_preserve_remote_stereo(text, rebuild):
     assert groups
     for products in groups:
         for req in original:
-            owner = next(p for p in products if req.atoms[0] in p._atoms)
+            owner = next(p for p in products if p.has_atom(req.atoms[0]))
             assert _sign(owner, req) == req.sign
 
 
@@ -281,7 +281,7 @@ def test_complete_family_route_stock_record_and_cgr_roundtrip(text, tmp_path):
     remapped = cgr.remap({n: n + 100 for n in cgr}, copy=True)
     assert str(reactions_from_route_cgr(remapped)[0].products[0]) == str(route.target)
     # Per-step labels changed without a corresponding source stereo update.
-    atom = next(iter(cgr._atoms.values()))
+    _, atom = next(cgr.atoms())
     before = atom.route_atom_step_states[1]
     atom.route_atom_step_states[1] = (before[0] + 1, *before[1:])
     with pytest.raises(ValueError, match="reassessment"):

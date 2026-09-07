@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 
+from synplan.chem.graph import get_bond, replace_atom
 from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction.routes.contracts import (
     RouteCGRBuildResult,
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 def _next_atom_number(*containers):
     max_num = 0
     for container in containers:
-        atoms = getattr(container, "_atoms", {})
+        atoms = container if container is not None else ()
         if atoms:
             max_num = max(max_num, max(atoms))
     return max_num + 1
@@ -51,11 +52,11 @@ def find_next_atom_num(reactions: list):
 def _route_order_depths(reactions):
     final_step = len(reactions) - 1
     reactant_atoms = [
-        {atom for reactant in reaction.reactants for atom in reactant._atoms}
+        {atom for reactant in reaction.reactants for atom in reactant}
         for reaction in reactions
     ]
     product_atoms = [
-        {atom for product in reaction.products for atom in product._atoms}
+        {atom for product in reaction.products for atom in product}
         for reaction in reactions
     ]
     successors = {idx: set() for idx in range(len(reactions))}
@@ -91,7 +92,7 @@ def _record_route_orders(
 ):
     """Collect route depth and chronological step metadata after remapping."""
 
-    for atom_num, atom in cgr._atoms.items():
+    for atom_num, atom in cgr.atoms():
         if getattr(atom, "is_dynamic", False):
             atom_route_orders.setdefault(atom_num, set()).add(route_order)
             atom_route_step_orders.setdefault(atom_num, set()).add(route_step_order)
@@ -124,7 +125,7 @@ def _record_deconvolution_labels(
 ):
     """Collect per-step CGR states needed for native RouteCGR deconvolution."""
 
-    for atom_num, atom in cgr._atoms.items():
+    for atom_num, atom in cgr.atoms():
         atom_step_states.setdefault(atom_num, {})[route_step_order] = _atom_step_state(
             atom
         )
@@ -149,7 +150,7 @@ def _apply_route_orders(
         for atom1, atom2 in sorted(
             set(bond_step_states) - {bond_key(a1, a2) for a1, a2, _ in cgr.bonds()}
         ):
-            if atom1 in cgr._atoms and atom2 in cgr._atoms:
+            if cgr.has_atom(atom1) and cgr.has_atom(atom2):
                 cgr.add_bond(atom1, atom2, transient_bond())
 
     for atom1, atom2, bond in list(cgr.bonds()):
@@ -187,13 +188,17 @@ def _apply_route_orders(
     for atom_num in sorted(
         set(atom_route_orders) | set(atom_route_step_orders) | set(atom_step_states)
     ):
-        if atom_num in cgr._atoms:
-            cgr._atoms[atom_num] = route_atom(
-                cgr._atoms[atom_num],
-                atom_route_orders.get(atom_num, set()),
-                atom_route_step_orders.get(atom_num, set()),
+        if cgr.has_atom(atom_num):
+            replace_atom(
+                cgr,
+                atom_num,
+                route_atom(
+                    cgr.atom(atom_num),
+                    atom_route_orders.get(atom_num, set()),
+                    atom_route_step_orders.get(atom_num, set()),
+                ),
             )
-            cgr._atoms[atom_num].route_atom_step_states = dict(
+            cgr.atom(atom_num).route_atom_step_states = dict(
                 atom_step_states.get(atom_num, {})
             )
 
@@ -256,7 +261,7 @@ def get_clean_mapping(
     if rr is None:
         return dict_map
 
-    curr_atoms = set(curr_prod._atoms.keys())
+    curr_atoms = set(curr_prod)
     # Build mapping while checking for conflicts
     for key, value in rr.items():
         if key != value:
@@ -312,7 +317,7 @@ def get_leaving_groups(products: list):
     lg_atom_nums = []
     for i, prod in enumerate(products):
         if i != 0:  # Skip first product (main product)
-            lg_atom_nums.extend(prod._atoms.keys())
+            lg_atom_nums.extend(prod)
     return lg_atom_nums
 
 
@@ -342,7 +347,7 @@ def process_first_reaction(first_react: ReactionContainer, tree: "Tree", route_i
     bb_set = set()
 
     for curr_mol in first_react.reactants:
-        react_key = tuple(curr_mol._atoms)
+        react_key = tuple(curr_mol)
         react_key_set = set(react_key)
 
         if is_purchasable(
@@ -399,7 +404,7 @@ def update_reaction_dict(
                       building blocks.
     """
     for curr_mol in reaction.reactants:
-        react_key = tuple(curr_mol._atoms)
+        react_key = tuple(curr_mol)
         react_key_set = set(react_key)
 
         if validate_molecule_components(curr_mol, route_id) == 0:
@@ -457,8 +462,8 @@ def process_target_blocks(
     target_atoms = set(lg_atom_nums) | set(curr_lg_atom_nums) | set(bb_set)
     if len(curr_products) > 1:
         for prod in curr_products:
-            if prod._atoms.keys() != curr_prod._atoms.keys():
-                for key in prod._atoms:
+            if set(prod) != set(curr_prod):
+                for key in prod:
                     if key in target_atoms:
                         target_block.add(key)
     return list(target_block)
@@ -474,7 +479,7 @@ def _compose_cgrs(
         return composed_cgr
 
     for atom1, atom2, bond in curr_cgr.bonds():
-        next_bond = accum_cgr._bonds.get(atom1, {}).get(atom2)
+        next_bond = get_bond(accum_cgr, atom1, atom2)
         if (
             bond.order is None
             and (
@@ -485,7 +490,7 @@ def _compose_cgrs(
                     and next_bond.p_order is None
                 )
             )
-            and atom2 not in composed_cgr._bonds.get(atom1, {})
+            and get_bond(composed_cgr, atom1, atom2) is None
         ):
             if bond.p_order is None:
                 composed_cgr.add_bond(atom1, atom2, bond)
@@ -496,7 +501,7 @@ def _compose_cgrs(
         if (
             bond.order is None
             and bond.p_order is None
-            and atom2 not in composed_cgr._bonds.get(atom1, {})
+            and get_bond(composed_cgr, atom1, atom2) is None
         ):
             composed_cgr.add_bond(atom1, atom2, bond)
 
@@ -629,15 +634,13 @@ def _compose_route_cgr_legacy(
     """
 
     def remap_composition_conflicts(curr_cgr, accum_cgr, start_num):
-        curr_atoms = curr_cgr._atoms
-        accum_atoms = accum_cgr._atoms
-        used_nums = set(curr_atoms) | set(accum_atoms)
+        used_nums = set(curr_cgr) | set(accum_cgr)
         remap = {}
         next_num = start_num
 
-        for atom_num in sorted(set(curr_atoms) & set(accum_atoms)):
-            curr_atom = curr_atoms[atom_num]
-            accum_atom = accum_atoms[atom_num]
+        for atom_num in sorted(set(curr_cgr) & set(accum_cgr)):
+            curr_atom = curr_cgr.atom(atom_num)
+            accum_atom = accum_cgr.atom(atom_num)
             curr_identity = (
                 curr_atom.atomic_number,
                 getattr(curr_atom, "isotope", None),
@@ -662,7 +665,7 @@ def _compose_route_cgr_legacy(
         if not remap:
             return
         for curr_mol in reaction.reactants:
-            react_key = tuple(curr_mol._atoms)
+            react_key = tuple(curr_mol)
             if react_key not in react_dict:
                 continue
             stored_remap = react_dict[react_key]
@@ -709,7 +712,7 @@ def _compose_route_cgr_legacy(
             lg_atom_nums = get_leaving_groups(accum_products)
             curr_products = curr_cgr.decompose()[1].split()
 
-            tuple_atoms = tuple(curr_prod._atoms)
+            tuple_atoms = tuple(curr_prod)
             prev_remap = react_dict.get(tuple_atoms, {})
 
             if prev_remap:
@@ -725,7 +728,7 @@ def _compose_route_cgr_legacy(
             )
             mapping = {}
             for atom_num in sorted(target_block):
-                if atom_num in accum_cgr._atoms and atom_num not in mapping:
+                if accum_cgr.has_atom(atom_num) and atom_num not in mapping:
                     mapping[atom_num] = fold.max_num
                     fold.max_num += 1
 
@@ -740,7 +743,7 @@ def _compose_route_cgr_legacy(
                 dict_map = {
                     source: target
                     for source, target in dict_map.items()
-                    if source in curr_cgr._atoms and target not in curr_cgr._atoms
+                    if curr_cgr.has_atom(source) and not curr_cgr.has_atom(target)
                 }
             if dict_map:
                 curr_cgr = remap_source_cgr(curr_cgr, dict_map, copy=False)

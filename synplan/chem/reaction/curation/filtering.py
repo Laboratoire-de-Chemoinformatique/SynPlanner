@@ -13,6 +13,7 @@ from chython.containers import CGRContainer, MoleculeContainer, ReactionContaine
 from pydantic import Field, model_validator
 from tqdm.auto import tqdm
 
+from synplan.chem.graph import bond_items, neighbors
 from synplan.chem.reaction.curation.config import SmallMoleculesConfig
 from synplan.chem.reaction.curation.pipeline import (
     build_batch_result,
@@ -262,7 +263,7 @@ class WrongCHBreakingFilter:
                 is_c_h_breaking, is_c_c_formation = False, False
                 c_with_h_id, another_c_id = None, None
 
-                for neighbour_id, bond in cgr._bonds[atom_id].items():
+                for neighbour_id, bond in bond_items(cgr, atom_id):
                     neighbour = cgr.atom(neighbour_id)
 
                     if (
@@ -286,11 +287,11 @@ class WrongCHBreakingFilter:
                     return not (
                         any(
                             cgr.atom(nid).atomic_symbol not in ("C", "H")
-                            for nid in cgr._bonds[c_with_h_id]
+                            for nid in neighbors(cgr, c_with_h_id)
                         )
                         or any(
                             cgr.atom(nid).atomic_symbol not in ("C", "H")
-                            for nid in cgr._bonds[another_c_id]
+                            for nid in neighbors(cgr, another_c_id)
                         )
                     )
 
@@ -331,7 +332,7 @@ class CCsp3BreakingFilter:
         for _ in range(self.decoration_depth):
             nxt = set()
             for n in frontier:
-                for nbr in mol._bonds[n]:
+                for nbr in neighbors(mol, n):
                     if nbr in seen:
                         continue
                     a = mol.atom(nbr)

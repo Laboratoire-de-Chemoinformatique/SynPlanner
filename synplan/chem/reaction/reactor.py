@@ -256,7 +256,7 @@ def apply_reaction_rule(
                 # direct output before normalizing or accepting this recovery.
                 for original in reaction.products:
                     for req in _requirements(original):
-                        if all(n in mol._atoms for n in (*req.atoms, *req.environment)):
+                        if all(mol.has_atom(n) for n in (*req.atoms, *req.environment)):
                             _assign(mol, req)
                 c = validate_and_canonicalize(mol)
                 if c is None:

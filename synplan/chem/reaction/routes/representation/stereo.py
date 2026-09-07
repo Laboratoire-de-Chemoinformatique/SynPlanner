@@ -58,7 +58,7 @@ def remap_source_cgr(cgr, mapping, *, copy=True):
     if source is not None:
         source = source.copy()
         for molecule in source.molecules():
-            molecule.remap({n: m for n, m in mapping.items() if n in molecule._atoms})
+            molecule.remap({n: m for n, m in mapping.items() if molecule.has_atom(n)})
         source.flush_cache()
         result._stereo_source = source
     return result

@@ -34,13 +34,12 @@ class _Bond:
 
 class _RouteCGR:
     def __init__(self, edges):
-        self._atoms = {atom_id: _Atom() for atom_id in range(1, 7)}
-        self._bonds = {}
+        self.atom_table = {atom_id: _Atom() for atom_id in range(1, 7)}
         self._edges = edges
-        self.connected_components = [set(self._atoms)]
+        self.connected_components = [set(self.atom_table)]
 
     def atoms(self):
-        return self._atoms.items()
+        return self.atom_table.items()
 
     def bonds(self):
         for atom1, atom2 in self._edges:
@@ -136,11 +135,11 @@ def test_route_cgr_hash_without_route_order_ignores_route_order():
 def test_route_cgr_hash_uses_container_charge_state():
     route_cgr = _transient_route_cgr()
     changed = route_cgr.copy()
-    atom_num = next(iter(changed._atoms))
+    atom_num = next(iter(changed))
 
     changed._charges[atom_num] = changed._charges.get(atom_num, 0) + 1
 
-    assert changed._atoms[atom_num].charge != changed._charges[atom_num]
+    assert changed.atom(atom_num).charge != changed._charges[atom_num]
     assert route_cgr_hash(route_cgr) != route_cgr_hash(changed)
 
 
@@ -149,7 +148,7 @@ def test_route_order_variant_sets_detects_route_order_only_changes():
     remapped = route_cgr.remap({1: 300, 2: 200, 3: 100}, copy=True)
     route_order_changed = route_cgr.copy()
     chemistry_changed = route_cgr.copy()
-    atom_num = next(iter(chemistry_changed._atoms))
+    atom_num = next(iter(chemistry_changed))
 
     for _, _, bond in route_order_changed.bonds():
         if getattr(bond, "route_order", None) is not None:

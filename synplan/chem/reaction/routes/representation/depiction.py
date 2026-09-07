@@ -9,6 +9,7 @@ from typing import Any
 from chython.algorithms.depict import DepictCGR, _render_config
 from chython.containers import CGRContainer, ReactionContainer
 
+from synplan.chem.graph import pop_bond, set_bond
 from synplan.chem.reaction.routes.representation.container import unwrap_cgr
 
 TRANSIENT_BOND_COLOR = "blue"
@@ -69,14 +70,13 @@ def _temporary_render_config(**updates):
 def _hidden_bonds(cgr: CGRContainer, pairs: list[tuple[int, int]]):
     removed = []
     for n, m in pairs:
-        removed.append((n, m, cgr._bonds[n].pop(m), cgr._bonds[m].pop(n)))
+        removed.append((n, m, pop_bond(cgr, n, m)))
 
     try:
         yield
     finally:
-        for n, m, bond_nm, bond_mn in removed:
-            cgr._bonds[n][m] = bond_nm
-            cgr._bonds[m][n] = bond_mn
+        for n, m, bond in removed:
+            set_bond(cgr, n, m, bond)
 
 
 def _dynamic_bond_width() -> float:

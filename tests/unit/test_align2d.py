@@ -72,8 +72,7 @@ def test_align_molecule_leaves_a_single_shared_atom_alone():
     ref.clean2d()
     mol = read_smiles("CCO")
     mol.clean2d()
-    mol._atoms = {1: mol._atoms[1]}
-    mol._bonds = {1: {}}
+    mol = mol.substructure([1])
     before = (mol.atom(1).x, mol.atom(1).y)
 
     stats = align_molecule(mol, ref)

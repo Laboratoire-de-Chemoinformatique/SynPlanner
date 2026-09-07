@@ -13,7 +13,7 @@ from synplan.chem.reaction.routes.representation.state import (
 
 def _step_ids(route_cgr: CGRContainer) -> list[int]:
     steps = set()
-    for atom in route_cgr._atoms.values():
+    for _, atom in route_cgr.atoms():
         steps.update(getattr(atom, "route_atom_step_states", {}))
     for _, _, bond in route_cgr.bonds():
         steps.update(getattr(bond, "route_bond_step_states", {}))
@@ -29,7 +29,7 @@ def _set_atom_state(
     cgr: CGRContainer, atom_num: int, state: tuple[int, int, bool, bool]
 ) -> None:
     charge, p_charge, is_radical, p_is_radical = state
-    atom = cgr._atoms[atom_num]
+    atom = cgr.atom(atom_num)
     atom._charge = charge
     atom._p_charge = p_charge
     atom._is_radical = is_radical
@@ -43,7 +43,7 @@ def _set_atom_state(
 def _step_cgr(route_cgr: CGRContainer, step: int) -> CGRContainer:
     atom_nums = [
         atom_num
-        for atom_num, atom in route_cgr._atoms.items()
+        for atom_num, atom in route_cgr.atoms()
         if step in getattr(atom, "route_atom_step_states", {})
     ]
     if not atom_nums:
@@ -52,7 +52,7 @@ def _step_cgr(route_cgr: CGRContainer, step: int) -> CGRContainer:
     step_cgr = route_cgr.substructure(atom_nums)
 
     for atom_num in atom_nums:
-        state = route_cgr._atoms[atom_num].route_atom_step_states[step]
+        state = route_cgr.atom(atom_num).route_atom_step_states[step]
         _set_atom_state(step_cgr, atom_num, state)
 
     step_bonds = {}

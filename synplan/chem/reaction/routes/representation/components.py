@@ -11,8 +11,8 @@ def _target_atoms_from_pseudo_products(pseudo_products: Any) -> set[int]:
     products = pseudo_products.split()
     if not products:
         return set()
-    target_product = min(products, key=lambda mol: min(mol._atoms))
-    return set(target_product._atoms)
+    target_product = min(products, key=lambda mol: min(mol))
+    return set(target_product)
 
 
 def route_cgr_pseudo_reactants_by_role(route_cgr: Any) -> dict[str, list[Any]]:
@@ -26,7 +26,7 @@ def route_cgr_pseudo_reactants_by_role(route_cgr: Any) -> dict[str, list[Any]]:
         return result
 
     for mol in pseudo_reactants.split():
-        kind = "real_bb" if set(mol._atoms) & target_atoms else "supporting"
+        kind = "real_bb" if set(mol) & target_atoms else "supporting"
         # decompose() drops the implicit H on an aromatic N, so an azole comes back as
         # `c1cnc2...` and no catalogue lookup on it can ever match.
         result[kind].append(safe_canonicalization(mol))

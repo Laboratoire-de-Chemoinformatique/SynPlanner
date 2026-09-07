@@ -48,7 +48,7 @@ class RouteCGRContainer(CGRContainer):
             for step, reaction in reactions_from_route_cgr(self).items():
                 for molecule in reaction.molecules():
                     molecule.remap(
-                        {n: m for n, m in mapping.items() if n in molecule._atoms}
+                        {n: m for n, m in mapping.items() if molecule.has_atom(n)}
                     )
                 reaction.flush_cache()
                 snapshots[str(step + 1)] = snapshot(reaction, reaction.compose())
@@ -65,7 +65,7 @@ class RouteCGRContainer(CGRContainer):
         return depict_route_cgr(self, *args, **kwargs)
 
     def _format_bond(self, n, m, adjacency, **kwargs):
-        bond = self._bonds[n][m]
+        bond = self.bond(n, m)
         if bond.order is None and bond.p_order is None:
             return "[.>.]"
         return super()._format_bond(n, m, adjacency, **kwargs)

@@ -17,6 +17,7 @@ from chython import smarts, synthon_smiles
 from chython.exceptions import InvalidAromaticRing
 from chython.periodictable import AnyElement
 
+from synplan.chem.graph import neighbors
 from synplan.chem.synthon.rules._dialect import DialectError, to_chython
 from synplan.chem.synthon.rules.validate import shifted_labels
 from synplan.chem.synthon.transformer import SynthonTransformer, query_labels
@@ -349,16 +350,16 @@ def _component_targets(component: str) -> list[dict]:
     for n, atom in query.atoms():
         if not isinstance(atom, AnyElement) or n in mapped:
             continue
-        neighbours = list(query._bonds[n])
+        neighbours = list(neighbors(query, n))
         if len(neighbours) != 1:
             raise ConversionError(
                 f"stub with {len(neighbours)} neighbours in {component!r}"
             )
         (attached,) = neighbours
-        bond = int(query._bonds[n][attached].order[0])
+        bond = int(query.bond(n, attached).order[0])
         via_v = query.atom(attached).atomic_symbol == "V"
         if via_v:
-            rest = [m for m in query._bonds[attached] if m != n]
+            rest = [m for m in neighbors(query, attached) if m != n]
             if len(rest) != 1:
                 raise ConversionError(
                     f"[V] with {len(rest)} real neighbours in {component!r}"

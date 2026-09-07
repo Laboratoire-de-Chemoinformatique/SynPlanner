@@ -11,6 +11,7 @@ from chython import smarts
 from chython.containers import QueryCGRContainer, ReactionContainer
 from torch_geometric.data import Data
 
+from synplan.chem.graph import neighbors
 from synplan.chem.reaction.rules.representation.config import (
     RULE_GRAPH_CHARGE_OFFSET,
     RULE_GRAPH_COUNT_LABELS,
@@ -142,7 +143,7 @@ def _node_order_labels(
 ) -> dict[int, tuple]:
     return {
         atom: (query_cgr_atom_label(query_cgr, atom), atom_labels.get(atom))
-        for atom in query_cgr._atoms
+        for atom in query_cgr
     }
 
 
@@ -151,14 +152,18 @@ def _canonical_atom_order(
 ) -> tuple[int, ...]:
     labels = _node_order_labels(query_cgr, atom_labels)
     colors = refine_colors(query_cgr, compress_labels(labels))
-    atoms = tuple(query_cgr._atoms)
+    atoms = tuple(query_cgr)
 
     return tuple(
         atom
         for color in sorted(set(colors.values()))
         for atom in sorted(
             (item for item in atoms if colors[item] == color),
-            key=lambda item: (repr(labels[item]), len(query_cgr._bonds[item]), item),
+            key=lambda item: (
+                repr(labels[item]),
+                len(neighbors(query_cgr, item)),
+                item,
+            ),
         )
     )
 
@@ -176,7 +181,7 @@ def _node_features(
         _charge_feature(label[4]),
         float(label[5]),
         float(label[6]),
-        float(len(query_cgr._bonds[atom])),
+        float(len(neighbors(query_cgr, atom))),
     ]
     features.extend(_numeric_set_features(label[7], _COUNT_LABELS))
     features.extend(_numeric_set_features(label[8], _COUNT_LABELS))
@@ -238,9 +243,8 @@ def query_cgr_to_pyg(
 ) -> Data:
     """Convert a Chython QueryCGRContainer into a PyG graph with rule labels.
 
-    Chython stores composed QueryCGR topology in private ``_atoms`` and
-    ``_bonds`` slots; SynPlanner centralizes that access here and labels atoms
-    and bonds through its canonical QueryCGR helpers.
+    Atom and bond labels use the same canonical QueryCGR helpers as rule
+    deduplication, with topology read through the graph accessors.
     """
     atom_labels = dict(atom_labels or {})
     order = _canonical_atom_order(query_cgr, atom_labels)
@@ -253,7 +257,7 @@ def query_cgr_to_pyg(
     edge_index = []
     edge_attr = []
     for atom in order:
-        for neighbor in query_cgr._bonds[atom]:
+        for neighbor in neighbors(query_cgr, atom):
             edge_index.append([positions[atom], positions[neighbor]])
             edge_attr.append(_edge_features(query_cgr, atom, neighbor))
 

@@ -19,6 +19,7 @@ from chython.files.daylight.tokenize import smarts_tokenize
 from chython.files.SDFrw import SDFRead
 from tqdm.auto import tqdm
 
+from synplan.chem.graph import ordered_copy
 from synplan.utils.files import MoleculeReader, MoleculeWriter
 
 ReactionMappingStatus = Literal["fully_mapped", "partially_mapped", "unmapped"]
@@ -279,12 +280,7 @@ def in_atom_order(molecule: MoleculeContainer) -> MoleculeContainer:
     from synplan.chem.stereo import _assign, _requirements
 
     requirements = _requirements(molecule)
-    molecule = molecule.copy()
-    molecule._atoms = dict(sorted(molecule._atoms.items()))
-    molecule._bonds = {
-        atom: dict(sorted(bonds.items()))
-        for atom, bonds in sorted(molecule._bonds.items())
-    }
+    molecule = ordered_copy(molecule, bonds=True)
     if requirements:
         molecule.clean_stereo()
         for requirement in requirements:
@@ -403,8 +399,7 @@ def safe_canonicalization(
     :return: The canonicalized molecule, or the molecule itself when chython
         cannot prepare its aromatic ring.
     """
-    molecule = molecule.copy()
-    molecule._atoms = dict(sorted(molecule._atoms.items()))
+    molecule = ordered_copy(molecule)
     return clean_molecule(
         molecule,
         clean_stereo=clean_stereo,
@@ -424,8 +419,7 @@ def validate_and_canonicalize(
     For user inputs (targets, building blocks), use the permissive
     ``safe_canonicalization`` instead.
     """
-    tmp = molecule.copy()
-    tmp._atoms = dict(sorted(tmp._atoms.items()))
+    tmp = ordered_copy(molecule)
     try:
         tmp.remove_coordinate_bonds(keep_to_terminal=False)
         tmp.kekule()

@@ -16,6 +16,8 @@ from inspect import signature
 from chython import smiles as _read_smiles
 from chython.containers import MoleculeContainer
 
+from synplan.chem.graph import bond_items, get_bond, neighbors
+
 _STRICT_BACKEND = "strict_stereo" in signature(_read_smiles).parameters
 
 
@@ -176,8 +178,8 @@ def _requirements(mol: MoleculeContainer) -> tuple[StereoRequirement, ...]:
                 f"bond {n}-{m}: cumulene or unsupported stereo",
             )
         env = (
-            next(k for k in mol._bonds[n] if k != m),
-            next(k for k in mol._bonds[m] if k != n),
+            next(k for k in neighbors(mol, n) if k != m),
+            next(k for k in neighbors(mol, m) if k != n),
         )
         out.append(
             StereoRequirement(
@@ -201,7 +203,7 @@ def _sign(mol: MoleculeContainer, req: StereoRequirement) -> bool | None:
             return None
         return mol._translate_tetrahedron_sign(req.atoms[0], req.environment)
     n, m = req.atoms
-    if mol._bonds[n][m].stereo is None:
+    if mol.bond(n, m).stereo is None:
         return None
     return mol._translate_cis_trans_sign(n, m, *req.environment)
 
@@ -239,7 +241,7 @@ def _local_environment(mol: MoleculeContainer, n: int) -> tuple:
     return (
         _atom_identity(atom),
         atom.implicit_hydrogens,
-        tuple(sorted((k, int(b)) for k, b in mol._bonds[n].items())),
+        tuple(sorted((k, int(b)) for k, b in bond_items(mol, n))),
     )
 
 
@@ -283,8 +285,7 @@ def _transfer(
             )
             or (
                 req.kind == "double_bond"
-                and int(precursor._bonds.get(req.atoms[0], {}).get(req.atoms[1], 0))
-                != 2
+                and int(get_bond(precursor, req.atoms[0], req.atoms[1], 0)) != 2
             )
         ):
             reason = "requires_stereo_forming_step"
@@ -484,7 +485,7 @@ def stereo_events(reaction) -> list[dict]:
             keys += [
                 ("double_bond", (n, m))
                 for n, m in mol.chiral_cis_trans
-                if m in mol._bonds[n]
+                if m in neighbors(mol, n)
             ]
             for kind, atoms in keys:
                 key = (

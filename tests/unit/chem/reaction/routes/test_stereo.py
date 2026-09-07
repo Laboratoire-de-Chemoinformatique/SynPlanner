@@ -11,6 +11,7 @@ from chython import smiles
 from frozendict import frozendict
 
 from synplan.chem.building_blocks import BuildingBlock, molecule_to_inchikey
+from synplan.chem.graph import neighbors
 from synplan.chem.reaction.routes.stereo import (
     _requirements,
     _sign,
@@ -237,8 +238,8 @@ def test_real_uspto_cip_change_without_inversion():
 
     case = json.loads((DATA / "cip_change.json").read_text())["cases"][0]
     reaction = smiles(case["source_line"].split()[0])
-    product = next(m for m in reaction.products if case["atom"] in m._atoms)
-    precursor = next(m for m in reaction.reactants if case["atom"] in m._atoms)
+    product = next(m for m in reaction.products if m.has_atom(case["atom"]))
+    precursor = next(m for m in reaction.reactants if m.has_atom(case["atom"]))
     req = next(r for r in _requirements(product) if r.atoms == (case["atom"],))
     assert _sign(precursor, req) == req.sign
 
@@ -260,7 +261,7 @@ def test_real_uspto_cip_change_without_inversion():
 def test_real_uspto_double_bond_inheritance():
     case = json.loads((DATA / "cip_change.json").read_text())["cases"][0]
     reaction = smiles(case["source_line"].split()[0])
-    product = next(m for m in reaction.products if case["atom"] in m._atoms)
+    product = next(m for m in reaction.products if m.has_atom(case["atom"]))
     reqs = [r for r in _requirements(product) if r.kind == "double_bond"]
     assert len(reqs) == 2
     for req in reqs:
@@ -283,9 +284,9 @@ def test_stereo_lost_and_recreated_at_an_intermediate_is_unresolved(fixtures, st
     original, sources = read_stereo_route(case["tree"], strip_stereo=True)
     leaf = original.leaves()[1]
     n = next(iter(leaf.chiral_tetrahedrons))
-    o = next(k for k in leaf._bonds[n] if leaf.atom(k).atomic_number == 8)
+    o = next(k for k in neighbors(leaf, n) if leaf.atom(k).atomic_number == 8)
     ketone = leaf.copy()
-    ketone._bonds[n][o]._order = 2
+    ketone.bond(n, o)._order = 2
     ketone.atom(n)._implicit_hydrogens = 0
     ketone.atom(o)._implicit_hydrogens = 0
     ketone.flush_cache()

@@ -12,6 +12,7 @@ from typing import Any
 from chython.algorithms.fingerprints import MorganFingerprint
 from chython.containers import QueryCGRContainer, ReactionContainer
 
+from synplan.chem.graph import neighbors
 from synplan.chem.reaction.rules.representation.query_cgr import (
     query_cgr_atom_label,
     query_cgr_bond_label,
@@ -80,7 +81,7 @@ def query_reaction_atom_labels(reaction_query: ReactionContainer) -> dict[int, t
         ("products", reaction_query.products),
     ):
         for molecule in molecules:
-            for atom_number, atom in molecule._atoms.items():
+            for atom_number, atom in molecule.atoms():
                 labels.setdefault(atom_number, []).append(
                     (side_name, _query_atom_label(atom))
                 )
@@ -101,8 +102,8 @@ class QueryCGRMorganFingerprintAdapter(MorganFingerprint):
     """Expose Chython QueryCGRContainer through the MorganFingerprint protocol.
 
     Chython query-CGRs do not expose a public Morgan fingerprint API, so this
-    adapter reads the stable private graph slots (``_atoms`` and ``_bonds``) and
-    uses the same private label helpers as SynPlanner's canonical QueryCGR key.
+    adapter builds its fingerprint adjacency from the graph accessors and uses
+    the same label helpers as SynPlanner's canonical QueryCGR key.
     """
 
     def __init__(
@@ -118,9 +119,9 @@ class QueryCGRMorganFingerprintAdapter(MorganFingerprint):
                 neighbor: _FingerprintBond(
                     _stable_hash(query_cgr_bond_label(query_cgr, atom, neighbor))
                 )
-                for neighbor in neighbors
+                for neighbor in neighbors(query_cgr, atom)
             }
-            for atom, neighbors in query_cgr._bonds.items()
+            for atom in query_cgr
         }
 
     @property
@@ -132,7 +133,7 @@ class QueryCGRMorganFingerprintAdapter(MorganFingerprint):
                     self._atom_labels.get(atom),
                 )
             )
-            for atom in self._query_cgr._atoms
+            for atom in self._query_cgr
         }
 
 

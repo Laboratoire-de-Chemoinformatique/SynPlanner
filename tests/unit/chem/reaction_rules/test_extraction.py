@@ -15,6 +15,7 @@ from chython.containers import (
     ReactionContainer,
 )
 
+from synplan.chem.graph import neighbors
 from synplan.chem.reaction.curation.reaction_result import (
     ExtractedRuleRecord,
     ExtractionBatchResult,
@@ -44,28 +45,8 @@ def default_config() -> RuleExtractionConfig:
 
 
 def _neighbours(mol: MoleculeContainer | CGRContainer, idx: int) -> set[int]:
-    """Return immediate neighbour atom numbers for *idx*.
-
-    Implementation relies on chython's private `_bonds` mapping because the
-    public `Atom.neighbors` returns only a **count**.  Falls back to scanning
-    `mol.bonds` if the mapping is unavailable.
-    """
-    neigh: set[int] = set()
-
-    # Preferred: constant-time lookup from the internal adjacency table.
-    if hasattr(mol, "_bonds") and isinstance(mol._bonds, dict):  # type: ignore[attr-defined]
-        neigh.update(mol._bonds.get(idx, {}).keys())  # type: ignore[attr-defined]
-        if neigh:
-            return neigh
-
-    # Fallback: linear scan over bond objects (works for both containers).
-    for bond in getattr(mol, "bonds", ()):  # type: ignore[attr-defined]
-        a, b = bond.atom1.number, bond.atom2.number  # type: ignore[attr-defined]
-        if a == idx:
-            neigh.add(b)
-        elif b == idx:
-            neigh.add(a)
-    return neigh
+    """Return immediate neighbour atom numbers for *idx*."""
+    return set(neighbors(mol, idx))
 
 
 # ---------------------------------------------------------------------------

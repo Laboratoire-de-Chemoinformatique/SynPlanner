@@ -53,7 +53,8 @@ class _CheckedRead:
         kwargs.setdefault("calc_cis_trans", True)
         if "strict_stereo" in signature(super().__init__).parameters:
             kwargs.setdefault("strict_stereo", not kwargs.get("ignore_stereo", False))
-        super().__init__(file, **kwargs)
+        # The concrete MDL reader follows this cooperative mixin in the MRO.
+        super().__init__(file, **kwargs)  # ty: ignore[too-many-positional-arguments]
 
 
 class RDFRead(_CheckedRead, _RDFRead):

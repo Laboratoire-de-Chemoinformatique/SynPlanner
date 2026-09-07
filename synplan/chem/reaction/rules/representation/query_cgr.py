@@ -11,6 +11,8 @@ from chython.containers import (
     ReactionContainer,
 )
 
+from synplan.chem.graph import bond_items, neighbors
+
 # Cap on intra-class permutations before canonical_query_cgr_key falls back to
 # greedy ordering; the product of class-size factorials can blow up.
 _MAX_CANONICAL_PERMUTATIONS = 5000
@@ -93,7 +95,7 @@ def query_cgr_bond_label(
     query_cgr: QueryCGRContainer, atom_1: int, atom_2: int
 ) -> tuple:
     """Numbering-invariant label for a single QueryCGR bond."""
-    bond = query_cgr._bonds[atom_1][atom_2]
+    bond = query_cgr.bond(atom_1, atom_2)
     return bond.order, bond.p_order
 
 
@@ -116,7 +118,7 @@ def refine_colors(
     structure-only refinement from one that also folds in caller-supplied atom
     labels.
     """
-    atoms = tuple(query_cgr._atoms)
+    atoms = tuple(query_cgr)
     for _ in range(len(atoms)):
         signatures = {}
         for atom in atoms:
@@ -127,7 +129,7 @@ def refine_colors(
                             query_cgr_bond_label(query_cgr, atom, neighbor),
                             colors[neighbor],
                         )
-                        for neighbor in query_cgr._bonds[atom]
+                        for neighbor in neighbors(query_cgr, atom)
                     ],
                     key=repr,
                 )
@@ -150,7 +152,7 @@ def _refined_query_cgr_colors(query_cgr: QueryCGRContainer) -> dict[int, int]:
     return refine_colors(
         query_cgr,
         compress_labels(
-            {atom: query_cgr_atom_label(query_cgr, atom) for atom in query_cgr._atoms}
+            {atom: query_cgr_atom_label(query_cgr, atom) for atom in query_cgr}
         ),
     )
 
@@ -169,7 +171,7 @@ def _query_cgr_order_encoding(
     bond_labels = []
     for atom_1 in order:
         position_1 = atom_positions[atom_1]
-        for atom_2 in query_cgr._bonds[atom_1]:
+        for atom_2 in neighbors(query_cgr, atom_1):
             position_2 = atom_positions[atom_2]
             if position_1 < position_2:
                 bond_labels.append(
@@ -193,11 +195,11 @@ def _stereo_encoding(rule, order):
                 sign = getattr(atom, "stereo", None)
                 if sign is None:
                     continue
-                neighbours = list(mol._bonds[n])
-                if len(neighbours) == 2 and all(b == 2 for b in mol._bonds[n].values()):
+                neighbours = list(neighbors(mol, n))
+                if len(neighbours) == 2 and all(b == 2 for _, b in bond_items(mol, n)):
                     flips = 0
                     for terminal in neighbours:
-                        refs = [m for m in mol._bonds[terminal] if m != n]
+                        refs = [m for m in neighbors(mol, terminal) if m != n]
                         flips += refs.index(min(refs, key=position.__getitem__))
                     label = ("allene", position[n], bool(sign) ^ bool(flips % 2))
                 else:
@@ -212,7 +214,7 @@ def _stereo_encoding(rule, order):
                     continue
                 flips = 0
                 for terminal, other in ((n, m), (m, n)):
-                    refs = [k for k in mol._bonds[terminal] if k != other]
+                    refs = [k for k in neighbors(mol, terminal) if k != other]
                     flips += refs.index(min(refs, key=position.__getitem__))
                 labels.append(
                     (
@@ -246,7 +248,7 @@ def canonical_query_cgr_key(query_cgr: QueryCGRContainer, *, stereo_rule=None) -
     deterministic but not provably canonical for highly symmetric graphs, so
     such rules may miss dedup opportunities.
     """
-    atoms = tuple(query_cgr._atoms)
+    atoms = tuple(query_cgr)
     if not atoms:
         return repr(((), ()))
 
@@ -285,7 +287,7 @@ def canonical_query_cgr_key(query_cgr: QueryCGRContainer, *, stereo_rule=None) -
             group,
             key=lambda atom: (
                 repr(query_cgr_atom_label(query_cgr, atom)),
-                len(query_cgr._bonds[atom]),
+                len(neighbors(query_cgr, atom)),
                 atom,
             ),
         )

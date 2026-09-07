@@ -142,7 +142,7 @@ def _query_automorphisms(query: QueryContainer) -> Iterator[dict[int, int]]:
             _query_atoms_overlap(atom, atoms[mapping[atom_number]])
             for atom_number, atom in atoms.items()
         ) and all(
-            _query_bonds_overlap(bond, query._bonds[mapping[atom_1]][mapping[atom_2]])
+            _query_bonds_overlap(bond, query.bond(mapping[atom_1], mapping[atom_2]))
             for atom_1, atom_2, bond in query.bonds()
         ):
             yield mapping

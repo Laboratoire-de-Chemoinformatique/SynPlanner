@@ -5,6 +5,8 @@ from __future__ import annotations
 from chython.containers.bonds import DynamicBond
 from chython.periodictable import DynamicElement
 
+from synplan.chem.graph import set_bond
+
 __all__ = [
     "RouteDynamicBond",
     "bond_key",
@@ -23,8 +25,7 @@ def bond_key(atom1: int, atom2: int) -> tuple[int, int]:
 def set_symmetric_bond(cgr, atom1, atom2, bond):
     """Store one bond object in both directions of a CGR adjacency map."""
 
-    cgr._bonds.setdefault(atom1, {})[atom2] = bond
-    cgr._bonds.setdefault(atom2, {})[atom1] = bond
+    set_bond(cgr, atom1, atom2, bond)
 
 
 class RouteDynamicBond(DynamicBond):

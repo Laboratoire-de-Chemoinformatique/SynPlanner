@@ -5,6 +5,7 @@ from chython import smiles
 from chython.containers import CGRContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
 
+from synplan.chem.graph import get_bond
 from synplan.chem.reaction.routes.io import (
     make_dict,
     read_routes_csv,
@@ -157,26 +158,26 @@ def test_compose_route_cgr_preserves_formed_then_broken_bond():
 
     assert isinstance(default_cgr, RouteCGRContainer)
     assert isinstance(transient_cgr, RouteCGRContainer)
-    assert 2 not in default_cgr._bonds.get(1, {})
+    assert get_bond(default_cgr, 1, 2) is None
     assert transient_cgr.connected_components == [{1, 2, 3}]
     assert str(compose_sb_cgr(transient_cgr)) == str(compose_sb_cgr(default_cgr))
 
-    bond = transient_cgr._bonds[1][2]
+    bond = transient_cgr.bond(1, 2)
     assert isinstance(bond, DynamicBond)
     assert bond.order is None
     assert bond.p_order is None
     assert bond.route_order == 1
     assert bond.route_step_order == {1, 2}
-    assert transient_cgr._atoms[1].route_order == {1, 2}
-    assert transient_cgr._atoms[2].route_order == {1, 2}
-    assert transient_cgr._atoms[1].route_step_order == {1, 2}
-    assert transient_cgr._atoms[2].route_step_order == {1, 2}
+    assert transient_cgr.atom(1).route_order == {1, 2}
+    assert transient_cgr.atom(2).route_order == {1, 2}
+    assert transient_cgr.atom(1).route_step_order == {1, 2}
+    assert transient_cgr.atom(2).route_step_order == {1, 2}
 
     batch_cgr = compose_all_route_cgrs(
         routes, route_id=1, preserve_transient_bonds=True
     )[1]
     assert isinstance(batch_cgr, RouteCGRContainer)
-    batch_bond = batch_cgr._bonds[1][2]
+    batch_bond = batch_cgr.bond(1, 2)
     assert batch_bond.order is None
     assert batch_bond.p_order is None
 
@@ -192,7 +193,7 @@ def test_compose_route_cgr_preserves_transient_bonds_by_default():
     route_cgr = compose_route_cgr(routes, 1)["cgr"]
 
     assert isinstance(route_cgr, RouteCGRContainer)
-    bond = route_cgr._bonds[1][2]
+    bond = route_cgr.bond(1, 2)
     assert bond.order is None
     assert bond.p_order is None
 
@@ -211,16 +212,16 @@ def test_compose_route_cgr_route_order_uses_route_depth_for_convergent_route():
 
     route_cgr = compose_route_cgr(routes, 1)["cgr"]
 
-    assert route_cgr._bonds[2][3].route_order == 1
-    assert route_cgr._bonds[1][2].route_order == 2
-    assert route_cgr._bonds[3][4].route_order == 2
-    assert route_cgr._bonds[2][3].route_step_order == {3}
-    assert route_cgr._bonds[1][2].route_step_order == {1}
-    assert route_cgr._bonds[3][4].route_step_order == {2}
-    assert route_cgr._atoms[2].route_order == {1, 2}
-    assert route_cgr._atoms[3].route_order == {1, 2}
-    assert route_cgr._atoms[2].route_step_order == {1, 3}
-    assert route_cgr._atoms[3].route_step_order == {2, 3}
+    assert route_cgr.bond(2, 3).route_order == 1
+    assert route_cgr.bond(1, 2).route_order == 2
+    assert route_cgr.bond(3, 4).route_order == 2
+    assert route_cgr.bond(2, 3).route_step_order == {3}
+    assert route_cgr.bond(1, 2).route_step_order == {1}
+    assert route_cgr.bond(3, 4).route_step_order == {2}
+    assert route_cgr.atom(2).route_order == {1, 2}
+    assert route_cgr.atom(3).route_order == {1, 2}
+    assert route_cgr.atom(2).route_step_order == {1, 3}
+    assert route_cgr.atom(3).route_step_order == {2, 3}
 
 
 def test_compose_route_cgr_route_order_covers_all_final_dynamic_bonds():
@@ -260,7 +261,7 @@ def test_compose_sb_cgr_syncs_copied_atom_state_after_charge_reduction():
         assert atom.p_charge == sb_cgr._p_charges[atom_num]
         assert atom.is_radical == sb_cgr._radicals[atom_num]
         assert atom.p_is_radical == sb_cgr._p_radicals[atom_num]
-    assert sb_cgr._atoms[1].charge == 0
+    assert sb_cgr.atom(1).charge == 0
     assert "+" not in str(sb_cgr)
 
 
@@ -276,8 +277,8 @@ def test_compose_sb_cgr_preserves_product_side_charge_delta():
 
     assert sb_cgr._charges[1] == 0
     assert sb_cgr._p_charges[1] == 1
-    assert sb_cgr._atoms[1].charge == 0
-    assert sb_cgr._atoms[1].p_charge == 1
+    assert sb_cgr.atom(1).charge == 0
+    assert sb_cgr.atom(1).p_charge == 1
     assert ">+" in str(sb_cgr)
 
 
@@ -293,8 +294,8 @@ def test_compose_sb_cgr_preserves_unchanged_charged_atoms_with_charge_delta():
 
     assert sb_cgr._charges[1] == -1
     assert sb_cgr._p_charges[1] == -1
-    assert sb_cgr._atoms[1].charge == -1
-    assert sb_cgr._atoms[1].p_charge == -1
+    assert sb_cgr.atom(1).charge == -1
+    assert sb_cgr.atom(1).p_charge == -1
     assert sb_cgr._charges[3] == 0
     assert sb_cgr._p_charges[3] == 1
     assert "O0>-" not in str(sb_cgr)
@@ -302,8 +303,8 @@ def test_compose_sb_cgr_preserves_unchanged_charged_atoms_with_charge_delta():
 
 def _reaction_atom_maps(reaction):
     return {
-        "reactants": sorted(sorted(molecule._atoms) for molecule in reaction.reactants),
-        "products": sorted(sorted(molecule._atoms) for molecule in reaction.products),
+        "reactants": sorted(sorted(molecule) for molecule in reaction.reactants),
+        "products": sorted(sorted(molecule) for molecule in reaction.products),
     }
 
 
@@ -322,7 +323,7 @@ def test_route_cgr_has_native_deconvolution_labels_without_payload_attributes():
     assert not hasattr(route_cgr, "route_json")
     assert any(
         getattr(atom, "route_atom_step_states", None)
-        for atom in route_cgr._atoms.values()
+        for atom in (atom for _, atom in route_cgr.atoms())
     )
     assert any(
         getattr(bond, "route_bond_step_states", None)

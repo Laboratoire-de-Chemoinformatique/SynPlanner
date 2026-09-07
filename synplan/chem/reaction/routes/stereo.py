@@ -18,6 +18,7 @@ from chython.containers import MoleculeContainer, ReactionContainer
 
 from synplan.chem.building_blocks import BuildingBlockCatalogue, molecule_to_inchikey
 from synplan.chem.building_blocks.stereo import _record_molecule
+from synplan.chem.graph import bond_items, neighbors
 from synplan.chem.mapping import MappingBudgetExceeded, bounded_mappings
 from synplan.chem.reaction.routes.route import Route, Step
 from synplan.chem.stereo import (
@@ -126,7 +127,8 @@ def _orientation_key(
             atoms = req.atoms
         elif req.kind == "allene":
             center = req.atoms[0]
-            native = mol._translate_allene_sign(center, *req.environment, req.sign)
+            n1, n2 = req.environment
+            native = mol._translate_allene_sign(center, n1, n2, req.sign)
             env = mol.stereogenic_allenes[center][:2]
             sign = mol._translate_allene_sign(center, *env, native)
             atoms = (center,)
@@ -136,8 +138,8 @@ def _orientation_key(
             n1, n2 = req.environment
             native = mol._translate_cis_trans_sign(start, end, n1, n2, req.sign)
             env = (
-                min(k for k in mol._bonds[n] if k != m),
-                min(k for k in mol._bonds[m] if k != n),
+                min(k for k in neighbors(mol, n) if k != m),
+                min(k for k in neighbors(mol, m) if k != n),
             )
             sign = mol._translate_cis_trans_sign(n, m, *env, native)
         out.append((req.target_atoms if by_requirement else (), req.kind, atoms, sign))
@@ -315,9 +317,9 @@ def _chemistry_flags(
             product.atom(k).atomic_number == 6
             and any(
                 int(b) == 2 and product.atom(j).atomic_number == 8
-                for j, b in product._bonds[k].items()
+                for j, b in bond_items(product, k)
             )
-            for k in product._bonds[n]
+            for k in neighbors(product, n)
         ):
             flags.append(
                 {
@@ -500,7 +502,7 @@ def audit_stereo_inheritance(
         product.clean_stereo()
         for precursor in reactants:
             for req in _requirements(precursor):
-                if all(n in product._atoms for n in req.atoms) and all(
+                if all(product.has_atom(n) for n in req.atoms) and all(
                     _local_environment(product, n) == _local_environment(precursor, n)
                     for n in req.atoms
                 ):

@@ -4,6 +4,7 @@ import pytest
 from chython import smarts, smiles, synthon_smiles
 from chython.periodictable import LABEL_TABLE
 
+from synplan.chem.graph import bond_items, neighbors
 from synplan.chem.scaffolds import murcko_atoms
 from synplan.chem.synthon.analogues import (
     analogue_key,
@@ -271,10 +272,14 @@ def test_the_murcko_scaffold_keeps_the_exocyclic_double_bond():
     core = murcko_atoms(molecule)
     in_a_ring = {n for ring in molecule.sssr for n in ring}
     kept_leaves = {
-        n for n in core if n not in in_a_ring and len(molecule._bonds[n]) == 1
+        n for n in core if n not in in_a_ring and len(neighbors(molecule, n)) == 1
     }
     assert [molecule.atom(n).atomic_symbol for n in kept_leaves] == ["O"]
-    assert all(int(b) == 2 for n in kept_leaves for b in molecule._bonds[n].values())
+    assert all(
+        int(b) == 2
+        for n in kept_leaves
+        for b in (bond for _, bond in bond_items(molecule, n))
+    )
 
 
 # --- the rule of two --------------------------------------------------------------------

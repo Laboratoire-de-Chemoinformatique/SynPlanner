@@ -410,7 +410,7 @@ def _make_json_v1(
             # Determine target molecule atoms from the final step of this route
             final_step = max(steps)
             target = steps[final_step].products[0]
-            atom_nums = set(target._atoms.keys())
+            atom_nums = set(target)
 
             # Precompute canonical SMILES and producer mapping for all products
             prod_map = {}  # smiles -> list of step_ids
@@ -446,7 +446,7 @@ def _make_json_v1(
             product = next((p for p in reaction.products if p == molecule), None)
             if product is None:
                 product = next(
-                    (p for p in reaction.products if _atom_nums & p._atoms.keys()), None
+                    (p for p in reaction.products if _atom_nums & set(p)), None
                 )
             return step_id, reaction, product
 
