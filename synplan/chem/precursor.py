@@ -12,6 +12,7 @@ from frozendict import frozendict
 
 from synplan.chem.building_blocks import (
     BuildingBlockCatalogue,
+    SQLiteBuildingBlockCatalogue,
     molecule_to_inchikey,
 )
 from synplan.chem.building_blocks.stereo import compatible_records, selected_record
@@ -115,7 +116,7 @@ class Precursor:
         if isinstance(bb_stock, Mapping):
             cached = self._stock_cache
             if (
-                isinstance(bb_stock, frozendict)
+                isinstance(bb_stock, (frozendict, SQLiteBuildingBlockCatalogue))
                 and cached is not None
                 and cached[0] is bb_stock
             ):

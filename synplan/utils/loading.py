@@ -2,7 +2,9 @@
 retrosynthetic models."""
 
 import contextlib
+import csv
 import functools
+import gzip
 import logging
 import os
 import pickle
@@ -30,7 +32,6 @@ from synplan.chem.utils import (
     standardize_sdf_text,
     standardize_smiles_batch,
 )
-from synplan.ml.networks.value import ValueNetwork
 from synplan.utils.files import (
     count_sdf_records,
     count_smiles_records,
@@ -43,6 +44,7 @@ from synplan.utils.files import (
 from synplan.utils.parallel import process_pool_map_stream
 
 if TYPE_CHECKING:
+    from synplan.chem.building_blocks import BuildingBlockCatalogue
     from synplan.mcts.config import CombinedPolicyConfig
     from synplan.mcts.evaluation import (
         EvaluationStrategy,
@@ -53,6 +55,7 @@ if TYPE_CHECKING:
         PolicyNetworkConfig,
         ValueNetworkConfig,
     )
+    from synplan.ml.networks.value import ValueNetwork
 
 REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner-data"
 LEGACY_REPO_ID = "Laboratoire-De-Chemoinformatique/SynPlanner"
@@ -480,7 +483,6 @@ def _load_rules_pickle(file: str) -> tuple[CanonicalRetroReactor, ...]:
     return tuple(reaction_rules)
 
 
-@functools.cache
 def load_building_blocks(
     building_blocks_path: str | Path,
     standardize: bool = True,
@@ -491,9 +493,13 @@ def load_building_blocks(
     header: bool = True,
     delimiter: str = ",",
     smiles_column: str = "SMILES",
-) -> frozenset[str]:
-    """Loads building blocks data from a file and returns a frozen set of building
-    blocks.
+) -> "frozenset[str] | BuildingBlockCatalogue":
+    """Load molecular stock or a cached stereo-aware vendor catalogue.
+
+    Prepared catalogues retain their InChIKeys and vendor offers and skip
+    chemistry preparation, regardless of ``standardize``.
+    JSON/JSON.GZ is indexed into SQLite once; vendor TSV/TSV.GZ first performs
+    chemistry preparation. SQLite files open directly with bounded reader caches.
 
     :param building_blocks_path: The path to the file containing the building blocks.
     :param standardize: Flag if building blocks have to be standardized before loading. Default=True.
@@ -501,10 +507,47 @@ def load_building_blocks(
     :param delimiter: For CSV/CSV.GZ files: delimiter character. Default=",".
     :param smiles_column: For CSV/CSV.GZ files: header column name containing SMILES.
         Default="SMILES" (case-insensitive match is supported).
-    :return: The set of building blocks smiles.
+    :return: A read-only catalogue for JSON/SQLite/vendor TSV, otherwise a SMILES set.
     """
 
     building_blocks_path = Path(building_blocks_path).resolve()
+    suffixes = "".join(building_blocks_path.suffixes).lower()
+    vendor_tsv = False
+    if header and suffixes.endswith((".tsv", ".tsv.gz")):
+        opener = gzip.open if suffixes.endswith(".gz") else open
+        with opener(building_blocks_path, "rt", encoding="utf-8", newline="") as stream:
+            columns = next(csv.reader(stream, delimiter="\t"), ())
+        vendor_tsv = any(column.casefold().endswith("_ppg") for column in columns)
+    if suffixes.endswith((".json", ".json.gz", ".sqlite")) or vendor_tsv:
+        from synplan.chem.building_blocks import load_building_block_catalogue
+
+        return load_building_block_catalogue(
+            building_blocks_path, num_workers=1 if num_workers is None else num_workers
+        )
+    return _load_smiles_building_blocks(
+        building_blocks_path,
+        standardize,
+        silent,
+        num_workers,
+        chunksize,
+        header=header,
+        delimiter=delimiter,
+        smiles_column=smiles_column,
+    )
+
+
+@functools.cache
+def _load_smiles_building_blocks(
+    building_blocks_path,
+    standardize,
+    silent,
+    num_workers,
+    chunksize,
+    *,
+    header,
+    delimiter,
+    smiles_column,
+):
     suffixes = "".join(building_blocks_path.suffixes).lower()
     is_csv = suffixes.endswith(".csv") or suffixes.endswith(".csv.gz")
     is_tsv = suffixes.endswith(".tsv") or suffixes.endswith(".tsv.gz")
@@ -515,7 +558,7 @@ def load_building_blocks(
     if not is_csv and suffix not in {".smi", ".smiles", ".sdf"}:
         raise ValueError(
             f"Unsupported building blocks file extension: '{building_blocks_path.name}'. "
-            "Supported: .smi, .smiles, .sdf, .csv, .csv.gz, .tsv, .tsv.gz"
+            "Supported: .smi, .smiles, .sdf, .csv, .csv.gz, .tsv, .tsv.gz, .json, .json.gz"
         )
 
     building_blocks_smiles = set()
@@ -599,8 +642,8 @@ def load_building_blocks(
 
 
 def load_value_net(
-    model_class: type[ValueNetwork], value_network_path: str | Path
-) -> ValueNetwork:
+    model_class: "type[ValueNetwork]", value_network_path: str | Path
+) -> "ValueNetwork":
     """Loads the value network.
 
     :param value_network_path: The path to the file storing value network weights.

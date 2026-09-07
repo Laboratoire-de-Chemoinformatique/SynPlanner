@@ -235,6 +235,10 @@ font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:c
 line-height:1;margin-top:1px}
 .lab{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--ok)}
 .rxn{font-size:12px;color:var(--ink2);word-break:break-all;line-height:1.6}
+.stock{padding:12px 18px;border-top:1px solid var(--rule);overflow-x:auto}
+.stock table{width:100%;border-collapse:collapse;font-size:12px;text-align:left}
+.stock th,.stock td{padding:6px 12px 6px 0;vertical-align:top;border-bottom:1px solid var(--rule)}
+.stock .mono{overflow-wrap:anywhere}
 """
 
 #: Every role the drawing tints, in reading order.
@@ -370,6 +374,32 @@ def routes_report_html(
                 + f'<div class="rxn mono">{escape(str(step.reaction))}</div></div></div>'
             )
         provenance = route.provenance
+        offers = []
+        seen_stock = set()
+        for leaf in route.leaves():
+            selected = leaf.meta.get("selected_stock")
+            if not selected or selected["inchikey"] in seen_stock:
+                continue
+            seen_stock.add(selected["inchikey"])
+            for vendor, price in sorted(
+                selected.get("vendors", {}).items(), key=lambda item: (item[1], item[0])
+            ):
+                offers.append(
+                    f'<tr><td class="mono">{escape(selected["smiles"])}<br>'
+                    f"{escape(selected['inchikey'])}</td><td>{escape(vendor)}</td>"
+                    f"<td>{price:g}</td></tr>"
+                )
+        stock_html = (
+            (
+                '<div class="stock"><div class="eyebrow">Selected building blocks</div>'
+                "<table><thead><tr><th>Purchased structure / InChIKey</th><th>Vendor</th>"
+                "<th>Price per gram</th></tr></thead><tbody>"
+                + "".join(offers)
+                + '</tbody></table><div class="rxn">Catalogue price units; currency is not specified.</div></div>'
+            )
+            if offers
+            else ""
+        )
         node_id = None if provenance is None else provenance.tree_node_id
         score = None if provenance is None else provenance.search_score
         unresolved = len(route.unresolved)
@@ -390,7 +420,7 @@ def routes_report_html(
             f'<div class="v">{unresolved}</div></div></div>'
             f'<div class="draw">'
             f"{doc.route(route.svg(standalone=False, layouts=layouts))}"
-            f"</div>{rows}</section>"
+            f"</div>{rows}{stock_html}</section>"
         )
 
     page = (

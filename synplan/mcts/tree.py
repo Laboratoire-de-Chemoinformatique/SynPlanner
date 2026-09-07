@@ -17,6 +17,7 @@ from tqdm.auto import tqdm
 
 from synplan.chem.building_blocks import (
     BuildingBlockCatalogue,
+    SQLiteBuildingBlockCatalogue,
 )
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
@@ -201,8 +202,10 @@ class Tree:
                     "JSON building-block catalogues are supported only for retrosynthesis"
                 )
             self.building_blocks = building_blocks
-            self._building_block_count = sum(
-                len(bucket) for bucket in building_blocks.values()
+            self._building_block_count = (
+                building_blocks.record_count
+                if isinstance(building_blocks, SQLiteBuildingBlockCatalogue)
+                else sum(len(bucket) for bucket in building_blocks.values())
             )
             self._building_block_bucket_count: int | None = len(building_blocks)
         else:

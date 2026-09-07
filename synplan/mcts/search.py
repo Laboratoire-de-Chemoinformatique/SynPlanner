@@ -6,17 +6,14 @@ import gzip
 import json
 import logging
 import os.path
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 
 from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
 from synplan import __version__
-from synplan.chem.building_blocks import (
-    load_building_block_catalogue,
-    molecule_to_inchikey,
-)
+from synplan.chem.building_blocks import molecule_to_inchikey
 from synplan.chem.building_blocks.stereo import compatible_records
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.routes.io import (
@@ -281,11 +278,8 @@ def run_search(
     else:
         policy_function = load_policy_function(policy_config=policy_config)
     reaction_rules = load_reaction_rules(reaction_rules_path)
-    is_json_catalogue = Path(building_blocks_path).suffix.lower() == ".json"
-    if is_json_catalogue:
-        building_blocks = load_building_block_catalogue(building_blocks_path)
-    else:
-        building_blocks = load_building_blocks(building_blocks_path, standardize=False)
+    building_blocks = load_building_blocks(building_blocks_path, standardize=False)
+    is_json_catalogue = isinstance(building_blocks, Mapping)
 
     # Create evaluation strategy from config
     evaluation_function = load_evaluation_function(evaluation_config)

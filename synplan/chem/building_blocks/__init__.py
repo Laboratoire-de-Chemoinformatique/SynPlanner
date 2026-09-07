@@ -5,6 +5,7 @@ from .core import (
     BuildingBlockCatalogue,
     match_building_blocks,
 )
+from .database import SQLiteBuildingBlockCatalogue
 from .identity import (
     molecule_has_stereo,
     molecule_to_inchikey,
@@ -18,6 +19,7 @@ from .io import (
 __all__ = [
     "BuildingBlock",
     "BuildingBlockCatalogue",
+    "SQLiteBuildingBlockCatalogue",
     "load_building_block_catalogue",
     "match_building_blocks",
     "molecule_has_stereo",
