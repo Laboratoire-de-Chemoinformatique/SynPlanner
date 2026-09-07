@@ -10,11 +10,12 @@ from os.path import splitext
 from pathlib import Path
 from typing import TYPE_CHECKING, TextIO
 
-from chython import smiles
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from chython.exceptions import MappingError
-from chython.files.RDFrw import RDFRead, RDFWrite
-from chython.files.SDFrw import SDFRead, SDFWrite
+from chython.files.RDFrw import ERDFWrite as RDFWrite
+from chython.files.RDFrw import RDFRead
+from chython.files.SDFrw import ESDFWrite as SDFWrite
+from chython.files.SDFrw import SDFRead
 
 if TYPE_CHECKING:
     from synplan.chem.utils import AtomMappingCheck
@@ -87,6 +88,15 @@ def split_smiles_record(record: str) -> tuple[str, list[str]]:
     if "\t" in raw:
         smiles_part, *source_fields = raw.split("\t")
     else:
+        # CXSMILES extensions belong to chemistry, even though they follow a
+        # space. A generic whitespace split silently loses OR/AND groups.
+        if " |" in raw:
+            end = raw.find("|", raw.index(" |") + 2)
+            if end < 0:
+                raise ValueError("unterminated CXSMILES extension")
+            return raw[: end + 1], [raw[end + 1 :].strip()] if raw[
+                end + 1 :
+            ].strip() else []
         parts = raw.split(maxsplit=1)
         smiles_part = parts[0]
         source_fields = parts[1:]
@@ -125,7 +135,7 @@ def reaction_source_info(reaction: ReactionContainer) -> str:
     meta_fields = [
         f"{key}={value}"
         for key, value in sorted(reaction.meta.items(), key=lambda item: item[0])
-        if key != "init_smiles"
+        if key not in {"init_smiles", "stereo_mapping_status"}
     ]
     return format_source_fields(meta_fields)
 
@@ -217,7 +227,9 @@ class SMILESRead:
         for line in iter(self._file.readline, ""):
             line = line.strip()
             smiles_part, source_fields = split_smiles_record(line)
-            x = smiles(smiles_part)
+            from synplan.chem.stereo import parse_smiles_preserving_stereo
+
+            x = parse_smiles_preserving_stereo(smiles_part)
             if isinstance(x, (ReactionContainer, CGRContainer, MoleculeContainer)):
                 x.meta["init_smiles"] = smiles_part
                 _store_source_fields(x, source_fields)
@@ -293,6 +305,8 @@ class ReactionReader(Reader):
         if self._file_type == "SMI":
             self._file = SMILESRead(filename, **kwargs)
         elif self._file_type == "RDF":
+            kwargs.setdefault("calc_cis_trans", True)
+            kwargs.setdefault("strict_stereo", not kwargs.get("ignore_stereo", False))
             self._file = RDFRead(filename, indexable=True, **kwargs)
         elif self._file_type == "PB":
             self._file = _ORDReadAdapter(filename)
@@ -374,6 +388,8 @@ class MoleculeReader(Reader):
         if self._file_type == "SMI":
             self._file = SMILESRead(filename, ignore=True, **kwargs)
         elif self._file_type == "SDF":
+            kwargs.setdefault("calc_cis_trans", True)
+            kwargs.setdefault("strict_stereo", not kwargs.get("ignore_stereo", False))
             self._file = SDFRead(filename, indexable=True, **kwargs)
         else:
             raise ValueError("File type incompatible -", filename)
@@ -676,14 +692,22 @@ def parse_reaction(
         if check_atom_mapping != "off":
             status = reaction_string_mapping_status(smiles_part)
             _check_mapping_status(status, check_atom_mapping)
-        rxn = smiles(smiles_part, ignore_stereo=ignore_stereo)
+        from synplan.chem.stereo import parse_smiles_preserving_stereo
+
+        rxn = parse_smiles_preserving_stereo(smiles_part, ignore_stereo=ignore_stereo)
         rxn.meta["init_smiles"] = smiles_part
         _store_source_fields(rxn, source_fields)
         if check_atom_mapping != "off":
             rxn.meta["mapping_status"] = status
         return rxn
     else:  # rdf block
-        with RDFRead(StringIO(item), ignore=True, ignore_stereo=ignore_stereo) as r:
+        with RDFRead(
+            StringIO(item),
+            ignore=True,
+            ignore_stereo=ignore_stereo,
+            calc_cis_trans=True,
+            strict_stereo=not ignore_stereo,
+        ) as r:
             rxn = next(iter(r))
         if check_atom_mapping != "off":
             status = reaction_mapping_status(rxn)
@@ -837,6 +861,8 @@ def to_reaction_smiles_record(reaction: ReactionContainer) -> str:
     ]
     ordered_meta = source_meta + other_meta if has_source_fields else other_meta
     for key, meta_info in ordered_meta:
+        if key == "stereo_mapping_status":
+            continue
         if has_source_fields and key == "init_smiles":
             continue
         meta_info = ";".join(str(meta_info).split("\n"))

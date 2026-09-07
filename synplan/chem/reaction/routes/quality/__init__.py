@@ -20,6 +20,7 @@ from synplan.chem.reaction.routes.quality.protection.scanner import (
 )
 from synplan.chem.reaction.routes.quality.protection.scorer import CompetingSitesScore
 from synplan.chem.reaction.routes.quality.scorer import (
+    PolicyLikelihoodScorer,
     ProtectionRouteScorer,
     RouteScorer,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "HalogenDetector",
     "HalogenMatch",
     "IncompatibilityMatrix",
+    "PolicyLikelihoodScorer",
     "ProtectionConfig",
     "ProtectionRouteScorer",
     "RouteScanner",

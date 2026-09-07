@@ -29,7 +29,7 @@ Extract rules using the repository configuration in ``configs/rules_extraction.y
 
     min_popularity: 3
     single_product_only: True
-    ignore_stereo: True
+    ignore_stereo: False
     environment_atom_count: 1
     multicenter_rules: True
     include_rings: False
@@ -66,7 +66,7 @@ Extract rules using the repository configuration in ``configs/rules_extraction.y
     keep_incoming_groups               Retains incoming groups in the extracted reaction rule if set to True.
     keep_reagents                      Includes reagents in the extracted reaction rule when True.
     single_product_only                Skips reactions with more than one product after reagent removal.
-    ignore_stereo                      Strips atom/bond stereochemistry from input reactions before extraction (the reactor path does not preserve stereo).
+    ignore_stereo                      Strips atom/bond stereochemistry from input reactions before extraction (explicit legacy connectivity projection).
     worker_timeout_per_reaction        Seconds allowed per reaction in a parallel extraction batch. The per-batch worker timeout is this value times the batch size.
     reactor_validation                 Skip rules whose forward-application in the reactor does not reproduce the original products.
     atom_info_retention                Dictates the level of detail retained about atoms in the reaction center and their environment. See below.
@@ -94,7 +94,7 @@ the value used by ``configs/rules_extraction.yaml``.
     keep_incoming_groups        ``True``          ``False``
     keep_reagents               ``False``         ``False``
     single_product_only         ``True``          ``True``
-    ignore_stereo               ``True``          ``True``
+    ignore_stereo               ``False``         ``False``
     worker_timeout_per_reaction ``10.0``          ``10.0``
     reactor_validation          ``True``          not set
     atom_info_retention         see below         all six sub-keys ``False``

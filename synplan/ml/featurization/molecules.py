@@ -54,7 +54,7 @@ def bonds_to_vector(molecule: MoleculeContainer, atom_ind: int) -> Tensor:
     """
 
     vector = torch.zeros(3, dtype=torch.uint8)
-    for b_order in molecule._bonds[atom_ind].values():
+    for _, b_order in molecule.bond_items(atom_ind):
         vector[int(b_order) - 1] += 1
     return vector
 

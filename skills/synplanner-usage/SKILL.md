@@ -147,6 +147,15 @@ differ from canonical SMILES from RDKit for the same molecule. To compare
 molecules, either parse both through the same engine and compare the resulting
 objects, or compare InChI.
 
+**Choose the stock format deliberately.** Legacy SMILES/SDF/CSV/TSV stocks are
+canonical-SMILES sets. A vendor-priced JSON catalogue is a different public
+workflow: prepare it with `standardize_building_blocks`, load it with
+`load_building_block_catalogue`, and pass that one immutable catalogue to both
+the rollout evaluator and `Tree`. Its MCTS identity is the first 14 characters
+of a Chython Standard InChIKey, so stereo, isotope and protonation differences
+are intentionally collapsed. Full keys and stereo are metadata, not a claim of
+stereo-aware planning. The task index gives the preparation and costing sequence.
+
 When the user needs RDKit objects at the boundary, use `synplan.chem.rdkit_compat`
 rather than converting by hand:
 

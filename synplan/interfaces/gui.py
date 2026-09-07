@@ -5,12 +5,14 @@ import pickle
 import re
 import uuid
 import zipfile
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 from huggingface_hub.utils import disable_progress_bars
 from streamlit_ketcher import st_ketcher
 
+from synplan.chem.building_blocks import load_building_block_catalogue
 from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.routes.clustering import (
     cluster_routes,
@@ -378,7 +380,7 @@ def setup_planning_options():
         st.session_state.target_smiles = active_smile_code
 
         try:
-            target_molecule = mol_from_smiles(active_smile_code, clean_stereo=True)
+            target_molecule = mol_from_smiles(active_smile_code, clean_stereo=False)
             if target_molecule is None:
                 st.error(f"Could not parse the input SMILES: {active_smile_code}")
             else:
@@ -390,9 +392,14 @@ def setup_planning_options():
                 with st.spinner("Running retrosynthetic planning..."):
                     with st.status("Loading resources...", expanded=False) as status:
                         st.write("Loading building blocks...")
-                        building_blocks = load_building_blocks(
-                            building_blocks_path, standardize=False
-                        )
+                        if Path(building_blocks_path).suffix.lower() == ".json":
+                            building_blocks = load_building_block_catalogue(
+                                building_blocks_path
+                            )
+                        else:
+                            building_blocks = load_building_blocks(
+                                building_blocks_path, standardize=False
+                            )
                         st.write("Loading reaction rules...")
                         reaction_rules = load_reaction_rules(reaction_rules_path)
                         st.write("Loading policy network...")
@@ -477,6 +484,24 @@ def display_planning_results():
         return
 
     st.header("Planning results")
+    if res.get("stereo_proposals", 0):
+        from synplan.chem.reaction.routes.route import Route
+
+        tree = st.session_state.tree
+        proposals = [Route.from_tree(tree, node_id) for node_id in tree.proposal_nodes]
+        st.warning(
+            "Starting materials were found, but these routes still need a stereo strategy or assessment."
+        )
+        for number, route in enumerate(proposals, 1):
+            with st.expander(f"Stereo proposal {number}"):
+                st.json(route.to_json()["stereo"])
+        st.download_button(
+            "Download stereo proposals (HTML)",
+            data=routes_report_html(proposals, html_path=None),
+            file_name="stereo_proposals.html",
+            mime="text/html",
+        )
+        return
     st.warning(
         "No reaction path found for the target molecule with the current settings."
     )
@@ -613,7 +638,10 @@ def run_clustering_core():
             st.session_state.sb_cgrs_dict = sb_cgrs_dict
             st.write("Extracting reactions...")
             st.session_state.reactions_dict = extract_reactions(current_tree)
-            st.session_state.route_json = make_json(st.session_state.reactions_dict)
+            st.session_state.route_json = make_json(
+                st.session_state.reactions_dict,
+                tree=current_tree,
+            )
 
             if (
                 st.session_state.clusters is not None

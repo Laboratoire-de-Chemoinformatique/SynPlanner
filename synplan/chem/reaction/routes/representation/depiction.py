@@ -69,14 +69,13 @@ def _temporary_render_config(**updates):
 def _hidden_bonds(cgr: CGRContainer, pairs: list[tuple[int, int]]):
     removed = []
     for n, m in pairs:
-        removed.append((n, m, cgr._bonds[n].pop(m), cgr._bonds[m].pop(n)))
+        removed.append((n, m, cgr.pop_bond(n, m, clean_cache=False)))
 
     try:
         yield
     finally:
-        for n, m, bond_nm, bond_mn in removed:
-            cgr._bonds[n][m] = bond_nm
-            cgr._bonds[m][n] = bond_mn
+        for n, m, bond in removed:
+            cgr.set_bond(n, m, bond, clean_cache=False)
 
 
 def _dynamic_bond_width() -> float:

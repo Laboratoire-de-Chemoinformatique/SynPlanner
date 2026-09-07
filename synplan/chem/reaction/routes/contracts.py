@@ -24,6 +24,10 @@ class RouteNode(TypedDict, total=False):
     rule_id: int | None
     rule_source: str | None
     rule_key: str | None
+    stereo: dict[str, Any]
+    stereo_status: str
+    connectivity_solved: bool
+    selectivity_evidence_status: str
 
 
 @dataclass(frozen=True)

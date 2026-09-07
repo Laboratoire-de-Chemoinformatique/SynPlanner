@@ -29,6 +29,8 @@ class TreeConfig(BaseConfigModel):
     :param max_time: The time limit (in seconds) for the algorithm to
         run.
     :param max_depth: The maximum depth of the tree.
+    :param max_reaction_outcomes: Maximum mappings examined per rule application.
+        Defaults to 5; larger values can retain alternate reaction sites.
     :param ucb_type: Type of UCB used in the search algorithm. Options
         are "puct", "uct", "value", defaults to "uct".
     :param c_ucb: The exploration-exploitation balance coefficient used
@@ -88,6 +90,7 @@ class TreeConfig(BaseConfigModel):
     max_tree_size: int = Field(default=1000000, gt=0)
     max_time: float = Field(default=600, gt=0)
     max_depth: int = Field(default=6, gt=0)
+    max_reaction_outcomes: int = Field(default=5, gt=0)
     exclude_small: bool = True
     min_mol_size: int = Field(default=6, ge=0)
     silent: bool = False
@@ -100,6 +103,12 @@ class TreeConfig(BaseConfigModel):
     enable_pruning: bool = False
     use_priority: bool = False
     priority_rule_multiapplication: bool = False
+
+    # Stereo remains authoritative in both modes. Strict mode excludes proposals
+    # whose requested configuration cannot yet be justified.
+    stereo_mode: Literal["proposal", "strict"] = "proposal"
+    max_mapping_work: int = Field(default=100_000, gt=0)
+    stereo_assessments: list[dict[str, Any]] = Field(default_factory=list)
 
     # UCT configuration
     search_strategy: Literal["expansion_first", "evaluation_first"] = "expansion_first"
@@ -129,6 +138,7 @@ class RolloutEvaluationConfig(BaseConfigModel):
     :param building_blocks: Set of building block molecules.
     :param min_mol_size: Minimum molecule size to consider for expansion.
     :param max_depth: Maximum depth for rollout simulation.
+    :param max_reaction_outcomes: Maximum mappings examined per rule application.
     :param normalize: Whether to normalize scores to [0, 1].
     :param stochastic: If True, sample from valid rules using policy probabilities.
         If False (default), use greedy selection (first successful rule).
@@ -138,11 +148,12 @@ class RolloutEvaluationConfig(BaseConfigModel):
 
     policy_network: Any  # Policy - using Any to avoid circular import
     reaction_rules: Any  # List[Reactor]
-    building_blocks: Any  # Set[str]
+    building_blocks: Any  # Set[str] or BuildingBlockCatalogue
     min_mol_size: int = Field(default=0, ge=0)
     max_depth: int = Field(default=6, gt=0)
     normalize: bool = False
     stochastic: bool = False
+    max_reaction_outcomes: int = Field(default=5, gt=0)
 
 
 class ValueNetworkEvaluationConfig(BaseConfigModel):

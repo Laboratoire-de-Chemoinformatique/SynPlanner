@@ -27,7 +27,7 @@ def analogue_key(synthon: SynthonContainer) -> tuple[tuple, tuple]:
     # degree 2, and they are not interchangeable
     signature = tuple(
         sorted(
-            (a.atomic_symbol, len(synthon._bonds[n]))
+            (a.atomic_symbol, len(synthon.neighbor_numbers(n)))
             for n, a in synthon.atoms()
             if getattr(a, "_label", None) is not None
         )

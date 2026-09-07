@@ -7,9 +7,60 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Optional progress bars for route ranking and clustering through `silent=False`.
+- Chython stereo constraints for carbon tetrahedra, E/Z and allene axes across
+  preparation, extraction, stock selection, search and route reconstruction.
+  Unresolved stereo strategies remain proposals; they cannot receive solved
+  rewards. Scoped chemist reviews preserve their source and reopen after edits.
+- Bounded mapping work, persistent stereo obligations, source-reaction event
+  ledgers and rule-vocabulary manifests checked against fixed-output policies.
+- Enhanced-group CXSMILES and checked V3000 export, stereo-preserving RouteCGR
+  snapshots and search-record schema 3 (schemas 1 and 2 remain readable).
+
+- `PolicyLikelihoodScorer().rank(tree.routes())` ranks all
+  discovered routes by the sum of unscaled policy log probabilities before
+  retaining candidates. `Node.policy_probability` and search-record schema 2
+  preserve those probabilities; schema 1 remains readable.
+- `max_reaction_outcomes` configures rule mapping limits in tree expansion and
+  rollout evaluation (default 5).
+- Search statistics count distinct expanded molecules and states, iterations
+  without expansion, root diversity, and newly discovered routes with timestamps.
+- `standardize_smiles_batch(..., failures=[])` optionally reports rejected inputs
+  without changing safe canonicalization or its permissive aromatic fallback.
+
 - Added `synplan.chem.reaction.rules.symmetry` with
   `needs_decollapsed_matches()` for detecting reaction SMARTS where a compatible
   non-identity LHS permutation is not realized by the exact RHS product patch.
+
+- Added a vendor-aware `BuildingBlock` model and immutable
+  `BuildingBlockCatalogue`. Prepared JSON catalogues retain canonical SMILES,
+  full Chython Standard InChIKeys, vendor prices, and stereo metadata while
+  grouping runtime records by the first 14 InChIKey characters.
+
+- `standardize_building_blocks()` and the `building_blocks_standardizing` CLI
+  now produce vendor-aware JSON catalogues when the output extension is `.json`.
+  Invalid rows are omitted and reported in `<output>.errors.tsv`; valid records
+  are published atomically. Duplicate full InChIKeys merge the lowest positive
+  offer from each vendor.
+
+- Retrosynthetic MCTS can use a JSON `BuildingBlockCatalogue` for stock
+  membership. Each finalized `Precursor` calculates and caches its Chython
+  InChIKey once, after which membership uses the cached 14-character
+  connectivity block.
+
+- Added `Route.calculate_cost(building_blocks)`, which prices terminal route
+  materials using catalogue vendor offers. It reports complete and partial
+  totals, repeated-leaf equivalents, selected vendors, molecular weights, and
+  missing or unpriced leaves. CLI searches using JSON catalogues write these
+  results to `route_costs.json`.
+
+- Added `BBSynthoniser.synthonise_building_block()` as a thin adapter that
+  processes a `BuildingBlock` through its stored SMILES without coupling the
+  Synthonizer to MCTS.
+
+- Added an InChIKey catalogue tutorial and a Chython-only identity benchmark
+  demonstrating catalogue loading, connectivity-prefix matching, MCTS use,
+  and post-search route costing.
 
 - `write_search_record(tree, path)` / `read_search_record(path)` write a finished
   search to one file and read it back: the molecules interned into one list, the node
@@ -27,8 +78,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `read_routes_json(..., as_routes=True)` hands `Route` objects back. The
   `{route_id: {step_id: Reaction}}` mapping still works and the v1 file is unchanged.
 
+### Fixed
+
+- Deduplicate accepted complete precursor multisets, including multiplicity.
+  An earlier ester-plus-hydroxide outcome no longer suppresses an ester-only
+  alternative, and rejected cyclic outcomes cannot suppress later valid ones.
+- Symmetry detection accepts concrete molecule properties and preserves
+  stereo-valid mappings even when the product topology is symmetric.
+- Honor `stop_at_first` from configuration and check current elapsed time before
+  starting another iteration. Repeated visits to solved nodes no longer count
+  as new route discoveries.
+
 ### Changed
 
+- Pin Chython 1.108 for compiled graph and stereo operations, public graph APIs,
+  the macOS InChI loader fix, and clearer filled, hashed and unspecified stereo bonds.
 - `load_reaction_rules()` now disables Chython's `automorphism_filter` only
   when a compatible LHS permutation is not realized by the exact RHS product
   patch. Callers can retain the configured baseline with
@@ -39,6 +103,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   reactor validation is disabled or passed. Failed and deliberately skipped
   validation occurrences remain auditable but do not contribute support, so
   results are independent of ingestion order.
+
+- JSON-catalogue planning retrieves candidates by the first 14 InChIKey
+  characters, then verifies compatible explicit structures and configurations.
+  Search and cost pin the selected full material record. Opposite or unspecified
+  stereo cannot satisfy a specified requirement; every leaf requires stock.
+
+- JSON catalogues are supported only for retrosynthesis. Existing
+  SMILES/SDF/CSV/TSV stocks and `Tree(building_blocks=set(...))` callers retain
+  canonical-SMILES membership, and forward search retains its existing stock
+  handling.
+
+- Route JSON includes stereo status, obligations, context and selected materials.
+  Public route artifacts use schema 2 and Chython target keys; vendor costs are
+  emitted as a separate `route_costs.json` file. Rebuild caches and train matching
+  weights when changing a manifested rule vocabulary.
 
 - The reactor no longer puts back aromaticity a `kekule` -> `thiele` round trip
   dropped. Its test was "these ring atoms were aromatic and are not now", which is
@@ -58,8 +137,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Off unless this module's logger is at `DEBUG`, because the only way to tell is to
   canonicalize and doing that per precursor costs the search a tenth of its time.
   Nothing is repaired: a repair hides the origin, which is the thing worth finding.
-
-### Changed
 
 - Route scoring is a post-search step, not something the tree holds. `Tree` no longer
   takes `route_scorer` (it raises `TypeError`), and `Tree.route_score` returns the
@@ -125,6 +202,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   combined multicenter rules that run and fail validation are
   `ReactorValidationFailed`; only split component rules whose full-reaction
   validation is deliberately skipped are `MultiCenter`.
+
+- A generated precursor that Chython cannot convert to InChI no longer aborts
+  JSON-catalogue planning. Its failed identity attempt is cached and it is
+  conservatively treated as not purchasable.
 
 - `write_routes_json(routes_dict, path, tree=tree)` reads the mapping's keys as tree
   node ids, and an `enumerate` index instead raised `ZeroDivisionError: division by

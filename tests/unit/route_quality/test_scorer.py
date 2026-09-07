@@ -1,9 +1,11 @@
 """Tests for the competing sites scorer and route re-ranking module."""
 
+from io import StringIO
 from unittest.mock import MagicMock
 
 import pytest
 from chython import smiles
+from tqdm import tqdm
 
 from synplan.chem.reaction.reactor import Reaction
 from synplan.chem.reaction.routes.quality.protection.config import ProtectionConfig
@@ -324,6 +326,39 @@ def test_a_scorer_that_ignores_the_search_needs_no_search_score():
 
 def test_rank_of_nothing_is_nothing():
     assert _ByStepCount().rank([]) == []
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_rank_progress_counts_finished_scores_and_closes(monkeypatch, fail):
+    bars, scored = [], []
+
+    def make_bar(**kwargs):
+        bar = tqdm(**kwargs, file=StringIO(), mininterval=0)
+        bars.append(bar)
+        return bar
+
+    monkeypatch.setattr("synplan.chem.reaction.routes.quality.scorer.tqdm", make_bar)
+    routes = [_esterification(value) for value in (0.1, 0.9, 0.9)]
+    scorer = _BySearchScore()
+
+    def score(route):
+        assert bars[0].n == len(scored)
+        if fail and len(scored) == 1:
+            raise ValueError("scoring failed")
+        scored.append(route)
+        return route.provenance.search_score
+
+    monkeypatch.setattr(scorer, "score", score)
+    if fail:
+        with pytest.raises(ValueError, match="scoring failed"):
+            scorer.rank(iter(routes), silent=False)
+    else:
+        ranked = scorer.rank(iter(routes), silent=False)
+        assert [id(route) for route in ranked] == [id(routes[i]) for i in (1, 2, 0)]
+    assert len(bars) == 1
+    assert bars[0].total == len(routes)
+    assert bars[0].n == len(scored) == (1 if fail else 3)
+    assert bars[0].disable  # tqdm closes the bar on success and on exceptions.
 
 
 def test_protection_scorer_scores_a_route():

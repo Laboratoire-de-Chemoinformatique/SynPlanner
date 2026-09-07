@@ -1,8 +1,10 @@
 """Module containing functions for protocol of reaction rules extraction."""
 
+import json
 import logging
 import tempfile
 from collections import Counter, defaultdict
+from importlib.metadata import version
 from io import TextIOWrapper
 from itertools import islice
 from os.path import splitext
@@ -17,6 +19,7 @@ from chython.exceptions import InvalidAromaticRing
 from chython.periodictable import QueryElement
 from tqdm.auto import tqdm
 
+from synplan.chem.mapping import MappingBudgetExceeded
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.curation.reaction_result import (
     ErrorEntry,
@@ -26,6 +29,13 @@ from synplan.chem.reaction.curation.reaction_result import (
 from synplan.chem.reaction.curation.standardizing import RemoveReagentsStandardizer
 from synplan.chem.reaction.rules.config import RuleExtractionConfig
 from synplan.chem.reaction.rules.symmetry import needs_decollapsed_matches
+from synplan.chem.reaction.rules.vocabulary import file_digest
+from synplan.chem.stereo import (
+    has_stereo,
+    has_stereo_groups,
+    stereo_events,
+    stereo_requirements,
+)
 from synplan.chem.utils import (
     canonical_query_cgr_key,
     reverse_reaction,
@@ -50,7 +60,9 @@ RuleOccurrence = tuple[str, str | None]
 def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
     atoms = set(atoms)
     q = QueryContainer(smarts="")
-    for n in atoms:
+    for n in mol:
+        if n not in atoms:
+            continue
         atom = mol.atom(n)
         xy = atom.xy if hasattr(atom, "xy") else None
         if isinstance(atom, QueryElement):
@@ -62,6 +74,9 @@ def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
                 hydrogens=True,
                 ring_sizes=True,
             )
+            # Chython's molecular ring_sizes is a set; the Python query
+            # predicate expects the query's tuple representation.
+            query_atom._ring_sizes = tuple(sorted(atom.ring_sizes))
             # Stamp `(4,)` only for aromatic atoms (SMARTS writer emits `[c]`);
             # leave `_hybridization=()` otherwise to stay lenient on non-aromatic targets.
             if atom.hybridization == 4:
@@ -73,6 +88,39 @@ def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
                 q.add_bond(n, m, bond.copy(full=True))
             elif isinstance(bond, Bond):
                 q.add_bond(n, m, QueryBond.from_bond(bond))
+    if isinstance(mol, MoleculeContainer):
+        if has_stereo_groups(mol):
+            raise ValueError(
+                "enhanced stereo groups cannot be silently converted to absolute query constraints"
+            )
+        for req in stereo_requirements(mol):
+            if not set(req.atoms).intersection(atoms):
+                continue
+            references = set(req.atoms)
+            for n in req.atoms:
+                references.update(mol.neighbor_numbers(n))
+            if not references <= atoms:
+                raise ValueError(
+                    f"incomplete {req.kind} reference environment in query at {req.atoms}"
+                )
+            if req.kind == "tetrahedron":
+                q.atom(req.atoms[0]).stereo = mol._translate_tetrahedron_sign(
+                    req.atoms[0], tuple(q.neighbor_numbers(req.atoms[0]))
+                )
+            elif req.kind == "allene":
+                center, left, right = req.atoms
+                env = (
+                    next(n for n in q.neighbor_numbers(left) if n != center),
+                    next(n for n in q.neighbor_numbers(right) if n != center),
+                )
+                q.atom(center).stereo = mol._translate_allene_sign(center, *env)
+            else:
+                n, m = req.atoms
+                env = (
+                    next(k for k in q.neighbor_numbers(n) if k != m),
+                    next(k for k in q.neighbor_numbers(m) if k != n),
+                )
+                q.bond(n, m).stereo = mol._translate_cis_trans_sign(n, m, *env)
     return q
 
 
@@ -237,8 +285,7 @@ def clean_molecules(
         for rxn_mol in reaction_molecules:
             rxn_atoms = set(rxn_mol.atoms_numbers)
             if rule_atoms <= rxn_atoms:
-                q_rxn = molecule_substructure_as_query(rxn_mol, rxn_atoms)
-                q_rule = molecule_substructure_as_query(q_rxn, rule_atoms)
+                q_rule = molecule_substructure_as_query(rxn_mol, rule_atoms)
 
                 if not all(atom_retention_details["reaction_center"].values()):
                     for n in rule_atoms & reaction_center_atoms:
@@ -400,7 +447,7 @@ def _isomorphism_cost_estimate(query, target) -> float:
         a = mol.atom(n)
         return (
             a.atomic_symbol,
-            len(mol._bonds[n]),
+            len(mol.neighbor_numbers(n)),
             getattr(a, "hybridization", None) == 4,
         )
 
@@ -452,6 +499,8 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
     if patterns and reaction.reactants:
         cost = _isomorphism_cost_estimate(patterns[0], reaction.reactants[0])
         if cost > _ISOMORPHISM_COST_SKIP_THRESHOLD:
+            rule.meta["reactor_validation"] = "could_not_be_assessed"
+            rule.meta["validation_reason"] = "estimated_mapping_work_exceeds_limit"
             return False
     reactor = CanonicalRetroReactor(
         patterns=patterns,
@@ -481,6 +530,10 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
                 # KeyError/IndexError: reactor exhausted or bad ion contraction;
                 # InvalidAromaticRing: aromatic ring is invalid.
                 continue
+    except MappingBudgetExceeded as error:
+        rule.meta["reactor_validation"] = "could_not_be_assessed"
+        rule.meta["validation_reason"] = str(error)
+        return False
     except KeyError:
         # KeyError - iteration over reactor is finished and products are different from the original reaction
         return False
@@ -525,6 +578,11 @@ def create_rule(
         center_atoms = set(_restrict_center_atoms)
     else:
         center_atoms = set(cgr.center_atoms)
+    source_stereo_events = stereo_events(reaction) if not config.ignore_stereo else []
+    # CGRs omit stereo-only changes. They still need an extraction center.
+    for event in source_stereo_events:
+        if event["event"] not in ("retained", "unspecified"):
+            center_atoms.update(event["atoms"])
 
     # 2. add atoms of reaction environment based on config settings
     center_atoms = add_environment_atoms(
@@ -547,6 +605,24 @@ def create_rule(
     rule_atoms, meta_debug = add_leaving_incoming_groups(
         reaction, rule_atoms, config.keep_leaving_groups, config.keep_incoming_groups
     )
+    # Complete every included stereo reference once; adding a neighboring center
+    # may bring its own reference environment into scope.
+    from collections import deque
+
+    references = {}
+    for mol in (*reaction.reactants, *reaction.products):
+        for req in stereo_requirements(mol):
+            needed = set(req.atoms)
+            for n in req.atoms:
+                needed.update(mol.neighbor_numbers(n))
+            for n in req.atoms:
+                references.setdefault(n, []).append(needed)
+    pending = deque(rule_atoms)
+    while pending:
+        for needed in references.pop(pending.popleft(), ()):
+            added = needed - rule_atoms
+            rule_atoms.update(added)
+            pending.extend(added)
 
     # 6. create substructures for reactants, products, and reagents
     reactant_substructures, product_substructures, reagents = (
@@ -578,6 +654,10 @@ def create_rule(
         config.keep_metadata,
         reaction,
     )
+    rule.meta["stereo_schema"] = 1
+    rule.meta["stereo_events"] = source_stereo_events
+    rule.meta["stereo_source_reaction"] = format(reaction, "m")
+    rule.meta["selectivity_evidence_status"] = "not_established_by_structure"
 
     # 9. reverse extracted reaction rule and reaction
     if config.reverse_rule:
@@ -593,7 +673,7 @@ def create_rule(
         elif validate_rule(rule, reaction):
             rule.meta["reactor_validation"] = "passed"
         else:
-            rule.meta["reactor_validation"] = "failed"
+            rule.meta.setdefault("reactor_validation", "failed")
 
     return rule
 
@@ -618,6 +698,11 @@ def extract_rules(
 
     """
 
+    return extract_rule_components(config, reaction, as_records=False)
+
+
+def extract_rule_components(config, reaction, *, as_records):
+    """Share component deduplication records with serial/worker aggregation."""
     if config.ignore_stereo:
         reaction = reaction.copy()
         reaction.clean_stereo()
@@ -630,11 +715,21 @@ def extract_rules(
         return [], True
 
     if config.multicenter_rules:
-        return [create_rule(config, reaction)], False
+        rule = create_rule(config, reaction)
+        return [_make_extracted_rule_record(rule) if as_records else rule], False
 
     # extract one rule per disconnected reaction-center component, dedup by CGR
     cgr = ~reaction
     center_components = [set(component) for component in islice(cgr.centers_list, 15)]
+    if not center_components and not config.ignore_stereo:
+        changed = {
+            n
+            for e in stereo_events(reaction)
+            if e["event"] not in ("retained", "unspecified")
+            for n in e["atoms"]
+        }
+        if changed:
+            center_components = [changed]
     skip_full_validation = len(center_components) > 1
     seen_cgrs = {}
     for component in center_components:
@@ -644,9 +739,9 @@ def extract_rules(
             _restrict_center_atoms=component,
             _skip_full_reaction_validation=skip_full_validation,
         )
-        rule_cgr = ~rule
-        if rule_cgr not in seen_cgrs:
-            seen_cgrs[rule_cgr] = rule
+        record = _make_extracted_rule_record(rule)
+        if record.cgr_key not in seen_cgrs:
+            seen_cgrs[record.cgr_key] = record if as_records else rule
 
     return list(seen_cgrs.values()), False
 
@@ -673,9 +768,14 @@ def _make_extracted_rule_record(rule: ReactionContainer) -> ExtractedRuleRecord:
     avoids parser crashes in the parent.
     """
     query_cgr = ~rule
+    smarts = _rule_to_reactor_smarts(rule)
+    if any(has_stereo(m) for m in (*rule.reactants, *rule.products)):
+        key = "stereo-v1:" + canonical_query_cgr_key(query_cgr, stereo_rule=rule)
+    else:
+        key = canonical_query_cgr_key(query_cgr)
     return ExtractedRuleRecord(
-        cgr_key=canonical_query_cgr_key(query_cgr),
-        rule_smarts=_rule_to_reactor_smarts(rule),
+        cgr_key=key,
+        rule_smarts=smarts,
         reactor_validation=rule.meta.get("reactor_validation"),
     )
 
@@ -719,6 +819,24 @@ def _make_audit_entry(
     )
 
 
+def source_stereo_record(reaction, index):
+    return {
+        "schema": 1,
+        "reaction_index": index,
+        "mapped_reaction": format(reaction, "m"),
+        "source": {
+            k: v
+            for k, v in reaction.meta.items()
+            if k.startswith("source_")
+            or k in {"ID", "conditions", "procedure", "stereo_evidence"}
+        },
+        "events": stereo_events(reaction),
+        "selectivity_evidence_status": "supplied"
+        if reaction.meta.get("stereo_evidence")
+        else "not_established_by_structure",
+    }
+
+
 def _extract_rules_batch_worker(
     batch: list[tuple[int, str]],
 ) -> ExtractionBatchResult:
@@ -748,13 +866,17 @@ def _extract_rules_batch_worker(
     errors: list[ErrorEntry] = []
     audit_entries: list[ErrorEntry] = []
     n_multi_product = 0
+    stereo_records = []
     for index, raw_item in batch:
         try:
             reaction = parse_reaction(
                 raw_item, fmt=fmt, ignore_stereo=config.ignore_stereo
             )
+            stereo_records.append(source_stereo_record(reaction, index))
             product_smi = str(unite_molecules(reaction.products))
-            extracted_rules, skipped = extract_rules(config, reaction)
+            rules_payload, skipped = extract_rule_components(
+                config, reaction, as_records=True
+            )
             if skipped:
                 n_multi_product += 1
                 audit_entries.append(
@@ -769,9 +891,6 @@ def _extract_rules_batch_worker(
                     )
                 )
                 continue
-            rules_payload = [
-                _make_extracted_rule_record(rule) for rule in extracted_rules
-            ]
             if not rules_payload:
                 audit_entries.append(
                     _make_audit_entry(
@@ -806,6 +925,7 @@ def _extract_rules_batch_worker(
         errors=errors,
         n_multi_product=n_multi_product,
         audit_entries=audit_entries,
+        stereo_records=stereo_records,
     )
 
 
@@ -847,6 +967,7 @@ def process_extraction_result(
     audit_entries_by_index: dict[int, ErrorEntry] | None = None,
     reaction_rule_occurrences_by_index: dict[int, list[RuleOccurrence]] | None = None,
     audit_counts: Counter | None = None,
+    stereo_file: TextIOWrapper | None = None,
 ) -> int:
     """Process a single ExtractionBatchResult, updating rules statistics.
 
@@ -868,6 +989,9 @@ def process_extraction_result(
     :param audit_counts: Optional counter to accumulate audit-entry categories.
     :return: Number of reactions processed in this batch (for progress bar).
     """
+    if stereo_file is not None:
+        for record in result.stereo_records:
+            stereo_file.write(json.dumps(record, sort_keys=True) + "\n")
     for index, rule_records, product_smi in result.rule_records:
         _update_rules_statistics(
             all_rules_statistics,
@@ -1008,6 +1132,9 @@ def _make_rule_filter_audit_entry(
             "extracted from a multicenter reaction "
             f"(rules={reason_counts['multicenter']})"
         )
+    elif "reactor_validation_could_not_be_assessed" in reason_counts:
+        error_type = "ReactorValidationIncomplete"
+        message = f"reactor correspondence was not completely assessed ({dict(reason_counts)})"
     elif all(reason.startswith("reactor_validation_") for reason in reason_counts):
         error_type = "ReactorValidationFailed"
         details = ", ".join(
@@ -1111,6 +1238,7 @@ def _extract_rules_serial(
     audit_entries_by_index: dict[int, ErrorEntry] | None = None,
     reaction_rule_occurrences_by_index: dict[int, list[RuleOccurrence]] | None = None,
     audit_counts: Counter | None = None,
+    stereo_file: TextIOWrapper | None = None,
 ) -> tuple[int, int]:
     """Serial rules extraction path used when a single CPU is requested.
 
@@ -1129,8 +1257,15 @@ def _extract_rules_serial(
             reaction = parse_reaction(
                 raw_item, fmt=fmt, ignore_stereo=config.ignore_stereo
             )
+            if stereo_file is not None:
+                stereo_file.write(
+                    json.dumps(source_stereo_record(reaction, index), sort_keys=True)
+                    + "\n"
+                )
             product_smi = str(unite_molecules(reaction.products))
-            extracted_rules, skipped = extract_rules(config, reaction)
+            rule_records, skipped = extract_rule_components(
+                config, reaction, as_records=True
+            )
             if skipped:
                 n_multi_product += 1
                 entry = _make_audit_entry(
@@ -1147,9 +1282,6 @@ def _extract_rules_serial(
                 if audit_counts is not None:
                     audit_counts[(entry.stage, entry.error_type)] += 1
                 continue
-            rule_records = [
-                _make_extracted_rule_record(rule) for rule in extracted_rules
-            ]
             if not rule_records:
                 entry = _make_audit_entry(
                     index,
@@ -1347,6 +1479,9 @@ def extract_rules_from_reactions(
         mode="w", suffix=".tsv", delete=False, encoding="utf-8"
     )
 
+    stereo_file = open(
+        f"{reaction_rules_path_base}.stereo.jsonl", "w", encoding="utf-8"
+    )
     try:
         # Simple serial path for a single CPU.
         if num_cpus <= 1:
@@ -1360,6 +1495,7 @@ def extract_rules_from_reactions(
                 error_file=error_file,
                 error_counts=error_counts,
                 products_file=products_tmp,
+                stereo_file=stereo_file,
                 fmt=fmt,
                 audit_entries_by_index=audit_entries_by_index,
                 reaction_rule_occurrences_by_index=reaction_rule_occurrences_by_index,
@@ -1436,6 +1572,7 @@ def extract_rules_from_reactions(
                         error_counts=error_counts,
                         multi_product_count=multi_product_count,
                         products_file=products_tmp,
+                        stereo_file=stereo_file,
                         audit_entries_by_index=audit_entries_by_index,
                         reaction_rule_occurrences_by_index=reaction_rule_occurrences_by_index,
                         audit_counts=audit_counts,
@@ -1449,6 +1586,7 @@ def extract_rules_from_reactions(
         if error_file is not None:
             error_file.close()
         products_tmp.close()
+        stereo_file.close()
 
     sorted_rules, filter_stats = sort_rules(
         all_rules_statistics,
@@ -1487,6 +1625,21 @@ def extract_rules_from_reactions(
             tsv_file.write(
                 f"{rule.rule_smarts}\t{len(indices)}\t{','.join(map(str, indices))}\n"
             )
+
+    manifest = {
+        "schema": "synplan-rules/2",
+        "stereo_schema": 1,
+        "preserve_stereo": not config.ignore_stereo,
+        "chython_version": version("chython-synplan"),
+        "input_sha256": file_digest(reaction_data_path),
+        "rules_sha256": file_digest(rules_tsv_path),
+        "source_stereo_file": f"{reaction_rules_path_base}.stereo.jsonl",
+        "rule_count": len(sorted_rules),
+        "policy_compatibility": "requires the exact ordered rule vocabulary used for training",
+    }
+    Path(f"{reaction_rules_path_base}.manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n"
+    )
 
     print_extraction_summary(
         n_processed,

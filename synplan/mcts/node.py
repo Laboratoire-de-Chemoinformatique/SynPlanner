@@ -1,5 +1,7 @@
 """Module containing a class Node in the tree search."""
 
+from synplan.chem.stereo import StereoObligations
+
 
 class Node:
     """Node class represents a node in the tree search.
@@ -22,6 +24,11 @@ class Node:
         rule_source: str | None = None,
         rule_key: str | None = None,
         policy_rank: int | None = None,
+        policy_probability: float | None = None,
+        stereo_obligations: tuple = (),
+        stereo_events: tuple = (),
+        stereo_evidence: tuple = (),
+        stereo_history: str = "",
     ) -> None:
         """Initialize the Node object.
 
@@ -60,10 +67,20 @@ class Node:
             or ``None`` whenever either component is missing.
         :param policy_rank: 1-indexed Top-N position from the policy network for
             policy-source rules; ``None`` for priority-source rules and the root.
+        :param policy_probability: Unscaled policy output used for pathway
+            likelihood; ``None`` for rules without a model probability.
         """
 
         self.precursors_to_expand = precursors_to_expand
         self.new_precursors = new_precursors
+        self.stereo_obligations = (
+            stereo_obligations
+            if isinstance(stereo_obligations, StereoObligations)
+            else StereoObligations().extend(stereo_obligations)
+        )
+        self.stereo_events = tuple(stereo_events)
+        self.stereo_evidence = tuple(stereo_evidence)
+        self.stereo_history = stereo_history
 
         if len(self.precursors_to_expand) == 0:
             self.curr_precursor = tuple()
@@ -82,6 +99,8 @@ class Node:
         self.rule_source = rule_source
         self.rule_key = rule_key
         self.policy_rank = policy_rank
+        # Unscaled model output, distinct from the fragment-weighted UCB prior.
+        self.policy_probability = policy_probability
 
     def __len__(self) -> int:
         """Returns the number of precursor in the node to expand."""
@@ -100,4 +119,18 @@ class Node:
         There are no precursors for expansion.
         """
 
+        return self.is_terminal() and not self.stereo_obligations
+
+    def is_terminal(self) -> bool:
+        """All leaf structures are purchased; stereo strategy may still be needed."""
         return len(self.precursors_to_expand) == 0
+
+    @property
+    def stereo_status(self) -> str:
+        if self.stereo_obligations:
+            return (
+                "could_not_be_assessed"
+                if self.stereo_obligations.unassessed
+                else "strategy_needed"
+            )
+        return "fulfilled" if self.is_terminal() else "pending_stock_or_expansion"

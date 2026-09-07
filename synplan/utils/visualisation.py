@@ -12,6 +12,7 @@ from chython import depict_settings
 from chython.containers.molecule import MoleculeContainer
 from IPython.display import HTML, display
 
+from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction.routes.io import make_dict
 from synplan.chem.reaction.routes.representation.depiction import (
     cgr_display,
@@ -58,7 +59,12 @@ def get_child_nodes(
         temp_obj = {
             "smiles": str(precursor),
             "type": "mol",
-            "in_stock": str(precursor) in tree.building_blocks,
+            "in_stock": is_purchasable(
+                precursor,
+                tree.building_blocks,
+                min_mol_size=0,
+                key=str(precursor),
+            ),
         }
         node = get_child_nodes(tree, precursor, graph)
         if node:
@@ -86,9 +92,16 @@ def extract_routes(
     :return: A list of dictionaries. Each dictionary contains a target, a list of
         children, and a boolean indicating whether the target is in building_blocks.
     """
+    from synplan.mcts.tree import Tree
+
+    if isinstance(tree, Tree) and tree.winning_nodes:
+        return [
+            Route.from_tree(tree, node_id).to_json() for node_id in tree.winning_nodes
+        ]
     target = tree.nodes[1].precursors_to_expand[0].molecule
     target_in_stock = tree.nodes[1].curr_precursor.is_building_block(
-        tree.building_blocks, min_mol_size
+        tree.building_blocks,
+        min_mol_size,
     )
 
     # append encoded routes to list
@@ -233,7 +246,9 @@ _ROLE_LEGEND = (
 )
 
 
-def _report_header(routes: Sequence[Route], tile: MoleculeContainer | None) -> str:
+def _report_header(
+    routes: Sequence[Route], tile: MoleculeContainer | None, solved: int
+) -> str:
     scores = [
         route.provenance.search_score
         for route in routes
@@ -241,7 +256,7 @@ def _report_header(routes: Sequence[Route], tile: MoleculeContainer | None) -> s
     ]
     stats = (
         ("Routes", len(routes), ""),
-        ("Solved", sum(route.solved for route in routes), f" of {len(routes)}"),
+        ("Solved", solved, f" of {len(routes)}"),
         ("Longest", max((len(route) for route in routes), default=0), " steps"),
         ("Best score", round(max(scores), 3) if scores else "—", ""),
     )
@@ -317,19 +332,52 @@ def routes_report_html(
     doc = Doc()
     layouts: dict = {}  # one geometry per molecule, so a card matches its neighbours
     body = []
+    solved = 0
     for index, route in enumerate(routes, 1):
         rows = ""
+        stereo_status = route.stereo_status
+        step_by_node = {
+            s.origin.tree_node_id: i for i, s in enumerate(route.steps) if s.origin
+        }
+        issues_by_step = {}
+        for obligation in (route.stereo or {}).get("obligations", ()):
+            responsible = obligation.get("step")
+            if responsible is None:
+                responsible = step_by_node.get(obligation.get("tree_node_id"))
+            issues_by_step.setdefault(responsible, []).append(
+                {
+                    "requires_stereo_forming_step": "Required stereochemistry must be established at this step; selectivity is unassessed.",
+                    "requires_explicit_resolution_or_inversion_strategy": "An explicit stereo inversion or separation strategy is needed.",
+                }.get(obligation.get("reason"))
+                or obligation.get("detail")
+                or obligation.get("reason", "Stereo assessment needed")
+            )
         for number, step in enumerate(route, 1):
             label = _step_label(step)
+            notes = list(issues_by_step.get(number - 1, ()))
+            if stereo_status == "needs_reassessment" and (
+                notes or step.reaction.meta.get("stereo_events")
+            ):
+                notes = ["Stereo needs reassessment after edits."]
+            stereo_note = "".join(
+                f'<div class="rxn">Stereo: {escape(detail.replace("_", " "))}</div>'
+                for detail in dict.fromkeys(notes)
+            )
             rows += (
                 f'<div class="step"><div class="disc">{number}</div><div>'
                 + (f'<div class="lab">{escape(label)}</div>' if label else "")
+                + stereo_note
                 + f'<div class="rxn mono">{escape(str(step.reaction))}</div></div></div>'
             )
         provenance = route.provenance
         node_id = None if provenance is None else provenance.tree_node_id
         score = None if provenance is None else provenance.search_score
         unresolved = len(route.unresolved)
+        solved += (
+            not unresolved and stereo_status == "fulfilled"
+            if route.stereo is not None
+            else route.solved
+        )
         body.append(
             '<section class="route card"><div class="rhead">'
             f'<div class="kv"><div class="eyebrow">Route</div>'
@@ -355,6 +403,7 @@ def routes_report_html(
         + _report_header(
             routes,
             drawable_copy(routes[0].target, layouts) if routes else None,
+            solved,
         )
         + "".join(body)
         + "</div>\n</body>\n</html>\n"

@@ -324,6 +324,9 @@ def _load_rules_tsv(
     """Load reaction rules from a TSV file."""
     if reactor_kwargs is None:
         reactor_kwargs = {}
+    from synplan.chem.reaction.rules.vocabulary import RuleLibrary, manifest_digest
+
+    vocabulary_digest = manifest_digest(file)
     reactor_kwargs.setdefault("delete_atoms", False)
     reactors: list[CanonicalRetroReactor] = []
     with open(file, encoding="utf-8") as f:
@@ -367,7 +370,7 @@ def _load_rules_tsv(
                     f"{file!r}:\n  SMARTS: {smarts_str}\n"
                     f"  error: {type(err).__name__}: {err}"
                 ) from err
-    return tuple(reactors)
+    return RuleLibrary(reactors, vocabulary_digest)
 
 
 def _parse_reaction_rule(smarts_str: str) -> ReactionContainer:
@@ -906,6 +909,7 @@ def load_evaluation_function(eval_config) -> "EvaluationStrategy":
             max_depth=eval_config.max_depth,
             normalize=eval_config.normalize,
             stochastic=eval_config.stochastic,
+            max_reaction_outcomes=eval_config.max_reaction_outcomes,
         )
 
     elif isinstance(eval_config, ValueNetworkEvaluationConfig):

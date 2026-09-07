@@ -92,7 +92,7 @@ the ``nmcs_*`` / ``lnmcs_ratio`` keys go under ``tree:``, and the optional
     tree:backprop_type                       The backpropagation method used during the tree search. Options are "muzero" (model-based approach) and "cumulative" (cumulative reward approach)
     tree:search_strategy                     The strategy for navigating the tree. Options are "expansion_first" (prioritizing the expansion of new nodes) and "evaluation_first" (prioritizing the evaluation of existing nodes)
     tree:exclude_small                       If True, excludes small molecules from the tree, typically focusing on more complex molecules
-    tree:min_mol_size                        The minimum size of a molecule (the number of heavy atoms) to be considered in the search. Molecules smaller than this threshold are typically considered readily available building blocks
+    tree:min_mol_size                        Size heuristic for scoring precursor fragments. Every leaf, including small molecules, still requires an actual compatible stock record
     tree:init_node_value                     The initial value for newly created nodes in the tree (for expansion_first search strategy)
     tree:epsilon                             This parameter is used in the epsilon-greedy strategy during the node selection, representing the probability of choosing a random action for exploration. A higher value leads to more exploration
     tree:silent                              If True, suppresses the progress logging of the tree search

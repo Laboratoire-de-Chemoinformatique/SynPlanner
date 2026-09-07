@@ -98,6 +98,9 @@ def load_network_from_checkpoint(
         hparams.update(overrides)
         model = model_class(**hparams)
 
+    if "rule_vocabulary_digest" in hparams:
+        model.rule_vocabulary_digest = hparams["rule_vocabulary_digest"]
+        model.hparams["rule_vocabulary_digest"] = hparams["rule_vocabulary_digest"]
     model.load_state_dict(_strip_wrapper_prefix(checkpoint["state_dict"], model))
     return model.eval()
 

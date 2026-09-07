@@ -62,9 +62,27 @@ Standardize custom building blocks for compatibility with ``SynPlanner``.
 
     synplan building_blocks_standardizing --input building_blocks_original.smi --output building_blocks_standardized.smi
 
+For a stereo-preserving, vendor-aware InChIKey catalogue, provide a headered
+TSV with ``SMILES`` and ``*_ppg`` vendor-price columns and select JSON output:
+
+.. code-block:: bash
+
+    synplan building_blocks_standardizing \
+      --input building_blocks.tsv \
+      --output building_blocks.json
+
 **Parameters**:
-    - ``input`` - the path to the file (.smi or .rdf) with building blocks to be standardized.
-    - ``output`` - the path to the file (.smi or .rdf) where standardized building blocks to be stored.
+    - ``input`` - a legacy molecular file, or a vendor-aware TSV for JSON output.
+    - ``output`` - a legacy molecular file, or ``.json`` for the Chython InChIKey catalogue.
+
+The Python equivalent is
+``standardize_building_blocks("building_blocks.tsv", "building_blocks.json")``.
+See :doc:`/methods/building_blocks` for validation, retained stereo metadata, route
+costing, and compatibility details.
+
+Invalid TSV rows are omitted and reported in ``<output>.errors.tsv`` while
+valid records are still published. Preparation fails without replacing an
+existing JSON only when no row is valid.
 
 Synthon workflows
 -----------------

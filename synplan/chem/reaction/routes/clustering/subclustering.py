@@ -4,6 +4,7 @@ from typing import Any
 
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from chython.containers.bonds import DynamicBond
+from tqdm.auto import tqdm
 
 from synplan.chem.reaction.routes.clustering.pseudo_atoms import (
     DynamicX,
@@ -37,17 +38,15 @@ def lg_process_reset(lg_cgr: CGRContainer, atom_num: int):
         The modified `lg_cgr` with normalized bonds and the specified atom
         flagged as a radical.
     """
-    bond_items = list(lg_cgr._bonds.items())
-    for atom1, bond_set in bond_items:
-        bond_set_items = list(bond_set.items())
-        for atom2, bond in bond_set_items:
+    for atom1 in lg_cgr:
+        for atom2, bond in list(lg_cgr.bond_items(atom1)):
             if bond.p_order is None and bond.order is not None:
                 order = int(bond.order)
                 lg_cgr.delete_bond(atom1, atom2)
                 lg_cgr.add_bond(atom1, atom2, DynamicBond(order, order))
     lg_cgr._radicals[atom_num] = True
-    if atom_num in lg_cgr._atoms:
-        lg_cgr._atoms[atom_num]._is_radical = True
+    if lg_cgr.has_atom(atom_num):
+        lg_cgr.atom(atom_num)._is_radical = True
     return lg_cgr
 
 
@@ -78,17 +77,16 @@ def lg_replacer(route_cgr: CGRContainer):
     cgr_prods = [route_cgr.substructure(c) for c in route_cgr.connected_components]
     target_cgr = cgr_prods[0]
 
-    bond_items = list(target_cgr._bonds.items())
+    rows = [(n, list(target_cgr.bond_items(n))) for n in target_cgr]
     reaction = ReactionContainer.from_cgr(target_cgr)
     target_mol = reaction.products[0]
-    max_in_target_mol = max(target_mol._atoms)
+    max_in_target_mol = max(target_mol)
 
     k = 1
     atom_nums = []
     checked_atoms = set()
 
-    for atom1, bond_set in bond_items:
-        bond_set_items = list(bond_set.items())
+    for atom1, bond_set_items in rows:
         for atom2, bond in bond_set_items:
             if (
                 bond.p_order is None
@@ -142,8 +140,8 @@ def lg_replacer(route_cgr: CGRContainer):
     g = 1
     for r in reactants:
         for atom_num in atom_nums:
-            if atom_num in r._atoms:
-                synthon_cgr._atoms[atom_num].mark = g
+            if r.has_atom(atom_num):
+                synthon_cgr.atom(atom_num).mark = g
                 atom_mark_map[atom_num] = g
                 g += 1
 
@@ -185,7 +183,7 @@ def lg_reaction_replacer(
     """
     new_reactants = []
     for reactant in synthon_reaction.reactants:
-        atom_keys = list(reactant._atoms.keys())
+        atom_keys = list(reactant)
         for atom_num in atom_keys:
             if atom_num > max_in_target_mol:
                 for k, val in lg_groups.items():
@@ -193,8 +191,8 @@ def lg_reaction_replacer(
                     if atom_num == val[1]:
                         lg.mark = k
                         lg.isotope = k
-                        atom1 = next(iter(reactant._bonds[atom_num].keys()))
-                        bond = reactant._bonds[atom_num][atom1]
+                        atom1 = next(iter(reactant.neighbor_numbers(atom_num)))
+                        bond = reactant.bond(atom_num, atom1)
                         reactant.delete_bond(atom1, atom_num)
                         reactant.delete_atom(atom_num)
                         reactant.add_atom(lg, atom_num)
@@ -228,13 +226,13 @@ def replace_supporting_reactants_with_y(
         return synthon_reaction
 
     target_mol = synthon_reaction.products[0]
-    target_atoms = set(target_mol._atoms)
+    target_atoms = set(target_mol)
     max_atom_idx = max(target_atoms, default=0)
     new_reactants = []
     y_mark = 1
 
     for reactant in synthon_reaction.reactants:
-        if set(reactant._atoms) & target_atoms:
+        if set(reactant) & target_atoms:
             new_reactants.append(reactant)
             continue
 
@@ -306,7 +304,7 @@ def _build_subcluster_route_data(group, sb_cgrs_dict, route_cgrs_dict):
         try:
             old_reactants = synthon_rxn.reactants
             target_mol = synthon_rxn.products[0]
-            max_atom_idx = max(target_mol._atoms)
+            max_atom_idx = max(target_mol)
             new_reactants = lg_reaction_replacer(synthon_rxn, lg_groups, max_atom_idx)
             new_rxn = ReactionContainer(reactants=new_reactants, products=[target_mol])
             new_rxn = replace_supporting_reactants_with_y(new_rxn)
@@ -412,7 +410,9 @@ def group_routes_by_synthon_detail(
     return final_groups
 
 
-def subcluster_all_clusters(groups, sb_cgrs_dict, route_cgrs_dict):
+def subcluster_all_clusters(
+    groups, sb_cgrs_dict, route_cgrs_dict, *, silent: bool = True
+):
     """
     Subdivide each reaction cluster into detailed synthon-based subgroups.
 
@@ -427,6 +427,8 @@ def subcluster_all_clusters(groups, sb_cgrs_dict, route_cgrs_dict):
         Dictionary of SB-CGRs
     route_cgrs_dict : dict
         Dictionary of RoteCGRs
+    silent : bool
+        Set False to show one progress bar for all clusters.
 
     Returns
     -------
@@ -435,7 +437,9 @@ def subcluster_all_clusters(groups, sb_cgrs_dict, route_cgrs_dict):
         or None if any cluster fails to subcluster.
     """
     all_subgroups = {}
-    for group_index, group in groups.items():
+    for group_index, group in tqdm(
+        groups.items(), desc="Subclustering", unit="cluster", disable=silent
+    ):
         group_synthons = _build_subcluster_route_data(
             group, sb_cgrs_dict, route_cgrs_dict
         )
@@ -522,10 +526,10 @@ def replace_leaving_groups_in_synthon(subgroup, to_remove):
 
         if current_mark in to_remove:
             # Remove old LG (X): delete bond and atom
-            neighbors = list(updated_cgr._bonds[atom_idx].keys())
-            if neighbors:
-                neighbor_idx = neighbors[0]
-                bond = updated_cgr._bonds[atom_idx][neighbor_idx]
+            adjacent = list(updated_cgr.neighbor_numbers(atom_idx))
+            if adjacent:
+                neighbor_idx = adjacent[0]
+                bond = updated_cgr.bond(atom_idx, neighbor_idx)
                 updated_cgr.delete_bond(atom_idx, neighbor_idx)
                 updated_cgr.delete_atom(atom_idx)
 
@@ -548,7 +552,7 @@ def replace_leaving_groups_in_synthon(subgroup, to_remove):
             new_lgs[adjusted_mark] = atom_idx
 
     # Reorder atoms dict and update 2D coordinates for depiction
-    updated_cgr._atoms = dict(sorted(updated_cgr._atoms.items()))
+    updated_cgr = updated_cgr.ordered_copy()
 
     return updated_cgr, new_lgs
 
@@ -638,7 +642,7 @@ def _post_process_subgroup_in_place(subgroup):
     new_synthon_cgr, new_lgs = replace_leaving_groups_in_synthon(subgroup, to_remove)
     synthon_reaction = ReactionContainer.from_cgr(new_synthon_cgr)
     target_mol = synthon_reaction.products[0]
-    max_in_target_mol = max(target_mol._atoms)
+    max_in_target_mol = max(target_mol)
     new_reactants = new_lg_reaction_replacer(
         synthon_reaction, new_lgs, max_in_target_mol
     )

@@ -41,7 +41,7 @@ def _molecule(smi: str):
 
 def test_retro_is_the_default_and_is_not_policed():
     """The coupling check must not fire on the retro path — every existing caller lives there."""
-    tree = build_tree()
+    tree = build_tree(building_blocks=set())
     assert tree.config.direction == "retro"
     assert tree.building_blocks == frozenset()
 
@@ -75,7 +75,11 @@ def test_forward_accepts_an_evaluator_that_agrees():
 def test_forward_refuses_an_empty_goal():
     """`building_blocks` is the goal in forward mode, so empty is unsatisfiable, not permissive."""
     with pytest.raises(ValueError, match="GOAL"):
-        build_tree(direction="forward", evaluator=FixedEvaluationStrategy())
+        build_tree(
+            direction="forward",
+            building_blocks=set(),
+            evaluator=FixedEvaluationStrategy(),
+        )
 
 
 def test_an_evaluator_without_a_rollout_is_left_alone():

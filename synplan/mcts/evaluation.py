@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from synplan.chem import building_blocks as building_block_types
 from synplan.chem.precursor import Precursor, compose_precursors
 from synplan.chem.rdkit_utils import RDKitScore
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
@@ -35,10 +36,13 @@ class RolloutSimulator:
         self,
         policy_network: "Policy",
         reaction_rules,
-        building_blocks: set[str],
+        building_blocks: set[str]
+        | frozenset[str]
+        | building_block_types.BuildingBlockCatalogue,
         min_mol_size: int,
         max_depth: int,
         stochastic: bool = False,
+        max_reaction_outcomes: int = 5,
     ) -> None:
         """Initialize the rollout simulator.
 
@@ -56,6 +60,7 @@ class RolloutSimulator:
         self.min_mol_size = min_mol_size
         self.max_depth = max_depth
         self.stochastic = stochastic
+        self.max_reaction_outcomes = max_reaction_outcomes
 
     def _select_reaction(self, current_precursor: Precursor) -> tuple[bool, any, int]:
         """Select a reaction rule to apply.
@@ -141,7 +146,10 @@ class RolloutSimulator:
         """
         max_depth = self.max_depth - current_depth
 
-        if precursor.is_building_block(self.building_blocks, self.min_mol_size):
+        if precursor.is_building_block(
+            self.building_blocks,
+            self.min_mol_size,
+        ):
             return 1.0
 
         occurred_precursor = set()
@@ -165,6 +173,12 @@ class RolloutSimulator:
             if not reaction_applied:
                 return -1.0
 
+            from synplan.chem.stereo import assess_inheritance
+
+            assessment = assess_inheritance(current_precursor.molecule, products)
+            if assessment["obligations"]:
+                return 0.0
+
             history[rollout_depth]["rule_index"] = rule_id
             # ``apply_reaction_rule`` already validated + canonicalized each
             # product in a single kekule pass.
@@ -182,7 +196,8 @@ class RolloutSimulator:
                         x
                         for x in products
                         if not x.is_building_block(
-                            self.building_blocks, self.min_mol_size
+                            self.building_blocks,
+                            self.min_mol_size,
                         )
                     ]
                 )
@@ -190,12 +205,15 @@ class RolloutSimulator:
 
         return 1.0
 
-    @staticmethod
-    def _apply_rule(precursor_mol, rule):
+    def _apply_rule(self, precursor_mol, rule):
         # Local import to avoid circular dependency
         from synplan.chem.reaction import apply_reaction_rule
 
-        return apply_reaction_rule(precursor_mol.molecule, rule)
+        return apply_reaction_rule(
+            precursor_mol.molecule,
+            rule,
+            top_reactions_num=self.max_reaction_outcomes,
+        )
 
 
 class EvaluationStrategy(ABC):
@@ -267,11 +285,14 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         self,
         policy_network: "Policy",
         reaction_rules,
-        building_blocks: set[str],
+        building_blocks: set[str]
+        | frozenset[str]
+        | building_block_types.BuildingBlockCatalogue,
         min_mol_size: int,
         max_depth: int,
         normalize: bool = False,
         stochastic: bool = False,
+        max_reaction_outcomes: int = 5,
     ) -> None:
         """Initialize rollout evaluation strategy.
 
@@ -291,6 +312,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
             min_mol_size=min_mol_size,
             max_depth=max_depth,
             stochastic=stochastic,
+            max_reaction_outcomes=max_reaction_outcomes,
         )
         self.normalize = normalize
 
@@ -302,6 +324,8 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
     ) -> float:
         """Evaluate node using rollout simulation."""
         current_depth = nodes[node_id].depth
+        if getattr(node, "stereo_obligations", ()):
+            return 0.5 if self.normalize else 0.0
         raw = min(
             (
                 self.rollout.simulate_precursor(precursor, current_depth=current_depth)

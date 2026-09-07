@@ -27,7 +27,7 @@ def compose_sb_cgr(route_cgr: CGRContainer):
     # keeps target atoms at the lowest atom numbers, while later leaving-group
     # atoms can be remapped above that range.
     cgr_prods = [route_cgr.substructure(c) for c in route_cgr.connected_components]
-    target_cgr = min(cgr_prods, key=lambda cgr: min(cgr._atoms))
+    target_cgr = min(cgr_prods, key=lambda cgr: min(cgr))
 
     # `ReactionContainer.from_cgr` may split off several product fragments
     # (leaving groups, salts, etc.).  The target product is the fragment with
@@ -35,8 +35,8 @@ def compose_sb_cgr(route_cgr: CGRContainer):
     # return exactly these atoms, not whichever connected component happens to
     # be yielded first.
     reaction = ReactionContainer.from_cgr(target_cgr)
-    target_product = min(reaction.products, key=lambda mol: min(mol._atoms))
-    target_atom_nums = set(target_product._atoms)
+    target_product = min(reaction.products, key=lambda mol: min(mol))
+    target_atom_nums = set(target_product)
 
     # a snapshot, because the loop rewrites the bonds it walks; chython yields
     # each edge once, so there is nothing to deduplicate
@@ -69,7 +69,7 @@ def compose_sb_cgr(route_cgr: CGRContainer):
     # Chython copies DynamicElement objects during substructure extraction.
     # Keep atom objects in sync with the CGR state dictionaries so SMILES
     # serialization does not see stale charges or radicals after reduction.
-    for atom_num, atom in sb_cgr._atoms.items():
+    for atom_num, atom in sb_cgr.atoms():
         atom._charge = sb_cgr._charges[atom_num]
         atom._p_charge = sb_cgr._p_charges[atom_num]
         atom._is_radical = sb_cgr._radicals[atom_num]

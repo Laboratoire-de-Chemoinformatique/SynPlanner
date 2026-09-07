@@ -246,10 +246,31 @@ figure in at least one of them, so treating the whole file as orderable is safe.
 synthon commands read the file unmodified — they want a headered TSV with a `SMILES`
 column and ignore the rest.
 
-**Use my own building blocks**
+**Use my own building blocks as a legacy structural stock**
 CLI: `building_blocks_standardizing`. Preset building blocks are already
 standardized — pass `standardize=False` to `load_building_blocks`.
 Docs: `user_guide/cli_interface`, `user_guide/data`
+
+**Prepare a vendor-priced building-block catalogue**
+`standardize_building_blocks(input_tsv, output_json)`
+(`synplan.chem.utils`), or the same `building_blocks_standardizing` CLI command
+with a `.json` output. The TSV needs one `SMILES` column and one or more `*_ppg`
+vendor-price columns. Bad rows go to `<output>.errors.tsv`; valid rows still
+publish atomically. Load the result with `load_building_block_catalogue`
+(`synplan.chem.building_blocks`).
+Tutorial: `20_InChIKey_Building_Block_Catalogue`
+Docs: `methods/building_blocks`, `user_guide/cli_interface`
+
+**Plan and price routes with a vendor catalogue**
+`load_building_block_catalogue` → pass the same catalogue as `building_blocks`
+to `RolloutEvaluationConfig` and `Tree` → `tree.run()` →
+`route.calculate_cost(building_blocks)`. The planning CLI accepts the prepared
+`.json` directly and writes `route_costs.json`. Matching is connectivity-only
+and uses the first 14 Chython InChIKey characters; JSON catalogues are
+retrosynthesis-only. Costs choose the cheapest positive offer in the complete
+prefix bucket and assume one equivalent per leaf and 100% yield.
+Tutorial: `20_InChIKey_Building_Block_Catalogue`
+Docs: `methods/building_blocks`
 
 **Show rules, synthons or any chython objects as a table**
 `rules_frame` and `synthons_frame` (`synplan.chem.synthon.frames`),
@@ -310,6 +331,8 @@ Knobs that silently disable what you asked for are in `configuration/synthonisat
 
 **Turn a building-block catalogue into a synthon stock**
 `BBClassifier` assigns one of 147 classes, `BBSynthoniser` runs its rule program.
+For an already-loaded `BuildingBlock`, call
+`BBSynthoniser.synthonise_building_block`; MCTS does not call the Synthonizer.
 CLI `bb_classifying` → `bb_synthonizing`. `synplan.chem.synthon` · T17
 
 **Judge a catalogue before buying it**

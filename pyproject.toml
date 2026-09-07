@@ -1,6 +1,6 @@
 [project]
 name = "SynPlanner"
-version = "1.7.0"
+version = "1.8.0"
 description = "Toolbox for chemical synthesis planning"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "chython-synplan[racer-default]==1.105",
+  "chython-synplan[racer-default]==1.108",
   "chytorch-synplan>=1.70",
   "chytorch-rxnmap-synplan>=1.7",
   "numpy>=2",
@@ -41,6 +41,8 @@ dependencies = [
   "pyyaml>=6.0",
   "safetensors>=0.4",
   "protobuf>=6.0",
+  "frozendict>=2.4.6",
+  "ijson>=3.4.0",
 ]
 
 # Extras to select PyTorch variant - required for uv users

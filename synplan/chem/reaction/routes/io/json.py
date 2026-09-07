@@ -4,8 +4,7 @@ from functools import lru_cache
 from itertools import zip_longest
 from typing import TYPE_CHECKING, Any, NamedTuple
 
-from chython import smiles as read_smiles
-
+from synplan.chem.building_blocks import BuildingBlockCatalogue
 from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction.routes.contracts import (
     RouteDiagnostic,
@@ -16,6 +15,8 @@ from synplan.chem.reaction.routes.io.metadata import (
     reaction_metadata,
     restore_reaction_metadata,
 )
+from synplan.chem.stereo import has_stereo
+from synplan.chem.stereo import parse_smiles_preserving_stereo as read_smiles
 from synplan.chem.utils import mapped_smiles, molecule_key, normalise
 
 if TYPE_CHECKING:
@@ -40,7 +41,13 @@ def route_tree_has_null_node(node) -> bool:
     )
 
 
-def _purchasable(smiles: str, molecule, stock, min_mol_size: int, fallback: bool):
+def _purchasable(
+    smiles: str,
+    molecule,
+    stock,
+    min_mol_size: int,
+    fallback: bool,
+):
     """``Precursor.is_building_block`` on an already-serialised molecule.
 
     Without a stock the caller gets the old positional answer, so an export that never
@@ -48,7 +55,12 @@ def _purchasable(smiles: str, molecule, stock, min_mol_size: int, fallback: bool
     """
     if stock is None:
         return fallback
-    return is_purchasable(molecule, stock, min_mol_size, key=smiles)
+    return is_purchasable(
+        molecule,
+        stock,
+        min_mol_size,
+        key=smiles,
+    )
 
 
 def _collect_reactions(tree):
@@ -150,6 +162,15 @@ def read_route_tree(route_json) -> RouteRead:
     unresolved = []
     uncanonical = 0
 
+    def check_stereo_node(mol, node):
+        expected = read_smiles(node["smiles"])
+        if (has_stereo(mol) or has_stereo(expected)) and molecule_key(
+            mol
+        ) != molecule_key(expected):
+            raise ValueError(
+                "inconsistent stereo in adjacent route molecule and reaction records"
+            )
+
     def link(reaction, child_nodes):
         """Give every reactant its file verdict and, if a step made it, that step.
 
@@ -172,20 +193,31 @@ def read_route_tree(route_json) -> RouteRead:
             made = molecule(node)
             if slot is None:  # a node no reactant claims: keep its steps, drop it
                 continue
+            check_stereo_node(reactants[slot], node)
             if made is not None:
+                check_stereo_node(made, node)
                 reactants[slot] = made
             elif not node.get("in_stock"):
                 unresolved.append(reactants[slot])
+            if node.get("selected_stock"):
+                reactants[slot].meta["selected_stock"] = dict(node["selected_stock"])
         # splice, rather than rebuild, to keep the parsed reaction's metadata
         reaction._reactants = tuple(reactants)
 
     def product_of(reaction, node):
         """The fragment of ``reaction`` this molecule node stands for."""
         if len(reaction.products) == 1:
+            check_stereo_node(reaction.products[0], node)
             return reaction.products[0]
         smiles = _file_key(node["smiles"])
         product = next((p for p in reaction.products if str(p) == smiles), None)
         if product is None:
+            if any(has_stereo(p) for p in reaction.products) or has_stereo(
+                read_smiles(node["smiles"])
+            ):
+                raise ValueError(
+                    "route molecule stereo does not match a reaction product"
+                )
             logger.warning(
                 "Route molecule %s is not a product of %s", node["smiles"], reaction
             )
@@ -251,6 +283,11 @@ def route_tree(target, source_of, purchasable, step_fields) -> "RouteNode | None
                 "type": "mol",
                 "smiles": key,
                 "in_stock": purchasable(molecule, key, True),
+                **(
+                    {"selected_stock": dict(molecule.meta["selected_stock"])}
+                    if "selected_stock" in molecule.meta
+                    else {}
+                ),
             }
         step_id, reaction, product = source
         if product is None:
@@ -334,7 +371,7 @@ def _make_json_v1(
     keep_ids=True,
     tree: "Tree | None" = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
-    building_blocks: frozenset[str] | set[str] | None = None,
+    building_blocks: frozenset[str] | set[str] | BuildingBlockCatalogue | None = None,
     min_mol_size: int = 6,
 ):
     """
@@ -352,6 +389,12 @@ def _make_json_v1(
     Returns:
         list or dict: JSON-like tree(s) of routes.
     """
+    if tree is not None and building_blocks is None:
+        building_blocks = getattr(tree, "building_blocks", None)
+        tree_config = getattr(tree, "config", None)
+        if tree_config is not None:
+            min_mol_size = tree_config.min_mol_size
+
     # Prepare output
     all_routes = {} if keep_ids else []
 
@@ -367,7 +410,7 @@ def _make_json_v1(
             # Determine target molecule atoms from the final step of this route
             final_step = max(steps)
             target = steps[final_step].products[0]
-            atom_nums = set(target._atoms.keys())
+            atom_nums = set(target)
 
             # Precompute canonical SMILES and producer mapping for all products
             prod_map = {}  # smiles -> list of step_ids
@@ -403,11 +446,17 @@ def _make_json_v1(
             product = next((p for p in reaction.products if p == molecule), None)
             if product is None:
                 product = next(
-                    (p for p in reaction.products if _atom_nums & p._atoms.keys()), None
+                    (p for p in reaction.products if _atom_nums & set(p)), None
                 )
             return step_id, reaction, product
 
-        def purchasable(molecule, key, leaf, _bb=building_blocks, _size=min_mol_size):
+        def purchasable(
+            molecule,
+            key,
+            leaf,
+            _bb=building_blocks,
+            _size=min_mol_size,
+        ):
             return _purchasable(key, molecule, _bb, _size, leaf)
 
         def step_fields(step_id, _steps=steps, _meta=route_step_metadata):
@@ -422,6 +471,17 @@ def _make_json_v1(
 
         # Build route tree and store
         tree_node = route_tree(target, source_of, purchasable, step_fields)
+        if tree_node is not None and tree is not None:
+            summary = getattr(
+                getattr(tree, "nodes", {}).get(route_id), "stereo_summary", None
+            )
+            if summary:
+                tree_node["stereo"] = summary
+                tree_node["stereo_status"] = summary["stereo_status"]
+                tree_node["connectivity_solved"] = tree.nodes[route_id].is_terminal()
+                tree_node["selectivity_evidence_status"] = summary[
+                    "selectivity_evidence_status"
+                ]
         if route_tree_has_null_node(tree_node):
             logger.warning(
                 "Dropping malformed route %s from export: route tree contains a "
@@ -444,7 +504,7 @@ def build_route_trees(
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
-    building_blocks: frozenset[str] | set[str] | None = None,
+    building_blocks: frozenset[str] | set[str] | BuildingBlockCatalogue | None = None,
     min_mol_size: int = 6,
 ) -> RouteExportResult:
     """Build v1 route trees with explicit diagnostics for skipped routes."""
@@ -479,7 +539,7 @@ def make_json(
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
-    building_blocks: frozenset[str] | set[str] | None = None,
+    building_blocks: frozenset[str] | set[str] | BuildingBlockCatalogue | None = None,
     min_mol_size: int = 6,
 ):
     """Convert routes into v1 JSON trees.

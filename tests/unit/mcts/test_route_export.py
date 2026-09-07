@@ -68,21 +68,21 @@ def test_manifest_filename_tracks_results_filename(tmp_path):
     assert manifest["directives"]["raw_results_filename"] == "routes.json.gz"
 
 
-def test_canonical_target_key_matches_retrocast():
-    # Non-canonical input is normalized to the exact string retrocast stores in
-    # Target.smiles (canonicalize_smiles defaults: isomericSmiles=True, mapping
-    # preserved). "OCC" -> "CCO".
-    assert _canonical_target_key("OCC") == "CCO"
-    # Already canonical input is a no-op.
-    assert _canonical_target_key("CCO") == "CCO"
+def test_canonical_target_key_uses_chython():
+    from synplan.chem.utils import mol_from_smiles
+
+    assert _canonical_target_key("OCC") == str(mol_from_smiles("CCO"))
+    assert _canonical_target_key("OCC") == _canonical_target_key("CCO")
 
 
 def test_canonical_target_key_preserves_stereo():
-    # retrocast keeps stereochemistry (isomericSmiles=True), so it must survive.
-    assert _canonical_target_key("C/C=C/C") == "C/C=C/C"
-    assert _canonical_target_key("N[C@@H](C)C(=O)O") == "C[C@H](N)C(=O)O"
+    assert _canonical_target_key("C/C=C/C") != _canonical_target_key("C/C=C\\C")
+    assert _canonical_target_key("N[C@@H](C)C(=O)O") != _canonical_target_key(
+        "N[C@H](C)C(=O)O"
+    )
+    assert _canonical_target_key("CC=[C@]=CC") != _canonical_target_key("CC=[C@@]=CC")
 
 
 def test_canonical_target_key_unparseable_falls_back_to_raw():
-    # RDKit cannot parse this; helper keys by the raw string instead of crashing.
+    # Invalid input remains traceable without a silently repaired export key.
     assert _canonical_target_key("not a smiles") == "not a smiles"
