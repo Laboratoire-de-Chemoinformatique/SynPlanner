@@ -32,3 +32,8 @@ The complex fixture uses the same configuration except:
 max_iterations=500
 max_time=180
 ```
+
+The strict route reader rejects medium routes `1709`, `3472`, `4210` and `4211`:
+their reaction children include a different molecule where the reaction needs
+water. The fixture is retained unchanged as rejection evidence; clustering tests
+use its other 24 routes.

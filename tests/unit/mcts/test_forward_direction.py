@@ -14,6 +14,7 @@ from test_tree_stats import FixedEvaluationStrategy, build_tree, make_mol
 
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.reactor import apply_reaction_rule
+from synplan.mcts.config import RolloutEvaluationConfig
 from synplan.mcts.evaluation import RolloutEvaluationStrategy
 
 # forward amide formation: two reactants, one product, and the chloride has to be deleted
@@ -41,7 +42,7 @@ def _molecule(smi: str):
 
 def test_retro_is_the_default_and_is_not_policed():
     """The coupling check must not fire on the retro path — every existing caller lives there."""
-    tree = build_tree()
+    tree = build_tree(building_blocks=set())
     assert tree.config.direction == "retro"
     assert tree.building_blocks == frozenset()
 
@@ -75,7 +76,11 @@ def test_forward_accepts_an_evaluator_that_agrees():
 def test_forward_refuses_an_empty_goal():
     """`building_blocks` is the goal in forward mode, so empty is unsatisfiable, not permissive."""
     with pytest.raises(ValueError, match="GOAL"):
-        build_tree(direction="forward", evaluator=FixedEvaluationStrategy())
+        build_tree(
+            direction="forward",
+            building_blocks=set(),
+            evaluator=FixedEvaluationStrategy(),
+        )
 
 
 def test_an_evaluator_without_a_rollout_is_left_alone():
@@ -116,3 +121,18 @@ def test_no_co_reactants_is_the_untouched_retro_path():
         for out in apply_reaction_rule(amide, rule, co_reactants=())
     ]
     assert default == explicit == [["CCN", "c1ccccc1C(Cl)=O"]]
+
+
+def test_forward_accepts_the_tree_and_rollout_defaults():
+    goal = {str(make_mol(7))}
+    tree = build_tree(
+        direction="forward",
+        building_blocks=goal,
+        evaluator=_rollout(
+            goal,
+            RolloutEvaluationConfig(
+                policy_network=None, reaction_rules=[], building_blocks=goal
+            ).min_mol_size,
+        ),
+    )
+    assert tree.config.min_mol_size == tree.evaluator.rollout.min_mol_size

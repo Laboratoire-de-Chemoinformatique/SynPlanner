@@ -8,7 +8,6 @@ from collections.abc import Iterable
 from io import StringIO
 from typing import Literal
 
-from chython import smiles as smiles_parser
 from chython.containers import (
     MoleculeContainer,
     ReactionContainer,
@@ -16,9 +15,8 @@ from chython.containers import (
 from chython.exceptions import InvalidAromaticRing, MappingError
 from chython.files.daylight.tokenize import smarts_tokenize
 from chython.files.SDFrw import SDFRead
-from tqdm.auto import tqdm
 
-from synplan.utils.files import MoleculeReader, MoleculeWriter
+from synplan.chem.stereo import parse_smiles_preserving_stereo
 
 ReactionMappingStatus = Literal["fully_mapped", "partially_mapped", "unmapped"]
 AtomMappingCheck = Literal["off", "reject_unmapped", "reject_partial"]
@@ -217,7 +215,7 @@ class StereoDiscardedWarning(UserWarning):
 def mol_from_smiles(
     smiles: str,
     standardize: bool = True,
-    clean_stereo: bool = True,
+    clean_stereo: bool = False,
     clean2d: bool = True,
 ) -> MoleculeContainer:
     """Converts a SMILES string to a `MoleculeContainer` object and optionally
@@ -225,12 +223,12 @@ def mol_from_smiles(
 
     :param smiles: The SMILES string representing the molecule.
     :param standardize: Whether to standardize the molecule (default is True).
-    :param clean_stereo: Whether to remove the stereo marks on atoms of the molecule (default is True).
+    :param clean_stereo: Whether to remove stereo marks (default is False).
     :param clean2d: Whether to clean the 2D coordinates of the molecule (default is True).
     :return: The processed molecule object.
     :raises ValueError: If the SMILES string could not be processed by chython.
     """
-    molecule = smiles_parser(smiles, ignore=True)
+    molecule = parse_smiles_preserving_stereo(smiles)
 
     if not isinstance(molecule, MoleculeContainer):
         raise ValueError("SMILES string was not processed by chython")
@@ -273,12 +271,14 @@ def in_atom_order(molecule: MoleculeContainer) -> MoleculeContainer:
     file rewritten from what it wrote does not match it, and the difference is
     a permutation of equivalent atoms that means nothing.
     """
-    molecule = molecule.copy()
-    molecule._atoms = dict(sorted(molecule._atoms.items()))
-    molecule._bonds = {
-        atom: dict(sorted(bonds.items()))
-        for atom, bonds in sorted(molecule._bonds.items())
-    }
+    from synplan.chem.stereo import assign_stereo, stereo_requirements
+
+    requirements = stereo_requirements(molecule)
+    molecule = molecule.ordered_copy(bonds=True)
+    if requirements:
+        molecule.clean_stereo()
+        for requirement in requirements:
+            assign_stereo(molecule, requirement)
     return molecule
 
 
@@ -325,7 +325,7 @@ def mapped_smiles(reaction: ReactionContainer) -> str:
     return format(ordered, "m")
 
 
-def _warn_stereo_loss(molecule: MoleculeContainer) -> None:
+def warn_stereo_loss(molecule: MoleculeContainer) -> None:
     """Warn once per call site when ``clean_stereo`` is about to discard real stereo marks.
 
     chython only keeps a descriptor on a genuine stereocentre, so a surviving
@@ -339,10 +339,7 @@ def _warn_stereo_loss(molecule: MoleculeContainer) -> None:
     ):
         return
     warnings.warn(
-        "Input stereochemistry is being discarded: SynPlanner's rule application "
-        "and its synthon/building-block stock are keyed on flat structures, so "
-        "any route proposed for this molecule is racemic / relative configuration "
-        "not determined.",
+        "Input stereochemistry is being discarded by an explicit clean_stereo=True request.",
         StereoDiscardedWarning,
         stacklevel=3,
     )
@@ -352,7 +349,7 @@ def clean_molecule(
     molecule: MoleculeContainer,
     *,
     standardize: bool = True,
-    clean_stereo: bool = True,
+    clean_stereo: bool = False,
     clean2d: bool = True,
 ) -> MoleculeContainer:
     """Clean a Chython molecule on a copy while preserving failure semantics.
@@ -369,8 +366,12 @@ def clean_molecule(
         if standardize:
             tmp.canonicalize()
         if clean_stereo:
-            _warn_stereo_loss(tmp)
+            warn_stereo_loss(tmp)
             tmp.clean_stereo()
+        if not clean_stereo:
+            from synplan.chem.stereo import assert_stereo_preserved
+
+            assert_stereo_preserved(molecule, tmp)
         if clean2d:
             tmp.clean2d()
         return tmp
@@ -378,8 +379,10 @@ def clean_molecule(
         return molecule
 
 
-def safe_canonicalization(molecule: MoleculeContainer) -> MoleculeContainer:
-    """The one spelling of a molecule: canonical, flat, without 2D coordinates.
+def safe_canonicalization(
+    molecule: MoleculeContainer, *, clean_stereo: bool = False
+) -> MoleculeContainer:
+    """The one spelling of a molecule: canonical, with stereo, without 2D coordinates.
 
     The building-block catalogue is written with this, so it is also what a
     lookup against the catalogue has to be written with.
@@ -388,10 +391,12 @@ def safe_canonicalization(molecule: MoleculeContainer) -> MoleculeContainer:
     :return: The canonicalized molecule, or the molecule itself when chython
         cannot prepare its aromatic ring.
     """
-    # ponytail: sorts the caller's own molecule, not just the copy; callers may
-    # lean on that, so it stays until someone checks
-    molecule._atoms = dict(sorted(molecule._atoms.items()))
-    return clean_molecule(molecule, clean2d=False)
+    molecule = molecule.ordered_copy()
+    return clean_molecule(
+        molecule,
+        clean_stereo=clean_stereo,
+        clean2d=False,
+    )
 
 
 def validate_and_canonicalize(
@@ -406,9 +411,7 @@ def validate_and_canonicalize(
     For user inputs (targets, building blocks), use the permissive
     ``safe_canonicalization`` instead.
     """
-    # Atom-key sort, idempotent across calls.
-    molecule._atoms = dict(sorted(molecule._atoms.items()))
-    tmp = molecule.copy()
+    tmp = molecule.ordered_copy()
     try:
         tmp.remove_coordinate_bonds(keep_to_terminal=False)
         tmp.kekule()
@@ -419,65 +422,42 @@ def validate_and_canonicalize(
         tmp.thiele(fix_tautomers=True)
         tmp.standardize_charges(prepare_molecule=False)
         tmp.standardize_tautomers(prepare_molecule=False)
-        tmp.clean_stereo()
+        tmp.fix_stereo()
+        from synplan.chem.stereo import assert_stereo_preserved
+
+        assert_stereo_preserved(molecule, tmp)
         return tmp
     except InvalidAromaticRing:
         return None
 
 
-def standardize_building_blocks(input_file: str, output_file: str) -> str:
-    """Standardizes custom building blocks.
+def standardize_building_blocks(
+    input_file: str, output_file: str, *, num_workers: int = 1
+) -> str:
+    """Compatibility wrapper for building-block preparation."""
+    from synplan.chem.building_blocks.io import standardize_building_blocks
 
-    :param input_file: The path to the file that stores the original building blocks.
-    :param output_file: The path to the file that will store the standardized building
-        blocks.
-    :return: The path to the file with standardized building blocks.
-    """
-    if input_file == output_file:
-        raise ValueError("input_file name and output_file name cannot be the same.")
-
-    with (
-        MoleculeReader(input_file) as inp_file,
-        MoleculeWriter(output_file) as out_file,
-    ):
-        for mol in tqdm(
-            inp_file,
-            desc="Number of building blocks processed: ",
-            bar_format="{desc}{n} [{elapsed}]",
-        ):
-            try:
-                mol = safe_canonicalization(mol)
-            except Exception as e:
-                logging.debug(e)
-                continue
-            out_file.write(mol)
-
-    return output_file
+    return standardize_building_blocks(input_file, output_file, num_workers=num_workers)
 
 
-def _standardize_one_smiles(smiles_str: str) -> str | None:
+def _standardize_one_smiles(
+    smiles_str: str, *, failures: list[dict] | None = None, record: int | None = None
+) -> str | None:
     try:
-        mol = smiles_parser(smiles_str, ignore=True)
-        mol = safe_canonicalization(mol)
-        return str(mol)
-    except Exception:
+        mol = parse_smiles_preserving_stereo(smiles_str)
+        canonical = safe_canonicalization(mol)
+        return str(canonical)
+    except Exception as error:
+        if failures is not None:
+            failures.append(
+                {
+                    "smiles": smiles_str,
+                    "record": record,
+                    "retained": False,
+                    "error": f"{type(error).__name__}: {error}",
+                }
+            )
         return None
-
-
-def _standardize_sdf_range(filename: str, start: int, end: int) -> list[str]:
-    out: list[str] = []
-    sdf = SDFRead(filename, indexable=True)
-    try:
-        for i in range(start, end):
-            try:
-                mol = sdf[i]
-                mol = safe_canonicalization(mol)
-                out.append(str(mol))
-            except Exception:
-                pass
-    finally:
-        sdf.close()
-    return out
 
 
 def standardize_sdf_text(block: str) -> list[str]:
@@ -497,28 +477,21 @@ def standardize_sdf_text(block: str) -> list[str]:
     return out
 
 
-def standardize_smiles_batch(batch: list[str]) -> list[str]:
-    """Standardize a batch of SMILES strings and return valid results."""
+def standardize_smiles_batch(
+    batch: list[str], *, failures: list[dict] | None = None
+) -> list[str]:
+    """Standardize SMILES using safe_canonicalization, optionally reporting failures.
+
+    Reports use 1-based input record numbers for inputs dropped on exceptions.
+    The permissive aromatic fallback in safe_canonicalization is preserved;
+    that helper does not expose whether a fallback occurred.
+    """
     out: list[str] = []
-    for smiles_str in batch:
-        res = _standardize_one_smiles(smiles_str)
+    for index, smiles_str in enumerate(batch, start=1):
+        res = _standardize_one_smiles(smiles_str, failures=failures, record=index)
         if res:
             out.append(res)
     return out
-
-
-def hash_from_reaction_rule(reaction_rule: ReactionContainer) -> int:
-    """Generates hash for the given reaction rule.
-
-    :param reaction_rule: The reaction rule to be converted.
-    :return: The resulting hash.
-    """
-
-    reactants_hash = tuple(sorted(hash(r) for r in reaction_rule.reactants))
-    reagents_hash = tuple(sorted(hash(r) for r in reaction_rule.reagents))
-    products_hash = tuple(sorted(hash(r) for r in reaction_rule.products))
-
-    return hash((reactants_hash, reagents_hash, products_hash))
 
 
 def reverse_reaction(

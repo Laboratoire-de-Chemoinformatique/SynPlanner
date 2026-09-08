@@ -1,11 +1,10 @@
 import json
 import logging
+from collections import defaultdict, deque
 from functools import lru_cache
-from itertools import zip_longest
 from typing import TYPE_CHECKING, Any, NamedTuple
 
-from chython import smiles as read_smiles
-
+from synplan.chem.building_blocks import BuildingBlockCatalogue
 from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction.routes.contracts import (
     RouteDiagnostic,
@@ -13,9 +12,9 @@ from synplan.chem.reaction.routes.contracts import (
     RouteExportResult,
 )
 from synplan.chem.reaction.routes.io.metadata import (
-    reaction_metadata,
     restore_reaction_metadata,
 )
+from synplan.chem.stereo import parse_smiles_preserving_stereo as read_smiles
 from synplan.chem.utils import mapped_smiles, molecule_key, normalise
 
 if TYPE_CHECKING:
@@ -40,7 +39,7 @@ def route_tree_has_null_node(node) -> bool:
     )
 
 
-def _purchasable(smiles: str, molecule, stock, min_mol_size: int, fallback: bool):
+def _purchasable(smiles: str, molecule, stock, fallback: bool):
     """``Precursor.is_building_block`` on an already-serialised molecule.
 
     Without a stock the caller gets the old positional answer, so an export that never
@@ -48,7 +47,7 @@ def _purchasable(smiles: str, molecule, stock, min_mol_size: int, fallback: bool
     """
     if stock is None:
         return fallback
-    return is_purchasable(molecule, stock, min_mol_size, key=smiles)
+    return is_purchasable(molecule, stock, key=smiles)
 
 
 def _collect_reactions(tree):
@@ -151,45 +150,41 @@ def read_route_tree(route_json) -> RouteRead:
     uncanonical = 0
 
     def link(reaction, child_nodes):
-        """Give every reactant its file verdict and, if a step made it, that step.
-
-        Neither side is in a trustworthy order -- a reaction SMILES does not keep
-        its container's molecule order, and an older file's children were never
-        written in one -- so both are sorted by canonical SMILES and paired off.
-        Reactants that share that key are the same molecule, so pairing equals in
-        an arbitrary order is a swap of interchangeable subtrees, not a mismatch.
-        """
+        """Match each reactant occurrence to its own molecule node."""
         reactants = list(reaction.reactants)
-        slots = sorted(range(len(reactants)), key=lambda index: str(reactants[index]))
-        nodes = sorted(
-            (node for node in child_nodes if isinstance(node, dict)),
-            key=lambda node: _file_key(node["smiles"]),
-        )
-        for slot, node in zip_longest(slots, nodes):
-            if node is None:  # a reactant the file wrote no node for: no verdict
-                unresolved.append(reactants[slot])
+        nodes = defaultdict(deque)
+        for node in child_nodes:
+            if isinstance(node, dict):
+                nodes[_file_key(node["smiles"])].append(node)
+        for slot, reactant in enumerate(reactants):
+            matches = nodes[_file_key(str(reactant))]
+            if not matches:
+                unresolved.append(reactant)
                 continue
+            node = matches.popleft()
             made = molecule(node)
-            if slot is None:  # a node no reactant claims: keep its steps, drop it
-                continue
             if made is not None:
                 reactants[slot] = made
-            elif not node.get("in_stock"):
-                unresolved.append(reactants[slot])
-        # splice, rather than rebuild, to keep the parsed reaction's metadata
+            elif not node.get("in_stock") and not node.get("assumed_trivial"):
+                unresolved.append(reactant)
+            if node.get("selected_stock"):
+                reactants[slot].meta["selected_stock"] = dict(node["selected_stock"])
+            if node.get("assumed_trivial"):
+                reactants[slot].meta["assumed_trivial"] = node["assumed_trivial"]
+        if any(nodes.values()):
+            raise ValueError(
+                "inconsistent stereo or molecule identity in route children"
+            )
         reaction._reactants = tuple(reactants)
 
     def product_of(reaction, node):
-        """The fragment of ``reaction`` this molecule node stands for."""
-        if len(reaction.products) == 1:
-            return reaction.products[0]
-        smiles = _file_key(node["smiles"])
-        product = next((p for p in reaction.products if str(p) == smiles), None)
+        """Select the product named by the file, including achiral identity."""
+        key = _file_key(node["smiles"])
+        product = next((p for p in reaction.products if _file_key(str(p)) == key), None)
         if product is None:
-            logger.warning(
-                "Route molecule %s is not a product of %s", node["smiles"], reaction
+            raise ValueError(
+                "inconsistent stereo or molecule identity in route product"
             )
-            return reaction.products[0]
         return product
 
     def molecule(node):
@@ -250,7 +245,18 @@ def route_tree(target, source_of, purchasable, step_fields) -> "RouteNode | None
             return {
                 "type": "mol",
                 "smiles": key,
-                "in_stock": purchasable(molecule, key, True),
+                "in_stock": not molecule.meta.get("assumed_trivial", False)
+                and purchasable(molecule, key, True),
+                **(
+                    {"assumed_trivial": molecule.meta["assumed_trivial"]}
+                    if "assumed_trivial" in molecule.meta
+                    else {}
+                ),
+                **(
+                    {"selected_stock": dict(molecule.meta["selected_stock"])}
+                    if "selected_stock" in molecule.meta
+                    else {}
+                ),
             }
         step_id, reaction, product = source
         if product is None:
@@ -334,8 +340,7 @@ def _make_json_v1(
     keep_ids=True,
     tree: "Tree | None" = None,
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
-    building_blocks: frozenset[str] | set[str] | None = None,
-    min_mol_size: int = 6,
+    building_blocks: frozenset[str] | set[str] | BuildingBlockCatalogue | None = None,
 ):
     """
     Convert routes into a nested JSON tree of reaction and molecule nodes.
@@ -352,6 +357,9 @@ def _make_json_v1(
     Returns:
         list or dict: JSON-like tree(s) of routes.
     """
+    if tree is not None and building_blocks is None:
+        building_blocks = getattr(tree, "building_blocks", None)
+
     # Prepare output
     all_routes = {} if keep_ids else []
 
@@ -367,7 +375,7 @@ def _make_json_v1(
             # Determine target molecule atoms from the final step of this route
             final_step = max(steps)
             target = steps[final_step].products[0]
-            atom_nums = set(target._atoms.keys())
+            atom_nums = set(target)
 
             # Precompute canonical SMILES and producer mapping for all products
             prod_map = {}  # smiles -> list of step_ids
@@ -403,17 +411,17 @@ def _make_json_v1(
             product = next((p for p in reaction.products if p == molecule), None)
             if product is None:
                 product = next(
-                    (p for p in reaction.products if _atom_nums & p._atoms.keys()), None
+                    (p for p in reaction.products if _atom_nums & set(p)), None
                 )
             return step_id, reaction, product
 
-        def purchasable(molecule, key, leaf, _bb=building_blocks, _size=min_mol_size):
-            return _purchasable(key, molecule, _bb, _size, leaf)
+        def purchasable(molecule, key, leaf, _bb=building_blocks):
+            return _purchasable(key, molecule, _bb, leaf)
 
         def step_fields(step_id, _steps=steps, _meta=route_step_metadata):
             reaction = _steps[step_id]
             extra = {}
-            metadata = reaction_metadata(reaction)
+            metadata = dict(reaction.meta)
             if metadata:
                 extra["meta"] = metadata
             if _meta and step_id in _meta:
@@ -422,6 +430,17 @@ def _make_json_v1(
 
         # Build route tree and store
         tree_node = route_tree(target, source_of, purchasable, step_fields)
+        if tree_node is not None and tree is not None:
+            summary = getattr(
+                getattr(tree, "nodes", {}).get(route_id), "stereo_summary", None
+            )
+            if summary:
+                tree_node["stereo"] = summary
+                tree_node["stereo_status"] = summary["stereo_status"]
+                tree_node["connectivity_solved"] = tree.nodes[route_id].is_terminal()
+                tree_node["selectivity_evidence_status"] = summary[
+                    "selectivity_evidence_status"
+                ]
         if route_tree_has_null_node(tree_node):
             logger.warning(
                 "Dropping malformed route %s from export: route tree contains a "
@@ -444,7 +463,7 @@ def build_route_trees(
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
-    building_blocks: frozenset[str] | set[str] | None = None,
+    building_blocks: frozenset[str] | set[str] | BuildingBlockCatalogue | None = None,
     min_mol_size: int = 6,
 ) -> RouteExportResult:
     """Build v1 route trees with explicit diagnostics for skipped routes."""
@@ -455,7 +474,6 @@ def build_route_trees(
         tree=tree,
         route_metadata=route_metadata,
         building_blocks=building_blocks,
-        min_mol_size=min_mol_size,
     )
     diagnostics = tuple(
         RouteDiagnostic(
@@ -479,7 +497,7 @@ def make_json(
     route_metadata: dict[int, dict[int, dict[str, Any]]] | None = None,
     *,
     strict: bool = False,
-    building_blocks: frozenset[str] | set[str] | None = None,
+    building_blocks: frozenset[str] | set[str] | BuildingBlockCatalogue | None = None,
     min_mol_size: int = 6,
 ):
     """Convert routes into v1 JSON trees.
@@ -495,7 +513,6 @@ def make_json(
         route_metadata=route_metadata,
         strict=strict,
         building_blocks=building_blocks,
-        min_mol_size=min_mol_size,
     ).routes
 
 

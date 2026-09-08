@@ -6,12 +6,6 @@ from collections.abc import Mapping
 from typing import Any
 
 
-def reaction_metadata(reaction) -> dict[str, Any]:
-    """The reaction's metadata as a plain dict, detached from the reaction."""
-
-    return dict(reaction.meta)
-
-
 def restore_reaction_metadata(reaction, metadata: Any) -> None:
     """Put a file's metadata back on a reaction.
 

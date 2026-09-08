@@ -1,0 +1,27 @@
+{
+  "cases": [
+    {
+      "step": 389,
+      "rule_id": 813,
+      "smarts": "[C:4](-[C:5])-[O:9]-[C:8]>>[C:8]-[O:9].[C:1]-[S:2](-[O:3]-[C:4]-[C:5])(=[O:6])=[O:7]",
+      "product": "CCOC(=O)CCCCCOCCOCCOCCOCCOCCOCCOCc1ccccc1",
+      "gold": [
+        "CCOC(=O)CCCCCOS(C)(=O)=O",
+        "OCCOCCOCCOCCOCCOCCOCc1ccccc1"
+      ],
+      "budget": 20,
+      "below_budget": 5
+    },
+    {
+      "step": 708,
+      "rule_id": 1737,
+      "smarts": "[c:1]:[c:4]:1:[c:3](:[c:2]):[n:9]:[c:6](:[c:5]:1:[c:8]):[c:7]>>[c:1]:[c:4](:[c:3]:[c:2])-[c:5](:[c:6](:[c:7])-[N+:9](-[O-:10])=[O:11]):[c:8]",
+      "product": "O=C1CCc2c1ccc1[nH]c3ccccc3c21",
+      "gold": [
+        "O=C1CCc2c1cccc2-c1ccccc1[N+](=O)[O-]"
+      ],
+      "budget": 5,
+      "below_budget": 1
+    }
+  ]
+}

@@ -135,8 +135,8 @@ def reaction_atom_maps(reaction):
     """Return side-wise atom-map numbers, ignoring molecule ordering."""
 
     return {
-        "reactants": sorted(sorted(molecule._atoms) for molecule in reaction.reactants),
-        "products": sorted(sorted(molecule._atoms) for molecule in reaction.products),
+        "reactants": sorted(sorted(molecule) for molecule in reaction.reactants),
+        "products": sorted(sorted(molecule) for molecule in reaction.products),
     }
 
 

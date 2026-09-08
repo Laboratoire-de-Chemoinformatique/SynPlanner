@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import base64
-import contextlib
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from chython import depict_settings
 from IPython.display import HTML, display
 
 from synplan.chem.reaction.routes.io import make_dict
 from synplan.chem.reaction.routes.representation.depiction import (
+    _temporary_render_config,
     cgr_display,
     depict_custom_reaction,
 )
@@ -99,7 +98,6 @@ def html_top_routes_cluster(
         r_cgr = group_data.get("sb_cgr")
         r_cgr_svg = None
         if r_cgr:
-            r_cgr.clean2d()
             r_cgr_svg = cgr_display(r_cgr)
         # Start row
         html.append(f"<tr><td>{cluster_num}</td>")
@@ -139,200 +137,218 @@ def routes_clustering_report(
     sb_cgrs_dict: dict,
     aam: bool = False,
     html_path: str | None = None,
+    *,
+    _subcluster: tuple | None = None,
 ) -> str:
-    """
-    Generates an HTML report visualizing a cluster of retrosynthetic routes.
-
-    This function takes a source of retrosynthetic routes (either a Tree object
-    or a dictionary representing routes in JSON format), cluster information,
-    and a dictionary of SB-CGRs, and produces a comprehensive HTML report.
-    The report includes details about the cluster, a representative SB-CGR,
-    and SVG visualizations of each route within the specified cluster.
-
-    Args:
-        source (Union[Tree, dict]): The source of retrosynthetic routes.
-                                     Can be a Tree object containing the full
-                                     search tree, or a dictionary loaded from
-                                     a routes JSON file.
-        clusters (dict): A dictionary containing clustering results. It should
-                       contain information about different clusters, typically
-                       including a list of 'route_ids' for each cluster.
-        group_index (str): The key identifying the specific cluster within the
-                           `clusters` dictionary for which the report should be
-                           generated.
-        sb_cgrs_dict (dict): A dictionary mapping route IDs (integers) to
-                             SB-CGR objects. Used to display a representative
-                             SB-CGR for the cluster.
-        aam (bool, optional): Whether to enable atom-atom mapping visualization
-                              in molecule depictions. Defaults to False.
-        html_path (str, optional): The file path where the generated HTML
-                                   report should be saved. If provided, the
-                                   function saves the report to this file and
-                                   returns a confirmation message. If None,
-                                   the function returns the HTML string
-                                   directly. Defaults to None.
-
-    Returns:
-        str: The generated HTML report as a string, or a string confirming
-             the file path where the report was saved if `html_path` is
-             provided. Returns an error message string if the input `source`
-             or `clusters` are invalid, or if the specified `group_index` is
-             not found.
-    """
-    # --- Depict Settings ---
-    with contextlib.suppress(Exception):
-        depict_settings(aam=bool(aam))
-
+    """Build a cluster report, sharing rendering with the subcluster adapter."""
     # --- Figure out what `source` is ---
-    using_tree = False
-    if hasattr(source, "nodes") and hasattr(source, "route_to_node"):
-        tree = source
-        using_tree = True
-    elif isinstance(source, dict):
-        routes_json = source
-        tree = None
-    else:
-        return "<html><body>Error: first argument must be a Tree or a routes_json dict.</body></html>"
-
-    # --- Validate clusters ---
-    if not isinstance(clusters, dict):
-        return "<html><body>Error: clusters must be a dict.</body></html>"
-
-    group = clusters.get(group_index)
-    if group is None:
-        return f"<html><body>Error: no group with index {group_index!r}.</body></html>"
-
-    cluster_route_ids = group.get("route_ids", [])
-    # Filter valid routes
-    valid_routes = []
-
-    if using_tree:
-        for nid in cluster_route_ids:
-            if nid in tree.nodes and tree.nodes[nid].is_solved():
-                valid_routes.append(nid)
-    else:
-        # JSON mode: check if the route ID exists in the routes_dict
-        routes_dict = make_dict(routes_json)
-        for nid in cluster_route_ids:
-            if nid in routes_dict:
-                valid_routes.append(nid)
-    if not valid_routes:
-        return f"""
-        <!doctype html><html><body>
-          <h3>Cluster {group_index} Report</h3>
-          <p>No valid routes found in this cluster.</p>
-        </body></html>
-        """
-
-    # show target
-    if using_tree:
-        try:
-            target_smiles = str(tree.nodes[1].curr_precursor)
-        except Exception:
-            target_smiles = "N/A"
-    else:
-        # JSON mode: take the root smiles of the first route
-        try:
-            key = valid_routes[0]
-            route_node = routes_json.get(key) or routes_json.get(str(key), {})
-            target_smiles = route_node.get("smiles", "N/A")
-        except Exception:
-            target_smiles = "N/A"
-
-    # --- HTML Templates & Tags ---
-    td = '<td style="text-align: left; border: 1px solid black; border-spacing: 0">'
-    font_normal = "<font style='font-weight: normal; font-size: 18px'>"
-    font_close = "</font>"
-
-    page_head = BOOTSTRAP_PAGE_HEAD.format(title=f"Cluster {group_index} Routes Report")
-
-    # --- Build HTML Table ---
-    table = f"""
-    <table class="table table-hover caption-top">
-    <caption><h3>Retrosynthetic Routes Report - Cluster {group_index}</h3></caption>
-    <tbody>"""
-
-    table += (
-        f"<tr>{td}{font_normal}Target Molecule: {target_smiles}{font_close}</td></tr>"
-    )
-    table += f"<tr>{td}{font_normal}Group index: {group_index}{font_close}</td></tr>"
-    table += f"<tr>{td}{font_normal}Size of Cluster: {len(valid_routes)} routes{font_close} </td></tr>"
-
-    # --- Add SB-CGR Image ---
-    first_route_id = valid_routes[0] if valid_routes else None
-
-    sb_cgr = group.get("sb_cgr")
-    if sb_cgr is None and first_route_id is not None and sb_cgrs_dict:
-        sb_cgr = sb_cgrs_dict.get(first_route_id)
-
-    if sb_cgr is not None:
-        try:
-            sb_cgr.clean2d()
-            sb_cgr_svg = cgr_display(sb_cgr)
-
-            if sb_cgr_svg.strip().startswith("<svg"):
-                table += f"<tr>{td}{font_normal}Identified Strategic Bonds{font_close}<br>{sb_cgr_svg}</td></tr>"
-            else:
-                table += f"<tr>{td}{font_normal}Cluster Representative SB-CGR:{font_close}<br><i>Invalid SVG format retrieved.</i></td></tr>"
-                print(
-                    f"Warning: Expected SVG for SB-CGR of route {first_route_id}, but got: {sb_cgr_svg[:100]}..."
-                )
-        except Exception as e:
-            table += f"<tr>{td}{font_normal}Cluster Representative SB-CGR:{font_close}<br><i>Error retrieving/displaying SB-CGR: {e}</i></td></tr>"
-    else:
-        if first_route_id:
-            table += f"<tr>{td}{font_normal}Cluster Representative SB-CGR (from Route {first_route_id}):{font_close}<br><i>Not found in provided SB-CGR dictionary.</i></td></tr>"
+    with _temporary_render_config(mapping=bool(aam)):
+        using_tree = False
+        if hasattr(source, "nodes") and hasattr(source, "route_to_node"):
+            tree = source
+            using_tree = True
+        elif isinstance(source, dict):
+            routes_json = source
+            tree = None
         else:
-            table += f"<tr>{td}{font_normal}Cluster Representative SB-CGR:{font_close}<br><i>No valid routes in cluster to select from.</i></td></tr>"
+            return "<html><body>Error: first argument must be a Tree or a routes_json dict.</body></html>"
 
-    table += f"""
-    <tr>{td}
-        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
-            <span>{BOX_MARK.replace("rgb()", "rgb(152, 238, 255)")} Target Molecule</span>
-            <span>{BOX_MARK.replace("rgb()", "rgb(240, 171, 144)")} Molecule Not In Stock</span>
-            <span>{BOX_MARK.replace("rgb()", "rgb(155, 250, 179)")} Molecule In Stock</span>
-        </div>
-    </td></tr>
-    """
-    layouts: dict = {}  # one geometry per molecule, shared by every route on the page
-    for route_id in valid_routes:
+        # --- Validate clusters ---
+        if not isinstance(clusters, dict):
+            return "<html><body>Error: clusters must be a dict.</body></html>"
+
+        group = clusters.get(group_index)
+        if group is None:
+            return (
+                f"<html><body>Error: no group with index {group_index!r}.</body></html>"
+            )
+
+        cluster_num, if_lg_group = (
+            _subcluster if _subcluster is not None else (None, False)
+        )
+        label = (
+            f"{group_index}.{cluster_num}"
+            if _subcluster is not None
+            else str(group_index)
+        )
+        title = "SubCluster" if _subcluster is not None else "Cluster"
+        cluster_route_ids = (
+            group["routes_data"]
+            if _subcluster is not None
+            else group.get("route_ids", [])
+        )
+        # Filter valid routes
+        valid_routes = []
+
         if using_tree:
-            # 1) SVG from Tree
-            route = Route.from_tree(tree, route_id)
+            for nid in cluster_route_ids:
+                if nid in tree.nodes and tree.nodes[nid].is_solved():
+                    valid_routes.append(nid)
+        else:
+            # JSON mode: check if the route ID exists in the routes_dict
+            routes_dict = make_dict(routes_json)
+            for nid in cluster_route_ids:
+                if int(nid) in routes_dict:
+                    valid_routes.append(nid)
+        if not valid_routes:
+            return f"""
+            <!doctype html><html><body>
+              <h3>Cluster {label} Report</h3>
+              <p>No valid routes found in this cluster.</p>
+            </body></html>
+            """
+
+        # show target
+        if using_tree:
+            try:
+                target_smiles = str(tree.nodes[1].curr_precursor)
+            except Exception:
+                target_smiles = "N/A"
+        else:
+            # JSON mode: take the root smiles of the first route
+            try:
+                key = valid_routes[0]
+                route_node = routes_json.get(key) or routes_json.get(str(key), {})
+                target_smiles = route_node.get("smiles", "N/A")
+            except Exception:
+                target_smiles = "N/A"
+
+        # --- HTML Templates & Tags ---
+        td = '<td style="text-align: left; border: 1px solid black; border-spacing: 0">'
+        font_normal = "<font style='font-weight: normal; font-size: 18px'>"
+        font_close = "</font>"
+
+        page_head = BOOTSTRAP_PAGE_HEAD.format(title=f"{title} {label} Routes Report")
+
+        # --- Build HTML Table ---
+        table = f"""
+        <table class="table table-hover caption-top">
+        <caption><h3>Retrosynthetic Routes Report - Cluster {label}</h3></caption>
+        <tbody>"""
+
+        table += f"<tr>{td}{font_normal}Target Molecule: {target_smiles}{font_close}</td></tr>"
+        table += (
+            f"<tr>{td}{font_normal}Group index: {group_index}{font_close}</td></tr>"
+        )
+        if _subcluster is not None:
+            table += f"<tr>{td}{font_normal}Cluster Number: {cluster_num}{font_close}</td></tr>"
+        table += f"<tr>{td}{font_normal}Size of Cluster: {len(valid_routes)} routes{font_close} </td></tr>"
+
+        # --- Add SB-CGR Image ---
+        first_route_id = valid_routes[0] if valid_routes else None
+
+        sb_cgr = group.get("sb_cgr")
+        if sb_cgr is None and first_route_id is not None and sb_cgrs_dict:
+            sb_cgr = sb_cgrs_dict.get(first_route_id)
+
+        if sb_cgr is not None:
+            try:
+                sb_cgr_svg = cgr_display(sb_cgr)
+
+                if sb_cgr_svg.strip().startswith("<svg"):
+                    table += f"<tr>{td}{font_normal}Identified Strategic Bonds{font_close}<br>{sb_cgr_svg}</td></tr>"
+                else:
+                    table += f"<tr>{td}{font_normal}Cluster Representative SB-CGR:{font_close}<br><i>Invalid SVG format retrieved.</i></td></tr>"
+                    print(
+                        f"Warning: Expected SVG for SB-CGR of route {first_route_id}, but got: {sb_cgr_svg[:100]}..."
+                    )
+            except Exception as e:
+                table += f"<tr>{td}{font_normal}Cluster Representative SB-CGR:{font_close}<br><i>Error retrieving/displaying SB-CGR: {e}</i></td></tr>"
+        else:
+            if first_route_id:
+                table += f"<tr>{td}{font_normal}Cluster Representative SB-CGR (from Route {first_route_id}):{font_close}<br><i>Not found in provided SB-CGR dictionary.</i></td></tr>"
+            else:
+                table += f"<tr>{td}{font_normal}Cluster Representative SB-CGR:{font_close}<br><i>No valid routes in cluster to select from.</i></td></tr>"
+
+        if _subcluster is not None:
+            try:
+                synthon_reaction = group["synthon_reaction"]
+                synthon_svg = depict_custom_reaction(synthon_reaction)
+
+                extra_synthon = f"<tr>{td}{font_normal}Synthon pseudo reaction:{font_close}<br>{synthon_svg}</td></tr>"
+                table += extra_synthon
+            except Exception as e:
+                table += f"<tr><td colspan='1' style='color: red;'>Error displaying synthon reaction: {e}</td></tr>"
+
+            try:
+                if if_lg_group:
+                    grouped_lgs = group["group_lgs"]
+                    lg_table_html = group_lg_table_2_html_fixed(
+                        grouped_lgs, if_display=False
+                    )
+                    supporting_table_html = group_supporting_table_2_html_fixed(
+                        group.get("group_supporting", {}), if_display=False
+                    )
+                    if not supporting_table_html:
+                        supporting_table_html = supporting_table_2_html(
+                            group, if_display=False
+                        )
+                else:
+                    lg_table_html = lg_table_2_html(group, if_display=False)
+                    supporting_table_html = supporting_table_2_html(
+                        group, if_display=False
+                    )
+                table_sections = [
+                    (
+                        "Leaving Groups table:",
+                        lg_table_html,
+                    )
+                ]
+                if supporting_table_html:
+                    table_sections.append(
+                        ("Supporting Groups table:", supporting_table_html)
+                    )
+                sections_html = "".join(
+                    f"<div style='flex:1 1 360px; min-width:300px;'>{font_normal}{title}{font_close}<br>{section_html}</div>"
+                    for title, section_html in table_sections
+                )
+                extra_lg = f"<tr>{td}<div style='display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;'>{sections_html}</div></td></tr>"
+                table += extra_lg
+            except Exception as e:
+                table += f"<tr><td colspan='1' style='color: red;'>Error displaying leaving groups: {e}</td></tr>"
+
+        table += f"""
+        <tr>{td}
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
+                <span>{BOX_MARK.replace("rgb()", "rgb(152, 238, 255)")} Target Molecule</span>
+                <span>{BOX_MARK.replace("rgb()", "rgb(240, 171, 144)")} Molecule Not In Stock</span>
+                <span>{BOX_MARK.replace("rgb()", "rgb(155, 250, 179)")} Molecule In Stock</span>
+            </div>
+        </td></tr>
+        """
+        layouts: dict = {}  # one geometry per molecule, shared by every route on the page
+        for route_id in valid_routes:
+            route = (
+                Route.from_tree(tree, route_id)
+                if using_tree
+                else _json_route(routes_json, route_id)
+            )
             svg = route.svg(layouts=layouts)
-            # 2) Reaction steps & score; step order is the drawing's disc order
-            steps = [step.reaction for step in route]
-            score = round(route.provenance.search_score, 3)
-            # build reaction list
+            steps = (
+                [step.reaction for step in route]
+                if using_tree
+                else list(routes_dict[int(route_id)].values())
+            )
             reac_html = "".join(
                 f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in enumerate(steps)
             )
-            header = f"Route {route_id} — {len(steps)} steps, score={score}"
-            table += f"<tr><td><b>{header}</b></td></tr>"
-            table += f"<tr><td>{svg}</td></tr>"
-            table += f"<tr><td>{reac_html}</td></tr>"
-        else:
-            # 1) SVG from JSON
-            svg = _json_route(routes_json, route_id).svg(layouts=layouts)
-            steps = routes_dict[route_id]
-            reac_html = "".join(
-                f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in steps.items()
+            score = (
+                f", score={round(route.provenance.search_score, 3)}"
+                if using_tree
+                else ""
             )
+            header = f"Route {route_id} — {len(steps)} steps{score}"
+            table += f"<tr><td><b>{header}</b></td></tr><tr><td>{svg}</td></tr><tr><td>{reac_html}</td></tr>"
 
-            header = f"Route {route_id} — {len(steps)} steps"
-            table += f"<tr><td><b>{header}</b></td></tr>"
-            table += f"<tr><td>{svg}</td></tr>"
-            table += f"<tr><td>{reac_html}</td></tr>"
+        table += "</tbody></table>"
 
-    table += "</tbody></table>"
+        html = page_head + table + BOOTSTRAP_PAGE_TAIL
 
-    html = page_head + table + BOOTSTRAP_PAGE_TAIL
-
-    if html_path:
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(html)
-        return f"Written to {html_path}"
-    return html
+        if html_path:
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(html)
+            return f"Written to {html_path}"
+        return html
 
 
 def _has_table_values(data: dict) -> bool:
@@ -583,265 +599,23 @@ def routes_subclustering_report(
     aam: bool = False,
     html_path: str | None = None,
 ) -> str:
-    """
-    Generates an HTML report visualizing a specific subcluster of retrosynthetic routes.
-
-    This function takes a source of retrosynthetic routes (either a Tree object
-    or a dictionary representing routes in JSON format), data for a specific
-    subcluster, and a dictionary of SB-CGRs. It produces a detailed HTML report
-    for the subcluster, including general cluster information, a representative
-    SB-CGR, a synthon pseudo reaction, a table of leaving groups (either per
-    route or grouped), and SVG visualizations of each valid route within the
-    subcluster.
-
-    Args:
-        source (Union[Tree, dict]): The source of retrosynthetic routes.
-                                     Can be a Tree object containing the full
-                                     search tree, or a dictionary loaded from
-                                     a routes JSON file.
-        subcluster (dict): A dictionary containing data for the specific
-                           subcluster. Expected keys include 'routes_data'
-                           (mapping route IDs to mark data), 'synthon_reaction',
-                           'sb_cgr', and optionally 'group_lgs' if
-                           `if_lg_group` is True.
-        group_index (str, optional): Main cluster ID. If omitted, the value is
-                                     read from `subcluster['cluster_id']`.
-        cluster_num (int | str, optional): Subcluster ID. If omitted, the value
-                                           is read from
-                                           `subcluster['subcluster_id']`.
-        sb_cgrs_dict (dict, optional): Legacy route-ID to SB-CGR mapping. If
-                                       omitted, `subcluster['sb_cgr']` is used.
-        if_lg_group (bool, optional): If True, the leaving groups table will
-                                     display grouped leaving groups from
-                                     `subcluster['group_lgs']`. If False, it
-                                     will display leaving groups per individual
-                                     route from `subcluster['routes_data']`.
-                                     Defaults to False.
-        aam (bool, optional): Whether to enable atom-atom mapping visualization
-                              in molecule depictions. Defaults to False.
-        html_path (str, optional): The file path where the generated HTML
-                                   report should be saved. If provided, the
-                                   function saves the report to this file and
-                                   returns a confirmation message. If None,
-                                   the function returns the HTML string
-                                   directly. Defaults to None.
-
-    Returns:
-        str: The generated HTML report as a string, or a string confirming
-             the file path where the report was saved if `html_path` is
-             provided. Returns a minimal HTML page indicating no valid routes
-             if the subcluster contains no valid/solved routes. Returns an
-             error message string if the input `source` or `subcluster` are
-             invalid.
-    """
-    # --- Depict Settings ---
-    with contextlib.suppress(Exception):
-        depict_settings(aam=bool(aam))
-
-    # --- Figure out what `source` is ---
-    using_tree = False
-    if hasattr(source, "nodes") and hasattr(source, "route_to_node"):
-        tree = source
-        using_tree = True
-    elif isinstance(source, dict):
-        routes_json = source
-        tree = None
-    else:
-        return "<html><body>Error: first argument must be a Tree or a routes_json dict.</body></html>"
-
-    # --- Validate groups ---
+    """Render subcluster chemistry and groups through the shared cluster report."""
     if not isinstance(subcluster, dict):
         return "<html><body>Error: groups must be a dict.</body></html>"
-
     group_index = (
         group_index if group_index is not None else subcluster.get("cluster_id")
-    )
+    ) or "?"
     cluster_num = (
         cluster_num if cluster_num is not None else subcluster.get("subcluster_id")
-    )
-    group_index = group_index or "?"
-    cluster_num = cluster_num or "?"
+    ) or "?"
     if if_lg_group is None:
         if_lg_group = bool(subcluster.get("group_lgs"))
-
-    subcluster_route_ids = list(subcluster["routes_data"].keys())
-    # Filter valid routes
-    valid_routes = []
-
-    if using_tree:
-        for nid in subcluster_route_ids:
-            if nid in tree.nodes and tree.nodes[nid].is_solved():
-                valid_routes.append(nid)
-    else:
-        # JSON mode: just keep those IDs present in the JSON
-        for nid in subcluster_route_ids:
-            if nid in routes_json or str(nid) in routes_json:
-                valid_routes.append(nid)
-        routes_dict = make_dict(routes_json)
-
-    if not valid_routes:
-        # Return a minimal HTML page indicating no valid routes
-        return f"""
-        <!doctype html><html lang="en"><head><meta charset="utf-8">
-        <title>Cluster {group_index}.{cluster_num} Report</title></head><body>
-        <h3>Cluster {group_index}.{cluster_num} Report</h3>
-        <p>No valid/solved routes found for this cluster.</p>
-        </body></html>"""
-
-    # show target
-    if using_tree:
-        try:
-            target_smiles = str(tree.nodes[1].curr_precursor)
-        except Exception:
-            target_smiles = "N/A"
-    else:
-        # JSON mode: take the root smiles of the first route
-        try:
-            key = valid_routes[0]
-            route_node = routes_json.get(key) or routes_json.get(str(key), {})
-            target_smiles = route_node.get("smiles", "N/A")
-        except Exception:
-            target_smiles = "N/A"
-
-    # legend row omitted…
-
-    # --- HTML Templates & Tags ---
-    td = '<td style="text-align: left; border: 1px solid black; border-spacing: 0">'
-    font_normal = "<font style='font-weight: normal; font-size: 18px'>"
-    font_close = "</font>"
-
-    page_head = BOOTSTRAP_PAGE_HEAD.format(
-        title=f"SubCluster {group_index}.{cluster_num} Routes Report"
+    return routes_clustering_report(
+        source,
+        {group_index: subcluster},
+        group_index,
+        sb_cgrs_dict,
+        aam,
+        html_path,
+        _subcluster=(cluster_num, if_lg_group),
     )
-
-    # --- Build HTML Table ---
-    table = f"""
-    <table class="table table-hover caption-top">
-    <caption><h3>Retrosynthetic Routes Report - Cluster {group_index}.{cluster_num}</h3></caption>
-    <tbody>"""
-
-    table += (
-        f"<tr>{td}{font_normal}Target Molecule: {target_smiles}{font_close}</td></tr>"
-    )
-    table += f"<tr>{td}{font_normal}Group index: {group_index}{font_close}</td></tr>"
-    table += f"<tr>{td}{font_normal}Cluster Number: {cluster_num}{font_close}</td></tr>"
-    table += f"<tr>{td}{font_normal}Size of Cluster: {len(valid_routes)} routes{font_close} </td></tr>"
-
-    # --- Add SB-CGR Image ---
-    first_route_id = valid_routes[0] if valid_routes else None
-
-    sb_cgr = subcluster.get("sb_cgr")
-    if sb_cgr is None and first_route_id is not None and sb_cgrs_dict:
-        sb_cgr = sb_cgrs_dict.get(first_route_id)
-
-    if sb_cgr is not None:
-        try:
-            sb_cgr.clean2d()
-            sb_cgr_svg = cgr_display(sb_cgr)
-
-            if sb_cgr_svg.strip().startswith("<svg"):
-                table += f"<tr>{td}{font_normal}Identified Strategic Bonds{font_close}<br>{sb_cgr_svg}</td></tr>"
-            else:
-                table += f"<tr>{td}{font_normal}Cluster Representative SB-CGR:{font_close}<br><i>Invalid SVG format retrieved.</i></td></tr>"
-                print(
-                    f"Warning: Expected SVG for SB-CGR of route {first_route_id}, but got: {sb_cgr_svg[:100]}..."
-                )
-        except Exception as e:
-            table += f"<tr>{td}{font_normal}Cluster Representative SB-CGR:{font_close}<br><i>Error retrieving/displaying SB-CGR: {e}</i></td></tr>"
-    else:
-        if first_route_id:
-            table += f"<tr>{td}{font_normal}Cluster Representative SB-CGR (from Route {first_route_id}):{font_close}<br><i>Not found in provided SB-CGR dictionary.</i></td></tr>"
-        else:
-            table += f"<tr>{td}{font_normal}Cluster Representative SB-CGR:{font_close}<br><i>No valid routes in cluster to select from.</i></td></tr>"
-
-    try:
-        synthon_reaction = subcluster["synthon_reaction"]
-        synthon_svg = depict_custom_reaction(synthon_reaction)
-
-        extra_synthon = f"<tr>{td}{font_normal}Synthon pseudo reaction:{font_close}<br>{synthon_svg}</td></tr>"
-        table += extra_synthon
-    except Exception as e:
-        table += f"<tr><td colspan='1' style='color: red;'>Error displaying synthon reaction: {e}</td></tr>"
-
-    try:
-        if if_lg_group:
-            grouped_lgs = subcluster["group_lgs"]
-            lg_table_html = group_lg_table_2_html_fixed(grouped_lgs, if_display=False)
-            supporting_table_html = group_supporting_table_2_html_fixed(
-                subcluster.get("group_supporting", {}), if_display=False
-            )
-            if not supporting_table_html:
-                supporting_table_html = supporting_table_2_html(
-                    subcluster, if_display=False
-                )
-        else:
-            lg_table_html = lg_table_2_html(subcluster, if_display=False)
-            supporting_table_html = supporting_table_2_html(
-                subcluster, if_display=False
-            )
-        table_sections = [
-            (
-                "Leaving Groups table:",
-                lg_table_html,
-            )
-        ]
-        if supporting_table_html:
-            table_sections.append(("Supporting Groups table:", supporting_table_html))
-        sections_html = "".join(
-            f"<div style='flex:1 1 360px; min-width:300px;'>{font_normal}{title}{font_close}<br>{section_html}</div>"
-            for title, section_html in table_sections
-        )
-        extra_lg = f"<tr>{td}<div style='display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;'>{sections_html}</div></td></tr>"
-        table += extra_lg
-    except Exception as e:
-        table += f"<tr><td colspan='1' style='color: red;'>Error displaying leaving groups: {e}</td></tr>"
-
-    table += f"""
-    <tr>{td}
-        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
-            <span>{BOX_MARK.replace("rgb()", "rgb(152, 238, 255)")} Target Molecule</span>
-            <span>{BOX_MARK.replace("rgb()", "rgb(240, 171, 144)")} Molecule Not In Stock</span>
-            <span>{BOX_MARK.replace("rgb()", "rgb(155, 250, 179)")} Molecule In Stock</span>
-        </div>
-    </td></tr>
-    """
-    layouts: dict = {}  # one geometry per molecule, shared by every route on the page
-    for route_id in valid_routes:
-        if using_tree:
-            # 1) SVG from Tree
-            route = Route.from_tree(tree, route_id)
-            svg = route.svg(layouts=layouts)
-            # 2) Reaction steps & score; step order is the drawing's disc order
-            steps = [step.reaction for step in route]
-            score = round(route.provenance.search_score, 3)
-            # build reaction list
-            reac_html = "".join(
-                f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in enumerate(steps)
-            )
-            header = f"Route {route_id} — {len(steps)} steps, score={score}"
-            table += f"<tr><td><b>{header}</b></td></tr>"
-            table += f"<tr><td>{svg}</td></tr>"
-            table += f"<tr><td>{reac_html}</td></tr>"
-
-        else:
-            # 1) SVG from JSON
-            svg = _json_route(routes_json, route_id).svg(layouts=layouts)
-            steps = routes_dict[route_id]
-            reac_html = "".join(
-                f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in steps.items()
-            )
-
-            header = f"Route {route_id} — {len(steps)} steps"
-            table += f"<tr><td><b>{header}</b></td></tr>"
-            table += f"<tr><td>{svg}</td></tr>"
-            table += f"<tr><td>{reac_html}</td></tr>"
-
-    table += "</tbody></table>"
-
-    html = page_head + table + BOOTSTRAP_PAGE_TAIL
-
-    if html_path:
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(html)
-        return f"Written to {html_path}"
-    return html

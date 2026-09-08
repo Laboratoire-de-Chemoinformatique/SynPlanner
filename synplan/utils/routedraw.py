@@ -9,6 +9,7 @@ page showing these must also carry :data:`ROUTE_CSS` and one copy of
 from __future__ import annotations
 
 import re
+from html import escape
 from math import cos, radians, sin
 from typing import TYPE_CHECKING, Any
 
@@ -21,11 +22,15 @@ if TYPE_CHECKING:
 #: One cleaned geometry per molecule: mapped SMILES -> atom number -> (x, y).
 Layouts = dict[str, dict[int, tuple[float, float]]] | None
 
+#: Pill label and click payload per molecule id, for :func:`draw_route`.
+Prices = dict[int, tuple[str, str]] | None
+
 __all__ = [
     "ARROW_DEFS",
     "ROLE_STYLE",
     "ROUTE_CSS",
     "Layouts",
+    "Prices",
     "draw_route",
     "drawable_copy",
     "molecule_svg",
@@ -36,6 +41,9 @@ __all__ = [
 PX_PER_UNIT = 26.0
 BOX_PAD = 9.0
 ROW_GAP = 34.0  # 18 for air plus 16 for the caption band above a box
+PILL_H = 17.0  # the chip under a box
+PILL_GAP = 7.0  # air between the box and its chip
+PRICE_BAND = PILL_H + 2 * PILL_GAP  # the chip, with air above and below
 
 #: fill, stroke, stroke width per role.
 ROLE_STYLE = {
@@ -58,6 +66,9 @@ ROUTE_CSS = (
     f".sp-tag{{font-family:{_FONT};font-size:8.5px;font-weight:700;letter-spacing:.5px}}"
     ".sp-num{text-anchor:middle;dominant-baseline:central;font-weight:700;fill:#fff;"
     f"font-family:{_FONT};font-size:11px}}"
+    ".sp-price>rect{fill:#eef5f1;stroke:#9dbcae;stroke-width:1}"
+    f".sp-price>text{{font-family:{_FONT};font-size:11px;font-weight:600;"
+    "fill:#37624f;dominant-baseline:central}"
 )
 ARROW_DEFS = (
     '<marker id="sp-arrow" markerWidth="7" markerHeight="7" refX="5.4" refY="2.6" '
@@ -68,18 +79,7 @@ ARROW_DEFS = (
 _VIEWBOX = re.compile(r'viewBox="(-?[\d.]+) (-?[\d.]+) ([\d.]+) ([\d.]+)"')
 
 
-def _is_degenerate(mol: MoleculeContainer) -> bool:
-    """chython's own test for "never laid out": every atom on one point."""
-    if len(mol) < 2:
-        return False
-    xs = [atom.x for _, atom in mol.atoms()]
-    ys = [atom.y for _, atom in mol.atoms()]
-    return max(xs) - min(xs) < 0.01 and max(ys) - min(ys) < 0.01
-
-
 def _depiction(mol: MoleculeContainer) -> tuple[str, list[float]]:
-    if _is_degenerate(mol):
-        mol.clean2d()
     svg = mol.depict()
     match = _VIEWBOX.search(svg)
     if match is None:
@@ -145,7 +145,7 @@ def drawable_copy(mol: MoleculeContainer, layouts: Layouts = None) -> MoleculeCo
     ``clean2d()`` is not deterministic: laying the same molecule out again draws it
     another way. Pass a ``layouts`` dict -- keyed by mapped SMILES, the spelling that
     also fixes the atom numbers this geometry is stored under -- to lay a molecule out
-    once and reuse that geometry everywhere it turns up.
+    once and reuse that geometry before aligning each route's drawing copies.
     """
     copy = mol.copy()
     if layouts is None:
@@ -182,15 +182,13 @@ def _route_tree(
     steps: Any, unresolved: Any, align: bool, layouts: Layouts = None
 ) -> tuple[Node, dict]:
     copies = _drawable_copies(steps, layouts)
+    # Align drawing copies, leaving the shared base geometry untouched.
     if align:
-        # leaf-first order, so each disconnection inherits the layout above it
         for step in reversed(steps):
             product = copies[id(step.product)]
             for precursor in step.reaction.reactants:
                 align_molecule(copies[id(precursor)], product)
         if layouts is None:
-            # shared layouts arrive oriented; turning the route would turn the target
-            # away from the layout every other card of the page shows
             orient_route(copies.values())
 
     by_product = {
@@ -222,10 +220,18 @@ def _route_tree(
     return root, depicts
 
 
-def _to_svg(root: Node, depicts: dict, links: list[dict], w: float, h: float) -> str:
+def _to_svg(
+    root: Node,
+    depicts: dict,
+    links: list[dict],
+    w: float,
+    h: float,
+    prices: Prices = None,
+) -> str:
     top = 16.0  # room for the role caption drawn above a box
+    bottom = PRICE_BAND if prices else 0.0  # the last row's pill hangs below h
     margin = 14.0  # frame strokes are centred on the box edge; keep them on the canvas
-    width, height = w + 2 * margin, h + top + 2 * margin
+    width, height = w + 2 * margin, h + top + bottom + 2 * margin
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" '
         f'xmlns:xlink="http://www.w3.org/1999/xlink" width="{width:.0f}" '
@@ -273,6 +279,19 @@ def _to_svg(root: Node, depicts: dict, links: list[dict], w: float, h: float) ->
                 f'<text x="{node.x + 1:.1f}" y="{node.y - 5:.1f}" class="sp-tag" '
                 f'fill="{colour}">{caption}</text>'
             )
+        offer = prices.get(id(node.mol)) if prices else None
+        if offer:
+            label, payload = offer
+            # 6.4px per character at 11px semibold, plus the chip's own padding.
+            pill = 24.0 + 6.4 * len(label)
+            top = node.y + node.h + PILL_GAP
+            parts.append(
+                f'<g class="sp-price" data-offers="{escape(payload, quote=True)}">'
+                f'<rect x="{node.x:.1f}" y="{top:.1f}" '
+                f'width="{pill:.1f}" height="{PILL_H}" rx="{PILL_H / 2}"/>'
+                f'<text x="{node.x + 12:.1f}" y="{top + PILL_H / 2:.1f}">'
+                f"{escape(label)}</text></g>"
+            )
 
     for edge in links:
         lane, (_, py) = edge["lane"], edge["parent"]
@@ -287,7 +306,11 @@ def _to_svg(root: Node, depicts: dict, links: list[dict], w: float, h: float) ->
 
 
 def draw_route(
-    steps: Any, unresolved: Any = (), align: bool = True, layouts: Layouts = None
+    steps: Any,
+    unresolved: Any = (),
+    align: bool = True,
+    layouts: Layouts = None,
+    prices: Prices = None,
 ) -> str:
     """Draw one route.
 
@@ -301,14 +324,20 @@ def draw_route(
     :param unresolved: The terminal precursors that are not purchasable; they are
         drawn in the ``oos`` role, every other leaf in ``bb``.
     :param align: If True, give every precursor its product's orientation.
-    :param layouts: A dict shared with the other routes of the same page, so one
-        molecule is laid out once and drawn the same way everywhere. Pass None for a
-        route drawn on its own, which has nothing to share.
+    :param layouts: Shared base geometries, laid out once per molecule. Targets keep
+        this orientation across cards; precursor copies align to their own product.
+        Pass None for a route drawn on its own, which has nothing to share.
+    :param prices: ``{id(molecule): (pill label, data-offers payload)}``. Each
+        listed molecule gets a small pill under its box, carrying the payload
+        verbatim for a page that wants to open something on a click. What a price
+        is and where it came from is the caller's business, never this module's.
     :return: The SVG, without ``ROUTE_CSS`` or ``ARROW_DEFS``.
     """
     root, depicts = _route_tree(steps, unresolved, align, layouts)
-    width, height, col_x, col_w = layout(root, row_gap=ROW_GAP)
+    width, height, col_x, col_w = layout(
+        root, row_gap=ROW_GAP + (PRICE_BAND if prices else 0.0)
+    )
     links = edges(root, col_x, col_w)
     for edge in links:
         edge["number"] = edge["node"].number
-    return _to_svg(root, depicts, links, width, height)
+    return _to_svg(root, depicts, links, width, height, prices)

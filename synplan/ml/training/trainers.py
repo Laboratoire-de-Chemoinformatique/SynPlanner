@@ -24,6 +24,7 @@ from synplan.chem.reaction.rules.representation import (
     reaction_rules_path_from_policy_data,
     rule_representation_digest,
 )
+from synplan.chem.reaction.rules.vocabulary import bind_training_vocabulary
 from synplan.ml.config import (
     LinearPolicyNetworkConfig,
     MHNRankingPolicyNetworkConfig,
@@ -83,7 +84,11 @@ class LitRankingPolicy(LitNetworkTrainer):
         cls, config: LinearPolicyNetworkConfig, dataset: RankingPolicyDataset
     ) -> LitRankingPolicy:
         """Build a ranking policy network from a config and wrap it for training."""
-        return cls(RankingPolicyNetwork(config, dataset.num_classes))
+        return cls(
+            bind_training_vocabulary(
+                RankingPolicyNetwork(config, dataset.num_classes), dataset
+            )
+        )
 
     def compute_loss(self, batch: Batch) -> dict[str, Tensor]:
         """Cross-entropy loss and ranking metrics for reaction-rule prediction."""
@@ -118,7 +123,11 @@ class LitFilteringPolicy(LitNetworkTrainer):
         cls, config: LinearPolicyNetworkConfig, dataset: RankingPolicyDataset
     ) -> LitFilteringPolicy:
         """Build a filtering policy network from a config and wrap it for training."""
-        return cls(FilteringPolicyNetwork(config, dataset.num_classes))
+        return cls(
+            bind_training_vocabulary(
+                FilteringPolicyNetwork(config, dataset.num_classes), dataset
+            )
+        )
 
     def compute_loss(self, batch: Batch) -> dict[str, Tensor]:
         """BCE loss + metrics for the rule and priority filtering heads."""

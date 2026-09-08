@@ -59,16 +59,13 @@ def murcko_atoms(molecule: MoleculeContainer) -> set[int]:
         drop = {
             n
             for n in core
-            if n not in keep and len(molecule._bonds[n].keys() & core) <= 1
+            if n not in keep and len(set(molecule.neighbor_numbers(n)) & core) <= 1
         }
         if not drop:
             break
         core -= drop
     return core | {
-        other
-        for n in core
-        for other, bond in molecule._bonds[n].items()
-        if int(bond) > 1
+        other for n in core for other, bond in molecule.bond_items(n) if int(bond) > 1
     }
 
 

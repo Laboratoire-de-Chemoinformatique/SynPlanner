@@ -262,7 +262,7 @@ class WrongCHBreakingFilter:
                 is_c_h_breaking, is_c_c_formation = False, False
                 c_with_h_id, another_c_id = None, None
 
-                for neighbour_id, bond in cgr._bonds[atom_id].items():
+                for neighbour_id, bond in cgr.bond_items(atom_id):
                     neighbour = cgr.atom(neighbour_id)
 
                     if (
@@ -286,11 +286,11 @@ class WrongCHBreakingFilter:
                     return not (
                         any(
                             cgr.atom(nid).atomic_symbol not in ("C", "H")
-                            for nid in cgr._bonds[c_with_h_id]
+                            for nid in cgr.neighbor_numbers(c_with_h_id)
                         )
                         or any(
                             cgr.atom(nid).atomic_symbol not in ("C", "H")
-                            for nid in cgr._bonds[another_c_id]
+                            for nid in cgr.neighbor_numbers(another_c_id)
                         )
                     )
 
@@ -331,7 +331,7 @@ class CCsp3BreakingFilter:
         for _ in range(self.decoration_depth):
             nxt = set()
             for n in frontier:
-                for nbr in mol._bonds[n]:
+                for nbr in mol.neighbor_numbers(n):
                     if nbr in seen:
                         continue
                     a = mol.atom(nbr)

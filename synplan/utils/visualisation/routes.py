@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import json
 from html import escape
 from typing import TYPE_CHECKING, Any
 
-from chython import depict_settings
 from chython.containers.molecule import MoleculeContainer
 
+from synplan.chem.building_blocks import vendor_names
+from synplan.chem.precursor import is_purchasable
+from synplan.chem.reaction.routes.representation.depiction import (
+    _temporary_render_config,
+)
 from synplan.chem.reaction.routes.route import Route, Step
 from synplan.chem.reaction.rules.priority import POLICY_SOURCE_NAME
 from synplan.utils.routedraw import (
@@ -53,7 +58,11 @@ def get_child_nodes(
         temp_obj = {
             "smiles": str(precursor),
             "type": "mol",
-            "in_stock": str(precursor) in tree.building_blocks,
+            "in_stock": is_purchasable(
+                precursor,
+                tree.building_blocks,
+                key=str(precursor),
+            ),
         }
         node = get_child_nodes(tree, precursor, graph)
         if node:
@@ -76,15 +85,22 @@ def extract_routes(
 
     :param tree: The built tree.
     :param extended: If True, generates the extended route representation.
-    :param min_mol_size: If the size of the Precursor is equal or smaller than
-            min_mol_size it is automatically classified as building block.
+    :param min_mol_size: Retained for API compatibility; stock membership is size-independent.
     :return: A list of dictionaries. Each dictionary contains a target, a list of
         children, and a boolean indicating whether the target is in building_blocks.
     """
+    from synplan.mcts.tree import Tree
+
+    if isinstance(tree, Tree):
+        node_ids = (
+            [i for i, node in tree.nodes.items() if i != 1 and node.is_solved()]
+            if extended
+            else tree.winning_nodes
+        )
+        if node_ids:
+            return [Route.from_tree(tree, node_id).to_json() for node_id in node_ids]
     target = tree.nodes[1].precursors_to_expand[0].molecule
-    target_in_stock = tree.nodes[1].curr_precursor.is_building_block(
-        tree.building_blocks, min_mol_size
-    )
+    target_in_stock = tree.nodes[1].curr_precursor.is_purchasable(tree.building_blocks)
 
     # append encoded routes to list
     routes_block = []
@@ -226,13 +242,68 @@ def _step_label(step: Step) -> str:
     return origin.rule_key or ""
 
 
+def _route_prices(
+    route: Route, names: dict[str, str]
+) -> tuple[dict[int, tuple[str, str]], str]:
+    """A pill per terminal leaf, and the route's own cost per gram.
+
+    A leaf is priced from the catalogue record the search selected for it, so the
+    cheapest offer here is the cheapest offer for that exact isomer. The route
+    figure is :meth:`Route.calculate_cost`'s ``cost_per_gram`` computed from those
+    same records: one molar equivalent per leaf occurrence at 100% yield, over the
+    target's own weight. One leaf without a price and the route has no figure.
+
+    A leaf the search only assumed away for being small gets a pill saying so.
+    Its box is drawn in the green ``bb`` role like any other terminal, and that
+    pill is the page's one place saying no catalogue backs it.
+    """
+
+    pills: dict[int, tuple[str, str]] = {}
+    per_mol, complete = 0.0, True
+    for leaf in route.leaves():
+        selected = leaf.meta.get("selected_stock") or {}
+        offers = sorted(
+            (selected.get("vendors") or {}).items(), key=lambda item: (item[1], item[0])
+        )
+        if offers:
+            per_mol += float(leaf.molecular_mass) * offers[0][1]
+            rows = [[names.get(code, code), f"{price:g}"] for code, price in offers]
+            note = "Per gram of this material, catalogue units."
+        elif cutoff := leaf.meta.get("assumed_trivial"):
+            rows = [["Assumed trivial", f"at most {int(cutoff)} atoms"]]
+            note = (
+                "No catalogue record: the search assumed a molecule this small "
+                "is available."
+            )
+        elif selected:
+            rows = [["Price", "unavailable"]]
+            note = "The catalogue lists this material with no offer."
+        else:
+            complete = False
+            continue
+        complete = complete and bool(offers)
+        pills[id(leaf)] = (
+            # One label on every chip, so a row of them reads as one control rather
+            # than as a row of numbers competing with the drawing.
+            "show price",
+            json.dumps(
+                {"title": selected.get("inchikey", ""), "rows": rows, "note": note}
+            ),
+        )
+    weight = float(route.target.molecular_mass)
+    if not complete or weight <= 0.0:
+        return pills, "—"
+    return pills, f"{per_mol / weight:g}"
+
+
 def routes_report_html(
     routes: Iterable[Route],
     html_path: str | None,
     aam: bool = False,
     *,
-    show_steps: bool = False,
     stats: dict | None = None,
+    prices: bool = True,
+    building_blocks: Any = None,
 ) -> str | None:
     """Write an HTML page with the given routes drawn.
 
@@ -246,78 +317,127 @@ def routes_report_html(
     Each route gets one drawing; the disc a step is drawn on carries its number, 1
     being the first reaction performed. Unresolved leaves -- the molecules the
     search could not buy -- are drawn in the red ``oos`` role. Each route header
-    carries Zoom (also on the drawing itself: wheel to scale, drag to pan) and
-    SVG/PNG export, which write the one route as a standalone file. The page is
-    self-contained: nothing is fetched, and the only script is the inline one those
-    three buttons run.
+    carries Zoom (wheel to scale, drag to pan once open) and SVG/PNG export, which
+    write the one route as a standalone file. Only those buttons open anything:
+    clicking the drawing itself does nothing, so the chips on it stay clickable.
+    The page is self-contained: nothing is fetched, and the only script is the
+    inline one those buttons and chips run.
 
     :param routes: The routes to draw.
     :param html_path: The path to the file where to store resulting HTML. When None,
         the page is returned instead of written.
     :param aam: If True, depict atom-to-atom mapping.
-    :param show_steps: List each step's reaction SMILES under its drawing, numbered
-        to match the discs. Off: the drawing already says what the SMILES say, and
-        a nine-step route spells them over half a screen.
     :param stats: ``Tree.to_stats_dict()`` (or ``SearchRecord.stats``), for the one
         fact the routes cannot carry: how long the search took. Routes read back
         from a v1 JSON file have no search behind them, so they have no time.
+    :param prices: Put a pill under every leaf the search could price, and the
+        route's own cost per gram beside its search score. Turn it off for a page
+        that is about the chemistry, or for routes carrying no catalogue records.
+    :param building_blocks: The catalogue the search ran against, read only for the
+        vendor names its release metadata carries. Without it a pill names its
+        vendors by the short codes the records hold.
     :return: The page when ``html_path`` is None, otherwise None.
     """
-    depict_settings(aam=bool(aam))
-    routes = list(routes)
+    vendors = (
+        vendor_names(building_blocks) if prices and building_blocks is not None else {}
+    )
+    with _temporary_render_config(mapping=bool(aam)):
+        routes = list(routes)
+        # A legacy SMILES stock carries no vendors at all, so a page drawn against
+        # one would wear a Price per gram column that can never hold anything.
+        prices = prices and any(
+            leaf.meta.get("selected_stock") or leaf.meta.get("assumed_trivial")
+            for route in routes
+            for leaf in route.leaves()
+        )
 
-    doc = Doc()
-    layouts: dict = {}  # one geometry per molecule, so a card matches its neighbours
-    body = []
-    for index, route in enumerate(routes, 1):
-        rows = ""
-        if show_steps:
+        doc = Doc()
+        layouts: dict = {}  # one geometry per molecule, so a card matches its neighbours
+        body = []
+        for index, route in enumerate(routes, 1):
+            rows = ""
+            stereo_status = route.stereo_status
+            step_by_node = {
+                s.origin.tree_node_id: i for i, s in enumerate(route.steps) if s.origin
+            }
+            issues_by_step = {}
+            for obligation in (route.stereo or {}).get("obligations", ()):
+                responsible = obligation.get("step")
+                if responsible is None:
+                    responsible = step_by_node.get(obligation.get("tree_node_id"))
+                issues_by_step.setdefault(responsible, []).append(
+                    {
+                        "requires_stereo_forming_step": "Required stereochemistry must be established at this step; selectivity is unassessed.",
+                        "requires_explicit_resolution_or_inversion_strategy": "An explicit stereo inversion or separation strategy is needed.",
+                    }.get(obligation.get("reason"))
+                    or obligation.get("detail")
+                    or obligation.get("reason", "Stereo assessment needed")
+                )
             for number, step in enumerate(route, 1):
+                notes = list(issues_by_step.get(number - 1, ()))
+                if stereo_status == "needs_reassessment" and (
+                    notes or step.reaction.meta.get("stereo_events")
+                ):
+                    notes = ["Stereo needs reassessment after edits."]
+                stereo_note = "".join(
+                    f'<div class="rxn">Stereo: {escape(detail.replace("_", " "))}</div>'
+                    for detail in dict.fromkeys(notes)
+                )
                 label = _step_label(step)
                 rows += (
                     f'<div class="step"><div class="disc">{number}</div><div>'
                     + (f'<div class="lab">{escape(label)}</div>' if label else "")
+                    + stereo_note
                     + f'<div class="rxn mono">{escape(str(step.reaction))}</div>'
-                    "</div></div>"
+                    + "</div></div>"
                 )
-        provenance = route.provenance
-        node_id = None if provenance is None else provenance.tree_node_id
-        score = None if provenance is None else provenance.search_score
-        body.append(
-            '<section class="route card"><div class="rhead">'
-            f'<div class="kv"><div class="eyebrow">Route ID</div>'
-            f'<div class="v id">{index if node_id is None else node_id}</div></div>'
-            f'<div class="kv"><div class="eyebrow">Steps</div>'
-            f'<div class="v">{len(route)}</div></div>'
-            f'<div class="kv"><div class="eyebrow">Search score</div>'
-            f'<div class="v">{"—" if score is None else round(score, 3)}</div></div>'
-            '<div class="acts"><button class="act" data-act="svg">SVG</button>'
-            '<button class="act" data-act="png">PNG</button></div></div>'
-            f'<div class="draw">'
-            f"{doc.route(route.svg(standalone=False, layouts=layouts))}"
-            f"</div>{rows}</section>"
+            provenance = route.provenance
+            pills, per_gram = _route_prices(route, vendors) if prices else ({}, "")
+            cost = (
+                '<div class="kv"><div class="eyebrow">Price per g of target</div>'
+                f'<div class="v">{per_gram}</div></div>'
+                if prices
+                else ""
+            )
+            node_id = None if provenance is None else provenance.tree_node_id
+            score = None if provenance is None else provenance.search_score
+            body.append(
+                '<section class="route card"><div class="rhead">'
+                f'<div class="kv"><div class="eyebrow">Route ID</div>'
+                f'<div class="v id">{index if node_id is None else node_id}</div></div>'
+                f'<div class="kv"><div class="eyebrow">Steps</div>'
+                f'<div class="v">{len(route)}</div></div>'
+                f'<div class="kv"><div class="eyebrow">Search score</div>'
+                f'<div class="v">{"—" if score is None else round(score, 3)}</div></div>'
+                + cost
+                + '<div class="acts"><button class="act" data-act="zoom">Zoom</button>'
+                '<button class="act" data-act="svg">SVG</button>'
+                '<button class="act" data-act="png">PNG</button></div></div>'
+                f'<div class="draw">'
+                f"{doc.route(route.svg(standalone=False, layouts=layouts, prices=pills))}"
+                f"</div>{rows}</section>"
+            )
+
+        page = (
+            '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+            "<title>Retrosynthetic Routes Report</title>\n"
+            f"<style>{ROUTE_CSS}{REPORT_CSS}</style>\n</head>\n<body>\n"
+            + hidden_defs(ARROW_DEFS, doc.defs())
+            + '<div class="wrap">'
+            + _report_header(
+                routes,
+                drawable_copy(routes[0].target, layouts) if routes else None,
+                stats,
+            )
+            + "".join(body)
+            + "</div>\n<script>"
+            + REPORT_JS
+            + "</script>\n</body>\n</html>\n"
         )
 
-    page = (
-        '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        "<title>Retrosynthetic Routes Report</title>\n"
-        f"<style>{ROUTE_CSS}{REPORT_CSS}</style>\n</head>\n<body>\n"
-        + hidden_defs(ARROW_DEFS, doc.defs())
-        + '<div class="wrap">'
-        + _report_header(
-            routes,
-            drawable_copy(routes[0].target, layouts) if routes else None,
-            stats,
-        )
-        + "".join(body)
-        + "</div>\n<script>"
-        + REPORT_JS
-        + "</script>\n</body>\n</html>\n"
-    )
-
-    if html_path is None:
-        return page
-    with open(html_path, "w", encoding="utf-8") as html_file:
-        html_file.write(page)
-    return None
+        if html_path is None:
+            return page
+        with open(html_path, "w", encoding="utf-8") as html_file:
+            html_file.write(page)
+        return None

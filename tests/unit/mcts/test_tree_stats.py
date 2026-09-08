@@ -88,7 +88,9 @@ def build_tree(algorithm="breadth_first", rules=None, **kwargs):
     evaluator = kwargs.pop("evaluator", None)
     policy_cls = kwargs.pop("policy_cls", FakePolicy)
     search_strategy = kwargs.pop("search_strategy", "expansion_first")
-    building_blocks = kwargs.pop("building_blocks", set())
+    building_blocks = kwargs.pop(
+        "building_blocks", {str(make_mol(n)) for n in range(1, 7)}
+    )
     cfg = TreeConfig(
         algorithm=algorithm,
         max_iterations=max_iterations,
@@ -96,7 +98,7 @@ def build_tree(algorithm="breadth_first", rules=None, **kwargs):
         max_time=10,
         max_depth=4,
         search_strategy=search_strategy,
-        min_mol_size=6,
+        min_mol_size=kwargs.pop("min_mol_size", 6),
         silent=True,
         enable_pruning=False,
         **kwargs,
@@ -109,6 +111,7 @@ def build_tree(algorithm="breadth_first", rules=None, **kwargs):
             policy_network=fake_policy,
             reaction_rules=reactors,
             building_blocks=building_blocks,
+            min_mol_size=cfg.min_mol_size,
         )
         evaluator = load_evaluation_function(eval_config)
     return Tree(
@@ -613,3 +616,18 @@ def test_tree_stats_subscript_on_unknown_key_raises_keyerror():
     tree = build_tree()
     with pytest.raises(KeyError):
         _ = tree.stats["does_not_exist"]
+
+
+def test_extended_export_includes_solved_nodes_outside_the_winning_selection():
+    from synplan.utils.visualisation import extract_routes
+
+    tree = build_tree(
+        rules=[
+            (0.5, FakeReactor(lambda: [make_mol(5)]), 0),
+            (0.5, FakeReactor(lambda: [make_mol(4)]), 1),
+        ]
+    )
+    tree.run()
+    assert len(tree.winning_nodes) == 1
+    assert len(extract_routes(tree)) == 1
+    assert len(extract_routes(tree, extended=True)) == 2

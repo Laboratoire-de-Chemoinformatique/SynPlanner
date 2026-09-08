@@ -4,6 +4,7 @@ approach."""
 import os
 import random
 from collections import defaultdict
+from collections.abc import Mapping
 from pathlib import Path
 from random import shuffle
 
@@ -120,15 +121,17 @@ def run_tree_search(
     :return: The built search tree for the given molecule.
     """
 
-    # policy and value function loading
+    building_blocks = load_building_blocks(building_blocks_path, standardize=True)
+    if isinstance(building_blocks, Mapping):
+        raise ValueError(
+            "RL tree search requires SMILES stock; vendor catalogues are not supported."
+        )
+    # Exclude the target before tree construction (Tree freezes the stock).
+    building_blocks = set(building_blocks)
+    building_blocks.discard(str(target))
 
     policy_function = load_policy_function(policy_config=policy_config)
     reaction_rules = load_reaction_rules(reaction_rules_path)
-    building_blocks = load_building_blocks(building_blocks_path, standardize=True)
-    # Adjust building blocks to exclude target before tree construction (Tree freezes later)
-    building_blocks = set(building_blocks)
-    if str(target) in building_blocks:
-        building_blocks.discard(str(target))
 
     # Create evaluation config and strategy
     eval_config = ValueNetworkEvaluationConfig(

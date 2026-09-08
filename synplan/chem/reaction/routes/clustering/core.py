@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 from chython.containers import CGRContainer
+from tqdm.auto import tqdm
 
 from synplan.chem.reaction.routes.io import (
     make_dict,
@@ -96,13 +97,14 @@ def extract_strat_bonds(target_cgr: CGRContainer):
     )
 
 
-def cluster_routes(sb_cgrs: dict, use_strat=False):
+def cluster_routes(sb_cgrs: dict, use_strat=False, *, silent: bool = True):
     """
     Cluster routes objects based on their strategic bonds
       or CGRContainer object signature (not avoid mapping)
 
     Args:
         sb_cgrs: Dictionary mapping route_id to sb_cgr objects.
+        silent: Set False to show one progress bar for all routes.
 
     Returns:
         Dictionary with groups keyed by '{length}.{index}' containing
@@ -113,7 +115,9 @@ def cluster_routes(sb_cgrs: dict, use_strat=False):
     )
 
     # 1. Initial grouping based on the content of strategic bonds
-    for route_id, sb_cgr in sb_cgrs.items():
+    for route_id, sb_cgr in tqdm(
+        sb_cgrs.items(), desc="Clustering routes", unit="route", disable=silent
+    ):
         strat_bonds_list = extract_strat_bonds(sb_cgr)
         if use_strat:
             group_key = tuple(strat_bonds_list)

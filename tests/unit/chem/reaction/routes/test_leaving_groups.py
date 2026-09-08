@@ -74,7 +74,7 @@ def test_unmarked_dynamic_x_is_ignored_during_leaving_group_replacement():
 
     updated_cgr, new_lgs = replace_leaving_groups_in_synthon(subgroup, [])
 
-    assert updated_cgr._atoms[1].mark is None
+    assert updated_cgr.atom(1).mark is None
     assert new_lgs == {}
 
 
@@ -83,4 +83,4 @@ def test_lg_process_reset_syncs_radical_state_to_atom_object():
     leaving_group_cgr = lg_process_reset(~reaction, 2)
 
     assert leaving_group_cgr._radicals[2] is True
-    assert leaving_group_cgr._atoms[2].is_radical is True
+    assert leaving_group_cgr.atom(2).is_radical is True

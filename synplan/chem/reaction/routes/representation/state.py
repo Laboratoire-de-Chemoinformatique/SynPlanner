@@ -20,13 +20,6 @@ def bond_key(atom1: int, atom2: int) -> tuple[int, int]:
     return (atom1, atom2) if atom1 <= atom2 else (atom2, atom1)
 
 
-def set_symmetric_bond(cgr, atom1, atom2, bond):
-    """Store one bond object in both directions of a CGR adjacency map."""
-
-    cgr._bonds.setdefault(atom1, {})[atom2] = bond
-    cgr._bonds.setdefault(atom2, {})[atom1] = bond
-
-
 class RouteDynamicBond(DynamicBond):
     """DynamicBond carrying RouteCGR route-order and deconvolution metadata."""
 
@@ -126,12 +119,6 @@ def __getattr__(name):
     raise AttributeError(name)
 
 
-def _route_atom_class(atom):
-    if hasattr(atom, "route_order") and hasattr(atom, "route_step_order"):
-        return atom.__class__
-    return _route_atom_class_from_class(atom.__class__, atom.atomic_symbol)
-
-
 def route_atom(atom, route_orders, route_step_orders=None):
     """Return an atom copy carrying route-order and step-order metadata."""
 
@@ -145,7 +132,7 @@ def route_atom(atom, route_orders, route_step_orders=None):
             atom.route_atom_step_states = {}
         return atom
 
-    route_atom_class = _route_atom_class(atom)
+    route_atom_class = _route_atom_class_from_class(atom.__class__, atom.atomic_symbol)
     new_atom = object.__new__(route_atom_class)
     new_atom._isotope = atom.isotope
     new_atom._charge = atom.charge

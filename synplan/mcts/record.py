@@ -15,9 +15,8 @@ from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from chython import smiles as read_smiles
-
 from synplan.chem.precursor import Precursor
+from synplan.chem.stereo import parse_smiles_preserving_stereo as read_smiles
 from synplan.chem.utils import in_atom_order, molecule_key
 from synplan.mcts.node import Node
 from synplan.mcts.tree import Tree
@@ -33,7 +32,7 @@ __all__ = [
 ]
 
 #: Versioned identifier for the search-record file. Bump when the shape changes.
-SEARCH_RECORD_SCHEMA = "synplan-tree/1"
+SEARCH_RECORD_SCHEMA = "synplan-tree/3"
 
 
 @dataclass
@@ -64,6 +63,7 @@ class SearchRecord:
     route_steps = Tree.route_steps
     route_to_node = Tree.route_to_node
     route_score = Tree.route_score
+    route_log_likelihood = Tree.route_log_likelihood
     route_details = Tree.route_details
     step_metadata = Tree.step_metadata
     synthesis_route = Tree.synthesis_route
@@ -78,6 +78,14 @@ class SearchRecord:
             f"<SearchRecord {self.target}: {len(self.nodes)} nodes, "
             f"{len(self.winning_nodes)} routes>"
         )
+
+    @property
+    def proposal_nodes(self):
+        return [
+            n
+            for n, node in self.nodes.items()
+            if node.is_terminal() and not node.is_solved()
+        ]
 
 
 def _open(file_path: str | PathLike[str], mode: str):
@@ -135,6 +143,7 @@ def write_search_record(
             "value": node.total_value,
             "init": node.init_value,
             "prob": node.prob,
+            "policy_probability": node.policy_probability,
             "rule": node.rule_key,
             "rank": node.policy_rank,
             "new": [index(precursor) for precursor in node.new_precursors],
@@ -142,6 +151,24 @@ def write_search_record(
             # expanding, an empty list is a solved node, and the whole list is
             # the route's unresolved leaves
             "expand": [index(precursor) for precursor in node.precursors_to_expand],
+            "stereo_local": list(node.stereo_obligations.local)
+            if not tree.parents[node_id]
+            or node.stereo_obligations
+            is not tree.nodes[tree.parents[node_id]].stereo_obligations
+            else [],
+            "stereo_events": list(node.stereo_events),
+            "stereo_evidence": list(node.stereo_evidence),
+            "stereo_history": node.stereo_history,
+            "stereo_summary": getattr(node, "stereo_summary", None),
+            "selected_stock": [
+                p.molecule.meta.get("selected_stock") for p in node.new_precursors
+            ],
+            "assumed_trivial": [
+                p.molecule.meta.get("assumed_trivial") for p in node.new_precursors
+            ],
+            "reconstructed": node.reconstructed_route.to_json()
+            if hasattr(node, "reconstructed_route")
+            else None,
         }
         for node_id, node in sorted(tree.nodes.items())
     ]
@@ -181,7 +208,11 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
 
     with _open(file_path, "rt") as file:
         raw = json.load(file)
-    if raw.get("schema") != SEARCH_RECORD_SCHEMA:
+    if raw.get("schema") not in {
+        "synplan-tree/1",
+        "synplan-tree/2",
+        SEARCH_RECORD_SCHEMA,
+    }:
         raise ValueError(
             f"{file_path} is {raw.get('schema')!r}, not a {SEARCH_RECORD_SCHEMA} "
             "search record"
@@ -198,6 +229,13 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
         new = tuple(
             Precursor(molecules[i].copy(), canonicalize=False) for i in entry["new"]
         )
+        for precursor, selected in zip(new, entry.get("selected_stock", ())):
+            if selected:
+                precursor.molecule.meta["selected_stock"] = selected
+                precursor.selected_stock = selected
+        for precursor, cutoff in zip(new, entry.get("assumed_trivial", ())):
+            if cutoff:
+                precursor.molecule.meta["assumed_trivial"] = cutoff
         # what this node could still have to expand: what its parent handed on,
         # then what this node itself made
         pool = list(zip(entry["new"], new))
@@ -218,6 +256,11 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             expand.append(pool.pop(slot)[1])
 
         rule_source, rule_id = _rule(entry["rule"])
+        from synplan.chem.stereo import StereoObligations
+
+        obligations = (
+            nodes[parent_id].stereo_obligations if parent_id else StereoObligations()
+        )
         nodes[node_id] = Node(
             precursors_to_expand=tuple(expand),
             new_precursors=new,
@@ -230,7 +273,18 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             rule_source=rule_source,
             rule_key=entry["rule"],
             policy_rank=entry["rank"],
+            policy_probability=entry.get("policy_probability"),
+            stereo_obligations=obligations.extend(entry.get("stereo_local", ())),
+            stereo_events=entry.get("stereo_events", ()),
+            stereo_evidence=entry.get("stereo_evidence", ()),
+            stereo_history=entry.get("stereo_history", ""),
         )
+        if entry.get("stereo_summary"):
+            nodes[node_id].stereo_summary = entry["stereo_summary"]
+        if entry.get("reconstructed"):
+            from synplan.chem.reaction.routes.route import Route
+
+            nodes[node_id].reconstructed_route = Route.from_json(entry["reconstructed"])
         parents[node_id] = parent_id
         unexpanded[node_id] = tuple(entry["expand"])
         children.setdefault(node_id, set())

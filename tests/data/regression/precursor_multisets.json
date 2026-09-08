@@ -1,0 +1,66 @@
+{
+  "cases": [
+    {
+      "target_id": "n5-04837",
+      "product": "Cc1cccc2cccc(Cn3c(SCCCC(=O)O)nc4ccccc43)c12",
+      "expected_precursors": [
+        "C(c1cccc2c1c(C)ccc2)n3c(nc4ccccc34)SCCCC(=O)OCC"
+      ],
+      "rules": [
+        {
+          "id": 16,
+          "probability": 0.267822802066803,
+          "smarts": "[C:1]-[C:2](=[O:6])-[O:7]>>[C:1]-[C:2](-[O:3]-[C:4]-[C:5])=[O:6].[O-:7]"
+        },
+        {
+          "id": 5,
+          "probability": 0.15413981676101685,
+          "smarts": "[C:1]-[O:2]>>[C:1]-[O:2]-[C:3]-[C:4]"
+        }
+      ]
+    },
+    {
+      "target_id": "n5-02115",
+      "product": "CC(C)(C)c1ccc(NC(=O)NCCC(=O)O)cc1",
+      "expected_precursors": [
+        "CC(C)(C)c1ccc(cc1)NC(=O)NCCC(=O)OCC"
+      ],
+      "rules": [
+        {
+          "id": 16,
+          "probability": 0.11516735702753067,
+          "smarts": "[C:1]-[C:2](=[O:6])-[O:7]>>[C:1]-[C:2](-[O:3]-[C:4]-[C:5])=[O:6].[O-:7]"
+        },
+        {
+          "id": 5,
+          "probability": 0.08176765590906143,
+          "smarts": "[C:1]-[O:2]>>[C:1]-[O:2]-[C:3]-[C:4]"
+        }
+      ]
+    },
+    {
+      "target_id": "n5-07747",
+      "product": "O=C(O)Cn1ccc2cc(OCCCC#Cc3ccc(OC(F)(F)F)cc3)ccc21",
+      "expected_precursors": [
+        "FC(F)(F)Oc1ccc(cc1)C#CCCCOc2cc3ccn(c3cc2)CC(OCC)=O"
+      ],
+      "rules": [
+        {
+          "id": 16,
+          "probability": 0.47358450293540955,
+          "smarts": "[C:1]-[C:2](=[O:6])-[O:7]>>[C:1]-[C:2](-[O:3]-[C:4]-[C:5])=[O:6].[O-:7]"
+        },
+        {
+          "id": 5,
+          "probability": 0.2412419468164444,
+          "smarts": "[C:1]-[O:2]>>[C:1]-[O:2]-[C:3]-[C:4]"
+        },
+        {
+          "id": 980,
+          "probability": 0.028934277594089508,
+          "smarts": "[C:1]-[C:2](=[O:6])-[O:7]>>[O:7].[C:1]-[C:2](-[O:3]-[C:4]-[C:5])=[O:6]"
+        }
+      ]
+    }
+  ]
+}

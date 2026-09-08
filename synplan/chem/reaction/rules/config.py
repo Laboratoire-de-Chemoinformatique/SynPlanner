@@ -58,7 +58,7 @@ class RuleExtractionConfig(BaseConfigModel):
     reverse_rule: bool = True
     as_query_container: bool = True
     single_product_only: bool = True
-    ignore_stereo: bool = True
+    ignore_stereo: bool = False
     worker_timeout_per_reaction: float = Field(default=10.0, gt=0)
 
     # adjustable parameters

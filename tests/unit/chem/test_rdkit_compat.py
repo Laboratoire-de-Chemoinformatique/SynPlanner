@@ -59,7 +59,7 @@ class TestTargetFromRdkit:
     def test_no_standardization(self):
         """Skipping standardization must be observable, or the flags are decorative."""
         rdmol = Chem.MolFromSmiles("C/C=C/[C@@H](O)F")
-        cleaned = target_from_rdkit(rdmol)
+        cleaned = target_from_rdkit(rdmol, clean_stereo=True)
         raw = target_from_rdkit(
             rdmol, standardize=False, clean_stereo=False, clean2d=False
         )

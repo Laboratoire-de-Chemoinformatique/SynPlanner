@@ -137,9 +137,20 @@ def download_all_data_cli(save_to: str = ".") -> None:
     type=click.Path(),
     help="Path to the file where standardized building blocks will be stored.",
 )
-def building_blocks_standardizing_cli(input_file: str, output_file: str) -> None:
-    """Standardizes building blocks."""
-    standardize_building_blocks(input_file=input_file, output_file=output_file)
+@click.option(
+    "--num-workers",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help="Worker processes for vendor TSV to JSON/JSON.GZ/SQLite preparation.",
+)
+def building_blocks_standardizing_cli(
+    input_file: str, output_file: str, num_workers: int
+) -> None:
+    """Standardize molecular files or prepare a JSON/SQLite vendor catalogue."""
+    standardize_building_blocks(
+        input_file=input_file, output_file=output_file, num_workers=num_workers
+    )
 
 
 @synplan.command(name="ord_convert")

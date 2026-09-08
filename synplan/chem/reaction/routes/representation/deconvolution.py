@@ -7,13 +7,12 @@ from chython.containers import CGRContainer, ReactionContainer
 from synplan.chem.reaction.routes.representation.state import (
     RouteDynamicBond,
     bond_key,
-    set_symmetric_bond,
 )
 
 
 def _step_ids(route_cgr: CGRContainer) -> list[int]:
     steps = set()
-    for atom in route_cgr._atoms.values():
+    for _, atom in route_cgr.atoms():
         steps.update(getattr(atom, "route_atom_step_states", {}))
     for _, _, bond in route_cgr.bonds():
         steps.update(getattr(bond, "route_bond_step_states", {}))
@@ -29,7 +28,7 @@ def _set_atom_state(
     cgr: CGRContainer, atom_num: int, state: tuple[int, int, bool, bool]
 ) -> None:
     charge, p_charge, is_radical, p_is_radical = state
-    atom = cgr._atoms[atom_num]
+    atom = cgr.atom(atom_num)
     atom._charge = charge
     atom._p_charge = p_charge
     atom._is_radical = is_radical
@@ -43,7 +42,7 @@ def _set_atom_state(
 def _step_cgr(route_cgr: CGRContainer, step: int) -> CGRContainer:
     atom_nums = [
         atom_num
-        for atom_num, atom in route_cgr._atoms.items()
+        for atom_num, atom in route_cgr.atoms()
         if step in getattr(atom, "route_atom_step_states", {})
     ]
     if not atom_nums:
@@ -52,7 +51,7 @@ def _step_cgr(route_cgr: CGRContainer, step: int) -> CGRContainer:
     step_cgr = route_cgr.substructure(atom_nums)
 
     for atom_num in atom_nums:
-        state = route_cgr._atoms[atom_num].route_atom_step_states[step]
+        state = route_cgr.atom(atom_num).route_atom_step_states[step]
         _set_atom_state(step_cgr, atom_num, state)
 
     step_bonds = {}
@@ -69,7 +68,7 @@ def _step_cgr(route_cgr: CGRContainer, step: int) -> CGRContainer:
         order, p_order = step_bonds[(atom1, atom2)]
         if order is None and p_order is None:
             continue
-        set_symmetric_bond(step_cgr, atom1, atom2, RouteDynamicBond(order, p_order))
+        step_cgr.set_bond(atom1, atom2, RouteDynamicBond(order, p_order))
 
     step_cgr.flush_cache()
     return step_cgr
@@ -77,11 +76,18 @@ def _step_cgr(route_cgr: CGRContainer, step: int) -> CGRContainer:
 
 def reactions_from_route_cgr(route_cgr: CGRContainer) -> dict[int, ReactionContainer]:
     """Reconstruct mapped reaction steps from native RouteCGR labels."""
+    from synplan.chem.reaction.routes.representation.stereo import restore
 
-    return {
-        step - 1: ReactionContainer.from_cgr(_step_cgr(route_cgr, step))
-        for step in _step_ids(route_cgr)
-    }
+    snapshots = getattr(route_cgr, "route_stereo_steps", None)
+    reactions = {}
+    for step in _step_ids(route_cgr):
+        cgr = _step_cgr(route_cgr, step)
+        reactions[step - 1] = (
+            restore(snapshots[str(step)], cgr)
+            if snapshots is not None
+            else ReactionContainer.from_cgr(cgr)
+        )
+    return reactions
 
 
 def routes_dict_from_route_cgrs(

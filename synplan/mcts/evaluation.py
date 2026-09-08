@@ -2,15 +2,17 @@
 
 import random
 from abc import ABC, abstractmethod
-from collections import defaultdict, deque
+from collections import deque
 from random import uniform
 from typing import TYPE_CHECKING
 
 import torch
 
+from synplan.chem import building_blocks as building_block_types
 from synplan.chem.precursor import Precursor, compose_precursors
 from synplan.chem.rdkit_utils import RDKitScore
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
+from synplan.chem.stereo import has_stereo, has_stereo_groups
 from synplan.ml.networks.checkpoint import load_network_from_checkpoint
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training import mol_to_pyg
@@ -35,10 +37,13 @@ class RolloutSimulator:
         self,
         policy_network: "Policy",
         reaction_rules,
-        building_blocks: set[str],
+        building_blocks: set[str]
+        | frozenset[str]
+        | building_block_types.BuildingBlockCatalogue,
         min_mol_size: int,
         max_depth: int,
         stochastic: bool = False,
+        max_reaction_outcomes: int = 5,
     ) -> None:
         """Initialize the rollout simulator.
 
@@ -56,6 +61,7 @@ class RolloutSimulator:
         self.min_mol_size = min_mol_size
         self.max_depth = max_depth
         self.stochastic = stochastic
+        self.max_reaction_outcomes = max_reaction_outcomes
 
     def _select_reaction(self, current_precursor: Precursor) -> tuple[bool, any, int]:
         """Select a reaction rule to apply.
@@ -97,12 +103,11 @@ class RolloutSimulator:
         :return: Tuple of (success, products, rule_id).
         """
         # Collect all candidate rules with their probabilities
-        candidates = [
-            (prob, rule, rule_id)
-            for prob, rule, rule_id in self.policy_network.predict_reaction_rules(
+        candidates = list(
+            self.policy_network.predict_reaction_rules(
                 current_precursor, self.reaction_rules
             )
-        ]
+        )
 
         if not candidates:
             return False, None, -1
@@ -141,61 +146,77 @@ class RolloutSimulator:
         """
         max_depth = self.max_depth - current_depth
 
-        if precursor.is_building_block(self.building_blocks, self.min_mol_size):
+        if precursor.is_building_block(
+            self.building_blocks,
+            self.min_mol_size,
+        ):
+            if precursor.molecule.meta.get("assumed_trivial") and (
+                has_stereo(precursor.molecule) or has_stereo_groups(precursor.molecule)
+            ):
+                return 0.0
             return 1.0
 
         occurred_precursor = set()
         precursor_to_expand = deque([precursor])
-        history = defaultdict(dict)
         rollout_depth = 0
 
         while precursor_to_expand:
-            if len(history) >= max_depth:
+            if rollout_depth >= max_depth:
                 return -0.5
 
             current_precursor = precursor_to_expand.popleft()
-            history[rollout_depth]["target"] = current_precursor
             occurred_precursor.add(current_precursor)
 
             # Select reaction (greedy or stochastic based on self.stochastic)
-            reaction_applied, products, rule_id = self._select_reaction(
-                current_precursor
-            )
+            reaction_applied, products, _ = self._select_reaction(current_precursor)
 
             if not reaction_applied:
                 return -1.0
 
-            history[rollout_depth]["rule_index"] = rule_id
+            from synplan.chem.stereo import assess_inheritance
+
+            assessment = assess_inheritance(current_precursor.molecule, products)
+            if assessment["obligations"]:
+                return 0.0
+
             # ``apply_reaction_rule`` already validated + canonicalized each
             # product in a single kekule pass.
             products = tuple(
                 Precursor(product, canonicalize=False) for product in products
             )
-            history[rollout_depth]["products"] = products
 
             if any(x in occurred_precursor for x in products) and products:
                 return -1.0
 
-            if occurred_precursor.isdisjoint(products):
-                precursor_to_expand.extend(
-                    [
-                        x
-                        for x in products
-                        if not x.is_building_block(
-                            self.building_blocks, self.min_mol_size
-                        )
-                    ]
-                )
-                rollout_depth += 1
+            precursor_to_expand.extend(
+                [
+                    x
+                    for x in products
+                    if not x.is_building_block(
+                        self.building_blocks,
+                        self.min_mol_size,
+                    )
+                ]
+            )
+            if any(
+                x.molecule.meta.get("assumed_trivial")
+                and (has_stereo(x.molecule) or has_stereo_groups(x.molecule))
+                for x in products
+            ):
+                return 0.0
+            rollout_depth += 1
 
         return 1.0
 
-    @staticmethod
-    def _apply_rule(precursor_mol, rule):
+    def _apply_rule(self, precursor_mol, rule):
         # Local import to avoid circular dependency
         from synplan.chem.reaction import apply_reaction_rule
 
-        return apply_reaction_rule(precursor_mol.molecule, rule)
+        return apply_reaction_rule(
+            precursor_mol.molecule,
+            rule,
+            top_reactions_num=self.max_reaction_outcomes,
+        )
 
 
 class EvaluationStrategy(ABC):
@@ -267,11 +288,14 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
         self,
         policy_network: "Policy",
         reaction_rules,
-        building_blocks: set[str],
+        building_blocks: set[str]
+        | frozenset[str]
+        | building_block_types.BuildingBlockCatalogue,
         min_mol_size: int,
         max_depth: int,
         normalize: bool = False,
         stochastic: bool = False,
+        max_reaction_outcomes: int = 5,
     ) -> None:
         """Initialize rollout evaluation strategy.
 
@@ -291,6 +315,7 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
             min_mol_size=min_mol_size,
             max_depth=max_depth,
             stochastic=stochastic,
+            max_reaction_outcomes=max_reaction_outcomes,
         )
         self.normalize = normalize
 
@@ -302,6 +327,8 @@ class RolloutEvaluationStrategy(EvaluationStrategy):
     ) -> float:
         """Evaluate node using rollout simulation."""
         current_depth = nodes[node_id].depth
+        if getattr(node, "stereo_obligations", ()):
+            return 0.5 if self.normalize else 0.0
         raw = min(
             (
                 self.rollout.simulate_precursor(precursor, current_depth=current_depth)

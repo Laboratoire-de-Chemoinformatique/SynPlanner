@@ -56,12 +56,20 @@ font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:c
 line-height:1;margin-top:1px}
 .lab{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--ok)}
 .rxn{font-size:12px;color:var(--ink2);word-break:break-all;line-height:1.6}
+.sp-price{cursor:pointer}
+.offers{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--rule);
+border-radius:8px;box-shadow:0 8px 28px rgba(16,24,40,.18);padding:10px 13px;font-size:13px}
+.offers table{border-collapse:collapse}
+.offers td{padding:3px 0;white-space:nowrap}
+.offers td+td{padding-left:14px;text-align:right;font-variant-numeric:tabular-nums}
+.offers .who{color:var(--ink3);font-size:11px;padding-bottom:5px;border-bottom:1px solid var(--rule);margin-bottom:5px}
+.offers .cap{color:var(--ink3);font-size:11px;padding-top:5px;border-top:1px solid var(--rule);margin-top:5px}
 .acts{margin-left:auto;align-self:center;display:flex;gap:6px}
 .act{font:inherit;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;
 line-height:1;color:var(--ink2);background:var(--surface);border:1px solid var(--rule);
 border-radius:3px;padding:6px 9px;cursor:pointer}
 .act:hover{color:var(--accent);border-color:var(--accent)}
-.draw{cursor:zoom-in}
+.draw{cursor:default}
 .zoom{display:none;position:fixed;inset:0;z-index:9;overflow:hidden;cursor:grab;
 background:var(--surface);touch-action:none}
 .zoom.on{display:block}
@@ -169,7 +177,8 @@ function build() {
     zoomAt(Math.exp(-e.deltaY * 0.002), e.clientX, e.clientY);
   }, { passive: false });
   zoom.addEventListener("pointerdown", (e) => {
-    if (e.target.closest(".zbar")) return;
+    // Capturing retargets the click to .zoom, so a pill there would never be hit.
+    if (e.target.closest(".zbar") || e.target.closest(".sp-price")) return;
     zoom.setPointerCapture(e.pointerId);
     drag = [e.clientX - tx, e.clientY - ty];
     zoom.classList.add("drag");
@@ -205,16 +214,84 @@ function showZoom(svg) {
 }
 
 addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && zoom) zoom.classList.remove("on");
+  if (e.key !== "Escape") return;
+  if (zoom) zoom.classList.remove("on");
+  hideOffers();
 });
 
+let offers = null, shown = null;
+
+function showOffers(pill) {
+  if (shown === pill) {
+    hideOffers();  // the same chip again closes what it opened
+    return;
+  }
+  shown = pill;
+  if (!offers) {
+    offers = document.createElement("div");
+    offers.className = "offers";
+    document.body.appendChild(offers);
+  }
+  const data = JSON.parse(pill.dataset.offers);
+  offers.replaceChildren();
+  if (data.title) {
+    const title = document.createElement("div");
+    title.className = "who mono";
+    title.textContent = data.title;
+    offers.appendChild(title);
+  }
+  const table = document.createElement("table");
+  for (const row of data.rows) {
+    const tr = table.insertRow();
+    for (const cell of row) tr.insertCell().textContent = cell;
+  }
+  const note = document.createElement("div");
+  note.className = "cap";
+  note.textContent = data.note;
+  offers.append(table, note);
+  // Unhide first: a hidden element measures zero, and both clamps need real sizes.
+  offers.hidden = false;
+  offers.style.left = "0px";
+  offers.style.top = "0px";
+  const box = pill.getBoundingClientRect();
+  const { width, height } = offers.getBoundingClientRect();
+  offers.style.left = Math.max(8, Math.min(box.left, innerWidth - width - 8)) + "px";
+  // Below the pill, or above it when there is no room below.
+  const below = box.bottom + 6;
+  offers.style.top =
+    (below + height > innerHeight - 8 ? Math.max(8, box.top - height - 6) : below) +
+    "px";
+}
+
+function hideOffers() {
+  if (offers) {
+    offers.hidden = true;
+    shown = null;
+  }
+}
+
+// Dismissal rides on pointerdown, in the capture phase. A click needs press and
+// release on one element, so a press that drifts a pixel -- or lands on an SVG
+// that swallows it -- would leave the panel open over the drawing.
+addEventListener("pointerdown", (e) => {
+  if (!e.target.closest(".sp-price") && !e.target.closest(".offers")) hideOffers();
+}, true);
+
+// It is positioned against a pill that has since moved, so it cannot follow.
+addEventListener("scroll", hideOffers, true);
+addEventListener("resize", hideOffers);
+
 document.addEventListener("click", (e) => {
+  const pill = e.target.closest(".sp-price");
+  if (pill) {
+    showOffers(pill);
+    return;  // a chip prices a block; it never opens the zoom view
+  }
+  // The drawing is not itself a button any more: its chips need those clicks.
   const button = e.target.closest("[data-act]");
-  const section = e.target.closest(".route");
+  const section = button && button.closest(".route");
   if (!section) return;
-  const act = button ? button.dataset.act
-            : e.target.closest(".draw") ? "zoom" : null;
-  if (!act) return;
+  const act = button.dataset.act;
   const svg = section.querySelector(".draw > svg");
   const name = "route-" + section.querySelector(".v.id").textContent.trim();
   if (act === "zoom") showZoom(svg);

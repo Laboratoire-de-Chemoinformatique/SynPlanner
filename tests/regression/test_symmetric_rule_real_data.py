@@ -113,7 +113,6 @@ def test_stereo_nitrile_reduction_keeps_recorded_precursor(
         load_reaction_rules.cache_clear()
 
     # The nitrogen-only patch leaves the target unchanged. Compare with the
-    # recorded molecules using CanonicalRetroReactor's flat-output contract.
+    # recorded molecules including their two specified stereocenters.
     expected = smiles(product if rhs_atoms == (14,) else substrate)
-    expected.clean_stereo()
     assert precursor_sets == {(str(expected),)}

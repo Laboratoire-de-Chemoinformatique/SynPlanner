@@ -138,8 +138,7 @@ def _departing(
     """Heavy neighbours of *number* that never reach the product, and whether a pi bond dropped."""
     departing: set[str] = set()
     pi_reduced = False
-    neighbours = molecule._bonds[number]  # no public accessor in chython
-    for neighbour, bond in neighbours.items():
+    for neighbour, bond in molecule.bond_items(number):
         if neighbour not in product_numbers:
             departing.add(molecule.atom(neighbour).atomic_symbol)
         elif bond.order > 1 and molecule.atom(neighbour).atomic_symbol != "C":
@@ -167,7 +166,7 @@ def _formed_bonds(
     for a, b, _ in product.bonds():
         if a not in left or b not in left:
             continue  # unmapped in the product: cannot tell, do not guess
-        if left[a] is left[b] and b in left[a]._bonds[a]:
+        if left[a] is left[b] and b in left[a].neighbor_numbers(a):
             continue
         formed.add(frozenset((a, b)))
     return formed

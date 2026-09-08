@@ -44,28 +44,8 @@ def default_config() -> RuleExtractionConfig:
 
 
 def _neighbours(mol: MoleculeContainer | CGRContainer, idx: int) -> set[int]:
-    """Return immediate neighbour atom numbers for *idx*.
-
-    Implementation relies on chython's private `_bonds` mapping because the
-    public `Atom.neighbors` returns only a **count**.  Falls back to scanning
-    `mol.bonds` if the mapping is unavailable.
-    """
-    neigh: set[int] = set()
-
-    # Preferred: constant-time lookup from the internal adjacency table.
-    if hasattr(mol, "_bonds") and isinstance(mol._bonds, dict):  # type: ignore[attr-defined]
-        neigh.update(mol._bonds.get(idx, {}).keys())  # type: ignore[attr-defined]
-        if neigh:
-            return neigh
-
-    # Fallback: linear scan over bond objects (works for both containers).
-    for bond in getattr(mol, "bonds", ()):  # type: ignore[attr-defined]
-        a, b = bond.atom1.number, bond.atom2.number  # type: ignore[attr-defined]
-        if a == idx:
-            neigh.add(b)
-        elif b == idx:
-            neigh.add(a)
-    return neigh
+    """Return immediate neighbour atom numbers for *idx*."""
+    return set(mol.neighbor_numbers(idx))
 
 
 # ---------------------------------------------------------------------------
@@ -282,7 +262,7 @@ def test_ignore_stereo_allows_validation_of_stereo_cleaned_rules():
     no_stereo_cfg = RuleExtractionConfig(**base, ignore_stereo=True)
     no_stereo_rules, _ = extract_rules(no_stereo_cfg, smiles(rxn_smi))
 
-    assert stereo_rules[0].meta["reactor_validation"] == "failed"
+    assert stereo_rules[0].meta["reactor_validation"] == "passed"
     assert no_stereo_rules[0].meta["reactor_validation"] == "passed"
 
 

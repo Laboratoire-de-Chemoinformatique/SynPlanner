@@ -287,8 +287,7 @@ def _has_broken_valence(molecule: MoleculeContainer) -> bool:
     itself a broken structure.  Only the verdict is wanted, so none of the
     canonicalisation that follows a valence check elsewhere is done here.
     """
-    kekulized = molecule.copy()
-    kekulized._atoms = dict(sorted(kekulized._atoms.items()))
+    kekulized = molecule.ordered_copy()
     try:
         kekulized.remove_coordinate_bonds(keep_to_terminal=False)
         kekulized.kekule()
@@ -384,12 +383,11 @@ def _broken_bonds(reaction: ReactionContainer) -> set[frozenset] | None:
 
 def _side_of_cuts(molecule: MoleculeContainer, start: int, cuts) -> set[int]:
     """Atoms reachable from ``start`` once every bond in ``cuts`` is ignored."""
-    bonds = molecule._bonds
     seen = {start}
     queue = [start]
     while queue:
         atom = queue.pop()
-        for neighbour in bonds[atom]:
+        for neighbour in molecule.neighbor_numbers(atom):
             if neighbour in seen or frozenset((atom, neighbour)) in cuts:
                 continue
             seen.add(neighbour)
@@ -794,7 +792,7 @@ def _ketones(molecules) -> int:
             carbon = left if molecule.atom(left).atomic_symbol == "C" else right
             if all(
                 molecule.atom(neighbour).atomic_symbol == "C"
-                for neighbour in molecule._bonds[carbon]
+                for neighbour in molecule.neighbor_numbers(carbon)
                 if neighbour not in (left, right)
             ):
                 total += 1

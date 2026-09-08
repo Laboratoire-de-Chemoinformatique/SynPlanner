@@ -349,16 +349,16 @@ def _component_targets(component: str) -> list[dict]:
     for n, atom in query.atoms():
         if not isinstance(atom, AnyElement) or n in mapped:
             continue
-        neighbours = list(query._bonds[n])
+        neighbours = list(query.neighbor_numbers(n))
         if len(neighbours) != 1:
             raise ConversionError(
                 f"stub with {len(neighbours)} neighbours in {component!r}"
             )
         (attached,) = neighbours
-        bond = int(query._bonds[n][attached].order[0])
+        bond = int(query.bond(n, attached).order[0])
         via_v = query.atom(attached).atomic_symbol == "V"
         if via_v:
-            rest = [m for m in query._bonds[attached] if m != n]
+            rest = [m for m in query.neighbor_numbers(attached) if m != n]
             if len(rest) != 1:
                 raise ConversionError(
                     f"[V] with {len(rest)} real neighbours in {component!r}"

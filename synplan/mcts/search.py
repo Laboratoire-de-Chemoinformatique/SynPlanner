@@ -6,14 +6,14 @@ import gzip
 import json
 import logging
 import os.path
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 
 from chython.containers import MoleculeContainer
-from rdkit import Chem
 from tqdm.auto import tqdm
 
 from synplan import __version__
+from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.routes.io import (
     make_json,
@@ -38,27 +38,20 @@ from synplan.utils.visualisation import extract_routes, routes_report_html
 
 #: Versioned identifier for the public route-export contract emitted by
 #: :func:`export_routes_artifact`. Bump when the envelope/manifest shape changes.
-ROUTE_EXPORT_SCHEMA_VERSION = "synplan-routes/1"
+ROUTE_EXPORT_SCHEMA_VERSION = "synplan-routes/2"
 
 
 def _canonical_target_key(smiles: str) -> str:
-    """Canonical SMILES key for the route-export artifact.
-
-    Mirrors retrocast's ``canonicalize_smiles`` default flags so keys match
-    ``retrocast.curation...Target.smiles`` byte-for-byte: RDKit
-    ``MolFromSmiles`` (sanitize=True) then ``MolToSmiles(canonical=True,
-    isomericSmiles=True)``, with atom mapping left intact. Falls back to the raw
-    string (with a warning) when RDKit cannot parse the input.
-    """
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
+    """Chython canonical stereo-preserving key (route export schema 2)."""
+    try:
+        return str(mol_from_smiles(smiles, clean2d=False))
+    except ValueError:
         logging.warning(
-            "Could not RDKit-canonicalize target SMILES %r for route export; "
+            "Could not Chython-canonicalize target SMILES %r for route export; "
             "keying by the raw string.",
             smiles,
         )
         return smiles
-    return Chem.MolToSmiles(mol, canonical=True, isomericSmiles=True)
 
 
 def _iter_target_smiles(targets_path: str) -> Iterator[str]:
@@ -120,7 +113,6 @@ def build_target_routes(tree, reactions: dict | None = None) -> list[dict]:
             reactions,
             keep_ids=True,
             building_blocks=tree.building_blocks,
-            min_mol_size=tree.config.min_mol_size,
         ).values()
     )
 
@@ -134,8 +126,8 @@ def export_routes_artifact(
     """Write the target-keyed route-export artifact (public contract).
 
     Gzip-writes ``results`` as JSON to ``results_root/filename``. ``results`` is
-    the public envelope: a top-level dict keyed by the RDKit-canonical target
-    SMILES (matching retrocast's ``Target.smiles``; see
+    the public envelope: a top-level dict keyed by the Chython-canonical target
+    SMILES (see
     :func:`_canonical_target_key`) mapping to ``[route_tree, ...]`` with ``[]``
     for unsolved targets, where each ``route_tree`` is a
     :func:`build_target_routes` / ``make_json`` node tree.
@@ -155,6 +147,8 @@ def export_routes_artifact(
 
     manifest = {
         "schema_version": ROUTE_EXPORT_SCHEMA_VERSION,
+        "target_key_backend": "chython_canonical_stereo_smiles",
+        "stereo_schema": 1,
         "synplan_version": __version__,
         "directives": {
             "adapter": "synplanner",
@@ -209,7 +203,7 @@ def run_search(
         cross-step-reconciled atom-map numbering in the exported reactions.
     :param export_routes: When True, additionally emit the public route-export
         artifact (``routes_filename`` + ``manifest.json``) keyed by the
-        RDKit-canonical target SMILES (matching retrocast's ``Target.smiles``;
+        Chython-canonical target SMILES (
         ``[]`` for unsolved targets), for downstream consumers. Defaults to
         False, leaving the existing outputs byte-identical.
     :param routes_filename: Filename (under ``results_root``) for the gzipped
@@ -240,10 +234,19 @@ def run_search(
         # Policy performance
         "expansion_calls",
         "expansion_successes",
+        "unique_expanded_molecules",
+        "unique_expanded_states",
+        "iterations_without_expansion",
+        "root_disconnections",
+        "solved_root_disconnections",
         "total_rules_tried",
         "total_rules_succeeded",
         "rule_applicability_rate",
         "dead_end_nodes",
+        "stereo_proposals",
+        "stereo_incompatible_outcomes",
+        "stereo_unresolved_outcomes",
+        "stereo_incomplete_assessments",
         # Search dynamics
         "first_solution_iteration",
         "first_solution_time",
@@ -274,6 +277,7 @@ def run_search(
         policy_function = load_policy_function(policy_config=policy_config)
     reaction_rules = load_reaction_rules(reaction_rules_path)
     building_blocks = load_building_blocks(building_blocks_path, standardize=False)
+    is_json_catalogue = isinstance(building_blocks, Mapping)
 
     # Create evaluation strategy from config
     evaluation_function = load_evaluation_function(evaluation_config)
@@ -281,9 +285,12 @@ def run_search(
     # run search
     n_solved = 0
     extracted_routes = []
-    # Public route-export accumulator keyed by RDKit-canonical target SMILES:
+    # Public route-export accumulator keyed by Chython-canonical target SMILES:
     # {canonical_target_smiles: [route_tree, ...]}.
     exported_routes: dict[str, list[dict]] = {}
+    # CLI runs may contain many targets whose per-tree node IDs overlap, so the
+    # sidecar is target-keyed before it is route-node-keyed.
+    route_costs: dict[str, dict[str, dict]] = {}
     n_in_stock = 0
 
     tree_config = TreeConfig.from_dict(search_config)
@@ -299,19 +306,18 @@ def run_search(
             bar_format="{desc}{n} [{elapsed}]",
         ):
             target_smi = target_smi.strip()
-            # Key the export dict by the RDKit-canonical target SMILES so keys
-            # match retrocast's Target.smiles byte-for-byte. Every target starts
+            if is_json_catalogue:
+                route_costs[target_smi] = {}
+            # Key the export dict by the Chython-canonical target SMILES so keys
+            # match the canonicalizer recorded in the manifest. Every target starts
             # empty; only a solved one overwrites it.
             export_key = None
             if export_routes:
                 export_key = _canonical_target_key(target_smi)
                 exported_routes[export_key] = []
             try:
-                target_mol = mol_from_smiles(target_smi)
-                # exact catalogue membership, not is_building_block: that also passes
-                # anything under min_mol_size, which is right for a precursor and wrong
-                # for a target -- a small target is small, not purchasable.
-                if str(target_mol) in building_blocks:
+                target_mol = mol_from_smiles(target_smi, clean_stereo=False)
+                if is_purchasable(target_mol, building_blocks):
                     n_in_stock += 1
                     tqdm.write(
                         f"{target_smi} is already in the building blocks - "
@@ -365,10 +371,18 @@ def run_search(
                 routes = tree.routes()
                 if route_scorer is not None:
                     routes = route_scorer.rank(routes)
+                if is_json_catalogue:
+                    route_costs[target_smi] = {
+                        str(route.provenance.tree_node_id): route.calculate_cost(
+                            building_blocks
+                        )
+                        for route in routes
+                    }
                 routes_report_html(
                     routes,
                     os.path.join(routes_folder, f"retroroutes_target_{ti}.html"),
                     stats=tree.to_stats_dict(),
+                    building_blocks=building_blocks,
                 )
 
                 # save json routes
@@ -385,7 +399,9 @@ def run_search(
 
                 # save mapped reactions (JSON)
                 write_routes_json(
-                    routes_dict, os.path.join(routes_folder, f"mapped_routes_{ti}.json")
+                    routes_dict,
+                    os.path.join(routes_folder, f"mapped_routes_{ti}.json"),
+                    tree=tree,
                 )
 
                 # public route export (reuse extract_reactions result)
@@ -395,6 +411,19 @@ def run_search(
                     )
 
             # save stats
+            if tree.proposal_nodes:
+                from synplan.chem.reaction.routes.route import Route
+
+                proposals = [
+                    Route.from_tree(tree, node_id) for node_id in tree.proposal_nodes
+                ]
+                proposal_path = Path(routes_folder) / f"stereo_proposals_{ti}.json"
+                proposal_path.write_text(
+                    json.dumps([r.to_json() for r in proposals], indent=2)
+                )
+                routes_report_html(
+                    proposals, str(Path(routes_folder) / f"stereo_proposals_{ti}.html")
+                )
             stats_row = extract_tree_stats(tree, target_smi)
             stats_row["target_in_stock"] = False
             statswriter.writerow(stats_row)
@@ -402,6 +431,11 @@ def run_search(
 
     if export_routes:
         export_routes_artifact(exported_routes, results_root, filename=routes_filename)
+    if is_json_catalogue:
+        with open(
+            results_root.joinpath("route_costs.json"), "w", encoding="utf-8"
+        ) as file:
+            json.dump(route_costs, file, indent=2)
 
     print(f"Number of solved target molecules: {n_solved}")
     if n_in_stock:
