@@ -5,7 +5,12 @@ from functools import lru_cache
 from chython.containers import MoleculeContainer
 
 from synplan.chem.building_blocks.identity import molecule_to_inchikey
-from synplan.chem.mapping import MappingBudgetExceeded, bounded_mappings, mapping_budget
+from synplan.chem.mapping import (
+    MappingBudgetExceeded,
+    backend_preparation,
+    bounded_mappings,
+    mapping_budget,
+)
 from synplan.chem.stereo import (
     _requirements,
     _sign,
@@ -16,12 +21,13 @@ from synplan.chem.stereo import (
 
 @lru_cache(maxsize=8192)
 def _record_molecule(smiles_text, key):
-    candidate = parse_smiles_preserving_stereo(smiles_text)
-    if not isinstance(candidate, MoleculeContainer):
-        raise ValueError("catalogue record must contain a molecule")
-    candidate.thiele()
-    if molecule_to_inchikey(candidate) != key:
-        raise ValueError("catalogue record SMILES and InChIKey disagree")
+    with backend_preparation():
+        candidate = parse_smiles_preserving_stereo(smiles_text)
+        if not isinstance(candidate, MoleculeContainer):
+            raise ValueError("catalogue record must contain a molecule")
+        candidate.thiele()
+        if molecule_to_inchikey(candidate) != key:
+            raise ValueError("catalogue record SMILES and InChIKey disagree")
     return candidate
 
 
