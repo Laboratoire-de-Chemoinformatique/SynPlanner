@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, TextIO
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from chython.exceptions import MappingError
 
+from synplan.chem.stereo import parse_smiles_preserving_stereo, reaction_smiles
 from synplan.utils.stereo_io import RDFRead, RDFWrite, SDFRead, SDFWrite
 
 if TYPE_CHECKING:
@@ -88,14 +89,13 @@ def split_smiles_record(record: str) -> tuple[str, list[str]]:
     else:
         # CXSMILES extensions belong to chemistry, even though they follow a
         # space. A generic whitespace split silently loses OR/AND groups.
-        if " |" in raw:
-            end = raw.find("|", raw.index(" |") + 2)
+        parts = raw.split(maxsplit=1)
+        if len(parts) == 2 and parts[1].startswith("|"):
+            end = raw.find("|", raw.index("|") + 1)
             if end < 0:
                 raise ValueError("unterminated CXSMILES extension")
-            return raw[: end + 1], [raw[end + 1 :].strip()] if raw[
-                end + 1 :
-            ].strip() else []
-        parts = raw.split(maxsplit=1)
+            rest = raw[end + 1 :].strip()
+            return raw[: end + 1], [rest] if rest else []
         smiles_part = parts[0]
         source_fields = parts[1:]
     return smiles_part.strip(), [field.strip() for field in source_fields]
@@ -225,7 +225,6 @@ class SMILESRead:
         for line in iter(self._file.readline, ""):
             line = line.strip()
             smiles_part, source_fields = split_smiles_record(line)
-            from synplan.chem.stereo import parse_smiles_preserving_stereo
 
             x = parse_smiles_preserving_stereo(smiles_part)
             if isinstance(x, (ReactionContainer, CGRContainer, MoleculeContainer)):
@@ -688,7 +687,6 @@ def parse_reaction(
         if check_atom_mapping != "off":
             status = reaction_string_mapping_status(smiles_part)
             _check_mapping_status(status, check_atom_mapping)
-        from synplan.chem.stereo import parse_smiles_preserving_stereo
 
         rxn = parse_smiles_preserving_stereo(smiles_part, ignore_stereo=ignore_stereo)
         rxn.meta["init_smiles"] = smiles_part
@@ -841,8 +839,6 @@ def to_reaction_smiles_record(reaction: ReactionContainer) -> str:
 
     if isinstance(reaction, str):
         return reaction
-
-    from synplan.chem.stereo import reaction_smiles
 
     reaction_record = [reaction_smiles(reaction)]
     has_source_fields = any(key.startswith("source_") for key in reaction.meta)

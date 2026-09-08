@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping, Set
 
+from chython import inchi_key, smiles
 from chython.containers import MoleculeContainer
 from chython.exceptions import InvalidAromaticRing
 from frozendict import frozendict
@@ -13,7 +14,6 @@ from frozendict import frozendict
 from synplan.chem.building_blocks import (
     BuildingBlockCatalogue,
     SQLiteBuildingBlockCatalogue,
-    molecule_to_inchikey,
 )
 from synplan.chem.building_blocks.stereo import compatible_records, selected_record
 from synplan.chem.stereo import has_stereo_groups
@@ -69,8 +69,6 @@ class Precursor:
         model input, including atom order.
         """
         if self._policy_molecule is None:
-            from chython import smiles
-
             projected = self.molecule.copy()
             projected.clean_stereo()
             self._policy_molecule = smiles(str(projected))
@@ -80,12 +78,12 @@ class Precursor:
     def inchi_key(self) -> str:
         """Return the full Chython Standard InChIKey, generated once."""
 
-        if failure := getattr(self, "_inchi_key_error", None):
+        if failure := self._inchi_key_error:
             error_type, message = failure
             raise error_type(message)
-        if getattr(self, "_inchi_key", None) is None:
+        if self._inchi_key is None:
             try:
-                self._inchi_key = molecule_to_inchikey(self.molecule)
+                self._inchi_key = inchi_key(self.molecule)
             except (InvalidAromaticRing, ValueError) as error:
                 self._inchi_key_error = type(error), str(error)
                 logger.warning(
@@ -171,7 +169,7 @@ def is_purchasable(
         return False
     if isinstance(stock, Mapping):
         try:
-            identity = inchikey or molecule_to_inchikey(molecule)
+            identity = inchikey or inchi_key(molecule)
         except (InvalidAromaticRing, ValueError) as error:
             logger.warning(
                 "Chython cannot generate an InChIKey for molecule %s; "

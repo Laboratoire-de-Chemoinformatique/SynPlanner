@@ -13,12 +13,12 @@ from enum import Enum
 from math import fsum
 from typing import TYPE_CHECKING, Any, Literal
 
+from chython import inchi_key
+
 from synplan.chem.building_blocks import (
     BuildingBlockCatalogue,
-    molecule_to_inchikey,
 )
 from synplan.chem.reaction.routes.io.json import read_route_tree, route_tree
-from synplan.chem.reaction.routes.io.metadata import reaction_metadata
 from synplan.chem.reaction.routes.representation.route_cgr import build_route_cgr
 from synplan.chem.reaction.routes.traversal import (
     linearise,
@@ -375,7 +375,7 @@ class Route:
         grouped: dict[str, tuple[MoleculeContainer, int]] = {}
         for leaf in self.leaves():
             leaf = leaf.copy()
-            key = molecule_to_inchikey(leaf)
+            key = inchi_key(leaf)
             if key in grouped:
                 molecule, equivalents = grouped[key]
                 grouped[key] = molecule, equivalents + 1
@@ -517,6 +517,7 @@ class Route:
             for a page that carries one copy of both itself.
         :param layouts: A dict shared with the other routes of the same page, so a
             molecule two routes have in common is drawn the same way in both.
+            Shared geometry takes precedence over alignment to each route parent.
         """
 
         unresolved: tuple[MoleculeContainer, ...] = ()
@@ -616,7 +617,7 @@ class Route:
         def step_fields(index: int) -> tuple[str, dict[str, Any]]:
             step = self.steps[index]
             extra: dict[str, Any] = {}
-            metadata = reaction_metadata(step.reaction)
+            metadata = dict(step.reaction.meta)
             if metadata:
                 extra["meta"] = metadata
             if step.origin is not None:

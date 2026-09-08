@@ -1,7 +1,7 @@
 import json
 import logging
+from collections import defaultdict, deque
 from functools import lru_cache
-from itertools import zip_longest
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from synplan.chem.building_blocks import BuildingBlockCatalogue
@@ -12,10 +12,8 @@ from synplan.chem.reaction.routes.contracts import (
     RouteExportResult,
 )
 from synplan.chem.reaction.routes.io.metadata import (
-    reaction_metadata,
     restore_reaction_metadata,
 )
-from synplan.chem.stereo import has_stereo
 from synplan.chem.stereo import parse_smiles_preserving_stereo as read_smiles
 from synplan.chem.utils import mapped_smiles, molecule_key, normalise
 
@@ -151,68 +149,42 @@ def read_route_tree(route_json) -> RouteRead:
     unresolved = []
     uncanonical = 0
 
-    def check_stereo_node(mol, node):
-        expected = read_smiles(node["smiles"])
-        if (has_stereo(mol) or has_stereo(expected)) and molecule_key(
-            mol
-        ) != molecule_key(expected):
-            raise ValueError(
-                "inconsistent stereo in adjacent route molecule and reaction records"
-            )
-
     def link(reaction, child_nodes):
-        """Give every reactant its file verdict and, if a step made it, that step.
-
-        Neither side is in a trustworthy order -- a reaction SMILES does not keep
-        its container's molecule order, and an older file's children were never
-        written in one -- so both are sorted by canonical SMILES and paired off.
-        Reactants that share that key are the same molecule, so pairing equals in
-        an arbitrary order is a swap of interchangeable subtrees, not a mismatch.
-        """
+        """Match each reactant occurrence to its own molecule node."""
         reactants = list(reaction.reactants)
-        slots = sorted(range(len(reactants)), key=lambda index: str(reactants[index]))
-        nodes = sorted(
-            (node for node in child_nodes if isinstance(node, dict)),
-            key=lambda node: _file_key(node["smiles"]),
-        )
-        for slot, node in zip_longest(slots, nodes):
-            if node is None:  # a reactant the file wrote no node for: no verdict
-                unresolved.append(reactants[slot])
+        nodes = defaultdict(deque)
+        for node in child_nodes:
+            if isinstance(node, dict):
+                nodes[_file_key(node["smiles"])].append(node)
+        for slot, reactant in enumerate(reactants):
+            matches = nodes[_file_key(str(reactant))]
+            if not matches:
+                unresolved.append(reactant)
                 continue
+            node = matches.popleft()
             made = molecule(node)
-            if slot is None:  # a node no reactant claims: keep its steps, drop it
-                continue
-            check_stereo_node(reactants[slot], node)
             if made is not None:
-                check_stereo_node(made, node)
                 reactants[slot] = made
             elif not node.get("in_stock") and not node.get("assumed_trivial"):
-                unresolved.append(reactants[slot])
+                unresolved.append(reactant)
             if node.get("selected_stock"):
                 reactants[slot].meta["selected_stock"] = dict(node["selected_stock"])
             if node.get("assumed_trivial"):
                 reactants[slot].meta["assumed_trivial"] = node["assumed_trivial"]
-        # splice, rather than rebuild, to keep the parsed reaction's metadata
+        if any(nodes.values()):
+            raise ValueError(
+                "inconsistent stereo or molecule identity in route children"
+            )
         reaction._reactants = tuple(reactants)
 
     def product_of(reaction, node):
-        """The fragment of ``reaction`` this molecule node stands for."""
-        if len(reaction.products) == 1:
-            check_stereo_node(reaction.products[0], node)
-            return reaction.products[0]
-        smiles = _file_key(node["smiles"])
-        product = next((p for p in reaction.products if str(p) == smiles), None)
+        """Select the product named by the file, including achiral identity."""
+        key = _file_key(node["smiles"])
+        product = next((p for p in reaction.products if _file_key(str(p)) == key), None)
         if product is None:
-            if any(has_stereo(p) for p in reaction.products) or has_stereo(
-                read_smiles(node["smiles"])
-            ):
-                raise ValueError(
-                    "route molecule stereo does not match a reaction product"
-                )
-            logger.warning(
-                "Route molecule %s is not a product of %s", node["smiles"], reaction
+            raise ValueError(
+                "inconsistent stereo or molecule identity in route product"
             )
-            return reaction.products[0]
         return product
 
     def molecule(node):
@@ -449,7 +421,7 @@ def _make_json_v1(
         def step_fields(step_id, _steps=steps, _meta=route_step_metadata):
             reaction = _steps[step_id]
             extra = {}
-            metadata = reaction_metadata(reaction)
+            metadata = dict(reaction.meta)
             if metadata:
                 extra["meta"] = metadata
             if _meta and step_id in _meta:

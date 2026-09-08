@@ -175,5 +175,4 @@ def depict_custom_reaction(reaction: ReactionContainer):
     rendering work to Chython.
     """
 
-    reaction.clean2d()
     return reaction.depict()

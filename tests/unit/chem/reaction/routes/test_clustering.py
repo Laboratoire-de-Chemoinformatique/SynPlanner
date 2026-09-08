@@ -1,13 +1,15 @@
+import json
+
 import pytest
 from chython import smiles
 from chython.containers import CGRContainer, ReactionContainer
 
+from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.routes.clustering import (
     cluster_routes,
     subcluster_all_clusters,
     subcluster_one_cluster,
 )
-from synplan.chem.reaction.routes.io import read_routes_json
 from synplan.chem.reaction.routes.representation import compose_all_sb_cgrs
 
 #: 28 routes for one target, generated with seeded MCTS; see
@@ -23,7 +25,14 @@ def routes_cgrs_dict():
     readable, their provenance is written down, and a regression in composition
     shows up as a clustering failure instead of hiding behind a stale binary.
     """
-    routes = read_routes_json(ROUTES, as_routes=True)
+    with open(ROUTES) as source:
+        records = json.load(source)
+    # Four legacy routes attach an unrelated child where the reaction needs water.
+    for key in ("1709", "3472", "4210", "4211"):
+        with pytest.raises(ValueError, match="molecule identity"):
+            Route.from_json(records.pop(key))
+    routes = [Route.from_json(record) for record in records.values()]
+    assert len(routes) == 24
     return {index: route.route_cgr() for index, route in enumerate(routes)}
 
 
@@ -48,7 +57,7 @@ def test_cluster_routes_valid(sb_cgrs_dict):
     total = sum(len(cluster["route_ids"]) for cluster in clusters.values())
     assert total == len(sb_cgrs_dict)
 
-    expected_keys = ["3.1", "3.2", "4.1", "5.1", "5.2", "5.3", "5.4"]
+    expected_keys = ["3.1", "3.2", "4.1", "5.1", "5.2", "5.3"]
     assert list(clusters.keys()) == expected_keys
     for route_id, value in clusters.items():
         assert isinstance(route_id, str)

@@ -664,9 +664,6 @@ def test_raw_native_mapping_keeps_compiled_query_and_shared_budget(monkeypatch):
 
     from synplan.chem import mapping
 
-    if not mapping._native_budget:
-        pytest.skip("paired Chython native dispatch control")
-
     def no_wrap(*args, **kwargs):
         pytest.fail("native raw queries must retain their compiled caches")
 
@@ -679,23 +676,12 @@ def test_raw_native_mapping_keeps_compiled_query_and_shared_budget(monkeypatch):
 
 
 @pytest.mark.parametrize("spec", ["m", "!cm", "!xm", "!sm"])
-def test_reaction_group_fallback_matches_native_formatting(spec, monkeypatch):
+def test_reaction_groups_use_native_formatting(spec):
     from synplan.chem.stereo import reaction_smiles
 
     reaction = smiles("C[C@H](O)N.[CH3]>O>C[C@H](O)Cl |o1:1,&2:7|")
     encoded = reaction_smiles(reaction, spec)
-    if getattr(ReactionContainer, "_supports_stereo_groups", False):
-        original = ReactionContainer.__format__
-
-        # Emulate the released reaction writer: keep radicals, omit groups.
-        def released_format(self, fmt):
-            import re
-
-            return re.sub(r",?[&o]\d+:\d+(?:,\d+)*", "", original(self, fmt))
-
-        monkeypatch.setattr(ReactionContainer, "__format__", released_format)
-        monkeypatch.setattr(ReactionContainer, "_supports_stereo_groups", False)
-        assert reaction_smiles(reaction, spec) == encoded
+    assert encoded == format(reaction, spec)
     if "!s" not in spec and "!x" not in spec:
         assert "o1:" in encoded and "&2:" in encoded and "^1:" in encoded
 
@@ -838,3 +824,25 @@ def test_vocabulary_streaming_digest_rejects_content_edits(tmp_path, monkeypatch
         path.write_bytes(edited)
         with pytest.raises(ValueError, match="rule file changed"):
             manifest_digest(path)
+
+
+def test_source_metadata_pipe_is_not_a_cxsmiles_extension():
+    assert split_smiles_record("CCO source | note") == ("CCO", ["source | note"])
+    with pytest.raises(ValueError):
+        split_smiles_record("CCO |unterminated")
+
+
+def test_unsupported_stereo_survives_the_extraction_source_ledger():
+    from synplan.chem.reaction.rules.config import RuleExtractionConfig
+    from synplan.chem.reaction.rules.extraction import _extract_rules_batch_worker
+    from synplan.chem.stereo import stereo_events
+
+    text = "C/C=C=C=C/C>>C/C=C=C=C/C"
+    events = stereo_events(smiles(text))
+    assert events[0]["event"] == "unsupported_stereo_type"
+    assert events[0]["selectivity_evidence"] == "not_established_by_structure"
+    result = _extract_rules_batch_worker(
+        [(0, text)], config=RuleExtractionConfig(), ignore_errors=True
+    )
+    assert result.stereo_records[0]["events"] == events
+    assert not any("_Unresolved" in error.error_type for error in result.errors)

@@ -68,18 +68,7 @@ ARROW_DEFS = (
 _VIEWBOX = re.compile(r'viewBox="(-?[\d.]+) (-?[\d.]+) ([\d.]+) ([\d.]+)"')
 
 
-def _is_degenerate(mol: MoleculeContainer) -> bool:
-    """chython's own test for "never laid out": every atom on one point."""
-    if len(mol) < 2:
-        return False
-    xs = [atom.x for _, atom in mol.atoms()]
-    ys = [atom.y for _, atom in mol.atoms()]
-    return max(xs) - min(xs) < 0.01 and max(ys) - min(ys) < 0.01
-
-
 def _depiction(mol: MoleculeContainer) -> tuple[str, list[float]]:
-    if _is_degenerate(mol):
-        mol.clean2d()
     svg = mol.depict()
     match = _VIEWBOX.search(svg)
     if match is None:
@@ -182,16 +171,13 @@ def _route_tree(
     steps: Any, unresolved: Any, align: bool, layouts: Layouts = None
 ) -> tuple[Node, dict]:
     copies = _drawable_copies(steps, layouts)
-    if align:
-        # leaf-first order, so each disconnection inherits the layout above it
+    # A shared layout takes precedence over alignment to different route parents.
+    if align and layouts is None:
         for step in reversed(steps):
             product = copies[id(step.product)]
             for precursor in step.reaction.reactants:
                 align_molecule(copies[id(precursor)], product)
-        if layouts is None:
-            # shared layouts arrive oriented; turning the route would turn the target
-            # away from the layout every other card of the page shows
-            orient_route(copies.values())
+        orient_route(copies.values())
 
     by_product = {
         id(step.product): (number, step) for number, step in enumerate(steps, 1)

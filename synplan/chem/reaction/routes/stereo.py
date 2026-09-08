@@ -14,9 +14,11 @@ from dataclasses import dataclass, field
 from itertools import islice
 from typing import Any
 
+from chython import inchi_key
 from chython.containers import MoleculeContainer, ReactionContainer
 
-from synplan.chem.building_blocks import BuildingBlockCatalogue, molecule_to_inchikey
+from synplan.chem.building_blocks import BuildingBlockCatalogue
+from synplan.chem.building_blocks.core import match_building_blocks
 from synplan.chem.building_blocks.stereo import _record_molecule
 from synplan.chem.mapping import MappingBudgetExceeded, bounded_mappings
 from synplan.chem.reaction.routes.route import Route, Step
@@ -211,10 +213,10 @@ def _stock_match(
     catalogue: BuildingBlockCatalogue,
     cap: int,
 ) -> tuple[MoleculeContainer, dict[str, Any]]:
-    key = molecule_to_inchikey(mol)
+    key = inchi_key(mol)
     constraints = (*reqs, *_requirements(mol))
     rejected = []
-    bucket = catalogue.get(key[:14], ())
+    bucket = match_building_blocks(catalogue, key)
     if selected := mol.meta.get("selected_stock"):
         bucket = tuple(
             r

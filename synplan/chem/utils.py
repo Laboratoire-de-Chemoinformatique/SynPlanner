@@ -462,22 +462,6 @@ def _standardize_one_smiles(
         return None
 
 
-def _standardize_sdf_range(filename: str, start: int, end: int) -> list[str]:
-    out: list[str] = []
-    sdf = SDFRead(filename, indexable=True)
-    try:
-        for i in range(start, end):
-            try:
-                mol = sdf[i]
-                mol = safe_canonicalization(mol)
-                out.append(str(mol))
-            except Exception:
-                pass
-    finally:
-        sdf.close()
-    return out
-
-
 def standardize_sdf_text(block: str) -> list[str]:
     """Standardize molecules from an SDF text block.
 
@@ -510,20 +494,6 @@ def standardize_smiles_batch(
         if res:
             out.append(res)
     return out
-
-
-def hash_from_reaction_rule(reaction_rule: ReactionContainer) -> int:
-    """Generates hash for the given reaction rule.
-
-    :param reaction_rule: The reaction rule to be converted.
-    :return: The resulting hash.
-    """
-
-    reactants_hash = tuple(sorted(hash(r) for r in reaction_rule.reactants))
-    reagents_hash = tuple(sorted(hash(r) for r in reaction_rule.reagents))
-    products_hash = tuple(sorted(hash(r) for r in reaction_rule.products))
-
-    return hash((reactants_hash, reagents_hash, products_hash))
 
 
 def reverse_reaction(

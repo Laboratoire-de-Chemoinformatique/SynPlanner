@@ -12,7 +12,6 @@ from synplan.chem.reaction.routes.clustering.subclustering import (
 )
 from synplan.chem.reaction.routes.contracts import (
     RouteExportError,
-    SubclusterRouteData,
 )
 from synplan.chem.reaction.routes.io import (
     build_route_trees,
@@ -106,29 +105,6 @@ def test_bond_key_is_order_independent_and_shared():
     assert bond_key(3, 7) == (3, 7)
 
 
-def test_subcluster_route_data_keeps_legacy_tuple_shape():
-    data = SubclusterRouteData(
-        sb_cgr="sb",
-        unlabeled_reaction="original",
-        synthon_cgr="synthon",
-        synthon_reaction="reaction",
-        leaving_groups={1: ("group", 2)},
-        leaving_group_count=1,
-        supporting_groups={1: ("support", None)},
-    )
-
-    assert data.as_legacy_tuple() == (
-        "sb",
-        "original",
-        "synthon",
-        "reaction",
-        {1: ("group", 2)},
-        1,
-        {1: ("support", None)},
-    )
-    assert callable(post_process_subcluster)
-
-
 def test_root_legacy_helper_warns_and_stays_available():
     import synplan.chem.reaction.routes as routes
 
@@ -147,3 +123,12 @@ def test_post_process_subcluster_does_not_mutate_completed_mapping():
 
     assert result == subgroup
     assert result is not subgroup
+
+
+def test_route_composition_does_not_hide_coding_errors():
+    class BrokenTree:
+        def synthesis_route(self, route_id):
+            raise AttributeError("broken implementation")
+
+    with pytest.raises(AttributeError, match="broken implementation"):
+        build_route_cgr(BrokenTree(), 3)

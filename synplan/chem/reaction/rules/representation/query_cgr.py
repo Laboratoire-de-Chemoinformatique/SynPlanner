@@ -301,4 +301,5 @@ __all__ = [
     "query_cgr_bond_label",
     "query_to_mol",
     "reaction_query_to_reaction",
+    "refine_colors",
 ]

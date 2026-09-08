@@ -15,7 +15,6 @@ from synplan.chem.reaction.routes.representation.state import (
     RouteDynamicBond,
     bond_key,
     route_atom,
-    set_symmetric_bond,
     transient_bond,
 )
 from synplan.chem.reaction.routes.representation.stereo import (
@@ -181,7 +180,7 @@ def _apply_route_orders(
                 route_order,
                 route_step_orders,
             )
-            set_symmetric_bond(cgr, atom1, atom2, bond)
+            cgr.set_bond(atom1, atom2, bond)
         bond.route_bond_step_states = dict(bond_step_states.get(key, {}))
 
     for atom_num in sorted(
@@ -759,7 +758,7 @@ def _compose_route_cgr_legacy(
         fold.accum = accum_cgr
         return fold.finish(preserve_transient_bonds)
 
-    except Exception as e:
+    except (ValueError, KeyError, IndexError) as e:
         logger.warning("Error processing route %s: %s", route_id, e)
         return None
 

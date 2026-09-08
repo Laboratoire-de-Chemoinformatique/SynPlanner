@@ -143,7 +143,9 @@ def review_stereo_route(
     remaining = []
     for obligation in reviewed.stereo.get("obligations", ()):
         belongs = obligation.get("step") == step_index or (
-            step.origin and obligation.get("tree_node_id") == step.origin.tree_node_id
+            step.origin is not None
+            and step.origin.tree_node_id is not None
+            and obligation.get("tree_node_id") == step.origin.tree_node_id
         )
         if not (
             belongs

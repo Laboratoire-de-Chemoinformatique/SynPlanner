@@ -478,8 +478,6 @@ def display_planning_results():
 
     st.header("Planning results")
     if res.get("stereo_proposals", 0):
-        from synplan.chem.reaction.routes.route import Route
-
         tree = st.session_state.tree
         proposals = [Route.from_tree(tree, node_id) for node_id in tree.proposal_nodes]
         st.warning(

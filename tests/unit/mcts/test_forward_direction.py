@@ -14,6 +14,7 @@ from test_tree_stats import FixedEvaluationStrategy, build_tree, make_mol
 
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.reactor import apply_reaction_rule
+from synplan.mcts.config import RolloutEvaluationConfig
 from synplan.mcts.evaluation import RolloutEvaluationStrategy
 
 # forward amide formation: two reactants, one product, and the chloride has to be deleted
@@ -120,3 +121,18 @@ def test_no_co_reactants_is_the_untouched_retro_path():
         for out in apply_reaction_rule(amide, rule, co_reactants=())
     ]
     assert default == explicit == [["CCN", "c1ccccc1C(Cl)=O"]]
+
+
+def test_forward_accepts_the_tree_and_rollout_defaults():
+    goal = {str(make_mol(7))}
+    tree = build_tree(
+        direction="forward",
+        building_blocks=goal,
+        evaluator=_rollout(
+            goal,
+            RolloutEvaluationConfig(
+                policy_network=None, reaction_rules=[], building_blocks=goal
+            ).min_mol_size,
+        ),
+    )
+    assert tree.config.min_mol_size == tree.evaluator.rollout.min_mol_size

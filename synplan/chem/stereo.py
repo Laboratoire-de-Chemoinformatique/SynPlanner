@@ -7,7 +7,6 @@ No stereoisomer enumeration or experimental selectivity inference is performed.
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from hashlib import sha256
@@ -17,36 +16,8 @@ from chython.containers import MoleculeContainer, ReactionContainer
 
 
 def reaction_smiles(reaction, spec="m"):
-    """Serialize enhanced reaction groups, including with released Chython 1.105."""
-    text = format(reaction, spec)
-    if (
-        getattr(reaction, "_supports_stereo_groups", False)
-        or "!x" in spec
-        or "!s" in spec
-        or re.search(r"[&o]\d+:", text)
-    ):
-        return text
-    groups, offset = {}, 0
-    for side in (reaction.reactants, reaction.reagents, reaction.products):
-        formatted = [(m, *m.__format__(spec, _return_order=True)) for m in side]
-        if "!c" not in spec:
-            formatted.sort(key=lambda row: row[1])
-        for molecule, _, order in formatted:
-            for index, atom in enumerate(order, start=offset):
-                if group := getattr(molecule.atom(atom), "extended_stereo", None):
-                    label = f"o{-group}:" if group < 0 else f"&{group}:"
-                    groups.setdefault(label, []).append(str(index))
-            offset += len(order)
-    if groups:
-        extension = ",".join(
-            label + ",".join(indices) for label, indices in sorted(groups.items())
-        )
-        text = (
-            text[:-1] + "," + extension + "|"
-            if text.endswith("|")
-            else text + " |" + extension + "|"
-        )
-    return text
+    """Serialize reaction stereo and enhanced groups with Chython."""
+    return format(reaction, spec)
 
 
 @dataclass(frozen=True)
@@ -146,7 +117,7 @@ def _requirements(mol: MoleculeContainer) -> tuple[StereoRequirement, ...]:
                 )
             )
             continue
-        if n not in mol.stereogenic_tetrahedrons or atom.atomic_number != 6:
+        if n not in mol.stereogenic_tetrahedrons:
             raise _Unresolved(
                 "unsupported_stereo_type", f"atom {n}: only carbon tetrahedra supported"
             )
@@ -424,7 +395,24 @@ def stereo_events(reaction) -> list[dict]:
                 found[key] = (mol, req, atoms)
         return found
 
-    left, right = elements(reaction.reactants), elements(reaction.products)
+    try:
+        left, right = elements(reaction.reactants), elements(reaction.products)
+    except _Unresolved as error:
+        return [
+            {
+                "kind": "unassessed",
+                "atoms": sorted(
+                    {
+                        n
+                        for mol in (*reaction.reactants, *reaction.products)
+                        for n in mol
+                    }
+                ),
+                "event": error.reason,
+                "detail": str(error),
+                "selectivity_evidence": "not_established_by_structure",
+            }
+        ]
     if not left and not right:
         return []
     from synplan.chem.utils import reaction_mapping_status

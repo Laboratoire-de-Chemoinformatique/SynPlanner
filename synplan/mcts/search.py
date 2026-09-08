@@ -126,8 +126,8 @@ def export_routes_artifact(
     """Write the target-keyed route-export artifact (public contract).
 
     Gzip-writes ``results`` as JSON to ``results_root/filename``. ``results`` is
-    the public envelope: a top-level dict keyed by the RDKit-canonical target
-    SMILES (matching retrocast's ``Target.smiles``; see
+    the public envelope: a top-level dict keyed by the Chython-canonical target
+    SMILES (see
     :func:`_canonical_target_key`) mapping to ``[route_tree, ...]`` with ``[]``
     for unsolved targets, where each ``route_tree`` is a
     :func:`build_target_routes` / ``make_json`` node tree.
@@ -203,7 +203,7 @@ def run_search(
         cross-step-reconciled atom-map numbering in the exported reactions.
     :param export_routes: When True, additionally emit the public route-export
         artifact (``routes_filename`` + ``manifest.json``) keyed by the
-        RDKit-canonical target SMILES (matching retrocast's ``Target.smiles``;
+        Chython-canonical target SMILES (
         ``[]`` for unsolved targets), for downstream consumers. Defaults to
         False, leaving the existing outputs byte-identical.
     :param routes_filename: Filename (under ``results_root``) for the gzipped
@@ -285,7 +285,7 @@ def run_search(
     # run search
     n_solved = 0
     extracted_routes = []
-    # Public route-export accumulator keyed by RDKit-canonical target SMILES:
+    # Public route-export accumulator keyed by Chython-canonical target SMILES:
     # {canonical_target_smiles: [route_tree, ...]}.
     exported_routes: dict[str, list[dict]] = {}
     # CLI runs may contain many targets whose per-tree node IDs overlap, so the
@@ -308,8 +308,8 @@ def run_search(
             target_smi = target_smi.strip()
             if is_json_catalogue:
                 route_costs[target_smi] = {}
-            # Key the export dict by the RDKit-canonical target SMILES so keys
-            # match retrocast's Target.smiles byte-for-byte. Every target starts
+            # Key the export dict by the Chython-canonical target SMILES so keys
+            # match the canonicalizer recorded in the manifest. Every target starts
             # empty; only a solved one overwrites it.
             export_key = None
             if export_routes:

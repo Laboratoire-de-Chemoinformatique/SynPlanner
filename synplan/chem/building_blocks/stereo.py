@@ -5,6 +5,7 @@ from functools import lru_cache
 from chython import inchi_key, smiles
 from chython.containers import MoleculeContainer
 
+from synplan.chem.building_blocks.core import match_building_blocks
 from synplan.chem.mapping import (
     MappingBudgetExceeded,
     backend_preparation,
@@ -55,7 +56,7 @@ def compatible_records(
                 }
             )
         return ()
-    bucket = catalogue.get(key[:14], ())
+    bucket = match_building_blocks(catalogue, key)
     if len(bucket) > max_records:
         if diagnostics is not None:
             diagnostics.append(

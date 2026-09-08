@@ -616,3 +616,18 @@ def test_tree_stats_subscript_on_unknown_key_raises_keyerror():
     tree = build_tree()
     with pytest.raises(KeyError):
         _ = tree.stats["does_not_exist"]
+
+
+def test_extended_export_includes_solved_nodes_outside_the_winning_selection():
+    from synplan.utils.visualisation import extract_routes
+
+    tree = build_tree(
+        rules=[
+            (0.5, FakeReactor(lambda: [make_mol(5)]), 0),
+            (0.5, FakeReactor(lambda: [make_mol(4)]), 1),
+        ]
+    )
+    tree.run()
+    assert len(tree.winning_nodes) == 1
+    assert len(extract_routes(tree)) == 1
+    assert len(extract_routes(tree, extended=True)) == 2

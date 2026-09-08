@@ -8,7 +8,7 @@ import json
 from copy import deepcopy
 from hashlib import sha256
 
-from synplan.chem.stereo import parse_smiles_preserving_stereo
+from synplan.chem.stereo import parse_smiles_preserving_stereo, reaction_smiles
 
 
 def graph_digest(cgr):
@@ -31,8 +31,6 @@ def graph_digest(cgr):
 
 
 def snapshot(reaction, cgr):
-    from synplan.chem.stereo import reaction_smiles
-
     return {
         "reaction": reaction_smiles(reaction),
         "graph": graph_digest(cgr),

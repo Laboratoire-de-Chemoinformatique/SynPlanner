@@ -88,29 +88,3 @@ class RouteExportResult:
     @property
     def ok(self) -> bool:
         return not self.diagnostics
-
-
-@dataclass(frozen=True)
-class SubclusterRouteData:
-    """Named internal replacement for the historical seven-item tuple."""
-
-    sb_cgr: Any
-    unlabeled_reaction: Any
-    synthon_cgr: Any
-    synthon_reaction: Any
-    leaving_groups: Mapping[int, tuple[Any, int]]
-    leaving_group_count: int
-    supporting_groups: Mapping[int, tuple[Any, Any]]
-
-    def as_legacy_tuple(self) -> tuple[Any, ...]:
-        """Return the tuple shape historically exposed by subclustering."""
-
-        return (
-            self.sb_cgr,
-            self.unlabeled_reaction,
-            self.synthon_cgr,
-            self.synthon_reaction,
-            self.leaving_groups,
-            self.leaving_group_count,
-            self.supporting_groups,
-        )
