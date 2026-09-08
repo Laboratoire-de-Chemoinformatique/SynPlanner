@@ -190,8 +190,10 @@ Tutorial: `07_Clustering`, `15_Routes_compare`
 Docs: `methods/routes` — "A route as a graph"
 
 **Group similar routes together**
-For an in-memory planning tree, call `cluster_tree(tree, use_strat=...)`
-(`...routes.clustering`) to obtain RouteCGRs, SB-CGRs, and clusters directly.
+For an in-memory planning tree, call `compose_all_route_cgrs(tree)`, then
+`compose_all_sb_cgrs` (`...routes.representation`), and finally `cluster_routes`
+(`...routes.clustering`). Set `use_strat=True` to group by strategic-bond sets;
+the default `use_strat=False` groups by the complete SB-CGR representation.
 Use `cgr_display` and `routes_clustering_report` to inspect the results.
 CLI: `synplan clustering`.
 Tutorial: `07_Clustering`

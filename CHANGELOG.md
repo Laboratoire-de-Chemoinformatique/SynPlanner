@@ -17,9 +17,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Chython reuses an atom number from another fragment.
 - `selected_bonds_svg()` in `synplan.chem.target_bonds` depicts required bonds in
   red and frozen bonds in blue using the same validation as `Tree`.
-- `cluster_tree(tree, use_strat=True)` returns RouteCGRs, SB-CGRs, and clusters for
-  in-memory analysis. Tutorial 19 compares baseline and constrained searches and
-  independently checks each winning route's disconnections.
+- Tutorial 19 compares baseline and bond-constrained searches using the existing
+  RouteCGR/SB-CGR clustering APIs and independently checks each winning route's
+  disconnections.
 - Search-record schema 4 preserves bond constraints, unresolved required bonds,
   and precursor target identities alongside stereo state. Schemas 1–3 remain
   readable with empty bond-constraint defaults; records cannot resume searches.
