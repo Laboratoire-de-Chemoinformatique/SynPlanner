@@ -271,14 +271,14 @@ def in_atom_order(molecule: MoleculeContainer) -> MoleculeContainer:
     file rewritten from what it wrote does not match it, and the difference is
     a permutation of equivalent atoms that means nothing.
     """
-    from synplan.chem.stereo import _assign, _requirements
+    from synplan.chem.stereo import assign_stereo, stereo_requirements
 
-    requirements = _requirements(molecule)
+    requirements = stereo_requirements(molecule)
     molecule = molecule.ordered_copy(bonds=True)
     if requirements:
         molecule.clean_stereo()
         for requirement in requirements:
-            _assign(molecule, requirement)
+            assign_stereo(molecule, requirement)
     return molecule
 
 
@@ -322,12 +322,10 @@ def mapped_smiles(reaction: ReactionContainer) -> str:
         [in_atom_order(molecule) for molecule in reaction.products],
         [in_atom_order(molecule) for molecule in reaction.reagents],
     )
-    from synplan.chem.stereo import reaction_smiles
-
-    return reaction_smiles(ordered)
+    return format(ordered, "m")
 
 
-def _warn_stereo_loss(molecule: MoleculeContainer) -> None:
+def warn_stereo_loss(molecule: MoleculeContainer) -> None:
     """Warn once per call site when ``clean_stereo`` is about to discard real stereo marks.
 
     chython only keeps a descriptor on a genuine stereocentre, so a surviving
@@ -368,7 +366,7 @@ def clean_molecule(
         if standardize:
             tmp.canonicalize()
         if clean_stereo:
-            _warn_stereo_loss(tmp)
+            warn_stereo_loss(tmp)
             tmp.clean_stereo()
         if not clean_stereo:
             from synplan.chem.stereo import assert_stereo_preserved

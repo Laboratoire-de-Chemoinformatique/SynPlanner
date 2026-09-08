@@ -30,10 +30,10 @@ from synplan.chem.reaction.rules.config import RuleExtractionConfig
 from synplan.chem.reaction.rules.symmetry import needs_decollapsed_matches
 from synplan.chem.reaction.rules.vocabulary import file_digest
 from synplan.chem.stereo import (
-    _requirements,
     has_stereo,
     has_stereo_groups,
     stereo_events,
+    stereo_requirements,
 )
 from synplan.chem.utils import (
     canonical_query_cgr_key,
@@ -92,7 +92,7 @@ def molecule_substructure_as_query(mol, atoms) -> QueryContainer:
             raise ValueError(
                 "enhanced stereo groups cannot be silently converted to absolute query constraints"
             )
-        for req in _requirements(mol):
+        for req in stereo_requirements(mol):
             if not set(req.atoms).intersection(atoms):
                 continue
             references = set(req.atoms)
@@ -619,7 +619,7 @@ def create_rule(
         ):
             # Unassessed stereo kept the complete source structures in the center.
             continue
-        for req in _requirements(mol):
+        for req in stereo_requirements(mol):
             needed = set(req.atoms)
             for n in req.atoms:
                 needed.update(mol.neighbor_numbers(n))
@@ -664,9 +664,7 @@ def create_rule(
     )
     rule.meta["stereo_schema"] = 1
     rule.meta["stereo_events"] = source_stereo_events
-    from synplan.chem.stereo import reaction_smiles
-
-    rule.meta["stereo_source_reaction"] = reaction_smiles(reaction)
+    rule.meta["stereo_source_reaction"] = format(reaction, "m")
     rule.meta["selectivity_evidence_status"] = "not_established_by_structure"
 
     # 9. reverse extracted reaction rule and reaction
@@ -708,10 +706,10 @@ def extract_rules(
 
     """
 
-    return _extract_rules(config, reaction, as_records=False)
+    return extract_rule_components(config, reaction, as_records=False)
 
 
-def _extract_rules(config, reaction, *, as_records):
+def extract_rule_components(config, reaction, *, as_records):
     """Share component deduplication records with serial/worker aggregation."""
     if config.ignore_stereo:
         reaction = reaction.copy()
@@ -829,13 +827,11 @@ def _make_audit_entry(
     )
 
 
-def _source_stereo_record(reaction, index):
-    from synplan.chem.stereo import reaction_smiles
-
+def source_stereo_record(reaction, index):
     return {
         "schema": 1,
         "reaction_index": index,
-        "mapped_reaction": reaction_smiles(reaction),
+        "mapped_reaction": format(reaction, "m"),
         "source": {
             k: v
             for k, v in reaction.meta.items()
@@ -890,9 +886,11 @@ def _extract_rules_batch_worker(
                 raw_item, fmt=fmt, ignore_stereo=config.ignore_stereo
             )
             if collect_stereo:
-                stereo_records.append(_source_stereo_record(reaction, index))
+                stereo_records.append(source_stereo_record(reaction, index))
             product_smi = str(unite_molecules(reaction.products))
-            rules_payload, skipped = _extract_rules(config, reaction, as_records=True)
+            rules_payload, skipped = extract_rule_components(
+                config, reaction, as_records=True
+            )
             if skipped:
                 n_multi_product += 1
                 audit_entries.append(

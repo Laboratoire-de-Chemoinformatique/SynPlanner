@@ -17,10 +17,10 @@ from synplan.chem.mapping import (
     mapping_budget,
 )
 from synplan.chem.stereo import (
-    _assign,
-    _requirements,
     assert_stereo_preserved,
+    assign_stereo,
     has_stereo,
+    stereo_requirements,
 )
 from synplan.chem.utils import safe_canonicalization, validate_and_canonicalize
 
@@ -60,9 +60,9 @@ class CanonicalRetroReactor(Reactor):
         from synplan.chem.mapping import backend_preparation
 
         with backend_preparation():
-            return self._canonical_patch(structure, mapping)
+            return self.canonical_patch(structure, mapping)
 
-    def _canonical_patch(self, structure, mapping):
+    def canonical_patch(self, structure, mapping):
         new = super()._patcher(structure, mapping)
         patched = new.copy() if has_stereo(new) else None
 
@@ -246,9 +246,9 @@ def apply_reaction_rule(
                 # A CGR contains bond edits, not stereo. Restore the mapped
                 # direct output before normalizing or accepting this recovery.
                 for original in reaction.products:
-                    for req in _requirements(original):
+                    for req in stereo_requirements(original):
                         if all(mol.has_atom(n) for n in (*req.atoms, *req.environment)):
-                            _assign(mol, req)
+                            assign_stereo(mol, req)
                 c = validate_and_canonicalize(mol)
                 if c is None:
                     return None

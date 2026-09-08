@@ -13,14 +13,14 @@ from synplan.chem.mapping import (
     mapping_budget,
 )
 from synplan.chem.stereo import (
-    _requirements,
-    _sign,
     has_stereo_groups,
+    stereo_requirements,
+    stereo_sign,
 )
 
 
 @lru_cache(maxsize=8192)
-def _record_molecule(smiles_text, key):
+def record_molecule(smiles_text, key):
     with backend_preparation():
         candidate = smiles(smiles_text, strict_stereo=True)
         if not isinstance(candidate, MoleculeContainer):
@@ -66,7 +66,7 @@ def compatible_records(
                 }
             )
         return ()
-    requirements = _requirements(molecule)
+    requirements = stereo_requirements(molecule)
     query_smiles = str(molecule)
     compatible = []
     try:
@@ -74,7 +74,7 @@ def compatible_records(
             # Exact representations need no mapping work; check them before alternatives.
             for record in sorted(bucket, key=lambda r: r.smiles != query_smiles):
                 try:
-                    candidate = _record_molecule(record.smiles, record.inchikey)
+                    candidate = record_molecule(record.smiles, record.inchikey)
                 except ValueError as error:
                     if diagnostics is not None:
                         diagnostics.append(
@@ -95,7 +95,7 @@ def compatible_records(
                 for mapping in bounded_mappings(molecule, candidate):
                     try:
                         if all(
-                            _sign(candidate, req.remap(mapping)) == req.sign
+                            stereo_sign(candidate, req.remap(mapping)) == req.sign
                             for req in requirements
                         ):
                             compatible.append(record)

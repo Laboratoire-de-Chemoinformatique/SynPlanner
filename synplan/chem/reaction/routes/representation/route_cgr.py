@@ -233,19 +233,19 @@ def get_clean_mapping(
     """
     dict_map = {}
     from synplan.chem.mapping import bounded_mappings
-    from synplan.chem.stereo import _requirements, _sign
+    from synplan.chem.stereo import stereo_requirements, stereo_sign
 
-    requirements = _requirements(curr_prod)
+    requirements = stereo_requirements(curr_prod)
     rr = None
     orientation = None
     for candidate in bounded_mappings(curr_prod, prod):
         translated = tuple(r.remap(candidate) for r in requirements)
-        if any(_sign(prod, r) not in (None, r.sign) for r in translated):
+        if any(stereo_sign(prod, r) not in (None, r.sign) for r in translated):
             continue
         if requirements:
-            from synplan.chem.reaction.routes.stereo import _orientation_key
+            from synplan.chem.reaction.routes.stereo import orientation_key
 
-            key = _orientation_key(prod, translated, by_requirement=True)
+            key = orientation_key(prod, translated, by_requirement=True)
             if orientation is not None and key != orientation:
                 raise ValueError(
                     "ambiguous stereo correspondence requires reassessment"

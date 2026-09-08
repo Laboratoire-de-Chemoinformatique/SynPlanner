@@ -140,7 +140,7 @@ def refine_colors(
     return colors
 
 
-def _refined_query_cgr_colors(query_cgr: QueryCGRContainer) -> dict[int, int]:
+def refined_query_cgr_colors(query_cgr: QueryCGRContainer) -> dict[int, int]:
     """Run 1-WL colour refinement on the QueryCGR atom graph.
 
     Returns a stable colour per atom: atoms in the same final class are
@@ -155,8 +155,8 @@ def _refined_query_cgr_colors(query_cgr: QueryCGRContainer) -> dict[int, int]:
     )
 
 
-def _query_cgr_order_encoding(
-    query_cgr: QueryCGRContainer, order: tuple[int, ...]
+def query_cgr_order_encoding(
+    query_cgr: QueryCGRContainer, order: tuple[int, ...], *, stereo_rule=None
 ) -> tuple:
     """Encode the QueryCGR as atom-labels and bond-labels in the given order.
 
@@ -179,10 +179,15 @@ def _query_cgr_order_encoding(
                         query_cgr_bond_label(query_cgr, atom_1, atom_2),
                     )
                 )
-    return atom_labels, tuple(sorted(bond_labels, key=repr))
+    graph = atom_labels, tuple(sorted(bond_labels, key=repr))
+    return (
+        (graph, stereo_encoding(stereo_rule, order))
+        if stereo_rule is not None
+        else graph
+    )
 
 
-def _stereo_encoding(rule, order):
+def stereo_encoding(rule, order):
     """Query-local parity expressed in canonical atom positions on both sides."""
     position = {n: i for i, n in enumerate(order)}
     sides = []
@@ -250,15 +255,7 @@ def canonical_query_cgr_key(query_cgr: QueryCGRContainer, *, stereo_rule=None) -
     if not atoms:
         return repr(((), ()))
 
-    def encode(order):
-        graph = _query_cgr_order_encoding(query_cgr, order)
-        return (
-            (graph, _stereo_encoding(stereo_rule, order))
-            if stereo_rule is not None
-            else graph
-        )
-
-    colors = _refined_query_cgr_colors(query_cgr)
+    colors = refined_query_cgr_colors(query_cgr)
     color_groups = []
     for color in sorted(set(colors.values())):
         color_groups.append(tuple(atom for atom in atoms if colors[atom] == color))
@@ -269,8 +266,10 @@ def canonical_query_cgr_key(query_cgr: QueryCGRContainer, *, stereo_rule=None) -
 
     if permutation_count <= _MAX_CANONICAL_PERMUTATIONS:
         encodings = (
-            encode(
+            query_cgr_order_encoding(
+                query_cgr,
                 tuple(atom for group_order in group_orders for atom in group_order),
+                stereo_rule=stereo_rule,
             )
             for group_orders in product(
                 *(permutations(group) for group in color_groups)
@@ -290,7 +289,7 @@ def canonical_query_cgr_key(query_cgr: QueryCGRContainer, *, stereo_rule=None) -
             ),
         )
     )
-    return repr(encode(order))
+    return repr(query_cgr_order_encoding(query_cgr, order, stereo_rule=stereo_rule))
 
 
 __all__ = [

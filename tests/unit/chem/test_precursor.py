@@ -75,7 +75,7 @@ def test_precursor_with_invalid_input():
         Precursor(None)
 
 
-def _stereo_block(smiles_value: str) -> BuildingBlock:
+def stereo_block(smiles_value: str) -> BuildingBlock:
     molecule = smiles(smiles_value, ignore_stereo=False)
     return BuildingBlock(
         smiles=str(molecule),
@@ -86,7 +86,7 @@ def _stereo_block(smiles_value: str) -> BuildingBlock:
 
 
 def test_inchikey_bucket_does_not_satisfy_opposite_stereo():
-    r_block = _stereo_block("C[C@H](O)C(=O)O")
+    r_block = stereo_block("C[C@H](O)C(=O)O")
     s_precursor = Precursor(smiles("C[C@@H](O)C(=O)O", ignore_stereo=False))
     catalogue = frozendict({r_block.inchikey[:14]: (r_block,)})
 
@@ -99,9 +99,9 @@ def test_inchikey_bucket_does_not_satisfy_opposite_stereo():
 def test_precursor_generates_its_inchikey_only_once(monkeypatch):
     import synplan.chem.precursor as precursor_module
 
-    block = _stereo_block("C[C@H](O)C(=O)O")
+    block = stereo_block("C[C@H](O)C(=O)O")
     catalogue = frozendict({block.inchikey[:14]: (block,)})
-    original = precursor_module.molecule_to_inchikey
+    original = precursor_module.inchi_key
     calls = 0
 
     def counted(molecule):
@@ -109,7 +109,7 @@ def test_precursor_generates_its_inchikey_only_once(monkeypatch):
         calls += 1
         return original(molecule)
 
-    monkeypatch.setattr(precursor_module, "molecule_to_inchikey", counted)
+    monkeypatch.setattr(precursor_module, "inchi_key", counted)
     precursor = Precursor(smiles("C[C@H](O)C(=O)O", ignore_stereo=False))
     for _ in range(3):
         assert precursor.is_building_block(catalogue, min_mol_size=0)
@@ -122,7 +122,7 @@ def test_unrepresentable_inchikey_is_cached_and_not_purchasable(monkeypatch, cap
 
     molecule = smiles("c1c(O)[n-]ccc1", ignore=True)
     precursor = Precursor(molecule)
-    original = precursor_module.molecule_to_inchikey
+    original = precursor_module.inchi_key
     calls = 0
 
     def counted(candidate):
@@ -130,7 +130,7 @@ def test_unrepresentable_inchikey_is_cached_and_not_purchasable(monkeypatch, cap
         calls += 1
         return original(candidate)
 
-    monkeypatch.setattr(precursor_module, "molecule_to_inchikey", counted)
+    monkeypatch.setattr(precursor_module, "inchi_key", counted)
     catalogue = frozendict()
     with caplog.at_level(logging.WARNING):
         assert not precursor.is_building_block(catalogue, min_mol_size=0)

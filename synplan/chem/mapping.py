@@ -69,8 +69,8 @@ class BoundedQuery(QueryContainer):
     def get_mapping(
         self, other, *, automorphism_filter=True, searching_scope=None, _cython=True
     ):
-        # Chython deduplicates atom sets before checking stereo. That may discard
-        # the only valid orientation. Keep mappings until after stereo checks.
+        # Keep all orientations even for stereo-free queries against chiral
+        # targets: the caller may assess inherited stereo after matching.
         if has_stereo(other) or has_stereo(self):
             automorphism_filter = False
         return super().get_mapping(

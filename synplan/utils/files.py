@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, TextIO
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 from chython.exceptions import MappingError
 
-from synplan.chem.stereo import parse_smiles_preserving_stereo, reaction_smiles
+from synplan.chem.stereo import parse_smiles_preserving_stereo
 from synplan.utils.stereo_io import RDFRead, RDFWrite, SDFRead, SDFWrite
 
 if TYPE_CHECKING:
@@ -303,6 +303,7 @@ class ReactionReader(Reader):
             self._file = SMILESRead(filename, **kwargs)
         elif self._file_type == "RDF":
             kwargs.setdefault("calc_cis_trans", True)
+            kwargs.setdefault("strict_stereo", not kwargs.get("ignore_stereo", False))
             self._file = RDFRead(filename, indexable=True, **kwargs)
         elif self._file_type == "PB":
             self._file = _ORDReadAdapter(filename)
@@ -385,6 +386,7 @@ class MoleculeReader(Reader):
             self._file = SMILESRead(filename, ignore=True, **kwargs)
         elif self._file_type == "SDF":
             kwargs.setdefault("calc_cis_trans", True)
+            kwargs.setdefault("strict_stereo", not kwargs.get("ignore_stereo", False))
             self._file = SDFRead(filename, indexable=True, **kwargs)
         else:
             raise ValueError("File type incompatible -", filename)
@@ -700,6 +702,7 @@ def parse_reaction(
             ignore=True,
             ignore_stereo=ignore_stereo,
             calc_cis_trans=True,
+            strict_stereo=not ignore_stereo,
         ) as r:
             rxn = next(iter(r))
         if check_atom_mapping != "off":
@@ -840,7 +843,7 @@ def to_reaction_smiles_record(reaction: ReactionContainer) -> str:
     if isinstance(reaction, str):
         return reaction
 
-    reaction_record = [reaction_smiles(reaction)]
+    reaction_record = [format(reaction, "m")]
     has_source_fields = any(key.startswith("source_") for key in reaction.meta)
     source_meta = [
         (key, value)

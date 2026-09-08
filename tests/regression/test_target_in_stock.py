@@ -114,9 +114,7 @@ def test_searched_target_exports_expansion_statistics(
         def fail_identity(*args, **kwargs):
             raise ValueError("Cannot generate InChIKey")
 
-        monkeypatch.setattr(
-            "synplan.chem.precursor.molecule_to_inchikey", fail_identity
-        )
+        monkeypatch.setattr("synplan.chem.precursor.inchi_key", fail_identity)
 
     monkeypatch.setattr(
         "synplan.mcts.search.load_building_blocks", lambda *a, **k: stock

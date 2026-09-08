@@ -12,26 +12,27 @@ from contextlib import suppress
 from copy import deepcopy
 from dataclasses import dataclass, field
 from itertools import islice
-from typing import Any
+from typing import Any, ClassVar
 
 from chython import inchi_key
 from chython.containers import MoleculeContainer, ReactionContainer
 
 from synplan.chem.building_blocks import BuildingBlockCatalogue
 from synplan.chem.building_blocks.core import match_building_blocks
-from synplan.chem.building_blocks.stereo import _record_molecule
+from synplan.chem.building_blocks.stereo import record_molecule
 from synplan.chem.mapping import MappingBudgetExceeded, bounded_mappings
 from synplan.chem.reaction.routes.route import Route, Step
 from synplan.chem.stereo import (
+    REVIEWABLE_STEREO_REASONS,
     StereoRequirement,
-    _assign,
-    _local_environment,
-    _requirements,
-    _sign,
-    _transfer,
-    _Unresolved,
+    UnresolvedStereo,
+    assign_stereo,
     atom_owners,
     has_stereo_groups,
+    local_environment,
+    stereo_requirements,
+    stereo_sign,
+    transfer_stereo,
 )
 from synplan.chem.stereo_evidence import chemistry_assessment
 
@@ -48,14 +49,26 @@ class StereoAudit:
     route: Route | None = None
     ledger: list[dict[str, Any]] = field(default_factory=list)
     issues: list[dict[str, Any]] = field(default_factory=list)
-    assigned_stereo: str = "inferred_during_reconstruction"
-    chemistry_scope: str = (
+    assigned_stereo: ClassVar[str] = "inferred_during_reconstruction"
+    chemistry_scope: ClassVar[str] = (
         "graph inheritance only; conditions and epimerization unverified"
     )
 
     @property
     def supported(self) -> bool:
         return self.route is not None and not self.issues
+
+    def add_issue(self, exc, step=None, leaf=None, req=None):
+        self.issues.append(
+            {
+                "reason": exc.reason,
+                "detail": str(exc),
+                "step": step,
+                "leaf": leaf,
+                "target_atoms": list(req.target_atoms) if req else None,
+                **exc.context,
+            }
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -77,40 +90,42 @@ class StereoAudit:
         }
 
 
-def _connectivity(mol: MoleculeContainer) -> str:
+def connectivity_key(mol: MoleculeContainer) -> str:
     copy = mol.copy()
     copy.clean_stereo()
     return str(copy)
 
 
-def _mappings(
+def molecule_mappings(
     source: MoleculeContainer, dest: MoleculeContainer, cap: int
 ) -> list[dict[int, int]]:
     a, b = source.copy(), dest.copy()
     a.clean_stereo()
     b.clean_stereo()
     if str(a) != str(b):
-        raise _Unresolved(
+        raise UnresolvedStereo(
             "mapping_or_representation_unresolved",
             "inconsistent adjacent molecule structures",
         )
     try:
         mappings = list(islice(bounded_mappings(a, b), cap + 1))
     except MappingBudgetExceeded as error:
-        raise _Unresolved("mapping_or_representation_unresolved", str(error)) from error
+        raise UnresolvedStereo(
+            "mapping_or_representation_unresolved", str(error)
+        ) from error
     if len(mappings) > cap:
-        raise _Unresolved(
+        raise UnresolvedStereo(
             "mapping_or_representation_unresolved",
             f"isomorphism enumeration exceeded {cap}; no arbitrary mapping selected",
         )
     if not mappings:
-        raise _Unresolved(
+        raise UnresolvedStereo(
             "mapping_or_representation_unresolved", "no complete atom correspondence"
         )
     return mappings
 
 
-def _orientation_key(
+def orientation_key(
     mol: MoleculeContainer,
     reqs: tuple[StereoRequirement, ...],
     *,
@@ -147,50 +162,42 @@ def _orientation_key(
     return frozenset(out)
 
 
-def _align(
+def align_stereo(
     source: MoleculeContainer,
     dest: MoleculeContainer,
     reqs: tuple[StereoRequirement, ...],
     cap: int,
 ) -> tuple[tuple[StereoRequirement, ...], dict[int, int], list[dict[int, int]]]:
-    choices = {}
-    mappings = _mappings(source, dest, cap)
-    for mapping in mappings:
+    choices, equivalent = {}, []
+    for mapping in molecule_mappings(source, dest, cap):
         translated = tuple(r.remap(mapping) for r in reqs)
-        if any(_sign(dest, r) not in (None, r.sign) for r in translated):
+        if any(stereo_sign(dest, r) not in (None, r.sign) for r in translated):
             continue
-        key = _orientation_key(dest, translated)
+        key = orientation_key(dest, translated)
         choices.setdefault(key, (translated, mapping))
+        equivalent.append(mapping)
     if not choices:
-        raise _Unresolved(
+        raise UnresolvedStereo(
             "configuration_contradicted",
             "opposite mapped configuration in adjacent molecule records",
         )
     if len(choices) != 1:
-        raise _Unresolved(
+        raise UnresolvedStereo(
             "mapping_or_representation_unresolved",
             f"{len(choices)} stereo-distinct atom correspondences",
         )
     required, mapping = next(iter(choices.values()))
-    return (
-        required,
-        mapping,
-        [
-            m
-            for m in mappings
-            if all(_sign(dest, r.remap(m)) in (None, r.sign) for r in reqs)
-        ],
-    )
+    return required, mapping, equivalent
 
 
-def _validate_mapping(reaction: ReactionContainer) -> None:
+def validate_mapping(reaction: ReactionContainer) -> None:
     sides = []
     for side in (reaction.reactants, reaction.products):
         atoms = {}
         for mol in side:
             for n, atom in mol.atoms():
                 if n in atoms:
-                    raise _Unresolved(
+                    raise UnresolvedStereo(
                         "mapping_or_representation_unresolved",
                         f"duplicate mapped atom {n} on reaction side",
                     )
@@ -201,20 +208,20 @@ def _validate_mapping(reaction: ReactionContainer) -> None:
             sides[1][n].atomic_number,
             sides[1][n].isotope,
         ):
-            raise _Unresolved(
+            raise UnresolvedStereo(
                 "mapping_or_representation_unresolved",
                 f"element/isotope changes at mapped atom {n}",
             )
 
 
-def _stock_match(
+def match_stereo_stock(
     mol: MoleculeContainer,
     reqs: tuple[StereoRequirement, ...],
     catalogue: BuildingBlockCatalogue,
     cap: int,
 ) -> tuple[MoleculeContainer, dict[str, Any]]:
     key = inchi_key(mol)
-    constraints = (*reqs, *_requirements(mol))
+    constraints = (*reqs, *stereo_requirements(mol))
     rejected = []
     bucket = match_building_blocks(catalogue, key)
     if selected := mol.meta.get("selected_stock"):
@@ -224,18 +231,18 @@ def _stock_match(
             if r.inchikey == selected["inchikey"] and r.smiles == selected["smiles"]
         )
     if len(bucket) > cap:
-        raise _Unresolved(
+        raise UnresolvedStereo(
             "stock_assessment_incomplete",
             f"stock bucket exceeds {cap} explicit records",
         )
     if has_stereo_groups(mol):
-        raise _Unresolved(
+        raise UnresolvedStereo(
             "relative_or_mixture_stereo", "material/group semantics require review"
         )
-    connectivity = _connectivity(mol)
+    connectivity = connectivity_key(mol)
     for record in bucket:
         try:
-            candidate = _record_molecule(record.smiles, record.inchikey)
+            candidate = record_molecule(record.smiles, record.inchikey)
         except ValueError as error:
             rejected.append(
                 {
@@ -250,29 +257,29 @@ def _stock_match(
                 {"inchikey": record.inchikey, "reason": "relative_or_mixture_stock"}
             )
             continue
-        if _connectivity(candidate) != connectivity:
+        if connectivity_key(candidate) != connectivity:
             rejected.append(
                 {"inchikey": record.inchikey, "reason": "connectivity_bucket_only"}
             )
             continue
         compatible = []
-        for mapping in _mappings(mol, candidate, cap):
+        for mapping in molecule_mappings(mol, candidate, cap):
             mapped = tuple(r.remap(mapping) for r in constraints)
-            if all(_sign(candidate, r) == r.sign for r in mapped):
+            if all(stereo_sign(candidate, r) == r.sign for r in mapped):
                 compatible.append(mapping)
         if compatible:
             # Extra configurations are retained from the selected actual record.
-            candidate_reqs = _requirements(candidate)
+            candidate_reqs = stereo_requirements(candidate)
             orientations = set()
             for mapping in compatible:
                 inverse = {v: k for k, v in mapping.items()}
                 orientations.add(
-                    _orientation_key(
+                    orientation_key(
                         mol, tuple(r.remap(inverse) for r in candidate_reqs)
                     )
                 )
             if len(orientations) > 1:
-                raise _Unresolved(
+                raise UnresolvedStereo(
                     "mapping_or_representation_unresolved",
                     "stock record has stereo-distinct alignments",
                 )
@@ -295,7 +302,7 @@ def _stock_match(
                 "reason": "wrong_or_unspecified_configuration",
             }
         )
-    raise _Unresolved(
+    raise UnresolvedStereo(
         "required_stock_unavailable",
         f"no explicit compatible record in {key[:14]}",
         connectivity_prefix=key[:14],
@@ -303,7 +310,7 @@ def _stock_match(
     )
 
 
-def _chemistry_flags(
+def chemistry_flags(
     product: MoleculeContainer, reqs: tuple[StereoRequirement, ...]
 ) -> list[dict[str, Any]]:
     """Structural review flags, with no claim about the unreported conditions."""
@@ -365,31 +372,19 @@ def audit_stereo_inheritance(
     assignments = {}
     reviewed_steps = set()
 
-    def issue(exc, step=None, leaf=None, req=None):
-        result.issues.append(
-            {
-                "reason": exc.reason,
-                "detail": str(exc),
-                "step": step,
-                "leaf": leaf,
-                "target_atoms": list(req.target_atoms) if req else None,
-                **exc.context,
-            }
-        )
-
     try:
-        required = _requirements(original_target)
+        required = stereo_requirements(original_target)
         if has_stereo_groups(original_target):
-            raise _Unresolved(
+            raise UnresolvedStereo(
                 "relative_or_mixture_stereo",
                 "target material/group semantics require review",
             )
         if not required and not allow_unconstrained_target:
-            raise _Unresolved(
+            raise UnresolvedStereo(
                 "mapping_or_representation_unresolved",
                 "original target has no supported explicit stereo requirement",
             )
-        required, mapping, equivalent_mappings = _align(
+        required, mapping, equivalent_mappings = align_stereo(
             original_target, working.target, required, max_mappings
         )
         requirements[id(working.target)] = required
@@ -401,8 +396,8 @@ def audit_stereo_inheritance(
                 "requirements": [r.__dict__ for r in required],
             }
         )
-    except _Unresolved as exc:
-        issue(exc)
+    except UnresolvedStereo as exc:
+        result.add_issue(exc)
         return result
 
     for index in reversed(range(len(working.steps))):
@@ -411,10 +406,10 @@ def audit_stereo_inheritance(
             reviewed_steps.add(index)
         reqs = requirements.get(id(step.product), ())
         try:
-            reqs = tuple(dict.fromkeys((*reqs, *_requirements(step.product))))
+            reqs = tuple(dict.fromkeys((*reqs, *stereo_requirements(step.product))))
             requirements[id(step.product)] = reqs
-        except _Unresolved as exc:
-            issue(exc, index)
+        except UnresolvedStereo as exc:
+            result.add_issue(exc, index)
         entry = {
             "stage": "step",
             "step": index,
@@ -425,27 +420,27 @@ def audit_stereo_inheritance(
             "requirements": [r.__dict__ for r in reqs],
             "transfers": [],
             "conditions": "not_evaluated",
-            "chemistry_flags": _chemistry_flags(step.product, reqs),
+            "chemistry_flags": chemistry_flags(step.product, reqs),
         }
         result.ledger.append(entry)
         owners = atom_owners(step.reaction.reactants)
         try:
             if not mapping_sources.get(index):
-                raise _Unresolved(
+                raise UnresolvedStereo(
                     "mapping_or_representation_unresolved",
                     "no provenance for reaction atom correspondence",
                 )
-            _validate_mapping(step.reaction)
+            validate_mapping(step.reaction)
             precursor_atoms = {n for mol in step.reaction.reactants for n in mol}
             if missing := set(step.product) - precursor_atoms:
-                raise _Unresolved(
+                raise UnresolvedStereo(
                     "mapping_or_representation_unresolved",
                     f"product atoms {sorted(missing)} have no mapped reactant source",
                 )
             for req in reqs:
                 try:
-                    _assign(step.product, req)
-                    slot = _transfer(
+                    assign_stereo(step.product, req)
+                    slot = transfer_stereo(
                         step.product, step.reaction.reactants, req, owners=owners
                     )
                     child = step.reaction.reactants[slot]
@@ -458,11 +453,11 @@ def audit_stereo_inheritance(
                             "configuration": "mapped_orientation_retained",
                         }
                     )
-                except _Unresolved as exc:
-                    if index in reviewed_steps and exc.reason in {
-                        "requires_stereo_forming_step",
-                        "requires_explicit_resolution_or_inversion_strategy",
-                    }:
+                except UnresolvedStereo as exc:
+                    if (
+                        index in reviewed_steps
+                        and exc.reason in REVIEWABLE_STEREO_REASONS
+                    ):
                         entry["transfers"].append(
                             {
                                 "target_atoms": req.target_atoms,
@@ -470,9 +465,9 @@ def audit_stereo_inheritance(
                             }
                         )
                     else:
-                        issue(exc, index, req=req)
-        except _Unresolved as exc:
-            issue(exc, index)
+                        result.add_issue(exc, index, req=req)
+        except UnresolvedStereo as exc:
+            result.add_issue(exc, index)
 
     for index, leaf in enumerate(working.leaves()):
         reqs = requirements.get(id(leaf), ())
@@ -484,22 +479,22 @@ def audit_stereo_inheritance(
         }
         result.ledger.append(entry)
         try:
-            selected, record = _stock_match(leaf, reqs, catalogue, max_mappings)
+            selected, record = match_stereo_stock(leaf, reqs, catalogue, max_mappings)
             assignments[id(leaf)] = selected
             entry["selected_stock"] = record
-        except _Unresolved as exc:
+        except UnresolvedStereo as exc:
             if (
                 exc.reason == "required_stock_unavailable"
                 and 0 < len(leaf) <= min_mol_size
                 and not reqs
-                and not _requirements(leaf)
+                and not stereo_requirements(leaf)
             ):
                 selected = leaf.copy()
                 selected.meta["assumed_trivial"] = min_mol_size
                 assignments[id(leaf)] = selected
                 entry["assumed_trivial"] = min_mol_size
                 continue
-            issue(exc, leaf=index)
+            result.add_issue(exc, leaf=index)
             result.issues[-1]["target_atoms"] = sorted(
                 {n for r in reqs for n in r.target_atoms}
             )
@@ -515,21 +510,21 @@ def audit_stereo_inheritance(
         product = step.product.copy()
         product.clean_stereo()
         for precursor in reactants:
-            for req in _requirements(precursor):
+            for req in stereo_requirements(precursor):
                 if all(product.has_atom(n) for n in req.atoms) and all(
-                    _local_environment(product, n) == _local_environment(precursor, n)
+                    local_environment(product, n) == local_environment(precursor, n)
                     for n in req.atoms
                 ):
                     # Non-required stock stereo can disappear by symmetry;
                     # target-linked obligations are checked immediately below.
-                    with suppress(_Unresolved):
-                        _assign(product, req)
+                    with suppress(UnresolvedStereo):
+                        assign_stereo(product, req)
         for req in requirements.get(id(step.product), ()):
             if index in reviewed_steps:
-                _assign(product, req)
-            if _sign(product, req) != req.sign:
-                issue(
-                    _Unresolved(
+                assign_stereo(product, req)
+            if stereo_sign(product, req) != req.sign:
+                result.add_issue(
+                    UnresolvedStereo(
                         "configuration_contradicted",
                         "forward replay did not reproduce assigned configuration",
                     ),

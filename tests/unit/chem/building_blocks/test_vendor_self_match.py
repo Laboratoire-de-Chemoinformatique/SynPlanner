@@ -16,7 +16,7 @@ from synplan.chem.building_blocks import (
     molecule_to_inchikey,
     standardize_building_blocks,
 )
-from synplan.chem.building_blocks.stereo import _record_molecule, compatible_records
+from synplan.chem.building_blocks.stereo import compatible_records, record_molecule
 from synplan.chem.precursor import Precursor
 from synplan.chem.stereo import parse_smiles_preserving_stereo
 
@@ -52,7 +52,7 @@ def test_every_published_record_is_readable_and_matches_itself(prepared_catalogu
             assert molecule_to_inchikey(query) == record.inchikey
             # Exact stock must remain reachable even with virtually no mapping budget.
             for catalogue in (stock, frozendict({prefix: tuple(reversed(bucket))})):
-                _record_molecule.cache_clear()
+                record_molecule.cache_clear()
                 for _ in range(2):  # cold and warm chemistry caches
                     assert record in compatible_records(
                         query, catalogue, max_mapping_work=1

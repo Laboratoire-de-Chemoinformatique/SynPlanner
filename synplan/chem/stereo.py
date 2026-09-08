@@ -14,10 +14,24 @@ from hashlib import sha256
 from chython import smiles as _read_smiles
 from chython.containers import MoleculeContainer, ReactionContainer
 
+UNASSESSED_STEREO_REASONS = frozenset(
+    {
+        "unsupported_stereo_type",
+        "mapping_budget_exceeded",
+        "relative_or_mixture_stereo",
+        "mapping_or_representation_unresolved",
+        "stock_assessment_incomplete",
+        "forward_stereo_not_assessed",
+        "conflicting_chemistry_assessments",
+    }
+)
 
-def reaction_smiles(reaction, spec="m"):
-    """Serialize reaction stereo and enhanced groups with Chython."""
-    return format(reaction, spec)
+REVIEWABLE_STEREO_REASONS = frozenset(
+    {
+        "requires_stereo_forming_step",
+        "requires_explicit_resolution_or_inversion_strategy",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -34,26 +48,15 @@ class StereoObligations:
         records = tuple(records)
         if not records:
             return self
-        unassessed = {
-            "unsupported_stereo_type",
-            "mapping_budget_exceeded",
-            "relative_or_mixture_stereo",
-            "mapping_or_representation_unresolved",
-            "stock_assessment_incomplete",
-            "forward_stereo_not_assessed",
-            "conflicting_chemistry_assessments",
-        }
         payload = json.dumps(records, sort_keys=True, separators=(",", ":"))
         return StereoObligations(
             records,
             self,
             self.count + len(records),
             sha256((self.key + payload).encode()).hexdigest(),
-            self.unassessed or any(o["reason"] in unassessed for o in records),
+            self.unassessed
+            or any(o["reason"] in UNASSESSED_STEREO_REASONS for o in records),
         )
-
-    def __bool__(self):
-        return bool(self.count)
 
     def __iter__(self):
         chain, current = [], self
@@ -89,14 +92,14 @@ class StereoRequirement:
         )
 
 
-class _Unresolved(ValueError):
+class UnresolvedStereo(ValueError):
     def __init__(self, reason: str, detail: str | None = None, **context):
         self.reason = reason
         self.context = context
         super().__init__(detail or reason)
 
 
-def _requirements(mol: MoleculeContainer) -> tuple[StereoRequirement, ...]:
+def stereo_requirements(mol: MoleculeContainer) -> tuple[StereoRequirement, ...]:
     out = []
     for n, atom in mol.atoms():
         if atom.stereo is None:
@@ -104,7 +107,9 @@ def _requirements(mol: MoleculeContainer) -> tuple[StereoRequirement, ...]:
         if n in mol.stereogenic_allenes:
             terminals = mol._stereo_allenes_terminals[n]
             if any(int(mol.bond(n, t)) != 2 for t in terminals):
-                raise _Unresolved("unsupported_stereo_type", "general cumulene axis")
+                raise UnresolvedStereo(
+                    "unsupported_stereo_type", "general cumulene axis"
+                )
             env = mol.stereogenic_allenes[n][:2]
             out.append(
                 StereoRequirement(
@@ -118,7 +123,7 @@ def _requirements(mol: MoleculeContainer) -> tuple[StereoRequirement, ...]:
             )
             continue
         if n not in mol.stereogenic_tetrahedrons:
-            raise _Unresolved(
+            raise UnresolvedStereo(
                 "unsupported_stereo_type", f"atom {n}: only carbon tetrahedra supported"
             )
         env = tuple(sorted(mol.stereogenic_tetrahedrons[n]))
@@ -139,7 +144,7 @@ def _requirements(mol: MoleculeContainer) -> tuple[StereoRequirement, ...]:
             (n, m) not in mol.stereogenic_cis_trans
             and (m, n) not in mol.stereogenic_cis_trans
         ):
-            raise _Unresolved(
+            raise UnresolvedStereo(
                 "unsupported_stereo_type",
                 f"bond {n}-{m}: cumulene or unsupported stereo",
             )
@@ -159,7 +164,7 @@ def _requirements(mol: MoleculeContainer) -> tuple[StereoRequirement, ...]:
     return tuple(out)
 
 
-def _sign(mol: MoleculeContainer, req: StereoRequirement) -> bool | None:
+def stereo_sign(mol: MoleculeContainer, req: StereoRequirement) -> bool | None:
     if req.kind == "allene":
         if mol.atom(req.atoms[0]).stereo is None:
             return None
@@ -174,11 +179,11 @@ def _sign(mol: MoleculeContainer, req: StereoRequirement) -> bool | None:
     return mol._translate_cis_trans_sign(n, m, *req.environment)
 
 
-def _assign(mol: MoleculeContainer, req: StereoRequirement) -> None:
-    existing = _sign(mol, req)
+def assign_stereo(mol: MoleculeContainer, req: StereoRequirement) -> None:
+    existing = stereo_sign(mol, req)
     if existing is not None:
         if existing != req.sign:
-            raise _Unresolved(
+            raise UnresolvedStereo(
                 "configuration_contradicted",
                 f"opposite mapped configuration at {req.atoms}",
             )
@@ -192,26 +197,22 @@ def _assign(mol: MoleculeContainer, req: StereoRequirement) -> None:
             n1, n2 = req.environment
             mol.add_cis_trans_stereo(n, m, n1, n2, req.sign)
     except (KeyError, ValueError) as exc:
-        raise _Unresolved(
+        raise UnresolvedStereo(
             "requires_stereo_forming_step",
             f"configuration not stereogenic at {req.atoms}: {exc}",
         ) from exc
 
 
-def _atom_identity(atom) -> tuple:
-    return atom.atomic_number, atom.isotope, atom.charge, atom.is_radical
-
-
-def _local_environment(mol: MoleculeContainer, n: int) -> tuple:
+def local_environment(mol: MoleculeContainer, n: int) -> tuple:
     atom = mol.atom(n)
     return (
-        _atom_identity(atom),
+        (atom.atomic_number, atom.isotope, atom.charge, atom.is_radical),
         atom.implicit_hydrogens,
         tuple(sorted((k, int(b)) for k, b in mol.bond_items(n))),
     )
 
 
-def _transfer(
+def transfer_stereo(
     product: MoleculeContainer,
     reactants: tuple[MoleculeContainer, ...],
     req: StereoRequirement,
@@ -225,18 +226,18 @@ def _transfer(
         candidates.intersection_update(owners.get(number, ()))
     if len(candidates) != 1:
         if req.kind == "double_bond" and all(owners.get(n) for n in req.atoms):
-            raise _Unresolved(
+            raise UnresolvedStereo(
                 "requires_stereo_forming_step",
                 f"double bond {req.atoms} is assembled from separate reactants",
             )
-        raise _Unresolved(
+        raise UnresolvedStereo(
             "mapping_or_representation_unresolved",
             f"required atoms {req.atoms} have no unique precursor mapping",
         )
     index = next(iter(candidates))
     precursor = reactants[index]
     if any(
-        _local_environment(product, n) != _local_environment(precursor, n)
+        local_environment(product, n) != local_environment(precursor, n)
         for n in req.atoms
     ):
         reason = "requires_explicit_resolution_or_inversion_strategy"
@@ -255,11 +256,11 @@ def _transfer(
             )
         ):
             reason = "requires_stereo_forming_step"
-        raise _Unresolved(
+        raise UnresolvedStereo(
             reason,
             f"mapped local environment changes at {req.atoms}; retention is unsupported",
         )
-    _assign(precursor, req)
+    assign_stereo(precursor, req)
     return index
 
 
@@ -301,15 +302,15 @@ def assert_stereo_preserved(
     before: MoleculeContainer, after: MoleculeContainer
 ) -> None:
     """Validate mapped normalization; fail explicitly if it changes a requirement."""
-    for req in _requirements(before):
+    for req in stereo_requirements(before):
         try:
-            valid = _sign(after, req) == req.sign
+            valid = stereo_sign(after, req) == req.sign
             if req.kind != "double_bond":
                 valid = valid and after.atom(req.atoms[0]).extended_stereo == req.group
         except (KeyError, ValueError):
             valid = False
         if not valid:
-            raise _Unresolved(
+            raise UnresolvedStereo(
                 "normalization_changed_stereo",
                 f"normalization cannot preserve {req.kind} at {req.atoms}",
                 original_input=format(before, "m"),
@@ -325,21 +326,22 @@ def assess_inheritance(product: MoleculeContainer, reactants) -> dict:
     events, obligations = [], []
     owners = atom_owners(reactants)
     try:
-        reqs = _requirements(product)
-    except _Unresolved as error:
+        reqs = stereo_requirements(product)
+    except UnresolvedStereo as error:
         return {
             "events": [],
             "obligations": [{"reason": error.reason, "detail": str(error)}],
         }
     for req in reqs:
-        event = {"requirement": asdict(req), "basis": "mapped_structure"}
+        requirement = asdict(req)
+        event = {"requirement": requirement, "basis": "mapped_structure"}
         try:
             if req.group:
-                raise _Unresolved(
+                raise UnresolvedStereo(
                     "relative_or_mixture_stereo",
                     "group requires a material/relative stereo assessment",
                 )
-            index = _transfer(product, tuple(reactants), req, owners=owners)
+            index = transfer_stereo(product, tuple(reactants), req, owners=owners)
             event.update(event="inherited", reactant=index)
         except (KeyError, ValueError) as error:
             reason = getattr(error, "reason", "mapping_or_representation_unresolved")
@@ -348,13 +350,44 @@ def assess_inheritance(product: MoleculeContainer, reactants) -> dict:
                 {
                     "reason": reason,
                     "detail": str(error),
-                    "requirement": asdict(req),
+                    "requirement": requirement.copy(),
                     "required_product": str(product),
                     "next_action": "Find a supported stereo transformation, compatible chiral precursor, or documented separation.",
                 }
             )
         events.append(event)
     return {"events": events, "obligations": obligations}
+
+
+def stereo_elements(molecules):
+    found = {}
+    for mol in molecules:
+        specified = {(r.kind, r.atoms): r for r in stereo_requirements(mol)}
+        keys = list(specified)
+        keys += [
+            ("tetrahedron", (n,))
+            for n in mol.chiral_tetrahedrons
+            if mol.atom(n).atomic_number == 6
+        ]
+        keys += [
+            ("allene", (n, *mol._stereo_allenes_terminals[n]))
+            for n in mol.chiral_allenes
+        ]
+        keys += [
+            ("double_bond", (n, m))
+            for n, m in mol.chiral_cis_trans
+            if m in mol.neighbor_numbers(n)
+        ]
+        for kind, atoms in keys:
+            key = (
+                kind,
+                tuple(sorted(atoms)) if kind == "double_bond" else atoms[:1],
+            )
+            req = specified.get((kind, atoms))
+            if req is None and kind == "double_bond":
+                req = specified.get((kind, tuple(reversed(atoms))))
+            found[key] = (mol, req, atoms)
+    return found
 
 
 def stereo_events(reaction) -> list[dict]:
@@ -365,39 +398,12 @@ def stereo_events(reaction) -> list[dict]:
     from accidentally equal parser numbering.
     """
 
-    def elements(molecules):
-        found = {}
-        for mol in molecules:
-            specified = {(r.kind, r.atoms): r for r in _requirements(mol)}
-            keys = list(specified)
-            keys += [
-                ("tetrahedron", (n,))
-                for n in mol.chiral_tetrahedrons
-                if mol.atom(n).atomic_number == 6
-            ]
-            keys += [
-                ("allene", (n, *mol._stereo_allenes_terminals[n]))
-                for n in mol.chiral_allenes
-            ]
-            keys += [
-                ("double_bond", (n, m))
-                for n, m in mol.chiral_cis_trans
-                if m in mol.neighbor_numbers(n)
-            ]
-            for kind, atoms in keys:
-                key = (
-                    kind,
-                    tuple(sorted(atoms)) if kind == "double_bond" else atoms[:1],
-                )
-                req = specified.get((kind, atoms))
-                if req is None and kind == "double_bond":
-                    req = specified.get((kind, tuple(reversed(atoms))))
-                found[key] = (mol, req, atoms)
-        return found
-
     try:
-        left, right = elements(reaction.reactants), elements(reaction.products)
-    except _Unresolved as error:
+        left, right = (
+            stereo_elements(reaction.reactants),
+            stereo_elements(reaction.products),
+        )
+    except UnresolvedStereo as error:
         return [
             {
                 "kind": "unassessed",
@@ -450,14 +456,14 @@ def stereo_events(reaction) -> list[dict]:
         else:
             try:
                 if any(
-                    _local_environment(before[0], n) != _local_environment(after[0], n)
+                    local_environment(before[0], n) != local_environment(after[0], n)
                     for n in before[1].atoms
                 ):
                     event = "reference_environment_changed"
                 else:
                     event = (
                         "retained"
-                        if _sign(after[0], before[1]) == before[1].sign
+                        if stereo_sign(after[0], before[1]) == before[1].sign
                         else "inverted"
                     )
             except (KeyError, ValueError):
