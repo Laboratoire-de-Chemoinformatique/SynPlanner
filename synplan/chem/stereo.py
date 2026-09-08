@@ -11,12 +11,9 @@ import re
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from hashlib import sha256
-from inspect import signature
 
 from chython import smiles as _read_smiles
-from chython.containers import MoleculeContainer
-
-_STRICT_BACKEND = "strict_stereo" in signature(_read_smiles).parameters
+from chython.containers import MoleculeContainer, ReactionContainer
 
 
 def reaction_smiles(reaction, spec="m"):
@@ -313,88 +310,19 @@ def has_stereo_groups(mol: MoleculeContainer) -> bool:
     return any(getattr(a, "extended_stereo", None) for _, a in mol.atoms())
 
 
-def validate_stereo_input(text: str) -> None:
-    """Reject known lossy encodings before Chython can discard their annotation.
-
-    The exception retains the original representation for API error ledgers.
-    Extended tetrahedral and allene syntax supported by Chython stays accepted.
-    """
-    if re.search(r"@(?:SP|TB|OH|TH[3-9]|AL[3-9])|\bw[UD]:", text):
-        raise _Unresolved(
-            "unsupported_stereo_type",
-            "atropisomer or unsupported non-tetrahedral annotation",
-            original_input=text,
-        )
-
-
 def parse_smiles_preserving_stereo(text, *, ignore_stereo=False):
-    """Allow legacy valence repairs, but reject discarded stereo annotations.
-
-    Chython's ``ignore=False`` does not cover every stereo-loss path. Check the
-    parsed annotation sites against the returned atoms and bond terminals too.
-    The raw token stream and parsed atom insertion order share the input order.
-    """
-    from chython import smiles
-    from chython.containers import ReactionContainer
-    from chython.files.daylight.parser import parser
-    from chython.files.daylight.tokenize import smiles_tokenize
-
-    validate_stereo_input(text)
-    result = smiles(
+    """Use native strict parsing and retain reaction mapping provenance."""
+    result = _read_smiles(
         text,
-        ignore=True,
         ignore_stereo=ignore_stereo,
-        **({"strict_stereo": not ignore_stereo} if _STRICT_BACKEND else {}),
+        strict_stereo=not ignore_stereo,
     )
-    if ignore_stereo:
-        return result
-    core = text.split()[0]
-    if isinstance(result, ReactionContainer):
+    if not ignore_stereo and isinstance(result, ReactionContainer):
         from synplan.chem.utils import reaction_string_mapping_status
 
-        result.meta["stereo_mapping_status"] = reaction_string_mapping_status(core)
-        sides = zip(
-            core.split(">"), (result.reactants, result.reagents, result.products)
+        result.meta["stereo_mapping_status"] = reaction_string_mapping_status(
+            text.split()[0]
         )
-    else:
-        sides = ((core, (result,)),)
-    if _STRICT_BACKEND:
-        return result
-    for source, molecules in sides:
-        if not source or not any(mark in source for mark in ("@", "/", "\\")):
-            continue
-        raw = parser(smiles_tokenize(source), False)
-        atoms = [(m, n) for m in molecules for n in m]
-        if len(atoms) != len(raw["atoms"]):
-            raise _Unresolved("stereo_input_alignment_failed", original_input=text)
-        for index in raw["stereo_atoms"]:
-            molecule, number = atoms[index]
-            if molecule.atom(number).stereo is None:
-                raise _Unresolved(
-                    "stereo_annotation_discarded", original_input=text, atom=number
-                )
-        for index, neighbours in raw["stereo_bonds"].items():
-            for neighbour in neighbours:
-                if neighbour < index:
-                    continue
-                participates = False
-                for endpoint in (index, neighbour):
-                    molecule, number = atoms[endpoint]
-                    terminals = molecule._stereo_cis_trans_terminals.get(number)
-                    if terminals and molecule.bond(*terminals).stereo is not None:
-                        participates = True
-                if not participates:
-                    raise _Unresolved(
-                        "stereo_bond_annotation_discarded", original_input=text
-                    )
-    for molecule in (
-        result.molecules() if isinstance(result, ReactionContainer) else (result,)
-    ):
-        if any(
-            "stereo" in str(message).lower()
-            for message in molecule.meta.get("chython_parsing_log", ())
-        ):
-            raise _Unresolved("stereo_parser_diagnostic", original_input=text)
     return result
 
 

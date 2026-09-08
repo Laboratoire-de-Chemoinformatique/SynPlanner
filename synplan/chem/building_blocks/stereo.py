@@ -2,9 +2,9 @@
 
 from functools import lru_cache
 
+from chython import inchi_key, smiles
 from chython.containers import MoleculeContainer
 
-from synplan.chem.building_blocks.identity import molecule_to_inchikey
 from synplan.chem.mapping import (
     MappingBudgetExceeded,
     backend_preparation,
@@ -15,18 +15,17 @@ from synplan.chem.stereo import (
     _requirements,
     _sign,
     has_stereo_groups,
-    parse_smiles_preserving_stereo,
 )
 
 
 @lru_cache(maxsize=8192)
 def _record_molecule(smiles_text, key):
     with backend_preparation():
-        candidate = parse_smiles_preserving_stereo(smiles_text)
+        candidate = smiles(smiles_text, strict_stereo=True)
         if not isinstance(candidate, MoleculeContainer):
             raise ValueError("catalogue record must contain a molecule")
         candidate.thiele()
-        if molecule_to_inchikey(candidate) != key:
+        if inchi_key(candidate) != key:
             raise ValueError("catalogue record SMILES and InChIKey disagree")
     return candidate
 
@@ -46,7 +45,7 @@ def compatible_records(
     correspondence work is separately bounded. Empty results after a budget
     exception are incomplete, not proof that compatible stock does not exist.
     """
-    key = inchikey or molecule_to_inchikey(molecule)
+    key = inchikey or inchi_key(molecule)
     if has_stereo_groups(molecule):
         if diagnostics is not None:
             diagnostics.append(

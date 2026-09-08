@@ -136,9 +136,9 @@ def test_prepared_gzip_catalogue_loads_without_repeating_chemistry(
         pytest.fail("Prepared catalogues must not repeat chemistry or InChI generation")
 
     for name in (
-        "parse_smiles_preserving_stereo",
+        "smiles",
         "safe_canonicalization",
-        "molecule_to_inchikey",
+        "inchi_key",
         "standardize_smiles_batch",
     ):
         monkeypatch.setattr(catalogue_io, name, unexpected_preparation)

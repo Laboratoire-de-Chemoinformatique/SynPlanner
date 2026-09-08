@@ -10,6 +10,7 @@ import json
 import logging
 import math
 import os
+import re
 import tempfile
 from contextlib import contextmanager
 from decimal import Decimal
@@ -18,12 +19,13 @@ from pathlib import Path
 from typing import Any
 
 import ijson
+from chython import inchi_key, smiles
 from chython.containers import MoleculeContainer
 from chython.files.SDFrw import SDFRead
 from frozendict import frozendict
 from tqdm.auto import tqdm
 
-from synplan.chem.stereo import parse_smiles_preserving_stereo
+from synplan.chem.stereo import has_stereo
 from synplan.chem.utils import (
     safe_canonicalization,
     standardize_sdf_text,
@@ -44,11 +46,6 @@ from synplan.utils.parallel import chunked, process_pool_map_stream
 
 from .core import BuildingBlock, BuildingBlockCatalogue
 from .database import build_catalogue, load_building_block_catalogue
-from .identity import (
-    molecule_has_stereo,
-    molecule_to_inchikey,
-    validate_standard_inchikey,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -453,14 +450,14 @@ def _prepare_catalogue_batch(rows, *, smiles_column, price_columns):
                 if price > 0.0:
                     vendors[column[: -len("_ppg")]] = price
 
-            molecule = parse_smiles_preserving_stereo(raw_smiles)
+            molecule = smiles(raw_smiles, strict_stereo=True)
             if not isinstance(molecule, MoleculeContainer):
                 raise ValueError("SMILES does not describe one molecule")
             molecule = safe_canonicalization(molecule, clean_stereo=False)
             smiles_text = str(molecule)
-            key = molecule_to_inchikey(molecule)
-            restored = parse_smiles_preserving_stereo(smiles_text)
-            if molecule_to_inchikey(restored) != key:
+            key = inchi_key(molecule)
+            restored = smiles(smiles_text, strict_stereo=True)
+            if inchi_key(restored) != key:
                 raise ValueError("prepared SMILES changes identity when read back")
             records.append(
                 (
@@ -468,7 +465,7 @@ def _prepare_catalogue_batch(rows, *, smiles_column, price_columns):
                     {
                         "smiles": smiles_text,
                         "vendors": vendors,
-                        "has_stereo": molecule_has_stereo(molecule),
+                        "has_stereo": has_stereo(molecule),
                     },
                 )
             )
@@ -479,7 +476,8 @@ def _prepare_catalogue_batch(rows, *, smiles_column, price_columns):
 
 def _validate_record(key, raw_record, *, context):
     """Validate stored fields without repeating molecular parsing or identity work."""
-    key = validate_standard_inchikey(key, context=context)
+    if not isinstance(key, str) or not re.fullmatch(r"[A-Z]{14}-[A-Z]{8}SA-[A-Z]", key):
+        raise ValueError(f"{context}: invalid Standard InChIKey {key!r}")
     location = f"{context}:{key}"
     if not isinstance(raw_record, dict):
         raise ValueError(f"{location}: record must be a JSON object")
