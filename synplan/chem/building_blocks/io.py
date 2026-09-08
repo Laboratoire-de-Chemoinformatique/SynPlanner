@@ -99,6 +99,8 @@ def standardize_building_block_catalogue(
     if num_workers < 1:
         raise ValueError("num_workers must be >= 1")
 
+    # ponytail: JSON export holds records in RAM; stream from SQLite if large
+    # JSON releases are needed. SQLite output already bounds preparation memory.
     records: dict[str, dict[str, Any]] = {}
     errors: list[tuple[int, str]] = []
     for batch_records, batch_errors in _prepare_catalogue_batches(source, num_workers):

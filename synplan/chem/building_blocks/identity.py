@@ -7,6 +7,8 @@ import re
 from chython import inchi_key
 from chython.containers import MoleculeContainer
 
+from synplan.chem.stereo import has_stereo as molecule_has_stereo
+
 _STANDARD_INCHIKEY = re.compile(r"^[A-Z]{14}-[A-Z]{8}SA-[A-Z]$")
 
 
@@ -29,14 +31,6 @@ def molecule_to_inchikey(molecule: MoleculeContainer) -> str:
         raise TypeError("molecule must be a Chython MoleculeContainer")
     return validate_standard_inchikey(
         inchi_key(molecule.copy(), ignore_stereo=False), context=str(molecule)
-    )
-
-
-def molecule_has_stereo(molecule: MoleculeContainer) -> bool:
-    """Whether Chython retained at least one real atom or bond stereo descriptor."""
-
-    return any(atom.stereo is not None for _, atom in molecule.atoms()) or any(
-        bond.stereo is not None for _, _, bond in molecule.bonds()
     )
 
 

@@ -334,7 +334,7 @@ def process_first_reaction(first_react: ReactionContainer, tree: "Tree", route_i
     Args:
         first_react (ReactionContainer): The first ReactionContainer object in the route.
         tree (Tree): The Tree object containing the retrosynthetic search tree
-                     and configuration (including `min_mol_size` and `building_blocks`).
+                     and building blocks.
         route_id (int): The ID of the tree node associated with this reaction,
                        used for validation reporting.
 
@@ -348,11 +348,7 @@ def process_first_reaction(first_react: ReactionContainer, tree: "Tree", route_i
         react_key = tuple(curr_mol)
         react_key_set = set(react_key)
 
-        if is_purchasable(
-            curr_mol,
-            tree.building_blocks,
-            tree.config.min_mol_size,
-        ):
+        if is_purchasable(curr_mol, tree.building_blocks):
             bb_set = bb_set.union(react_key_set)
 
         if validate_molecule_components(curr_mol, route_id) == 0:
@@ -378,8 +374,7 @@ def update_reaction_dict(
     with atom mappings for each reactant, and expands a set of building block
     atom indices (`bb_set`). The mapping is filtered based on the atoms present
     in the current reactant, and can optionally include a previous remapping.
-    Reactants are identified as building blocks based on size or presence in
-    the tree's building blocks set.
+    Reactants are identified as building blocks by compatible stock membership.
 
     Args:
         reaction (ReactionContainer): The ReactionContainer object representing the reaction.
@@ -389,7 +384,7 @@ def update_reaction_dict(
         react_dict (dict): The dictionary to update with filtered mappings for each reactant.
                            Keys are tuples of atom indices for each reactant molecule.
         tree (Tree): The Tree object containing the retrosynthetic search tree
-                     and configuration (including `min_mol_size` and `building_blocks`).
+                     and building blocks.
         bb_set (set): The set of building block atom indices to update.
         prev_remap (dict, optional): An optional dictionary representing a previous
                                      remapping to include in the filtered mapping.
@@ -408,11 +403,7 @@ def update_reaction_dict(
         if validate_molecule_components(curr_mol, route_id) == 0:
             return dict(), set()
 
-        if is_purchasable(
-            curr_mol,
-            tree.building_blocks,
-            tree.config.min_mol_size,
-        ):
+        if is_purchasable(curr_mol, tree.building_blocks):
             bb_set = bb_set.union(react_key_set)
 
         # Filter the mapping to include only keys present in the current react_key

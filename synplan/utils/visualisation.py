@@ -62,7 +62,6 @@ def get_child_nodes(
             "in_stock": is_purchasable(
                 precursor,
                 tree.building_blocks,
-                min_mol_size=0,
                 key=str(precursor),
             ),
         }
@@ -87,8 +86,7 @@ def extract_routes(
 
     :param tree: The built tree.
     :param extended: If True, generates the extended route representation.
-    :param min_mol_size: If the size of the Precursor is equal or smaller than
-            min_mol_size it is automatically classified as building block.
+    :param min_mol_size: Retained for API compatibility; stock membership is size-independent.
     :return: A list of dictionaries. Each dictionary contains a target, a list of
         children, and a boolean indicating whether the target is in building_blocks.
     """
@@ -100,8 +98,7 @@ def extract_routes(
         ]
     target = tree.nodes[1].precursors_to_expand[0].molecule
     target_in_stock = tree.nodes[1].curr_precursor.is_building_block(
-        tree.building_blocks,
-        min_mol_size,
+        tree.building_blocks
     )
 
     # append encoded routes to list
@@ -383,11 +380,12 @@ def routes_report_html(
             seen_stock.add(selected["inchikey"])
             for vendor, price in sorted(
                 selected.get("vendors", {}).items(), key=lambda item: (item[1], item[0])
-            ):
+            ) or [("—", None)]:
+                price_text = "Price unavailable" if price is None else f"{price:g}"
                 offers.append(
                     f'<tr><td class="mono">{escape(selected["smiles"])}<br>'
                     f"{escape(selected['inchikey'])}</td><td>{escape(vendor)}</td>"
-                    f"<td>{price:g}</td></tr>"
+                    f"<td>{price_text}</td></tr>"
                 )
         stock_html = (
             (

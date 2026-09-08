@@ -9,7 +9,6 @@ from io import StringIO
 from pathlib import Path
 from typing import Literal
 
-from chython import smiles as smiles_parser
 from chython.containers import (
     MoleculeContainer,
     ReactionContainer,
@@ -19,6 +18,7 @@ from chython.files.daylight.tokenize import smarts_tokenize
 from chython.files.SDFrw import SDFRead
 from tqdm.auto import tqdm
 
+from synplan.chem.stereo import parse_smiles_preserving_stereo
 from synplan.utils.files import MoleculeReader, MoleculeWriter
 
 ReactionMappingStatus = Literal["fully_mapped", "partially_mapped", "unmapped"]
@@ -231,8 +231,6 @@ def mol_from_smiles(
     :return: The processed molecule object.
     :raises ValueError: If the SMILES string could not be processed by chython.
     """
-    from synplan.chem.stereo import parse_smiles_preserving_stereo
-
     molecule = parse_smiles_preserving_stereo(smiles)
 
     if not isinstance(molecule, MoleculeContainer):
@@ -491,7 +489,7 @@ def _standardize_one_smiles(
     smiles_str: str, *, failures: list[dict] | None = None, record: int | None = None
 ) -> str | None:
     try:
-        mol = smiles_parser(smiles_str, ignore=True)
+        mol = parse_smiles_preserving_stereo(smiles_str)
         canonical = safe_canonicalization(mol)
         return str(canonical)
     except Exception as error:

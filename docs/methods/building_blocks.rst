@@ -162,6 +162,8 @@ Legacy SMILES/SDF/CSV and TSV without vendor headers, and
 ``Tree(building_blocks=set(...))`` callers continue to use canonical-SMILES
 membership. Vendor-aware catalogues are restricted to retrosynthesis; forward search
 keeps the legacy path.
+RL value-network tuning also requires legacy SMILES stock and rejects vendor
+catalogues before loading models.
 
 Route costs
 ===========
@@ -192,6 +194,7 @@ HTML route reports also show the selected purchased structure, full InChIKey,
 vendors and price per gram. Offers come from the detached route's
 ``selected_stock`` metadata, including after JSON export/import: rendering needs
 no database connection. Prices retain catalogue units; no currency is inferred.
+Selected records without offers remain visible with ``Price unavailable``.
 
 Synthonizer adapter
 ===================

@@ -404,15 +404,13 @@ class Route:
                     if c.inchikey == selected["inchikey"]
                     and c.smiles == selected["smiles"]
                 )
-            offers = sorted(
+            offer = min(
                 (
-                    price,
-                    vendor,
-                    block.inchikey,
-                    block.smiles,
-                )
-                for block in candidates
-                for vendor, price in block.vendors.items()
+                    (price, vendor, block.inchikey, block.smiles)
+                    for block in candidates
+                    for vendor, price in block.vendors.items()
+                ),
+                default=None,
             )
 
             row: dict[str, Any] = {
@@ -433,13 +431,13 @@ class Route:
                 missing.append(leaf_smiles)
                 rows.append(row)
                 continue
-            if not offers:
+            if offer is None:
                 row["status"] = "unpriced"
                 unpriced.append(leaf_smiles)
                 rows.append(row)
                 continue
 
-            price, vendor, selected_key, selected_smiles = offers[0]
+            price, vendor, selected_key, selected_smiles = offer
             contribution = equivalents * molecular_weight * price
             priced_per_mol.append(contribution)
             row.update(

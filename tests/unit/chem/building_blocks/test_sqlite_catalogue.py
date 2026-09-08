@@ -146,11 +146,13 @@ def test_thread_and_spawn_readers_open_database_paths(tmp_path):
         SQLiteBuildingBlockCatalogue(stock.path, expected_cache_id=release_id)
 
 
+@pytest.mark.parametrize("priced", [True, False])
 def test_cost_export_and_html_use_selected_isomer_without_scanning(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, priced
 ):
     source = tmp_path / "stock.tsv"
-    source.write_text(RAW.replace("chosen_ppg", "<chosen>_ppg"))
+    raw = RAW.replace("chosen_ppg", "<chosen>_ppg")
+    source.write_text(raw if priced else raw.replace("\t5\t7\n", "\t0\t0\n"))
     stock = load_building_blocks(source)
 
     def no_scan(self):
@@ -164,7 +166,9 @@ def test_cost_export_and_html_use_selected_isomer_without_scanning(
     selected = leaf.meta["selected_stock"]
     target = smiles("CCOC(=O)C(O)C")
     route = Route((Step(Reaction([leaf], [target]), target),))
-    assert route.calculate_cost(stock)["leaves"][0]["vendor"] == "<chosen>"
+    cost = route.calculate_cost(stock)["leaves"][0]
+    assert cost["vendor"] == ("<chosen>" if priced else None)
+    assert cost["status"] == ("priced" if priced else "unpriced")
     detached = Route.from_json(json.loads(json.dumps(route.to_json())))
     assert detached.leaves()[0].meta["selected_stock"] == selected
     stock.close()
@@ -172,8 +176,11 @@ def test_cost_export_and_html_use_selected_isomer_without_scanning(
     html = routes_report_html([detached], None)
     assert "<svg" in html
     assert selected["inchikey"] in html
-    assert "&lt;chosen&gt;" in html and "<chosen>" not in html
-    assert "<td>5</td>" in html and "<td>7</td>" in html
+    if priced:
+        assert "&lt;chosen&gt;" in html and "<chosen>" not in html
+        assert "<td>5</td>" in html and "<td>7</td>" in html
+    else:
+        assert "Price unavailable" in html
     assert "<td>1</td>" not in html
     assert "Price per gram" in html
 
@@ -187,6 +194,7 @@ def test_tree_init_does_not_materialize_stock(tmp_path, monkeypatch):
     from synplan.mcts.config import TreeConfig
     from synplan.mcts.evaluation import RolloutEvaluationStrategy
     from synplan.mcts.tree import Tree
+    from synplan.ml.training.reinforcement import run_tree_search
 
     source = tmp_path / "stock.tsv"
     source.write_text(RAW)
@@ -214,3 +222,7 @@ def test_tree_init_does_not_materialize_stock(tmp_path, monkeypatch):
     )
     assert tree.building_blocks is evaluator.rollout.building_blocks is stock
     assert tree.building_blocks.record_count == 3
+    with pytest.raises(ValueError, match="RL tree search requires SMILES stock"):
+        run_tree_search(
+            smiles("CCCCCCC"), tree.config, None, None, "unused", str(stock.path)
+        )

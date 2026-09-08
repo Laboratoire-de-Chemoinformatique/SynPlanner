@@ -13,8 +13,7 @@ from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
 from synplan import __version__
-from synplan.chem.building_blocks import molecule_to_inchikey
-from synplan.chem.building_blocks.stereo import compatible_records
+from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.routes.io import (
     make_json,
@@ -114,7 +113,6 @@ def build_target_routes(tree, reactions: dict | None = None) -> list[dict]:
             reactions,
             keep_ids=True,
             building_blocks=tree.building_blocks,
-            min_mol_size=tree.config.min_mol_size,
         ).values()
     )
 
@@ -319,19 +317,7 @@ def run_search(
                 exported_routes[export_key] = []
             try:
                 target_mol = mol_from_smiles(target_smi, clean_stereo=False)
-                # Catalogue membership, not is_building_block: that also passes
-                # anything under min_mol_size, which is right for a precursor and wrong
-                # for a target -- a small target is small, not purchasable.
-                if not is_json_catalogue:
-                    target_in_stock = str(target_mol) in building_blocks
-                else:
-                    target_key = molecule_to_inchikey(target_mol)
-                    target_in_stock = bool(
-                        compatible_records(
-                            target_mol, building_blocks, inchikey=target_key
-                        )
-                    )
-                if target_in_stock:
+                if is_purchasable(target_mol, building_blocks):
                     n_in_stock += 1
                     tqdm.write(
                         f"{target_smi} is already in the building blocks - "

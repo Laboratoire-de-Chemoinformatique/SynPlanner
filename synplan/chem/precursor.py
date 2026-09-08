@@ -141,11 +141,7 @@ class Precursor:
                 self.molecule.meta.pop("selected_stock", None)
             self._stock_cache = (bb_stock, bool(records))
             return bool(records)
-        return is_purchasable(
-            self.molecule,
-            bb_stock,
-            min_mol_size,
-        )
+        return is_purchasable(self.molecule, bb_stock)
 
 
 def is_purchasable(
@@ -161,6 +157,7 @@ def is_purchasable(
     A legacy stock is keyed by the molecule's canonical SMILES, so a caller
     holding that string can pass it as ``key``. A JSON catalogue uses the
     molecule's Chython Standard InChIKey instead.
+    ``min_mol_size`` is retained for API compatibility and does not affect membership.
     """
 
     if has_stereo_groups(molecule):

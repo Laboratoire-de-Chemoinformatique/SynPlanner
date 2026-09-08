@@ -50,6 +50,18 @@ def test_load_building_blocks_csv_standardize_true_runs(tmp_path):
     assert bbs == expected
 
 
+def test_standardized_stock_rejects_unsupported_stereo(tmp_path):
+    unsupported = "Cc1ccccc1-c1ccccc1C |wU:1.6|"
+    failures = []
+    assert standardize_smiles_batch(["CCO", unsupported], failures=failures) == ["CCO"]
+    assert failures[0]["record"] == 2
+    assert failures[0]["smiles"] == unsupported
+    assert "unsupported" in failures[0]["error"].lower()
+    path = tmp_path / "stock.smi"
+    path.write_text(f"CCO\n{unsupported}\n")
+    assert load_building_blocks(path, standardize=True, num_workers=1) == {"CCO"}
+
+
 def test_load_policy_function_weights_path_applies_overrides(monkeypatch):
     captured = {}
 
