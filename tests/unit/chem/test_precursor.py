@@ -19,8 +19,11 @@ def test_len_eq_hash(simple_molecule):
 
 def test_is_building_block_default(simple_molecule):
     p = Precursor(simple_molecule)
-    # Size is a search heuristic, never evidence of purchasability.
-    assert not p.is_building_block(bb_stock=set())
+    assert p.is_building_block(bb_stock=set())
+    assert not p.is_purchasable(set())
+    assert p.molecule.meta["assumed_trivial"] == 6
+    assert not p.is_building_block(set(), min_mol_size=0)
+    assert "assumed_trivial" not in p.molecule.meta
 
 
 def test_is_building_block_custom_size(simple_molecule, complex_molecule):
@@ -28,7 +31,7 @@ def test_is_building_block_custom_size(simple_molecule, complex_molecule):
     p_small = Precursor(simple_molecule)
     p_large = Precursor(complex_molecule)
 
-    assert not p_small.is_building_block(bb_stock=set(), min_mol_size=10)
+    assert p_small.is_building_block(bb_stock=set(), min_mol_size=10)
     # Large molecule should not be BB with min_mol_size=10
     assert not p_large.is_building_block(bb_stock=set(), min_mol_size=10)
 
@@ -50,7 +53,8 @@ def test_is_building_block_with_stock(simple_molecule, complex_molecule):
 def test_ring_molecule_handling(ring_molecule):
     p = Precursor(ring_molecule)
     assert len(p) == 6
-    assert not p.is_building_block(bb_stock=set())
+    assert p.is_building_block(bb_stock=set())
+    assert not p.is_building_block(bb_stock=set(), min_mol_size=5)
 
 
 def test_precursor_canonicalizes_molecule():

@@ -253,6 +253,13 @@ def route_context(route) -> str:
             [str(leaf), leaf.meta.get("selected_stock")] for leaf in route.leaves()
         )
     )
+    trivial = [
+        [str(leaf), leaf.meta["assumed_trivial"]]
+        for leaf in route.leaves()
+        if leaf.meta.get("assumed_trivial")
+    ]
+    if trivial:
+        payload.append(multiset(trivial))
     payload = json.loads(json.dumps(payload))
     return sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -276,7 +283,11 @@ def route_stereo_summary(
         "first_responsible": deepcopy(next(iter(obligations), None)),
         "context": route_context(route),
         "audit": deepcopy(audit),
-        "basis": "structural_inheritance_from_explicit_stock"
+        "basis": (
+            "structural_inheritance_with_trivial_leaf_assumptions"
+            if any(leaf.meta.get("assumed_trivial") for leaf in route.leaves())
+            else "structural_inheritance_from_explicit_stock"
+        )
         if status == "fulfilled"
         else None,
     }

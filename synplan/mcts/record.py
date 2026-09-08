@@ -163,6 +163,9 @@ def write_search_record(
             "selected_stock": [
                 p.molecule.meta.get("selected_stock") for p in node.new_precursors
             ],
+            "assumed_trivial": [
+                p.molecule.meta.get("assumed_trivial") for p in node.new_precursors
+            ],
             "reconstructed": node.reconstructed_route.to_json()
             if hasattr(node, "reconstructed_route")
             else None,
@@ -230,6 +233,9 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             if selected:
                 precursor.molecule.meta["selected_stock"] = selected
                 precursor.selected_stock = selected
+        for precursor, cutoff in zip(new, entry.get("assumed_trivial", ())):
+            if cutoff:
+                precursor.molecule.meta["assumed_trivial"] = cutoff
         # what this node could still have to expand: what its parent handed on,
         # then what this node itself made
         pool = list(zip(entry["new"], new))

@@ -16,12 +16,10 @@ from synplan.chem.stereo import (
 
 @lru_cache(maxsize=8192)
 def _record_molecule(smiles_text, key):
-    from synplan.chem.utils import safe_canonicalization
-
     candidate = parse_smiles_preserving_stereo(smiles_text)
     if not isinstance(candidate, MoleculeContainer):
         raise ValueError("catalogue record must contain a molecule")
-    candidate = safe_canonicalization(candidate)
+    candidate.thiele()
     if molecule_to_inchikey(candidate) != key:
         raise ValueError("catalogue record SMILES and InChIKey disagree")
     return candidate
@@ -63,19 +61,29 @@ def compatible_records(
             )
         return ()
     requirements = _requirements(molecule)
+    query_smiles = str(molecule)
     compatible = []
     try:
         with mapping_budget(max_mapping_work):
-            for record in bucket:
+            # Exact representations need no mapping work; check them before alternatives.
+            for record in sorted(bucket, key=lambda r: r.smiles != query_smiles):
                 try:
                     candidate = _record_molecule(record.smiles, record.inchikey)
-                except ValueError:
+                except ValueError as error:
+                    if diagnostics is not None:
+                        diagnostics.append(
+                            {
+                                "reason": "invalid_stock_record",
+                                "inchikey": record.inchikey,
+                                "detail": str(error),
+                            }
+                        )
                     continue
                 # OR is unresolved absolute identity; AND is a material mixture.
                 # Neither satisfies a request for the depicted absolute isomer.
                 if has_stereo_groups(candidate) or len(candidate) != len(molecule):
                     continue
-                if str(candidate) == str(molecule):
+                if str(candidate) == query_smiles:
                     compatible.append(record)
                     continue
                 for mapping in bounded_mappings(molecule, candidate):

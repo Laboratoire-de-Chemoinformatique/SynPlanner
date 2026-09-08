@@ -79,7 +79,10 @@ candidate retains its full key, stereo-bearing SMILES and vendor offers. Chython
 checks the explicit required geometry before a record is selected. Opposite and
 unspecified isomers cannot satisfy a specified request. Partially specified
 requests may accept an explicit material satisfying all specified requirements.
-Every leaf needs actual stock, including small reagents. Cost uses the selected
+Strict stock-only searches (``min_mol_size=0``) require stock for every leaf.
+A positive threshold allows small leaves with no stereo requirements to be
+marked ``assumed_trivial``. Missing required configurations remain unresolved.
+Assumed-trivial leaves have no vendor offer and leave costing incomplete. Cost uses the selected
 compatible record; an opposite isomer's price cannot be substituted.
 
 Evidence is attached to the particular reactants, products, agents and procedure.

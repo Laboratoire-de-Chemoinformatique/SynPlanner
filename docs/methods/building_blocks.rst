@@ -102,6 +102,12 @@ price per vendor. This is deliberate: Standard InChI may merge some tautomeric
 representations, and the initial implementation does not preserve their
 alternative SMILES.
 
+Raw preparation checks that the saved SMILES parses strictly and retains its
+full InChIKey. Unreadable or identity-changing output is reported as a rejected
+row. Reprepare older releases to remove records emitted without this check.
+Runtime validation aromatizes stored representations without repeating chemical
+standardization; an invalid stored record produces a stock diagnostic.
+
 Every invalid row is omitted and recorded in ``<output>.errors.tsv``. If at least one row succeeds, all valid
 records are published atomically and the function returns the output path. If no
 row succeeds, the error report is written, an existing output is left
@@ -154,9 +160,17 @@ metadata used by stereo-compatible stock selection.
 MCTS preserves stereo. The first 14 InChIKey characters retrieve candidates;
 Chython then checks identity and specified tetrahedral, E/Z and allene requirements.
 Wrong and unspecified configurations cannot fulfill a specified request.
-Relative groups and mixture records require assessment. Small molecules also
-require actual stock records. Existing stereo-free policy weights use a separate
+Relative groups and mixture records require assessment. Stock membership always
+requires an actual compatible record. Existing stereo-free policy weights use a separate
 connectivity projection; this projection never decides stock membership.
+
+``min_mol_size`` separately controls search termination: fragments at or below
+the threshold may be assumed trivial without stock. Set it to zero for strict
+stock-only termination. These endpoints retain ``in_stock: false`` and an
+``assumed_trivial`` threshold in route JSON and search records; HTML labels the
+assumption and leaves the price unavailable. They do not establish a required
+stereochemical configuration, so such routes remain unresolved without suitable
+stock. Standalone stereo audits remain stock-only unless given a size threshold.
 
 Each finalized ``Precursor`` generates its Chython InChIKey at most once.
 Repeated checks reuse the result for that precursor and immutable catalogue.

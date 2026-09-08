@@ -22,7 +22,7 @@ from .core import BuildingBlock
 logger = logging.getLogger(__name__)
 SCHEMA_VERSION = 1
 # Bump when catalogue preparation/identity semantics change independently of Chython.
-PREPARATION_VERSION = 1
+PREPARATION_VERSION = 2
 
 
 class SQLiteBuildingBlockCatalogue(Mapping[str, tuple[BuildingBlock, ...]]):

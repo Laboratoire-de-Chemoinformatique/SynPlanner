@@ -97,9 +97,7 @@ def extract_routes(
             Route.from_tree(tree, node_id).to_json() for node_id in tree.winning_nodes
         ]
     target = tree.nodes[1].precursors_to_expand[0].molecule
-    target_in_stock = tree.nodes[1].curr_precursor.is_building_block(
-        tree.building_blocks
-    )
+    target_in_stock = tree.nodes[1].curr_precursor.is_purchasable(tree.building_blocks)
 
     # append encoded routes to list
     routes_block = []
@@ -374,6 +372,13 @@ def routes_report_html(
         offers = []
         seen_stock = set()
         for leaf in route.leaves():
+            if cutoff := leaf.meta.get("assumed_trivial"):
+                offers.append(
+                    f'<tr><td class="mono">{escape(str(leaf))}<br>'
+                    f"Assumed trivial (at most {int(cutoff)} atoms)</td>"
+                    "<td>Not in stock</td><td>Price unavailable</td></tr>"
+                )
+                continue
             selected = leaf.meta.get("selected_stock")
             if not selected or selected["inchikey"] in seen_stock:
                 continue
@@ -390,7 +395,7 @@ def routes_report_html(
         stock_html = (
             (
                 '<div class="stock"><div class="eyebrow">Selected building blocks</div>'
-                "<table><thead><tr><th>Purchased structure / InChIKey</th><th>Vendor</th>"
+                "<table><thead><tr><th>Structure / InChIKey</th><th>Vendor</th>"
                 "<th>Price per gram</th></tr></thead><tbody>"
                 + "".join(offers)
                 + '</tbody></table><div class="rxn">Catalogue price units; currency is not specified.</div></div>'

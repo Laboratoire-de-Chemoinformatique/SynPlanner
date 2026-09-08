@@ -102,13 +102,20 @@ class Precursor:
         bb_stock: Set[str] | BuildingBlockCatalogue,
         min_mol_size: int = 6,
     ) -> bool:
-        """Checks if a Precursor is a building block.
+        """Stop expansion for compatible stock or an assumed-trivial small fragment."""
+        purchasable = self.is_purchasable(bb_stock)
+        self.molecule.meta.pop("assumed_trivial", None)
+        if not purchasable and 0 < len(self) <= min_mol_size:
+            self.molecule.meta["assumed_trivial"] = min_mol_size
+            return True
+        return purchasable
+
+    def is_purchasable(self, bb_stock: Set[str] | BuildingBlockCatalogue) -> bool:
+        """Check compatible stock, retaining the selected record and diagnostics.
 
         :param bb_stock: The list of building blocks. Each building block is represented
             by a canonical SMILES in legacy mode. JSON mode uses an immutable
             prefix-bucket catalogue whose records retain their full InChIKeys.
-        :param min_mol_size: Legacy size heuristic parameter; stock membership
-            always requires an actual compatible record, including small leaves.
         :return: True is Precursor is a building block.
         """
         if has_stereo_groups(self.molecule):

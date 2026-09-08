@@ -901,6 +901,7 @@ class Tree:
                             for i, step in enumerate(route.steps)
                         },
                         allow_unconstrained_target=True,
+                        min_mol_size=self.config.min_mol_size,
                     )
                 if audit.supported:
                     node.reconstructed_route = route = audit.route

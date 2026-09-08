@@ -12,6 +12,7 @@ from synplan.chem import building_blocks as building_block_types
 from synplan.chem.precursor import Precursor, compose_precursors
 from synplan.chem.rdkit_utils import RDKitScore
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
+from synplan.chem.stereo import has_stereo, has_stereo_groups
 from synplan.ml.networks.checkpoint import load_network_from_checkpoint
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training import mol_to_pyg
@@ -150,6 +151,10 @@ class RolloutSimulator:
             self.building_blocks,
             self.min_mol_size,
         ):
+            if precursor.molecule.meta.get("assumed_trivial") and (
+                has_stereo(precursor.molecule) or has_stereo_groups(precursor.molecule)
+            ):
+                return 0.0
             return 1.0
 
         occurred_precursor = set()
@@ -201,6 +206,12 @@ class RolloutSimulator:
                         )
                     ]
                 )
+                if any(
+                    x.molecule.meta.get("assumed_trivial")
+                    and (has_stereo(x.molecule) or has_stereo_groups(x.molecule))
+                    for x in products
+                ):
+                    return 0.0
                 rollout_depth += 1
 
         return 1.0

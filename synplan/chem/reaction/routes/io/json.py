@@ -186,10 +186,12 @@ def read_route_tree(route_json) -> RouteRead:
             if made is not None:
                 check_stereo_node(made, node)
                 reactants[slot] = made
-            elif not node.get("in_stock"):
+            elif not node.get("in_stock") and not node.get("assumed_trivial"):
                 unresolved.append(reactants[slot])
             if node.get("selected_stock"):
                 reactants[slot].meta["selected_stock"] = dict(node["selected_stock"])
+            if node.get("assumed_trivial"):
+                reactants[slot].meta["assumed_trivial"] = node["assumed_trivial"]
         # splice, rather than rebuild, to keep the parsed reaction's metadata
         reaction._reactants = tuple(reactants)
 
@@ -271,7 +273,13 @@ def route_tree(target, source_of, purchasable, step_fields) -> "RouteNode | None
             return {
                 "type": "mol",
                 "smiles": key,
-                "in_stock": purchasable(molecule, key, True),
+                "in_stock": not molecule.meta.get("assumed_trivial", False)
+                and purchasable(molecule, key, True),
+                **(
+                    {"assumed_trivial": molecule.meta["assumed_trivial"]}
+                    if "assumed_trivial" in molecule.meta
+                    else {}
+                ),
                 **(
                     {"selected_stock": dict(molecule.meta["selected_stock"])}
                     if "selected_stock" in molecule.meta

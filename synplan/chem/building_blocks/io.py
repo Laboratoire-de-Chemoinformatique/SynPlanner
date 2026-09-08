@@ -457,11 +457,16 @@ def _prepare_catalogue_batch(rows, *, smiles_column, price_columns):
             if not isinstance(molecule, MoleculeContainer):
                 raise ValueError("SMILES does not describe one molecule")
             molecule = safe_canonicalization(molecule, clean_stereo=False)
+            smiles_text = str(molecule)
+            key = molecule_to_inchikey(molecule)
+            restored = parse_smiles_preserving_stereo(smiles_text)
+            if molecule_to_inchikey(restored) != key:
+                raise ValueError("prepared SMILES changes identity when read back")
             records.append(
                 (
-                    molecule_to_inchikey(molecule),
+                    key,
                     {
-                        "smiles": str(molecule),
+                        "smiles": smiles_text,
                         "vendors": vendors,
                         "has_stereo": molecule_has_stereo(molecule),
                     },

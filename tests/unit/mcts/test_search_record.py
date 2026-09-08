@@ -6,10 +6,12 @@ import json
 import pytest
 from test_tree_stats import FakeReactor, build_tree, make_mol
 
+from synplan.chem.reaction.routes.route import Route
 from synplan.chem.utils import standardize_building_blocks
 from synplan.mcts.record import read_search_record, write_search_record
 from synplan.mcts.tree import Tree
 from synplan.utils.loading import load_building_blocks
+from synplan.utils.visualisation import routes_report_html
 
 
 @pytest.fixture(scope="module")
@@ -81,6 +83,34 @@ def test_the_record_is_not_a_tree(record):
     assert not isinstance(record, Tree)
     assert not hasattr(record, "expansion_function")
     assert not hasattr(record, "building_blocks")
+
+
+@pytest.mark.parametrize("cutoff", [0, 5])
+def test_trivial_endpoints_survive_export_without_claiming_stock(tmp_path, cutoff):
+    tree = build_tree(building_blocks=frozenset(), min_mol_size=cutoff).run()
+    assert bool(tree.winning_nodes) == bool(cutoff)
+    if not cutoff:
+        return
+    route = tree.routes()[0]
+    exported = route.to_json()
+    leaf = exported["children"][0]["children"][0]
+    assert leaf["assumed_trivial"] == cutoff
+    assert leaf["in_stock"] is False
+    assert "selected_stock" not in leaf
+    restored = Route.from_json(exported)
+    record = read_search_record(write_search_record(tree, tmp_path / "tree.json.gz"))
+    for copy in (restored, record.routes()[0]):
+        assert copy.to_json()["children"][0]["children"][0] == leaf
+        assert [str(s.reaction) for s in copy] == [str(s.reaction) for s in route]
+        assert copy.solved
+    assert restored.solved
+    cost = restored.calculate_cost({})
+    assert cost["cost_per_mol"] is None and not cost["complete"]
+    html = routes_report_html([restored], None)
+    assert "Assumed trivial" in html and "Not in stock" in html
+    assert "Price unavailable" in html
+    restored.leaves()[0].meta["assumed_trivial"] = cutoff + 1
+    assert restored.stereo_status == "needs_reassessment"
 
 
 def test_the_record_carries_the_graph_and_no_routes(searched, tmp_path):

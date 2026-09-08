@@ -76,7 +76,7 @@ def test_default_preservation_and_query_positive_negative(text):
     matches = compatible_records(mol, stock)
     assert len(matches) == 1
     assert matches[0].vendors["supplier"] == 9
-    assert not Precursor(mol).is_building_block(catalogue((str(opposite), 1)), 100)
+    assert not Precursor(mol).is_purchasable(catalogue((str(opposite), 1)))
 
 
 @pytest.mark.parametrize("group", ["a:1,3", "o1:1,3", "&1:1,3"])
@@ -167,6 +167,11 @@ def test_strict_mode_excludes_new_center_and_rollout_cannot_reward_it():
     assert len(tree.nodes) == 1
     rollout = RolloutSimulator(RulesPolicy(), (rule,), stock, 0, 3)
     assert rollout.simulate_precursor(Precursor(smiles(STEREO[0]))) < 1
+
+
+def test_trivial_cutoff_does_not_reward_unstocked_stereo():
+    rollout = RolloutSimulator(RulesPolicy(), (), frozendict(), 6, 3)
+    assert rollout.simulate_precursor(Precursor(smiles("C[C@H](O)CCO"))) == 0
 
 
 @pytest.mark.parametrize("rebuild", [False, True])

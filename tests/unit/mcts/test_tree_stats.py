@@ -98,7 +98,7 @@ def build_tree(algorithm="breadth_first", rules=None, **kwargs):
         max_time=10,
         max_depth=4,
         search_strategy=search_strategy,
-        min_mol_size=6,
+        min_mol_size=kwargs.pop("min_mol_size", 6),
         silent=True,
         enable_pruning=False,
         **kwargs,
@@ -111,6 +111,7 @@ def build_tree(algorithm="breadth_first", rules=None, **kwargs):
             policy_network=fake_policy,
             reaction_rules=reactors,
             building_blocks=building_blocks,
+            min_mol_size=cfg.min_mol_size,
         )
         evaluator = load_evaluation_function(eval_config)
     return Tree(
