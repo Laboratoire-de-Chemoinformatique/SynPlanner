@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import Mock
+
 import pytest
 from chython import smiles
 
@@ -7,6 +9,7 @@ from synplan.chem.reaction.reactor import ReactionApplication
 from synplan.chem.target_bonds import TargetAtomProvenance
 from synplan.mcts import tree as tree_module
 from synplan.mcts.config import TreeConfig
+from synplan.mcts.node import Node
 from synplan.mcts.record import read_search_record, write_search_record
 from synplan.mcts.tree import Tree
 
@@ -162,6 +165,62 @@ def test_tree_without_constraints_preserves_empty_required_state():
     assert tree.nodes[1].remaining_required_bonds == frozenset()
 
 
+@pytest.mark.parametrize("terminal", [False, True])
+@pytest.mark.parametrize(
+    "stereo_obligations", [(), ({"reason": "requires_stereo_forming_step"},)]
+)
+@pytest.mark.parametrize("remaining_required_bonds", [frozenset(), frozenset({(1, 2)})])
+def test_node_is_solved_requires_all_obligations_complete(
+    terminal, stereo_obligations, remaining_required_bonds
+):
+    node = Node(
+        precursors_to_expand=() if terminal else (object(),),
+        new_precursors=(),
+        stereo_obligations=stereo_obligations,
+        remaining_required_bonds=remaining_required_bonds,
+    )
+
+    assert node.is_terminal() is terminal
+    assert node.is_solved() is (
+        terminal and not stereo_obligations and not remaining_required_bonds
+    )
+
+
+@pytest.mark.parametrize("bonds_state", [None, {}, {(1, 2): 0}, {(1, 2): 2}])
+def test_tree_skips_required_bond_scan_without_requirements(monkeypatch, bonds_state):
+    scan = Mock(wraps=tree_module.removed_target_bonds)
+    monkeypatch.setattr(tree_module, "removed_target_bonds", scan)
+    tree = _build_tree(bonds_state)
+    products = _reaction_application(
+        tree, 1, "[CH3:1][CH2:2][CH2:3][CH3:4]>>[CH3:1][CH2:2][CH3:3].[CH4:4]"
+    )
+
+    assert tree._add_child_if_new(_context(tree, 1), products, _candidate())
+    assert not tree.nodes[2].remaining_required_bonds
+    scan.assert_not_called()
+
+
+def test_tree_skips_required_bond_scan_after_requirements_are_satisfied(monkeypatch):
+    scan = Mock(wraps=tree_module.removed_target_bonds)
+    monkeypatch.setattr(tree_module, "removed_target_bonds", scan)
+    tree = _build_tree({(3, 4): 1}, min_mol_size=1)
+    first_products = _reaction_application(
+        tree, 1, "[CH3:1][CH2:2][CH2:3][CH3:4]>>[CH3:1][CH2:2][CH3:3].[CH4:4]"
+    )
+
+    assert tree._add_child_if_new(_context(tree, 1), first_products, _candidate())
+    assert not tree.nodes[2].remaining_required_bonds
+    assert tree.nodes[1].remaining_required_bonds == frozenset({(3, 4)})
+    scan.assert_called_once()
+
+    next_products = _reaction_application(
+        tree, 2, "[CH3:1][CH2:2][CH3:3]>>[CH3:1][CH3:2].[CH4:3]"
+    )
+    assert tree._add_child_if_new(_context(tree, 2), next_products, _candidate())
+    assert not tree.nodes[3].remaining_required_bonds
+    scan.assert_called_once()
+
+
 def test_terminal_route_is_rejected_until_required_bond_is_broken():
     tree = _build_tree({(1, 2): 1}, min_mol_size=10)
     products = _reaction_application(
@@ -173,6 +232,9 @@ def test_terminal_route_is_rejected_until_required_bond_is_broken():
     assert added is False
     assert tree.children[1] == set()
     assert tree.curr_tree_size == 2
+    assert set(tree.nodes) == {1}
+    assert tree.proposal_nodes == []
+    assert tree.winning_nodes == []
 
 
 def test_terminal_route_is_accepted_after_required_bond_is_broken():
@@ -189,7 +251,9 @@ def test_terminal_route_is_accepted_after_required_bond_is_broken():
     assert child.remaining_required_bonds == frozenset()
 
 
-def test_required_bonds_can_be_broken_across_multiple_steps():
+def test_required_bonds_can_be_broken_across_multiple_steps(monkeypatch):
+    scan = Mock(wraps=tree_module.removed_target_bonds)
+    monkeypatch.setattr(tree_module, "removed_target_bonds", scan)
     tree = _build_tree({(1, 2): 1, (2, 3): 1}, min_mol_size=1)
 
     unrelated_products = _reaction_application(
@@ -197,6 +261,7 @@ def test_required_bonds_can_be_broken_across_multiple_steps():
     )
     assert tree._add_child_if_new(_context(tree, 1), unrelated_products, _candidate())
     assert tree.nodes[2].remaining_required_bonds == frozenset({(1, 2), (2, 3)})
+    assert scan.call_count == 1
 
     first_required_products = _reaction_application(
         tree, 2, "[CH3:1][CH2:2][CH3:3]>>[CH4:1].[CH3:2][CH3:3]"
@@ -205,6 +270,8 @@ def test_required_bonds_can_be_broken_across_multiple_steps():
         _context(tree, 2), first_required_products, _candidate()
     )
     assert tree.nodes[3].remaining_required_bonds == frozenset({(2, 3)})
+    assert tree.nodes[2].remaining_required_bonds == frozenset({(1, 2), (2, 3)})
+    assert scan.call_count == 2
 
     second_required_products = _reaction_application(
         tree, 3, "[CH3:2][CH3:3]>>[CH4:2].[CH4:3]"
@@ -214,6 +281,9 @@ def test_required_bonds_can_be_broken_across_multiple_steps():
     )
     assert tree.nodes[4].is_solved() is True
     assert tree.nodes[4].remaining_required_bonds == frozenset()
+    assert tree.nodes[3].remaining_required_bonds == frozenset({(2, 3)})
+    assert tree.nodes[1].remaining_required_bonds == frozenset({(1, 2), (2, 3)})
+    assert scan.call_count == 3
 
 
 def test_pruning_key_includes_remaining_required_bonds():

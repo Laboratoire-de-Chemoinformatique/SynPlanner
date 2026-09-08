@@ -780,14 +780,15 @@ class Tree:
                 (history + json.dumps(local, sort_keys=True)).encode()
             ).hexdigest()
         pruning_key = (precursors_to_expand, obligations.key, history)
-        broken_bonds = curr_node.remaining_required_bonds & removed_target_bonds(
-            (
-                curr_node.curr_precursor.molecule,
-                curr_node.curr_precursor.target_atom_provenance,
-            ),
-            application.states,
-        )
-        remaining_required_bonds = curr_node.remaining_required_bonds - broken_bonds
+        remaining_required_bonds = curr_node.remaining_required_bonds
+        if remaining_required_bonds:
+            remaining_required_bonds = remaining_required_bonds - removed_target_bonds(
+                (
+                    curr_node.curr_precursor.molecule,
+                    curr_node.curr_precursor.target_atom_provenance,
+                ),
+                application.states,
+            )
         if not precursors_to_expand and remaining_required_bonds:
             return False
 

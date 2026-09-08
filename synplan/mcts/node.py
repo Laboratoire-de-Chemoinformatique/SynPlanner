@@ -118,12 +118,12 @@ class Node:
         )
 
     def is_solved(self) -> bool:
-        """If True, it is a terminal node.
-
-        There are no precursors for expansion.
-        """
-
-        return self.is_terminal() and not self.stereo_obligations
+        """Return whether expansion, stereo, and required-bond obligations are complete."""
+        return (
+            self.is_terminal()
+            and not self.stereo_obligations
+            and not self.remaining_required_bonds
+        )
 
     def is_terminal(self) -> bool:
         """All leaf structures are purchased; stereo strategy may still be needed."""
