@@ -6,18 +6,14 @@ import gzip
 import json
 import logging
 import os.path
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 
 from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
 from synplan import __version__
-from synplan.chem.building_blocks import (
-    load_building_block_catalogue,
-    molecule_to_inchikey,
-)
-from synplan.chem.building_blocks.stereo import compatible_records
+from synplan.chem.precursor import is_purchasable
 from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.routes.io import (
     make_json,
@@ -117,7 +113,6 @@ def build_target_routes(tree, reactions: dict | None = None) -> list[dict]:
             reactions,
             keep_ids=True,
             building_blocks=tree.building_blocks,
-            min_mol_size=tree.config.min_mol_size,
         ).values()
     )
 
@@ -131,8 +126,8 @@ def export_routes_artifact(
     """Write the target-keyed route-export artifact (public contract).
 
     Gzip-writes ``results`` as JSON to ``results_root/filename``. ``results`` is
-    the public envelope: a top-level dict keyed by the RDKit-canonical target
-    SMILES (matching retrocast's ``Target.smiles``; see
+    the public envelope: a top-level dict keyed by the Chython-canonical target
+    SMILES (see
     :func:`_canonical_target_key`) mapping to ``[route_tree, ...]`` with ``[]``
     for unsolved targets, where each ``route_tree`` is a
     :func:`build_target_routes` / ``make_json`` node tree.
@@ -208,7 +203,7 @@ def run_search(
         cross-step-reconciled atom-map numbering in the exported reactions.
     :param export_routes: When True, additionally emit the public route-export
         artifact (``routes_filename`` + ``manifest.json``) keyed by the
-        RDKit-canonical target SMILES (matching retrocast's ``Target.smiles``;
+        Chython-canonical target SMILES (
         ``[]`` for unsolved targets), for downstream consumers. Defaults to
         False, leaving the existing outputs byte-identical.
     :param routes_filename: Filename (under ``results_root``) for the gzipped
@@ -281,11 +276,8 @@ def run_search(
     else:
         policy_function = load_policy_function(policy_config=policy_config)
     reaction_rules = load_reaction_rules(reaction_rules_path)
-    is_json_catalogue = Path(building_blocks_path).suffix.lower() == ".json"
-    if is_json_catalogue:
-        building_blocks = load_building_block_catalogue(building_blocks_path)
-    else:
-        building_blocks = load_building_blocks(building_blocks_path, standardize=False)
+    building_blocks = load_building_blocks(building_blocks_path, standardize=False)
+    is_json_catalogue = isinstance(building_blocks, Mapping)
 
     # Create evaluation strategy from config
     evaluation_function = load_evaluation_function(evaluation_config)
@@ -293,7 +285,7 @@ def run_search(
     # run search
     n_solved = 0
     extracted_routes = []
-    # Public route-export accumulator keyed by RDKit-canonical target SMILES:
+    # Public route-export accumulator keyed by Chython-canonical target SMILES:
     # {canonical_target_smiles: [route_tree, ...]}.
     exported_routes: dict[str, list[dict]] = {}
     # CLI runs may contain many targets whose per-tree node IDs overlap, so the
@@ -316,8 +308,8 @@ def run_search(
             target_smi = target_smi.strip()
             if is_json_catalogue:
                 route_costs[target_smi] = {}
-            # Key the export dict by the RDKit-canonical target SMILES so keys
-            # match retrocast's Target.smiles byte-for-byte. Every target starts
+            # Key the export dict by the Chython-canonical target SMILES so keys
+            # match the canonicalizer recorded in the manifest. Every target starts
             # empty; only a solved one overwrites it.
             export_key = None
             if export_routes:
@@ -325,19 +317,7 @@ def run_search(
                 exported_routes[export_key] = []
             try:
                 target_mol = mol_from_smiles(target_smi, clean_stereo=False)
-                # Catalogue membership, not is_building_block: that also passes
-                # anything under min_mol_size, which is right for a precursor and wrong
-                # for a target -- a small target is small, not purchasable.
-                if not is_json_catalogue:
-                    target_in_stock = str(target_mol) in building_blocks
-                else:
-                    target_key = molecule_to_inchikey(target_mol)
-                    target_in_stock = bool(
-                        compatible_records(
-                            target_mol, building_blocks, inchikey=target_key
-                        )
-                    )
-                if target_in_stock:
+                if is_purchasable(target_mol, building_blocks):
                     n_in_stock += 1
                     tqdm.write(
                         f"{target_smi} is already in the building blocks - "

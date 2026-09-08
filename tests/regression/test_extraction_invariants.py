@@ -171,3 +171,48 @@ def test_extraction_policy_data_consistent_with_rules_tsv(
         f"only declares {n_rules} rules (ids 0..{n_rules - 1}). Downstream "
         "training will index out of range or undersize the output head."
     )
+
+
+def test_rule_extraction_does_not_truncate_distinct_reaction_centers():
+    from chython import smiles
+
+    from synplan.chem.reaction.rules.config import RuleExtractionConfig
+    from synplan.chem.reaction.rules.extraction import extract_rules
+
+    left, right = [], []
+    for i in range(16):
+        a, b, c = 3 * i + 1, 3 * i + 2, 3 * i + 3
+        element = "O" if i < 15 else "S"
+        left.append(f"[CH3:{a}][CH2:{b}][{element}H:{c}]")
+        right.append(f"[CH3:{a}][CH:{b}]=[{element}:{c}]")
+    reaction = smiles(".".join(left) + ">>" + ".".join(right))
+    assert len((~reaction).centers_list) == 16
+    rules, _ = extract_rules(
+        RuleExtractionConfig(
+            multicenter_rules=False,
+            single_product_only=False,
+            reactor_validation=False,
+            reverse_rule=False,
+        ),
+        reaction,
+    )
+    assert len(rules) == 2  # repeated alcohol center plus the final thiol center
+
+
+def test_validation_estimates_the_reactant_that_supplied_the_query(monkeypatch):
+    from chython import smiles
+    from chython.containers import ReactionContainer
+
+    from synplan.chem.reaction.rules import extraction
+
+    reaction = smiles("[CH4:7].[CH3:1][CH2:2][OH:3]>>[CH3:1][CH:2]=[O:3]")
+    rule = ReactionContainer([reaction.reactants[1]], reaction.products)
+    targets = []
+
+    def estimate(query, target):
+        targets.append(target)
+        return 1e10
+
+    monkeypatch.setattr(extraction, "_isomorphism_cost_estimate", estimate)
+    assert not extraction.validate_rule(rule, reaction)
+    assert targets == [reaction.reactants[1]]

@@ -2,13 +2,18 @@
 
 from functools import lru_cache
 
+from chython import inchi_key, smiles
 from chython.containers import MoleculeContainer
 
-from synplan.chem.building_blocks.identity import molecule_to_inchikey
-from synplan.chem.mapping import MappingBudgetExceeded, bounded_mappings, mapping_budget
+from synplan.chem.building_blocks.core import match_building_blocks
+from synplan.chem.mapping import (
+    MappingBudgetExceeded,
+    backend_preparation,
+    bounded_mappings,
+    mapping_budget,
+)
 from synplan.chem.stereo import (
     has_stereo_groups,
-    parse_smiles_preserving_stereo,
     stereo_requirements,
     stereo_sign,
 )
@@ -16,14 +21,13 @@ from synplan.chem.stereo import (
 
 @lru_cache(maxsize=8192)
 def record_molecule(smiles_text, key):
-    from synplan.chem.utils import safe_canonicalization
-
-    candidate = parse_smiles_preserving_stereo(smiles_text)
-    if not isinstance(candidate, MoleculeContainer):
-        raise ValueError("catalogue record must contain a molecule")
-    candidate = safe_canonicalization(candidate)
-    if molecule_to_inchikey(candidate) != key:
-        raise ValueError("catalogue record SMILES and InChIKey disagree")
+    with backend_preparation():
+        candidate = smiles(smiles_text, strict_stereo=True)
+        if not isinstance(candidate, MoleculeContainer):
+            raise ValueError("catalogue record must contain a molecule")
+        candidate.thiele()
+        if inchi_key(candidate) != key:
+            raise ValueError("catalogue record SMILES and InChIKey disagree")
     return candidate
 
 
@@ -42,7 +46,7 @@ def compatible_records(
     correspondence work is separately bounded. Empty results after a budget
     exception are incomplete, not proof that compatible stock does not exist.
     """
-    key = inchikey or molecule_to_inchikey(molecule)
+    key = inchikey or inchi_key(molecule)
     if has_stereo_groups(molecule):
         if diagnostics is not None:
             diagnostics.append(
@@ -52,7 +56,7 @@ def compatible_records(
                 }
             )
         return ()
-    bucket = catalogue.get(key[:14], ())
+    bucket = match_building_blocks(catalogue, key)
     if len(bucket) > max_records:
         if diagnostics is not None:
             diagnostics.append(
@@ -63,19 +67,29 @@ def compatible_records(
             )
         return ()
     requirements = stereo_requirements(molecule)
+    query_smiles = str(molecule)
     compatible = []
     try:
         with mapping_budget(max_mapping_work):
-            for record in bucket:
+            # Exact representations need no mapping work; check them before alternatives.
+            for record in sorted(bucket, key=lambda r: r.smiles != query_smiles):
                 try:
                     candidate = record_molecule(record.smiles, record.inchikey)
-                except ValueError:
+                except ValueError as error:
+                    if diagnostics is not None:
+                        diagnostics.append(
+                            {
+                                "reason": "invalid_stock_record",
+                                "inchikey": record.inchikey,
+                                "detail": str(error),
+                            }
+                        )
                     continue
                 # OR is unresolved absolute identity; AND is a material mixture.
                 # Neither satisfies a request for the depicted absolute isomer.
                 if has_stereo_groups(candidate) or len(candidate) != len(molecule):
                     continue
-                if str(candidate) == str(molecule):
+                if str(candidate) == query_smiles:
                     compatible.append(record)
                     continue
                 for mapping in bounded_mappings(molecule, candidate):

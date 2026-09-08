@@ -122,3 +122,51 @@ def test_extract_routes_uses_root_to_terminal_steps():
     reaction = routes[0]["children"][0]
     assert reaction["type"] == "reaction"
     assert reaction["children"][0]["smiles"] == str(product.molecule)
+
+
+def test_rendering_restores_global_settings_and_shared_geometry(monkeypatch):
+    import pytest
+    from chython.algorithms.depict import _render_config
+
+    from synplan.chem.reaction.routes import Step
+    from synplan.utils.svgslim import content_key
+    from synplan.utils.visualisation import (
+        routes_clustering_report,
+        routes_report_html,
+        routes_subclustering_report,
+    )
+
+    reaction = read_smiles("CCO.CC(=O)O>>CCOC(C)=O")
+    route = Route((Step(reaction, reaction.products[0]),))
+    layouts = {}
+    # A common layout must give the same drawing regardless of parent alignment.
+    assert content_key(route.svg(layouts=layouts, align=True)) == content_key(
+        route.svg(layouts=layouts, align=False)
+    )
+    before = dict(_render_config)
+    assert "<svg" in routes_report_html([route], None, aam=not before["mapping"])
+    routes_clustering_report({}, {}, "absent", {}, aam=not before["mapping"])
+    routes_subclustering_report({}, {"routes_data": {}}, aam=not before["mapping"])
+    assert _render_config == before
+
+    def broken_svg(*args, **kwargs):
+        raise RuntimeError("render failure")
+
+    monkeypatch.setattr(Route, "svg", broken_svg)
+    with pytest.raises(RuntimeError, match="render failure"):
+        routes_report_html([route], None, aam=not before["mapping"])
+    assert _render_config == before
+
+
+def test_importing_search_leaves_chython_render_settings_alone():
+    import subprocess
+    import sys
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            'from chython.algorithms.depict import _render_config; _render_config["mapping"] = True; import synplan.mcts; assert _render_config["mapping"] is True',
+        ],
+        check=True,
+    )

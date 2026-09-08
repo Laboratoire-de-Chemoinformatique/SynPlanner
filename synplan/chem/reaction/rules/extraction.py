@@ -3,10 +3,9 @@
 import json
 import logging
 import tempfile
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, deque
 from importlib.metadata import version
 from io import TextIOWrapper
-from itertools import islice
 from os.path import splitext
 from pathlib import Path
 
@@ -497,7 +496,12 @@ def validate_rule(rule: ReactionContainer, reaction: ReactionContainer) -> bool:
     )
     products = tuple(rule.products)
     if patterns and reaction.reactants:
-        cost = _isomorphism_cost_estimate(patterns[0], reaction.reactants[0])
+        source = next(
+            (m for m in reaction.reactants if set(patterns[0]).issubset(m)), None
+        )
+        cost = (
+            _isomorphism_cost_estimate(patterns[0], source) if source is not None else 0
+        )
         if cost > _ISOMORPHISM_COST_SKIP_THRESHOLD:
             rule.meta["reactor_validation"] = "could_not_be_assessed"
             rule.meta["validation_reason"] = "estimated_mapping_work_exceeds_limit"
@@ -607,10 +611,14 @@ def create_rule(
     )
     # Complete every included stereo reference once; adding a neighboring center
     # may bring its own reference environment into scope.
-    from collections import deque
-
     references = {}
     for mol in (*reaction.reactants, *reaction.products):
+        if any(
+            event["event"] == "unsupported_stereo_type"
+            for event in source_stereo_events
+        ):
+            # Unassessed stereo kept the complete source structures in the center.
+            continue
         for req in stereo_requirements(mol):
             needed = set(req.atoms)
             for n in req.atoms:
@@ -720,7 +728,7 @@ def extract_rule_components(config, reaction, *, as_records):
 
     # extract one rule per disconnected reaction-center component, dedup by CGR
     cgr = ~reaction
-    center_components = [set(component) for component in islice(cgr.centers_list, 15)]
+    center_components = [set(component) for component in cgr.centers_list]
     if not center_components and not config.ignore_stereo:
         changed = {
             n
@@ -839,6 +847,11 @@ def source_stereo_record(reaction, index):
 
 def _extract_rules_batch_worker(
     batch: list[tuple[int, str]],
+    *,
+    config: RuleExtractionConfig | None = None,
+    ignore_errors: bool = False,
+    fmt: str = "smi",
+    collect_stereo: bool = True,
 ) -> ExtractionBatchResult:
     """Top-level picklable worker function for rule extraction.
 
@@ -853,14 +866,14 @@ def _extract_rules_batch_worker(
         validation metadata, errors, and the count of skipped multi-product
         reactions.
     """
-    if _worker_state is None:
-        raise RuntimeError(
-            "_extract_rules_batch_worker called outside a worker process. "
-            "This function requires _init_extraction_worker to run first."
-        )
-    config = _worker_state["config"]
-    ignore_errors = _worker_state["ignore_errors"]
-    fmt = _worker_state["fmt"]
+    if config is None:
+        if _worker_state is None:
+            raise RuntimeError(
+                "Extraction worker requires configuration or initialization"
+            )
+        config = _worker_state["config"]
+        ignore_errors = _worker_state["ignore_errors"]
+        fmt = _worker_state["fmt"]
 
     rule_records: list[tuple[int, list[ExtractedRuleRecord], str]] = []
     errors: list[ErrorEntry] = []
@@ -872,7 +885,8 @@ def _extract_rules_batch_worker(
             reaction = parse_reaction(
                 raw_item, fmt=fmt, ignore_stereo=config.ignore_stereo
             )
-            stereo_records.append(source_stereo_record(reaction, index))
+            if collect_stereo:
+                stereo_records.append(source_stereo_record(reaction, index))
             product_smi = str(unite_molecules(reaction.products))
             rules_payload, skipped = extract_rule_components(
                 config, reaction, as_records=True
@@ -1245,92 +1259,34 @@ def _extract_rules_serial(
     Returns ``(n_processed, n_multi_product)``.
     """
     n_processed = 0
-    n_multi_product = 0
-    raw_reader = RawReactionReader(reaction_data_path)
-    for index, raw_item in tqdm(
-        enumerate(raw_reader),
+    n_multi_product = [0]
+    for row in tqdm(
+        enumerate(RawReactionReader(reaction_data_path)),
         desc="Number of reactions processed: ",
         bar_format="{desc}{n} [{elapsed}]",
     ):
-        n_processed += 1
-        try:
-            reaction = parse_reaction(
-                raw_item, fmt=fmt, ignore_stereo=config.ignore_stereo
-            )
-            if stereo_file is not None:
-                stereo_file.write(
-                    json.dumps(source_stereo_record(reaction, index), sort_keys=True)
-                    + "\n"
-                )
-            product_smi = str(unite_molecules(reaction.products))
-            rule_records, skipped = extract_rule_components(
-                config, reaction, as_records=True
-            )
-            if skipped:
-                n_multi_product += 1
-                entry = _make_audit_entry(
-                    index,
-                    raw_item,
-                    fmt,
-                    "extract_rules",
-                    "SkippedMultiProduct",
-                    "single_product_only=True and reaction has multiple "
-                    "products after reagent removal",
-                )
-                if audit_entries_by_index is not None:
-                    audit_entries_by_index[index] = entry
-                if audit_counts is not None:
-                    audit_counts[(entry.stage, entry.error_type)] += 1
-                continue
-            if not rule_records:
-                entry = _make_audit_entry(
-                    index,
-                    raw_item,
-                    fmt,
-                    "extract_rules",
-                    "NoRulesExtracted",
-                    "reaction parsed successfully but no rules were extracted",
-                )
-                if audit_entries_by_index is not None:
-                    audit_entries_by_index[index] = entry
-                if audit_counts is not None:
-                    audit_counts[(entry.stage, entry.error_type)] += 1
-                continue
-            _update_rules_statistics(
-                all_rules_statistics,
-                eligible_rules_statistics,
-                cgr_to_rule,
-                index,
-                rule_records,
-            )
-            if reaction_rule_occurrences_by_index is not None:
-                reaction_rule_occurrences_by_index[index] = [
-                    (rule_record.cgr_key, rule_record.reactor_validation)
-                    for rule_record in rule_records
-                ]
-            if products_file is not None:
-                products_file.write(f"{index}\t{product_smi}\n")
-        except Exception as e:
-            if not ignore_errors:
-                raise
-            orig, source_info = extract_origin_fields(raw_item, fmt)
-            etype = type(e).__qualname__
-            stage = e.stage if hasattr(e, "stage") else "extract_rules"
-            err_entry = ErrorEntry(
-                original=orig,
-                source_info=source_info,
-                stage=stage,
-                error_type=etype,
-                message=tsv_safe(str(e)),
-                line_number=index,
-            )
-            if audit_entries_by_index is not None:
-                audit_entries_by_index[index] = err_entry
-            if error_file is not None:
-                write_error_row(error_file, orig, source_info, stage, etype, str(e))
-            if error_counts is not None:
-                error_counts[(stage, etype)] += 1
-    return n_processed, n_multi_product
+        result = _extract_rules_batch_worker(
+            [row],
+            config=config,
+            ignore_errors=ignore_errors,
+            fmt=fmt,
+            collect_stereo=stereo_file is not None,
+        )
+        n_processed += process_extraction_result(
+            result,
+            all_rules_statistics,
+            eligible_rules_statistics,
+            cgr_to_rule,
+            error_file=error_file,
+            error_counts=error_counts,
+            multi_product_count=n_multi_product,
+            products_file=products_file,
+            audit_entries_by_index=audit_entries_by_index,
+            reaction_rule_occurrences_by_index=reaction_rule_occurrences_by_index,
+            audit_counts=audit_counts,
+            stereo_file=stereo_file,
+        )
+    return n_processed, n_multi_product[0]
 
 
 def print_extraction_summary(

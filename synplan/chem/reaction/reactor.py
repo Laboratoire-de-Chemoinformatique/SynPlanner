@@ -30,9 +30,6 @@ logger = logging.getLogger(__name__)
 class Reaction(ReactionContainer):
     """Reaction class used for a general representation of reaction."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
 
 class CanonicalRetroReactor(Reactor):
     """Reactor subclass that emits **already-canonical** products in a
@@ -69,26 +66,20 @@ class CanonicalRetroReactor(Reactor):
         new = super()._patcher(structure, mapping)
         patched = new.copy() if has_stereo(new) else None
 
-        try:
-            new.kekule(ignore_pyrrole_hydrogen=self._fix_broken_pyrroles)
-        except InvalidAromaticRing:
-            raise  # caught by chython._single_stage → rule skipped
+        new.kekule(ignore_pyrrole_hydrogen=self._fix_broken_pyrroles)
 
         if new.check_valence():
             # ValenceError would escape; InvalidAromaticRing is caught.
             raise InvalidAromaticRing("patched molecule has invalid valence")
 
-        try:
-            new.standardize(_fix_stereo=False)
-            new.implicify_hydrogens(_fix_stereo=False)
-            if not new.thiele(fix_tautomers=self._fix_tautomers):
-                new.fix_stereo()
-            new.standardize_charges(prepare_molecule=False)
-            new.standardize_tautomers(prepare_molecule=False)
-            if patched is not None:
-                assert_stereo_preserved(patched, new)
-        except InvalidAromaticRing:
-            raise  # reject half-canonicalized output
+        new.standardize(_fix_stereo=False)
+        new.implicify_hydrogens(_fix_stereo=False)
+        if not new.thiele(fix_tautomers=self._fix_tautomers):
+            new.fix_stereo()
+        new.standardize_charges(prepare_molecule=False)
+        new.standardize_tautomers(prepare_molecule=False)
+        if patched is not None:
+            assert_stereo_preserved(patched, new)
 
         return new
 

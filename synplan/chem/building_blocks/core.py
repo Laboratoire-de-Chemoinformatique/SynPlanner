@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TypeAlias
 
@@ -18,7 +19,7 @@ class BuildingBlock:
     has_stereo: bool
 
 
-BuildingBlockCatalogue: TypeAlias = frozendict[str, tuple[BuildingBlock, ...]]
+BuildingBlockCatalogue: TypeAlias = Mapping[str, tuple[BuildingBlock, ...]]
 
 
 def match_building_blocks(

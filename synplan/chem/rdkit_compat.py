@@ -91,12 +91,7 @@ def route_to_rdkit(tree, node_id: int, keep_mapping: bool = True) -> list[dict]:
         in_stock = []
         for p in after_node.new_precursors:
             precursor_mols.append(p.molecule.to_rdkit(keep_mapping=keep_mapping))
-            in_stock.append(
-                p.is_building_block(
-                    tree.building_blocks,
-                    tree.config.min_mol_size,
-                )
-            )
+            in_stock.append(p.is_purchasable(tree.building_blocks))
 
         steps.append(
             {
@@ -138,10 +133,7 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
     :return: List of route tree dicts, one per winning node.
     """
     target_mol = tree.nodes[1].precursors_to_expand[0].molecule
-    target_in_stock = tree.nodes[1].curr_precursor.is_building_block(
-        tree.building_blocks,
-        tree.config.min_mol_size,
-    )
+    target_in_stock = tree.nodes[1].curr_precursor.is_purchasable(tree.building_blocks)
 
     if not tree.winning_nodes:
         return [
@@ -192,7 +184,6 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
                 "in_stock": is_purchasable(
                     molecule,
                     tree.building_blocks,
-                    tree.config.min_mol_size,
                     key=smi,
                 ),
             }

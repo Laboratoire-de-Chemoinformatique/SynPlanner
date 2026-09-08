@@ -8,7 +8,6 @@ import json
 from chython import smiles as read_smiles
 
 from synplan.chem.reaction.routes.io.metadata import (
-    reaction_metadata,
     restore_reaction_metadata,
 )
 
@@ -44,7 +43,7 @@ def write_routes_csv(routes_dict, file_path="routes.csv"):
         for route_id in sorted(routes_dict):
             for step_id in sorted(routes_dict[route_id]):
                 reaction = routes_dict[route_id][step_id]
-                metadata = reaction_metadata(reaction)
+                metadata = dict(reaction.meta)
                 meta = (
                     json.dumps(metadata, sort_keys=True, separators=(",", ":"))
                     if metadata

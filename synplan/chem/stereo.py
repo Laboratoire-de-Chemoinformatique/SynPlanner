@@ -7,12 +7,12 @@ No stereoisomer enumeration or experimental selectivity inference is performed.
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from hashlib import sha256
 
-from chython.containers import MoleculeContainer
+from chython import smiles as _read_smiles
+from chython.containers import MoleculeContainer, ReactionContainer
 
 UNASSESSED_STEREO_REASONS = frozenset(
     {
@@ -122,7 +122,7 @@ def stereo_requirements(mol: MoleculeContainer) -> tuple[StereoRequirement, ...]
                 )
             )
             continue
-        if n not in mol.stereogenic_tetrahedrons or atom.atomic_number != 6:
+        if n not in mol.stereogenic_tetrahedrons:
             raise UnresolvedStereo(
                 "unsupported_stereo_type", f"atom {n}: only carbon tetrahedra supported"
             )
@@ -282,35 +282,14 @@ def has_stereo_groups(mol: MoleculeContainer) -> bool:
     return any(getattr(a, "extended_stereo", None) for _, a in mol.atoms())
 
 
-def validate_stereo_input(text: str) -> None:
-    """Reject known lossy encodings before Chython can discard their annotation.
-
-    The exception retains the original representation for API error ledgers.
-    Extended tetrahedral and allene syntax supported by Chython stays accepted.
-    """
-    if re.search(r"@(?:SP|TB|OH|TH[3-9]|AL[3-9])|\bw[UD]:", text):
-        raise UnresolvedStereo(
-            "unsupported_stereo_type",
-            "atropisomer or unsupported non-tetrahedral annotation",
-            original_input=text,
-        )
-
-
 def parse_smiles_preserving_stereo(text, *, ignore_stereo=False):
-    """Allow valence repairs while Chython rejects discarded stereo annotations."""
-    from chython import smiles
-    from chython.containers import ReactionContainer
-
-    validate_stereo_input(text)
-    result = smiles(
+    """Use native strict parsing and retain reaction mapping provenance."""
+    result = _read_smiles(
         text,
-        ignore=True,
         ignore_stereo=ignore_stereo,
         strict_stereo=not ignore_stereo,
     )
-    if ignore_stereo:
-        return result
-    if isinstance(result, ReactionContainer):
+    if not ignore_stereo and isinstance(result, ReactionContainer):
         from synplan.chem.utils import reaction_string_mapping_status
 
         result.meta["stereo_mapping_status"] = reaction_string_mapping_status(
@@ -419,10 +398,27 @@ def stereo_events(reaction) -> list[dict]:
     from accidentally equal parser numbering.
     """
 
-    left, right = (
-        stereo_elements(reaction.reactants),
-        stereo_elements(reaction.products),
-    )
+    try:
+        left, right = (
+            stereo_elements(reaction.reactants),
+            stereo_elements(reaction.products),
+        )
+    except UnresolvedStereo as error:
+        return [
+            {
+                "kind": "unassessed",
+                "atoms": sorted(
+                    {
+                        n
+                        for mol in (*reaction.reactants, *reaction.products)
+                        for n in mol
+                    }
+                ),
+                "event": error.reason,
+                "detail": str(error),
+                "selectivity_evidence": "not_established_by_structure",
+            }
+        ]
     if not left and not right:
         return []
     from synplan.chem.utils import reaction_mapping_status

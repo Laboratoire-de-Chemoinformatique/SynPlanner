@@ -85,7 +85,7 @@ def test_default_preservation_and_query_positive_negative(text):
     matches = compatible_records(mol, stock)
     assert len(matches) == 1
     assert matches[0].vendors["supplier"] == 9
-    assert not Precursor(mol).is_building_block(catalogue((str(opposite), 1)), 100)
+    assert not Precursor(mol).is_purchasable(catalogue((str(opposite), 1)))
 
 
 @pytest.mark.parametrize("group", ["a:1,3", "o1:1,3", "&1:1,3"])
@@ -177,6 +177,11 @@ def test_strict_mode_excludes_new_center_and_rollout_cannot_reward_it():
     assert len(tree.nodes) == 1
     rollout = RolloutSimulator(RulesPolicy(), (rule,), stock, 0, 3)
     assert rollout.simulate_precursor(Precursor(smiles(STEREO[0]))) < 1
+
+
+def test_trivial_cutoff_does_not_reward_unstocked_stereo():
+    rollout = RolloutSimulator(RulesPolicy(), (), frozendict(), 6, 3)
+    assert rollout.simulate_precursor(Precursor(smiles("C[C@H](O)CCO"))) == 0
 
 
 @pytest.mark.parametrize("rebuild", [False, True])
@@ -838,3 +843,25 @@ def test_vocabulary_streaming_digest_rejects_content_edits(tmp_path, monkeypatch
         path.write_bytes(edited)
         with pytest.raises(ValueError, match="rule file changed"):
             manifest_digest(path)
+
+
+def test_source_metadata_pipe_is_not_a_cxsmiles_extension():
+    assert split_smiles_record("CCO source | note") == ("CCO", ["source | note"])
+    with pytest.raises(ValueError):
+        split_smiles_record("CCO |unterminated")
+
+
+def test_unsupported_stereo_survives_the_extraction_source_ledger():
+    from synplan.chem.reaction.rules.config import RuleExtractionConfig
+    from synplan.chem.reaction.rules.extraction import _extract_rules_batch_worker
+    from synplan.chem.stereo import stereo_events
+
+    text = "C/C=C=C=C/C>>C/C=C=C=C/C"
+    events = stereo_events(smiles(text))
+    assert events[0]["event"] == "unsupported_stereo_type"
+    assert events[0]["selectivity_evidence"] == "not_established_by_structure"
+    result = _extract_rules_batch_worker(
+        [(0, text)], config=RuleExtractionConfig(), ignore_errors=True
+    )
+    assert result.stereo_records[0]["events"] == events
+    assert not any("_Unresolved" in error.error_type for error in result.errors)

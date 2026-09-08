@@ -6,13 +6,14 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping, Set
 
+from chython import inchi_key, smiles
 from chython.containers import MoleculeContainer
 from chython.exceptions import InvalidAromaticRing
 from frozendict import frozendict
 
 from synplan.chem.building_blocks import (
     BuildingBlockCatalogue,
-    molecule_to_inchikey,
+    SQLiteBuildingBlockCatalogue,
 )
 from synplan.chem.building_blocks.stereo import compatible_records, selected_record
 from synplan.chem.stereo import has_stereo_groups
@@ -68,8 +69,6 @@ class Precursor:
         model input, including atom order.
         """
         if self._policy_molecule is None:
-            from chython import smiles
-
             projected = self.molecule.copy()
             projected.clean_stereo()
             self._policy_molecule = smiles(str(projected))
@@ -79,12 +78,12 @@ class Precursor:
     def inchi_key(self) -> str:
         """Return the full Chython Standard InChIKey, generated once."""
 
-        if failure := getattr(self, "_inchi_key_error", None):
+        if failure := self._inchi_key_error:
             error_type, message = failure
             raise error_type(message)
-        if getattr(self, "_inchi_key", None) is None:
+        if self._inchi_key is None:
             try:
-                self._inchi_key = molecule_to_inchikey(self.molecule)
+                self._inchi_key = inchi_key(self.molecule)
             except (InvalidAromaticRing, ValueError) as error:
                 self._inchi_key_error = type(error), str(error)
                 logger.warning(
@@ -101,13 +100,20 @@ class Precursor:
         bb_stock: Set[str] | BuildingBlockCatalogue,
         min_mol_size: int = 6,
     ) -> bool:
-        """Checks if a Precursor is a building block.
+        """Stop expansion for compatible stock or an assumed-trivial small fragment."""
+        purchasable = self.is_purchasable(bb_stock)
+        self.molecule.meta.pop("assumed_trivial", None)
+        if not purchasable and 0 < len(self) <= min_mol_size:
+            self.molecule.meta["assumed_trivial"] = min_mol_size
+            return True
+        return purchasable
+
+    def is_purchasable(self, bb_stock: Set[str] | BuildingBlockCatalogue) -> bool:
+        """Check compatible stock, retaining the selected record and diagnostics.
 
         :param bb_stock: The list of building blocks. Each building block is represented
             by a canonical SMILES in legacy mode. JSON mode uses an immutable
             prefix-bucket catalogue whose records retain their full InChIKeys.
-        :param min_mol_size: Legacy size heuristic parameter; stock membership
-            always requires an actual compatible record, including small leaves.
         :return: True is Precursor is a building block.
         """
         if has_stereo_groups(self.molecule):
@@ -115,7 +121,7 @@ class Precursor:
         if isinstance(bb_stock, Mapping):
             cached = self._stock_cache
             if (
-                isinstance(bb_stock, frozendict)
+                isinstance(bb_stock, (frozendict, SQLiteBuildingBlockCatalogue))
                 and cached is not None
                 and cached[0] is bb_stock
             ):
@@ -140,11 +146,7 @@ class Precursor:
                 self.molecule.meta.pop("selected_stock", None)
             self._stock_cache = (bb_stock, bool(records))
             return bool(records)
-        return is_purchasable(
-            self.molecule,
-            bb_stock,
-            min_mol_size,
-        )
+        return is_purchasable(self.molecule, bb_stock)
 
 
 def is_purchasable(
@@ -160,13 +162,14 @@ def is_purchasable(
     A legacy stock is keyed by the molecule's canonical SMILES, so a caller
     holding that string can pass it as ``key``. A JSON catalogue uses the
     molecule's Chython Standard InChIKey instead.
+    ``min_mol_size`` is retained for API compatibility and does not affect membership.
     """
 
     if has_stereo_groups(molecule):
         return False
     if isinstance(stock, Mapping):
         try:
-            identity = inchikey or molecule_to_inchikey(molecule)
+            identity = inchikey or inchi_key(molecule)
         except (InvalidAromaticRing, ValueError) as error:
             logger.warning(
                 "Chython cannot generate an InChIKey for molecule %s; "

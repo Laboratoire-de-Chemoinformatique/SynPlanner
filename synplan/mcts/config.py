@@ -51,10 +51,9 @@ class TreeConfig(BaseConfigModel):
         specifically during Upper Confidence Bound estimation. It
         balances between exploration and exploitation.
     :param min_mol_size: Defines the minimum size of a molecule that is
-        have to be synthesized. Molecules with 6 or fewer heavy atoms
-        are assumed to be building blocks by definition, thus setting
-        the threshold for considering larger molecules in the search,
-        defaults to 6.
+        has to be synthesized. Fragments at or below this threshold are assumed
+        trivial without claiming stock availability; missing required stereo
+        remains unresolved. Defaults to 6; zero requires actual stock for all leaves.
     :param silent: Whether to suppress progress output.
     :param nmcs_level: Nesting level for NMCS and LazyNMCS algorithms.
         Higher levels provide more thorough search but are more
@@ -149,7 +148,7 @@ class RolloutEvaluationConfig(BaseConfigModel):
     policy_network: Any  # Policy - using Any to avoid circular import
     reaction_rules: Any  # List[Reactor]
     building_blocks: Any  # Set[str] or BuildingBlockCatalogue
-    min_mol_size: int = Field(default=0, ge=0)
+    min_mol_size: int = Field(default=6, ge=0)
     max_depth: int = Field(default=6, gt=0)
     normalize: bool = False
     stochastic: bool = False

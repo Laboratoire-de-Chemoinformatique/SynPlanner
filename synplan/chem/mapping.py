@@ -48,16 +48,16 @@ def bounded_mappings(
     """
     budget = budget or _budget.get() or MappingBudget()
     with mapping_budget(budget=budget):
-        compiled = isinstance(query, QueryContainer)
+        is_query = isinstance(query, QueryContainer)
         matcher = (
-            QueryIsomorphism._get_mapping if compiled else Isomorphism._get_mapping
+            QueryIsomorphism._get_mapping if is_query else Isomorphism._get_mapping
         )
         yield from matcher(
             query,
             molecule,
             automorphism_filter=automorphism_filter,
             searching_scope=searching_scope,
-            **({"_cython": _cython} if compiled else {}),
+            **({"_cython": _cython} if is_query else {}),
         )
 
 
@@ -80,6 +80,7 @@ class BoundedQuery(QueryContainer):
             _cython=_cython,
         )
 
+    # Native matching has no default limit outside a budget context.
     def _get_mapping(
         self, other, *, automorphism_filter=True, searching_scope=None, **kwargs
     ):

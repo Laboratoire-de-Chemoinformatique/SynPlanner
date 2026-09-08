@@ -174,6 +174,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
+- `Tree.save_pickle()`. Save finished searches with `write_search_record()` and
+  read them with `read_search_record()`; JSON records do not serialize live
+  catalogue connections or policy objects. Loading pickled trees is unsupported.
 - `ProtectionRouteScorer(weight=...)`, whose `(1 - w) + w * S(T)` softening is nowhere
   in the paper and which nothing ever set below its `1.0` default, where it is
   arithmetically the plain product.

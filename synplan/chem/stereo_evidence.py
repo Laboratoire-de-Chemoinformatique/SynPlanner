@@ -143,7 +143,9 @@ def review_stereo_route(
     remaining = []
     for obligation in reviewed.stereo.get("obligations", ()):
         belongs = obligation.get("step") == step_index or (
-            step.origin and obligation.get("tree_node_id") == step.origin.tree_node_id
+            step.origin is not None
+            and step.origin.tree_node_id is not None
+            and obligation.get("tree_node_id") == step.origin.tree_node_id
         )
         if not (belongs and obligation["reason"] in REVIEWABLE_STEREO_REASONS):
             remaining.append(obligation)
@@ -248,6 +250,13 @@ def route_context(route) -> str:
             [str(leaf), leaf.meta.get("selected_stock")] for leaf in route.leaves()
         )
     )
+    trivial = [
+        [str(leaf), leaf.meta["assumed_trivial"]]
+        for leaf in route.leaves()
+        if leaf.meta.get("assumed_trivial")
+    ]
+    if trivial:
+        payload.append(multiset_digest(trivial))
     return record_digest(payload)
 
 
@@ -268,7 +277,11 @@ def route_stereo_summary(
         "first_responsible": deepcopy(next(iter(obligations), None)),
         "context": route_context(route),
         "audit": deepcopy(audit),
-        "basis": "structural_inheritance_from_explicit_stock"
+        "basis": (
+            "structural_inheritance_with_trivial_leaf_assumptions"
+            if any(leaf.meta.get("assumed_trivial") for leaf in route.leaves())
+            else "structural_inheritance_from_explicit_stock"
+        )
         if status == "fulfilled"
         else None,
     }

@@ -6,10 +6,8 @@ import re
 import warnings
 from collections.abc import Iterable
 from io import StringIO
-from pathlib import Path
 from typing import Literal
 
-from chython import smiles as smiles_parser
 from chython.containers import (
     MoleculeContainer,
     ReactionContainer,
@@ -17,9 +15,8 @@ from chython.containers import (
 from chython.exceptions import InvalidAromaticRing, MappingError
 from chython.files.daylight.tokenize import smarts_tokenize
 from chython.files.SDFrw import SDFRead
-from tqdm.auto import tqdm
 
-from synplan.utils.files import MoleculeReader, MoleculeWriter
+from synplan.chem.stereo import parse_smiles_preserving_stereo
 
 ReactionMappingStatus = Literal["fully_mapped", "partially_mapped", "unmapped"]
 AtomMappingCheck = Literal["off", "reject_unmapped", "reject_partial"]
@@ -231,8 +228,6 @@ def mol_from_smiles(
     :return: The processed molecule object.
     :raises ValueError: If the SMILES string could not be processed by chython.
     """
-    from synplan.chem.stereo import parse_smiles_preserving_stereo
-
     molecule = parse_smiles_preserving_stereo(smiles)
 
     if not isinstance(molecule, MoleculeContainer):
@@ -436,46 +431,20 @@ def validate_and_canonicalize(
         return None
 
 
-def standardize_building_blocks(input_file: str, output_file: str) -> str:
-    """Standardizes custom building blocks.
+def standardize_building_blocks(
+    input_file: str, output_file: str, *, num_workers: int = 1
+) -> str:
+    """Compatibility wrapper for building-block preparation."""
+    from synplan.chem.building_blocks.io import standardize_building_blocks
 
-    :param input_file: The path to the file that stores the original building blocks.
-    :param output_file: The path to the file that will store the standardized building
-        blocks.
-    :return: The path to the file with standardized building blocks.
-    """
-    if input_file == output_file:
-        raise ValueError("input_file name and output_file name cannot be the same.")
-
-    if Path(output_file).suffix.lower() == ".json":
-        from synplan.chem.building_blocks import standardize_building_block_catalogue
-
-        return standardize_building_block_catalogue(input_file, output_file)
-
-    with (
-        MoleculeReader(input_file) as inp_file,
-        MoleculeWriter(output_file) as out_file,
-    ):
-        for mol in tqdm(
-            inp_file,
-            desc="Number of building blocks processed: ",
-            bar_format="{desc}{n} [{elapsed}]",
-        ):
-            try:
-                mol = safe_canonicalization(mol)
-            except Exception as e:
-                logging.debug(e)
-                continue
-            out_file.write(mol)
-
-    return output_file
+    return standardize_building_blocks(input_file, output_file, num_workers=num_workers)
 
 
 def _standardize_one_smiles(
     smiles_str: str, *, failures: list[dict] | None = None, record: int | None = None
 ) -> str | None:
     try:
-        mol = smiles_parser(smiles_str, ignore=True)
+        mol = parse_smiles_preserving_stereo(smiles_str)
         canonical = safe_canonicalization(mol)
         return str(canonical)
     except Exception as error:
@@ -489,22 +458,6 @@ def _standardize_one_smiles(
                 }
             )
         return None
-
-
-def _standardize_sdf_range(filename: str, start: int, end: int) -> list[str]:
-    out: list[str] = []
-    sdf = SDFRead(filename, indexable=True)
-    try:
-        for i in range(start, end):
-            try:
-                mol = sdf[i]
-                mol = safe_canonicalization(mol)
-                out.append(str(mol))
-            except Exception:
-                pass
-    finally:
-        sdf.close()
-    return out
 
 
 def standardize_sdf_text(block: str) -> list[str]:
@@ -539,20 +492,6 @@ def standardize_smiles_batch(
         if res:
             out.append(res)
     return out
-
-
-def hash_from_reaction_rule(reaction_rule: ReactionContainer) -> int:
-    """Generates hash for the given reaction rule.
-
-    :param reaction_rule: The reaction rule to be converted.
-    :return: The resulting hash.
-    """
-
-    reactants_hash = tuple(sorted(hash(r) for r in reaction_rule.reactants))
-    reagents_hash = tuple(sorted(hash(r) for r in reaction_rule.reagents))
-    products_hash = tuple(sorted(hash(r) for r in reaction_rule.products))
-
-    return hash((reactants_hash, reagents_hash, products_hash))
 
 
 def reverse_reaction(

@@ -121,6 +121,11 @@ def test_real_small_diol_cannot_use_wrong_or_unspecified_stock(mode, fixtures, s
         i["reason"] == "required_stock_unavailable" and i["leaf"] == 1
         for i in audit.issues
     )
+    _, heuristic = run(
+        fixtures["source:n5-02322"], frozendict(replacement), min_mol_size=100
+    )
+    assert not heuristic.supported
+    assert any(i["reason"] == "required_stock_unavailable" for i in heuristic.issues)
 
 
 def test_achiral_small_leaf_also_requires_actual_stock(fixtures, stock):
@@ -133,6 +138,14 @@ def test_achiral_small_leaf_also_requires_actual_stock(fixtures, stock):
     _, audit = run(fixtures["source:n5-02322"], frozendict(reduced))
     assert not audit.supported
     assert any(i["leaf"] == achiral["leaf"] for i in audit.issues)
+    cutoff = len(smiles(achiral["required_smiles"]))
+    _, heuristic = run(
+        fixtures["source:n5-02322"], frozendict(reduced), min_mol_size=cutoff
+    )
+    assert heuristic.supported, heuristic.issues
+    leaf = next(m for m in heuristic.route.leaves() if m.meta.get("assumed_trivial"))
+    assert leaf.meta["assumed_trivial"] == cutoff
+    assert "selected_stock" not in leaf.meta
 
 
 @pytest.mark.parametrize(

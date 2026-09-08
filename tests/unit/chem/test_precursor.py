@@ -19,8 +19,11 @@ def test_len_eq_hash(simple_molecule):
 
 def test_is_building_block_default(simple_molecule):
     p = Precursor(simple_molecule)
-    # Size is a search heuristic, never evidence of purchasability.
-    assert not p.is_building_block(bb_stock=set())
+    assert p.is_building_block(bb_stock=set())
+    assert not p.is_purchasable(set())
+    assert p.molecule.meta["assumed_trivial"] == 6
+    assert not p.is_building_block(set(), min_mol_size=0)
+    assert "assumed_trivial" not in p.molecule.meta
 
 
 def test_is_building_block_custom_size(simple_molecule, complex_molecule):
@@ -28,7 +31,7 @@ def test_is_building_block_custom_size(simple_molecule, complex_molecule):
     p_small = Precursor(simple_molecule)
     p_large = Precursor(complex_molecule)
 
-    assert not p_small.is_building_block(bb_stock=set(), min_mol_size=10)
+    assert p_small.is_building_block(bb_stock=set(), min_mol_size=10)
     # Large molecule should not be BB with min_mol_size=10
     assert not p_large.is_building_block(bb_stock=set(), min_mol_size=10)
 
@@ -50,7 +53,8 @@ def test_is_building_block_with_stock(simple_molecule, complex_molecule):
 def test_ring_molecule_handling(ring_molecule):
     p = Precursor(ring_molecule)
     assert len(p) == 6
-    assert not p.is_building_block(bb_stock=set())
+    assert p.is_building_block(bb_stock=set())
+    assert not p.is_building_block(bb_stock=set(), min_mol_size=5)
 
 
 def test_precursor_canonicalizes_molecule():
@@ -97,7 +101,7 @@ def test_precursor_generates_its_inchikey_only_once(monkeypatch):
 
     block = stereo_block("C[C@H](O)C(=O)O")
     catalogue = frozendict({block.inchikey[:14]: (block,)})
-    original = precursor_module.molecule_to_inchikey
+    original = precursor_module.inchi_key
     calls = 0
 
     def counted(molecule):
@@ -105,7 +109,7 @@ def test_precursor_generates_its_inchikey_only_once(monkeypatch):
         calls += 1
         return original(molecule)
 
-    monkeypatch.setattr(precursor_module, "molecule_to_inchikey", counted)
+    monkeypatch.setattr(precursor_module, "inchi_key", counted)
     precursor = Precursor(smiles("C[C@H](O)C(=O)O", ignore_stereo=False))
     for _ in range(3):
         assert precursor.is_building_block(catalogue, min_mol_size=0)
@@ -118,7 +122,7 @@ def test_unrepresentable_inchikey_is_cached_and_not_purchasable(monkeypatch, cap
 
     molecule = smiles("c1c(O)[n-]ccc1", ignore=True)
     precursor = Precursor(molecule)
-    original = precursor_module.molecule_to_inchikey
+    original = precursor_module.inchi_key
     calls = 0
 
     def counted(candidate):
@@ -126,7 +130,7 @@ def test_unrepresentable_inchikey_is_cached_and_not_purchasable(monkeypatch, cap
         calls += 1
         return original(candidate)
 
-    monkeypatch.setattr(precursor_module, "molecule_to_inchikey", counted)
+    monkeypatch.setattr(precursor_module, "inchi_key", counted)
     catalogue = frozendict()
     with caplog.at_level(logging.WARNING):
         assert not precursor.is_building_block(catalogue, min_mol_size=0)

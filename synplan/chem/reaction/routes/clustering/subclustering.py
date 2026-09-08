@@ -11,7 +11,6 @@ from synplan.chem.reaction.routes.clustering.pseudo_atoms import (
     MarkedAt,
     MarkedY,
 )
-from synplan.chem.reaction.routes.contracts import SubclusterRouteData
 from synplan.chem.reaction.routes.representation.components import (
     route_cgr_pseudo_reactants_by_role,
 )
@@ -314,16 +313,14 @@ def _build_subcluster_route_data(group, sb_cgrs_dict, route_cgrs_dict):
                 f"Leaving group (X) reaction replacement failed for route {route_id}"
             ) from e
 
-        result[route_id] = SubclusterRouteData(
-            sb_cgr=sb_cgr,
-            unlabeled_reaction=ReactionContainer(
-                reactants=old_reactants, products=[target_mol]
-            ),
-            synthon_cgr=synthon_cgr,
-            synthon_reaction=new_rxn,
-            leaving_groups=lg_groups,
-            leaving_group_count=lg_sizes,
-            supporting_groups=supporting_groups,
+        result[route_id] = (
+            sb_cgr,
+            ReactionContainer(reactants=old_reactants, products=[target_mol]),
+            synthon_cgr,
+            new_rxn,
+            lg_groups,
+            lg_sizes,
+            supporting_groups,
         )
 
     return result
@@ -332,16 +329,7 @@ def _build_subcluster_route_data(group, sb_cgrs_dict, route_cgrs_dict):
 def subcluster_one_cluster(group, sb_cgrs_dict, route_cgrs_dict):
     """Compatibility adapter returning historical per-route seven-item tuples."""
 
-    return {
-        route_id: route_data.as_legacy_tuple()
-        for route_id, route_data in _build_subcluster_route_data(
-            group, sb_cgrs_dict, route_cgrs_dict
-        ).items()
-    }
-
-
-def _subcluster_values(value):
-    return value.as_legacy_tuple() if isinstance(value, SubclusterRouteData) else value
+    return _build_subcluster_route_data(group, sb_cgrs_dict, route_cgrs_dict)
 
 
 def group_routes_by_synthon_detail(
@@ -359,7 +347,7 @@ def group_routes_by_synthon_detail(
     temp_groups = defaultdict(list)
     for route_id, result_list in data_dict.items():
         # unpack values with defaults
-        result_values = _subcluster_values(result_list)
+        result_values = result_list
         sb_cgr = result_values[0] if len(result_values) > 0 else None
         synthon_reaction = result_values[3] if len(result_values) > 3 else None
         lg_sizes = result_values[5] if len(result_values) > 5 else None
@@ -387,11 +375,11 @@ def group_routes_by_synthon_detail(
         routes_data = {}
         supporting_data = {}
         for rid in sorted(route_ids):
-            orig = _subcluster_values(data_dict.get(rid, []))
+            orig = data_dict.get(rid, [])
             routes_data[rid] = orig[4] if len(orig) > 4 else None
             supporting_data[rid] = orig[6] if len(orig) > 6 else {}
 
-        representative = _subcluster_values(data_dict[route_ids[0]])
+        representative = data_dict[route_ids[0]]
 
         final_groups[group_index] = {
             "cluster_id": cluster_id,

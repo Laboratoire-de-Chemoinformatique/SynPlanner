@@ -14,9 +14,11 @@ from dataclasses import dataclass, field
 from itertools import islice
 from typing import Any, ClassVar
 
+from chython import inchi_key
 from chython.containers import MoleculeContainer, ReactionContainer
 
-from synplan.chem.building_blocks import BuildingBlockCatalogue, molecule_to_inchikey
+from synplan.chem.building_blocks import BuildingBlockCatalogue
+from synplan.chem.building_blocks.core import match_building_blocks
 from synplan.chem.building_blocks.stereo import record_molecule
 from synplan.chem.mapping import MappingBudgetExceeded, bounded_mappings
 from synplan.chem.reaction.routes.route import Route, Step
@@ -218,10 +220,10 @@ def match_stereo_stock(
     catalogue: BuildingBlockCatalogue,
     cap: int,
 ) -> tuple[MoleculeContainer, dict[str, Any]]:
-    key = molecule_to_inchikey(mol)
+    key = inchi_key(mol)
     constraints = (*reqs, *stereo_requirements(mol))
     rejected = []
-    bucket = catalogue.get(key[:14], ())
+    bucket = match_building_blocks(catalogue, key)
     if selected := mol.meta.get("selected_stock"):
         bucket = tuple(
             r
@@ -346,6 +348,7 @@ def audit_stereo_inheritance(
     mapping_sources: Mapping[int, str],
     max_mappings: int = 256,
     allow_unconstrained_target: bool = False,
+    min_mol_size: int = 0,
 ) -> StereoAudit:
     """Reconstruct a detached Route without modifying input molecules or provenance.
 
@@ -355,7 +358,8 @@ def audit_stereo_inheritance(
     SMILES. Missing evidence abstains. Maps are checked for conservation and
     local environments; source provenance is not proof of experimental mapping.
 
-    All leaves require catalogue records, including achiral/small molecules.
+    By default all leaves require catalogue records. A positive ``min_mol_size``
+    permits assumed-trivial leaves only when they carry no stereo requirements.
     No incomplete reconstruction is returned as a supported route. Callers must
     preserve the original source serialization before using lossy route readers.
     """
@@ -479,6 +483,17 @@ def audit_stereo_inheritance(
             assignments[id(leaf)] = selected
             entry["selected_stock"] = record
         except UnresolvedStereo as exc:
+            if (
+                exc.reason == "required_stock_unavailable"
+                and 0 < len(leaf) <= min_mol_size
+                and not reqs
+                and not stereo_requirements(leaf)
+            ):
+                selected = leaf.copy()
+                selected.meta["assumed_trivial"] = min_mol_size
+                assignments[id(leaf)] = selected
+                entry["assumed_trivial"] = min_mol_size
+                continue
             result.add_issue(exc, leaf=index)
             result.issues[-1]["target_atoms"] = sorted(
                 {n for r in reqs for n in r.target_atoms}

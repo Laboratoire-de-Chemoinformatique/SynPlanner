@@ -444,15 +444,34 @@ def test_a_routes_dict_keyed_by_position_says_what_it_wanted(tmp_path, solved_ro
 # --------------------------------------------------------------------------- #
 
 
-def test_a_multi_product_route_file_reads_back_with_its_own_root_as_target():
-    """`products[0]` picked whichever fragment the SMILES happened to start with."""
+@pytest.mark.parametrize("target", ["CCO", "O"])
+def test_a_multi_product_route_file_reads_back_with_its_own_root_as_target(target):
+    reaction = read_smiles("CCBr.O>>CCO.O")
+    route = Route.from_json(
+        {
+            "type": "mol",
+            "smiles": target,
+            "children": [
+                {
+                    "type": "reaction",
+                    "smiles": format(reaction, "m"),
+                    "children": [
+                        {"type": "mol", "smiles": str(m), "in_stock": True}
+                        for m in reaction.reactants
+                    ],
+                }
+            ],
+        }
+    )
+    assert route.target == read_smiles(target)
 
-    routes = json.loads(_ROUTES_JSON.read_text(encoding="utf-8"))
-    assert routes
 
-    for route_id, route_json in routes.items():
-        route = Route.from_json(route_json)
-        assert route.target == read_smiles(route_json["smiles"]), route_id
+def test_old_radical_inconsistent_routes_are_rejected_without_rewriting_chemistry():
+    # These legacy reactions spell aromatic [c] radicals where their molecule
+    # nodes spell [cH]. Positional linking used to erase that disagreement.
+    for route_json in json.loads(_ROUTES_JSON.read_text()).values():
+        with pytest.raises(ValueError, match="molecule identity"):
+            Route.from_json(route_json)
 
 
 def test_a_file_in_another_tools_spelling_reads_back_with_the_right_verdicts():

@@ -1,0 +1,56 @@
+[
+  {
+    "line": 122415,
+    "raw": {
+      "SMILES": "Cc1cc(cc(C)c1-n2[c-][n+](cc2)-c3c(C)cc(cc3C)C)C.[Cu+]",
+      "example_A_ppg": "10",
+      "example_B_ppg": "0"
+    },
+    "key": "FQZDRDAGKQLCBE-UHFFFAOYSA-N"
+  },
+  {
+    "line": 293305,
+    "raw": {
+      "SMILES": "CC(C)(C)c1cc(cc(C(C)(C)C)c1OC)[C@H](NS(C(C)(C)C)=O)c2ccccc2P(C3CCCCC3)C4CCCCC4",
+      "example_A_ppg": "11",
+      "example_B_ppg": "20"
+    },
+    "key": "HSLGLEHHIZVRPQ-RGQUUCBMSA-N"
+  },
+  {
+    "line": 305831,
+    "raw": {
+      "SMILES": "CC(C)(C)c1cc(cc(C(C)(C)C)c1OC)[C@@H](NS(C(C)(C)C)=O)c2ccccc2P(C3CCCCC3)C4CCCCC4",
+      "example_A_ppg": "12",
+      "example_B_ppg": "20"
+    },
+    "key": "HSLGLEHHIZVRPQ-UQLGGBPNSA-N"
+  },
+  {
+    "line": 371213,
+    "raw": {
+      "SMILES": "c1cc(ccc1)/C/2=C/3\\C=CC(/C(=C\\4/C=CC5=C(C6=NC(C=C6)=C(c7ccccc7)c8ccc\\2[nH]8~[Fe](~N/45)Cl)c9ccccc9)/c%10ccccc%10)=N\\3",
+      "example_A_ppg": "13",
+      "example_B_ppg": "0"
+    },
+    "key": "VYQLRDLWDISGIJ-FZESVRRZSA-M"
+  },
+  {
+    "line": 478784,
+    "raw": {
+      "SMILES": "c1ccccc1C2=C3[N+]([B-](F)(F)n4c2c(c(C=O)c4C)C)=C(C=C3C)C",
+      "example_A_ppg": "14",
+      "example_B_ppg": "0"
+    },
+    "key": "MBVYTILQPGJEEP-UHFFFAOYSA-O"
+  },
+  {
+    "line": 931985,
+    "raw": {
+      "SMILES": "c1(cc(cc(C)c1-[n+]2[c-](~[Cu+])n(cc2)-c3c(C)cc(cc3C)C)C)C",
+      "example_A_ppg": "0",
+      "example_B_ppg": "20"
+    },
+    "key": "FQZDRDAGKQLCBE-UHFFFAOYSA-N"
+  }
+]

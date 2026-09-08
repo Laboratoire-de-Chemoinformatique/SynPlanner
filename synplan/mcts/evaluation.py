@@ -2,7 +2,7 @@
 
 import random
 from abc import ABC, abstractmethod
-from collections import defaultdict, deque
+from collections import deque
 from random import uniform
 from typing import TYPE_CHECKING
 
@@ -12,6 +12,7 @@ from synplan.chem import building_blocks as building_block_types
 from synplan.chem.precursor import Precursor, compose_precursors
 from synplan.chem.rdkit_utils import RDKitScore
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
+from synplan.chem.stereo import has_stereo, has_stereo_groups
 from synplan.ml.networks.checkpoint import load_network_from_checkpoint
 from synplan.ml.networks.value import ValueNetwork
 from synplan.ml.training import mol_to_pyg
@@ -102,12 +103,11 @@ class RolloutSimulator:
         :return: Tuple of (success, products, rule_id).
         """
         # Collect all candidate rules with their probabilities
-        candidates = [
-            (prob, rule, rule_id)
-            for prob, rule, rule_id in self.policy_network.predict_reaction_rules(
+        candidates = list(
+            self.policy_network.predict_reaction_rules(
                 current_precursor, self.reaction_rules
             )
-        ]
+        )
 
         if not candidates:
             return False, None, -1
@@ -150,25 +150,25 @@ class RolloutSimulator:
             self.building_blocks,
             self.min_mol_size,
         ):
+            if precursor.molecule.meta.get("assumed_trivial") and (
+                has_stereo(precursor.molecule) or has_stereo_groups(precursor.molecule)
+            ):
+                return 0.0
             return 1.0
 
         occurred_precursor = set()
         precursor_to_expand = deque([precursor])
-        history = defaultdict(dict)
         rollout_depth = 0
 
         while precursor_to_expand:
-            if len(history) >= max_depth:
+            if rollout_depth >= max_depth:
                 return -0.5
 
             current_precursor = precursor_to_expand.popleft()
-            history[rollout_depth]["target"] = current_precursor
             occurred_precursor.add(current_precursor)
 
             # Select reaction (greedy or stochastic based on self.stochastic)
-            reaction_applied, products, rule_id = self._select_reaction(
-                current_precursor
-            )
+            reaction_applied, products, _ = self._select_reaction(current_precursor)
 
             if not reaction_applied:
                 return -1.0
@@ -179,29 +179,32 @@ class RolloutSimulator:
             if assessment["obligations"]:
                 return 0.0
 
-            history[rollout_depth]["rule_index"] = rule_id
             # ``apply_reaction_rule`` already validated + canonicalized each
             # product in a single kekule pass.
             products = tuple(
                 Precursor(product, canonicalize=False) for product in products
             )
-            history[rollout_depth]["products"] = products
 
             if any(x in occurred_precursor for x in products) and products:
                 return -1.0
 
-            if occurred_precursor.isdisjoint(products):
-                precursor_to_expand.extend(
-                    [
-                        x
-                        for x in products
-                        if not x.is_building_block(
-                            self.building_blocks,
-                            self.min_mol_size,
-                        )
-                    ]
-                )
-                rollout_depth += 1
+            precursor_to_expand.extend(
+                [
+                    x
+                    for x in products
+                    if not x.is_building_block(
+                        self.building_blocks,
+                        self.min_mol_size,
+                    )
+                ]
+            )
+            if any(
+                x.molecule.meta.get("assumed_trivial")
+                and (has_stereo(x.molecule) or has_stereo_groups(x.molecule))
+                for x in products
+            ):
+                return 0.0
+            rollout_depth += 1
 
         return 1.0
 

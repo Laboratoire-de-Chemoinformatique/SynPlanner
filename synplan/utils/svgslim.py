@@ -15,16 +15,6 @@ _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 _WS = re.compile(r">\s+<")
 _ATTR = re.compile(r'="([^"]*)"')
 _NUM = re.compile(r"-?\d+\.\d+")
-_B36 = "abcdefghijklmnopqrstuvwxyz0123456789"
-
-
-def _b36(n: int) -> str:
-    out = ""
-    while True:
-        n, r = divmod(n, 36)
-        out = _B36[r] + out
-        if not n:
-            return out
 
 
 def _shortest(literal: str) -> str:
@@ -88,7 +78,7 @@ class Doc:
             self.hits += 1
             pool_id = self._ids.get(key)
             if pool_id is None:
-                pool_id = self._ids[key] = _b36(len(self._ids))
+                pool_id = self._ids[key] = f"m{len(self._ids)}"
                 self._defs.append(_UUID.sub(pool_id, tighten(body)))
             out.append(svg[last:start])
             out.append(f'{head}<use xlink:href="#{pool_id}-molecule"/></svg>')

@@ -9,6 +9,7 @@ from collections import Counter, defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
 from itertools import permutations, product
+from math import factorial
 from typing import Any
 
 from synplan.chem.reaction.routes.representation.state import bond_key, metadata_set
@@ -392,6 +393,14 @@ def _component_canonical_encoding(
         tuple(sorted(groups_by_color[color]))
         for color in sorted(groups_by_color, key=_json_label)
     ]
+    orders = 1
+    for group in color_groups:
+        orders *= factorial(len(group))
+        if orders > 5000:
+            raise ValueError(
+                "Exact RouteCGR hashing exceeds 5000 atom orders in one component; "
+                "the bucket hash alone cannot establish route identity"
+            )
     best_key = None
 
     for group_orders in product(*(permutations(group) for group in color_groups)):
@@ -435,7 +444,11 @@ def route_cgr_fingerprint(route_cgr: Any) -> dict[str, Any]:
 
 
 def route_cgr_hash(route_cgr: Any) -> str:
-    """Return an exact RouteCGR hash that ignores atom-map numbering."""
+    """Return an exact hash, independent of atom-map numbering.
+
+    Raises ValueError above 5000 candidate orders per component; no approximate
+    identity is returned. Completed hashes retain the existing schema and values.
+    """
 
     return _stable_digest(route_cgr_fingerprint(route_cgr))
 
@@ -457,15 +470,6 @@ def route_cgr_hash_without_route_order(route_cgr: Any) -> str:
 
 def _route_cgr_hash_from_prepared(prepared: _PreparedRouteCGR) -> str:
     return _stable_digest(_route_cgr_fingerprint_from_prepared(prepared))
-
-
-def _route_order_agnostic_hash_from_prepared(prepared: _PreparedRouteCGR) -> str:
-    return _stable_digest(
-        _route_cgr_fingerprint_from_prepared(
-            prepared,
-            schema=ROUTE_ORDER_AGNOSTIC_HASH_SCHEMA,
-        )
-    )
 
 
 def _numbered_fingerprint_from_graph(

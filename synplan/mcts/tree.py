@@ -2,21 +2,21 @@
 
 import json
 import logging
-import pickle
 from collections import deque
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, fields
 from hashlib import sha256
 from itertools import pairwise
 from math import log
-from os import PathLike
 from time import time
 
+from chython import inchi_key
 from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
 from synplan.chem.building_blocks import (
     BuildingBlockCatalogue,
+    SQLiteBuildingBlockCatalogue,
 )
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
@@ -201,8 +201,10 @@ class Tree:
                     "JSON building-block catalogues are supported only for retrosynthesis"
                 )
             self.building_blocks = building_blocks
-            self._building_block_count = sum(
-                len(bucket) for bucket in building_blocks.values()
+            self._building_block_count = (
+                building_blocks.record_count
+                if isinstance(building_blocks, SQLiteBuildingBlockCatalogue)
+                else sum(len(bucket) for bucket in building_blocks.values())
             )
             self._building_block_bucket_count: int | None = len(building_blocks)
         else:
@@ -322,13 +324,6 @@ class Tree:
             f"search_strategy={config.search_strategy}, "
             f"normalize_scores={config.normalize_scores}, "
         )
-
-    def save_pickle(self, file_path: str | PathLike[str]) -> None:
-        """Save this tree directly as a pickle after disabling tqdm."""
-
-        self._tqdm = None
-        with open(file_path, "wb") as file:
-            pickle.dump(self, file)
 
     def __len__(self) -> int:
         """Returns the current size (the number of nodes) in the tree."""
@@ -552,7 +547,9 @@ class Tree:
                         policy_rank=None,
                     )
 
-        policy_top_rules = self._get_policy_top_rules_limit()
+        policy_top_rules = getattr(self.expansion_function, "top_rules", None)
+        if policy_top_rules is not None:
+            policy_top_rules = int(policy_top_rules)
         for policy_rank, (prob, rule, rule_id) in enumerate(
             self.expansion_function.predict_reaction_rules(
                 curr_node.curr_precursor, self.reaction_rules
@@ -568,14 +565,6 @@ class Tree:
                 rule_source=POLICY_SOURCE_NAME,
                 policy_rank=policy_rank,
             )
-
-    def _get_policy_top_rules_limit(self) -> int | None:
-        """Return the configured policy Top-N limit when exposed by the policy."""
-
-        top_rules = getattr(self.expansion_function, "top_rules", None)
-        if top_rules is None:
-            return None
-        return int(top_rules)
 
     def _add_child_if_new(
         self,
@@ -859,7 +848,7 @@ class Tree:
         """Whole-route verification precedes any winning-node flag or reward."""
         from frozendict import frozendict
 
-        from synplan.chem.building_blocks import BuildingBlock, molecule_to_inchikey
+        from synplan.chem.building_blocks import BuildingBlock
         from synplan.chem.mapping import MappingBudgetExceeded, mapping_budget
         from synplan.chem.reaction.routes.stereo import audit_stereo_inheritance
         from synplan.chem.stereo_evidence import route_stereo_summary
@@ -889,7 +878,7 @@ class Tree:
                 buckets = {}
                 for leaf in route.leaves():
                     if str(leaf) in catalogue:
-                        key = molecule_to_inchikey(leaf)
+                        key = inchi_key(leaf)
                         buckets.setdefault(key[:14], []).append(
                             BuildingBlock(str(leaf), key, frozendict(), False)
                         )
@@ -907,6 +896,7 @@ class Tree:
                             for i, step in enumerate(route.steps)
                         },
                         allow_unconstrained_target=True,
+                        min_mol_size=self.config.min_mol_size,
                     )
                 if audit.supported:
                     node.reconstructed_route = route = audit.route

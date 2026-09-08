@@ -39,7 +39,7 @@ def _route(target_smiles: str, *leaf_smiles: str) -> Route:
 
 @pytest.mark.parametrize("target_smiles", ["C[C@H](F)Cl", "CC(F)Cl"])
 def test_costing_selects_compatible_stereoisomer_for_the_leaf(target_smiles):
-    r_block = _block(R_LACTIC, expensive=5.0)
+    r_block = _block(R_LACTIC, z_vendor=5.0, expensive=5.0)
     s_block = _block(S_LACTIC, inexpensive=1.0)
     route = _route(target_smiles, R_LACTIC)
 
