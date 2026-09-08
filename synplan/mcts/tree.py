@@ -2,14 +2,12 @@
 
 import json
 import logging
-import pickle
 from collections import deque
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, fields
 from hashlib import sha256
 from itertools import pairwise
 from math import log
-from os import PathLike
 from time import time
 
 from chython.containers import MoleculeContainer
@@ -325,13 +323,6 @@ class Tree:
             f"search_strategy={config.search_strategy}, "
             f"normalize_scores={config.normalize_scores}, "
         )
-
-    def save_pickle(self, file_path: str | PathLike[str]) -> None:
-        """Save this tree directly as a pickle after disabling tqdm."""
-
-        self._tqdm = None
-        with open(file_path, "wb") as file:
-            pickle.dump(self, file)
 
     def __len__(self) -> int:
         """Returns the current size (the number of nodes) in the tree."""

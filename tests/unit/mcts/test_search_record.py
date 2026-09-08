@@ -6,8 +6,10 @@ import json
 import pytest
 from test_tree_stats import FakeReactor, build_tree, make_mol
 
+from synplan.chem.utils import standardize_building_blocks
 from synplan.mcts.record import read_search_record, write_search_record
 from synplan.mcts.tree import Tree
+from synplan.utils.loading import load_building_blocks
 
 
 @pytest.fixture(scope="module")
@@ -124,6 +126,32 @@ def test_the_record_gzips_itself(searched, tmp_path):
         read_search_record(zipped).nodes.keys()
         == read_search_record(plain).nodes.keys()
     )
+
+
+@pytest.mark.parametrize("suffix", [".json", ".json.gz", ".sqlite", ".tsv"])
+def test_catalogue_tree_record_survives_database_removal(tmp_path, monkeypatch, suffix):
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    source = tmp_path / "stock.tsv"
+    source.write_text("SMILES\tvendor_ppg\nCCCCC\t2\n")
+    catalogue = tmp_path / f"stock{suffix}"
+    if catalogue != source:
+        standardize_building_blocks(source, catalogue)
+    stock = load_building_blocks(catalogue)
+    tree = build_tree(building_blocks=stock).run()
+    assert tree.winning_nodes
+    expected = [route.to_json() for route in tree.routes()]
+    # Export while the catalogue has a live reader; only search data is written.
+    assert stock._reader().connection.execute("SELECT 1").fetchone() == (1,)
+    progress = tree._tqdm
+    path = write_search_record(tree, tmp_path / "tree.json.gz")
+    assert tree._tqdm is progress
+    stock.close()
+    stock.path.unlink()
+    record = read_search_record(path)
+    assert not hasattr(record, "building_blocks")
+    assert [route.to_json() for route in record.routes()] == expected
+    selected = record.routes()[0].leaves()[0].meta["selected_stock"]
+    assert selected["vendors"] == {"vendor": 2.0}
 
 
 def test_a_file_that_is_not_a_search_record_says_so(tmp_path):

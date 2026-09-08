@@ -12,6 +12,28 @@ For the full per-release log, see :doc:`/release_notes`.
    :local:
    :depth: 2
 
+Unreleased
+==========
+
+Tree pickle persistence removed
+--------------------------------
+
+``Tree.save_pickle()`` was removed. Save and read finished searches as JSON or
+JSON.GZ with the existing search-record API:
+
+.. code-block:: python
+
+   from synplan.mcts.record import read_search_record, write_search_record
+
+   write_search_record(tree, "tree.json.gz")
+   record = read_search_record("tree.json.gz")
+   routes = list(record.routes())
+
+The record preserves nodes, statistics and selected vendor offers without
+serializing the catalogue, its SQLite connections or the policy network. It
+supports analysis and route reconstruction, but cannot resume the search.
+Loading pickled trees is unsupported.
+
 1.6.0
 =====
 
@@ -99,9 +121,8 @@ MCTS expansion wrappers moved to ``synplan.mcts.policy``. The old
 Tree persistence and route exports
 ----------------------------------
 
-``TreeWrapper`` was removed. Save a tree directly with
-``tree.save_pickle(path)`` and load it with ``pickle.load()``; the saved tree
-has ``_tqdm`` disabled. Route JSON and CSV exports now live in
+``TreeWrapper`` was removed. Use the search-record API above for finished-search
+persistence. Route JSON and CSV exports live in
 ``synplan.chem.reaction.routes.io``. Update imports from
 ``synplan.mcts.tree.export_tree_to_json`` and
 ``synplan.mcts.tree.export_tree_to_csv`` to the canonical route-I/O module.
@@ -182,25 +203,8 @@ evaluator subclasses must be updated:
 Pickled trees from 1.4.x
 ------------------------
 
-Pickled ``Tree`` instances from 1.4.x are *partially* compatible with
-1.5.0 only when loaded through project-specific legacy unpickling code.
-The old reaction-route tree wrapper has been removed from the public API.
-When a legacy pickle can still be loaded, its legacy attributes survive
-verbatim.
-
-Code paths that only read ``tree.synthesis_route``,
-``tree.route_to_node``, or ``tree.nodes[id].precursors_to_expand``
-continue to work. Code paths that touch the migrated surfaces fail:
-
-- ``tree.stats.<anything>`` raises ``AttributeError`` (the legacy
-  ``stats`` is still a ``dict``).
-- ``tree.nodes[id].rule_source`` / ``.rule_key`` / ``.policy_rank`` /
-  ``.depth`` etc. raise ``AttributeError`` because ``Node.__dict__`` from
-  a 1.4.x pickle lacks the new fields.
-
-No automatic migration is provided — there is no way to reconstruct the
-per-node rule provenance that 1.4.x never recorded. The supported
-workaround is to re-run the search.
+Legacy pickled trees are unsupported. Re-run the search and save a JSON search
+record; the per-node rule provenance missing from 1.4.x cannot be reconstructed.
 
 YAML ``key:`` (null) for nested standardization / filtering configs
 -------------------------------------------------------------------
