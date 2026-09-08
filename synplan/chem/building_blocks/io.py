@@ -1,7 +1,8 @@
-"""Strict TSV preparation and streaming JSON loading for building blocks."""
+"""Building-block format dispatch, loading and preparation."""
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import functools
 import gzip
@@ -18,14 +19,31 @@ from typing import Any
 
 import ijson
 from chython.containers import MoleculeContainer
+from chython.files.SDFrw import SDFRead
 from frozendict import frozendict
+from tqdm.auto import tqdm
 
 from synplan.chem.stereo import parse_smiles_preserving_stereo
-from synplan.chem.utils import safe_canonicalization
+from synplan.chem.utils import (
+    safe_canonicalization,
+    standardize_sdf_text,
+    standardize_smiles_batch,
+)
+from synplan.utils.files import (
+    MoleculeReader,
+    MoleculeWriter,
+    count_sdf_records,
+    count_smiles_records,
+    iter_csv_smiles,
+    iter_csv_smiles_blocks,
+    iter_sdf_text_blocks,
+    iter_smiles,
+    iter_smiles_blocks,
+)
 from synplan.utils.parallel import chunked, process_pool_map_stream
 
-from .core import BuildingBlock
-from .database import load_building_block_catalogue
+from .core import BuildingBlock, BuildingBlockCatalogue
+from .database import build_catalogue, load_building_block_catalogue
 from .identity import (
     molecule_has_stereo,
     molecule_to_inchikey,
@@ -33,6 +51,237 @@ from .identity import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def load_building_blocks(
+    building_blocks_path: str | Path,
+    standardize: bool = True,
+    silent: bool = True,
+    num_workers: int | None = None,
+    chunksize: int = 1000,
+    *,
+    header: bool = True,
+    delimiter: str = ",",
+    smiles_column: str = "SMILES",
+) -> frozenset[str] | BuildingBlockCatalogue:
+    """Load molecular stock or a cached stereo-aware vendor catalogue.
+
+    Prepared catalogues retain their InChIKeys and vendor offers and skip
+    chemistry preparation, regardless of ``standardize``.
+    JSON/JSON.GZ is indexed into SQLite once; vendor TSV/TSV.GZ first performs
+    chemistry preparation. SQLite files open directly with bounded reader caches.
+
+    :param building_blocks_path: The path to the file containing the building blocks.
+    :param standardize: Flag if building blocks have to be standardized before loading. Default=True.
+    :param header: For CSV/CSV.GZ files: treat the first row as header. Default=True.
+    :param delimiter: For CSV/CSV.GZ files: delimiter character. Default=",".
+    :param smiles_column: For CSV/CSV.GZ files: header column name containing SMILES.
+        Default="SMILES" (case-insensitive match is supported).
+    :return: A read-only catalogue for JSON/SQLite/vendor TSV, otherwise a SMILES set.
+    """
+
+    building_blocks_path = Path(building_blocks_path).resolve()
+    suffixes = "".join(building_blocks_path.suffixes).lower()
+    vendor_tsv = False
+    if header and suffixes.endswith((".tsv", ".tsv.gz")):
+        opener = gzip.open if suffixes.endswith(".gz") else open
+        with opener(building_blocks_path, "rt", encoding="utf-8", newline="") as stream:
+            columns = next(csv.reader(stream, delimiter="\t"), ())
+        vendor_tsv = any(column.casefold().endswith("_ppg") for column in columns)
+    if suffixes.endswith((".json", ".json.gz", ".sqlite")) or vendor_tsv:
+        return load_building_block_catalogue(
+            building_blocks_path, num_workers=1 if num_workers is None else num_workers
+        )
+    return _load_smiles_building_blocks(
+        building_blocks_path,
+        standardize,
+        silent,
+        num_workers,
+        chunksize,
+        header=header,
+        delimiter=delimiter,
+        smiles_column=smiles_column,
+    )
+
+
+@functools.cache
+def _load_smiles_building_blocks(
+    building_blocks_path,
+    standardize,
+    silent,
+    num_workers,
+    chunksize,
+    *,
+    header,
+    delimiter,
+    smiles_column,
+):
+    suffixes = "".join(building_blocks_path.suffixes).lower()
+    is_csv = suffixes.endswith(".csv") or suffixes.endswith(".csv.gz")
+    is_tsv = suffixes.endswith(".tsv") or suffixes.endswith(".tsv.gz")
+    if is_tsv:
+        is_csv = True
+        delimiter = "\t"
+    suffix = building_blocks_path.suffix.lower()
+    if not is_csv and suffix not in {".smi", ".smiles", ".sdf"}:
+        raise ValueError(
+            f"Unsupported building blocks file extension: '{building_blocks_path.name}'. "
+            "Supported: .smi, .smiles, .sdf, .csv, .csv.gz, .tsv, .tsv.gz, .json, .json.gz"
+        )
+
+    building_blocks_smiles = set()
+    if standardize:
+        if num_workers is None:
+            num_workers = max(1, os.cpu_count() - 1)
+        if num_workers < 1:
+            raise ValueError("num_workers must be >= 1")
+
+        if suffix in {".smi", ".smiles"}:
+            total = count_smiles_records(building_blocks_path) if not silent else None
+            step = max(1, chunksize or 1000)
+
+            progress_iter = _building_blocks_progress(total, silent=silent)
+            for out in _map_blocks(
+                iter_smiles_blocks(building_blocks_path, step),
+                standardize_smiles_batch,
+                num_workers=num_workers,
+            ):
+                if out:
+                    building_blocks_smiles.update(out)
+                    if progress_iter is not None:
+                        progress_iter.update(len(out))
+            if progress_iter is not None:
+                progress_iter.close()
+
+        elif is_csv:
+            step = max(1, chunksize or 1000)
+            progress_iter = _building_blocks_progress(None, silent=silent)
+            blocks = iter_csv_smiles_blocks(
+                building_blocks_path,
+                step,
+                header=header,
+                delimiter=delimiter,
+                smiles_column=smiles_column,
+            )
+            for out in _map_blocks(
+                blocks, standardize_smiles_batch, num_workers=num_workers
+            ):
+                if out:
+                    building_blocks_smiles.update(out)
+                    if progress_iter is not None:
+                        progress_iter.update(len(out))
+            if progress_iter is not None:
+                progress_iter.close()
+
+        elif suffix == ".sdf":
+            n = count_sdf_records(building_blocks_path) if not silent else None
+            step = max(1, chunksize or 5000)
+            blocks = iter_sdf_text_blocks(building_blocks_path, step)
+
+            progress = _building_blocks_progress(n, silent=silent)
+            for chunk_out in _map_blocks(
+                blocks, standardize_sdf_text, num_workers=num_workers
+            ):
+                if chunk_out:
+                    building_blocks_smiles.update(chunk_out)
+                    if progress is not None:
+                        progress.update(len(chunk_out))
+            if progress is not None:
+                progress.close()
+    else:
+        if suffix in {".smi", ".smiles"}:
+            for smiles in iter_smiles(building_blocks_path):
+                building_blocks_smiles.add(smiles)
+        elif is_csv:
+            for smiles in iter_csv_smiles(
+                building_blocks_path,
+                header=header,
+                delimiter=delimiter,
+                smiles_column=smiles_column,
+            ):
+                building_blocks_smiles.add(smiles)
+        elif suffix == ".sdf":
+            with SDFRead(str(building_blocks_path)) as sdf:
+                for mol in sdf:
+                    with contextlib.suppress(Exception):
+                        building_blocks_smiles.add(str(mol))
+
+    return frozenset(building_blocks_smiles)
+
+
+def standardize_building_blocks(
+    input_file: str, output_file: str, *, num_workers: int = 1
+) -> str:
+    """Standardizes custom building blocks.
+
+    :param input_file: The path to the file that stores the original building blocks.
+    :param output_file: The path to the file that will store the standardized building
+        blocks.
+    :param num_workers: Worker processes for TSV to JSON/JSON.GZ/SQLite preparation.
+    :return: The path to the file with standardized building blocks.
+    """
+    if input_file == output_file:
+        raise ValueError("input_file name and output_file name cannot be the same.")
+
+    if Path(output_file).suffix.lower() == ".sqlite":
+        return str(
+            build_catalogue(
+                Path(input_file), Path(output_file), num_workers=num_workers
+            )
+        )
+
+    if Path(output_file).name.lower().endswith((".json", ".json.gz")):
+        return standardize_building_block_catalogue(
+            input_file, output_file, num_workers=num_workers
+        )
+
+    with (
+        MoleculeReader(input_file) as inp_file,
+        MoleculeWriter(output_file) as out_file,
+    ):
+        for mol in tqdm(
+            inp_file,
+            desc="Number of building blocks processed: ",
+            bar_format="{desc}{n} [{elapsed}]",
+        ):
+            try:
+                mol = safe_canonicalization(mol)
+            except Exception as e:
+                logging.debug(e)
+                continue
+            out_file.write(mol)
+
+    return output_file
+
+
+def _building_blocks_progress(total: int | None, *, silent: bool):
+    """Create a consistent progress bar for building blocks loading."""
+    if silent:
+        return None
+    return tqdm(
+        total=total,
+        desc="Building blocks",
+        unit="mol",
+        unit_scale=True,
+        unit_divisor=1000,
+        dynamic_ncols=True,
+        smoothing=0.1,
+        disable=silent,
+    )
+
+
+def _map_blocks(blocks, worker_fn, *, num_workers: int):
+    """Map blocks through worker function, optionally using a process pool.
+
+    For `num_workers == 1`, this runs sequentially to avoid process-spawn overhead.
+    """
+    if num_workers < 1:
+        raise ValueError("num_workers must be >= 1")
+    if num_workers == 1:
+        for block in blocks:
+            yield worker_fn(block)
+        return
+    yield from process_pool_map_stream(blocks, worker_fn, max_workers=num_workers)
 
 
 @contextmanager
@@ -271,4 +520,9 @@ def _iter_prepared_catalogue(path: Path):
         ) from error
 
 
-__all__ = ["load_building_block_catalogue", "standardize_building_block_catalogue"]
+__all__ = [
+    "load_building_block_catalogue",
+    "load_building_blocks",
+    "standardize_building_block_catalogue",
+    "standardize_building_blocks",
+]

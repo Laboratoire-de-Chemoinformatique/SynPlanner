@@ -6,7 +6,6 @@ import re
 import warnings
 from collections.abc import Iterable
 from io import StringIO
-from pathlib import Path
 from typing import Literal
 
 from chython.containers import (
@@ -16,10 +15,8 @@ from chython.containers import (
 from chython.exceptions import InvalidAromaticRing, MappingError
 from chython.files.daylight.tokenize import smarts_tokenize
 from chython.files.SDFrw import SDFRead
-from tqdm.auto import tqdm
 
 from synplan.chem.stereo import parse_smiles_preserving_stereo
-from synplan.utils.files import MoleculeReader, MoleculeWriter
 
 ReactionMappingStatus = Literal["fully_mapped", "partially_mapped", "unmapped"]
 AtomMappingCheck = Literal["off", "reject_unmapped", "reject_partial"]
@@ -439,50 +436,10 @@ def validate_and_canonicalize(
 def standardize_building_blocks(
     input_file: str, output_file: str, *, num_workers: int = 1
 ) -> str:
-    """Standardizes custom building blocks.
+    """Compatibility wrapper for building-block preparation."""
+    from synplan.chem.building_blocks.io import standardize_building_blocks
 
-    :param input_file: The path to the file that stores the original building blocks.
-    :param output_file: The path to the file that will store the standardized building
-        blocks.
-    :param num_workers: Worker processes for TSV to JSON/JSON.GZ/SQLite preparation.
-    :return: The path to the file with standardized building blocks.
-    """
-    if input_file == output_file:
-        raise ValueError("input_file name and output_file name cannot be the same.")
-
-    if Path(output_file).suffix.lower() == ".sqlite":
-        from synplan.chem.building_blocks.database import build_catalogue
-
-        return str(
-            build_catalogue(
-                Path(input_file), Path(output_file), num_workers=num_workers
-            )
-        )
-
-    if Path(output_file).name.lower().endswith((".json", ".json.gz")):
-        from synplan.chem.building_blocks import standardize_building_block_catalogue
-
-        return standardize_building_block_catalogue(
-            input_file, output_file, num_workers=num_workers
-        )
-
-    with (
-        MoleculeReader(input_file) as inp_file,
-        MoleculeWriter(output_file) as out_file,
-    ):
-        for mol in tqdm(
-            inp_file,
-            desc="Number of building blocks processed: ",
-            bar_format="{desc}{n} [{elapsed}]",
-        ):
-            try:
-                mol = safe_canonicalization(mol)
-            except Exception as e:
-                logging.debug(e)
-                continue
-            out_file.write(mol)
-
-    return output_file
+    return standardize_building_blocks(input_file, output_file, num_workers=num_workers)
 
 
 def _standardize_one_smiles(

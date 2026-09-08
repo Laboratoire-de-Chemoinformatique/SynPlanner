@@ -13,7 +13,9 @@ from .identity import (
 )
 from .io import (
     load_building_block_catalogue,
+    load_building_blocks,
     standardize_building_block_catalogue,
+    standardize_building_blocks,
 )
 
 __all__ = [
@@ -21,9 +23,11 @@ __all__ = [
     "BuildingBlockCatalogue",
     "SQLiteBuildingBlockCatalogue",
     "load_building_block_catalogue",
+    "load_building_blocks",
     "match_building_blocks",
     "molecule_has_stereo",
     "molecule_to_inchikey",
     "standardize_building_block_catalogue",
+    "standardize_building_blocks",
     "validate_standard_inchikey",
 ]

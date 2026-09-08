@@ -139,11 +139,9 @@ def test_prepared_gzip_catalogue_loads_without_repeating_chemistry(
         "parse_smiles_preserving_stereo",
         "safe_canonicalization",
         "molecule_to_inchikey",
+        "standardize_smiles_batch",
     ):
         monkeypatch.setattr(catalogue_io, name, unexpected_preparation)
-    monkeypatch.setattr(
-        "synplan.utils.loading.standardize_smiles_batch", unexpected_preparation
-    )
     expected = load_building_block_catalogue(plain)
     actual = load_building_blocks(compressed)
     assert actual == expected

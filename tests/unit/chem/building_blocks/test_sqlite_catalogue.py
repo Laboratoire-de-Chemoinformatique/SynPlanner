@@ -3,6 +3,7 @@
 import gzip
 import json
 import multiprocessing
+import os
 import sqlite3
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
@@ -117,7 +118,8 @@ def test_empty_or_invalid_build_preserves_existing_database(tmp_path, monkeypatc
     assert not list(tmp_path.glob(".stock.sqlite.*"))
     build_catalogue(source, destination)
     assert not destination.with_name("stock.sqlite.errors.tsv").exists()
-    assert destination.stat().st_mode & 0o777 == 0o600
+    if os.name == "posix":
+        assert destination.stat().st_mode & 0o777 == 0o600
 
 
 def test_thread_and_spawn_readers_open_database_paths(tmp_path):

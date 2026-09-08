@@ -7,6 +7,11 @@ retrosynthetic planning.
 It uses Chython Standard InChIKeys throughout; the catalogue and MCTS identity
 path do not convert molecules through RDKit.
 
+Building-block format dispatch, loading and preparation live in
+``synplan.chem.building_blocks.io``; SQLite storage lives in the same package.
+The existing ``synplan.utils.loading.load_building_blocks`` import is an alias,
+and ``synplan.chem.utils.standardize_building_blocks`` delegates to that package.
+
 Loading a prepared catalogue
 ===========================
 
