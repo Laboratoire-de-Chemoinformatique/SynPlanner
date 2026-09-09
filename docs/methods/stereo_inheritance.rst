@@ -35,8 +35,9 @@ Supported scope
 
 Mapped orientation is the reference, not a CIP letter comparison. R can become S
 when substituent priorities change while spatial configuration is retained.
-Unspecified stereo is unknown. OR represents relative stereo with unresolved
-absolute identity; AND represents a mixture and does not imply a 50:50 ratio.
+Unspecified stereo establishes neither a particular configuration nor mixture
+composition. OR represents relative stereo with unresolved absolute identity;
+AND represents a mixture and does not imply a 50:50 ratio.
 A structural label never establishes ee, er, dr, E:Z or isolated purity.
 
 Planning behavior
@@ -111,6 +112,78 @@ stock records pinned to the route are available for rechecking. Editing the
 structures, maps, procedure, evidence or selected materials reopens the assessment.
 ``TreeConfig.stereo_assessments`` can carry the scoped records into another search.
 The default pipeline does not predict catalysts or extract patent prose.
+
+Supplier stereo semantics
+-------------------------
+
+`Mcule's stereochemical notations <https://doc.mcule.com/stereonotations>`_
+distinguish an unidentified single isomer from unspecified material that may
+contain a mixture. This applies to both tetrahedral and double-bond stereo.
+Neither establishes a requested absolute configuration. These source distinctions
+must survive import even when the molecular representation or drawing cannot
+express them separately.
+
+Mcule also describes four material-level types:
+
+.. list-table:: Supplier meaning and stock-selection requirement
+   :header-rows: 1
+   :widths: 15 40 45
+
+   * - Type
+     - Supplier meaning
+     - Requirement
+   * - Absolute
+     - The depicted stereoisomer is present
+     - Check the requested geometry; do not infer measured purity
+   * - Relative (REL)
+     - Either the depicted isomer or its enantiomer is present
+     - Preserve their relationship without selecting an absolute identity
+   * - Racemic (RAC)
+     - Both enantiomers form a 1:1 mixture
+     - Retain the declared ratio separately from generic AND semantics
+   * - Unknown (UNK)
+     - The absolute, relative or racemic classification is uncertain
+     - Keep the depicted geometry as unconfirmed supplier information
+
+Catalogue records retain source IDs, source structures and supplier declarations
+separately from prepared SMILES and optional prices. Mcule's SDF ``stereotype``
+field supplies the material type; the free SMILES download omits it. Different
+material types remain separate records even when their full InChIKeys coincide.
+REL, RAC and UNK records remain usable when no stereo configuration is required.
+They cannot fulfill a specific enantiomer request without further assessment,
+and their depicted wedges must not become inherited absolute geometry.
+A SMILES ``@`` marker alone does not establish supplier composition or purity.
+
+The selected source IDs and type survive route JSON export and reassessment.
+Reports show source links even with ``prices=False``; cached prices remain
+optional. Separations still require scoped evidence under the rules above.
+Distinguishing an unidentified single isomer from unspecified composition remains
+a design requirement where the supplied encoding cannot express that distinction.
+
+MolPort CXSMILES imports
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The inspected MolPort CSV contains CXSMILES, for example
+``Cl.N[C@H]1C[C@@H](C(O)=O)c2ccccc12 |r|`` for ``Molport-000-000-296``.
+No MolPort-specific stereo export policy was located; interpret the encoding
+using the `ChemAxon CXSMILES specification
+<https://docs.chemaxon.com/latest/formats_chemaxon-extended-smiles-and-smarts-cxsmiles-and-cxsmarts.html>`_,
+without treating it as independent confirmation of supplier composition.
+
+``r`` denotes the absence of the molecule-level absolute stereo flag under the
+original MDL convention. It is distinct from an enhanced OR group and must be
+interpreted together with any enhanced groups. CXSMILES uses ``a:`` for ABS,
+``o<group>:`` for OR and ``&<group>:`` for AND, with explicit atom membership.
+Do not turn ``r`` into a specific enantiomer or infer measured mixture ratios.
+
+The pinned Chython reader currently ignores legacy ``r``. Import preserves the
+complete source CXSMILES and marks these records ``unknown``; without source
+metadata it rejects the row. Enhanced OR/AND groups likewise cannot establish a requested absolute
+configuration. Other unsupported annotations must fail explicitly rather than
+silently becoming plain SMILES. Read the complete CSV/TSV structure field and
+preserve atom and group references during canonicalization. Supplier depictions
+should retain meaningful relative relationships with an explicit "absolute stereo
+unconfirmed" label; replacing every centre with a wavy bond loses that information.
 
 Extraction, persistence and compatibility
 -----------------------------------------

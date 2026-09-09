@@ -73,6 +73,16 @@ def compatible_records(
         with mapping_budget(max_mapping_work):
             # Exact representations need no mapping work; check them before alternatives.
             for record in sorted(bucket, key=lambda r: r.smiles != query_smiles):
+                if requirements and record.stereo_type not in ("", "absolute"):
+                    if diagnostics is not None:
+                        diagnostics.append(
+                            {
+                                "reason": "relative_or_mixture_stereo",
+                                "detail": f"supplier stereo type: {record.stereo_type}",
+                                "sources": [dict(s) for s in record.sources],
+                            }
+                        )
+                    continue
                 try:
                     candidate = record_molecule(record.smiles, record.inchikey)
                 except ValueError as error:
@@ -87,7 +97,9 @@ def compatible_records(
                     continue
                 # OR is unresolved absolute identity; AND is a material mixture.
                 # Neither satisfies a request for the depicted absolute isomer.
-                if has_stereo_groups(candidate) or len(candidate) != len(molecule):
+                if (requirements and has_stereo_groups(candidate)) or len(
+                    candidate
+                ) != len(molecule):
                     continue
                 if str(candidate) == query_smiles:
                     compatible.append(record)
@@ -113,10 +125,28 @@ def compatible_records(
 
 
 def selected_record(record):
-    return {
+    selected = {
         "inchikey": record.inchikey,
         "smiles": record.smiles,
         "vendors": dict(record.vendors),
         "price": min(record.vendors.values()) if record.vendors else None,
         "basis": "explicit_compatible_catalogue_record",
     }
+    if record.sources:
+        selected["sources"] = [dict(source) for source in record.sources]
+    if record.stereo_type:
+        selected["stereo_type"] = record.stereo_type
+    return selected
+
+
+def matches_selected(record, selected):
+    """Pin the material and its source declarations across route reassessment."""
+    return (
+        record.inchikey == selected["inchikey"]
+        and record.smiles == selected["smiles"]
+        and record.stereo_type == selected.get("stereo_type", "")
+        and (
+            "sources" not in selected
+            or [dict(s) for s in record.sources] == selected["sources"]
+        )
+    )

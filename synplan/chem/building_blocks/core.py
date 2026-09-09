@@ -11,12 +11,14 @@ from frozendict import frozendict
 
 @dataclass(frozen=True, slots=True)
 class BuildingBlock:
-    """One purchasable structure and its positive vendor price-per-gram offers."""
+    """One material, optional prices, and immutable supplier provenance."""
 
     smiles: str
     inchikey: str
     vendors: frozendict[str, float]
     has_stereo: bool
+    sources: tuple[frozendict[str, str], ...] = ()
+    stereo_type: str = ""
 
 
 BuildingBlockCatalogue: TypeAlias = Mapping[str, tuple[BuildingBlock, ...]]

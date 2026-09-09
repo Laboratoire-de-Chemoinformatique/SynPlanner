@@ -396,7 +396,10 @@ class Route:
         for leaf_key, (leaf, equivalents) in grouped.items():
             leaf_smiles = str(leaf)
             molecular_weight = float(leaf.molecular_mass)
-            from synplan.chem.building_blocks.stereo import compatible_records
+            from synplan.chem.building_blocks.stereo import (
+                compatible_records,
+                matches_selected,
+            )
 
             diagnostics = []
             candidates = compatible_records(
@@ -405,10 +408,7 @@ class Route:
             selected = leaf.meta.get("selected_stock")
             if selected:
                 candidates = tuple(
-                    c
-                    for c in candidates
-                    if c.inchikey == selected["inchikey"]
-                    and c.smiles == selected["smiles"]
+                    c for c in candidates if matches_selected(c, selected)
                 )
             offer = min(
                 (

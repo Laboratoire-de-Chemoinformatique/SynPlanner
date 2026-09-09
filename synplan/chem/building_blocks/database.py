@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import csv
 import functools
+import gzip
 import hashlib
 import json
 import logging
 import os
+import shutil
 import sqlite3
 import threading
 from collections.abc import Iterator, Mapping
@@ -20,9 +22,9 @@ from frozendict import frozendict
 from .core import BuildingBlock
 
 logger = logging.getLogger(__name__)
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 # Bump when catalogue preparation/identity semantics change independently of Chython.
-PREPARATION_VERSION = 2
+PREPARATION_VERSION = 3
 
 
 class SQLiteBuildingBlockCatalogue(Mapping[str, tuple[BuildingBlock, ...]]):
@@ -42,7 +44,7 @@ class SQLiteBuildingBlockCatalogue(Mapping[str, tuple[BuildingBlock, ...]]):
                     connection.execute("SELECT json FROM metadata").fetchone()[0]
                 )
             )
-        if self._metadata.get("schema_version") != SCHEMA_VERSION:
+        if self._metadata.get("schema_version") not in (1, SCHEMA_VERSION):
             raise ValueError(f"{self._path}: unsupported building-block SQLite schema")
         if (
             expected_cache_id is not None
@@ -51,6 +53,14 @@ class SQLiteBuildingBlockCatalogue(Mapping[str, tuple[BuildingBlock, ...]]):
             raise ValueError(f"{self._path}: building-block catalogue release changed")
         if self.record_count < 1 or len(self) < 1:
             raise ValueError(f"{self._path}: building-block catalogue is empty")
+        self._record_sql = (
+            "record"
+            if self._metadata["schema_version"] >= 2
+            else (
+                "json_object('smiles',smiles,'vendors',json(vendors),'has_stereo',"
+                "json(CASE has_stereo WHEN 1 THEN 'true' WHEN 0 THEN 'false' ELSE 'null' END))"
+            )
+        )
 
     @property
     def path(self) -> Path:
@@ -89,19 +99,11 @@ class SQLiteBuildingBlockCatalogue(Mapping[str, tuple[BuildingBlock, ...]]):
                 from .io import _validate_record
 
                 return tuple(
-                    _validate_record(
-                        key,
-                        {
-                            "smiles": smiles,
-                            "vendors": json.loads(vendors),
-                            "has_stereo": bool(stereo) if stereo in (0, 1) else stereo,
-                        },
-                        context=str(self._path),
-                    )
-                    for key, smiles, vendors, stereo in connection.execute(
-                        "SELECT inchikey, smiles, vendors, has_stereo FROM blocks "
-                        "WHERE substr(inchikey,1,14)=? ORDER BY rowid",
-                        (prefix,),
+                    _validate_record(key, json.loads(record), context=str(self._path))
+                    for key, record in connection.execute(
+                        f"SELECT inchikey, {self._record_sql} FROM blocks "
+                        "WHERE inchikey>=? AND inchikey<? ORDER BY rowid",
+                        (prefix + "-", prefix + "."),
                     )
                 )
 
@@ -127,6 +129,14 @@ class SQLiteBuildingBlockCatalogue(Mapping[str, tuple[BuildingBlock, ...]]):
 
     def __len__(self) -> int:
         return self._metadata["buckets"]
+
+    def records(self):
+        """Stream grouped JSON records without loading stock or repeating chemistry."""
+        for key, records in self._reader().connection.execute(
+            f"SELECT inchikey,json_group_array(json({self._record_sql})) FROM blocks "
+            "GROUP BY inchikey ORDER BY min(rowid)"
+        ):
+            yield from ((key, record) for record in json.loads(records))
 
     def close(self) -> None:
         """Release this thread's connection and bounded record cache."""
@@ -169,9 +179,10 @@ def _rows(records, *, context):
         block = _validate_record(key, record, context=context)
         yield (
             block.inchikey,
-            block.smiles,
-            json.dumps(dict(block.vendors), separators=(",", ":")),
-            int(block.has_stereo),
+            json.dumps(record, separators=(",", ":"), default=float),
+            json.dumps(
+                [block.stereo_type, block.smiles if "|" in block.smiles else ""]
+            ),
         )
 
 
@@ -184,7 +195,7 @@ def build_catalogue(source: Path, output: Path, *, num_workers: int = 1) -> Path
     from .io import (
         _atomic_output,
         _iter_prepared_catalogue,
-        _merge_vendor_prices,
+        _merge_records,
         _prepare_catalogue_batches,
     )
 
@@ -224,26 +235,23 @@ def build_catalogue(source: Path, output: Path, *, num_workers: int = 1) -> Path
         ):
             connection.execute("PRAGMA cache_size=-8192")
             connection.execute(
-                "CREATE TABLE blocks (inchikey TEXT NOT NULL UNIQUE, smiles TEXT NOT NULL, vendors TEXT NOT NULL, has_stereo INTEGER NOT NULL CHECK(has_stereo IN (0,1)))"
+                "CREATE TABLE blocks (inchikey TEXT NOT NULL, record TEXT NOT NULL, variant TEXT NOT NULL, UNIQUE(inchikey, variant))"
             )
-            insert = "INSERT INTO blocks VALUES (?, ?, ?, ?)"
+            insert = "INSERT INTO blocks VALUES (?, ?, ?)"
             writer = csv.writer(error_handle, delimiter="\t", lineterminator="\n")
             writer.writerow(("line_number", "error"))
             if prepared:
                 batches = ((_iter_prepared_catalogue(source), ()),)
             else:
                 connection.create_function(
-                    "merge_vendors",
+                    "merge_records",
                     2,
                     lambda old, new: json.dumps(
-                        _merge_vendor_prices(json.loads(old), json.loads(new)),
+                        _merge_records(json.loads(old), json.loads(new)),
                         separators=(",", ":"),
                     ),
                 )
-                # Keep the first SMILES/rowid; update only prices and stereo presence.
-                insert += """ ON CONFLICT(inchikey) DO UPDATE SET
-                    vendors=merge_vendors(blocks.vendors, excluded.vendors),
-                    has_stereo=blocks.has_stereo OR excluded.has_stereo"""
+                insert += " ON CONFLICT(inchikey,variant) DO UPDATE SET record=merge_records(blocks.record,excluded.record)"
                 batches = _prepare_catalogue_batches(source, num_workers)
             try:
                 for batch_records, batch_errors in batches:
@@ -254,9 +262,6 @@ def build_catalogue(source: Path, output: Path, *, num_workers: int = 1) -> Path
                     )
             except sqlite3.IntegrityError as error:
                 raise ValueError(f"{source}: duplicate InChIKey") from error
-            connection.execute(
-                "CREATE INDEX connectivity ON blocks(substr(inchikey,1,14))"
-            )
             records, buckets = connection.execute(
                 "SELECT count(*), count(DISTINCT substr(inchikey,1,14)) FROM blocks"
             ).fetchone()
@@ -334,7 +339,18 @@ def load_building_block_catalogue(
         token = hashlib.sha256(json.dumps(_source_token(path)).encode()).hexdigest()
         destination = root / f"{token}.sqlite"
         if not destination.exists():
-            build_catalogue(path, destination, num_workers=num_workers)
+            if path.name.lower().endswith(".sqlite.gz"):
+                from .io import _atomic_output
+
+                with _atomic_output(destination) as temporary:
+                    with (
+                        gzip.open(path, "rb") as source,
+                        temporary.open("wb") as output,
+                    ):
+                        shutil.copyfileobj(source, output, length=1024 * 1024)
+                    SQLiteBuildingBlockCatalogue(temporary).close()
+            else:
+                build_catalogue(path, destination, num_workers=num_workers)
     try:
         return _open_catalogue(destination, _signature(destination), os.getpid())
     except (sqlite3.Error, KeyError, TypeError, json.JSONDecodeError) as error:

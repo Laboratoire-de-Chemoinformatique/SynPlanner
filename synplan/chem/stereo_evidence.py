@@ -165,6 +165,10 @@ def review_stereo_route(
                         record["inchikey"],
                         frozendict(record["vendors"]),
                         True,
+                        tuple(
+                            frozendict(source) for source in record.get("sources", ())
+                        ),
+                        record.get("stereo_type", ""),
                     )
                     buckets.setdefault(block.inchikey[:14], []).append(block)
             catalogue = frozendict({k: tuple(v) for k, v in buckets.items()})

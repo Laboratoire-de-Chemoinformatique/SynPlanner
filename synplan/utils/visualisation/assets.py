@@ -243,7 +243,17 @@ function showOffers(pill) {
   const table = document.createElement("table");
   for (const row of data.rows) {
     const tr = table.insertRow();
-    for (const cell of row) tr.insertCell().textContent = cell;
+    for (const cell of row) {
+      const td = tr.insertCell();
+      if (cell && typeof cell === "object") {
+        const link = document.createElement("a");
+        link.textContent = cell.text;
+        if (/^https?:\/\//i.test(cell.href)) link.href = cell.href;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        td.appendChild(link);
+      } else td.textContent = cell;
+    }
   }
   const note = document.createElement("div");
   note.className = "cap";

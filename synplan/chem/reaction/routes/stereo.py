@@ -19,7 +19,11 @@ from chython.containers import MoleculeContainer, ReactionContainer
 
 from synplan.chem.building_blocks import BuildingBlockCatalogue
 from synplan.chem.building_blocks.core import match_building_blocks
-from synplan.chem.building_blocks.stereo import record_molecule
+from synplan.chem.building_blocks.stereo import (
+    matches_selected,
+    record_molecule,
+    selected_record,
+)
 from synplan.chem.mapping import MappingBudgetExceeded, bounded_mappings
 from synplan.chem.reaction.routes.route import Route, Step
 from synplan.chem.stereo import (
@@ -225,11 +229,7 @@ def match_stereo_stock(
     rejected = []
     bucket = match_building_blocks(catalogue, key)
     if selected := mol.meta.get("selected_stock"):
-        bucket = tuple(
-            r
-            for r in bucket
-            if r.inchikey == selected["inchikey"] and r.smiles == selected["smiles"]
-        )
+        bucket = tuple(r for r in bucket if matches_selected(r, selected))
     if len(bucket) > cap:
         raise UnresolvedStereo(
             "stock_assessment_incomplete",
@@ -241,6 +241,15 @@ def match_stereo_stock(
         )
     connectivity = connectivity_key(mol)
     for record in bucket:
+        if constraints and record.stereo_type not in ("", "absolute"):
+            rejected.append(
+                {
+                    "inchikey": record.inchikey,
+                    "reason": "unconfirmed_supplier_stereo",
+                    "stereo_type": record.stereo_type,
+                }
+            )
+            continue
         try:
             candidate = record_molecule(record.smiles, record.inchikey)
         except ValueError as error:
@@ -252,11 +261,14 @@ def match_stereo_stock(
                 }
             )
             continue
-        if has_stereo_groups(candidate):
+        if constraints and has_stereo_groups(candidate):
             rejected.append(
                 {"inchikey": record.inchikey, "reason": "relative_or_mixture_stock"}
             )
             continue
+        if record.stereo_type not in ("", "absolute") or has_stereo_groups(candidate):
+            candidate = candidate.copy()
+            candidate.clean_stereo()
         if connectivity_key(candidate) != connectivity:
             rejected.append(
                 {"inchikey": record.inchikey, "reason": "connectivity_bucket_only"}
@@ -286,10 +298,7 @@ def match_stereo_stock(
             selected = candidate.copy()
             selected.remap({v: k for k, v in compatible[0].items()})
             record_data = {
-                "inchikey": record.inchikey,
-                "smiles": record.smiles,
-                "vendors": dict(record.vendors),
-                "price": min(record.vendors.values()) if record.vendors else None,
+                **selected_record(record),
                 "record_to_route_atom_map": {v: k for k, v in compatible[0].items()},
                 "compatible_mapping_count": len(compatible),
                 "rejected_candidates": rejected,

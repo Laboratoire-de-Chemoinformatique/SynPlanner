@@ -243,7 +243,7 @@ def _step_label(step: Step) -> str:
 
 
 def _route_prices(
-    route: Route, names: dict[str, str]
+    route: Route, names: dict[str, str], *, prices: bool = True
 ) -> tuple[dict[int, tuple[str, str]], str]:
     """A pill per terminal leaf, and the route's own cost per gram.
 
@@ -262,9 +262,15 @@ def _route_prices(
     per_mol, complete = 0.0, True
     for leaf in route.leaves():
         selected = leaf.meta.get("selected_stock") or {}
-        offers = sorted(
-            (selected.get("vendors") or {}).items(), key=lambda item: (item[1], item[0])
+        offers = (
+            sorted(
+                (selected.get("vendors") or {}).items(),
+                key=lambda item: (item[1], item[0]),
+            )
+            if prices
+            else []
         )
+        sources = selected.get("sources") or []
         if offers:
             per_mol += float(leaf.molecular_mass) * offers[0][1]
             rows = [[names.get(code, code), f"{price:g}"] for code, price in offers]
@@ -276,16 +282,36 @@ def _route_prices(
                 "is available."
             )
         elif selected:
-            rows = [["Price", "unavailable"]]
-            note = "The catalogue lists this material with no offer."
+            rows = [["Price", "unavailable"]] if prices else []
+            note = "Check current availability and price at the source."
         else:
             complete = False
+            continue
+        for source in sources:
+            identifier = source["id"]
+            url = source.get("url", "")
+            if not url:
+                if source["vendor"] == "MC" and identifier.startswith("MCULE-"):
+                    url = f"https://mcule.com/{identifier}/"
+                elif source["vendor"] == "MP" and identifier.lower().startswith(
+                    "molport-"
+                ):
+                    url = f"https://www.molport.com/shop/compound/{identifier}"
+            cell = (
+                {"text": identifier, "href": url}
+                if url.lower().startswith(("https://", "http://"))
+                else identifier
+            )
+            rows.append([names.get(source["vendor"], source["vendor"]), cell])
+        if selected.get("stereo_type"):
+            rows.append(["Supplier stereo", selected["stereo_type"]])
+        if not prices and not sources:
             continue
         complete = complete and bool(offers)
         pills[id(leaf)] = (
             # One label on every chip, so a row of them reads as one control rather
             # than as a row of numbers competing with the drawing.
-            "show price",
+            "source IDs" if sources else "show price",
             json.dumps(
                 {"title": selected.get("inchikey", ""), "rows": rows, "note": note}
             ),
@@ -338,9 +364,7 @@ def routes_report_html(
         vendors by the short codes the records hold.
     :return: The page when ``html_path`` is None, otherwise None.
     """
-    vendors = (
-        vendor_names(building_blocks) if prices and building_blocks is not None else {}
-    )
+    vendors = vendor_names(building_blocks) if building_blocks is not None else {}
     with _temporary_render_config(mapping=bool(aam)):
         routes = list(routes)
         # A legacy SMILES stock carries no vendors at all, so a page drawn against
@@ -392,7 +416,7 @@ def routes_report_html(
                     + "</div></div>"
                 )
             provenance = route.provenance
-            pills, per_gram = _route_prices(route, vendors) if prices else ({}, "")
+            pills, per_gram = _route_prices(route, vendors, prices=prices)
             cost = (
                 '<div class="kv"><div class="eyebrow">Price per g of target</div>'
                 f'<div class="v">{per_gram}</div></div>'

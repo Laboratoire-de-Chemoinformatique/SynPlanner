@@ -11,10 +11,12 @@ import logging
 import math
 import os
 import re
+import shutil
 import tempfile
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from decimal import Decimal
 from io import TextIOWrapper
+from itertools import groupby
 from pathlib import Path
 from typing import Any
 
@@ -85,8 +87,10 @@ def load_building_blocks(
         opener = gzip.open if suffixes.endswith(".gz") else open
         with opener(building_blocks_path, "rt", encoding="utf-8", newline="") as stream:
             columns = next(csv.reader(stream, delimiter="\t"), ())
-        vendor_tsv = any(column.casefold().endswith("_ppg") for column in columns)
-    if suffixes.endswith((".json", ".json.gz", ".sqlite")) or vendor_tsv:
+        vendor_tsv = "sources" in columns or any(
+            column.casefold().endswith("_ppg") for column in columns
+        )
+    if suffixes.endswith((".json", ".json.gz", ".sqlite", ".sqlite.gz")) or vendor_tsv:
         return load_building_block_catalogue(
             building_blocks_path, num_workers=1 if num_workers is None else num_workers
         )
@@ -295,17 +299,7 @@ def _atomic_output(path: Path):
         os.replace(temporary, path)
 
 
-def _write_tsv_atomic(path: Path, rows: list[tuple[int, str]]) -> None:
-    with (
-        _atomic_output(path) as temporary,
-        temporary.open("w", encoding="utf-8", newline="") as handle,
-    ):
-        writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-        writer.writerow(("line_number", "error"))
-        writer.writerows(rows)
-
-
-def _write_json_atomic(path: Path, records: dict[str, dict[str, Any]]) -> None:
+def _write_json_atomic(path: Path, records) -> None:
     with _atomic_output(path) as temporary, temporary.open("wb") as handle:
         stream = (
             gzip.GzipFile(
@@ -315,27 +309,40 @@ def _write_json_atomic(path: Path, records: dict[str, dict[str, Any]]) -> None:
             else handle
         )
         with TextIOWrapper(stream, encoding="utf-8", newline="\n") as text:
-            json.dump(records, text, ensure_ascii=False, separators=(",", ":"))
-            text.write("\n")
+            text.write("{")
+            for index, (key, group) in enumerate(
+                groupby(records, key=lambda item: item[0])
+            ):
+                values = [value for _, value in group]
+                if index:
+                    text.write(",")
+                text.write(json.dumps(key) + ":")
+                json.dump(
+                    values[0] if len(values) == 1 else values,
+                    text,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+            text.write("}\n")
 
 
-def _merge_vendor_prices(existing: dict, incoming: dict) -> dict:
-    for vendor, price in incoming.items():
-        existing[vendor] = min(price, existing.get(vendor, price))
+def _merge_records(existing, incoming):
+    """Keep the first spelling, minimum prices and distinct source declarations."""
+    for vendor, price in incoming["vendors"].items():
+        existing["vendors"][vendor] = min(price, existing["vendors"].get(vendor, price))
+    existing["has_stereo"] |= incoming["has_stereo"]
+    if incoming.get("sources"):
+        sources = existing.setdefault("sources", [])
+        sources.extend(
+            source for source in incoming["sources"] if source not in sources
+        )
     return existing
 
 
 def standardize_building_block_catalogue(
     input_file: str | Path, output_file: str | Path, *, num_workers: int = 1
 ) -> str:
-    """Convert a vendor-price TSV into a stereo-preserving Chython JSON catalogue.
-
-    Valid rows are published atomically even when other rows fail. All row-level
-    failures are collected in ``<output>.errors.tsv``. If no row is valid, the
-    report is written but an existing output is left untouched.
-    ``num_workers`` parallelizes chemistry in ordered batches; loading the
-    prepared JSON/JSON.GZ never repeats this work.
-    """
+    """Prepare once through SQLite, then stream JSON with bounded memory."""
 
     source = Path(input_file)
     output = Path(output_file)
@@ -346,47 +353,24 @@ def standardize_building_block_catalogue(
     if num_workers < 1:
         raise ValueError("num_workers must be >= 1")
 
-    # ponytail: JSON export holds records in RAM; stream from SQLite if large
-    # JSON releases are needed. SQLite output already bounds preparation memory.
-    records: dict[str, dict[str, Any]] = {}
-    errors: list[tuple[int, str]] = []
-    for batch_records, batch_errors in _prepare_catalogue_batches(source, num_workers):
-        errors.extend(batch_errors)
-        for key, record in batch_records:
-            existing = records.get(key)
-            if existing is None:
-                records[key] = record
-            else:
-                # Standard InChI deliberately merges some tautomeric spellings.
-                # Keep the first canonical SMILES and merge only vendor offers.
-                existing["has_stereo"] = bool(
-                    existing["has_stereo"] or record["has_stereo"]
-                )
-                _merge_vendor_prices(existing["vendors"], record["vendors"])
-
     error_path = Path(f"{output}.errors.tsv")
-    if not records and not errors:
-        errors.append((1, "catalogue contains no data rows"))
-    if errors:
-        _write_tsv_atomic(error_path, errors)
-    if not records:
-        raise ValueError(
-            f"{source}: no valid rows; {len(errors)} invalid row(s) reported in "
-            f"{error_path}"
+    with tempfile.TemporaryDirectory() as folder:
+        database = (
+            source
+            if source.suffix.lower() == ".sqlite"
+            else Path(folder) / "stock.sqlite"
         )
-
-    _write_json_atomic(output, records)
-    if errors:
-        logger.warning(
-            "Published %d building blocks to %s after dropping %d invalid row(s); "
-            "details written to %s",
-            len(records),
-            output,
-            len(errors),
-            error_path,
-        )
-    else:
-        error_path.unlink(missing_ok=True)
+        try:
+            if database != source:
+                build_catalogue(source, database, num_workers=num_workers)
+            with closing(load_building_block_catalogue(database)) as stock:
+                _write_json_atomic(output, stock.records())
+            error_path.unlink(missing_ok=True)
+        finally:
+            errors = Path(f"{database}.errors.tsv")
+            if errors.exists():
+                error_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(errors, error_path)
     return str(output)
 
 
@@ -404,7 +388,7 @@ def _prepare_catalogue_batches(source: Path, num_workers: int):
         price_columns = [name for name in header if name.casefold().endswith("_ppg")]
         if len(smiles_columns) != 1:
             raise ValueError(f"{source}: expected exactly one SMILES column")
-        if not price_columns:
+        if not price_columns and "sources" not in header:
             raise ValueError(f"{source}: expected at least one *_ppg vendor column")
         worker = functools.partial(
             _prepare_catalogue_batch,
@@ -460,16 +444,27 @@ def _prepare_catalogue_batch(rows, *, smiles_column, price_columns):
             restored = smiles(smiles_text, strict_stereo=True)
             if inchi_key(restored) != key:
                 raise ValueError("prepared SMILES changes identity when read back")
-            records.append(
-                (
-                    key,
-                    {
-                        "smiles": smiles_text,
-                        "vendors": vendors,
-                        "has_stereo": has_stereo(molecule),
-                    },
+            record = {
+                "smiles": smiles_text,
+                "vendors": vendors,
+                "has_stereo": has_stereo(molecule),
+            }
+            if row.get("sources"):
+                record["sources"] = json.loads(row["sources"])
+            if row.get("stereo_type"):
+                record["stereo_type"] = row["stereo_type"].removesuffix(
+                    " (not confirmed)"
                 )
-            )
+            # The pinned reader ignores the legacy molecule-level CX r flag.
+            # Keep its source spelling, but never promote it to absolute stock.
+            if re.search(r"(?:\||,)r(?=[:,|])", raw_smiles):
+                if not record.get("sources"):
+                    raise ValueError(
+                        "CX r requires source metadata for unassessed stock"
+                    )
+                record["stereo_type"] = "unknown"
+            _validate_record(key, record, context=f"row {line_number}")
+            records.append((key, record))
         except Exception as error:
             errors.append((line_number, str(error) or type(error).__name__))
     return records, errors
@@ -482,7 +477,11 @@ def _validate_record(key, raw_record, *, context):
     location = f"{context}:{key}"
     if not isinstance(raw_record, dict):
         raise ValueError(f"{location}: record must be a JSON object")
-    if set(raw_record) != {"smiles", "vendors", "has_stereo"}:
+    required = {"smiles", "vendors", "has_stereo"}
+    if not required <= raw_record.keys() or raw_record.keys() - required - {
+        "sources",
+        "stereo_type",
+    }:
         raise ValueError(f"{location}: expected smiles, vendors, and has_stereo fields")
     canonical_smiles = raw_record["smiles"]
     if not isinstance(canonical_smiles, str) or not canonical_smiles:
@@ -505,11 +504,36 @@ def _validate_record(key, raw_record, *, context):
         if not math.isfinite(price) or price <= 0.0:
             raise ValueError(f"{location}: {vendor} price must be finite and positive")
         vendors[vendor] = price
+    stereo_type = raw_record.get("stereo_type", "")
+    if stereo_type not in (
+        "",
+        "absolute",
+        "relative",
+        "racemic",
+        "unknown",
+        "unspecified",
+    ):
+        raise ValueError(f"{location}: invalid stereo_type")
+    sources = raw_record.get("sources", [])
+    if not isinstance(sources, list):
+        raise ValueError(f"{location}: sources must be a list")
+    for source in sources:
+        if (
+            not isinstance(source, dict)
+            or not all(
+                isinstance(k, str) and isinstance(v, str) for k, v in source.items()
+            )
+            or not source.get("vendor")
+            or not source.get("id")
+        ):
+            raise ValueError(f"{location}: each source needs vendor and id strings")
     return BuildingBlock(
         smiles=canonical_smiles,
         inchikey=key,
         vendors=frozendict(vendors),
         has_stereo=has_stereo,
+        sources=tuple(frozendict(source) for source in sources),
+        stereo_type=stereo_type,
     )
 
 
@@ -517,7 +541,13 @@ def _iter_prepared_catalogue(path: Path):
     opener = gzip.open if path.suffix.lower() == ".gz" else open
     try:
         with opener(path, "rb") as stream:
-            yield from ijson.kvitems(stream, "")
+            for key, record in ijson.kvitems(stream, ""):
+                if isinstance(record, list):
+                    if not record:
+                        raise ValueError(f"{path}: empty material variants for {key}")
+                    yield from ((key, item) for item in record)
+                else:
+                    yield key, record
     except (OSError, EOFError, ijson.JSONError) as error:
         raise ValueError(
             f"Could not read building-block catalogue {path}: {error}"
