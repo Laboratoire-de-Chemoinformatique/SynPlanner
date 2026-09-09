@@ -99,16 +99,20 @@ class Precursor:
         self,
         bb_stock: Set[str] | BuildingBlockCatalogue,
         min_mol_size: int = 6,
+        *,
+        match_stereo: bool = True,
     ) -> bool:
         """Stop expansion for compatible stock or an assumed-trivial small fragment."""
-        purchasable = self.is_purchasable(bb_stock)
+        purchasable = self.is_purchasable(bb_stock, match_stereo=match_stereo)
         self.molecule.meta.pop("assumed_trivial", None)
         if not purchasable and 0 < len(self) <= min_mol_size:
             self.molecule.meta["assumed_trivial"] = min_mol_size
             return True
         return purchasable
 
-    def is_purchasable(self, bb_stock: Set[str] | BuildingBlockCatalogue) -> bool:
+    def is_purchasable(
+        self, bb_stock: Set[str] | BuildingBlockCatalogue, *, match_stereo: bool = True
+    ) -> bool:
         """Check compatible stock, retaining the selected record and diagnostics.
 
         :param bb_stock: The list of building blocks. Each building block is represented
@@ -116,7 +120,10 @@ class Precursor:
             prefix-bucket catalogue whose records retain their full InChIKeys.
         :return: True is Precursor is a building block.
         """
-        if has_stereo_groups(self.molecule):
+        if match_stereo and has_stereo_groups(self.molecule):
+            self.selected_stock = None
+            self._stock_cache = None
+            self.molecule.meta.pop("selected_stock", None)
             return False
         if isinstance(bb_stock, Mapping):
             cached = self._stock_cache
@@ -124,6 +131,7 @@ class Precursor:
                 isinstance(bb_stock, (frozendict, SQLiteBuildingBlockCatalogue))
                 and cached is not None
                 and cached[0] is bb_stock
+                and cached[2] == match_stereo
             ):
                 return cached[1]
             try:
@@ -131,22 +139,23 @@ class Precursor:
                     self.molecule,
                     bb_stock,
                     inchikey=self.inchi_key,
+                    match_stereo=match_stereo,
                     diagnostics=self.stock_diagnostics,
                 )
             except (InvalidAromaticRing, ValueError):
                 return False
             if records:
-                record = min(
-                    records, key=lambda r: min(r.vendors.values(), default=float("inf"))
-                )
+                record = min(records, key=lambda r: r.price or float("inf"))
                 self.selected_stock = selected_record(record)
+                if not match_stereo:
+                    self.selected_stock["basis"] = "connectivity_only"
                 self.molecule.meta["selected_stock"] = self.selected_stock
             else:
                 self.selected_stock = None
                 self.molecule.meta.pop("selected_stock", None)
-            self._stock_cache = (bb_stock, bool(records))
+            self._stock_cache = (bb_stock, bool(records), match_stereo)
             return bool(records)
-        return is_purchasable(self.molecule, bb_stock)
+        return is_purchasable(self.molecule, bb_stock, match_stereo=match_stereo)
 
 
 def is_purchasable(
@@ -156,6 +165,7 @@ def is_purchasable(
     *,
     key: str | None = None,
     inchikey: str | None = None,
+    match_stereo: bool = True,
 ) -> bool:
     """Whether a molecule has an actual compatible catalogue record.
 
@@ -165,7 +175,7 @@ def is_purchasable(
     ``min_mol_size`` is retained for API compatibility and does not affect membership.
     """
 
-    if has_stereo_groups(molecule):
+    if match_stereo and has_stereo_groups(molecule):
         return False
     if isinstance(stock, Mapping):
         try:
@@ -178,7 +188,15 @@ def is_purchasable(
                 error,
             )
             return False
-        return bool(compatible_records(molecule, stock, inchikey=identity))
+        return bool(
+            compatible_records(
+                molecule, stock, inchikey=identity, match_stereo=match_stereo
+            )
+        )
+    if not match_stereo:
+        molecule = molecule.copy()
+        molecule.clean_stereo()
+        key = None
     return (key or str(molecule)) in stock
 
 

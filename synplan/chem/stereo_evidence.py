@@ -163,7 +163,6 @@ def review_stereo_route(
                     block = BuildingBlock(
                         record["smiles"],
                         record["inchikey"],
-                        frozendict(record["vendors"]),
                         True,
                         tuple(
                             frozendict(source) for source in record.get("sources", ())

@@ -14,8 +14,8 @@ def test_building_block_adapter_delegates_only_the_smiles():
     block = BuildingBlock(
         smiles="CCO",
         inchikey="LFQSCWFLJHTTHZ-UHFFFAOYSA-N",
-        vendors=frozendict({"vendor": 1.0}),
         has_stereo=False,
+        sources=(frozendict(vendor="vendor", ppg=str(1.0)),),
     )
 
     assert synthoniser.synthonise_building_block(block) is expected

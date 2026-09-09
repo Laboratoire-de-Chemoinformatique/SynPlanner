@@ -191,7 +191,7 @@ def test_catalogue_tree_record_survives_database_removal(tmp_path, monkeypatch, 
     assert not hasattr(record, "building_blocks")
     assert [route.to_json() for route in record.routes()] == expected
     selected = record.routes()[0].leaves()[0].meta["selected_stock"]
-    assert selected["vendors"] == {"vendor": 2.0}
+    assert selected["sources"] == [{"vendor": "vendor", "ppg": "2.0"}]
 
 
 def test_a_file_that_is_not_a_search_record_says_so(tmp_path):

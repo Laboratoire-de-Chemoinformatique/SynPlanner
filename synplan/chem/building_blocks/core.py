@@ -15,10 +15,26 @@ class BuildingBlock:
 
     smiles: str
     inchikey: str
-    vendors: frozendict[str, float]
     has_stereo: bool
     sources: tuple[frozendict[str, str], ...] = ()
     stereo_type: str = ""
+
+    @property
+    def price(self) -> float | None:
+        return min(
+            (float(source["ppg"]) for source in self.sources if source.get("ppg")),
+            default=None,
+        )
+
+    def to_record(self) -> dict:
+        record = {
+            "smiles": self.smiles,
+            "has_stereo": self.has_stereo,
+            "sources": [dict(source) for source in self.sources],
+        }
+        if self.stereo_type:
+            record["stereo_type"] = self.stereo_type
+        return record
 
 
 BuildingBlockCatalogue: TypeAlias = Mapping[str, tuple[BuildingBlock, ...]]

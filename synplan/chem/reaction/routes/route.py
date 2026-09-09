@@ -242,6 +242,8 @@ class Route:
                 has_stereo(m) for s in route for m in s.reaction.molecules()
             ):
                 status = "fulfilled"
+            if getattr(getattr(tree, "config", None), "stereo_mode", None) == "off":
+                status = "not_assessed"
             route = replace(
                 route,
                 stereo=route_stereo_summary(
@@ -251,6 +253,9 @@ class Route:
                     obligations=getattr(node, "stereo_obligations", ()),
                 ),
             )
+        if getattr(getattr(tree, "config", None), "stereo_mode", None) == "off":
+            route.stereo["search_mode"] = "off"
+            route.stereo["basis"] = "connectivity_only"
         return route
 
     @classmethod
@@ -334,7 +339,13 @@ class Route:
             return not self.unresolved and not any(
                 has_stereo(m) for s in self.steps for m in s.reaction.molecules()
             )
-        return not self.unresolved and self.stereo_status == "fulfilled"
+        return not self.unresolved and (
+            self.stereo_status == "fulfilled"
+            or (
+                self.stereo_status == "not_assessed"
+                and self.stereo.get("search_mode") == "off"
+            )
+        )
 
     @property
     def connectivity_solved(self) -> bool:
@@ -403,7 +414,11 @@ class Route:
 
             diagnostics = []
             candidates = compatible_records(
-                leaf, building_blocks, inchikey=leaf_key, diagnostics=diagnostics
+                leaf,
+                building_blocks,
+                inchikey=leaf_key,
+                diagnostics=diagnostics,
+                match_stereo=(self.stereo or {}).get("search_mode") != "off",
             )
             selected = leaf.meta.get("selected_stock")
             if selected:
@@ -412,9 +427,15 @@ class Route:
                 )
             offer = min(
                 (
-                    (price, vendor, block.inchikey, block.smiles)
+                    (
+                        float(source["ppg"]),
+                        source["vendor"],
+                        block.inchikey,
+                        block.smiles,
+                    )
                     for block in candidates
-                    for vendor, price in block.vendors.items()
+                    for source in block.sources
+                    if source.get("ppg")
                 ),
                 default=None,
             )

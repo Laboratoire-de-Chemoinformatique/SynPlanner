@@ -62,6 +62,7 @@ class RolloutSimulator:
         self.max_depth = max_depth
         self.stochastic = stochastic
         self.max_reaction_outcomes = max_reaction_outcomes
+        self.match_stereo = True  # Set by the owning Tree, never a separate config.
 
     def _select_reaction(self, current_precursor: Precursor) -> tuple[bool, any, int]:
         """Select a reaction rule to apply.
@@ -145,10 +146,13 @@ class RolloutSimulator:
         :return: The reward (value) assigned to the precursor.
         """
         max_depth = self.max_depth - current_depth
+        if not self.match_stereo:
+            precursor = Precursor(precursor.policy_molecule)
 
         if precursor.is_building_block(
             self.building_blocks,
             self.min_mol_size,
+            match_stereo=self.match_stereo,
         ):
             if precursor.molecule.meta.get("assumed_trivial") and (
                 has_stereo(precursor.molecule) or has_stereo_groups(precursor.molecule)
@@ -195,6 +199,7 @@ class RolloutSimulator:
                     if not x.is_building_block(
                         self.building_blocks,
                         self.min_mol_size,
+                        match_stereo=self.match_stereo,
                     )
                 ]
             )

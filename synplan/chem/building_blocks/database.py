@@ -24,7 +24,7 @@ from .core import BuildingBlock
 logger = logging.getLogger(__name__)
 SCHEMA_VERSION = 2
 # Bump when catalogue preparation/identity semantics change independently of Chython.
-PREPARATION_VERSION = 3
+PREPARATION_VERSION = 2
 
 
 class SQLiteBuildingBlockCatalogue(Mapping[str, tuple[BuildingBlock, ...]]):
@@ -132,11 +132,17 @@ class SQLiteBuildingBlockCatalogue(Mapping[str, tuple[BuildingBlock, ...]]):
 
     def records(self):
         """Stream grouped JSON records without loading stock or repeating chemistry."""
+        from .io import _validate_record
+
         for key, records in self._reader().connection.execute(
             f"SELECT inchikey,json_group_array(json({self._record_sql})) FROM blocks "
             "GROUP BY inchikey ORDER BY min(rowid)"
         ):
-            yield from ((key, record) for record in json.loads(records))
+            for record in json.loads(records):
+                yield (
+                    key,
+                    _validate_record(key, record, context=str(self._path)).to_record(),
+                )
 
     def close(self) -> None:
         """Release this thread's connection and bounded record cache."""
@@ -179,7 +185,7 @@ def _rows(records, *, context):
         block = _validate_record(key, record, context=context)
         yield (
             block.inchikey,
-            json.dumps(record, separators=(",", ":"), default=float),
+            json.dumps(block.to_record(), separators=(",", ":")),
             json.dumps(
                 [block.stereo_type, block.smiles if "|" in block.smiles else ""]
             ),

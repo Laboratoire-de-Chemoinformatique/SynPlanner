@@ -36,6 +36,7 @@ def compatible_records(
     catalogue,
     *,
     inchikey=None,
+    match_stereo=True,
     max_records=256,
     max_mapping_work=100_000,
     diagnostics=None,
@@ -47,6 +48,8 @@ def compatible_records(
     exception are incomplete, not proof that compatible stock does not exist.
     """
     key = inchikey or inchi_key(molecule)
+    if not match_stereo:
+        return match_building_blocks(catalogue, key)
     if has_stereo_groups(molecule):
         if diagnostics is not None:
             diagnostics.append(
@@ -128,8 +131,7 @@ def selected_record(record):
     selected = {
         "inchikey": record.inchikey,
         "smiles": record.smiles,
-        "vendors": dict(record.vendors),
-        "price": min(record.vendors.values()) if record.vendors else None,
+        "price": record.price,
         "basis": "explicit_compatible_catalogue_record",
     }
     if record.sources:

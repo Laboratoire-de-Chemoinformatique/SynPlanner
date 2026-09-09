@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import gzip
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 from synplan.chem.precursor import Precursor
 from synplan.chem.stereo import parse_smiles_preserving_stereo as read_smiles
 from synplan.chem.utils import in_atom_order, molecule_key
+from synplan.mcts.config import TreeConfig
 from synplan.mcts.node import Node
 from synplan.mcts.tree import Tree
 
@@ -56,6 +57,8 @@ class SearchRecord:
     children: dict[int, set[int]]
     winning_nodes: list[int]
     stats: dict
+    config: TreeConfig = field(default_factory=TreeConfig)
+    original_target: MoleculeContainer | None = None
 
     # The Tree readouts that touch nodes and parents only, bound from the real
     # class: a record has to answer them exactly as the search did.
@@ -180,6 +183,8 @@ def write_search_record(
         "winning": list(tree.winning_nodes),
         "stats": _counters(tree),
     }
+    if tree.config.stereo_mode == "off":
+        record.update(stereo_mode="off", original_target=str(tree.original_target))
     with _open(file_path, "wt") as file:
         json.dump(record, file)
     return Path(file_path)
@@ -304,4 +309,6 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
         children=children,
         winning_nodes=list(raw["winning"]),
         stats=stats,
+        config=TreeConfig(stereo_mode=raw.get("stereo_mode", "proposal")),
+        original_target=read_smiles(raw.get("original_target", raw["target"])),
     )

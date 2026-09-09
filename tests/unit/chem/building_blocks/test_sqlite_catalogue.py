@@ -188,7 +188,10 @@ def test_cost_export_and_html_use_selected_isomer_without_scanning(
             ["<chosen>", "5"],
             ["second", "7"],
         ]
-        assert selected["vendors"] == {"<chosen>": 5.0, "second": 7.0}
+        assert selected["sources"] == [
+            {"vendor": "<chosen>", "ppg": "5.0"},
+            {"vendor": "second", "ppg": "7.0"},
+        ]
     else:
         # No offer behind the record, but the page still names what was selected.
         (payload,) = pills

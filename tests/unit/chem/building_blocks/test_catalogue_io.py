@@ -58,7 +58,11 @@ def test_standardize_json_preserves_stereo_and_merges_vendor_prices(
     ethanol = next(record for record in raw.values() if record["smiles"] == "CCO")
     assert ethanol == {
         "smiles": "CCO",
-        "vendors": {"LN": 2.0, "SA": 3.0},
+        "sources": [
+            {"vendor": "LN", "ppg": "4.0"},
+            {"vendor": "LN", "ppg": "2.0"},
+            {"vendor": "SA", "ppg": "3.0"},
+        ],
         "has_stereo": False,
     }
 
@@ -78,7 +82,7 @@ def test_standardize_json_preserves_stereo_and_merges_vendor_prices(
     assert set(loaded) == set(raw)
     for key, record in raw.items():
         assert loaded[key].smiles == record["smiles"]
-        assert dict(loaded[key].vendors) == record["vendors"]
+        assert [dict(s) for s in loaded[key].sources] == record["sources"]
         assert loaded[key].has_stereo is record["has_stereo"]
     expected_prefixes = list(dict.fromkeys(key[:14] for key in raw))
     assert list(catalogue) == expected_prefixes
@@ -98,7 +102,7 @@ def test_standardize_json_preserves_stereo_and_merges_vendor_prices(
     with pytest.raises(TypeError):
         catalogue["AAAAAAAAAAAAAA"] = ()
     with pytest.raises(TypeError):
-        catalogue[first_key[:14]][0].vendors["new"] = 1.0
+        catalogue[first_key[:14]][0].sources[0]["ppg"] = "1.0"
 
 
 @pytest.mark.parametrize("compressed", [False, True])

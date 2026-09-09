@@ -18,8 +18,13 @@ def _block(smiles_value: str, **vendors: float) -> BuildingBlock:
     return BuildingBlock(
         smiles=str(molecule),
         inchikey=molecule_to_inchikey(molecule),
-        vendors=frozendict(vendors),
-        has_stereo=any(atom.stereo is not None for _, atom in molecule.atoms()),
+        has_stereo=any((atom.stereo is not None for _, atom in molecule.atoms())),
+        sources=tuple(
+            (
+                frozendict(vendor=vendor, ppg=str(price))
+                for vendor, price in frozendict(vendors).items()
+            )
+        ),
     )
 
 

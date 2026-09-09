@@ -16,7 +16,7 @@ What you get after install
 - CLI entrypoint: ``synplan``
 - Python API: ``import synplan``
 - Data and weights are not bundled. Fetch them with
-  ``synplan download_preset --preset synplanner-gps --save_to synplan_data`` or follow :doc:`data_download`.
+  ``synplan download_preset --preset synplanner-gps-mcule-molport --save_to synplan_data`` or follow :doc:`data_download`.
 - The ``configs/*.yaml`` files used by every CLI example are **not** installed by
   ``pip`` either — they live only in the git repository. Clone it, or fetch the
   one you need:

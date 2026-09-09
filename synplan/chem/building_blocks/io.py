@@ -28,7 +28,7 @@ from chython.files.SDFrw import SDFRead
 from frozendict import frozendict
 from tqdm.auto import tqdm
 
-from synplan.chem.stereo import has_stereo
+from synplan.chem.stereo import has_stereo, has_stereo_groups
 from synplan.chem.utils import (
     safe_canonicalization,
     standardize_sdf_text,
@@ -313,7 +313,10 @@ def _write_json_atomic(path: Path, records) -> None:
             for index, (key, group) in enumerate(
                 groupby(records, key=lambda item: item[0])
             ):
-                values = [value for _, value in group]
+                values = [
+                    _validate_record(key, value, context=str(path)).to_record()
+                    for _, value in group
+                ]
                 if index:
                     text.write(",")
                 text.write(json.dumps(key) + ":")
@@ -327,9 +330,7 @@ def _write_json_atomic(path: Path, records) -> None:
 
 
 def _merge_records(existing, incoming):
-    """Keep the first spelling, minimum prices and distinct source declarations."""
-    for vendor, price in incoming["vendors"].items():
-        existing["vendors"][vendor] = min(price, existing["vendors"].get(vendor, price))
+    """Keep the first spelling and distinct source offers."""
     existing["has_stereo"] |= incoming["has_stereo"]
     if incoming.get("sources"):
         sources = existing.setdefault("sources", [])
@@ -406,6 +407,69 @@ def _prepare_catalogue_batches(source: Path, num_workers: int):
         yield from results
 
 
+def mcule_to_cxsmiles(smiles_text: str, stereo_type: str) -> tuple[str, str]:
+    """Return canonical CXSMILES and the Mcule material declaration; retain both.
+
+    REL/RAC link all depicted tetrahedral centres in one OR/AND group. E/Z stays
+    unchanged. UNK is not an OR group, and RAC's 1:1 ratio requires the declaration.
+    Plain SMILES cannot recover the distinction between wavy and unmarked centres
+    in a source drawing; unassigned centres are never assigned here.
+    """
+    kind = stereo_type.strip().lower().removesuffix(" (not confirmed)")
+    kind = {
+        "abs": "absolute",
+        "rel": "relative",
+        "rac": "racemic",
+        "unk": "unknown",
+    }.get(kind, kind)
+    if kind not in ("", "absolute", "relative", "racemic", "unknown", "unspecified"):
+        raise ValueError(f"Unknown Mcule stereo type: {stereo_type!r}")
+    if re.search(r"(?:\||,)r(?=[:,|])", smiles_text):
+        raise ValueError(
+            "Legacy CX r needs separate assessment; it is not a Mcule stereo type"
+        )
+    molecule = smiles(smiles_text, strict_stereo=True)
+    if not isinstance(molecule, MoleculeContainer):
+        raise ValueError("Mcule SMILES must describe a molecule")
+    if not kind and has_stereo(molecule):
+        kind = (
+            "unknown"  # Missing export metadata is not confirmation of absolute stock.
+        )
+    text = str(molecule)
+    group = {"relative": "o", "racemic": "&"}.get(kind)
+    centres = {n for n, atom in molecule.atoms() if atom.stereo is not None}
+    if has_stereo_groups(molecule):
+        groups = {molecule.atom(n).extended_stereo for n in centres}
+        if kind == "absolute" or (
+            group
+            and (
+                None in groups
+                or len(groups) != 1
+                or (next(iter(groups)) < 0) != (group == "o")
+            )
+        ):
+            raise ValueError(
+                "Existing CX groups conflict with the Mcule material declaration"
+            )
+        return text, kind
+    if group and centres:
+        if not centres <= molecule.stereogenic_tetrahedrons.keys():
+            raise ValueError(
+                "Mcule REL/RAC conversion supports tetrahedral centres only"
+            )
+        indices = ",".join(
+            str(i) for i, n in enumerate(molecule.smiles_atoms_order) if n in centres
+        )
+        annotation = f"{group}1:{indices}"
+        text = (
+            f"{text[:-1]},{annotation}|"
+            if text.endswith("|")
+            else f"{text} |{annotation}|"
+        )
+        text = str(smiles(text, strict_stereo=True))
+    return text, kind
+
+
 def _prepare_catalogue_batch(rows, *, smiles_column, price_columns):
     records = []
     errors = []
@@ -417,7 +481,7 @@ def _prepare_catalogue_batch(rows, *, smiles_column, price_columns):
             if not raw_smiles:
                 raise ValueError("SMILES is empty")
 
-            vendors: dict[str, float] = {}
+            sources = json.loads(row["sources"]) if row.get("sources") else []
             for column in price_columns:
                 raw_price = row[column].strip()
                 if not raw_price:
@@ -432,8 +496,12 @@ def _prepare_catalogue_batch(rows, *, smiles_column, price_columns):
                     raise ValueError(
                         f"{column}: price {raw_price!r} must be finite and non-negative"
                     )
-                if price > 0.0:
-                    vendors[column[: -len("_ppg")]] = price
+                vendor = column[: -len("_ppg")]
+                if price > 0.0 and not any(
+                    s.get("vendor") == vendor and float(s.get("ppg") or 0) == price
+                    for s in sources
+                ):
+                    sources.append({"vendor": vendor, "ppg": str(price)})
 
             molecule = smiles(raw_smiles, strict_stereo=True)
             if not isinstance(molecule, MoleculeContainer):
@@ -446,24 +514,24 @@ def _prepare_catalogue_batch(rows, *, smiles_column, price_columns):
                 raise ValueError("prepared SMILES changes identity when read back")
             record = {
                 "smiles": smiles_text,
-                "vendors": vendors,
+                "sources": sources,
                 "has_stereo": has_stereo(molecule),
             }
-            if row.get("sources"):
-                record["sources"] = json.loads(row["sources"])
             if row.get("stereo_type"):
                 record["stereo_type"] = row["stereo_type"].removesuffix(
                     " (not confirmed)"
                 )
             # The pinned reader ignores the legacy molecule-level CX r flag.
-            # Keep its source spelling, but never promote it to absolute stock.
+            # Keep its supplier ID, but never promote it to absolute stock.
             if re.search(r"(?:\||,)r(?=[:,|])", raw_smiles):
                 if not record.get("sources"):
                     raise ValueError(
                         "CX r requires source metadata for unassessed stock"
                     )
                 record["stereo_type"] = "unknown"
-            _validate_record(key, record, context=f"row {line_number}")
+            record = _validate_record(
+                key, record, context=f"row {line_number}"
+            ).to_record()
             records.append((key, record))
         except Exception as error:
             errors.append((line_number, str(error) or type(error).__name__))
@@ -477,33 +545,27 @@ def _validate_record(key, raw_record, *, context):
     location = f"{context}:{key}"
     if not isinstance(raw_record, dict):
         raise ValueError(f"{location}: record must be a JSON object")
-    required = {"smiles", "vendors", "has_stereo"}
-    if not required <= raw_record.keys() or raw_record.keys() - required - {
-        "sources",
-        "stereo_type",
-    }:
-        raise ValueError(f"{location}: expected smiles, vendors, and has_stereo fields")
+    required = {"smiles", "has_stereo"}
+    if (
+        not required <= raw_record.keys()
+        or raw_record.keys()
+        - required
+        - {
+            "vendors",
+            "sources",
+            "stereo_type",
+        }
+        or not {"vendors", "sources"} & raw_record.keys()
+    ):
+        raise ValueError(
+            f"{location}: expected smiles, has_stereo, and vendors or sources fields"
+        )
     canonical_smiles = raw_record["smiles"]
     if not isinstance(canonical_smiles, str) or not canonical_smiles:
         raise ValueError(f"{location}: smiles must be a non-empty string")
     has_stereo = raw_record["has_stereo"]
     if not isinstance(has_stereo, bool):
         raise ValueError(f"{location}: has_stereo must be boolean")
-    raw_vendors = raw_record["vendors"]
-    if not isinstance(raw_vendors, dict):
-        raise ValueError(f"{location}: vendors must be a JSON object")
-    vendors: dict[str, float] = {}
-    for vendor, raw_price in raw_vendors.items():
-        if not isinstance(vendor, str) or not vendor:
-            raise ValueError(f"{location}: vendor names must be non-empty strings")
-        if isinstance(raw_price, bool) or not isinstance(
-            raw_price, (int, float, Decimal)
-        ):
-            raise ValueError(f"{location}: {vendor} price must be numeric")
-        price = float(raw_price)
-        if not math.isfinite(price) or price <= 0.0:
-            raise ValueError(f"{location}: {vendor} price must be finite and positive")
-        vendors[vendor] = price
     stereo_type = raw_record.get("stereo_type", "")
     if stereo_type not in (
         "",
@@ -517,6 +579,7 @@ def _validate_record(key, raw_record, *, context):
     sources = raw_record.get("sources", [])
     if not isinstance(sources, list):
         raise ValueError(f"{location}: sources must be a list")
+    offers = []
     for source in sources:
         if (
             not isinstance(source, dict)
@@ -524,15 +587,51 @@ def _validate_record(key, raw_record, *, context):
                 isinstance(k, str) and isinstance(v, str) for k, v in source.items()
             )
             or not source.get("vendor")
-            or not source.get("id")
+            or not (source.get("id") or source.get("ppg"))
         ):
-            raise ValueError(f"{location}: each source needs vendor and id strings")
+            raise ValueError(
+                f"{location}: each source needs vendor and id strings or a price"
+            )
+        source = {
+            k: v
+            for k, v in source.items()
+            if k not in {"smiles", "url", "lead_time", "availability"}
+        }
+        if source.get("ppg"):
+            price = float(source["ppg"])
+            if not math.isfinite(price) or price < 0:
+                raise ValueError(
+                    f"{location}: source price must be finite and non-negative"
+                )
+            if price == 0:
+                source.pop("ppg")
+                if not source.get("id"):
+                    continue
+        offers.append(source)
+    # Read old catalogue prices once into source offers; never retain the summary.
+    legacy_prices = raw_record.get("vendors", {})
+    if not isinstance(legacy_prices, dict):
+        raise ValueError(f"{location}: vendors must be a JSON object")
+    for vendor, raw_price in legacy_prices.items():
+        if not isinstance(vendor, str) or not vendor:
+            raise ValueError(f"{location}: vendor names must be non-empty strings")
+        if isinstance(raw_price, bool) or not isinstance(
+            raw_price, (int, float, Decimal)
+        ):
+            raise ValueError(f"{location}: {vendor} price must be numeric")
+        price = float(raw_price)
+        if not math.isfinite(price) or price <= 0:
+            raise ValueError(f"{location}: {vendor} price must be finite and positive")
+        if not any(
+            s["vendor"] == vendor and s.get("ppg") and float(s["ppg"]) == price
+            for s in offers
+        ):
+            offers.append({"vendor": vendor, "ppg": str(price)})
     return BuildingBlock(
         smiles=canonical_smiles,
         inchikey=key,
-        vendors=frozendict(vendors),
         has_stereo=has_stereo,
-        sources=tuple(frozendict(source) for source in sources),
+        sources=tuple(frozendict(source) for source in offers),
         stereo_type=stereo_type,
     )
 

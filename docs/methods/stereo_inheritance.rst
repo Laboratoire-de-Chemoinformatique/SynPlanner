@@ -86,6 +86,20 @@ marked ``assumed_trivial``. Missing required configurations remain unresolved.
 Assumed-trivial leaves have no vendor offer and leave costing incomplete. Cost uses the selected
 compatible record; an opposite isomer's price cannot be substituted.
 
+``TreeConfig(stereo_mode="off")`` opts into connectivity-only search. It projects
+copies of the target and reaction rules without stereo, retaining the original
+target in route metadata. Stock lookup directly uses the existing 14-character
+InChIKey bucket without parsing candidate CXSMILES or checking stereo groups.
+This prefix also ignores isotope distinctions; it is not a full InChIKey made by
+removing only stereo. Stored full keys, CXSMILES and material declarations remain
+unchanged. Legacy SMILES sets are projected once per tree.
+
+The same tree setting governs rollout evaluation. Selected offers are marked
+``connectivity_only``; routes report ``not_assessed`` stereo and preserve
+``search_mode="off"`` through export. In this explicit mode, ``solved`` means
+connectivity solved, not fulfillment of the original stereo request. The default
+``proposal`` and opt-in ``strict`` modes retain their existing stereo checks.
+
 Evidence is attached to the particular reactants, products, agents and procedure.
 It is not a patent lookup that universally assigns a template's stereochemical
 outcome. ``attach_stereo_evidence`` accepts source observations and keeps their
@@ -145,14 +159,26 @@ Mcule also describes four material-level types:
      - The absolute, relative or racemic classification is uncertain
      - Keep the depicted geometry as unconfirmed supplier information
 
-Catalogue records retain source IDs, source structures and supplier declarations
-separately from prepared SMILES and optional prices. Mcule's SDF ``stereotype``
+Catalogue records retain one standardized Chython CXSMILES, the full Standard
+InChIKey, source IDs and supplier declarations alongside optional prices. Prices
+are stored only in source offers and used directly for stock selection and costing.
+Source SMILES, URLs, lead time and availability are omitted; source IDs generate
+the catalogue links. Mcule's SDF ``stereotype``
 field supplies the material type; the free SMILES download omits it. Different
 material types remain separate records even when their full InChIKeys coincide.
 REL, RAC and UNK records remain usable when no stereo configuration is required.
 They cannot fulfill a specific enantiomer request without further assessment,
 and their depicted wedges must not become inherited absolute geometry.
 A SMILES ``@`` marker alone does not establish supplier composition or purity.
+
+``mcule_to_cxsmiles(smiles_text, stereo_type)`` returns canonical Chython CXSMILES
+and a normalized material declaration. REL/RAC link the depicted tetrahedral
+centres in one OR/AND group while retaining E/Z geometry. Keep both return values:
+RAC declares 1:1 composition, and UNK cannot be represented by choosing OR or AND.
+Unmarked centres remain unassigned; plain SMILES cannot recover a source wavy bond.
+Conflicting existing groups are rejected. The local Mcule preparation script uses
+this converter. The local release regenerated on 2026-09-09 contains these
+linked groups and vendor IDs, with duplicate source SMILES removed.
 
 The selected source IDs and type survive route JSON export and reassessment.
 Reports show source links even with ``prices=False``; cached prices remain
@@ -177,8 +203,8 @@ interpreted together with any enhanced groups. CXSMILES uses ``a:`` for ABS,
 Do not turn ``r`` into a specific enantiomer or infer measured mixture ratios.
 
 The pinned Chython reader currently ignores legacy ``r``. Import preserves the
-complete source CXSMILES and marks these records ``unknown``; without source
-metadata it rejects the row. Enhanced OR/AND groups likewise cannot establish a requested absolute
+supplier IDs and marks these records ``unknown``; without source metadata it
+rejects the row. The original spelling can be checked with the supplier. Enhanced OR/AND groups likewise cannot establish a requested absolute
 configuration. Other unsupported annotations must fail explicitly rather than
 silently becoming plain SMILES. Read the complete CSV/TSV structure field and
 preserve atom and group references during canonicalization. Supplier depictions
@@ -243,3 +269,51 @@ Chython 1.108 draws specified configurations with filled or aligned hashed wedge
 and unspecified configurations with compact, tapered waves. Molecule, reaction
 and route depictions share these symbols without changing stored stereochemistry.
 Atropisomer planning and general conditions/selectivity prediction remain deferred.
+
+Next steps: partial stereo and conditional stock
+--------------------------------------------------
+
+Current behavior
+~~~~~~~~~~~~~~~~
+
+Stock matching checks specified geometry after indexed InChIKey retrieval.
+However, any stereo requirement currently excludes a candidate with OR/AND groups
+or a non-absolute supplier type. Without requirements, these candidates remain
+usable, but inheritance clears their stereo on a copy. This prevents unsupported
+absolute assignments while also losing useful confirmed and relative information.
+The regenerated Mcule/MolPort release includes linked CX groups for Mcule REL/RAC
+alongside the supplier declarations; normalization alone does not relax matching.
+Existing proposal reports identify unresolved stereo-forming steps, but stock
+matching does not yet retain these rejected materials as conditional alternatives.
+
+Planned behavior
+~~~~~~~~~~~~~~~~
+
+* Normalize supplier declarations using IUPAC and vendor definitions. Preserve
+  MolPort's source CXSMILES and Mcule's SDF declarations; construct equivalent
+  CX groups only when their meaning and atom membership are established. Keep
+  declared ratios and unknown-versus-unspecified composition separately.
+* Match every requested centre while allowing independent OR/AND groups at
+  unrequested centres. For a request A=R, confirmed A=R with an independent
+  uncertain B is compatible. A and B in one unresolved group do not establish
+  A=R. Preserve group correlations rather than choosing a favorable group member.
+* Retain potentially usable stock as conditional candidates, with a yellow or
+  orange node and a textual reason: supplier confirmation needed, mixture
+  separation unestablished, or another explicit strategy required. Keep
+  ``is_purchasable()`` strict; conditional candidates do not constitute verified
+  solutions or alone terminate further exploration. Reuse proposal reporting.
+  Uncertainty confined to unrequested centres does not itself warrant a warning.
+* Preserve confirmed configurations and surviving OR/AND relationships through
+  reaction mapping. Replace blanket stereo clearing with assessment of the
+  affected centres and groups. Newly created centres require evidence for any
+  requested configuration; supplier uncertainty does not establish selectivity.
+* Keep requested target configurations visible and mark unsupported formation
+  as unresolved. For unassigned product centres, distinguish unspecified
+  configuration from a declared mixture with text. Preserve relative depictions
+  and group labels instead of replacing all grouped centres with waves. Validate
+  drawing conventions against `IUPAC ST-0.4
+  <https://iupac.qmul.ac.uk/drawing/stereo.html>`_ later; retain current waves for now.
+* Keep group relationships symbolic, reuse bounded candidate retrieval and
+  caches, and avoid automatic enumeration of all stereoisomers. Validate matching,
+  inheritance and export with supplier examples and measure additional search
+  time and proposal counts before enabling conditional stock in normal runs.

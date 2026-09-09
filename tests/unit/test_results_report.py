@@ -352,12 +352,12 @@ def priced_route() -> Route:
     first.meta["selected_stock"] = {
         "inchikey": "AAAAAAAAAAAAAA-UHFFFAOYSA-N",
         "smiles": str(first),
-        "vendors": {"MP": 3.0, "CS": 11.0},
+        "sources": [{"vendor": "MP", "ppg": "3.0"}, {"vendor": "CS", "ppg": "11.0"}],
     }
     second.meta["selected_stock"] = {
         "inchikey": "BBBBBBBBBBBBBB-UHFFFAOYSA-N",
         "smiles": str(second),
-        "vendors": {"MC": 2.0},
+        "sources": [{"vendor": "MC", "ppg": "2.0"}],
     }
     return route
 
@@ -378,7 +378,7 @@ def test_the_route_price_is_its_leaves_over_the_target_weight():
     route = priced_route()
     expected = sum(
         float(leaf.molecular_mass)
-        * min(leaf.meta["selected_stock"]["vendors"].values())
+        * min(float(s["ppg"]) for s in leaf.meta["selected_stock"]["sources"])
         for leaf in route.leaves()
     ) / float(route.target.molecular_mass)
     page = routes_report_html([route], None)
@@ -424,7 +424,9 @@ def test_vendor_names_come_from_the_catalogue_that_was_searched():
 def test_a_price_under_one_keeps_its_leading_zero_through_the_page():
     """svgslim tightens geometry, not payloads: .25 is not what a catalogue said."""
     route = priced_route()
-    next(iter(route.leaves())).meta["selected_stock"]["vendors"] = {"MP": 0.25}
+    next(iter(route.leaves())).meta["selected_stock"]["sources"] = [
+        {"vendor": "MP", "ppg": "0.25"}
+    ]
     page = routes_report_html([route], None)
     assert offers_by_key(page)["AAAAAAAAAAAAAA-UHFFFAOYSA-N"] == [["MP", "0.25"]]
 
@@ -433,7 +435,7 @@ def test_a_catalogue_record_with_no_offer_still_gets_a_pill():
     """The page never drops a selected material for having no price behind it."""
     route = priced_route()
     leaf = next(iter(route.leaves()))
-    leaf.meta["selected_stock"]["vendors"] = {}
+    leaf.meta["selected_stock"]["sources"] = []
     page = routes_report_html([route], None)
     key = leaf.meta["selected_stock"]["inchikey"]
     assert offers_by_key(page)[key] == [["Price", "unavailable"]]
