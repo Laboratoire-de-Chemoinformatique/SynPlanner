@@ -5,8 +5,7 @@ from unittest.mock import Mock
 import pytest
 from chython import smiles
 
-from synplan.chem.reaction.reactor import ReactionApplication
-from synplan.chem.target_bonds import TargetAtomProvenance
+from synplan.chem.target_bonds import _PROVENANCE_KEY, TargetAtomProvenance
 from synplan.mcts import tree as tree_module
 from synplan.mcts.config import TreeConfig
 from synplan.mcts.node import Node
@@ -27,14 +26,14 @@ def test_tree_forwards_immutable_constraints_and_root_provenance(monkeypatch):
     bonds_state = {(3, 2): 2}
     observed = []
 
-    def fake_iter_reaction_applications(**kwargs):
+    def fake_apply_reaction_rule(**kwargs):
         observed.append(kwargs)
         return iter(())
 
     monkeypatch.setattr(
         tree_module,
-        "iter_reaction_applications",
-        fake_iter_reaction_applications,
+        "apply_reaction_rule",
+        fake_apply_reaction_rule,
     )
 
     config = TreeConfig(
@@ -111,12 +110,11 @@ def _context(tree, node_id):
 
 
 def _reaction_application(tree, node_id, reaction_smiles):
-    products = tuple(smiles(reaction_smiles).products)
+    products = list(smiles(reaction_smiles).products)
     parent_provenance = tree.nodes[node_id].curr_precursor.target_atom_provenance
-    return ReactionApplication(
-        products=products,
-        provenances=tuple(parent_provenance.inherit(product) for product in products),
-    )
+    for product in products:
+        product.meta[_PROVENANCE_KEY] = parent_provenance.inherit(product)
+    return products
 
 
 @pytest.mark.parametrize(
@@ -325,15 +323,13 @@ def test_state_zero_preserves_structure_only_pruning_key():
 def test_active_candidate_dedup_and_pruning_distinguish_provenance():
     tree = _build_tree({(1, 2): 2}, min_mol_size=0, enable_pruning=True)
     product = smiles("[CH3:1][CH2:2][CH3:3]")
-    first = ReactionApplication(
-        products=(product,),
-        provenances=(
-            tree.nodes[1].curr_precursor.target_atom_provenance.inherit(product),
-        ),
-    )
-    second = ReactionApplication(
-        products=(product.copy(),),
-        provenances=(TargetAtomProvenance.from_mapping({1: 1, 2: 2, 3: 4}),),
+    first = [product]
+    first[0].meta[_PROVENANCE_KEY] = tree.nodes[
+        1
+    ].curr_precursor.target_atom_provenance.inherit(product)
+    second = [product.copy()]
+    second[0].meta[_PROVENANCE_KEY] = TargetAtomProvenance.from_mapping(
+        {1: 1, 2: 2, 3: 4}
     )
     context = _context(tree, 1)
 
@@ -349,19 +345,16 @@ def test_active_candidate_dedup_and_pruning_distinguish_provenance():
 def test_active_cycle_detection_distinguishes_provenance():
     constrained = _build_tree({(1, 2): 2}, min_mol_size=0)
     root = constrained.nodes[1].curr_precursor.molecule
-    different_provenance = ReactionApplication(
-        products=(root.copy(),),
-        provenances=(TargetAtomProvenance.from_mapping({1: 1, 2: 2, 3: 4}),),
+    different_provenance = [root.copy()]
+    different_provenance[0].meta[_PROVENANCE_KEY] = TargetAtomProvenance.from_mapping(
+        {1: 1, 2: 2, 3: 4}
     )
     assert constrained._add_child_if_new(
         _context(constrained, 1), different_provenance, _candidate()
     )
 
     unconstrained = _build_tree(min_mol_size=0)
-    structure_only = ReactionApplication(
-        products=(unconstrained.nodes[1].curr_precursor.molecule.copy(),),
-        provenances=(unconstrained.nodes[1].curr_precursor.target_atom_provenance,),
-    )
+    structure_only = [unconstrained.nodes[1].curr_precursor.molecule.copy()]
     assert not unconstrained._add_child_if_new(
         _context(unconstrained, 1), structure_only, _candidate()
     )
@@ -370,13 +363,13 @@ def test_active_cycle_detection_distinguishes_provenance():
 def test_search_record_preserves_target_bonds_and_equal_molecule_provenance(tmp_path):
     tree = _build_tree({(1, 2): 1})
     molecule = smiles("[CH3:1][CH3:2]")
-    application = ReactionApplication(
-        products=(molecule, molecule.copy()),
-        provenances=(
-            TargetAtomProvenance.from_mapping({1: 1, 2: 2}),
-            TargetAtomProvenance.from_mapping({1: 3, 2: 4}),
-        ),
+    application = [molecule, molecule.copy()]
+    provenances = (
+        TargetAtomProvenance.from_mapping({1: 1, 2: 2}),
+        TargetAtomProvenance.from_mapping({1: 3, 2: 4}),
     )
+    for product, provenance in zip(application, provenances, strict=True):
+        product.meta[_PROVENANCE_KEY] = provenance
     assert tree._add_child_if_new(_context(tree, 1), application, _candidate())
     node = tree.nodes[2]
     node.precursors_to_expand = tuple(reversed(node.new_precursors))
@@ -389,13 +382,11 @@ def test_search_record_preserves_target_bonds_and_equal_molecule_provenance(tmp_
     assert record.nodes[2].remaining_required_bonds == frozenset({(1, 2)})
     assert record.nodes[2].curr_precursor is record.nodes[2].new_precursors[1]
     assert [p.target_atom_provenance for p in record.nodes[2].new_precursors] == list(
-        application.provenances
+        provenances
     )
+    assert all(_PROVENANCE_KEY not in p.molecule.meta for p in node.new_precursors)
     rewritten = read_search_record(
         write_search_record(record, tmp_path / "copy.json.gz")
     )
     assert rewritten.bonds_state == record.bonds_state
-    assert (
-        rewritten.nodes[2].curr_precursor.target_atom_provenance
-        == application.provenances[1]
-    )
+    assert rewritten.nodes[2].curr_precursor.target_atom_provenance == provenances[1]

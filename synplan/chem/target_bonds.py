@@ -12,6 +12,8 @@ from chython.containers import MoleculeContainer
 BondKey = tuple[int, int]
 
 _ALLOWED_BOND_STATES = frozenset({0, 1, 2})
+# Temporary transport between the reactor's molecule lists and Precursor state.
+_PROVENANCE_KEY = "_synplan_target_atom_provenance"
 
 
 def bond_key(atom1: int, atom2: int) -> BondKey:
@@ -171,10 +173,9 @@ class TargetBondConstraints:
         }
 
 
-ProvenancedMolecule = tuple[MoleculeContainer, TargetAtomProvenance]
-
-
-def target_bond_keys(states: Iterable[ProvenancedMolecule]) -> set[BondKey]:
+def target_bond_keys(
+    states: Iterable[tuple[MoleculeContainer, TargetAtomProvenance]],
+) -> set[BondKey]:
     """Translate local molecule bonds into stable target-atom bond keys."""
 
     result: set[BondKey] = set()
@@ -189,8 +190,8 @@ def target_bond_keys(states: Iterable[ProvenancedMolecule]) -> set[BondKey]:
 
 
 def removed_target_bonds(
-    parent: ProvenancedMolecule,
-    products: Iterable[ProvenancedMolecule],
+    parent: tuple[MoleculeContainer, TargetAtomProvenance],
+    products: Iterable[tuple[MoleculeContainer, TargetAtomProvenance]],
 ) -> set[BondKey]:
     """Return target-derived adjacencies removed by one reaction application."""
 

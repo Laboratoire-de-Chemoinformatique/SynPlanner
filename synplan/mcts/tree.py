@@ -19,11 +19,7 @@ from synplan.chem.building_blocks import (
     SQLiteBuildingBlockCatalogue,
 )
 from synplan.chem.precursor import Precursor
-from synplan.chem.reaction import CanonicalRetroReactor, Reaction
-from synplan.chem.reaction.reactor import (
-    ReactionApplication,
-    iter_reaction_applications,
-)
+from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
 from synplan.chem.reaction.routes.route import Route
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
 from synplan.chem.stereo import (
@@ -35,6 +31,7 @@ from synplan.chem.stereo import (
     stereo_requirements,
 )
 from synplan.chem.target_bonds import (
+    _PROVENANCE_KEY,
     TargetAtomProvenance,
     TargetBondConstraints,
     removed_target_bonds,
@@ -518,7 +515,7 @@ class Tree:
                 and self.config.priority_rule_multiapplication
             )
             diagnostics = []
-            for application in iter_reaction_applications(
+            for products in apply_reaction_rule(
                 molecule=curr_node.curr_precursor.molecule,
                 reaction_rule=candidate.rule,
                 provenance=curr_node.curr_precursor.target_atom_provenance,
@@ -529,7 +526,7 @@ class Tree:
                 max_mapping_work=self.config.max_mapping_work,
                 diagnostics=diagnostics,
             ):
-                if self._add_child_if_new(context, application, candidate):
+                if self._add_child_if_new(context, products, candidate):
                     rule_produced = True
                     expanded = True
             for diagnostic in diagnostics:
@@ -620,14 +617,13 @@ class Tree:
     def _add_child_if_new(
         self,
         context: _ExpansionContext,
-        application: ReactionApplication,
+        products: list[MoleculeContainer],
         candidate: _RuleCandidate,
     ) -> bool:
         """Add a child node if the generated products form a new valid state."""
 
         node_id = context.node_id
         curr_node = context.parent
-        products = application.products
         prev_precursor = context.previous_precursors
         tmp_products = context.seen_products
         prob = candidate.probability
@@ -636,6 +632,12 @@ class Tree:
         rule_source = candidate.rule_source
 
         products = [m.copy() for m in products]
+        provenances = tuple(
+            m.meta.pop(_PROVENANCE_KEY)
+            if self._bond_constraints.active
+            else m.meta.pop(_PROVENANCE_KEY, TargetAtomProvenance())
+            for m in products
+        )
         assessment = assess_inheritance(curr_node.curr_precursor.molecule, products)
         if self.config.direction == "forward" and any(
             has_stereo(m) for m in (curr_node.curr_precursor.molecule, *products)
@@ -693,9 +695,7 @@ class Tree:
             product_key = tuple(
                 sorted(
                     (str(molecule), tuple(sorted(provenance.pairs)))
-                    for molecule, provenance in zip(
-                        products, application.provenances, strict=True
-                    )
+                    for molecule, provenance in zip(products, provenances, strict=True)
                 )
             )
         # Identical precursors can arise from different stereo operations or
@@ -712,7 +712,7 @@ class Tree:
             molecule.meta["rule_key"] = rule_key
             molecule.meta["policy_rank"] = policy_rank
 
-        # The internal reaction generator already validated + canonicalized each
+        # apply_reaction_rule already validated + canonicalized each
         # product in a single kekule pass; skip the redundant copy here.
         new_precursor = tuple(
             Precursor(
@@ -720,9 +720,7 @@ class Tree:
                 canonicalize=False,
                 target_atom_provenance=provenance,
             )
-            for molecule, provenance in zip(
-                products, application.provenances, strict=True
-            )
+            for molecule, provenance in zip(products, provenances, strict=True)
         )
         # Multiply prob by the number of qualifying fragments so that
         # disconnections producing more usable precursors are preferred. Note:
@@ -787,7 +785,7 @@ class Tree:
                     curr_node.curr_precursor.molecule,
                     curr_node.curr_precursor.target_atom_provenance,
                 ),
-                application.states,
+                zip(products, provenances, strict=True),
             )
         if not precursors_to_expand and remaining_required_bonds:
             return False

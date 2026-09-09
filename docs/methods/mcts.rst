@@ -148,6 +148,14 @@ being expanded. If Chython reuses a number from another fragment for a newly
 introduced atom, that atom has no target identity and cannot satisfy or violate
 a constraint accidentally.
 
+``apply_reaction_rule()`` keeps its existing positional arguments and yields
+lists of native ``MoleculeContainer`` products. Optional keyword-only
+``constraints`` and ``provenance`` inputs support direct constrained applications;
+``Tree`` supplies them automatically. During repeated rule applications, immutable
+atom identities travel in product metadata, then Tree moves them into the
+precursor's provenance field. Preserve that metadata when passing products into
+another constrained call, or pass their provenance explicitly.
+
 This complete example downloads and loads the current GPS preset, standardizes
 the target, applies the tutorial's required and frozen bonds, and runs the search:
 

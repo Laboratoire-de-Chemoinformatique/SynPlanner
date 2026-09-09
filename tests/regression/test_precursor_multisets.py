@@ -5,8 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from synplan.chem.reaction.reactor import ReactionApplication
-from synplan.chem.target_bonds import TargetAtomProvenance
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.config import TreeConfig
 from synplan.mcts.evaluation import RandomEvaluationStrategy
@@ -69,13 +67,8 @@ def test_multiplicity_and_rejected_cycles_do_not_poison_dedup():
     candidate = _RuleCandidate(0.5, None, 0, "policy", 1)
     ethanol = mol_from_smiles("CCO", clean2d=False)
 
-    def application(*products):
-        return ReactionApplication(products, (TargetAtomProvenance(),) * len(products))
-
-    assert not tree._add_child_if_new(context, application(target, ethanol), candidate)
+    assert not tree._add_child_if_new(context, [target, ethanol], candidate)
     assert not context.seen_products
-    assert tree._add_child_if_new(context, application(ethanol), candidate)
-    assert tree._add_child_if_new(
-        context, application(ethanol.copy(), ethanol.copy()), candidate
-    )
-    assert not tree._add_child_if_new(context, application(ethanol.copy()), candidate)
+    assert tree._add_child_if_new(context, [ethanol], candidate)
+    assert tree._add_child_if_new(context, [ethanol.copy(), ethanol.copy()], candidate)
+    assert not tree._add_child_if_new(context, [ethanol.copy()], candidate)

@@ -6,10 +6,8 @@ import pytest
 from chython import smarts, smiles
 
 from synplan.chem.reaction import CanonicalRetroReactor, apply_reaction_rule
-from synplan.chem.reaction.reactor import (
-    iter_reaction_applications,
-)
 from synplan.chem.target_bonds import (
+    _PROVENANCE_KEY,
     TargetAtomProvenance,
     TargetBondConstraints,
     removed_target_bonds,
@@ -71,7 +69,7 @@ def _tree(target, rules, bonds_state, *, building_blocks=(), min_mol_size=0):
 
 def _applications(tree: Tree, node_id: int, rule: CanonicalRetroReactor):
     precursor = tree.nodes[node_id].curr_precursor
-    return iter_reaction_applications(
+    return apply_reaction_rule(
         molecule=precursor.molecule,
         reaction_rule=rule,
         provenance=precursor.target_atom_provenance,
@@ -111,12 +109,15 @@ def test_frozen_bond_keeps_real_element_substitution_candidate():
     provenance = TargetAtomProvenance.for_target(target)
     constraints = TargetBondConstraints.from_state(target, {(1, 2): 2})
     constrained = list(
-        iter_reaction_applications(target, substitution, provenance, constraints)
+        apply_reaction_rule(
+            target, substitution, provenance=provenance, constraints=constraints
+        )
     )
 
     assert len(constrained) == 1
     assert (1, 2) not in removed_target_bonds(
-        (target, provenance), constrained[0].states
+        (target, provenance),
+        ((mol, mol.meta[_PROVENANCE_KEY]) for mol in constrained[0]),
     )
 
 
@@ -126,18 +127,30 @@ def test_real_cleavage_of_frozen_target_bond_is_rejected():
     provenance = TargetAtomProvenance.for_target(target)
 
     unconstrained = list(
-        iter_reaction_applications(
+        apply_reaction_rule(
             target,
             cleavage,
-            provenance,
-            TargetBondConstraints(),
+            provenance=provenance,
+            constraints=TargetBondConstraints(),
         )
     )
     assert len(unconstrained) == 1
-    assert (2, 3) in removed_target_bonds((target, provenance), unconstrained[0].states)
+    removed = removed_target_bonds(
+        (target, provenance),
+        ((mol, provenance.inherit(mol)) for mol in unconstrained[0]),
+    )
+    assert (2, 3) in removed
+    assert (1, 2) not in removed
 
     frozen = TargetBondConstraints.from_state(target, {(2, 3): 2})
-    assert list(iter_reaction_applications(target, cleavage, provenance, frozen)) == []
+    assert (
+        list(
+            apply_reaction_rule(
+                target, cleavage, provenance=provenance, constraints=frozen
+            )
+        )
+        == []
+    )
 
 
 @pytest.mark.parametrize(("state", "terminal_added"), [(1, False), (2, True)])
@@ -157,7 +170,7 @@ def test_reused_atom_numbers_do_not_alias_target_atoms(state, terminal_added):
     step1 = next(
         application
         for application in _applications(tree, 1, split_rule)
-        if sorted(map(str, application.products)) == ["CC", "CO"]
+        if sorted(map(str, application)) == ["CC", "CO"]
     )
     assert tree._add_child_if_new(_context(tree, 1), step1, _candidate(split_rule, 0))
 
@@ -173,18 +186,17 @@ def test_reused_atom_numbers_do_not_alias_target_atoms(state, terminal_added):
     step2 = next(
         application
         for application in _applications(tree, 2, add_rule)
-        if any(
-            set(product.atoms_numbers) == {1, 2, 3, 4}
-            for product in application.products
-        )
+        if any(set(product.atoms_numbers) == {1, 2, 3, 4} for product in application)
     )
-    assert step2.provenances == (TargetAtomProvenance(frozenset({(1, 1), (2, 2)})),)
+    assert [mol.meta[_PROVENANCE_KEY] for mol in step2] == [
+        TargetAtomProvenance(frozenset({(1, 1), (2, 2)}))
+    ]
     assert tree._add_child_if_new(_context(tree, 2), step2, _candidate(add_rule, 1))
 
     step3 = next(
         application
         for application in _applications(tree, 3, break_rule)
-        if sorted(map(str, application.products)) == ["C", "CCC"]
+        if sorted(map(str, application)) == ["C", "CCC"]
     )
     assert (
         tree._add_child_if_new(_context(tree, 3), step3, _candidate(break_rule, 2))

@@ -4,7 +4,6 @@ rules."""
 import logging
 from collections.abc import Iterator
 from copy import copy
-from dataclasses import dataclass
 from typing import Any
 
 from chython.containers import MoleculeContainer, ReactionContainer, SynthonContainer
@@ -24,7 +23,7 @@ from synplan.chem.stereo import (
     stereo_requirements,
 )
 from synplan.chem.target_bonds import (
-    ProvenancedMolecule,
+    _PROVENANCE_KEY,
     TargetAtomProvenance,
     TargetBondConstraints,
     removed_target_bonds,
@@ -36,24 +35,6 @@ logger = logging.getLogger(__name__)
 
 class Reaction(ReactionContainer):
     """Reaction class used for a general representation of reaction."""
-
-
-@dataclass(frozen=True, slots=True)
-class ReactionApplication:
-    """Internal reaction result paired with target-atom provenance."""
-
-    products: tuple[MoleculeContainer, ...]
-    provenances: tuple[TargetAtomProvenance, ...]
-
-    def __post_init__(self) -> None:
-        if len(self.products) != len(self.provenances):
-            raise ValueError("every reaction product must have provenance")
-
-    @property
-    def states(self) -> tuple[ProvenancedMolecule, ...]:
-        """Return product/provenance pairs."""
-
-        return tuple(zip(self.products, self.provenances, strict=True))
 
 
 class CanonicalRetroReactor(Reactor):
@@ -139,11 +120,9 @@ def add_small_mols(
     return [big_mol]
 
 
-def iter_reaction_applications(
+def apply_reaction_rule(
     molecule: MoleculeContainer,
     reaction_rule: "CanonicalRetroReactor",
-    provenance: TargetAtomProvenance,
-    constraints: TargetBondConstraints,
     sort_reactions: bool = False,
     top_reactions_num: int = 5,
     rebuild_with_cgr: bool = False,
@@ -152,14 +131,17 @@ def iter_reaction_applications(
     co_reactants: tuple[MoleculeContainer, ...] = (),
     max_mapping_work: int = 100_000,
     diagnostics: list[dict] | None = None,
-) -> Iterator[ReactionApplication]:
-    """Yield internal canonical applications with target-atom provenance.
+    *,
+    provenance: TargetAtomProvenance | None = None,
+    constraints: TargetBondConstraints | None = None,
+) -> Iterator[list[MoleculeContainer]]:
+    """Applies a reaction rule to a given molecule.
 
-    The yielded products are always in canonical form — either
+    The yielded precursors are always in canonical form — either
     produced directly by :class:`CanonicalRetroReactor._patcher`
     (default path) or canonicalized via
     :func:`synplan.chem.utils.validate_and_canonicalize` when the CGR
-    rebuild path is used. Tree can wrap them with
+    rebuild path is used. Callers can wrap them with
     ``Precursor(mol, canonicalize=False)`` without further work.
 
     :param molecule: A molecule to which reaction rule will be applied.
@@ -167,16 +149,13 @@ def iter_reaction_applications(
         ``Reactor`` instance also works mechanically but the yielded
         precursors won't be canonicalized — only ``CanonicalRetroReactor``
         is supported by SynPlanner's MCTS state-dedup contract.)
-    :param provenance: Stable target identities for atoms in ``molecule``.
-    :param constraints: Validated immutable target-bond constraints. Frozen
-        bonds are filtered by product adjacency; required bonds are completed
-        by ``Tree`` at route level.
     :param sort_reactions: If True, candidate reactions are sorted by the
         number of large product fragments (length > 6) before truncation.
     :param top_reactions_num: The maximum amount of reactions after the
         application of reaction rule. **Default raised from 3 → 5 in 1.5.0**;
         callers that depended on the previous default must pass
         ``top_reactions_num=3`` explicitly.
+        Zero yields no candidates; negative values raise ``ValueError``.
     :param rebuild_with_cgr: If True, products are re-derived by composing
         the reaction into a CGR and decomposing it (recovery path for
         cases where the reactor's direct output has mapping or mass-
@@ -201,7 +180,16 @@ def iter_reaction_applications(
         ``direction="forward"`` search runs unimolecular rules only.
     :param max_mapping_work: Work budget shared by all matches of this application.
     :param diagnostics: Optional sink for incomplete mapping assessments.
-    :return: Internal product/provenance applications for Tree expansion.
+    :param provenance: Optional stable target identities for the input atoms.
+        With active constraints, defaults to provenance carried in molecule
+        metadata, or identity mapping for a fresh target. Pass it explicitly
+        for precursors whose target identities are stored separately.
+    :param constraints: Optional validated target-bond constraints. Frozen
+        bonds are filtered before the result limit; required bonds are completed
+        by ``Tree`` at route level. Constrained outputs carry immutable provenance
+        in ``meta["_synplan_target_atom_provenance"]`` for subsequent applications;
+        input molecules are not modified. Unconstrained calls add no metadata.
+    :return: An iterator yielding lists of ``MoleculeContainer`` products.
     :raises TypeError: if ``molecule`` carries synthon labels.
         ``QueryElement.__eq__`` never consults ``_label``, so a plain reactor
         matches a labelled synthon and emits unlabelled products — the labels
@@ -228,16 +216,19 @@ def iter_reaction_applications(
     if top_reactions_num == 0:
         return
 
-    empty_provenance = TargetAtomProvenance()
-
-    def _inherit_provenance(
-        parent: TargetAtomProvenance, product: MoleculeContainer
-    ) -> TargetAtomProvenance:
-        return parent.inherit(product) if constraints.active else empty_provenance
+    constraints = constraints or TargetBondConstraints()
+    if constraints.active:
+        molecule = molecule.copy()
+        if provenance is None:
+            provenance = molecule.meta.get(_PROVENANCE_KEY)
+        molecule.meta[_PROVENANCE_KEY] = (
+            provenance
+            if provenance is not None
+            else TargetAtomProvenance.for_target(molecule)
+        )
 
     def _collect_reactions(
         current_molecule: MoleculeContainer,
-        current_provenance: TargetAtomProvenance,
     ) -> list[ReactionContainer]:
         reactants = add_small_mols(current_molecule, small_molecules=co_reactants)
         reactions = []
@@ -246,13 +237,14 @@ def iter_reaction_applications(
             with mapping_budget(max_mapping_work, budget=work_budget):
                 for reaction in reaction_rule(*reactants):
                     if constraints.frozen:
-                        product_states = tuple(
-                            (product, _inherit_provenance(current_provenance, product))
-                            for product in reaction.products
-                        )
+                        current_provenance = current_molecule.meta[_PROVENANCE_KEY]
                         if (
                             removed_target_bonds(
-                                (current_molecule, current_provenance), product_states
+                                (current_molecule, current_provenance),
+                                (
+                                    (product, current_provenance.inherit(product))
+                                    for product in reaction.products
+                                ),
                             )
                             & constraints.frozen
                         ):
@@ -278,8 +270,7 @@ def iter_reaction_applications(
 
     def _prepare_reactants(
         reaction: ReactionContainer,
-        parent_provenance: TargetAtomProvenance,
-    ) -> list[ProvenancedMolecule] | None:
+    ) -> list[MoleculeContainer] | None:
         # temporary solution - incorrect leaving groups
         reactant_atom_nums = []
         for reactant in reaction.reactants:
@@ -313,34 +304,28 @@ def iter_reaction_applications(
                     return None
                 c.meta.update(mol.meta)
                 canon.append(c)
-            return [(mol, _inherit_provenance(parent_provenance, mol)) for mol in canon]
+            return canon
 
-        return [
-            (mol, _inherit_provenance(parent_provenance, mol))
-            for mol in reaction.products
-            if len(mol) > 0
-        ]
+        return [mol for mol in reaction.products if len(mol) > 0]
 
-    def _reactants_key(
-        reactants: list[ProvenancedMolecule],
-    ) -> tuple[object, ...]:
+    def _reactants_key(reactants: list[MoleculeContainer]) -> tuple[object, ...]:
         if constraints.active:
             return tuple(
                 sorted(
                     (
                         str(reactant),
-                        tuple(sorted(reactant_provenance.pairs)),
+                        tuple(sorted(reactant.meta[_PROVENANCE_KEY].pairs)),
                     )
-                    for reactant, reactant_provenance in reactants
+                    for reactant in reactants
                 )
             )
-        return tuple(sorted(str(reactant) for reactant, _provenance in reactants))
+        return tuple(sorted(str(reactant) for reactant in reactants))
 
     track_keys = rm_dup or multirule
     seen_reactants: set[tuple[object, ...]] = set()
-    pending_reactants: list[list[ProvenancedMolecule]] = [[(molecule, provenance)]]
+    pending_reactants: list[list[MoleculeContainer]] = [[molecule]]
     expanded_keys: set[tuple[object, ...]] = (
-        {_reactants_key([(molecule, provenance)])} if multirule else set()
+        {_reactants_key([molecule])} if multirule else set()
     )
     pending_index = 0
 
@@ -348,13 +333,18 @@ def iter_reaction_applications(
         current_reactants = pending_reactants[pending_index]
         pending_index += 1
 
-        for mol_index, (current_molecule, current_provenance) in enumerate(
-            current_reactants
-        ):
-            for reaction in _collect_reactions(current_molecule, current_provenance):
-                new_reactants = _prepare_reactants(reaction, current_provenance)
+        for mol_index, current_molecule in enumerate(current_reactants):
+            for reaction in _collect_reactions(current_molecule):
+                new_reactants = _prepare_reactants(reaction)
                 if new_reactants is None:
                     continue
+
+                if constraints.active:
+                    # Each occurrence owns its metadata, even if a rule reuses a product.
+                    new_reactants = [mol.copy() for mol in new_reactants]
+                    parent_provenance = current_molecule.meta[_PROVENANCE_KEY]
+                    for mol in new_reactants:
+                        mol.meta[_PROVENANCE_KEY] = parent_provenance.inherit(mol)
 
                 merged_reactants = [
                     reactant
@@ -363,7 +353,7 @@ def iter_reaction_applications(
                 ]
                 merged_reactants.extend(new_reactants)
                 merged_reactants = [
-                    reactant for reactant in merged_reactants if len(reactant[0]) > 0
+                    reactant for reactant in merged_reactants if len(reactant) > 0
                 ]
 
                 reactants_key = _reactants_key(merged_reactants) if track_keys else None
@@ -373,11 +363,8 @@ def iter_reaction_applications(
 
                 if rm_dup:
                     seen_reactants.add(reactants_key)
-                _warn_if_not_canonical([mol for mol, _ in merged_reactants])
-                yield ReactionApplication(
-                    products=tuple(molecule for molecule, _ in merged_reactants),
-                    provenances=tuple(provenance for _, provenance in merged_reactants),
-                )
+                _warn_if_not_canonical(merged_reactants)
+                yield merged_reactants
 
                 if multirule and reactants_key not in expanded_keys:
                     expanded_keys.add(reactants_key)
@@ -385,61 +372,6 @@ def iter_reaction_applications(
 
         if not multirule:
             break
-
-
-def apply_reaction_rule(
-    molecule: MoleculeContainer,
-    reaction_rule: "CanonicalRetroReactor",
-    sort_reactions: bool = False,
-    top_reactions_num: int = 5,
-    rebuild_with_cgr: bool = False,
-    multirule: bool = False,
-    rm_dup: bool = False,
-    co_reactants: tuple[MoleculeContainer, ...] = (),
-    max_mapping_work: int = 100_000,
-    diagnostics: list[dict] | None = None,
-) -> Iterator[list[MoleculeContainer]]:
-    """Apply a reaction rule and yield canonical product lists.
-
-    This public API remains structure-only. Target-bond constraints are accepted
-    exclusively by :class:`synplan.mcts.tree.Tree`; rollout, evaluation, and
-    existing direct callers retain their previous product-list interface.
-
-    :param molecule: A molecule to which reaction rule will be applied.
-    :param reaction_rule: A :class:`CanonicalRetroReactor`. Any Chython
-        ``Reactor`` instance also works mechanically, but only
-        ``CanonicalRetroReactor`` guarantees canonical products.
-    :param sort_reactions: Sort candidates by the number of large product
-        fragments before truncation.
-    :param top_reactions_num: Maximum number of accepted candidates. Zero
-        yields no candidates; negative values raise ``ValueError``.
-    :param rebuild_with_cgr: Re-derive and canonicalize products through the
-        legacy CGR recovery path.
-    :param multirule: Repeatedly apply the rule in a BFS-style loop.
-    :param rm_dup: Remove duplicate product sets by canonical SMILES.
-    :param co_reactants: Additional reaction partners, selected by the caller.
-        Tree currently supplies none, so forward search is unimolecular only.
-    :param max_mapping_work: Work budget shared by all matches of this application.
-    :param diagnostics: Optional sink for incomplete mapping assessments.
-    :return: An iterator yielding product lists.
-    :raises TypeError: If the molecule carries synthon labels that the rule would strip.
-    """
-
-    for application in iter_reaction_applications(
-        molecule=molecule,
-        reaction_rule=reaction_rule,
-        provenance=TargetAtomProvenance(),
-        constraints=TargetBondConstraints(),
-        sort_reactions=sort_reactions,
-        top_reactions_num=top_reactions_num,
-        rebuild_with_cgr=rebuild_with_cgr,
-        multirule=multirule,
-        rm_dup=rm_dup,
-        co_reactants=co_reactants,
-        max_mapping_work=max_mapping_work,
-        diagnostics=diagnostics,
-    ):
-        yield list(application.products)
 
 
 def reaction_rules_appliance(

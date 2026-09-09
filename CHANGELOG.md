@@ -15,6 +15,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Immutable target-atom provenance follows precursor fragmentation and multirule
   applications, preventing newly introduced atoms from acquiring constraints when
   Chython reuses an atom number from another fragment.
+- `apply_reaction_rule()` accepts optional keyword-only `constraints` and
+  `provenance` inputs while preserving existing arguments and native
+  `MoleculeContainer` product lists. Constrained applications carry immutable
+  atom identities in molecule metadata between steps; Tree stores them on
+  precursors without changing the search-record format.
 - `selected_bonds_svg()` in `synplan.chem.target_bonds` depicts required bonds in
   red and frozen bonds in blue using the same validation as `Tree`.
 - Tutorial 19 compares baseline and bond-constrained searches using the existing

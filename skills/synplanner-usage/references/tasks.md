@@ -76,6 +76,8 @@ that break the selected bond. Keys are unordered Chython atom-map pairs naming
 target-derived atoms; immutable provenance prevents introduced atoms from gaining
 constraints through number reuse. A break means loss of endpoint adjacency, not a
 bond-order or mapped endpoint-element change.
+For direct rule application, `apply_reaction_rule` also accepts optional
+`constraints` and `provenance` keywords and still yields molecule lists.
 **Python API only** - there is no YAML, CLI, or batch `run_search` surface.
 Tutorial: `19_Bond_freeze_break`
 Docs: `methods/mcts` - "Target bond constraints"
