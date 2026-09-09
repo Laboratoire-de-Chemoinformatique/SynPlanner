@@ -131,7 +131,8 @@ MHN policies bind runtime rule representations separately. Legacy assets lacking
 a manifest retain the existing compatibility checks; their provenance cannot be
 recovered from a weight tensor. Rebuild cached training datasets when rules change.
 
-Search records use ``synplan-tree/3`` and still read schemas 1 and 2. Public route
+Search records use ``synplan-tree/4`` and still read schemas 1–3. Schema 4 also
+preserves target-bond constraints and atom provenance. Public route
 artifacts use ``synplan-routes/2``: target keys are now Chython canonical SMILES,
 including stereo. External evaluation adapters must normalize these keys in their
 own boundary code. Core search no longer uses RDKit to create an export key.

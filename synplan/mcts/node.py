@@ -29,6 +29,7 @@ class Node:
         stereo_events: tuple = (),
         stereo_evidence: tuple = (),
         stereo_history: str = "",
+        remaining_required_bonds: frozenset[tuple[int, int]] | None = None,
     ) -> None:
         """Initialize the Node object.
 
@@ -69,6 +70,8 @@ class Node:
             policy-source rules; ``None`` for priority-source rules and the root.
         :param policy_probability: Unscaled policy output used for pathway
             likelihood; ``None`` for rules without a model probability.
+        :param remaining_required_bonds: Target bonds that must still be broken
+            before this branch can become a winning route.
         """
 
         self.precursors_to_expand = precursors_to_expand
@@ -101,6 +104,7 @@ class Node:
         self.policy_rank = policy_rank
         # Unscaled model output, distinct from the fragment-weighted UCB prior.
         self.policy_probability = policy_probability
+        self.remaining_required_bonds = frozenset(remaining_required_bonds or ())
 
     def __len__(self) -> int:
         """Returns the number of precursor in the node to expand."""
@@ -114,12 +118,12 @@ class Node:
         )
 
     def is_solved(self) -> bool:
-        """If True, it is a terminal node.
-
-        There are no precursors for expansion.
-        """
-
-        return self.is_terminal() and not self.stereo_obligations
+        """Return whether expansion, stereo, and required-bond obligations are complete."""
+        return (
+            self.is_terminal()
+            and not self.stereo_obligations
+            and not self.remaining_required_bonds
+        )
 
     def is_terminal(self) -> bool:
         """All leaf structures are purchased; stereo strategy may still be needed."""

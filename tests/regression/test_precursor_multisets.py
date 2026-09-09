@@ -66,6 +66,7 @@ def test_multiplicity_and_rejected_cycles_do_not_poison_dedup():
     context = _ExpansionContext(1, tree.nodes[1], [tree.nodes[1].curr_precursor], set())
     candidate = _RuleCandidate(0.5, None, 0, "policy", 1)
     ethanol = mol_from_smiles("CCO", clean2d=False)
+
     assert not tree._add_child_if_new(context, [target, ethanol], candidate)
     assert not context.seen_products
     assert tree._add_child_if_new(context, [ethanol], candidate)

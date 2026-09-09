@@ -57,6 +57,7 @@ some advanced explanations and configurations, that can be used for both demonst
 - `Synthon-Based Library Design`_ - demonstrates the synthon subsystem: building-block classification and synthonisation, target fragmentation, availability against a synthon stock, library and analogue enumeration, positional analogue scanning, and ring closure.
 - `Retrosynthesis with Synthon Priority Rules`_ - demonstrates how the shipped synthon disconnections steer an MCTS search as a curated priority-rule set.
 - `InChIKey Building-Block Catalogue`_ - uses a prepared vendor-aware JSON catalogue for connectivity-only Boceprevir MCTS and detached route costing.
+- `Target Bond Constraints`_ - requires selected disconnections and freezes protected target bonds.
 
 .. _Welcome to Chython: 00_Welcome_to_Chython.ipynb
 .. _Coming from RDKit: 01_Coming_from_RDKit.ipynb
@@ -79,6 +80,7 @@ some advanced explanations and configurations, that can be used for both demonst
 .. _Synthon-Based Library Design: 17_Synthon_Based_Design.ipynb
 .. _Retrosynthesis with Synthon Priority Rules: 18_Retrosynthesis_With_Synthon_Priority_Rules.ipynb
 .. _InChIKey Building-Block Catalogue: 20_InChIKey_Building_Block_Catalogue.ipynb
+.. _Target Bond Constraints: 19_Bond_freeze_break.ipynb
 
 .. toctree::
    :hidden:
@@ -108,6 +110,7 @@ some advanced explanations and configurations, that can be used for both demonst
    16_Building_block_search
    17_Synthon_Based_Design
    18_Retrosynthesis_With_Synthon_Priority_Rules
+   19_Bond_freeze_break
    20_InChIKey_Building_Block_Catalogue
    ../configuration/configuration
    ../methods/methods

@@ -30,6 +30,12 @@ from synplan.chem.stereo import (
     has_stereo_groups,
     stereo_requirements,
 )
+from synplan.chem.target_bonds import (
+    _PROVENANCE_KEY,
+    TargetAtomProvenance,
+    TargetBondConstraints,
+    removed_target_bonds,
+)
 from synplan.mcts.config import TreeConfig
 from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.node import Node
@@ -153,6 +159,7 @@ class Tree:
         expansion_function: Policy,
         evaluation_function: EvaluationStrategy = None,
         priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
+        bonds_state: Mapping[tuple[int, int], int] | None = None,
     ):
         """Initializes a tree object with optional parameters for tree search for target
         molecule.
@@ -183,6 +190,10 @@ class Tree:
             disconnect producing N qualifying fragments enters UCB with prior
             N. Multi-fragment priority disconnects (e.g. 4-component Ugi)
             therefore dominate sibling selection by design.
+        :param bonds_state: Optional target-bond state mapping keyed by unordered
+            Chython atom-number pairs. State ``0`` is unconstrained, state ``1``
+            requires the bond to be broken somewhere in every accepted route,
+            and state ``2`` rejects reaction candidates that break the bond.
         """
 
         # tree config parameters
@@ -192,6 +203,7 @@ class Tree:
             self._stereo_assessments.setdefault(record.get("context"), []).append(
                 record
             )
+        self._bond_constraints = TargetBondConstraints.from_state(target, bonds_state)
 
         # building blocks and reaction reaction_rules
         self.reaction_rules = tuple(reaction_rules)
@@ -325,6 +337,24 @@ class Tree:
             f"normalize_scores={config.normalize_scores}, "
         )
 
+    @property
+    def bond_constraints(self) -> TargetBondConstraints:
+        """Return the immutable normalized target-bond constraints."""
+
+        return self._bond_constraints
+
+    @property
+    def bonds_state(self) -> dict[tuple[int, int], int]:
+        """Return a defensive normalized snapshot of the public mapping."""
+
+        return self._bond_constraints.as_dict()
+
+    @property
+    def required_break_bonds(self) -> frozenset[tuple[int, int]]:
+        """Return target bonds that every accepted route must break."""
+
+        return self._bond_constraints.required
+
     def __len__(self) -> int:
         """Returns the current size (the number of nodes) in the tree."""
 
@@ -432,11 +462,20 @@ class Tree:
                 )
         except UnresolvedStereo as error:
             obligations.append({"reason": error.reason, "detail": str(error)})
-        target_molecule.prev_precursors.append(Precursor(target))
+        root_provenance = TargetAtomProvenance.for_target(target_molecule.molecule)
+        target_molecule.target_atom_provenance = root_provenance
+        target_molecule.prev_precursors.append(
+            Precursor(
+                target_molecule.molecule,
+                canonicalize=False,
+                target_atom_provenance=root_provenance,
+            )
+        )
         target_node = Node(
             precursors_to_expand=(target_molecule,),
             new_precursors=(target_molecule,),
             stereo_obligations=tuple(obligations),
+            remaining_required_bonds=self.required_break_bonds,
         )
 
         return target_node
@@ -477,8 +516,10 @@ class Tree:
             )
             diagnostics = []
             for products in apply_reaction_rule(
-                curr_node.curr_precursor.molecule,
-                candidate.rule,
+                molecule=curr_node.curr_precursor.molecule,
+                reaction_rule=candidate.rule,
+                provenance=curr_node.curr_precursor.target_atom_provenance,
+                constraints=self._bond_constraints,
                 top_reactions_num=self.config.max_reaction_outcomes,
                 multirule=enable_multirule,
                 rm_dup=enable_multirule,
@@ -566,10 +607,17 @@ class Tree:
                 policy_rank=policy_rank,
             )
 
+    def _precursor_identity(self, precursor: Precursor):
+        """Return the identity used for cycle detection and pruning."""
+
+        if self._bond_constraints.active:
+            return precursor, precursor.target_atom_provenance
+        return precursor
+
     def _add_child_if_new(
         self,
         context: _ExpansionContext,
-        products,
+        products: list[MoleculeContainer],
         candidate: _RuleCandidate,
     ) -> bool:
         """Add a child node if the generated products form a new valid state."""
@@ -584,6 +632,12 @@ class Tree:
         rule_source = candidate.rule_source
 
         products = [m.copy() for m in products]
+        provenances = tuple(
+            m.meta.pop(_PROVENANCE_KEY)
+            if self._bond_constraints.active
+            else m.meta.pop(_PROVENANCE_KEY, TargetAtomProvenance())
+            for m in products
+        )
         assessment = assess_inheritance(curr_node.curr_precursor.molecule, products)
         if self.config.direction == "forward" and any(
             has_stereo(m) for m in (curr_node.curr_precursor.molecule, *products)
@@ -637,6 +691,13 @@ class Tree:
             for o in assessment["obligations"]
         )
         product_key = tuple(sorted(str(molecule) for molecule in products))
+        if self._bond_constraints.active:
+            product_key = tuple(
+                sorted(
+                    (str(molecule), tuple(sorted(provenance.pairs)))
+                    for molecule, provenance in zip(products, provenances, strict=True)
+                )
+            )
         # Identical precursors can arise from different stereo operations or
         # evidence. Keep those alternatives and their provenance distinct.
         if obligations or assessment["events"]:
@@ -651,9 +712,16 @@ class Tree:
             molecule.meta["rule_key"] = rule_key
             molecule.meta["policy_rank"] = policy_rank
 
-        # ``apply_reaction_rule`` already validated + canonicalized each
+        # apply_reaction_rule already validated + canonicalized each
         # product in a single kekule pass; skip the redundant copy here.
-        new_precursor = tuple(Precursor(mol, canonicalize=False) for mol in products)
+        new_precursor = tuple(
+            Precursor(
+                molecule,
+                canonicalize=False,
+                target_atom_provenance=provenance,
+            )
+            for molecule, provenance in zip(products, provenances, strict=True)
+        )
         # Multiply prob by the number of qualifying fragments so that
         # disconnections producing more usable precursors are preferred. Note:
         # priority rules enter here with prob=1.0, so a priority disconnect
@@ -664,7 +732,11 @@ class Tree:
             [mol for mol in products if len(mol) > self.config.min_mol_size]
         )
 
-        if not set(prev_precursor).isdisjoint(new_precursor):
+        previous_identities = {
+            self._precursor_identity(precursor) for precursor in prev_precursor
+        }
+        new_identities = {self._precursor_identity(p) for p in new_precursor}
+        if not previous_identities.isdisjoint(new_identities):
             return False
 
         precursors_to_expand = (
@@ -706,9 +778,28 @@ class Tree:
                 (history + json.dumps(local, sort_keys=True)).encode()
             ).hexdigest()
         pruning_key = (precursors_to_expand, obligations.key, history)
+        remaining_required_bonds = curr_node.remaining_required_bonds
+        if remaining_required_bonds:
+            remaining_required_bonds = remaining_required_bonds - removed_target_bonds(
+                (
+                    curr_node.curr_precursor.molecule,
+                    curr_node.curr_precursor.target_atom_provenance,
+                ),
+                zip(products, provenances, strict=True),
+            )
+        if not precursors_to_expand and remaining_required_bonds:
+            return False
+
         if self.config.enable_pruning:
+            if self._bond_constraints.active:
+                pruning_key = (
+                    tuple(self._precursor_identity(p) for p in precursors_to_expand),
+                    remaining_required_bonds,
+                    obligations.key,
+                    history,
+                )
             if (
-                precursors_to_expand != ()
+                precursors_to_expand
                 and pruning_key
                 in self.big_dict_of_all_tuples_of_precursors_to_expand_but_not_building_blocks
             ):
@@ -730,6 +821,7 @@ class Tree:
             stereo_events=tuple(assessment["events"]),
             stereo_evidence=tuple(evidence),
             stereo_history=history,
+            remaining_required_bonds=remaining_required_bonds,
         )
 
         for np in new_precursor:

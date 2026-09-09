@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import gzip
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from synplan.chem.precursor import Precursor
 from synplan.chem.stereo import parse_smiles_preserving_stereo as read_smiles
+from synplan.chem.target_bonds import TargetAtomProvenance, TargetBondConstraints
 from synplan.chem.utils import in_atom_order, molecule_key
 from synplan.mcts.node import Node
 from synplan.mcts.tree import Tree
@@ -32,7 +33,7 @@ __all__ = [
 ]
 
 #: Versioned identifier for the search-record file. Bump when the shape changes.
-SEARCH_RECORD_SCHEMA = "synplan-tree/3"
+SEARCH_RECORD_SCHEMA = "synplan-tree/4"
 
 
 @dataclass
@@ -56,6 +57,19 @@ class SearchRecord:
     children: dict[int, set[int]]
     winning_nodes: list[int]
     stats: dict
+    bond_constraints: TargetBondConstraints = field(
+        default_factory=TargetBondConstraints
+    )
+
+    @property
+    def bonds_state(self) -> dict[tuple[int, int], int]:
+        """Return the target-bond constraints recorded with this search."""
+        return self.bond_constraints.as_dict()
+
+    @property
+    def required_break_bonds(self) -> frozenset[tuple[int, int]]:
+        """Return the target bonds the search required every route to break."""
+        return self.bond_constraints.required
 
     # The Tree readouts that touch nodes and parents only, bound from the real
     # class: a record has to answer them exactly as the search did.
@@ -147,10 +161,19 @@ def write_search_record(
             "rule": node.rule_key,
             "rank": node.policy_rank,
             "new": [index(precursor) for precursor in node.new_precursors],
+            "new_provenance": [
+                sorted(precursor.target_atom_provenance.pairs)
+                for precursor in node.new_precursors
+            ],
+            "remaining_required_bonds": sorted(node.remaining_required_bonds),
             # the unexpanded precursors: the first is the one the node was
             # expanding, an empty list is a solved node, and the whole list is
             # the route's unresolved leaves
             "expand": [index(precursor) for precursor in node.precursors_to_expand],
+            "expand_provenance": [
+                sorted(precursor.target_atom_provenance.pairs)
+                for precursor in node.precursors_to_expand
+            ],
             "stereo_local": list(node.stereo_obligations.local)
             if not tree.parents[node_id]
             or node.stereo_obligations
@@ -179,6 +202,9 @@ def write_search_record(
         "nodes": nodes,
         "winning": list(tree.winning_nodes),
         "stats": _counters(tree),
+        "bonds_state": [
+            [*bond, state] for bond, state in sorted(tree.bonds_state.items())
+        ],
     }
     with _open(file_path, "wt") as file:
         json.dump(record, file)
@@ -211,6 +237,7 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
     if raw.get("schema") not in {
         "synplan-tree/1",
         "synplan-tree/2",
+        "synplan-tree/3",
         SEARCH_RECORD_SCHEMA,
     }:
         raise ValueError(
@@ -229,6 +256,10 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
         new = tuple(
             Precursor(molecules[i].copy(), canonicalize=False) for i in entry["new"]
         )
+        for precursor, pairs in zip(new, entry.get("new_provenance", ())):
+            precursor.target_atom_provenance = TargetAtomProvenance.from_mapping(
+                dict(pairs)
+            )
         for precursor, selected in zip(new, entry.get("selected_stock", ())):
             if selected:
                 precursor.molecule.meta["selected_stock"] = selected
@@ -243,11 +274,27 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             leftover = zip(unexpanded[parent_id][1:], nodes[parent_id].next_precursor)
             pool = [*leftover, *pool]
         expand = []
-        for wanted in entry["expand"]:
-            # take the first unclaimed precursor spelling it: which occurrence of
-            # two equal ones is which is not written down, and swapping them
-            # swaps interchangeable subtrees
-            slot = next((s for s, (i, _) in enumerate(pool) if i == wanted), None)
+        for position, wanted in enumerate(entry["expand"]):
+            # Equal molecules are interchangeable only when their target identities agree.
+            provenance = (
+                TargetAtomProvenance.from_mapping(
+                    dict(entry["expand_provenance"][position])
+                )
+                if "expand_provenance" in entry
+                else None
+            )
+            slot = next(
+                (
+                    s
+                    for s, (i, precursor) in enumerate(pool)
+                    if i == wanted
+                    and (
+                        provenance is None
+                        or precursor.target_atom_provenance == provenance
+                    )
+                ),
+                None,
+            )
             if slot is None:
                 raise ValueError(
                     f"node {node_id} has {raw['molecules'][wanted]} to expand, but "
@@ -278,6 +325,9 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             stereo_events=entry.get("stereo_events", ()),
             stereo_evidence=entry.get("stereo_evidence", ()),
             stereo_history=entry.get("stereo_history", ""),
+            remaining_required_bonds=frozenset(
+                tuple(bond) for bond in entry.get("remaining_required_bonds", ())
+            ),
         )
         if entry.get("stereo_summary"):
             nodes[node_id].stereo_summary = entry["stereo_summary"]
@@ -304,4 +354,8 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
         children=children,
         winning_nodes=list(raw["winning"]),
         stats=stats,
+        bond_constraints=TargetBondConstraints.from_state(
+            nodes[1].curr_precursor.molecule,
+            {(a, b): state for a, b, state in raw.get("bonds_state", ())},
+        ),
     )
