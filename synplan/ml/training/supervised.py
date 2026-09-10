@@ -257,7 +257,7 @@ def create_training_logger(logger_config: dict | None, results_path: Path):
         except ImportError as e:
             raise ImportError(
                 "MLflow logger requires the 'mlflow' package. "
-                "Install SynPlanner with the 'mlflow' or 'loggers' extra."
+                "Install it with pip install mlflow."
             ) from e
         return MLFlowLogger(**kwargs)
     elif logger_type == "wandb":
@@ -266,7 +266,7 @@ def create_training_logger(logger_config: dict | None, results_path: Path):
         except ImportError as e:
             raise ImportError(
                 "Wandb logger requires the 'wandb' package. "
-                "Install SynPlanner with the 'wandb' or 'loggers' extra."
+                "Install it with pip install wandb."
             ) from e
         return WandbLogger(**kwargs)
     else:

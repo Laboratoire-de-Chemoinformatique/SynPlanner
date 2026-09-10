@@ -1,10 +1,53 @@
 import gzip
+from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
 from synplan.chem.building_blocks import load_building_blocks as catalogue_loader
 from synplan.chem.utils import standardize_smiles_batch
-from synplan.utils.loading import load_building_blocks, load_policy_function
+from synplan.utils.loading import (
+    download_preset,
+    load_building_blocks,
+    load_policy_function,
+)
+
+
+@pytest.mark.parametrize("onnx_available", [True, False])
+def test_download_preset_prefers_onnx_when_available(
+    tmp_path, monkeypatch, onnx_available
+):
+    preset = tmp_path / "preset.yaml"
+    preset.write_text(
+        "files:\n"
+        "  ranking_policy: policy/v1/ranking_policy.ckpt\n"
+        "  reaction_rules: policy/v1/reaction_rules.tsv\n"
+        "  other_policy: policy/v2/ranking_policy.onnx\n",
+        encoding="utf-8",
+    )
+
+    def download(*, repo_id, filename, subfolder, local_dir):
+        assert repo_id == "test/models"
+        if subfolder == "presets":
+            assert filename == "test-preset.yaml"
+            return preset
+        return Path(local_dir) / subfolder / filename
+
+    downloads = Mock(side_effect=download)
+    exists = Mock(return_value=onnx_available)
+    monkeypatch.setattr("synplan.utils.loading.hf_hub_download", downloads)
+    monkeypatch.setattr("synplan.utils.loading.file_exists", exists)
+    paths = download_preset("test-preset", tmp_path, repo_id="test/models")
+    extension = "onnx" if onnx_available else "ckpt"
+    assert paths == {
+        "ranking_policy": tmp_path / f"policy/v1/ranking_policy.{extension}",
+        "reaction_rules": tmp_path / "policy/v1/reaction_rules.tsv",
+        "other_policy": tmp_path / "policy/v2/ranking_policy.onnx",
+    }
+    exists.assert_called_once_with(
+        repo_id="test/models", filename="policy/v1/ranking_policy.onnx"
+    )
+    assert downloads.call_count == 4
 
 
 @pytest.mark.parametrize("extension", [".csv", ".csv.gz", ".tsv", ".tsv.gz"])

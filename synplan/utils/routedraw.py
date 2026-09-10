@@ -284,12 +284,12 @@ def _to_svg(
             label, payload = offer
             # 6.4px per character at 11px semibold, plus the chip's own padding.
             pill = 24.0 + 6.4 * len(label)
-            top = node.y + node.h + PILL_GAP
+            pill_y = node.y + node.h + PILL_GAP
             parts.append(
                 f'<g class="sp-price" data-offers="{escape(payload, quote=True)}">'
-                f'<rect x="{node.x:.1f}" y="{top:.1f}" '
+                f'<rect x="{node.x:.1f}" y="{pill_y:.1f}" '
                 f'width="{pill:.1f}" height="{PILL_H}" rx="{PILL_H / 2}"/>'
-                f'<text x="{node.x + 12:.1f}" y="{top + PILL_H / 2:.1f}">'
+                f'<text x="{node.x + 12:.1f}" y="{pill_y + PILL_H / 2:.1f}">'
                 f"{escape(label)}</text></g>"
             )
 

@@ -10,10 +10,6 @@ from synplan.chem.reaction.curation.filtering import (
     ReactionFilterConfig,
     filter_reactions_from_file,
 )
-from synplan.chem.reaction.curation.mapping import (
-    MappingConfig,
-    map_reactions_from_file,
-)
 from synplan.chem.reaction.curation.standardizing import (
     ReactionStandardizationConfig,
     standardize_reactions_from_file,
@@ -45,12 +41,6 @@ from synplan.ml.config import (
     PolicyNetworkConfig,
     TuningConfig,
     ValueNetworkConfig,
-)
-from synplan.ml.training.reinforcement import run_updating
-from synplan.ml.training.supervised import (
-    create_policy_dataset,
-    run_mhn_network_tuning,
-    run_policy_training,
 )
 from synplan.utils.loading import (
     download_all_data,
@@ -373,6 +363,11 @@ def reaction_mapping_cli(
     error_file,
 ):
     """Map reaction atoms using a neural attention model."""
+    from synplan.chem.reaction.curation.mapping import (
+        MappingConfig,
+        map_reactions_from_file,
+    )
+
     config = MappingConfig.from_yaml(config_path) if config_path else MappingConfig()
     if device is not None:
         config.device = device
@@ -511,6 +506,11 @@ def ranking_policy_training_cli(
     logger_type: str | None,
 ) -> None:
     """Ranking policy network training."""
+    from synplan.ml.training.supervised import (
+        create_policy_dataset,
+        run_policy_training,
+    )
+
     policy_config = PolicyNetworkConfig.from_yaml(config_path)
     policy_config.policy_type = "ranking"
     if logger_type is not None:
@@ -579,6 +579,8 @@ def mhn_network_tuning_cli(
     no_cache: bool,
 ) -> None:
     """Fine-tune an existing MHN ranking checkpoint on new policy data."""
+    from synplan.ml.training.supervised import run_mhn_network_tuning
+
     policy_config = PolicyNetworkConfig.from_yaml(config_path)
 
     run_mhn_network_tuning(
@@ -650,6 +652,10 @@ def filtering_policy_training_cli(
     logger_type: str | None,
 ):
     """Filtering policy network training."""
+    from synplan.ml.training.supervised import (
+        create_policy_dataset,
+        run_policy_training,
+    )
 
     policy_config = PolicyNetworkConfig.from_yaml(config_path)
     policy_config.policy_type = "filtering"
@@ -731,6 +737,7 @@ def value_network_tuning_cli(
     results_dir: str,
 ):
     """Value network tuning."""
+    from synplan.ml.training.reinforcement import run_updating
 
     with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)

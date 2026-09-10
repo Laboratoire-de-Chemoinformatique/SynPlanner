@@ -43,11 +43,33 @@ pip install SynPlanner
 synplan --version
 ```
 
+The base install provides chemistry tools, ChemFrame/pandas analysis, and CPU planning with ONNX policies and value networks.
+Choose an install for your workflow:
+
+| Workflow | Install |
+|---|---|
+| Chemistry, data tables and analysis, and ONNX planning on CPU | `pip install SynPlanner` |
+| Curate reaction data and run atom mapping | `pip install 'SynPlanner[curation]'` |
+| Train models, use notebooks, and export ONNX | `pip install 'SynPlanner[training]'` |
+| Streamlit planning interface | `pip install 'SynPlanner[gui]'` |
+| All three workflows | `pip install 'SynPlanner[all]'` |
+| Use existing Torch checkpoints | `pip install 'SynPlanner[cpu]'` |
+
+With `uv`, select a Torch backend using `cpu`, `cu126`, or `cu128`, for example
+`uv sync --no-dev --extra training --extra cu128` for CUDA 12.8 training.
+Use `--extra curation --extra cu128` for GPU atom mapping, or combine `curation`
+and `training` for the full data-to-model workflow.
+For all workflows with CUDA 12.8, use `uv sync --no-dev --extra all --extra cu128`.
+These backend indexes are configured for `uv`; `pip` users should select their
+Torch build through the PyTorch package index.
+See [ONNX export and inference](docs/configuration/policy.rst) to convert existing ranking checkpoints.
+
 ## Quick start
 
-**1.** Download pre-trained models, rules, and building blocks:
+**1.** Install Torch support for the existing published checkpoint presets, then download models, rules, and building blocks:
 
 ```bash
+pip install 'SynPlanner[cpu]'
 synplan download_preset --preset synplanner-gps-mcule-molport --save_to synplan_data
 ```
 
@@ -70,7 +92,9 @@ synplan planning \
   --results_dir planning_results
 ```
 
-Paths above are what `synplanner-gps-mcule-molport` writes — the download command prints each one.
+The download command prints each path. If a same-name `.onnx` file exists beside a
+checkpoint on Hugging Face, it downloads that file instead; use the printed
+`ranking_policy` path for `--policy_network`. ONNX planning needs only the base install.
 
 > [!TIP]
 > **Every tutorial runs in your browser.** Open the

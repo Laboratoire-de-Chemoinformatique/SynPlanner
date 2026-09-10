@@ -22,12 +22,12 @@ CONFIGS = Path(__file__).resolve().parents[2] / "configs"
 WORKERS = (
     "standardize_reactions_from_file",
     "filter_reactions_from_file",
-    "map_reactions_from_file",
+    "synplan.chem.reaction.curation.mapping.map_reactions_from_file",
     "extract_rules_from_reactions",
-    "create_policy_dataset",
-    "run_policy_training",
-    "run_mhn_network_tuning",
-    "run_updating",
+    "synplan.ml.training.supervised.create_policy_dataset",
+    "synplan.ml.training.supervised.run_policy_training",
+    "synplan.ml.training.supervised.run_mhn_network_tuning",
+    "synplan.ml.training.reinforcement.run_updating",
     "run_search",
     "load_policy_function",
     "load_reaction_rules",
@@ -184,7 +184,8 @@ def stubbed_workers(monkeypatch):
     """Replace every worker with a recorder, so only CLI wiring runs."""
     calls: list[str] = []
     for name in WORKERS:
-        monkeypatch.setattr(cli, name, lambda *a, _n=name, **kw: calls.append(_n))
+        path = name if "." in name else f"synplan.interfaces.cli.{name}"
+        monkeypatch.setattr(path, lambda *a, _n=name, **kw: calls.append(_n))
     return calls
 
 

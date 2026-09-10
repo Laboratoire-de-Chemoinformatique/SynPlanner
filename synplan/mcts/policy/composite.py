@@ -5,11 +5,11 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING
 
-import torch
-
 from synplan.mcts.policy.base import Policy
 
 if TYPE_CHECKING:
+    import torch
+
     from synplan.chem.precursor import Precursor
     from synplan.chem.reaction import CanonicalRetroReactor
 
@@ -77,16 +77,22 @@ class CompositePolicy(Policy):
 
     def _get_combined_probs(self, precursor: Precursor) -> torch.Tensor | None:
         """Weighted-logit softmax merge of the two policies, or ``None``."""
+        import torch
+
         filtering_logits = self.filtering_policy.get_logits(precursor)
         ranking_logits = self.ranking_policy.get_logits(precursor)
         if filtering_logits is None or ranking_logits is None:
             return None
-        combined_logits = filtering_logits + self.ranking_weight * ranking_logits
+        combined_logits = torch.as_tensor(
+            filtering_logits
+        ) + self.ranking_weight * torch.as_tensor(ranking_logits)
         return torch.softmax(combined_logits / self.temperature, dim=-1)
 
     def _predict_rules_common(
         self, precursor: Precursor, n_rules: int
     ) -> tuple[list[float], list[int]] | None:
+        import torch
+
         self._validate_dimensions(n_rules)
         combined_probs = self._get_combined_probs(precursor)
         if combined_probs is None:
