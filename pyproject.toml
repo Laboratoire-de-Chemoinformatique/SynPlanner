@@ -21,7 +21,8 @@ classifiers = [
 dependencies = [
   "chython-synplan[racer-default]==1.108",
   "numpy>=2",
-  "onnxruntime>=1.23",
+  "onnxruntime>=1.23,<1.24; python_version < '3.11'", # 1.24 has no Python 3.10 wheels.
+  "onnxruntime>=1.23; python_version >= '3.11'",
   "tqdm>=4.66",
   "click>=8.0.0",
   "huggingface-hub>=0.24.0",
