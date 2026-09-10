@@ -122,13 +122,16 @@ import sys
 class CoreOnly(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
         if fullname.split('.')[0] in {'torch', 'torch_geometric', 'chytorch',
-                                      'pytorch_lightning', 'IPython', 'pandas', 'streamlit'}:
+                                      'pytorch_lightning', 'IPython', 'streamlit'}:
             raise AssertionError(f'Base planning imported {fullname}')
 sys.meta_path.insert(0, CoreOnly())
 from synplan.interfaces.cli import synplan
 from synplan.chem.precursor import Precursor
 from synplan.utils.loading import load_policy_function
+from synplan.utils.frames import ChemFrame
 from chython import smiles
+frame = ChemFrame([{'molecule': smiles('CCO')}], depict_columns=['molecule'])
+assert '<svg' in frame._repr_html_()
 policy = load_policy_function(weights_path=sys.argv[1], top_rules=3, policy_type=sys.argv[2])
 assert len(list(policy.predict_reaction_rules_light(Precursor(smiles('CCO')), 7))) == 3
 """,

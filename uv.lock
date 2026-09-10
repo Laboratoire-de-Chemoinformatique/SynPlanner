@@ -6353,6 +6353,7 @@ dependencies = [
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
     { name = "onnxruntime", version = "1.23.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
     { name = "onnxruntime", version = "1.29.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "pandas" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "rdkit" },
@@ -6370,7 +6371,6 @@ all = [
     { name = "matplotlib-venn" },
     { name = "onnx" },
     { name = "onnxscript" },
-    { name = "pandas" },
     { name = "pytorch-lightning" },
     { name = "safetensors" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
@@ -6400,7 +6400,6 @@ cu128 = [
 curation = [
     { name = "chytorch-rxnmap-synplan" },
     { name = "chytorch-synplan" },
-    { name = "pandas" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
     { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
@@ -6410,7 +6409,6 @@ curation = [
     { name = "torch", version = "2.11.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
 gui = [
-    { name = "pandas" },
     { name = "streamlit" },
     { name = "streamlit-ketcher" },
 ]
@@ -6422,7 +6420,6 @@ training = [
     { name = "matplotlib-venn" },
     { name = "onnx" },
     { name = "onnxscript" },
-    { name = "pandas" },
     { name = "pytorch-lightning" },
     { name = "safetensors" },
     { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
@@ -6473,9 +6470,7 @@ requires-dist = [
     { name = "onnxruntime", marker = "python_full_version < '3.11'", specifier = ">=1.23,<1.24" },
     { name = "onnxruntime", marker = "python_full_version >= '3.11'", specifier = ">=1.23" },
     { name = "onnxscript", marker = "extra == 'training'", specifier = ">=0.5" },
-    { name = "pandas", marker = "extra == 'curation'", specifier = ">=1.4" },
-    { name = "pandas", marker = "extra == 'gui'", specifier = ">=1.4" },
-    { name = "pandas", marker = "extra == 'training'", specifier = ">=1.4" },
+    { name = "pandas", specifier = ">=1.4" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytorch-lightning", marker = "extra == 'training'", specifier = ">=2.3.3,!=2.6.2,!=2.6.3" },
     { name = "pyyaml", specifier = ">=6.0" },

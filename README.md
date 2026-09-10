@@ -43,13 +43,13 @@ pip install SynPlanner
 synplan --version
 ```
 
-The base install provides chemistry tools and CPU planning with ONNX policies and value networks.
+The base install provides chemistry tools, ChemFrame/pandas analysis, and CPU planning with ONNX policies and value networks.
 Choose an install for your workflow:
 
 | Workflow | Install |
 |---|---|
-| Chemistry and ONNX planning on CPU | `pip install SynPlanner` |
-| Curate reaction data, run atom mapping, and analyse data tables | `pip install 'SynPlanner[curation]'` |
+| Chemistry, data tables and analysis, and ONNX planning on CPU | `pip install SynPlanner` |
+| Curate reaction data and run atom mapping | `pip install 'SynPlanner[curation]'` |
 | Train models, use notebooks, and export ONNX | `pip install 'SynPlanner[training]'` |
 | Streamlit planning interface | `pip install 'SynPlanner[gui]'` |
 | All three workflows | `pip install 'SynPlanner[all]'` |

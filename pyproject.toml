@@ -21,6 +21,7 @@ classifiers = [
 dependencies = [
   "chython-synplan[racer-default]==1.108",
   "numpy>=2",
+  "pandas>=1.4",
   "onnxruntime>=1.23,<1.24; python_version < '3.11'", # 1.24 has no Python 3.10 wheels.
   "onnxruntime>=1.23; python_version >= '3.11'",
   "tqdm>=4.66",
@@ -40,7 +41,6 @@ curation = [
   "chytorch-synplan>=1.70",
   "chytorch-rxnmap-synplan>=1.7",
   "scipy>=1.10",
-  "pandas>=1.4",
 ]
 training = [
   "torch>=2.6",
@@ -48,7 +48,6 @@ training = [
   "adabelief-pytorch>=0.2.1",
   "pytorch-lightning>=2.3.3,!=2.6.2,!=2.6.3",
   "safetensors>=0.4",
-  "pandas>=1.4",
   "ipykernel>6.29.0",
   "ipywidgets>8.1.0",
   "matplotlib>=3.7",
@@ -56,7 +55,7 @@ training = [
   "onnx>=1.17",
   "onnxscript>=0.5",
 ]
-gui = ["pandas>=1.4", "streamlit>1.35.1", "streamlit-ketcher>=0.0.1"]
+gui = ["streamlit>1.35.1", "streamlit-ketcher>=0.0.1"]
 all = ["SynPlanner[curation,training,gui]"]
 cpu = ["torch>=2.0", "torch-geometric>=2.4.0"]
 cu126 = ["torch>=2.0", "torch-geometric>=2.4.0"]

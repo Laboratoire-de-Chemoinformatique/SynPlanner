@@ -49,7 +49,8 @@ The existing value-network evaluation configuration accepts the exported
 ``.onnx`` path and runs it on CPU without Torch.
 
 ``SynPlanner[curation]`` covers reaction data preparation and neural atom mapping
-with Torch, Chytorch, SciPy, and data tables. ``SynPlanner[training]`` covers model
+with Torch, Chytorch, and SciPy. ChemFrame and pandas analysis are included in the
+base installation. ``SynPlanner[training]`` covers model
 training, notebooks, and ONNX export, including Lightning and AdaBelief.
 ``SynPlanner[gui]`` adds the Streamlit planning interface.
 ``SynPlanner[all]`` includes all three workflows.
