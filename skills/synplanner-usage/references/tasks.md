@@ -52,6 +52,7 @@ The above, then `export_tree_to_json` and `routes_clustering_report`.
 `filter_reactions_from_file` — those two effectively always run as a pair.
 
 **"Use my own reaction data end to end"**
+Install `SynPlanner[curation,training]` (or `SynPlanner[all]`).
 Clean → `extract_rules_from_reactions` → `create_policy_dataset` +
 `run_policy_training` → planning setup with the new rules and policy.
 
@@ -210,6 +211,7 @@ CLI: `synplan download_preset`.
 Docs: `get_started/data_download`, `user_guide/data`
 
 **Clean a reaction dataset**
+Install `SynPlanner[curation]` for the mapping and curation workflow.
 `MappingConfig` + `map_reactions_from_file` (`synplan.chem.reaction.curation.mapping`), then
 `standardize_reactions_from_file`, then `filter_reactions_from_file`.
 CLI: `reaction_mapping` → `reaction_standardizing` → `reaction_filtering`.
@@ -297,7 +299,8 @@ Docs: `user_guide/cli_interface`
 
 ## Training and benchmarking
 
-Training is the one area where a GPU is worth setting up.
+Install `SynPlanner[training]`. Training and reaction mapping benefit from a GPU;
+choose the backend as described in the skill's installation instructions.
 
 **Train a ranking or filtering policy**
 `PolicyNetworkConfig` → `create_policy_dataset` → `run_policy_training`
@@ -321,7 +324,7 @@ Docs: `methods/value`, `configuration/value`
 Docs: `configuration/policy` — "Benchmark recipe".
 
 **Log training runs**
-Optional extras `wandb` / `mlflow` / `loggers`.
+Install the selected backend directly: `pip install wandb` or `pip install mlflow`.
 Docs: `configuration/policy` — "Training logger"
 
 ## Synthons (the Synt-On port)
