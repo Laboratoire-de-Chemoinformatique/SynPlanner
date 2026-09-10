@@ -478,7 +478,7 @@ def build_policy_from_config(
     except ModuleNotFoundError as error:
         if error.name in {"torch", "torch_geometric"}:
             raise ImportError(
-                "Checkpoint inference requires SynPlanner[torch]; use .onnx weights for the base install"
+                "Checkpoint inference requires SynPlanner[cpu] (or a CUDA extra); use .onnx weights for the base install"
             ) from error
         raise
 

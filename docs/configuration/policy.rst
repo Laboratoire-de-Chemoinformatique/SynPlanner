@@ -14,7 +14,7 @@ from a source checkout:
 
 .. code-block:: bash
 
-   uv sync --no-dev --extra cpu --extra onnx-export
+   uv sync --no-dev --extra cpu --extra training
    uv run --no-sync python -m scripts.export_policy_onnx ranking.ckpt ranking.onnx
 
 Use the exported file with the existing policy loader or as ``weights_path``
@@ -29,17 +29,24 @@ in the planning configuration:
 The export handles one molecule per call with variable atom and bond counts.
 Use the same ordered reaction-rule library as the checkpoint. Planning with
 ``.onnx`` weights uses NumPy and ONNX Runtime and does not require Torch.
-The ``onnx-export`` extra is only needed when exporting. For preset entries ending
+The ``training`` extra includes the export tools. For preset entries ending
 in ``.ckpt``, ``download_preset`` checks Hugging Face for a same-name ``.onnx`` file
 in the same folder and downloads it instead when available. Use the returned
 ``paths["ranking_policy"]`` (or the path printed by the CLI). If no ONNX file exists,
-the original checkpoint is downloaded; export it once or install ``SynPlanner[torch]``
+the original checkpoint is downloaded; export it once or install ``SynPlanner[cpu]``
 to use it. Filtering checkpoints are not supported by this exporter.
 
-Training requires ``SynPlanner[training]``; neural atom mapping requires
-``SynPlanner[mapping]``. Notebook tables and plots require ``SynPlanner[notebooks]``,
-and the Streamlit application requires ``SynPlanner[gui]``. The ``cpu``, ``cu126``
-and ``cu128`` extras select a Torch build for optional Torch workflows.
+``SynPlanner[curation]`` covers reaction data preparation and neural atom mapping
+with Torch, Chytorch, SciPy, and data tables. ``SynPlanner[training]`` covers model
+training, notebooks, and ONNX export, including Lightning and AdaBelief.
+``SynPlanner[gui]`` adds the Streamlit planning interface.
+``SynPlanner[all]`` includes all three workflows.
+With ``uv``, combine ``curation``, ``training``, or ``all`` with ``cpu``, ``cu126``,
+or ``cu128`` to select a Torch backend, for example
+``uv sync --no-dev --extra curation --extra cu128`` for GPU mapping or
+``uv sync --no-dev --extra training --extra cu128`` for GPU training.
+Backend indexes are configured
+for ``uv``; ``pip`` users select the Torch build through the PyTorch package index.
 
 Download example configuration
 ------------------------------
@@ -265,14 +272,13 @@ Every backend except ``csv`` needs a package SynPlanner does not depend on:
     ============== ==========================================================
     csv            nothing to install
     tensorboard    ``pip install tensorboard`` (or ``tensorboardX``) — there is no SynPlanner extra for it
-    mlflow         ``SynPlanner[mlflow]`` or ``SynPlanner[loggers]``; with ``uv``: ``uv sync --extra mlflow``
-    wandb          ``SynPlanner[wandb]`` or ``SynPlanner[loggers]``; with ``uv``: ``uv sync --extra wandb``
-    litlogger      ``pip install litlogger`` — there is no ``litlogger`` extra, and ``SynPlanner[loggers]`` covers only mlflow + wandb
+    mlflow         ``pip install mlflow``
+    wandb          ``pip install wandb``
+    litlogger      ``pip install litlogger``
     ============== ==========================================================
 
-The only extras SynPlanner defines for logging are ``mlflow``, ``wandb`` and
-``loggers`` (= mlflow + wandb). ``uv sync --extra litlogger`` and
-``uv sync --extra tensorboard`` both fail with "Extra ... is not defined".
+Install the tracking backend you use directly; SynPlanner does not define
+logger-specific extras. In a ``uv`` project, use ``uv add mlflow`` or ``uv add wandb``.
 
 You can also enable a logger from the command line without editing the YAML file:
 
@@ -349,7 +355,7 @@ for all available parameters.
         dataset: uspto_full
         policy: gps_g
 
-**MLflow logger** (requires ``SynPlanner[mlflow]`` or ``SynPlanner[loggers]``)
+**MLflow logger** (requires ``pip install mlflow``)
 
 Logs to an `MLflow <https://mlflow.org>`_ tracking server. See the
 `MLFlowLogger docs <https://lightning.ai/docs/pytorch/stable/extensions/generated/lightning.pytorch.loggers.MLFlowLogger.html>`_
@@ -372,7 +378,7 @@ for all available parameters.
       tracking_uri: http://localhost:5000
       run_name: gps-embedder-v1
 
-**Weights & Biases logger** (requires ``SynPlanner[wandb]`` or ``SynPlanner[loggers]``)
+**Weights & Biases logger** (requires ``pip install wandb``)
 
 Logs to `Weights & Biases <https://wandb.ai/>`_. See the
 `WandbLogger docs <https://lightning.ai/docs/pytorch/stable/extensions/generated/lightning.pytorch.loggers.WandbLogger.html>`_
