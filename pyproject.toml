@@ -50,6 +50,8 @@ training = [
   "pytorch-lightning>=2.3.3,!=2.6.2,!=2.6.3",
   "torchmetrics>=1.0",
   "safetensors>=0.4",
+  "jupyterlab>=4.5.7",
+  "ipywidgets>8.1.0",
   "matplotlib>=3.7",
   "matplotlib-venn>=1.1",
   "onnx>=1.17",
@@ -69,7 +71,6 @@ dev = [
   "pytest-xdist>=3.6",
   "twine>=6.2.0,<7",
   "ruff>=0.14.4,<0.15",
-  "jupyterlab>=4.5.7",
   "grpcio-tools>=1.78.0",
 ]
 docs = [

@@ -50,12 +50,14 @@ Choose an install for your workflow:
 |---|---|
 | Chemistry, data tables and analysis, and ONNX planning on CPU | `pip install SynPlanner` |
 | Curate reaction data and run atom mapping | `pip install 'SynPlanner[curation]'` |
-| Train models and export ONNX | `pip install 'SynPlanner[training]'` |
+| Train models, use tutorial notebooks, and export ONNX | `pip install 'SynPlanner[training]'` |
 | Streamlit planning interface | `pip install 'SynPlanner[gui]'` |
 | All three workflows | `pip install 'SynPlanner[all]'` |
 | Use existing Torch checkpoints | `pip install 'SynPlanner[cpu]'` |
 
-For notebooks, run `pip install jupyterlab ipywidgets` in the same environment.
+`training` includes JupyterLab and widgets; launch tutorials with `jupyter lab`.
+For tutorials that also prepare reaction data or run atom mapping, install
+`SynPlanner[curation,training]` or `SynPlanner[all]`.
 
 With `uv`, select a Torch backend using `cpu`, `cu126`, or `cu128`, for example
 `uv sync --no-dev --extra training --extra cu128` for CUDA 12.8 training.

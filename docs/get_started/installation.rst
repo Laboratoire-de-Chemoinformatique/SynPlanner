@@ -38,9 +38,11 @@ Use a virtual environment.
 
 The base package includes chemistry tools, ChemFrame/pandas analysis, and CPU
 planning with ONNX weights. Add ``SynPlanner[curation]`` for reaction data
-preparation and atom mapping, ``SynPlanner[training]`` for training and ONNX
+preparation and atom mapping, ``SynPlanner[training]`` for training, tutorial notebooks, and ONNX
 export, ``SynPlanner[gui]`` for Streamlit, or ``SynPlanner[all]`` for all three.
-For notebooks, also run ``pip install jupyterlab ipywidgets``.
+The ``training`` extra includes JupyterLab and widgets; launch tutorials with
+``jupyter lab``. Use ``SynPlanner[curation,training]`` or ``SynPlanner[all]``
+for tutorials that also prepare reaction data or run atom mapping.
 
 Verify:
 
