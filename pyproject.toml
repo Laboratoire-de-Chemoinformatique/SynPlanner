@@ -32,6 +32,7 @@ dependencies = [
   "pyyaml>=6.0",
   "frozendict>=2.4.6",
   "ijson>=3.4.0",
+  "protobuf>=6.0",
 ]
 
 # Optional workflows; the base installation runs ONNX policies on CPU.
@@ -47,9 +48,8 @@ training = [
   "torch-geometric>=2.4.0",
   "adabelief-pytorch>=0.2.1",
   "pytorch-lightning>=2.3.3,!=2.6.2,!=2.6.3",
+  "torchmetrics>=1.0",
   "safetensors>=0.4",
-  "ipykernel>6.29.0",
-  "ipywidgets>8.1.0",
   "matplotlib>=3.7",
   "matplotlib-venn>=1.1",
   "onnx>=1.17",
