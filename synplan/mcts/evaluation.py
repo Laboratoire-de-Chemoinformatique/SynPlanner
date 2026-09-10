@@ -3,6 +3,7 @@
 import random
 from abc import ABC, abstractmethod
 from collections import deque
+from pathlib import Path
 from random import uniform
 from typing import TYPE_CHECKING
 
@@ -359,13 +360,26 @@ class ValueNetworkEvaluationStrategy(EvaluationStrategy):
         :param weights_path: The value network weights file path.
         :param normalize: Whether to normalize scores to [0, 1].
         """
+        self.normalize = normalize
+        self.onnx_session = None
+        if Path(weights_path).suffix == ".onnx":
+            import onnxruntime as ort
+
+            options = ort.SessionOptions()
+            options.intra_op_num_threads = 1
+            self.onnx_session = ort.InferenceSession(
+                str(weights_path), options, providers=["CPUExecutionProvider"]
+            )
+            metadata = self.onnx_session.get_modelmeta().custom_metadata_map
+            if metadata.get("synplan.value") != "value-v1":
+                raise ValueError("Expected a SynPlanner ONNX value network export")
+            return
         from synplan.ml.networks.checkpoint import load_network_from_checkpoint
         from synplan.ml.networks.value import ValueNetwork
 
         self.value_network = load_network_from_checkpoint(
             ValueNetwork, weights_path, map_location="cpu"
         )
-        self.normalize = normalize
 
     def predict_value(self, precursors: list[Precursor]) -> float:
         """Predicts synthesisability for the precursors composed into one molecule.
@@ -373,11 +387,22 @@ class ValueNetworkEvaluationStrategy(EvaluationStrategy):
         :param precursors: The list of precursors.
         :return: The predicted float value ("synthesisability") of the node.
         """
+        molecule = compose_precursors(precursors=precursors, exclude_small=True)
+        if self.onnx_session is not None:
+            from synplan.ml.featurization.molecules import mol_to_numpy
+
+            arrays = mol_to_numpy(molecule)
+            if arrays is None:
+                return -1e6
+            inputs = {
+                item.name: arrays[item.name] for item in self.onnx_session.get_inputs()
+            }
+            return self.onnx_session.run(["value"], inputs)[0].item()
+
         import torch
 
         from synplan.ml.featurization.molecules import mol_to_pyg
 
-        molecule = compose_precursors(precursors=precursors, exclude_small=True)
         pyg_graph = mol_to_pyg(molecule)
         if pyg_graph:
             with torch.no_grad():

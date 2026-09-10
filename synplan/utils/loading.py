@@ -459,17 +459,20 @@ def load_value_net(
 def build_policy_from_config(
     policy_config: "PolicyNetworkConfig",
 ) -> "TemplateBasedPolicy":
-    """Build a template policy from a Torch checkpoint or ONNX ranking export."""
+    """Build a template policy from a Torch checkpoint or ONNX policy export."""
     if Path(policy_config.weights_path).suffix == ".onnx":
         from synplan.mcts.policy.onnx import OnnxPolicy
 
-        if policy_config.policy_type != "ranking":
-            raise ValueError("ONNX policies currently support ranking only")
-        return OnnxPolicy(
+        policy = OnnxPolicy(
             policy_config.weights_path,
             top_rules=policy_config.top_rules,
             rule_prob_threshold=policy_config.rule_prob_threshold,
         )
+        if policy.policy_net.policy_type != policy_config.policy_type:
+            raise ValueError(
+                "ONNX policy type does not match the configured policy_type"
+            )
+        return policy
 
     from synplan.mcts.policy import LinearPolicy, MHNReactPolicy
 

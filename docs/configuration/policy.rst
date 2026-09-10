@@ -6,10 +6,10 @@ Policy network
 
 The ranking or filtering policy network architecture and training hyperparameters can be adjusted in the training configuration file.
 
-ONNX ranking inference on CPU
------------------------------
+ONNX inference on CPU
+---------------------
 
-The base installation includes CPU ONNX inference. Install the optional export tools, then export a ranking checkpoint
+The base installation includes CPU ONNX inference. Install the optional export tools, then export a ranking or filtering checkpoint
 from a source checkout:
 
 .. code-block:: bash
@@ -34,7 +34,19 @@ in ``.ckpt``, ``download_preset`` checks Hugging Face for a same-name ``.onnx`` 
 in the same folder and downloads it instead when available. Use the returned
 ``paths["ranking_policy"]`` (or the path printed by the CLI). If no ONNX file exists,
 the original checkpoint is downloaded; export it once or install ``SynPlanner[cpu]``
-to use it. Filtering checkpoints are not supported by this exporter.
+to use it. Filtering exports retain both rule and priority heads; load them with
+``policy_type="filtering"`` and their original ordered rule library. The legacy
+article filtering model is incompatible with the GPS rule library. MHN models
+are not supported by this exporter.
+
+To export a value network, pass ``--value``:
+
+.. code-block:: bash
+
+   uv run --no-sync python -m scripts.export_policy_onnx value_network.ckpt value_network.onnx --value
+
+The existing value-network evaluation configuration accepts the exported
+``.onnx`` path and runs it on CPU without Torch.
 
 ``SynPlanner[curation]`` covers reaction data preparation and neural atom mapping
 with Torch, Chytorch, SciPy, and data tables. ``SynPlanner[training]`` covers model

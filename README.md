@@ -43,7 +43,7 @@ pip install SynPlanner
 synplan --version
 ```
 
-The base install provides chemistry tools and CPU planning with ONNX ranking models.
+The base install provides chemistry tools and CPU planning with ONNX policies and value networks.
 Choose an install for your workflow:
 
 | Workflow | Install |
