@@ -77,7 +77,9 @@ synplan planning \
   --results_dir planning_results
 ```
 
-Paths above are what `synplanner-gps-mcule-molport` writes — the download command prints each one.
+The download command prints each path. If a same-name `.onnx` file exists beside a
+checkpoint on Hugging Face, it downloads that file instead; use the printed
+`ranking_policy` path for `--policy_network`. ONNX planning needs only the base install.
 
 > [!TIP]
 > **Every tutorial runs in your browser.** Open the

@@ -15,7 +15,7 @@ from chython import smarts as smarts_parser
 from chython.containers import ReactionContainer
 from chython.files.daylight.tokenize import smarts_tokenize
 from chython.reactor.reactor import Reactor
-from huggingface_hub import hf_hub_download, snapshot_download
+from huggingface_hub import file_exists, hf_hub_download, snapshot_download
 
 from synplan.chem.building_blocks.io import load_building_blocks as load_building_blocks
 from synplan.chem.reaction import CanonicalRetroReactor
@@ -146,7 +146,8 @@ def download_preset(
 
     The preset YAML lists explicit file paths under a ``files:`` key.
     Each file is downloaded into the ``save_to`` directory, preserving
-    the repository folder structure.
+    the repository folder structure. For ``.ckpt`` entries, a same-name
+    ``.onnx`` file in the same remote folder is preferred when available.
 
     :param preset_name: Name of the preset (e.g. ``"synplanner-gps-mcule-molport"``).
     :param save_to: Local directory to save downloaded files.
@@ -173,6 +174,10 @@ def download_preset(
     result: dict[str, Path] = {}
     for key, repo_path in preset.get("files", {}).items():
         parts = PurePosixPath(repo_path)
+        if parts.suffix == ".ckpt" and file_exists(
+            repo_id=repo, filename=str(parts.with_suffix(".onnx"))
+        ):
+            parts = parts.with_suffix(".onnx")
         local_path = Path(
             hf_hub_download(
                 repo_id=repo,

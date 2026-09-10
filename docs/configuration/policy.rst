@@ -29,9 +29,12 @@ in the planning configuration:
 The export handles one molecule per call with variable atom and bond counts.
 Use the same ordered reaction-rule library as the checkpoint. Planning with
 ``.onnx`` weights uses NumPy and ONNX Runtime and does not require Torch.
-The ``onnx-export`` extra is only needed when exporting. Existing downloaded
-presets contain ``.ckpt`` weights: export them once, or install ``SynPlanner[torch]``
-to keep using those checkpoints. Filtering checkpoints are not supported by this exporter.
+The ``onnx-export`` extra is only needed when exporting. For preset entries ending
+in ``.ckpt``, ``download_preset`` checks Hugging Face for a same-name ``.onnx`` file
+in the same folder and downloads it instead when available. Use the returned
+``paths["ranking_policy"]`` (or the path printed by the CLI). If no ONNX file exists,
+the original checkpoint is downloaded; export it once or install ``SynPlanner[torch]``
+to use it. Filtering checkpoints are not supported by this exporter.
 
 Training requires ``SynPlanner[training]``; neural atom mapping requires
 ``SynPlanner[mapping]``. Notebook tables and plots require ``SynPlanner[notebooks]``,
