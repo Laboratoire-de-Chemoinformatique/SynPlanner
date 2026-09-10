@@ -6,8 +6,6 @@ import base64
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from IPython.display import HTML, display
-
 from synplan.chem.reaction.routes.io import make_dict
 from synplan.chem.reaction.routes.representation.depiction import (
     _temporary_render_config,
@@ -425,6 +423,8 @@ def lg_table_2_html(subcluster, routes_to_display=None, if_display=True):
     html += "</table>"
 
     if if_display:
+        from IPython.display import HTML, display
+
         display(HTML(html))
 
     return html
@@ -468,6 +468,8 @@ def supporting_table_2_html(subcluster, routes_to_display=None, if_display=True)
     html += "</table>"
 
     if if_display:
+        from IPython.display import HTML, display
+
         display(HTML(html))
 
     return html
@@ -560,6 +562,8 @@ def group_lg_table_2_html_fixed(
     html.append("</tbody></table>")
     out = "".join(html)
     if if_display:
+        from IPython.display import HTML, display
+
         display(HTML(out))
 
     return out

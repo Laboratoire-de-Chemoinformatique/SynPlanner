@@ -1,6 +1,7 @@
 from click.testing import CliRunner
 
 import synplan.interfaces.cli as cli
+import synplan.ml.training.supervised as supervised
 
 
 def test_synplan_help():
@@ -91,8 +92,8 @@ def test_ranking_policy_training_cli_accepts_litlogger(monkeypatch):
         observed["config"] = config
         observed["results_path"] = results_path
 
-    monkeypatch.setattr(cli, "create_policy_dataset", fake_create_policy_dataset)
-    monkeypatch.setattr(cli, "run_policy_training", fake_run_policy_training)
+    monkeypatch.setattr(supervised, "create_policy_dataset", fake_create_policy_dataset)
+    monkeypatch.setattr(supervised, "run_policy_training", fake_run_policy_training)
 
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -130,14 +131,14 @@ def test_ranking_policy_training_cli_accepts_litlogger(monkeypatch):
 def test_mhn_ranking_policy_training_cli_uses_policy_data_only(monkeypatch):
     observed = {}
 
-    monkeypatch.setattr(cli, "create_policy_dataset", lambda **_kwargs: object())
+    monkeypatch.setattr(supervised, "create_policy_dataset", lambda **_kwargs: object())
 
     def fake_run_policy_training(datamodule, *, config, results_path):
         observed["datamodule"] = datamodule
         observed["config"] = config
         observed["results_path"] = results_path
 
-    monkeypatch.setattr(cli, "run_policy_training", fake_run_policy_training)
+    monkeypatch.setattr(supervised, "run_policy_training", fake_run_policy_training)
 
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -167,7 +168,9 @@ def test_mhn_network_tuning_cli_passes_checkpoint_and_new_policy_data(monkeypatc
     def fake_run_mhn_network_tuning(**kwargs):
         observed.update(kwargs)
 
-    monkeypatch.setattr(cli, "run_mhn_network_tuning", fake_run_mhn_network_tuning)
+    monkeypatch.setattr(
+        supervised, "run_mhn_network_tuning", fake_run_mhn_network_tuning
+    )
 
     runner = CliRunner()
     with runner.isolated_filesystem():

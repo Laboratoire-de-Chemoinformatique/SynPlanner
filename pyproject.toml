@@ -20,36 +20,40 @@ classifiers = [
 
 dependencies = [
   "chython-synplan[racer-default]==1.108",
-  "chytorch-synplan>=1.70",
-  "chytorch-rxnmap-synplan>=1.7",
   "numpy>=2",
-  "pandas>=1.4",
-  "toytree>=2.0",
+  "onnxruntime>=1.23",
+  "tqdm>=4.66",
   "click>=8.0.0",
   "huggingface-hub>=0.24.0",
-  "adabelief-pytorch>=0.2.1",
-  "torch-geometric>=2.4.0",
-  "pytorch-lightning>=2.3.3,!=2.6.2,!=2.6.3",
-  "ipykernel>6.29.0",
-  "ipywidgets>8.1.0",
-  "streamlit>1.35.1",
-  "streamlit-ketcher>=0.0.1",
   "rdkit>=2023.9.1",
-  "matplotlib>=3.7",
-  "matplotlib-venn>=1.1",
   "pydantic>=2.0",
   "pyyaml>=6.0",
-  "safetensors>=0.4",
-  "protobuf>=6.0",
   "frozendict>=2.4.6",
   "ijson>=3.4.0",
 ]
 
-# Extras to select PyTorch variant - required for uv users
+# Optional workflows; the base installation runs ONNX policies on CPU.
 [project.optional-dependencies]
-cpu = ["torch>=2.0"]
-cu126 = ["torch>=2.0"]
-cu128 = ["torch>=2.0"]
+torch = ["torch>=2.0", "torch-geometric>=2.4.0"]
+training = [
+  "SynPlanner[torch]",
+  "adabelief-pytorch>=0.2.1",
+  "pytorch-lightning>=2.3.3,!=2.6.2,!=2.6.3",
+  "safetensors>=0.4",
+]
+mapping = ["chytorch-synplan>=1.70", "chytorch-rxnmap-synplan>=1.7", "scipy>=1.10"]
+notebooks = [
+  "pandas>=1.4",
+  "ipykernel>6.29.0",
+  "ipywidgets>8.1.0",
+  "matplotlib>=3.7",
+  "matplotlib-venn>=1.1",
+]
+gui = ["pandas>=1.4", "streamlit>1.35.1", "streamlit-ketcher>=0.0.1"]
+onnx-export = ["SynPlanner[torch]", "torch>=2.6", "onnx>=1.17", "onnxscript>=0.5"]
+cpu = ["SynPlanner[torch]", "torch>=2.0"]
+cu126 = ["SynPlanner[torch]", "torch>=2.0"]
+cu128 = ["SynPlanner[torch]", "torch>=2.0"]
 wandb = ["wandb>=0.17"]
 mlflow = ["mlflow>=2"]
 loggers = [
@@ -59,6 +63,7 @@ loggers = [
 
 [dependency-groups]
 dev = [
+  "SynPlanner[training,mapping,notebooks,onnx-export]",
   "pytest>=9.0.3",
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",

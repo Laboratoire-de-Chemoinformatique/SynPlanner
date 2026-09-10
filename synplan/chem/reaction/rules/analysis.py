@@ -4,7 +4,6 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 
-import pandas as pd
 from chython import smarts
 from chython.containers.reaction import ReactionContainer
 from chython.exceptions import IncorrectSmiles
@@ -151,6 +150,8 @@ class RuleSet:
         :return: ChemFrame with columns: rule, smarts, popularity, n_reactions.
             Use ``.df`` for the plain frame, rule objects intact.
         """
+        import pandas as pd
+
         for rule in self.rules:
             rule.clean2d()
 

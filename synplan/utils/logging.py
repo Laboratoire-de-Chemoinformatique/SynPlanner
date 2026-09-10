@@ -8,8 +8,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from IPython import get_ipython
-
 # --------------------------------------------------------------------------- #
 #                               Helper classes                                #
 # --------------------------------------------------------------------------- #
@@ -43,6 +41,11 @@ class HiddenPrints:
 
 
 def _in_notebook() -> bool:
+    try:
+        from IPython import get_ipython
+    except ImportError:
+        return False
+
     ip = get_ipython()
     return bool(ip) and ip.__class__.__name__ == "ZMQInteractiveShell"
 

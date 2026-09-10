@@ -454,9 +454,28 @@ def load_value_net(
 def build_policy_from_config(
     policy_config: "PolicyNetworkConfig",
 ) -> "TemplateBasedPolicy":
-    """Build a :class:`TemplateBasedPolicy` matching a checkpoint architecture."""
+    """Build a template policy from a Torch checkpoint or ONNX ranking export."""
+    if Path(policy_config.weights_path).suffix == ".onnx":
+        from synplan.mcts.policy.onnx import OnnxPolicy
+
+        if policy_config.policy_type != "ranking":
+            raise ValueError("ONNX policies currently support ranking only")
+        return OnnxPolicy(
+            policy_config.weights_path,
+            top_rules=policy_config.top_rules,
+            rule_prob_threshold=policy_config.rule_prob_threshold,
+        )
+
     from synplan.mcts.policy import LinearPolicy, MHNReactPolicy
-    from synplan.ml.networks.checkpoint import load_policy_network_from_checkpoint
+
+    try:
+        from synplan.ml.networks.checkpoint import load_policy_network_from_checkpoint
+    except ModuleNotFoundError as error:
+        if error.name in {"torch", "torch_geometric"}:
+            raise ImportError(
+                "Checkpoint inference requires SynPlanner[torch]; use .onnx weights for the base install"
+            ) from error
+        raise
 
     policy_net = load_policy_network_from_checkpoint(
         policy_config.weights_path, batch_size=1, dropout=0

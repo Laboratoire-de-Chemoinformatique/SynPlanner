@@ -6,16 +6,11 @@ from collections import deque
 from random import uniform
 from typing import TYPE_CHECKING
 
-import torch
-
 from synplan.chem import building_blocks as building_block_types
 from synplan.chem.precursor import Precursor, compose_precursors
 from synplan.chem.rdkit_utils import RDKitScore
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
 from synplan.chem.stereo import has_stereo, has_stereo_groups
-from synplan.ml.networks.checkpoint import load_network_from_checkpoint
-from synplan.ml.networks.value import ValueNetwork
-from synplan.ml.training import mol_to_pyg
 
 if TYPE_CHECKING:
     from synplan.mcts.node import Node
@@ -364,6 +359,9 @@ class ValueNetworkEvaluationStrategy(EvaluationStrategy):
         :param weights_path: The value network weights file path.
         :param normalize: Whether to normalize scores to [0, 1].
         """
+        from synplan.ml.networks.checkpoint import load_network_from_checkpoint
+        from synplan.ml.networks.value import ValueNetwork
+
         self.value_network = load_network_from_checkpoint(
             ValueNetwork, weights_path, map_location="cpu"
         )
@@ -375,6 +373,10 @@ class ValueNetworkEvaluationStrategy(EvaluationStrategy):
         :param precursors: The list of precursors.
         :return: The predicted float value ("synthesisability") of the node.
         """
+        import torch
+
+        from synplan.ml.featurization.molecules import mol_to_pyg
+
         molecule = compose_precursors(precursors=precursors, exclude_small=True)
         pyg_graph = mol_to_pyg(molecule)
         if pyg_graph:

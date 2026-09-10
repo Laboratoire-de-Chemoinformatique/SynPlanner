@@ -5,6 +5,7 @@ from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    import numpy as np
     import torch
 
     from synplan.chem.precursor import Precursor
@@ -55,7 +56,7 @@ class Policy(ABC):
         """
         raise NotImplementedError
 
-    def get_probs(self, precursor: "Precursor") -> "torch.Tensor | None":
+    def get_probs(self, precursor: "Precursor") -> "torch.Tensor | np.ndarray | None":
         """Return the per-rule probability tensor, or ``None`` on failure.
 
         :param precursor: The current precursor.
@@ -64,7 +65,7 @@ class Policy(ABC):
         """
         raise NotImplementedError
 
-    def get_logits(self, precursor: "Precursor") -> "torch.Tensor | None":
+    def get_logits(self, precursor: "Precursor") -> "torch.Tensor | np.ndarray | None":
         """Return the raw per-rule logits tensor, or ``None`` on failure.
 
         :param precursor: The current precursor.

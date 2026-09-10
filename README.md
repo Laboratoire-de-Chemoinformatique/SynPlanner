@@ -43,11 +43,18 @@ pip install SynPlanner
 synplan --version
 ```
 
+The base install provides chemistry tools and CPU planning with ONNX ranking models.
+Torch checkpoint inference, training, atom mapping, notebooks and the GUI are optional:
+`SynPlanner[torch]`, `SynPlanner[training]`, `SynPlanner[mapping]`,
+`SynPlanner[notebooks]`, and `SynPlanner[gui]`.
+See [ONNX export and inference](docs/configuration/policy.rst) to convert existing ranking checkpoints.
+
 ## Quick start
 
-**1.** Download pre-trained models, rules, and building blocks:
+**1.** Install Torch support for the existing published checkpoint presets, then download models, rules, and building blocks:
 
 ```bash
+pip install 'SynPlanner[torch]'
 synplan download_preset --preset synplanner-gps-mcule-molport --save_to synplan_data
 ```
 

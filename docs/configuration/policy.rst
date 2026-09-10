@@ -6,6 +6,38 @@ Policy network
 
 The ranking or filtering policy network architecture and training hyperparameters can be adjusted in the training configuration file.
 
+ONNX ranking inference on CPU
+-----------------------------
+
+The base installation includes CPU ONNX inference. Install the optional export tools, then export a ranking checkpoint
+from a source checkout:
+
+.. code-block:: bash
+
+   uv sync --no-dev --extra cpu --extra onnx-export
+   uv run --no-sync python -m scripts.export_policy_onnx ranking.ckpt ranking.onnx
+
+Use the exported file with the existing policy loader or as ``weights_path``
+in the planning configuration:
+
+.. code-block:: python
+
+   from synplan.utils.loading import load_policy_function
+
+   policy = load_policy_function(weights_path="ranking.onnx", top_rules=50)
+
+The export handles one molecule per call with variable atom and bond counts.
+Use the same ordered reaction-rule library as the checkpoint. Planning with
+``.onnx`` weights uses NumPy and ONNX Runtime and does not require Torch.
+The ``onnx-export`` extra is only needed when exporting. Existing downloaded
+presets contain ``.ckpt`` weights: export them once, or install ``SynPlanner[torch]``
+to keep using those checkpoints. Filtering checkpoints are not supported by this exporter.
+
+Training requires ``SynPlanner[training]``; neural atom mapping requires
+``SynPlanner[mapping]``. Notebook tables and plots require ``SynPlanner[notebooks]``,
+and the Streamlit application requires ``SynPlanner[gui]``. The ``cpu``, ``cu126``
+and ``cu128`` extras select a Torch build for optional Torch workflows.
+
 Download example configuration
 ------------------------------
 

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from html import escape
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
-import pandas as pd
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 def depict_value(value: Any) -> str:
@@ -47,6 +48,8 @@ class ChemFrame:
         data: pd.DataFrame | Iterable[Mapping[str, Any]],
         depict_columns: Iterable[str] | None = None,
     ) -> None:
+        import pandas as pd
+
         self._df = data if isinstance(data, pd.DataFrame) else pd.DataFrame(list(data))
         if depict_columns is not None:
             self.depict_columns = tuple(depict_columns)
@@ -93,6 +96,8 @@ class ChemFrame:
         return repr(self._df)
 
     def _rewrap(self, value: Any) -> Any:
+        import pandas as pd
+
         if isinstance(value, pd.DataFrame):
             return type(self)(value, self.depict_columns)
         return value
@@ -107,6 +112,8 @@ def tree_stats_frame(trees: Any) -> pd.DataFrame:
     :param trees: One tree, an iterable of trees, or an ordered ``run name -> tree`` mapping.
     :return: A frame indexed by run name — the mapping keys, or positions otherwise.
     """
+    import pandas as pd
+
     if hasattr(trees, "to_stats_dict"):
         trees = [trees]
     items = (
