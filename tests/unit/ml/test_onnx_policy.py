@@ -104,7 +104,12 @@ def test_onnx_policy_roundtrip(tmp_path, monkeypatch, embedder, policy_type):
             atol=1e-6,
         )
         for coef in (0.0, 1.0):
-            policy.priority_rules_fraction = reference.priority_rules_fraction = coef
+            policy = load_policy_function(
+                weights_path=output,
+                policy_type=policy_type,
+                priority_rules_fraction=coef,
+            )
+            reference.priority_rules_fraction = coef
             np.testing.assert_allclose(
                 policy.get_probs(precursor),
                 reference.get_probs(precursor).numpy(),

@@ -467,6 +467,7 @@ def build_policy_from_config(
             policy_config.weights_path,
             top_rules=policy_config.top_rules,
             rule_prob_threshold=policy_config.rule_prob_threshold,
+            priority_rules_fraction=policy_config.priority_rules_fraction,
         )
         if policy.policy_net.policy_type != policy_config.policy_type:
             raise ValueError(

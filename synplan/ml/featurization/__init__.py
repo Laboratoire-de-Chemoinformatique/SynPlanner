@@ -1,21 +1,27 @@
-"""Torch featurization layer turning chython rules and molecules into tensors and PyG ``Data``."""
+"""Molecular NumPy features and optional Torch/PyG featurization."""
 
 from synplan.ml.featurization.molecules import (
     MENDEL_INFO,
+    atom_features,
     atom_to_vector,
+    bond_features,
     bonds_to_vector,
     mol_to_matrix,
     mol_to_numpy,
     mol_to_pyg,
+    molecule_features,
 )
 
 __all__ = [
     "MENDEL_INFO",
+    "atom_features",
     "atom_to_vector",
+    "bond_features",
     "bonds_to_vector",
     "mol_to_matrix",
     "mol_to_numpy",
     "mol_to_pyg",
+    "molecule_features",
     "query_cgr_graph_from_rule_query",
     "query_cgr_graphs_from_smarts",
     "query_cgr_to_pyg",

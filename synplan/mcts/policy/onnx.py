@@ -12,7 +12,14 @@ from synplan.ml.featurization.molecules import mol_to_numpy
 class OnnxPolicy(TemplateBasedPolicy):
     """Run an exported ranking or filtering model on CPU without Torch."""
 
-    def __init__(self, path, *, top_rules=50, rule_prob_threshold=0.0):
+    def __init__(
+        self,
+        path,
+        *,
+        top_rules=50,
+        rule_prob_threshold=0.0,
+        priority_rules_fraction=0.5,
+    ):
         import onnxruntime as ort
 
         options = ort.SessionOptions()
@@ -36,7 +43,7 @@ class OnnxPolicy(TemplateBasedPolicy):
         )
         self.top_rules = top_rules
         self.rule_prob_threshold = rule_prob_threshold
-        self.priority_rules_fraction = 0.5
+        self.priority_rules_fraction = priority_rules_fraction
         self._proposal_cache = OrderedDict()
 
     def _predict(self, precursor, outputs):

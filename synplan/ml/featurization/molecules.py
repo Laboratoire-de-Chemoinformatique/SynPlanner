@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 from chython.containers import MoleculeContainer
@@ -13,30 +13,9 @@ if TYPE_CHECKING:
     from torch_geometric.data import Data
 
 
-def atom_to_vector(atom: Any) -> Tensor:
-    """Given an atom, return a vector of length 8 with the following
-    information:
-
-    1. Atomic number
-    2. Period
-    3. Group
-    4. Number of electrons + atom's charge
-    5. Shell
-    6. Total number of hydrogens
-    7. Whether the atom is in a ring
-    8. Number of neighbors
-
-    :param atom: The atom object.
-
-    :return: The vector of the atom.
-    """
-    import torch
-
-    return torch.tensor(_atom_features(atom), dtype=torch.uint8)
-
-
-def _atom_features(atom):
-    vector = [0] * 8
+def atom_features(atom) -> np.ndarray:
+    """Return the eight atomic descriptors shared by inference and training."""
+    vector = np.zeros(8, dtype=np.uint8)
     period, group, shell, electrons = MENDEL_INFO[atom.atomic_symbol]
     vector[0] = atom.atomic_number
     vector[1] = period
@@ -49,27 +28,36 @@ def _atom_features(atom):
     return vector
 
 
-def bonds_to_vector(molecule: MoleculeContainer, atom_ind: int) -> Tensor:
-    """Takes a molecule and an atom index as input, and returns a vector representing
-    the bond orders of the atom's bonds.
-
-    :param molecule: The given molecule.
-    :param atom_ind: The index of the atom in the molecule to be converted to the bond
-        vector.
-    :return: The torch tensor of size 3, with each element representing the order of
-        bonds connected to the atom with the given index in the molecule.
-    """
-
-    import torch
-
-    return torch.tensor(_bond_features(molecule, atom_ind), dtype=torch.uint8)
-
-
-def _bond_features(molecule, atom_ind):
-    vector = [0] * 3
+def bond_features(molecule: MoleculeContainer, atom_ind: int) -> np.ndarray:
+    """Count single, double and triple bonds adjacent to an atom."""
+    vector = np.zeros(3, dtype=np.uint8)
     for _, b_order in molecule.bond_items(atom_ind):
         vector[int(b_order) - 1] += 1
     return vector
+
+
+def molecule_features(molecule: MoleculeContainer) -> np.ndarray:
+    """Return the 11 features per atom for a molecule numbered from one."""
+    atoms_vectors = np.zeros((len(molecule), 11), dtype=np.uint8)
+    for n, atom in molecule.atoms():
+        atoms_vectors[n - 1][:8] = atom_features(atom)
+        atoms_vectors[n - 1][8:] = bond_features(molecule, n)
+
+    return atoms_vectors
+
+
+def atom_to_vector(atom) -> Tensor:
+    """Return atomic descriptors as a Torch tensor (legacy public API)."""
+    import torch
+
+    return torch.from_numpy(atom_features(atom))
+
+
+def bonds_to_vector(molecule: MoleculeContainer, atom_ind: int) -> Tensor:
+    """Return bond counts as a Torch tensor (legacy public API)."""
+    import torch
+
+    return torch.from_numpy(bond_features(molecule, atom_ind))
 
 
 def mol_to_matrix(molecule: MoleculeContainer) -> Tensor:
@@ -82,17 +70,7 @@ def mol_to_matrix(molecule: MoleculeContainer) -> Tensor:
 
     import torch
 
-    return torch.from_numpy(_mol_matrix(molecule))
-
-
-def _mol_matrix(molecule):
-    atoms_vectors = np.zeros((len(molecule), 11), dtype=np.uint8)
-    for n, atom in molecule.atoms():
-        atoms_vectors[n - 1][:8] = _atom_features(atom)
-    for n, _ in molecule.atoms():
-        atoms_vectors[n - 1][8:] = _bond_features(molecule, n)
-
-    return atoms_vectors
+    return torch.from_numpy(molecule_features(molecule))
 
 
 def mol_to_pyg(molecule: MoleculeContainer, canonicalize: bool = True) -> Data | None:
@@ -153,7 +131,7 @@ def mol_to_numpy(molecule: MoleculeContainer, canonicalize: bool = True) -> dict
     edge_index = np.asarray(edge_index, dtype=np.int64)
     order = np.lexsort((edge_index[:, 1], edge_index[:, 0]))
     return {
-        "x": _mol_matrix(tmp_molecule),
+        "x": molecule_features(tmp_molecule),
         "edge_index": np.ascontiguousarray(edge_index[order].T),
         "edge_attr": np.asarray(edge_attr, dtype=np.float32)[order],
     }
@@ -216,9 +194,12 @@ MENDEL_INFO = {
 
 __all__ = [
     "MENDEL_INFO",
+    "atom_features",
     "atom_to_vector",
+    "bond_features",
     "bonds_to_vector",
     "mol_to_matrix",
     "mol_to_numpy",
     "mol_to_pyg",
+    "molecule_features",
 ]

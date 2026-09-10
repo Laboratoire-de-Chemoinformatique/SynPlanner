@@ -305,3 +305,21 @@ def test_select_nmcs_path_greedy_policy_and_random_on_real_tree():
     assert len(seq_r) == 1
     assert seq_r[0] in list(tree.children[1])
     assert last_rnd in list(tree.children[1])
+
+
+def test_extract_routes_preserves_unsolved_target():
+    from synplan.utils.visualisation import extract_routes
+
+    tree = build_tree("breadth_first", [])
+    tree.run()
+    assert not tree.winning_nodes
+    expected = [
+        {
+            "type": "mol",
+            "smiles": str(tree.nodes[1].curr_precursor.molecule),
+            "in_stock": False,
+            "children": [],
+        }
+    ]
+    assert extract_routes(tree) == expected
+    assert extract_routes(tree, extended=True, min_mol_size=100) == expected

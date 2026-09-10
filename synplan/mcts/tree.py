@@ -216,6 +216,8 @@ class Tree:
             )
             self._building_block_bucket_count: int | None = len(building_blocks)
         else:
+            # ponytail: CLI stock is already normalized, but direct Tree callers need
+            # this. Reusing prepared stock would avoid reparsing it for every target.
             self.building_blocks = (
                 frozenset(str(smiles(s, ignore_stereo=True)) for s in building_blocks)
                 if config.stereo_mode == "off"
@@ -274,6 +276,7 @@ class Tree:
                 )
 
         if rollout is not None:
+            # Rollouts must use the same normalized stock, rules and stereo mode as the tree.
             rollout.building_blocks = self.building_blocks
             rollout.reaction_rules = self.reaction_rules
             rollout.match_stereo = config.stereo_mode != "off"
