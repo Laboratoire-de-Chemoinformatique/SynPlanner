@@ -127,6 +127,8 @@ class Node:
 
     @property
     def stereo_status(self) -> str:
+        if getattr(self, "stereo_summary", {}).get("search_mode") == "off":
+            return "not_assessed"
         if self.stereo_obligations:
             return (
                 "could_not_be_assessed"

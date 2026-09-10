@@ -26,7 +26,13 @@ from synplan.chem.reaction.routes.traversal import (
     steps_by_product,
 )
 from synplan.chem.utils import mapped_smiles, molecule_key
-from synplan.utils.routedraw import ARROW_DEFS, ROUTE_CSS, Layouts, draw_route
+from synplan.utils.routedraw import (
+    ARROW_DEFS,
+    ROUTE_CSS,
+    Layouts,
+    Prices,
+    draw_route,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Sequence
@@ -236,6 +242,8 @@ class Route:
                 has_stereo(m) for s in route for m in s.reaction.molecules()
             ):
                 status = "fulfilled"
+            if getattr(getattr(tree, "config", None), "stereo_mode", None) == "off":
+                status = "not_assessed"
             route = replace(
                 route,
                 stereo=route_stereo_summary(
@@ -245,6 +253,9 @@ class Route:
                     obligations=getattr(node, "stereo_obligations", ()),
                 ),
             )
+        if getattr(getattr(tree, "config", None), "stereo_mode", None) == "off":
+            route.stereo["search_mode"] = "off"
+            route.stereo["basis"] = "connectivity_only"
         return route
 
     @classmethod
@@ -328,7 +339,13 @@ class Route:
             return not self.unresolved and not any(
                 has_stereo(m) for s in self.steps for m in s.reaction.molecules()
             )
-        return not self.unresolved and self.stereo_status == "fulfilled"
+        return not self.unresolved and (
+            self.stereo_status == "fulfilled"
+            or (
+                self.stereo_status == "not_assessed"
+                and self.stereo.get("search_mode") == "off"
+            )
+        )
 
     @property
     def connectivity_solved(self) -> bool:
@@ -390,25 +407,35 @@ class Route:
         for leaf_key, (leaf, equivalents) in grouped.items():
             leaf_smiles = str(leaf)
             molecular_weight = float(leaf.molecular_mass)
-            from synplan.chem.building_blocks.stereo import compatible_records
+            from synplan.chem.building_blocks.stereo import (
+                compatible_records,
+                matches_selected,
+            )
 
             diagnostics = []
             candidates = compatible_records(
-                leaf, building_blocks, inchikey=leaf_key, diagnostics=diagnostics
+                leaf,
+                building_blocks,
+                inchikey=leaf_key,
+                diagnostics=diagnostics,
+                match_stereo=(self.stereo or {}).get("search_mode") != "off",
             )
             selected = leaf.meta.get("selected_stock")
             if selected:
                 candidates = tuple(
-                    c
-                    for c in candidates
-                    if c.inchikey == selected["inchikey"]
-                    and c.smiles == selected["smiles"]
+                    c for c in candidates if matches_selected(c, selected)
                 )
             offer = min(
                 (
-                    (price, vendor, block.inchikey, block.smiles)
+                    (
+                        float(source["ppg"]),
+                        source["vendor"],
+                        block.inchikey,
+                        block.smiles,
+                    )
                     for block in candidates
-                    for vendor, price in block.vendors.items()
+                    for source in block.sources
+                    if source.get("ppg")
                 ),
                 default=None,
             )
@@ -506,7 +533,11 @@ class Route:
     # ------------------------------------------------------------------
 
     def svg(
-        self, align: bool = True, standalone: bool = True, layouts: Layouts = None
+        self,
+        align: bool = True,
+        standalone: bool = True,
+        layouts: Layouts = None,
+        prices: Prices = None,
     ) -> str:
         """Draw the route as an SVG.
 
@@ -515,9 +546,10 @@ class Route:
         :param align: Give every precursor its product's orientation.
         :param standalone: Inline ``ROUTE_CSS`` and ``ARROW_DEFS``. Turn it off
             for a page that carries one copy of both itself.
-        :param layouts: A dict shared with the other routes of the same page, so a
-            molecule two routes have in common is drawn the same way in both.
-            Shared geometry takes precedence over alignment to each route parent.
+        :param layouts: Shared base geometries, keeping targets consistent across
+            cards. Precursor copies align to their own product when ``align=True``.
+        :param prices: Pill label and click payload per leaf id, drawn under the
+            leaf's box. See :func:`~synplan.utils.routedraw.draw_route`.
         """
 
         unresolved: tuple[MoleculeContainer, ...] = ()
@@ -525,7 +557,9 @@ class Route:
             unresolved = tuple(
                 leaf for leaf in self.leaves() if molecule_key(leaf) in self.unresolved
             )
-        svg = draw_route(self.steps, unresolved, align=align, layouts=layouts)
+        svg = draw_route(
+            self.steps, unresolved, align=align, layouts=layouts, prices=prices
+        )
         if not standalone:
             return svg
         head = svg.index(">") + 1

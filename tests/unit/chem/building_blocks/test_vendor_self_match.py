@@ -81,7 +81,9 @@ def test_real_vendor_records_remain_purchasable_or_are_reported(prepared_catalog
             for records in (bucket, tuple(reversed(bucket))):
                 assert query.is_purchasable(frozendict({row["key"][:14]: records}))
         if row["line"] == 122415:
-            assert query.selected_stock["vendors"] == {
+            assert {
+                s["vendor"]: float(s["ppg"]) for s in query.selected_stock["sources"]
+            } == {
                 "example_A": 10.0,
                 "example_B": 20.0,
             }

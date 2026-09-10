@@ -51,8 +51,8 @@ def catalogue(*entries):
             BuildingBlock(
                 str(mol),
                 key,
-                frozendict({"supplier": price}),
                 bool(stereo_requirements(mol)),
+                sources=(frozendict(vendor="supplier", ppg=str(price)),),
             )
         )
     return frozendict({key: tuple(value) for key, value in buckets.items()})
@@ -84,7 +84,7 @@ def test_default_preservation_and_query_positive_negative(text):
     stock = catalogue((str(opposite), 1), (str(mol), 9), (str(unspecified), 0.1))
     matches = compatible_records(mol, stock)
     assert len(matches) == 1
-    assert matches[0].vendors["supplier"] == 9
+    assert matches[0].price == 9
     assert not Precursor(mol).is_purchasable(catalogue((str(opposite), 1)))
 
 
@@ -635,7 +635,10 @@ def test_stock_signatures_match_materialized_alignments(
         assert remap.call_count == 1
         assert format(selected, "m") == format(versions[0], "m")
         assert detail["compatible_mapping_count"] == len(compatible)
-        assert detail["vendors"] == {"supplier": 9} and detail["price"] == 9
+        assert (
+            detail["sources"] == [{"vendor": "supplier", "ppg": "9"}]
+            and detail["price"] == 9
+        )
     assert before == (
         format(molecule, "m"),
         format(candidate, "m"),
@@ -652,9 +655,22 @@ def test_stock_audit_shares_strict_preparation_and_keeps_pinned_record():
     molecule = mol_from_smiles("C[C@H](O)c1ccccc1")
     key = molecule_to_inchikey(molecule)
     invalid = ["bad", "CC>>CC", "C[C@H](C)O", "C[C@@H](O)c1ccccc1"]
-    valid = BuildingBlock("C[C@H](O)C1=CC=CC=C1", key, frozendict(pinned=7), True)
+    valid = BuildingBlock(
+        "C[C@H](O)C1=CC=CC=C1",
+        key,
+        True,
+        sources=(frozendict(vendor="pinned", ppg=str(7)),),
+    )
     bucket = (
-        *(BuildingBlock(s, key, frozendict(cheap=1), True) for s in invalid),
+        *(
+            BuildingBlock(
+                s,
+                key,
+                True,
+                sources=(frozendict(vendor="cheap", ppg=str(1)),),
+            )
+            for s in invalid
+        ),
         valid,
     )
     stock = frozendict({key[:14]: bucket})
@@ -865,3 +881,102 @@ def test_unsupported_stereo_survives_the_extraction_source_ledger():
     )
     assert result.stereo_records[0]["events"] == events
     assert not any("_Unresolved" in error.error_type for error in result.errors)
+
+
+@pytest.mark.parametrize(
+    "algorithm", ["uct", "breadth_first", "best_first", "beam", "nmcs", "lazy_nmcs"]
+)
+def test_stereo_off_search_export_and_cost(algorithm, tmp_path):
+    from synplan.mcts.record import read_search_record, write_search_record
+
+    target = "OCC[C@H](F)Cl"
+    opposite = "ClCC[C@@H](F)Cl"
+    rule = CanonicalRetroReactor.from_smarts("[C;h2:1]-[O;h1:2]>>[C:1]-[Cl:3].[O:2]")
+    stock = catalogue((opposite, 4), ("O", 0.1))
+    tree = tree_for(target, rule, stock, algorithm=algorithm, stereo_mode="off")
+    tree.run()
+    assert tree.winning_nodes
+    route = tree.routes()[0]
+    assert route.solved and route.stereo_status == "not_assessed"
+    assert route.stereo["original_target"] == str(smiles(target))
+    assert not stereo_requirements(route.target)
+    leaf = next(m for m in route.leaves() if len(m) > 1)
+    assert leaf.meta["selected_stock"]["basis"] == "connectivity_only"
+    assert leaf.meta["selected_stock"]["inchikey"] == molecule_to_inchikey(
+        smiles(opposite)
+    )
+    assert route.calculate_cost(stock)["complete"]
+    from synplan.utils.visualisation import routes_report_html
+
+    assert "stereochemistry was not assessed" in routes_report_html([route], None)
+    restored = Route.from_json(route.to_json())
+    assert restored.solved and restored.stereo_status == "not_assessed"
+    record = read_search_record(write_search_record(tree, tmp_path / "off.json"))
+    assert record.routes()[0].stereo_status == "not_assessed"
+    assert record.config.stereo_mode == "off"
+    assert str(record.original_target) == str(smiles(target))
+
+
+@pytest.mark.parametrize("group", ["", " |o1:1|", " |&1:1|"])
+def test_stereo_off_lookup_skips_candidate_parsing_and_cache_is_mode_specific(
+    monkeypatch, group
+):
+    import synplan.chem.building_blocks.stereo as matching
+
+    precursor = Precursor(smiles(STEREO[0] + group))
+    stock = catalogue(("C[C@@H](O)C(=O)O", 1))
+    assert not precursor.is_purchasable(stock)
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            matching,
+            "record_molecule",
+            lambda *_: pytest.fail("parsed stock in off mode"),
+        )
+        assert precursor.is_purchasable(stock, match_stereo=False)
+    assert not precursor.is_purchasable(stock)
+    assert precursor.selected_stock is None
+    assert precursor.is_purchasable(stock, match_stereo=False)
+    assert precursor.selected_stock["basis"] == "connectivity_only"
+
+
+def test_stereo_off_projects_rule_queries_without_mutating_shared_rules():
+    from synplan.chem.reaction.reactor import stereo_free_rule
+
+    target = smiles(STEREO[0])
+    query = molecule_substructure_as_query(target, target)
+    rule = CanonicalRetroReactor((query,), (smiles("CC(=O)C(=O)O"),))
+    before = str(query)
+    projected = stereo_free_rule(rule)
+    unmarked = target.copy()
+    unmarked.clean_stereo()
+    assert not list(rule(unmarked))
+    assert list(projected(unmarked))
+    assert str(query) == before
+
+
+def test_tree_stereo_off_controls_rollout_and_legacy_stock():
+    from synplan.mcts.evaluation import RolloutEvaluationStrategy
+
+    target = smiles(STEREO[0])
+    rule = CanonicalRetroReactor.from_smarts("[C:1]-[O:2]>>[C:1]=[O:2]")
+    stock = catalogue(("CC(=O)C(=O)O", 1))
+    evaluator = RolloutEvaluationStrategy(RulesPolicy(), (rule,), stock, 0, 3)
+    tree = Tree(
+        target,
+        TreeConfig(stereo_mode="off", min_mol_size=0),
+        (rule,),
+        stock,
+        RulesPolicy(),
+        evaluator,
+    )
+    assert evaluator.rollout.simulate_precursor(Precursor(target)) == 1
+    assert stereo_requirements(target)
+    assert not stereo_requirements(tree.nodes[1].curr_precursor.molecule)
+    legacy = tree_for(
+        "OCC[C@H](F)Cl",
+        CanonicalRetroReactor.from_smarts("[C;h2:1]-[O;h1:2]>>[C:1]-[Cl:3].[O:2]"),
+        {"ClCC[C@@H](F)Cl", "O"},
+        stereo_mode="off",
+    )
+    legacy.run()
+    assert legacy.winning_nodes

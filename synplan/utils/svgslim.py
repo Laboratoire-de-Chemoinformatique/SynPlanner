@@ -13,7 +13,9 @@ __all__ = ["Doc", "content_key", "depictions", "hidden_defs", "tighten"]
 
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 _WS = re.compile(r">\s+<")
-_ATTR = re.compile(r'="([^"]*)"')
+#: An attribute and its value. The name is captured so payload attributes, whose
+#: contents are nobody's to reformat, can be left exactly as they were written.
+_ATTR = re.compile(r'([\w:.-]+)="([^"]*)"')
 _NUM = re.compile(r"-?\d+\.\d+")
 
 
@@ -31,13 +33,18 @@ def _shortest(literal: str) -> str:
     return literal
 
 
+def _tidy_attr(match: re.Match) -> str:
+    name, value = match.groups()
+    if name.startswith("data-"):
+        # Not geometry: a page reads these back, so shortening 0.25 to .25 there
+        # changes what it says rather than how big the file is.
+        return match.group(0)
+    return f'{name}="' + _NUM.sub(lambda n: _shortest(n.group(0)), value) + '"'
+
+
 def tighten(svg: str) -> str:
     """Drop chython's pretty-print and its padding zeros. No rendering effect."""
-    svg = _WS.sub("><", svg).strip()
-    return _ATTR.sub(
-        lambda m: '="' + _NUM.sub(lambda n: _shortest(n.group(0)), m.group(1)) + '"',
-        svg,
-    )
+    return _ATTR.sub(_tidy_attr, _WS.sub("><", svg).strip())
 
 
 def depictions(svg: str) -> list[tuple[int, int, str, str]]:

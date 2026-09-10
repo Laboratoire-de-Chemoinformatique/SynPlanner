@@ -139,10 +139,11 @@ def test_rendering_restores_global_settings_and_shared_geometry(monkeypatch):
     reaction = read_smiles("CCO.CC(=O)O>>CCOC(C)=O")
     route = Route((Step(reaction, reaction.products[0]),))
     layouts = {}
-    # A common layout must give the same drawing regardless of parent alignment.
-    assert content_key(route.svg(layouts=layouts, align=True)) == content_key(
-        route.svg(layouts=layouts, align=False)
-    )
+    # Alignment uses copies: drawing an aligned route must not change the cache.
+    unaligned = content_key(route.svg(layouts=layouts, align=False))
+    aligned = content_key(route.svg(layouts=layouts, align=True))
+    assert content_key(route.svg(layouts=layouts, align=False)) == unaligned
+    assert content_key(route.svg(layouts=layouts, align=True)) == aligned
     before = dict(_render_config)
     assert "<svg" in routes_report_html([route], None, aam=not before["mapping"])
     routes_clustering_report({}, {}, "absent", {}, aam=not before["mapping"])

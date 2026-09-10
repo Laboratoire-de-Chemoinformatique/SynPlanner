@@ -3,7 +3,7 @@ rules."""
 
 import logging
 from collections.abc import Iterator
-from copy import copy
+from copy import copy, deepcopy
 from typing import Any
 
 from chython.containers import MoleculeContainer, ReactionContainer, SynthonContainer
@@ -112,6 +112,27 @@ def add_small_mols(
         return tmp_mol.split()
 
     return [big_mol]
+
+
+def stereo_free_rule(rule):
+    """Project a reactor once per tree, preserving its non-stereo options.
+
+    Chython exposes no reactor projection API; its cached replacement must be
+    cleared alongside the input/output templates. Never mutate shared rules.
+    """
+    if not any(has_stereo(q) for q in (*rule._patterns, *rule._products)):
+        return rule
+    rule = deepcopy(rule)
+    for query in (*rule._patterns, *rule._products, rule._replacement):
+        if isinstance(query, MoleculeContainer):
+            query.clean_stereo()
+            continue
+        for _, atom in query.atoms():
+            atom._stereo = None
+        for *_, bond in query.bonds():
+            bond._stereo = None
+        query.flush_cache()
+    return rule
 
 
 def apply_reaction_rule(

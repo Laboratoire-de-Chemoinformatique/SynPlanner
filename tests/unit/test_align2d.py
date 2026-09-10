@@ -81,6 +81,38 @@ def test_align_molecule_leaves_a_single_shared_atom_alone():
     assert (mol.atom(1).x, mol.atom(1).y) == before
 
 
+def test_cached_route_layouts_align_copies_without_changing_sources(monkeypatch):
+    from copy import deepcopy
+
+    from synplan.chem.reaction.routes import Route, Step
+    from synplan.utils import routedraw
+
+    target, reactions = _route()
+    route = Route(tuple(Step(r, r.products[0]) for r in reactions))
+    mols = {id(m): m for r in reactions for m in (*r.reactants, *r.products)}
+
+    def geometry(mol):
+        return {n: (a.x, a.y) for n, a in mol.atoms()}
+
+    sources = {key: geometry(mol) for key, mol in mols.items()}
+    layouts = {format(mol, "m"): geometry(mol) for mol in mols.values()}
+    cached = deepcopy(layouts)
+    drawn = []
+    depict = routedraw._depiction
+
+    def capture(mol):
+        drawn.append(mol)
+        return depict(mol)
+
+    monkeypatch.setattr(routedraw, "_depiction", capture)
+    route.svg(layouts=layouts)
+
+    assert len(drawn) == len(mols)
+    assert all(_mean_dist(mol, target) < 1e-6 for mol in drawn)
+    assert layouts == cached
+    assert {key: geometry(mol) for key, mol in mols.items()} == sources
+
+
 def test_mirroring_redraws_the_wedges_instead_of_inverting_the_centres():
     """Chython caches wedges derived from coordinates; a mirror must drop that cache."""
     mol = read_smiles("CC(C)[C@@H]1CC[C@@H](C)C[C@H]1O")

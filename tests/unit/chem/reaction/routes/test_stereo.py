@@ -28,9 +28,7 @@ def stock():
     buckets = defaultdict(list)
     for row in json.loads((DATA / "stock.json").read_text()):
         buckets[row["InChIKey"][:14]].append(
-            BuildingBlock(
-                row["SMILES"], row["InChIKey"], frozendict(), "@" in row["SMILES"]
-            )
+            BuildingBlock(row["SMILES"], row["InChIKey"], "@" in row["SMILES"])
         )
     return frozendict({key: tuple(value) for key, value in buckets.items()})
 
@@ -111,9 +109,7 @@ def test_real_small_diol_cannot_use_wrong_or_unspecified_stock(mode, fixtures, s
         else:
             mol.clean_stereo()
         replacement[prefix] = (
-            BuildingBlock(
-                str(mol), molecule_to_inchikey(mol), frozendict(), mode == "opposite"
-            ),
+            BuildingBlock(str(mol), molecule_to_inchikey(mol), mode == "opposite"),
         )
     _, audit = run(fixtures["source:n5-02322"], frozendict(replacement))
     assert not audit.supported
@@ -229,8 +225,12 @@ def test_catalogue_price_belongs_to_selected_record(fixtures, stock):
         BuildingBlock(
             r.smiles,
             r.inchikey,
-            frozendict(vendor=50.0 if "C[C@H]" in r.smiles else 1.0),
             r.has_stereo,
+            sources=(
+                frozendict(
+                    vendor="vendor", ppg=str(50.0 if "C[C@H]" in r.smiles else 1.0)
+                ),
+            ),
         )
         for r in stock[prefix]
     )

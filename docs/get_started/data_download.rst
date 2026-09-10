@@ -10,21 +10,24 @@ Download a ready-to-use preset with all components needed for retrosynthetic pla
 
 .. code-block:: bash
 
-   synplan download_preset --preset synplanner-gps --save_to synplan_data
+   synplan download_preset --preset synplanner-gps-mcule-molport --save_to synplan_data
 
-This downloads the ``synplanner-gps`` preset, which includes:
+This downloads the ``synplanner-gps-mcule-molport`` preset, which includes:
 
 - Reaction rules (TSV): ``policy/supervised_gps/v1/reaction_rules.tsv``
 - Ranking policy weights: ``policy/supervised_gps/v1/v1/ranking_policy.ckpt``
 - Filtering policy weights: ``policy/supervised_gcn/v1/v1/filtering_policy.ckpt``
 - Value network weights: ``value/supervised_gcn/v1/value_network.ckpt``
-- Building blocks: ``building_blocks/emolecules-salt-ln/building_blocks.tsv``
+- Building blocks: ``building_blocks/mcule-molport-2026-08/building_blocks.json.gz``
+
+The original ``synplanner-gps`` preset remains available with its small stock for
+older SynPlanner versions and CI tests.
 
 The command prints the local path of every downloaded file, so use that output
 rather than retyping paths.
 
 .. warning::
-    The rules and the ranking head of ``synplanner-gps`` come from
+    The rules and the ranking head of ``synplanner-gps-mcule-molport`` come from
     ``supervised_gps`` (11235 rules); its filtering head comes from
     ``supervised_gcn`` (24094 rules). The two heads therefore cannot be combined
     (see :doc:`/configuration/planning`). If you need a matched filtering +
@@ -37,7 +40,7 @@ Python API:
 
    from synplan.utils.loading import download_preset
 
-   paths = download_preset("synplanner-gps", save_to="synplan_data")
+   paths = download_preset("synplanner-gps-mcule-molport", save_to="synplan_data")
    rules_path = paths["reaction_rules"]
    policy_path = paths["ranking_policy"]
    bb_path = paths["building_blocks"]

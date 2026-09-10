@@ -2,6 +2,8 @@
 
 import itertools
 import json
+import re
+from html import unescape
 
 import pytest
 from test_tree_stats import FakeReactor, build_tree, make_mol
@@ -106,9 +108,17 @@ def test_trivial_endpoints_survive_export_without_claiming_stock(tmp_path, cutof
     assert restored.solved
     cost = restored.calculate_cost({})
     assert cost["cost_per_mol"] is None and not cost["complete"]
+    # The box is drawn as a terminal like any other; the pill is the only thing
+    # on the page that says no catalogue record stands behind it.
     html = routes_report_html([restored], None)
-    assert "Assumed trivial" in html and "Not in stock" in html
-    assert "Price unavailable" in html
+    (payload,) = re.findall(r'<g class="sp-price" data-offers="([^"]*)">', html)
+    assert json.loads(unescape(payload))["rows"] == [
+        ["Assumed trivial", f"at most {cutoff} atoms"]
+    ]
+    assert ">show price</text>" in html
+    assert (
+        '<div class="eyebrow">Price per g of target</div><div class="v">—</div>' in html
+    )
     restored.leaves()[0].meta["assumed_trivial"] = cutoff + 1
     assert restored.stereo_status == "needs_reassessment"
 
@@ -181,7 +191,7 @@ def test_catalogue_tree_record_survives_database_removal(tmp_path, monkeypatch, 
     assert not hasattr(record, "building_blocks")
     assert [route.to_json() for route in record.routes()] == expected
     selected = record.routes()[0].leaves()[0].meta["selected_stock"]
-    assert selected["vendors"] == {"vendor": 2.0}
+    assert selected["sources"] == [{"vendor": "vendor", "ppg": "2.0"}]
 
 
 def test_a_file_that_is_not_a_search_record_says_so(tmp_path):

@@ -48,7 +48,7 @@ synplan --version
 **1.** Download pre-trained models, rules, and building blocks:
 
 ```bash
-synplan download_preset --preset synplanner-gps --save_to synplan_data
+synplan download_preset --preset synplanner-gps-mcule-molport --save_to synplan_data
 ```
 
 **2.** Write your targets and fetch a planning config (`configs/` is not installed by pip):
@@ -65,12 +65,12 @@ synplan planning \
   --config planning_standard.yaml \
   --targets targets.smi \
   --reaction_rules synplan_data/policy/supervised_gps/v1/reaction_rules.tsv \
-  --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \
+  --building_blocks synplan_data/building_blocks/mcule-molport-2026-08/building_blocks.json.gz \
   --policy_network synplan_data/policy/supervised_gps/v1/v1/ranking_policy.ckpt \
   --results_dir planning_results
 ```
 
-Paths above are what `synplanner-gps` writes — the download command prints each one.
+Paths above are what `synplanner-gps-mcule-molport` writes — the download command prints each one.
 
 > [!TIP]
 > **Every tutorial runs in your browser.** Open the

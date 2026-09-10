@@ -117,7 +117,7 @@ def load_route_scorer_cached():
 
 @st.cache_resource
 def load_planning_resources_cached():
-    paths = download_preset(preset_name="synplanner-gps", save_to=".")
+    paths = download_preset(save_to=".")
     return (
         str(paths["building_blocks"]),
         str(paths["ranking_policy"]),
@@ -488,7 +488,9 @@ def display_planning_results():
                 st.json(route.to_json()["stereo"])
         st.download_button(
             "Download stereo proposals (HTML)",
-            data=routes_report_html(proposals, html_path=None),
+            data=routes_report_html(
+                proposals, html_path=None, building_blocks=tree.building_blocks
+            ),
             file_name="stereo_proposals.html",
             mime="text/html",
         )
@@ -542,7 +544,10 @@ def download_planning_results():
                         st.session_state.tree.routes()
                     )
                     st.session_state.planning_report_html = routes_report_html(
-                        ranked, html_path=None
+                        ranked,
+                        html_path=None,
+                        stats=st.session_state.tree.to_stats_dict(),
+                        building_blocks=st.session_state.tree.building_blocks,
                     )
 
             if st.session_state.get("planning_report_html"):

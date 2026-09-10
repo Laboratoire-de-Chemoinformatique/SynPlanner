@@ -4,8 +4,10 @@ import gzip
 import json
 import multiprocessing
 import os
+import re
 import sqlite3
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from html import unescape
 
 import pytest
 from chython import smiles
@@ -177,14 +179,31 @@ def test_cost_export_and_html_use_selected_isomer_without_scanning(
     stock.path.unlink()
     html = routes_report_html([detached], None)
     assert "<svg" in html
-    assert selected["inchikey"] in html
+    pills = re.findall(r'<g class="sp-price" data-offers="([^"]*)">', html)
     if priced:
+        # The pill prices the isomer the search chose, not the cheaper opposite one.
         assert "&lt;chosen&gt;" in html and "<chosen>" not in html
-        assert "<td>5</td>" in html and "<td>7</td>" in html
+        (payload,) = pills
+        assert json.loads(unescape(payload))["rows"] == [
+            ["<chosen>", "5"],
+            ["second", "7"],
+        ]
+        assert selected["sources"] == [
+            {"vendor": "<chosen>", "ppg": "5.0"},
+            {"vendor": "second", "ppg": "7.0"},
+        ]
     else:
-        assert "Price unavailable" in html
-    assert "<td>1</td>" not in html
-    assert "Price per gram" in html
+        # No offer behind the record, but the page still names what was selected.
+        (payload,) = pills
+        offer = json.loads(unescape(payload))
+        assert offer["rows"] == [["Price", "unavailable"]]
+        assert offer["title"] == selected["inchikey"]
+        assert (
+            '<div class="eyebrow">Price per g of target</div><div class="v">—</div>'
+            in html
+        )
+    # 1 is the opposite isomer's price; no pill ever reaches for it.
+    assert all("1" not in str(json.loads(unescape(p))) for p in pills)
 
 
 class EmptyPolicy:

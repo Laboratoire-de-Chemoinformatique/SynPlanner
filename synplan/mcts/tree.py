@@ -10,7 +10,7 @@ from itertools import pairwise
 from math import log
 from time import time
 
-from chython import inchi_key
+from chython import inchi_key, smiles
 from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
@@ -195,6 +195,14 @@ class Tree:
 
         # building blocks and reaction reaction_rules
         self.reaction_rules = tuple(reaction_rules)
+        if config.stereo_mode == "off":
+            from synplan.chem.reaction.reactor import stereo_free_rule
+
+            self.reaction_rules = tuple(map(stereo_free_rule, self.reaction_rules))
+            priority_rules = {
+                name: list(map(stereo_free_rule, rules))
+                for name, rules in (priority_rules or {}).items()
+            }
         if isinstance(building_blocks, Mapping):
             if self.config.direction == "forward":
                 raise ValueError(
@@ -208,7 +216,11 @@ class Tree:
             )
             self._building_block_bucket_count: int | None = len(building_blocks)
         else:
-            self.building_blocks = frozenset(building_blocks)
+            self.building_blocks = (
+                frozenset(str(smiles(s, ignore_stereo=True)) for s in building_blocks)
+                if config.stereo_mode == "off"
+                else frozenset(building_blocks)
+            )
             self._building_block_count = len(self.building_blocks)
             self._building_block_bucket_count = None
         self.priority_rules: dict[str, tuple[CanonicalRetroReactor, ...]] = {
@@ -263,6 +275,8 @@ class Tree:
 
         if rollout is not None:
             rollout.building_blocks = self.building_blocks
+            rollout.reaction_rules = self.reaction_rules
+            rollout.match_stereo = config.stereo_mode != "off"
 
         # tree initialization
         target_node = self._init_target_node(target)
@@ -419,6 +433,9 @@ class Tree:
         assert len(target) > 3, "Target molecule has less than 3 atoms"
 
         self.original_target = target.copy()
+        if self.config.stereo_mode == "off":
+            target = target.copy()
+            target.clean_stereo()
         target_molecule = Precursor(target)
         obligations = []
         try:
@@ -584,6 +601,9 @@ class Tree:
         rule_source = candidate.rule_source
 
         products = [m.copy() for m in products]
+        if self.config.stereo_mode == "off":
+            for molecule in products:
+                molecule.clean_stereo()
         assessment = assess_inheritance(curr_node.curr_precursor.molecule, products)
         if self.config.direction == "forward" and any(
             has_stereo(m) for m in (curr_node.curr_precursor.molecule, *products)
@@ -601,7 +621,7 @@ class Tree:
         )
 
         evidence, decision = (), "unreviewed"
-        if self._stereo_assessments:
+        if self._stereo_assessments and self.config.stereo_mode != "off":
             forward = Reaction(products, [curr_node.curr_precursor.molecule])
             evidence_context = reaction_context(forward)
             evidence = self._stereo_assessments.get(evidence_context, ())
@@ -675,6 +695,7 @@ class Tree:
                 if not x.is_building_block(
                     self.building_blocks,
                     self.config.min_mol_size,
+                    match_stereo=self.config.stereo_mode != "off",
                 )
             ),
         )
@@ -866,6 +887,9 @@ class Tree:
                 )
             )
             return
+        if self.config.stereo_mode == "off":
+            node.stereo_summary = route.stereo
+            return
         audit = None
         carries_stereo = any(
             has_stereo(mol)
@@ -880,7 +904,7 @@ class Tree:
                     if str(leaf) in catalogue:
                         key = inchi_key(leaf)
                         buckets.setdefault(key[:14], []).append(
-                            BuildingBlock(str(leaf), key, frozendict(), False)
+                            BuildingBlock(str(leaf), key, False)
                         )
                 catalogue = frozendict(
                     {key: tuple(records) for key, records in buckets.items()}

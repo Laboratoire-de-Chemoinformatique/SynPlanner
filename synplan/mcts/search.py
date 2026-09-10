@@ -9,6 +9,7 @@ import os.path
 from collections.abc import Iterator, Mapping
 from pathlib import Path
 
+from chython import smiles
 from chython.containers import MoleculeContainer
 from tqdm.auto import tqdm
 
@@ -295,6 +296,10 @@ def run_search(
 
     tree_config = TreeConfig.from_dict(search_config)
     tree_config.silent = True
+    if tree_config.stereo_mode == "off" and not is_json_catalogue:
+        building_blocks = frozenset(
+            str(smiles(s, ignore_stereo=True)) for s in building_blocks
+        )
     with open(stats_file, "w", encoding="utf-8", newline="\n") as csvfile:
         statswriter = csv.DictWriter(csvfile, delimiter=",", fieldnames=stats_header)
         statswriter.writeheader()
@@ -317,11 +322,19 @@ def run_search(
                 exported_routes[export_key] = []
             try:
                 target_mol = mol_from_smiles(target_smi, clean_stereo=False)
-                if is_purchasable(target_mol, building_blocks):
+                if is_purchasable(
+                    target_mol,
+                    building_blocks,
+                    match_stereo=tree_config.stereo_mode != "off",
+                ):
                     n_in_stock += 1
                     tqdm.write(
                         f"{target_smi} is already in the building blocks - "
-                        "no search run, buy it instead"
+                        + (
+                            "connectivity match only; stereo was not assessed"
+                            if tree_config.stereo_mode == "off"
+                            else "no search run, buy it instead"
+                        )
                     )
                     row = dict.fromkeys(stats_header, "")
                     row["target_smiles"] = target_smi
@@ -381,6 +394,8 @@ def run_search(
                 routes_report_html(
                     routes,
                     os.path.join(routes_folder, f"retroroutes_target_{ti}.html"),
+                    stats=tree.to_stats_dict(),
+                    building_blocks=building_blocks,
                 )
 
                 # save json routes

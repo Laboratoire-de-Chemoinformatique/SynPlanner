@@ -103,9 +103,8 @@ class TreeConfig(BaseConfigModel):
     use_priority: bool = False
     priority_rule_multiapplication: bool = False
 
-    # Stereo remains authoritative in both modes. Strict mode excludes proposals
-    # whose requested configuration cannot yet be justified.
-    stereo_mode: Literal["proposal", "strict"] = "proposal"
+    # Off searches connectivity only; strict excludes unresolved stereo proposals.
+    stereo_mode: Literal["proposal", "strict", "off"] = "proposal"
     max_mapping_work: int = Field(default=100_000, gt=0)
     stereo_assessments: list[dict[str, Any]] = Field(default_factory=list)
 

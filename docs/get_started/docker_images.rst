@@ -37,7 +37,7 @@ Show help:
      ghcr.io/laboratoire-de-chemoinformatique/synplanner:${VERSION}-cli-amd64 --help
 
 Quick planning example (mount config and data). Paths below are the layout
-``synplan download_preset --preset synplanner-gps --save_to synplan_data``
+``synplan download_preset --preset synplanner-gps-mcule-molport --save_to synplan_data``
 writes; ``targets.smi`` is your own file of target SMILES. The image does not
 contain ``configs/`` — it is read from the mounted host directory, so clone the
 repository or fetch the file first:
@@ -56,7 +56,7 @@ repository or fetch the file first:
        --config configs/planning_standard.yaml \
        --targets targets.smi \
        --reaction_rules synplan_data/policy/supervised_gps/v1/reaction_rules.tsv \
-       --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \
+       --building_blocks synplan_data/building_blocks/mcule-molport-2026-08/building_blocks.json.gz \
        --policy_network synplan_data/policy/supervised_gps/v1/v1/ranking_policy.ckpt \
        --results_dir planning_results
 

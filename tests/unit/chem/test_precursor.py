@@ -80,8 +80,8 @@ def stereo_block(smiles_value: str) -> BuildingBlock:
     return BuildingBlock(
         smiles=str(molecule),
         inchikey=molecule_to_inchikey(molecule),
-        vendors=frozendict({"vendor": 1.0}),
         has_stereo=True,
+        sources=(frozendict(vendor="vendor", ppg=str(1.0)),),
     )
 
 

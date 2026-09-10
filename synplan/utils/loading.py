@@ -138,7 +138,7 @@ def download_unpack_data(filename, subfolder, save_to=".", repo_id=None):
 
 
 def download_preset(
-    preset_name: str = "synplanner-gps",
+    preset_name: str = "synplanner-gps-mcule-molport",
     save_to: str | Path = ".",
     repo_id: str | None = None,
 ) -> dict[str, Path]:
@@ -148,7 +148,7 @@ def download_preset(
     Each file is downloaded into the ``save_to`` directory, preserving
     the repository folder structure.
 
-    :param preset_name: Name of the preset (e.g. ``"synplanner-gps"``).
+    :param preset_name: Name of the preset (e.g. ``"synplanner-gps-mcule-molport"``).
     :param save_to: Local directory to save downloaded files.
     :param repo_id: Override the HuggingFace repo ID.
     :return: Dict mapping component keys to local file paths.

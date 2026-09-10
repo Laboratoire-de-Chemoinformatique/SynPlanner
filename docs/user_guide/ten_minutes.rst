@@ -27,7 +27,7 @@ from HuggingFace.
 
 .. code-block:: bash
 
-    synplan download_preset --preset synplanner-gps --save_to synplan_data
+    synplan download_preset --preset synplanner-gps-mcule-molport --save_to synplan_data
 
 Or from Python:
 
@@ -35,7 +35,7 @@ Or from Python:
 
     from synplan.utils.loading import download_preset
 
-    paths = download_preset("synplanner-gps", save_to="synplan_data")
+    paths = download_preset("synplanner-gps-mcule-molport", save_to="synplan_data")
 
 After downloading, you will have:
 
@@ -50,10 +50,10 @@ After downloading, you will have:
     │   └── filtering_policy.ckpt       # filtering policy network weights
     ├── value/supervised_gcn/v1/
     │   └── value_network.ckpt          # value network weights (advanced)
-    └── building_blocks/emolecules-salt-ln/
-        └── building_blocks.tsv         # purchasable building blocks
+    └── building_blocks/mcule-molport-2026-08/
+        └── building_blocks.json.gz     # purchasable building blocks
 
-The rules and ranking head of ``synplanner-gps`` live under ``supervised_gps``;
+The rules and ranking head of ``synplanner-gps-mcule-molport`` live under ``supervised_gps``;
 only its filtering head comes from ``supervised_gcn``. Use
 ``--preset synplanner-article`` if you need a filtering and a ranking head
 trained on the same rule set (see :doc:`09_Combined_Ranking_Filtering_Policy`).
@@ -112,7 +112,7 @@ The example below uses the ranking policy network and rollout evaluation. This i
     from synplan.mcts.tree import Tree
 
     # Download preset data (skip if already downloaded)
-    paths = download_preset("synplanner-gps", save_to="synplan_data")
+    paths = download_preset("synplanner-gps-mcule-molport", save_to="synplan_data")
 
     # Load components (preset building blocks are already standardized)
     building_blocks = load_building_blocks(paths["building_blocks"], standardize=False)
@@ -295,7 +295,7 @@ Batch-plan a list of targets from the command line:
       --config configs/planning_standard.yaml \
       --targets targets.smi \
       --reaction_rules synplan_data/policy/supervised_gps/v1/reaction_rules.tsv \
-      --building_blocks synplan_data/building_blocks/emolecules-salt-ln/building_blocks.tsv \
+      --building_blocks synplan_data/building_blocks/mcule-molport-2026-08/building_blocks.json.gz \
       --policy_network synplan_data/policy/supervised_gps/v1/v1/ranking_policy.ckpt \
       --results_dir planning_results
 
