@@ -92,15 +92,16 @@ Python `>=3.10,<3.15`. Use a virtual environment and choose the user's workflow:
 | --- | --- |
 | Chemistry, ChemFrame/pandas analysis, and CPU planning with ONNX weights | `pip install SynPlanner` |
 | Reaction data curation and atom mapping | `pip install 'SynPlanner[curation]'` |
-| Model training, notebooks, and ONNX export | `pip install 'SynPlanner[training]'` |
+| Model training and ONNX export | `pip install 'SynPlanner[training]'` |
 | Streamlit planning interface | `pip install 'SynPlanner[gui]'` |
 | All three optional workflows | `pip install 'SynPlanner[all]'` |
 | Inference with existing Torch checkpoints | `pip install 'SynPlanner[cpu]'` |
 
 The base install includes pandas for ChemFrame and general analysis and needs no
 Torch. Curation adds Torch, Chytorch's reaction mapper, and SciPy;
-training adds Torch/PyG, Lightning, AdaBelief, notebook tools,
-and the ONNX exporter. Combine `curation` and `training` for data-to-model work.
+training adds Torch/PyG, Lightning, AdaBelief, and the ONNX exporter.
+Combine `curation` and `training` for data-to-model work.
+For notebooks, run `pip install jupyterlab ipywidgets` in the same environment.
 Install a selected tracking backend directly, e.g. `pip install wandb` or
 `pip install mlflow`; there are no logger-specific SynPlanner extras.
 

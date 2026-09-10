@@ -51,7 +51,8 @@ The existing value-network evaluation configuration accepts the exported
 ``SynPlanner[curation]`` covers reaction data preparation and neural atom mapping
 with Torch, Chytorch, and SciPy. ChemFrame and pandas analysis are included in the
 base installation. ``SynPlanner[training]`` covers model
-training, notebooks, and ONNX export, including Lightning and AdaBelief.
+training and ONNX export, including Lightning and AdaBelief.
+For notebooks, run ``pip install jupyterlab ipywidgets`` in the same environment.
 ``SynPlanner[gui]`` adds the Streamlit planning interface.
 ``SynPlanner[all]`` includes all three workflows.
 With ``uv``, combine ``curation``, ``training``, or ``all`` with ``cpu``, ``cu126``,

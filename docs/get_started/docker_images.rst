@@ -29,6 +29,10 @@ Pull images
 Run the CLI
 ~~~~~~~~~~~
 
+The CLI image provides chemistry tools and CPU planning with ONNX weights.
+The GUI image adds Streamlit. Training and neural atom mapping dependencies are
+optional package extras and are not included in these runtime images.
+
 Show help:
 
 .. code-block:: bash
@@ -50,14 +54,14 @@ repository or fetch the file first:
 .. code-block:: bash
 
    docker run --rm --platform linux/amd64 \
-     -v "$(pwd)":/app -w /app \
+     -v "$(pwd)":/workspace -w /workspace \
      ghcr.io/laboratoire-de-chemoinformatique/synplanner:${VERSION}-cli-amd64 \
      planning \
        --config configs/planning_standard.yaml \
        --targets targets.smi \
        --reaction_rules synplan_data/policy/supervised_gps/v1/reaction_rules.tsv \
        --building_blocks synplan_data/building_blocks/mcule-molport-2026-08/building_blocks.json.gz \
-       --policy_network synplan_data/policy/supervised_gps/v1/v1/ranking_policy.ckpt \
+       --policy_network synplan_data/policy/supervised_gps/v1/v1/ranking_policy.onnx \
        --results_dir planning_results
 
 Run the GUI
