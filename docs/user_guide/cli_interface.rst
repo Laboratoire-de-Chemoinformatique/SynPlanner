@@ -269,12 +269,11 @@ types of policy networks is configured by the same configuration file (see the d
     - ``--workers`` - CPU workers for ranking dataset preprocessing (0 = auto).
     - ``--no-cache`` - disable dataset cache reuse.
     - ``--logger`` - logger backend: ``csv``, ``tensorboard``, ``mlflow``, ``wandb``, or ``litlogger``.
-      ``csv`` and ``tensorboard`` work out of the box; ``wandb`` and ``mlflow``
-      need ``SynPlanner[wandb]``, ``SynPlanner[mlflow]`` or ``SynPlanner[loggers]``.
+      ``csv`` works out of the box. Install other backends directly with
+      ``pip install tensorboard``, ``pip install wandb``, or ``pip install mlflow``.
       ``litlogger`` needs ``pytorch-lightning>=2.6.1`` (which is where the
-      ``LitLogger`` class lives) plus ``pip install litlogger``. There is no
-      ``SynPlanner[litlogger]`` extra — ``pip`` only warns and installs nothing
-      when you ask for one — and ``SynPlanner[loggers]`` covers wandb + mlflow only.
+      ``LitLogger`` class lives) plus ``pip install litlogger``. SynPlanner does not
+      define logger-specific extras.
 
 **MHN ranking policy tuning**
 
@@ -306,12 +305,11 @@ types of policy networks is configured by the same configuration file (see the d
     - ``--num_cpus`` - CPUs for filtering dataset preparation.
     - ``--no-cache`` - disable dataset cache reuse.
     - ``--logger`` - logger backend: ``csv``, ``tensorboard``, ``mlflow``, ``wandb``, or ``litlogger``.
-      ``csv`` and ``tensorboard`` work out of the box; ``wandb`` and ``mlflow``
-      need ``SynPlanner[wandb]``, ``SynPlanner[mlflow]`` or ``SynPlanner[loggers]``.
+      ``csv`` works out of the box. Install other backends directly with
+      ``pip install tensorboard``, ``pip install wandb``, or ``pip install mlflow``.
       ``litlogger`` needs ``pytorch-lightning>=2.6.1`` (which is where the
-      ``LitLogger`` class lives) plus ``pip install litlogger``. There is no
-      ``SynPlanner[litlogger]`` extra — ``pip`` only warns and installs nothing
-      when you ask for one — and ``SynPlanner[loggers]`` covers wandb + mlflow only.
+      ``LitLogger`` class lives) plus ``pip install litlogger``. SynPlanner does not
+      define logger-specific extras.
 
 Value network training
 ---------------------------

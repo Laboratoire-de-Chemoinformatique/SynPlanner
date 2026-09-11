@@ -15,7 +15,7 @@ from chython import smarts as smarts_parser
 from chython.containers import ReactionContainer
 from chython.files.daylight.tokenize import smarts_tokenize
 from chython.reactor.reactor import Reactor
-from huggingface_hub import hf_hub_download, snapshot_download
+from huggingface_hub import file_exists, hf_hub_download, snapshot_download
 
 from synplan.chem.building_blocks.io import load_building_blocks as load_building_blocks
 from synplan.chem.reaction import CanonicalRetroReactor
@@ -146,7 +146,8 @@ def download_preset(
 
     The preset YAML lists explicit file paths under a ``files:`` key.
     Each file is downloaded into the ``save_to`` directory, preserving
-    the repository folder structure.
+    the repository folder structure. For ``.ckpt`` entries, a same-name
+    ``.onnx`` file in the same remote folder is preferred when available.
 
     :param preset_name: Name of the preset (e.g. ``"synplanner-gps-mcule-molport"``).
     :param save_to: Local directory to save downloaded files.
@@ -173,6 +174,10 @@ def download_preset(
     result: dict[str, Path] = {}
     for key, repo_path in preset.get("files", {}).items():
         parts = PurePosixPath(repo_path)
+        if parts.suffix == ".ckpt" and file_exists(
+            repo_id=repo, filename=str(parts.with_suffix(".onnx"))
+        ):
+            parts = parts.with_suffix(".onnx")
         local_path = Path(
             hf_hub_download(
                 repo_id=repo,
@@ -454,9 +459,32 @@ def load_value_net(
 def build_policy_from_config(
     policy_config: "PolicyNetworkConfig",
 ) -> "TemplateBasedPolicy":
-    """Build a :class:`TemplateBasedPolicy` matching a checkpoint architecture."""
+    """Build a template policy from a Torch checkpoint or ONNX policy export."""
+    if Path(policy_config.weights_path).suffix == ".onnx":
+        from synplan.mcts.policy.onnx import OnnxPolicy
+
+        policy = OnnxPolicy(
+            policy_config.weights_path,
+            top_rules=policy_config.top_rules,
+            rule_prob_threshold=policy_config.rule_prob_threshold,
+            priority_rules_fraction=policy_config.priority_rules_fraction,
+        )
+        if policy.policy_net.policy_type != policy_config.policy_type:
+            raise ValueError(
+                "ONNX policy type does not match the configured policy_type"
+            )
+        return policy
+
     from synplan.mcts.policy import LinearPolicy, MHNReactPolicy
-    from synplan.ml.networks.checkpoint import load_policy_network_from_checkpoint
+
+    try:
+        from synplan.ml.networks.checkpoint import load_policy_network_from_checkpoint
+    except ModuleNotFoundError as error:
+        if error.name in {"torch", "torch_geometric"}:
+            raise ImportError(
+                "Checkpoint inference requires SynPlanner[cpu] (or a CUDA extra); use .onnx weights for the base install"
+            ) from error
+        raise
 
     policy_net = load_policy_network_from_checkpoint(
         policy_config.weights_path, batch_size=1, dropout=0

@@ -22,6 +22,8 @@ from synplan.mcts.policy.template_based import (
     LinearPolicy,
     MHNReactPolicy,
 )
+from synplan.ml.featurization import fingerprints
+from synplan.ml.featurization import rules as rule_features
 
 
 class _Rule:
@@ -110,7 +112,7 @@ def test_mhn_preparation_caches_encoded_rules(monkeypatch):
 
     monkeypatch.setattr(template_based, "rule_smarts_from_reactors", fake_rule_smarts)
     monkeypatch.setattr(
-        template_based, "rule_fingerprints_from_smarts", fake_rule_fingerprints
+        fingerprints, "rule_fingerprints_from_smarts", fake_rule_fingerprints
     )
     wrapper = _mhn_wrapper(_MHNPolicy())
     rules = [_Rule("A"), _Rule("B")]
@@ -141,7 +143,7 @@ def test_mhn_preparation_rebinds_new_rule_sequence(monkeypatch):
         return torch.full((len(rule_smarts), 4), float(len(calls)))
 
     monkeypatch.setattr(
-        template_based, "rule_fingerprints_from_smarts", fake_rule_fingerprints
+        fingerprints, "rule_fingerprints_from_smarts", fake_rule_fingerprints
     )
     wrapper = _mhn_wrapper(_MHNPolicy())
     first_rules = [_Rule("A"), _Rule("B")]
@@ -165,7 +167,7 @@ def test_mhn_preparation_passes_mhnreact_rdkit_fingerprint_config(monkeypatch):
         return torch.zeros((len(rule_smarts), 4))
 
     monkeypatch.setattr(
-        template_based, "rule_fingerprints_from_smarts", fake_rule_fingerprints
+        fingerprints, "rule_fingerprints_from_smarts", fake_rule_fingerprints
     )
     wrapper = _mhn_wrapper(_MHNRDKitPolicy())
 
@@ -183,9 +185,7 @@ def test_mhn_preparation_uses_query_cgr_rule_graphs(monkeypatch):
         calls.append((tuple(rule_smarts), schema_version))
         return [SimpleNamespace(rule=text) for text in rule_smarts]
 
-    monkeypatch.setattr(
-        template_based, "query_cgr_graphs_from_smarts", fake_rule_graphs
-    )
+    monkeypatch.setattr(rule_features, "query_cgr_graphs_from_smarts", fake_rule_graphs)
     wrapper = _mhn_wrapper(_MHNGraphPolicy())
     rules = [_Rule("A"), _Rule("B")]
 
@@ -200,7 +200,7 @@ def test_mhn_preparation_uses_query_cgr_rule_graphs(monkeypatch):
 
 def test_mhn_association_cache_is_bounded(monkeypatch):
     monkeypatch.setattr(
-        template_based,
+        fingerprints,
         "rule_fingerprints_from_smarts",
         lambda rule_smarts, _config: torch.zeros((len(rule_smarts), 4)),
     )

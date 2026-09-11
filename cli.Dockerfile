@@ -12,13 +12,13 @@ ENV UV_LINK_MODE=copy \
     UV_PYTHON=/usr/local/bin/python3 \
     UV_PROJECT_ENVIRONMENT=/app
 
-# Pre-sync dependencies with CPU-only torch (from optional-dependencies)
+# Pre-sync runtime dependencies for ONNX planning on CPU
 RUN --mount=type=cache,target=/root/.cache \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync \
         --locked \
-        --extra cpu \
+        --no-dev \
         --no-install-project
 
 # Install the project into the prepared environment
@@ -27,7 +27,7 @@ WORKDIR /src
 RUN --mount=type=cache,target=/root/.cache \
     uv sync \
         --locked \
-        --extra cpu \
+        --no-dev \
         --no-editable
 
 FROM python:3.12-slim

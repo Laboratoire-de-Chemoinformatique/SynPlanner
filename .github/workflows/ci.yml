@@ -44,7 +44,7 @@ jobs:
 
       - name: 📚Install project (incl. dev extras)
         run: |
-          uv sync --group dev --extra cpu
+          uv sync --locked --group dev --extra cpu
         shell: bash
 
       - name: ✅Run test‑suite + coverage
@@ -79,7 +79,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: |
-          uv sync --group dev --extra cpu
+          uv sync --locked --group dev --extra cpu
       - name: ruff format
         run: uv run --no-sync ruff format --check synplan tests
       - name: ruff

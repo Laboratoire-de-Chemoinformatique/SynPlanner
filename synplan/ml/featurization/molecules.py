@@ -1,35 +1,21 @@
-"""Torch tensorization of chython molecules into PyG graphs."""
+"""Shared molecular features for NumPy inference and Torch training."""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
-import torch
+import numpy as np
 from chython.containers import MoleculeContainer
 from chython.exceptions import InvalidAromaticRing
-from torch import Tensor
-from torch_geometric.data.data import Data
-from torch_geometric.transforms import ToUndirected
+
+if TYPE_CHECKING:
+    from torch import Tensor
+    from torch_geometric.data import Data
 
 
-def atom_to_vector(atom: Any) -> Tensor:
-    """Given an atom, return a vector of length 8 with the following
-    information:
-
-    1. Atomic number
-    2. Period
-    3. Group
-    4. Number of electrons + atom's charge
-    5. Shell
-    6. Total number of hydrogens
-    7. Whether the atom is in a ring
-    8. Number of neighbors
-
-    :param atom: The atom object.
-
-    :return: The vector of the atom.
-    """
-    vector = torch.zeros(8, dtype=torch.uint8)
+def atom_features(atom) -> np.ndarray:
+    """Return the eight atomic descriptors shared by inference and training."""
+    vector = np.zeros(8, dtype=np.uint8)
     period, group, shell, electrons = MENDEL_INFO[atom.atomic_symbol]
     vector[0] = atom.atomic_number
     vector[1] = period
@@ -42,47 +28,68 @@ def atom_to_vector(atom: Any) -> Tensor:
     return vector
 
 
-def bonds_to_vector(molecule: MoleculeContainer, atom_ind: int) -> Tensor:
-    """Takes a molecule and an atom index as input, and returns a vector representing
-    the bond orders of the atom's bonds.
-
-    :param molecule: The given molecule.
-    :param atom_ind: The index of the atom in the molecule to be converted to the bond
-        vector.
-    :return: The torch tensor of size 3, with each element representing the order of
-        bonds connected to the atom with the given index in the molecule.
-    """
-
-    vector = torch.zeros(3, dtype=torch.uint8)
+def bond_features(molecule: MoleculeContainer, atom_ind: int) -> np.ndarray:
+    """Count single, double and triple bonds adjacent to an atom."""
+    vector = np.zeros(3, dtype=np.uint8)
     for _, b_order in molecule.bond_items(atom_ind):
         vector[int(b_order) - 1] += 1
     return vector
 
 
+def molecule_features(molecule: MoleculeContainer) -> np.ndarray:
+    """Return the 11 features per atom for a molecule numbered from one."""
+    atoms_vectors = np.zeros((len(molecule), 11), dtype=np.uint8)
+    for n, atom in molecule.atoms():
+        atoms_vectors[n - 1][:8] = atom_features(atom)
+        atoms_vectors[n - 1][8:] = bond_features(molecule, n)
+
+    return atoms_vectors
+
+
+def atom_to_vector(atom) -> Tensor:
+    """Return atomic descriptors as a Torch tensor (legacy public API)."""
+    import torch
+
+    return torch.from_numpy(atom_features(atom))
+
+
+def bonds_to_vector(molecule: MoleculeContainer, atom_ind: int) -> Tensor:
+    """Return bond counts as a Torch tensor (legacy public API)."""
+    import torch
+
+    return torch.from_numpy(bond_features(molecule, atom_ind))
+
+
 def mol_to_matrix(molecule: MoleculeContainer) -> Tensor:
-    """Given a molecule, it returns a vector of shape (max_atoms, 12) where each row is
+    """Given a molecule, it returns a vector of shape (max_atoms, 11) where each row is
     an atom and each column is a feature.
 
     :param molecule: The molecule to be converted to a vector
     :return: The atoms vectors array.
     """
 
-    atoms_vectors = torch.zeros((len(molecule), 11), dtype=torch.uint8)
-    for n, atom in molecule.atoms():
-        atoms_vectors[n - 1][:8] = atom_to_vector(atom)
-    for n, _ in molecule.atoms():
-        atoms_vectors[n - 1][8:] = bonds_to_vector(molecule, n)
+    import torch
 
-    return atoms_vectors
+    return torch.from_numpy(molecule_features(molecule))
 
 
 def mol_to_pyg(molecule: MoleculeContainer, canonicalize: bool = True) -> Data | None:
-    """Takes a list of molecules and returns a list of PyTorch Geometric graphs, a one-
-    hot encoded vectors of the atoms, and a matrices of the bonds.
+    """Wrap the shared molecular features as a PyG graph for Torch models."""
+    import torch
+    from torch_geometric.data import Data
 
-    :param molecule: The molecule to be converted to PyTorch Geometric graph.
+    arrays = mol_to_numpy(molecule, canonicalize=canonicalize)
+    if arrays is None:
+        return None
+    return Data(**{key: torch.from_numpy(value) for key, value in arrays.items()})
+
+
+def mol_to_numpy(molecule: MoleculeContainer, canonicalize: bool = True) -> dict | None:
+    """Return atom features, directed edges and bond features as NumPy arrays.
+
+    :param molecule: The molecule to featurize.
     :param canonicalize: If True, the input molecule is canonicalized.
-    :return: The list of PyGraph objects.
+    :return: Input arrays, or None for an unsupported molecular graph.
     """
 
     if len(molecule) == 1:  # to avoid a precursor to be a single atom
@@ -109,34 +116,25 @@ def mol_to_pyg(molecule: MoleculeContainer, canonicalize: bool = True) -> Data |
     edge_index = []
     edge_attr = []
     for atom, neighbour, bond in tmp_molecule.bonds():
-        edge_index.append([atom - 1, neighbour - 1])
-        edge_attr.append(
-            [
-                float(bond.order == 1),
-                float(bond.order == 2),
-                float(bond.order == 3),
-                float(bond.in_ring),
-            ]
-        )
+        edge_index.extend([[atom - 1, neighbour - 1], [neighbour - 1, atom - 1]])
+        features = [
+            float(bond.order == 1),
+            float(bond.order == 2),
+            float(bond.order == 3),
+            float(bond.in_ring),
+        ]
+        edge_attr.extend([features, features])
     # Edgeless precursors (e.g. [NH4+].[OH-]) have no bonded fragment to expand;
     # disconnected salts still pass as long as one component has bonds.
     if not edge_index:
         return None
-    edge_index = torch.tensor(edge_index, dtype=torch.long)
-    edge_attr = torch.tensor(edge_attr, dtype=torch.float)
-
-    x = mol_to_matrix(tmp_molecule)
-
-    mol_pyg_graph = Data(
-        x=x,
-        edge_index=edge_index.t().contiguous(),
-        edge_attr=edge_attr,
-    )
-    mol_pyg_graph = ToUndirected()(mol_pyg_graph)
-
-    assert mol_pyg_graph.is_undirected()
-
-    return mol_pyg_graph
+    edge_index = np.asarray(edge_index, dtype=np.int64)
+    order = np.lexsort((edge_index[:, 1], edge_index[:, 0]))
+    return {
+        "x": molecule_features(tmp_molecule),
+        "edge_index": np.ascontiguousarray(edge_index[order].T),
+        "edge_attr": np.asarray(edge_attr, dtype=np.float32)[order],
+    }
 
 
 MENDEL_INFO = {
@@ -196,8 +194,12 @@ MENDEL_INFO = {
 
 __all__ = [
     "MENDEL_INFO",
+    "atom_features",
     "atom_to_vector",
+    "bond_features",
     "bonds_to_vector",
     "mol_to_matrix",
+    "mol_to_numpy",
     "mol_to_pyg",
+    "molecule_features",
 ]

@@ -14,7 +14,7 @@ description: >-
   Out of scope: building or contributing to SynPlanner itself, and general
   cheminformatics that does not involve reactions.
 license: MIT
-compatibility: Requires Python >=3.10,<3.15 and uv. GPU use requires CUDA 12.6 or 12.8.
+compatibility: Requires Python >=3.10,<3.15. Install with pip or uv. CUDA backend selectors use uv and CUDA 12.6 or 12.8.
 metadata:
   project: SynPlanner
   homepage: https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner
@@ -86,11 +86,32 @@ Say so when you hand over a library. `references/tasks.md` has the specifics.
 
 ## Installing
 
-Python `>=3.10,<3.15`. Three supported paths:
+Python `>=3.10,<3.15`. Use a virtual environment and choose the user's workflow:
+
+| Workflow | Install |
+| --- | --- |
+| Chemistry, ChemFrame/pandas analysis, and CPU planning with ONNX weights | `pip install SynPlanner` |
+| Reaction data curation and atom mapping | `pip install 'SynPlanner[curation]'` |
+| Model training, tutorial notebooks, and ONNX export | `pip install 'SynPlanner[training]'` |
+| Streamlit planning interface | `pip install 'SynPlanner[gui]'` |
+| All three optional workflows | `pip install 'SynPlanner[all]'` |
+| Inference with existing Torch checkpoints | `pip install 'SynPlanner[cpu]'` |
+
+The base install includes pandas for ChemFrame and general analysis and needs no
+Torch. Curation adds Torch, Chytorch's reaction mapper, and SciPy;
+training adds Torch/PyG, Lightning, AdaBelief, JupyterLab, widgets, and the ONNX exporter.
+Combine `curation` and `training` for data-to-model work.
+Launch tutorial notebooks with `jupyter lab`. For curation or atom-mapping
+tutorials, install `SynPlanner[curation,training]` or `SynPlanner[all]`.
+Install a selected tracking backend directly, e.g. `pip install wandb` or
+`pip install mlflow`; there are no logger-specific SynPlanner extras.
+
+From a source clone, use `--no-dev` for a user environment:
 
 ```bash
-pip install SynPlanner                 # users — recommended, use a virtualenv
-uv sync --extra cpu                    # from a source clone (dev)
+uv sync --no-dev                       # chemistry and ONNX planning
+uv sync --no-dev --extra training --extra cpu
+uv sync --extra cpu                    # contributors: includes the dev group
 docker build --platform linux/amd64 -t synplan:cli -f cli.Dockerfile .
 ```
 
@@ -106,7 +127,12 @@ synplan download_preset --preset synplanner-gps --save_to synplan_data
 ```
 
 Fetches from HuggingFace and prints a `key: path` map. Those paths are what
-`synplan planning` consumes. `download_all_data` still exists but is
+`synplan planning` consumes. For a preset entry ending in `.ckpt`, the downloader
+prefers a same-name `.onnx` file in the same remote folder when available.
+Use the printed path or the returned `paths["ranking_policy"]`; do not hardcode
+the checkpoint suffix. If no ONNX counterpart exists, it downloads the checkpoint,
+which needs `SynPlanner[cpu]` (or a CUDA extra), or can be exported using
+`SynPlanner[training]`. `download_all_data` still exists but is
 **deprecated** — do not use it.
 
 **2. `configs/*.yaml` are not installed by pip.** They live only in the git
@@ -125,7 +151,18 @@ and **network training** (`ranking_policy_training`, `filtering_policy_training`
 `mhn_network_tuning`, `value_network_tuning`). Everything else — planning, data
 curation, rule extraction, route analysis — runs on CPU, which is the typical case.
 
-If the user needs one of those two on a GPU, set it up for them: read
+With `uv` in a source clone, choose one backend: `cpu`, `cu126`, or `cu128`.
+Combine it with the workflow extra; `all` includes workflows, not a backend:
+
+```bash
+uv sync --no-dev --extra curation --extra cu128   # GPU atom mapping
+uv sync --no-dev --extra training --extra cu126  # GPU training
+uv sync --no-dev --extra all --extra cu128       # all workflows
+```
+
+The backend indexes are configured for `uv`; `pip install 'SynPlanner[cu128]'`
+alone does not select the CUDA wheel index. For a pip installation, select the
+Torch build through the PyTorch package index. If the user needs GPU setup, read
 [Selecting a PyTorch build](https://synplanner.readthedocs.io/en/latest/get_started/installation.html#selecting-a-pytorch-build)
 and run the install yourself. Do not hand the user a link and stop.
 

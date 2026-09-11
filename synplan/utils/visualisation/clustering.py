@@ -6,8 +6,6 @@ import base64
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from IPython.display import HTML, display
-
 from synplan.chem.reaction.routes.io import make_dict
 from synplan.chem.reaction.routes.representation.depiction import (
     _temporary_render_config,
@@ -396,35 +394,27 @@ def lg_table_2_html(subcluster, routes_to_display=None, if_display=True):
         html += f"<th style='border: 1px solid black; padding: 4px;'>{mark}</th>"
     html += "</tr>"
 
-    # Fill in the rows
-    if len(routes_to_display) == 0:
-        for route_id, route_data in subcluster["routes_data"].items():
-            html += f"<tr><td style='border: 1px solid black; padding: 4px;'>{route_id}</td>"
-            for mark in all_marks:
-                html += "<td style='border: 1px solid black; padding: 4px;'>"
-                if mark in route_data:
-                    html += depict_value(route_data[mark])
-                html += "</td>"
-            html += "</tr>"
-    else:
-        for route_id in routes_to_display:
-            # Check if the route_id exists in the subcluster data
-            if route_id in subcluster["routes_data"]:
-                route_data = subcluster["routes_data"][route_id]
-                html += f"<tr><td style='border: 1px solid black; padding: 4px;'>{route_id}</td>"
-                for mark in all_marks:
-                    html += "<td style='border: 1px solid black; padding: 4px;'>"
-                    if mark in route_data:
-                        html += depict_value(route_data[mark])
-                    html += "</td>"
-                html += "</tr>"
-            else:
-                # Optionally, you can note that the route_id was not found
-                html += f"<tr><td colspan='{len(all_marks) + 1}' style='border: 1px solid black; padding: 4px; color:red;'>Route ID {route_id} not found.</td></tr>"
+    # Fill in the rows, preserving explicit route order and missing-ID messages.
+    for route_id in routes_to_display or subcluster["routes_data"]:
+        if route_id not in subcluster["routes_data"]:
+            html += f"<tr><td colspan='{len(all_marks) + 1}' style='border: 1px solid black; padding: 4px; color:red;'>Route ID {route_id} not found.</td></tr>"
+            continue
+        route_data = subcluster["routes_data"][route_id]
+        html += (
+            f"<tr><td style='border: 1px solid black; padding: 4px;'>{route_id}</td>"
+        )
+        for mark in all_marks:
+            html += "<td style='border: 1px solid black; padding: 4px;'>"
+            if mark in route_data:
+                html += depict_value(route_data[mark])
+            html += "</td>"
+        html += "</tr>"
 
     html += "</table>"
 
     if if_display:
+        from IPython.display import HTML, display
+
         display(HTML(html))
 
     return html
@@ -468,6 +458,8 @@ def supporting_table_2_html(subcluster, routes_to_display=None, if_display=True)
     html += "</table>"
 
     if if_display:
+        from IPython.display import HTML, display
+
         display(HTML(html))
 
     return html
@@ -560,6 +552,8 @@ def group_lg_table_2_html_fixed(
     html.append("</tbody></table>")
     out = "".join(html)
     if if_display:
+        from IPython.display import HTML, display
+
         display(HTML(out))
 
     return out

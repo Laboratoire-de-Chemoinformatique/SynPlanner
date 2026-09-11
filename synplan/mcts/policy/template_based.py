@@ -7,19 +7,16 @@ from collections import OrderedDict
 from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING
 
-import torch
-
 from synplan.chem.reaction.rules import rule_query_pattern
 from synplan.chem.reaction.rules.representation import (
     rule_representation_digest,
     rule_smarts_from_reactors,
 )
 from synplan.mcts.policy.base import Policy
-from synplan.ml.featurization.fingerprints import rule_fingerprints_from_smarts
-from synplan.ml.featurization.molecules import mol_to_pyg
-from synplan.ml.featurization.rules import query_cgr_graphs_from_smarts
 
 if TYPE_CHECKING:
+    import numpy as np
+    import torch
     import torch_geometric.data
 
     from synplan.chem.precursor import Precursor
@@ -76,19 +73,30 @@ class TemplateBasedPolicy(Policy):
 
     def _get_graph(self, precursor: Precursor) -> torch_geometric.data.Data | None:
         """Convert a precursor molecule to a PyG graph."""
+        from synplan.ml.featurization.molecules import mol_to_pyg
+
         return mol_to_pyg(precursor.policy_molecule, canonicalize=False)
 
+    def _select_rules(self, probs):
+        import torch
+
+        k = min(self.top_rules, probs.numel())
+        sorted_probs, sorted_rules = torch.topk(probs, k=k, sorted=True)
+        if getattr(self.policy_net, "policy_type", "ranking") == "filtering":
+            sorted_probs = torch.softmax(sorted_probs, -1)
+        return sorted_probs, sorted_rules
+
     @abstractmethod
-    def get_logits(self, precursor: Precursor) -> torch.Tensor | None:
+    def get_logits(self, precursor: Precursor) -> torch.Tensor | np.ndarray | None:
         """Return raw per-rule logits, or ``None`` if featurization fails."""
 
     @abstractmethod
-    def get_probs(self, precursor: Precursor) -> torch.Tensor | None:
+    def get_probs(self, precursor: Precursor) -> torch.Tensor | np.ndarray | None:
         """Return per-rule probabilities, or ``None`` if featurization fails."""
 
     def _predict_rules_common(
         self, precursor: Precursor, n_rules: int
-    ) -> tuple[torch.Tensor, torch.Tensor] | None:
+    ) -> tuple[torch.Tensor, torch.Tensor] | tuple[np.ndarray, np.ndarray] | None:
         """Top-k probabilities and rule ids for a precursor, or ``None``."""
         out_dim = self.n_rules
         if out_dim != n_rules:
@@ -119,11 +127,7 @@ class TemplateBasedPolicy(Policy):
         probs = self.get_probs(precursor)
         if probs is None:
             return None
-        k = min(self.top_rules, probs.numel())
-        sorted_probs, sorted_rules = torch.topk(probs, k=k, sorted=True)
-        if getattr(self.policy_net, "policy_type", "ranking") == "filtering":
-            sorted_probs = torch.softmax(sorted_probs, -1)
-        result = sorted_probs, sorted_rules
+        result = self._select_rules(probs)
         self._proposal_cache[key] = result
         if len(self._proposal_cache) > 256:
             self._proposal_cache.popitem(last=False)
@@ -178,6 +182,8 @@ class LinearPolicy(TemplateBasedPolicy):
 
     def get_logits(self, precursor: Precursor) -> torch.Tensor | None:
         """Return raw per-rule logits (before sigmoid/softmax)."""
+        import torch
+
         pyg_graph = self._get_graph(precursor)
         if not pyg_graph:
             return None
@@ -187,6 +193,8 @@ class LinearPolicy(TemplateBasedPolicy):
 
     def get_probs(self, precursor: Precursor) -> torch.Tensor | None:
         """Return per-rule probabilities, mixing priority for filtering nets."""
+        import torch
+
         pyg_graph = self._get_graph(precursor)
         if not pyg_graph:
             return None
@@ -201,6 +209,8 @@ class LinearPolicy(TemplateBasedPolicy):
 
     def get_filtering_probs_only(self, precursor: Precursor) -> torch.Tensor | None:
         """Return the filtering rule head (sigmoid) without priority mixing."""
+        import torch
+
         if self.policy_net.policy_type != "filtering":
             raise ValueError("This method is only for filtering policy networks")
         logits = self.get_logits(precursor)
@@ -233,6 +243,11 @@ class MHNReactPolicy(TemplateBasedPolicy):
         self, reaction_rules: Sequence[CanonicalRetroReactor]
     ) -> None:
         """Encode a runtime rule set once for MHN ranking prediction."""
+        import torch
+
+        from synplan.ml.featurization.fingerprints import rule_fingerprints_from_smarts
+        from synplan.ml.featurization.rules import query_cgr_graphs_from_smarts
+
         if (
             self._rule_associations is not None
             and self._bound_reaction_rules is reaction_rules
@@ -276,6 +291,8 @@ class MHNReactPolicy(TemplateBasedPolicy):
 
     def get_logits(self, precursor: Precursor) -> torch.Tensor | None:
         """Return MHN logits for the currently prepared rule associations."""
+        import torch
+
         pyg_graph = self._get_graph(precursor)
         if not pyg_graph:
             return None
@@ -290,6 +307,8 @@ class MHNReactPolicy(TemplateBasedPolicy):
 
     def get_probs(self, precursor: Precursor) -> torch.Tensor | None:
         """Return MHN ranking probabilities for prepared runtime rules."""
+        import torch
+
         logits = self.get_logits(precursor)
         return torch.softmax(logits, dim=-1) if logits is not None else None
 

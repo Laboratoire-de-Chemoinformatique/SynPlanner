@@ -36,6 +36,14 @@ Use a virtual environment.
 
    pip install SynPlanner
 
+The base package includes chemistry tools, ChemFrame/pandas analysis, and CPU
+planning with ONNX weights. Add ``SynPlanner[curation]`` for reaction data
+preparation and atom mapping, ``SynPlanner[training]`` for training, tutorial notebooks, and ONNX
+export, ``SynPlanner[gui]`` for Streamlit, or ``SynPlanner[all]`` for all three.
+The ``training`` extra includes JupyterLab and widgets; launch tutorials with
+``jupyter lab``. Use ``SynPlanner[curation,training]`` or ``SynPlanner[all]``
+for tutorials that also prepare reaction data or run atom mapping.
+
 Verify:
 
 .. code-block:: bash
@@ -62,14 +70,14 @@ From source with uv (dev)
 
    git clone https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner.git
    cd SynPlanner/
-   uv sync --extra cpu   # add "--group docs --group dev" if you need docs or dev extras
+   uv sync --extra cpu   # includes the dev group; add --group docs to build docs
    uv run synplan --help
 
 Selecting a PyTorch build
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Most users do not need to think about this: the default PyTorch wheel for your
-platform is installed automatically and works.
+The base ONNX installation does not require PyTorch. Choose a Torch build for
+training, neural atom mapping, or inference with existing ``.ckpt`` weights.
 
 If you need a specific build (CPU-only on a GPU machine, or a particular CUDA
 version), how you select it depends on the installer.
@@ -82,15 +90,12 @@ version), how you select it depends on the installer.
    uv sync --extra cu126    # CUDA 12.6
    uv sync --extra cu128    # CUDA 12.8
 
-**With pip**, these extras change nothing. ``pip install "SynPlanner[cpu]"``
-succeeds — pip accepts the extra — but all it adds is ``torch>=2.0``, which is
-already satisfied by the transitive requirement from ``chytorch-synplan``,
-``torch-geometric`` and ``pytorch-lightning``. The index mapping that gives the
-extras their meaning lives in ``[tool.uv.sources]`` and ``[[tool.uv.index]]``,
-which pip does not read, so torch is resolved from PyPI either way. The result is
-identical to a plain ``pip install SynPlanner``. To control the build with pip, install ``torch`` from the
+**With pip**, the backend extras install Torch and PyG, but do not select a
+CPU or CUDA wheel index. The index mapping lives in ``[tool.uv.sources]`` and
+``[[tool.uv.index]]``, which pip does not read. To control the build with pip,
+install ``torch`` from the
 `PyTorch install selector <https://pytorch.org/get-started/locally/>`_ first, then
-install SynPlanner.
+install the SynPlanner workflow extra you need.
 
 To check what you ended up with:
 

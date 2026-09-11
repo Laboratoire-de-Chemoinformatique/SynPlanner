@@ -61,8 +61,8 @@ Check code against the existing project shape:
   train/validation leakage, long-tail class behavior, logger configuration,
   result directory creation, checkpointing, and GPU/CPU assumptions.
 - For logging integrations, keep optional remote services out of core
-  dependencies. Use extras such as ``SynPlanner[litlogger]``,
-  ``SynPlanner[wandb]``, ``SynPlanner[mlflow]``, or ``SynPlanner[loggers]``.
+  dependencies. Install the selected backend directly, for example with
+  ``pip install wandb``, ``pip install mlflow``, or ``pip install litlogger``.
 - Do not introduce private-library workarounds without a short comment explaining
   the dependency version or limitation being worked around.
 
