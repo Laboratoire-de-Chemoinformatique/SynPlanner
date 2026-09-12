@@ -3,6 +3,7 @@
 import pickle
 import re
 from pathlib import Path
+from time import perf_counter
 
 import click
 
@@ -31,6 +32,8 @@ def run_cluster_cli(
     cluster_results_dir: str,
     perform_subcluster: bool = False,
     subcluster_results_dir: Path | None = None,
+    *,
+    rendered_routes: dict | None = None,
 ):
     """
     Read routes from a CSV or JSON file, perform clustering, and optionally subclustering.
@@ -40,6 +43,7 @@ def run_cluster_cli(
         cluster_results_dir: Directory where clustering results are stored.
         perform_subcluster: Whether to run subclustering on each cluster.
         subcluster_results_dir: Subdirectory for subclustering results (if enabled).
+        rendered_routes: Drawings from ``routes_report_html`` for this source.
     """
     routes_file = Path(routes_file)
     match = re.search(r"_(\d+)\.", routes_file.name)
@@ -78,11 +82,15 @@ def run_cluster_cli(
         pickle.dump(clusters, f)
 
     # Generate HTML reports for each cluster
+    report_started = perf_counter()
+    click.echo("Generating cluster HTML reports")
     for idx in clusters:
         report_path = cluster_results_dir / f"{file_index}_cluster_{idx}.html"
         routes_clustering_report(
-            routes_json, clusters, idx, sb_cgrs, html_path=str(report_path)
+            routes_json, clusters, idx, sb_cgrs, html_path=str(report_path),
+            rendered_routes=rendered_routes,
         )
+    click.echo(f"Cluster HTML reports: {perf_counter() - report_started:.3f}s ({len(clusters)} reports)")
 
     # Optional subclustering
     if perform_subcluster and subcluster_results_dir:

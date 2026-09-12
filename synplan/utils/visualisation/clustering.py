@@ -6,7 +6,6 @@ import base64
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from synplan.chem.reaction.routes.io import make_dict
 from synplan.chem.reaction.routes.representation.depiction import (
     _temporary_render_config,
     cgr_display,
@@ -136,9 +135,14 @@ def routes_clustering_report(
     aam: bool = False,
     html_path: str | None = None,
     *,
+    rendered_routes: dict | None = None,
     _subcluster: tuple | None = None,
 ) -> str:
-    """Build a cluster report, sharing rendering with the subcluster adapter."""
+    """Build a cluster report, optionally reusing ``routes_report_html`` drawings.
+
+    ``rendered_routes`` must describe this source and use the requested AAM mode.
+    Missing entries are drawn normally. Chemistry is never inferred from SVGs.
+    """
     # --- Figure out what `source` is ---
     with _temporary_render_config(mapping=bool(aam)):
         using_tree = False
@@ -183,10 +187,10 @@ def routes_clustering_report(
                 if nid in tree.nodes and tree.nodes[nid].is_solved():
                     valid_routes.append(nid)
         else:
-            # JSON mode: check if the route ID exists in the routes_dict
-            routes_dict = make_dict(routes_json)
+            # Only inspect this cluster. Parsing the entire file for every page
+            # multiplies validation work by the number of clusters.
             for nid in cluster_route_ids:
-                if int(nid) in routes_dict:
+                if nid in routes_json or str(nid) in routes_json:
                     valid_routes.append(nid)
         if not valid_routes:
             return f"""
@@ -316,17 +320,17 @@ def routes_clustering_report(
         """
         layouts: dict = {}  # one geometry per molecule, shared by every route on the page
         for route_id in valid_routes:
-            route = (
-                Route.from_tree(tree, route_id)
-                if using_tree
-                else _json_route(routes_json, route_id)
-            )
-            svg = route.svg(layouts=layouts)
-            steps = (
-                [step.reaction for step in route]
-                if using_tree
-                else list(routes_dict[int(route_id)].values())
-            )
+            cached = (rendered_routes or {}).get(str(route_id))
+            if cached is not None and not using_tree and cached["aam"] == bool(aam):
+                svg, steps = cached["svg"], cached["steps"]
+            else:
+                route = (
+                    Route.from_tree(tree, route_id)
+                    if using_tree
+                    else _json_route(routes_json, route_id)
+                )
+                svg = route.svg(layouts=layouts)
+                steps = [step.reaction for step in route]
             reac_html = "".join(
                 f"<b>Step {i + 1}:</b> {r!s}<br>" for i, r in enumerate(steps)
             )

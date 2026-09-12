@@ -5,6 +5,7 @@ import logging
 import re
 import warnings
 from collections.abc import Iterable
+from functools import lru_cache
 from io import StringIO
 from typing import Literal
 
@@ -89,6 +90,7 @@ def reaction_mapping_status(reaction: ReactionContainer) -> ReactionMappingStatu
     return "fully_mapped"
 
 
+@lru_cache(maxsize=4096)
 def reaction_string_mapping_status(text: str) -> ReactionMappingStatus:
     """Classify a reaction's atom-mapping state from its raw text.
 

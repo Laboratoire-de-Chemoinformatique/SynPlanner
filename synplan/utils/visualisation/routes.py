@@ -335,6 +335,7 @@ def routes_report_html(
     stats: dict | None = None,
     prices: bool = True,
     building_blocks: Any = None,
+    rendered_routes: dict | None = None,
 ) -> str | None:
     """Write an HTML page with the given routes drawn.
 
@@ -367,6 +368,9 @@ def routes_report_html(
     :param building_blocks: The catalogue the search ran against, read only for the
         vendor names its release metadata carries. Without it a pill names its
         vendors by the short codes the records hold.
+    :param rendered_routes: Optional output mapping populated with standalone SVGs,
+        step text and AAM mode keyed by route ID (as a string). Reuse these exact
+        drawings in cluster reports or dashboards without drawing a route again.
     :return: The page when ``html_path`` is None, otherwise None.
     """
     vendors = vendor_names(building_blocks) if building_blocks is not None else {}
@@ -385,6 +389,7 @@ def routes_report_html(
         body = []
         for index, route in enumerate(routes, 1):
             rows = ""
+            step_smiles = []
             stereo_status = route.stereo_status
             if (route.stereo or {}).get("search_mode") == "off":
                 rows = '<div class="rxn">Connectivity-only search; stereochemistry was not assessed.</div>'
@@ -405,6 +410,7 @@ def routes_report_html(
                     or obligation.get("reason", "Stereo assessment needed")
                 )
             for number, step in enumerate(route, 1):
+                step_smiles.append(str(step.reaction))
                 notes = list(issues_by_step.get(number - 1, ()))
                 if stereo_status == "needs_reassessment" and (
                     notes or step.reaction.meta.get("stereo_events")
@@ -419,7 +425,7 @@ def routes_report_html(
                     f'<div class="step"><div class="disc">{number}</div><div>'
                     + (f'<div class="lab">{escape(label)}</div>' if label else "")
                     + stereo_note
-                    + f'<div class="rxn mono">{escape(str(step.reaction))}</div>'
+                    + f'<div class="rxn mono">{escape(step_smiles[-1])}</div>'
                     + "</div></div>"
                 )
             provenance = route.provenance
@@ -432,6 +438,14 @@ def routes_report_html(
             )
             node_id = None if provenance is None else provenance.tree_node_id
             score = None if provenance is None else provenance.search_score
+            svg = route.svg(standalone=False, layouts=layouts, prices=pills)
+            if rendered_routes is not None:
+                head = svg.index(">") + 1
+                rendered_routes[str(index if node_id is None else node_id)] = {
+                    "svg": f"{svg[:head]}<defs>{ARROW_DEFS}</defs><style>{ROUTE_CSS}</style>{svg[head:]}",
+                    "steps": step_smiles,
+                    "aam": bool(aam),
+                }
             body.append(
                 '<section class="route card"><div class="rhead">'
                 f'<div class="kv"><div class="eyebrow">Route ID</div>'
@@ -445,7 +459,7 @@ def routes_report_html(
                 '<button class="act" data-act="svg">SVG</button>'
                 '<button class="act" data-act="png">PNG</button></div></div>'
                 f'<div class="draw">'
-                f"{doc.route(route.svg(standalone=False, layouts=layouts, prices=pills))}"
+                f"{doc.route(svg)}"
                 f"</div>{rows}</section>"
             )
 

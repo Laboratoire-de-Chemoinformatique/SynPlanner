@@ -141,6 +141,33 @@ def test_each_route_offers_zoom_and_export_as_buttons(page):
     assert "cursor:zoom-in" not in page  # the drawing is not the control any more
 
 
+def test_cluster_report_reuses_standalone_drawings_without_parsing(routes, monkeypatch):
+    from synplan.utils.visualisation import routes_clustering_report
+
+    rendered = {}
+    routes_report_html(routes, None, rendered_routes=rendered)
+    source = {str(r.provenance.tree_node_id): r.to_json() for r in routes}
+    ids = list(source)
+    clusters = {"test": {"route_ids": ids}}
+    for value in rendered.values():
+        defined = set(re.findall(r'\bid="([^"]+)"', value["svg"]))
+        used = {a or b for a, b in _REFERENCE.findall(value["svg"])}
+        assert used <= defined
+        assert not value["aam"] and '-mapping"' not in value["svg"]
+
+    def unexpected(*args, **kwargs):
+        raise AssertionError("A cached cluster report reparsed or redrew a route")
+
+    monkeypatch.setattr(Route, "from_json", unexpected)
+    monkeypatch.setattr(Route, "svg", unexpected)
+    html = routes_clustering_report(source, clusters, "test", {}, rendered_routes=rendered)
+    for rid in ids:
+        assert rendered[rid]["svg"] in html
+        assert f"Route {rid} — {len(rendered[rid]['steps'])} steps" in html
+    with pytest.raises(AssertionError, match="reparsed"):
+        routes_clustering_report(source, clusters, "test", {}, aam=True, rendered_routes=rendered)
+
+
 def test_every_drawing_reference_is_defined_on_the_page(page):
     """Export re-inlines what a drawing points at, so nothing may point off-page."""
     defined = set(re.findall(r'<(?:g|marker)[^>]*\bid="([^"]+)"', page))
