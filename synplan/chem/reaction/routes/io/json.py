@@ -362,6 +362,9 @@ def _make_json_v1(
 
     # Prepare output
     all_routes = {} if keep_ids else []
+    # Search routes share molecule objects. Recheck each once against this stock,
+    # scoped to this export; never cache mutable chemistry between calls.
+    stock_verdicts = {}
 
     for route_id, steps in routes_dict.items():
         if not steps:
@@ -416,7 +419,12 @@ def _make_json_v1(
             return step_id, reaction, product
 
         def purchasable(molecule, key, leaf, _bb=building_blocks):
-            return _purchasable(key, molecule, _bb, leaf)
+            if _bb is None:
+                return leaf
+            identity = id(molecule)
+            if identity not in stock_verdicts:
+                stock_verdicts[identity] = _purchasable(key, molecule, _bb, leaf)
+            return stock_verdicts[identity]
 
         def step_fields(step_id, _steps=steps, _meta=route_step_metadata):
             reaction = _steps[step_id]

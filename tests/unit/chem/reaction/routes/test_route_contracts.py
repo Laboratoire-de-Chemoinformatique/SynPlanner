@@ -90,6 +90,30 @@ def test_route_json_and_csv_preserve_reaction_metadata(tmp_path):
     assert read_routes_csv(csv_path)[1][0].meta["source"] == "unit-test"
 
 
+def test_export_checks_shared_stock_once_but_refreshes_between_exports(monkeypatch):
+    import synplan.chem.reaction.routes.io.json as route_io
+
+    reaction = smiles("[CH3:1][OH:2]>>[CH2:1]=[O:2]")
+    routes = {rid: {0: reaction} for rid in range(5)}
+    stock = {str(reaction.reactants[0])}
+    check = route_io._purchasable
+    checked = []
+
+    def counted(*args):
+        checked.append(id(args[1]))
+        return check(*args)
+
+    monkeypatch.setattr(route_io, "_purchasable", counted)
+    result = make_json(routes, building_blocks=stock)
+    assert len(checked) == len(set(checked)) == 2
+    assert all(r["children"][0]["children"][0]["in_stock"] for r in result.values())
+    stock.clear()
+    changed = make_json(routes, building_blocks=stock)
+    assert all(not r["children"][0]["children"][0]["in_stock"] for r in changed.values())
+    # Without a catalogue, a leaf retains the legacy positional stock verdict.
+    assert make_json(routes)[0]["children"][0]["children"][0]["in_stock"]
+
+
 def test_route_csv_preserves_legacy_non_json_metadata(tmp_path):
     csv_path = tmp_path / "legacy.csv"
     csv_path.write_text(

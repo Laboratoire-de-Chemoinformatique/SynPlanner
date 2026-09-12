@@ -300,6 +300,27 @@ def test_compose_sb_cgr_preserves_unchanged_charged_atoms_with_charge_delta():
     assert "O0>-" not in str(sb_cgr)
 
 
+@pytest.mark.parametrize("reaction", [
+    "[CH3:1][CH2:2][Br:9].[OH:3]>>[CH3:1][CH2:2][OH:3].[Br:9]",
+    "[CH3:8][CH2:7][OH:1]>>[CH2:8]=[CH2:7].[OH2:1]",
+    "[NH2:1][CH3:2].[Cl-:9]>>[NH3+:1][CH3:2].[Cl-:9]",
+])
+def test_sb_target_connectivity_matches_decomposition_without_building_molecules(
+    reaction, monkeypatch
+):
+    cgr = ~smiles(reaction)
+    expected = set(min(ReactionContainer.from_cgr(cgr).products, key=lambda m: min(m)))
+    before = str(cgr)
+
+    def no_decomposition(*args, **kwargs):
+        pytest.fail("SB reduction only needs product connectivity")
+
+    monkeypatch.setattr(ReactionContainer, "from_cgr", no_decomposition)
+    result = compose_sb_cgr(cgr)
+    assert set(result) == expected
+    assert str(cgr) == before
+
+
 def _reaction_atom_maps(reaction):
     return {
         "reactants": sorted(sorted(molecule) for molecule in reaction.reactants),

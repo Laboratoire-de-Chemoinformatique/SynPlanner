@@ -1,6 +1,6 @@
 """Strategic-bond CGR (SB-CGR) representation derived from a RouteCGR."""
 
-from chython.containers import CGRContainer, ReactionContainer
+from chython.containers import CGRContainer
 from chython.containers.bonds import DynamicBond
 
 from synplan.chem.reaction.routes.representation.state import (
@@ -26,17 +26,23 @@ def compose_sb_cgr(route_cgr: CGRContainer):
     # Get the RouteCGR component with the target product.  Route construction
     # keeps target atoms at the lowest atom numbers, while later leaving-group
     # atoms can be remapped above that range.
-    cgr_prods = [route_cgr.substructure(c) for c in route_cgr.connected_components]
-    target_cgr = min(cgr_prods, key=lambda cgr: min(cgr))
+    target_cgr = route_cgr.substructure(min(route_cgr.connected_components, key=min))
 
-    # `ReactionContainer.from_cgr` may split off several product fragments
-    # (leaving groups, salts, etc.).  The target product is the fragment with
+    # The product side may split into several fragments (leaving groups, salts,
+    # etc.). The target product is the fragment with
     # the lowest atom numbers; after deleting leaving-group bonds we should
     # return exactly these atoms, not whichever connected component happens to
     # be yielded first.
-    reaction = ReactionContainer.from_cgr(target_cgr)
-    target_product = min(reaction.products, key=lambda mol: min(mol))
-    target_atom_nums = set(target_product)
+    # Only connectivity is needed: rebuilding both molecule sides runs chemical
+    # structure repair for every added bond, once per route.
+    target_atom_nums = {min(target_cgr)}
+    pending = list(target_atom_nums)
+    while pending:
+        atom = pending.pop()
+        for neighbour, bond in target_cgr._bonds[atom].items():
+            if bond.p_order is not None and neighbour not in target_atom_nums:
+                target_atom_nums.add(neighbour)
+                pending.append(neighbour)
 
     # a snapshot, because the loop rewrites the bonds it walks; chython yields
     # each edge once, so there is nothing to deduplicate
