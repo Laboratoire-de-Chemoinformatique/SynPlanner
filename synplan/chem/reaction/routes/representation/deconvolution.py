@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from hashlib import sha256
+
 from chython.containers import CGRContainer, ReactionContainer
 
 from synplan.chem.reaction.routes.representation.state import (
@@ -75,18 +77,38 @@ def _step_cgr(route_cgr: CGRContainer, step: int) -> CGRContainer:
 
 
 def reactions_from_route_cgr(route_cgr: CGRContainer) -> dict[int, ReactionContainer]:
-    """Reconstruct mapped reaction steps from native RouteCGR labels."""
+    """Reconstruct mapped steps, retaining depths for unchanged recomposition.
+
+    ``route_cgr_depth`` reaction metadata records the source depth and a mapped
+    graph digest. Composition ignores it if steps are edited, reordered, added
+    or removed. Older CGRs without depth records retain the inference fallback.
+    """
     from synplan.chem.reaction.routes.representation.stereo import restore
 
     snapshots = getattr(route_cgr, "route_stereo_steps", None)
+    depths = getattr(route_cgr, "route_step_depths", {})
+    steps = _step_ids(route_cgr)
+    sequence = sha256(
+        "".join(
+            depths[str(step)]["graph"] for step in steps if str(step) in depths
+        ).encode()
+    ).hexdigest()
     reactions = {}
-    for step in _step_ids(route_cgr):
+    for step in steps:
         cgr = _step_cgr(route_cgr, step)
         reactions[step - 1] = (
             restore(snapshots[str(step)], cgr)
             if snapshots is not None
             else ReactionContainer.from_cgr(cgr)
         )
+        reactions[step - 1].meta.pop("route_cgr_depth", None)
+        if str(step) in depths:
+            reactions[step - 1].meta["route_cgr_depth"] = {
+                **depths[str(step)],
+                "step": step,
+                "steps": len(steps),
+                "sequence": sequence,
+            }
     return reactions
 
 

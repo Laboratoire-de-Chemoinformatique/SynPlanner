@@ -62,16 +62,36 @@ post-processing metadata attachment is required.
     composed = compose_route_cgr(tree, route_id, preserve_transient_bonds=True)
     restored_reactions = routes_dict_from_route_cgrs({route_id: composed["cgr"]})
 
-RouteCGR composition assumes route-level atom mapping. The same atom-map number
-must refer to the same chemical atom throughout the route, and distinct atoms
-must not reuse the same map number. Independently mapped reaction steps with
-local atom numbering are not supported as direct input and may produce undefined
-composition or deconvolution behavior.
+For a detached ``Route``, use ``build_route_cgr(route)`` or ``route.route_cgr()``.
+These reconcile atom numbers across steps using the route's producer/consumer
+identities. The final reaction retains its numbers. Unrelated atoms that reuse a
+number, even atoms of the same element, receive fresh numbers above the maximum
+input ID. Already consistent global numbering remains unchanged.
+
+``route.to_json(reconcile_atom_mapping=True)`` uses that same reconciliation and
+preserves the existing step connections. It does not infer dependencies from
+shared atom numbers. ``build_route_cgr(route, include_reactions=True)`` also returns
+``mapped_route`` and ``atom_mapping`` (step index to local-to-global atom IDs), so
+callers can use the reconciled route without reconstructing molecule connections.
+Neither operation changes the input route.
+
+Bare reaction dictionaries still require route-level atom mapping: each number
+must identify the same atom throughout the route. Use a ``Route`` with explicit
+dependencies when the reaction steps reuse local numbers. Tree-based callers
+retain their existing reconciliation path.
 
 Deconvolution reconstructs ``ReactionContainer`` steps from labels stored on
 RouteCGR atoms and bonds. It does not promise exact planning-tree JSON, sibling
 ordering, UI metadata, or the original formatted mapped reaction SMILES. Those
 are serialization concerns outside the bare RouteCGR representation.
+
+Deconvolved reactions retain their source depths in ``route_cgr_depth`` metadata.
+Recomposing the complete, unchanged dictionary reuses these depths, preserving
+exact RouteCGR identity. Graph digests and step positions prevent reuse after
+mapped chemistry or the reaction sequence changes. Missing or stale records use
+the existing dictionary depth inference; use an explicit ``Route`` to determine
+dependencies after editing. Older RouteCGRs without depth records use that same
+fallback.
 
 For tests and debugging, ``compose_route_cgr(..., return_reactions_dict=True)``
 can also return the composed per-step reactions eagerly, but this is deliberately

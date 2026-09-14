@@ -1,4 +1,7 @@
 import logging
+from copy import deepcopy
+from dataclasses import replace
+from hashlib import sha256
 from typing import TYPE_CHECKING
 
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
@@ -18,12 +21,15 @@ from synplan.chem.reaction.routes.representation.state import (
     transient_bond,
 )
 from synplan.chem.reaction.routes.representation.stereo import (
+    graph_digest,
     remap_source_cgr,
     snapshot,
 )
+from synplan.chem.reaction.routes.traversal import steps_by_product
 from synplan.chem.stereo import has_stereo
 
 if TYPE_CHECKING:
+    from synplan.chem.reaction.routes.route import Route
     from synplan.mcts.tree import Tree
 
 logger = logging.getLogger(__name__)
@@ -77,6 +83,28 @@ def _route_order_depths(reactions):
         return depths[idx]
 
     return [depth(idx) for idx in range(len(reactions))]
+
+
+def _recorded_route_depths(reactions, cgrs):
+    """Reuse deconvolved depths only for the complete, unchanged step sequence."""
+    records = [reaction.meta.get("route_cgr_depth") for reaction in reactions]
+    if not all(isinstance(record, dict) for record in records):
+        return None
+    graphs = [graph_digest(cgr) for cgr in cgrs]
+    sequence = sha256("".join(graphs).encode()).hexdigest()
+    depths = []
+    for step, (record, graph) in enumerate(zip(records, graphs), 1):
+        if (
+            record.get("sequence") != sequence
+            or record.get("step") != step
+            or record.get("steps") != len(reactions)
+            or type(record.get("depth")) is not int
+            or record["depth"] < 1
+            or record.get("graph") != graph
+        ):
+            return None
+        depths.append(record["depth"])
+    return depths
 
 
 def _record_route_orders(
@@ -503,7 +531,7 @@ class _Fold:
     label and finish identically; only what happens to a step in between differs.
     """
 
-    def __init__(self, reactions, return_reactions_dict: bool):
+    def __init__(self, reactions, return_reactions_dict: bool, route_orders=None):
         self.cgrs = [reaction.compose() for reaction in reactions]
         self.stereo_sources = {}
         self.preserve_stereo = any(
@@ -514,8 +542,13 @@ class _Fold:
                 cgr._stereo_source = reaction.copy()
         # Depth is kept for route interpretation; step order preserves exact
         # chronological route identity for hashing.
-        self.route_orders = _route_order_depths(reactions)
+        if route_orders is None:
+            route_orders = _recorded_route_depths(reactions, self.cgrs)
+        self.route_orders = (
+            _route_order_depths(reactions) if route_orders is None else route_orders
+        )
         self.step_orders = list(range(1, len(reactions) + 1))
+        self.step_depths = {}
         self.bond_route_orders = {}
         self.atom_route_orders = {}
         self.bond_step_orders = {}
@@ -540,6 +573,10 @@ class _Fold:
     def label(self, step: int, cgr) -> None:
         """Record one step's deconvolution labels and route orders."""
 
+        self.step_depths[str(step + 1)] = {
+            "depth": self.route_orders[step],
+            "graph": graph_digest(cgr),
+        }
         if self.preserve_stereo:
             self.stereo_sources[str(step + 1)] = snapshot(cgr._stereo_source, cgr)
 
@@ -580,6 +617,7 @@ class _Fold:
             preserve_transient_bonds,
         )
         result = {"cgr": enable_route_cgr_container(self.accum)}
+        self.accum.route_step_depths = self.step_depths
         self.accum.__dict__.pop("_stereo_source", None)
         if self.preserve_stereo:
             self.accum.route_stereo_steps = self.stereo_sources
@@ -763,14 +801,129 @@ def _compose_route_cgr_legacy(
         return None
 
 
+def _reconcile_route(
+    route: "Route",
+) -> tuple["Route", dict[int, dict[int, int]], list[int]]:
+    """Return a detached, globally mapped route, atom correspondence and depths.
+
+    An atom is initially identified by (step, local number). Only a real
+    producer/consumer edge equates atoms from different steps. In particular,
+    equal elements or equal molecule spellings do not establish atom identity.
+    The final reaction keeps its numbers; other collisions are allocated above
+    the maximum input number. Already reconciled routes keep all their numbers.
+    """
+    route = deepcopy(route)
+    made = steps_by_product(route.steps)
+    atoms = [
+        sorted({n for mol in step.reaction.molecules() for n in mol}) for step in route
+    ]
+    parents = {(i, n): (i, n) for i, numbers in enumerate(atoms) for n in numbers}
+
+    def root(key):
+        while parents[key] != key:
+            parents[key] = parents[parents[key]]
+            key = parents[key]
+        return key
+
+    successors = {i: set() for i in range(len(route))}
+    for consumer, step in enumerate(route):
+        for molecule in step.reaction.reactants:
+            producer = made.get(id(molecule))
+            if producer is None:
+                continue
+            successors[producer].add(consumer)
+            for number in molecule:
+                parents[root((producer, number))] = root((consumer, number))
+
+    next_number = max((n for numbers in atoms for n in numbers), default=0) + 1
+    assigned, owners, mappings = {}, {}, {}
+    depths = [1] * len(route)
+    for index in reversed(range(len(route))):
+        mapping = {}
+        for number in atoms[index]:
+            identity = root((index, number))
+            if identity not in assigned:
+                if number in owners:
+                    assigned[identity] = next_number
+                    next_number += 1
+                else:
+                    assigned[identity] = number
+                owners[assigned[identity]] = identity
+            mapping[number] = assigned[identity]
+        mappings[index] = mapping
+        if successors[index]:
+            depths[index] = 1 + min(depths[s] for s in successors[index])
+
+    rebuilt = []
+    for index, step in enumerate(route):
+        mapping = mappings[index]
+
+        def remapped(molecule, mapping=mapping):
+            result = molecule.copy()
+            result.remap({n: mapping[n] for n in molecule})
+            return result
+
+        reactants = [
+            rebuilt[made[id(m)]].product if id(m) in made else remapped(m)
+            for m in step.reaction.reactants
+        ]
+        products = [remapped(m) for m in step.reaction.products]
+        chosen = next(
+            i for i, m in enumerate(step.reaction.products) if m is step.product
+        )
+        reaction = ReactionContainer(
+            reactants,
+            products,
+            reagents=[remapped(m) for m in step.reaction.reagents],
+            meta=deepcopy(step.reaction.meta),
+        )
+        rebuilt.append(replace(step, reaction=reaction, product=products[chosen]))
+    return replace(route, steps=tuple(rebuilt)), mappings, depths
+
+
 def build_route_cgr(
     tree_or_routes,
-    route_id,
+    route_id=None,
     preserve_transient_bonds: bool = True,
     *,
     include_reactions: bool = False,
 ) -> RouteCGRBuildResult:
-    """Build a RouteCGR and report recoverable composition failures explicitly."""
+    """Compose a Route, tree or globally mapped reaction dictionary.
+
+    A Route supplies explicit dependencies for full atom reconciliation. With
+    ``include_reactions``, its result also carries a detached mapped Route and
+    per-step input-to-global atom maps. Legacy dict/tree callers are unchanged.
+    """
+    from synplan.chem.reaction.routes.route import Route
+
+    if isinstance(tree_or_routes, Route):
+        try:
+            mapped, atom_mapping, depths = _reconcile_route(tree_or_routes)
+            fold = _Fold(list(mapped.reactions_dict.values()), False, depths)
+            for index in reversed(range(len(mapped) - 1)):
+                current = fold.cgrs[index]
+                fold.label(index, current)
+                fold.accum = _compose_cgrs(
+                    current, fold.accum, preserve_transient_bonds
+                )
+            cgr = fold.finish(preserve_transient_bonds)["cgr"]
+            return RouteCGRBuildResult(
+                route_id=route_id,
+                cgr=cgr,
+                reactions_dict=mapped.reactions_dict if include_reactions else None,
+                mapped_route=mapped if include_reactions else None,
+                atom_mapping=atom_mapping if include_reactions else None,
+            )
+        except (ValueError, KeyError, IndexError) as error:
+            return RouteCGRBuildResult(
+                route_id=route_id,
+                diagnostic=RouteDiagnostic(
+                    route_id=route_id,
+                    stage="route_cgr_composition",
+                    message=str(error),
+                    exception_type=type(error).__name__,
+                ),
+            )
 
     result = _compose_route_cgr_legacy(
         tree_or_routes,
