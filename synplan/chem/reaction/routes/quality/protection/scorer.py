@@ -25,6 +25,7 @@ from synplan.chem.reaction.routes.quality.protection.scanner import (
     CompetingInteraction,
     RouteScanner,
 )
+from synplan.chem.reaction.routes.route import Route
 
 
 class CompetingSitesScore:
@@ -56,7 +57,7 @@ class CompetingSitesScore:
         self._scanner = scanner
 
     def score_route(
-        self, route: dict[int, ReactionContainer]
+        self, route: Route | dict[int, ReactionContainer]
     ) -> tuple[float, list[CompetingInteraction]]:
         """Compute the S(T) score for a single route.
 

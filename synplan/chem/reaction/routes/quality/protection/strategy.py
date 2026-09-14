@@ -213,6 +213,24 @@ class ProtectionPlanner:
             for group in self._groups.get(label, ())
         ]
 
+    def ranked_candidates(
+        self,
+        interaction: CompetingInteraction,
+        molecule: MoleculeContainer,
+    ) -> list[ProtectingGroup]:
+        """Rank every supported template for one exact mapped site."""
+        allowed = self.candidates(interaction.fg_name)
+        return (
+            self._classifier.rank(
+                interaction.fg_name,
+                molecule,
+                interaction.fg_atoms,
+                allowed,
+            )
+            if allowed
+            else []
+        )
+
     def plan(
         self,
         interactions: list[CompetingInteraction],

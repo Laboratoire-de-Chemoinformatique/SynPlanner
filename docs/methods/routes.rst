@@ -115,3 +115,67 @@ For route serialization, ``build_route_trees()`` returns a ``RouteExportResult``
 with all skipped-route diagnostics. ``make_json()`` retains the existing v1
 dict/list output, while ``strict=True`` on ``build_route_trees()`` or
 ``write_routes_json()`` raises before writing an incomplete export.
+
+Protecting-group revision
+========================
+
+``ProtectionRouteReviser`` proposes protection/deprotection insertions in a detached
+``Route``. It scans competing and incompatible functional groups, tries the bundled
+single-attachment templates in deterministic order, and returns one revised route.
+The input route and search tree are not modified.
+
+.. code-block:: python
+
+    from synplan.chem.reaction.routes.quality.protection import (
+        ProtectionRevisionConfig,
+        ProtectionRouteReviser,
+    )
+
+    reviser = ProtectionRouteReviser.from_config(
+        ProtectionRevisionConfig(max_revisions_per_route=5)
+    )
+    result = reviser.revise_route(route)
+    if result.accepted:
+        revised = result.route
+        print(result.original_score, result.revised_score)
+        print(result.original_to_final)
+        for action in result.actions:
+            print(action.anchor_atom, action.new_step_ids, action.protected_step_ids)
+    else:
+        for diagnostic in result.diagnostics:
+            print(diagnostic.reason, diagnostic.detail)
+
+A protection step precedes the affected transformation. The group follows the
+actual intermediate dependencies through spectator transformations, and deprotection
+occurs before that site next reacts, or at the end of its path. Identical molecules
+on different branches remain distinct occurrences. Multiple consumers of a protected
+intermediate and sites found only on by-products are reported as unsupported.
+
+Every insertion must reduce the targeted interaction, improve the competing-sites
+score, preserve the target and pass RouteCGR/SB-CGR checks. All original RouteCGR
+atom IDs remain fixed, including atoms absent from the final target. Newly introduced
+atoms are numbered above the largest original ID. Transient PG bonds and per-step
+states are retained in the revised RouteCGR, while the mapped chemical structure of
+the SB-CGR remains unchanged. Route-order metadata is regenerated, not compared as
+part of SB-CGR chemical equality.
+
+``original_to_final`` maps zero-based input step positions to final positions.
+``new_step_ids`` contains the final protection, affected transformation and
+deprotection positions. ``protected_step_ids`` lists the transformations through
+which the group was carried. All earlier action references are updated after later
+insertions. Drawings display these positions plus one. Diagnostics use input step
+positions; remaining interactions use final positions.
+
+The result also contains ``remaining_interactions`` and structured diagnostics for
+unknown interactions, incomplete scans, unsupported templates, rejected candidates,
+and the revision limit. A route without an accepted insertion is returned unchanged.
+The default limit is five accepted insertions, configurable down to zero. Existing
+leaf availability and search provenance are retained; newly introduced reagents are
+unresolved unless the input already identifies that material as available. Existing
+stereo is preserved and changed routes use the normal stereo reassessment mechanism.
+Reaction metadata records each insertion and survives ``Route.to_json()`` /
+``Route.from_json()``.
+
+The templates provide graph proposals, not reaction-condition validation. Unsupported
+carbonyl protection templates are not approximated; no trained PG ranking model is
+required by the default rule-based classifier.

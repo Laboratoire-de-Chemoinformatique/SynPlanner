@@ -1,4 +1,4 @@
-"""Route quality assessment and re-ranking."""
+"""Route protection scoring and revision."""
 
 from synplan.chem.reaction.routes.quality.protection.config import ProtectionConfig
 from synplan.chem.reaction.routes.quality.protection.functional_groups import (
@@ -13,8 +13,16 @@ from synplan.chem.reaction.routes.quality.protection.reaction_classifier import 
     classify_reaction_type_detailed,
     get_reaction_center_atoms,
 )
+from synplan.chem.reaction.routes.quality.protection.revision import (
+    ProtectionRevisionAction,
+    ProtectionRevisionConfig,
+    ProtectionRevisionDiagnostic,
+    ProtectionRouteReviser,
+    RevisedRoute,
+)
 from synplan.chem.reaction.routes.quality.protection.scanner import (
     CompetingInteraction,
+    CompetingScanResult,
     IncompatibilityMatrix,
     RouteScanner,
 )
@@ -27,6 +35,7 @@ from synplan.chem.reaction.routes.quality.scorer import (
 
 __all__ = [
     "CompetingInteraction",
+    "CompetingScanResult",
     "CompetingSitesScore",
     "FunctionalGroupDetector",
     "FunctionalGroupMatch",
@@ -35,7 +44,12 @@ __all__ = [
     "IncompatibilityMatrix",
     "PolicyLikelihoodScorer",
     "ProtectionConfig",
+    "ProtectionRevisionAction",
+    "ProtectionRevisionConfig",
+    "ProtectionRevisionDiagnostic",
+    "ProtectionRouteReviser",
     "ProtectionRouteScorer",
+    "RevisedRoute",
     "RouteScanner",
     "RouteScorer",
     "classify_reaction_type",

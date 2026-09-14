@@ -1,6 +1,7 @@
 """Configuration for the protection strategy module."""
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 
@@ -31,3 +32,14 @@ class ProtectionConfig(BaseConfigModel):
     allowed_labels_path: str = str(_DATA_DIR / "reactive_function_label_mapping.json")
     score_weight: float = Field(default=0.5, ge=0.0, le=1.0)
     enable_reranking: bool = True
+
+
+class ProtectionRevisionConfig(ProtectionConfig):
+    """Bounded template-based revision; mapping and SB-CGR checks are mandatory."""
+
+    max_revisions_per_route: int = Field(default=5, ge=0)
+    min_score_improvement: float = Field(default=1e-6, gt=0)
+    candidate_severities: tuple[Literal["incompatible", "competing"], ...] = (
+        "incompatible",
+        "competing",
+    )

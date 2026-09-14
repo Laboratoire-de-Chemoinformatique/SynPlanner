@@ -94,6 +94,9 @@ _EXPORTS = {
     "depict_custom_reaction": "representation.depiction",
     "wide_cgr_renderer": "representation.depiction",
     # quality
+    "ProtectionRevisionConfig": "quality.protection.config",
+    "ProtectionRouteReviser": "quality.protection.revision",
+    "RevisedRoute": "quality.protection.revision",
     "ProtectionRouteScorer": "quality.scorer",
     "RouteScorer": "quality.scorer",
 }
