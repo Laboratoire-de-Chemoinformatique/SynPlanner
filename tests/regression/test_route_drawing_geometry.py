@@ -105,7 +105,8 @@ def test_a_drawn_route_has_bonds_of_one_length(route, align):
     assert max(lengths) <= MAX_BOND
 
 
-def test_drawing_leaves_the_route_molecules_where_the_reactor_put_them(route):
+@pytest.mark.parametrize("compact", [False, True])
+def test_drawing_leaves_the_route_molecules_where_the_reactor_put_them(route, compact):
     """The tree holds these very objects; the drawer may not relayout them."""
 
     molecules = [
@@ -114,5 +115,65 @@ def test_drawing_leaves_the_route_molecules_where_the_reactor_put_them(route):
         for mol in (*step.reaction.reactants, *step.reaction.products)
     ]
     before = {id(mol): coordinates(mol) for mol in molecules}
-    route.svg()
+    route.svg(compact=compact)
     assert {id(mol): coordinates(mol) for mol in molecules} == before
+
+
+def test_compact_spacing_preserves_molecule_scale_and_default_rendering(route):
+    from synplan.utils.svgslim import content_key
+
+    layouts = {}
+    default = route.svg(layouts=layouts)
+    compact = route.svg(layouts=layouts, compact=True)
+    normal_root, compact_root = ET.fromstring(default), ET.fromstring(compact)
+    if not all(
+        float(compact_root.get(axis)) < float(normal_root.get(axis))
+        for axis in ("width", "height")
+    ):
+        pytest.fail("Compact rendering did not reduce the canvas")
+    normal_mols = normal_root.find(f"{_SVG}g").findall(f"{_SVG}svg")
+    compact_mols = compact_root.find(f"{_SVG}g").findall(f"{_SVG}svg")
+    for normal, smaller in zip(normal_mols, compact_mols, strict=True):
+        for dimension in ("viewBox", "width", "height"):
+            if normal.get(dimension) != smaller.get(dimension):
+                pytest.fail("Compact rendering resized a molecule")
+    if content_key(default) != content_key(route.svg(layouts=layouts)):
+        pytest.fail("Compact settings leaked into default rendering")
+
+
+def test_explicit_spacing_overrides_compact_preset(route):
+    from synplan.utils.svgslim import content_key
+
+    layouts = {}
+    default = route.svg(layouts=layouts)
+    overridden = route.svg(
+        layouts=layouts, compact=True, box_pad=9, row_gap=34, col_gap=74
+    )
+    if content_key(default) != content_key(overridden):
+        pytest.fail("Explicit spacing did not override the compact preset")
+
+
+@pytest.mark.parametrize("prices_enabled", [False, True])
+def test_compact_boxes_and_captions_do_not_overlap(route, prices_enabled):
+    prices = (
+        {id(leaf): ("$10/g", "{}") for leaf in route.leaves()}
+        if prices_enabled
+        else None
+    )
+    drawing = ET.fromstring(route.svg(compact=True, prices=prices))
+    group = drawing.find(f"{_SVG}g")
+    boxes = [
+        tuple(float(rect.get(value)) for value in ("x", "y", "width", "height"))
+        for rect in group.findall(f"{_SVG}rect")
+    ]
+    # Caption and optional price space are part of each box's vertical footprint.
+    band = 31 if prices_enabled else 0
+    for index, (x, y, width, height) in enumerate(boxes):
+        for xx, yy, ww, hh in boxes[index + 1 :]:
+            if (
+                x < xx + ww
+                and xx < x + width
+                and y - 14 < yy + hh + band
+                and yy - 14 < y + height + band
+            ):
+                pytest.fail("Compact boxes or their caption bands overlap")

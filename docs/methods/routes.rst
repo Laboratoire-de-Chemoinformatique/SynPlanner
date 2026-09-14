@@ -104,6 +104,25 @@ reaction steps. Generated benchmark data and round-trip result folders are
 local artifacts and should not be committed.
 
 
+Compact route drawings
+======================
+
+``Route.svg(compact=True)`` reduces box padding to 5 px, vertical subtree gaps
+to 20 px and column gaps to 50 px. It also packs branches into unused vertical
+space while keeping molecule scale, branch order and connector separation. The
+default rendering, including ``display(route)``, is unchanged.
+
+.. code-block:: python
+
+    from IPython.display import SVG, display
+
+    display(SVG(route.svg(compact=True)))
+
+Explicit ``box_pad``, ``row_gap`` and ``col_gap`` values (in pixels) override the
+preset, for example ``route.svg(compact=True, row_gap=24)``. Leave room for role
+captions and reaction numbers when reducing gaps. Price labels reserve their
+additional vertical band automatically.
+
 Typed Route APIs
 ================
 

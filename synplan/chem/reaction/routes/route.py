@@ -538,6 +538,11 @@ class Route:
         standalone: bool = True,
         layouts: Layouts = None,
         prices: Prices = None,
+        *,
+        compact: bool = False,
+        box_pad: float | None = None,
+        row_gap: float | None = None,
+        col_gap: float | None = None,
     ) -> str:
         """Draw the route as an SVG.
 
@@ -550,6 +555,10 @@ class Route:
             cards. Precursor copies align to their own product when ``align=True``.
         :param prices: Pill label and click payload per leaf id, drawn under the
             leaf's box. See :func:`~synplan.utils.routedraw.draw_route`.
+        :param compact: Reduce padding/gaps and pack branches without shrinking molecules.
+        :param box_pad: Optional pixel padding inside boxes, overriding the preset.
+        :param row_gap: Optional pixel gap between subtrees, overriding the preset.
+        :param col_gap: Optional pixel gap between columns, overriding the preset.
         """
 
         unresolved: tuple[MoleculeContainer, ...] = ()
@@ -558,7 +567,15 @@ class Route:
                 leaf for leaf in self.leaves() if molecule_key(leaf) in self.unresolved
             )
         svg = draw_route(
-            self.steps, unresolved, align=align, layouts=layouts, prices=prices
+            self.steps,
+            unresolved,
+            align=align,
+            layouts=layouts,
+            prices=prices,
+            compact=compact,
+            box_pad=box_pad,
+            row_gap=row_gap,
+            col_gap=col_gap,
         )
         if not standalone:
             return svg
