@@ -179,3 +179,10 @@ Reaction metadata records each insertion and survives ``Route.to_json()`` /
 The templates provide graph proposals, not reaction-condition validation. Unsupported
 carbonyl protection templates are not approximated; no trained PG ranking model is
 required by the default rule-based classifier.
+
+The notebook ``tutorials/08a_Protection_Handling.ipynb`` runs Boceprevir planning with
+300 iterations, 120 seconds and maximum depth 7. It obtains routes directly with
+``tree.routes()``, scores them, and compares a repair spanning multiple original
+transformations. The notebook keeps the workflow in memory and reports when the
+fixed search produces no suitable repair. Recorded Boceprevir examples live under
+``tests/data/`` for regression coverage.
