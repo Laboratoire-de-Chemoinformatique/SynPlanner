@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `ProtectionRouteReviser` proposes graph-based protection/deprotection revisions
+  for `Route` objects, carrying protecting groups through multiple synthesis
+  steps and removing them before the protected site reacts or at the final target.
+- Revision results include actions, before/after scores, remaining interactions,
+  diagnostics and original-to-final step-index correspondence.
+- Boceprevir protection-handling tutorial in `08a_Protection_Handling.ipynb`.
+- Optional compact route visualization with tighter branch packing and
+  configurable box padding, vertical gaps and column gaps.
+
 - Optional progress bars for route ranking and clustering through `silent=False`.
 - Chython stereo constraints for carbon tetrahedra, E/Z and allene axes across
   preparation, extraction, stock selection, search and route reconstruction.
@@ -80,6 +89,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Whole-route atom-mapping reconciliation during JSON export preserves
+  producer-consumer connections, repeated identical intermediates and selected
+  products of multi-product reactions.
+- RouteCGR deconvolution/recomposition retains source depth annotations for
+  unchanged reaction sequences, preventing inconsistent exact equality and hashes.
+
 - Deduplicate accepted complete precursor multisets, including multiplicity.
   An earlier ester-plus-hydroxide outcome no longer suppresses an ester-only
   alternative, and rejected cyclic outcomes cannot suppress later valid ones.
@@ -90,6 +105,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   as new route discoveries.
 
 ### Changed
+
+- Protection scanning accepts `Route` objects and can return detailed mapped-site
+  information and processed/skipped-step coverage.
+- Reconciled JSON export, native RouteCGR composition and protection revision
+  share the same route-mapping baseline.
 
 - Pin Chython 1.108 for compiled graph and stereo operations, public graph APIs,
   the macOS InChI loader fix, and clearer filled, hashed and unspecified stereo bonds.
