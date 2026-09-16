@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
+
+if TYPE_CHECKING:
+    from synplan.chem.reaction.routes.route import Route
 
 
 class RouteNode(TypedDict, total=False):
@@ -60,6 +63,8 @@ class RouteCGRBuildResult:
     cgr: Any | None = None
     reactions_dict: Mapping[int, Any] | None = None
     diagnostic: RouteDiagnostic | None = None
+    mapped_route: Route | None = None
+    atom_mapping: Mapping[int, Mapping[int, int]] | None = None
 
     @property
     def ok(self) -> bool:

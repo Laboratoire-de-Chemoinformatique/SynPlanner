@@ -62,16 +62,36 @@ post-processing metadata attachment is required.
     composed = compose_route_cgr(tree, route_id, preserve_transient_bonds=True)
     restored_reactions = routes_dict_from_route_cgrs({route_id: composed["cgr"]})
 
-RouteCGR composition assumes route-level atom mapping. The same atom-map number
-must refer to the same chemical atom throughout the route, and distinct atoms
-must not reuse the same map number. Independently mapped reaction steps with
-local atom numbering are not supported as direct input and may produce undefined
-composition or deconvolution behavior.
+For a detached ``Route``, use ``build_route_cgr(route)`` or ``route.route_cgr()``.
+These reconcile atom numbers across steps using the route's producer/consumer
+identities. The final reaction retains its numbers. Unrelated atoms that reuse a
+number, even atoms of the same element, receive fresh numbers above the maximum
+input ID. Already consistent global numbering remains unchanged.
+
+``route.to_json(reconcile_atom_mapping=True)`` uses that same reconciliation and
+preserves the existing step connections. It does not infer dependencies from
+shared atom numbers. ``build_route_cgr(route, include_reactions=True)`` also returns
+``mapped_route`` and ``atom_mapping`` (step index to local-to-global atom IDs), so
+callers can use the reconciled route without reconstructing molecule connections.
+Neither operation changes the input route.
+
+Bare reaction dictionaries still require route-level atom mapping: each number
+must identify the same atom throughout the route. Use a ``Route`` with explicit
+dependencies when the reaction steps reuse local numbers. Tree-based callers
+retain their existing reconciliation path.
 
 Deconvolution reconstructs ``ReactionContainer`` steps from labels stored on
 RouteCGR atoms and bonds. It does not promise exact planning-tree JSON, sibling
 ordering, UI metadata, or the original formatted mapped reaction SMILES. Those
 are serialization concerns outside the bare RouteCGR representation.
+
+Deconvolved reactions retain their source depths in ``route_cgr_depth`` metadata.
+Recomposing the complete, unchanged dictionary reuses these depths, preserving
+exact RouteCGR identity. Graph digests and step positions prevent reuse after
+mapped chemistry or the reaction sequence changes. Missing or stale records use
+the existing dictionary depth inference; use an explicit ``Route`` to determine
+dependencies after editing. Older RouteCGRs without depth records use that same
+fallback.
 
 For tests and debugging, ``compose_route_cgr(..., return_reactions_dict=True)``
 can also return the composed per-step reactions eagerly, but this is deliberately
@@ -84,6 +104,25 @@ reaction steps. Generated benchmark data and round-trip result folders are
 local artifacts and should not be committed.
 
 
+Compact route drawings
+======================
+
+``Route.svg(compact=True)`` reduces box padding to 5 px, vertical subtree gaps
+to 20 px and column gaps to 50 px. It also packs branches into unused vertical
+space while keeping molecule scale, branch order and connector separation. The
+default rendering, including ``display(route)``, is unchanged.
+
+.. code-block:: python
+
+    from IPython.display import SVG, display
+
+    display(SVG(route.svg(compact=True)))
+
+Explicit ``box_pad``, ``row_gap`` and ``col_gap`` values (in pixels) override the
+preset, for example ``route.svg(compact=True, row_gap=24)``. Leave room for role
+captions and reaction numbers when reducing gaps. Price labels reserve their
+additional vertical band automatically.
+
 Typed Route APIs
 ================
 
@@ -95,3 +134,74 @@ For route serialization, ``build_route_trees()`` returns a ``RouteExportResult``
 with all skipped-route diagnostics. ``make_json()`` retains the existing v1
 dict/list output, while ``strict=True`` on ``build_route_trees()`` or
 ``write_routes_json()`` raises before writing an incomplete export.
+
+Protecting-group revision
+========================
+
+``ProtectionRouteReviser`` proposes protection/deprotection insertions in a detached
+``Route``. It scans competing and incompatible functional groups, tries the bundled
+single-attachment templates in deterministic order, and returns one revised route.
+The input route and search tree are not modified.
+
+.. code-block:: python
+
+    from synplan.chem.reaction.routes.quality.protection import (
+        ProtectionRevisionConfig,
+        ProtectionRouteReviser,
+    )
+
+    reviser = ProtectionRouteReviser.from_config(
+        ProtectionRevisionConfig(max_revisions_per_route=5)
+    )
+    result = reviser.revise_route(route)
+    if result.accepted:
+        revised = result.route
+        print(result.original_score, result.revised_score)
+        print(result.original_to_final)
+        for action in result.actions:
+            print(action.anchor_atom, action.new_step_ids, action.protected_step_ids)
+    else:
+        for diagnostic in result.diagnostics:
+            print(diagnostic.reason, diagnostic.detail)
+
+A protection step precedes the affected transformation. The group follows the
+actual intermediate dependencies through spectator transformations, and deprotection
+occurs before that site next reacts, or at the end of its path. Identical molecules
+on different branches remain distinct occurrences. Multiple consumers of a protected
+intermediate and sites found only on by-products are reported as unsupported.
+
+Every insertion must reduce the targeted interaction, improve the competing-sites
+score, preserve the target and pass RouteCGR/SB-CGR checks. All original RouteCGR
+atom IDs remain fixed, including atoms absent from the final target. Newly introduced
+atoms are numbered above the largest original ID. Transient PG bonds and per-step
+states are retained in the revised RouteCGR, while the mapped chemical structure of
+the SB-CGR remains unchanged. Route-order metadata is regenerated, not compared as
+part of SB-CGR chemical equality.
+
+``original_to_final`` maps zero-based input step positions to final positions.
+``new_step_ids`` contains the final protection, affected transformation and
+deprotection positions. ``protected_step_ids`` lists the transformations through
+which the group was carried. All earlier action references are updated after later
+insertions. Drawings display these positions plus one. Diagnostics use input step
+positions; remaining interactions use final positions.
+
+The result also contains ``remaining_interactions`` and structured diagnostics for
+unknown interactions, incomplete scans, unsupported templates, rejected candidates,
+and the revision limit. A route without an accepted insertion is returned unchanged.
+The default limit is five accepted insertions, configurable down to zero. Existing
+leaf availability and search provenance are retained; newly introduced reagents are
+unresolved unless the input already identifies that material as available. Existing
+stereo is preserved and changed routes use the normal stereo reassessment mechanism.
+Reaction metadata records each insertion and survives ``Route.to_json()`` /
+``Route.from_json()``.
+
+The templates provide graph proposals, not reaction-condition validation. Unsupported
+carbonyl protection templates are not approximated; no trained PG ranking model is
+required by the default rule-based classifier.
+
+The notebook ``tutorials/08a_Protection_Handling.ipynb`` runs Boceprevir planning with
+300 iterations, 120 seconds and maximum depth 7. It obtains routes directly with
+``tree.routes()``, scores them, and compares a repair spanning multiple original
+transformations. The notebook keeps the workflow in memory and reports when the
+fixed search produces no suitable repair. Recorded Boceprevir examples live under
+``tests/data/`` for regression coverage.

@@ -26,6 +26,7 @@ top of each notebook does nothing outside Colab.
 | [Tree analysis](06_Tree_Analysis.ipynb) | read a saved search back: policy performance, branching, where routes appeared | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/06_Tree_Analysis.ipynb) |
 | [Clustering](07_Clustering.ipynb) | group routes by strategy using RouteCGRs and strategic-bond CGRs | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/07_Clustering.ipynb) |
 | [Protection scoring](08_Protection_Scoring.ipynb) | find competing functional groups and score routes for selectivity trouble | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/08_Protection_Scoring.ipynb) |
+| [Boceprevir protecting-group revision](08a_Protection_Handling.ipynb) | plan and score Boceprevir routes, then compare a multi-step protecting-group revision | |
 
 ## Going further
 

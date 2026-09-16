@@ -122,9 +122,7 @@ class CompetingSitesRouteScorer(RouteScorer):
         :param route: The route to judge.
         :return: S(T) in [0, 1].
         """
-        st, _ = self._scorer.score_route(
-            dict(enumerate(step.reaction for step in route))
-        )
+        st, _ = self._scorer.score_route(route)
         return st
 
 

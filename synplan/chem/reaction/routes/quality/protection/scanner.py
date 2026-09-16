@@ -13,7 +13,9 @@ The competing-sites identification approach is inspired by the methodology of:
 
 import csv
 import logging
+from typing import TYPE_CHECKING
 
+from chython import smarts
 from chython.containers import ReactionContainer
 from pydantic import BaseModel, ConfigDict
 
@@ -24,6 +26,9 @@ from synplan.chem.reaction.routes.quality.protection.functional_groups import (
 from synplan.chem.reaction.routes.quality.protection.reaction_classifier import (
     get_reaction_center_atoms,
 )
+
+if TYPE_CHECKING:
+    from synplan.chem.reaction.routes.route import Route
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +56,23 @@ class CompetingInteraction(BaseModel):
     fg_atoms: tuple[int, ...]
     reacting_fg: str | None
     severity: str
+    anchor_atom: int | None = None
+    center_atoms: tuple[int, ...] = ()
+    product_index: int = 0
+    modification_type: str | None = None
+    template_smarts: str | None = None
+    site_key: str | None = None
+
+
+class CompetingScanResult(BaseModel):
+    """Interactions and explicit coverage, with this route's mapped site handles."""
+
+    model_config = ConfigDict(frozen=True)
+
+    interactions: list[CompetingInteraction]
+    halogen_count: int
+    processed_steps: tuple[int, ...]
+    skipped_steps: tuple[int, ...]
 
 
 class IncompatibilityMatrix:
@@ -121,57 +143,45 @@ class RouteScanner:
         # issues" from "scan failed and silently skipped" when normalizing
         # the score by route length.
         self.last_processed_steps: set[int] = set()
+        self._template_queries: dict[str, object] = {}
 
     def scan_route(
-        self, route: dict[int, ReactionContainer]
-    ) -> tuple[list[CompetingInteraction], int]:
-        """Walk a route step-by-step and collect competing interactions.
+        self,
+        route: "Route | dict[int, ReactionContainer]",
+        *,
+        detailed: bool = False,
+    ) -> tuple[list[CompetingInteraction], int] | CompetingScanResult:
+        """Scan all products, using ``Step.product`` for reaction classification.
 
-        For each step the scanner:
-
-        1. Identifies the **reacting FG** — the FG on the *reactant* side
-           that is consumed by the reaction (present in reactant, overlapping
-           the reaction center).  This matches the paper's approach of
-           looking at the FG being transformed.
-        2. Identifies **competing FGs** on the *product* side that do not
-           overlap the reaction center.
-        3. Looks up severity of each competing FG against the reacting FG
-           in the incompatibility matrix.
-
-        :param route: A dict mapping step_id -> ReactionContainer, as
-            returned by ``extract_reactions()`` in
-            ``synplan.chem.reaction.routes.representation``.
-        :return: Tuple of (interactions, halogen_count) where interactions
-            is a list of CompetingInteraction objects and halogen_count is
-            the total number of same-family competing halogen sites.
+        Dict callers retain their first-product convention. Detailed scans attach
+        exact template anchors and explicitly report incomplete coverage. Cached
+        functional-group matches are translated to each molecule's atom numbers.
         """
-        interactions: list[CompetingInteraction] = []
+        from synplan.chem.reaction.routes.route import Route
+
+        if isinstance(route, Route):
+            reactions = route.reactions_dict
+            selected = {i: step.product for i, step in enumerate(route)}
+        else:
+            reactions = route
+            selected = {}
+        interactions = []
         total_halogen_count = 0
-        processed_steps: set[int] = set()
-
-        for step_id in sorted(route):
-            reaction = route[step_id]
-
-            # 1. Get the product molecule (first product)
+        processed_steps = set()
+        for step_id in sorted(reactions):
+            reaction = reactions[step_id]
             products = list(reaction.products)
             if not products:
                 continue
-            product = products[0]
-
-            # 2. Compose CGR once and reuse
+            product = selected.get(step_id, products[0])
             try:
                 cgr = ~reaction
+                center_atoms = get_reaction_center_atoms(reaction, cgr=cgr)
             except Exception:
                 logger.warning("Could not compose CGR for step %d, skipping.", step_id)
                 continue
             processed_steps.add(step_id)
-
-            # 3. Find reaction center atoms (reuse CGR)
-            center_atoms = get_reaction_center_atoms(reaction, cgr=cgr)
-
-            # 4. Identify the reacting FG.
-            #    Try the REACTANT side first (the consumed FG, per the paper),
-            #    then fall back to the PRODUCT side (the formed FG).
+            # Identify the reacting FG on the reactant side first.
             reacting_fg_name = None
             best_overlap = 0
             for reactant in reaction.reactants:
@@ -184,42 +194,75 @@ class RouteScanner:
                         best_overlap = overlap
                         reacting_fg_name = reacting_match.name
 
-            # Fallback: check the product side if no reactant FG found
+            # Fallback: check the product side if no reactant FG found.
             if reacting_fg_name is None:
                 product_match = self._fg_detector.detect_reacting(product, center_atoms)
                 if product_match is not None:
                     reacting_fg_name = product_match.name
 
-            # 5. Detect competing FGs on product (not overlapping reaction center)
-            competing_fgs = self._fg_detector.detect_competing(product, center_atoms)
-
-            # 6. Look up severity for each competing FG against reacting FG. An
-            #    unidentified reaction leaves nothing to look up, which is reported as
-            #    unknown rather than compatible so the caller can see it went unchecked.
-            for fg in competing_fgs:
-                if reacting_fg_name is not None:
-                    severity = self._incompatibility.lookup(fg.name, reacting_fg_name)
-                else:
-                    severity = UNKNOWN_SEVERITY
-                interactions.append(
-                    CompetingInteraction(
-                        step_id=step_id,
-                        fg_name=fg.name,
-                        fg_atoms=fg.atom_indices,
-                        reacting_fg=reacting_fg_name,
-                        severity=severity,
+            for product_index, current in enumerate(products):
+                for fg in self._fg_detector.detect_competing(current, center_atoms):
+                    severity = (
+                        self._incompatibility.lookup(fg.name, reacting_fg_name)
+                        if reacting_fg_name is not None
+                        else UNKNOWN_SEVERITY
                     )
-                )
-
-            # 7. Count same-family competing halogens
-            if self._halogen_detector is not None:
-                total_halogen_count += (
-                    self._halogen_detector.count_same_family_competing(
-                        product, center_atoms
+                    extra = {}
+                    if detailed:
+                        template = self._fg_detector.template_for(fg.name)
+                        anchor = None
+                        if template is not None:
+                            pattern, modification = template
+                            if pattern not in self._template_queries:
+                                try:
+                                    self._template_queries[pattern] = smarts(pattern)
+                                except ValueError:
+                                    self._template_queries[pattern] = None
+                            query = self._template_queries[pattern]
+                            anchors = {
+                                mapping[1]
+                                for mapping in (
+                                    () if query is None else query.get_mapping(current)
+                                )
+                                if mapping.get(1) in fg.atom_indices
+                            }
+                            if len(anchors) == 1:
+                                anchor = next(iter(anchors))
+                            extra.update(
+                                template_smarts=pattern, modification_type=modification
+                            )
+                        extra.update(
+                            anchor_atom=anchor,
+                            center_atoms=tuple(sorted(center_atoms)),
+                            site_key=f"{step_id}:{product_index}:{fg.name}:"
+                            + ",".join(map(str, fg.atom_indices)),
+                        )
+                    interactions.append(
+                        CompetingInteraction(
+                            step_id=step_id,
+                            fg_name=fg.name,
+                            fg_atoms=fg.atom_indices,
+                            reacting_fg=reacting_fg_name,
+                            severity=severity,
+                            product_index=product_index,
+                            **extra,
+                        )
                     )
-                )
-
+                if self._halogen_detector is not None:
+                    total_halogen_count += (
+                        self._halogen_detector.count_same_family_competing(
+                            current,
+                            center_atoms,
+                        )
+                    )
         self.last_processed_steps = processed_steps
+        if detailed:
+            return CompetingScanResult(
+                interactions=interactions,
+                halogen_count=total_halogen_count,
+                processed_steps=tuple(sorted(processed_steps)),
+                skipped_steps=tuple(sorted(set(reactions) - processed_steps)),
+            )
         return interactions, total_halogen_count
 
     @staticmethod

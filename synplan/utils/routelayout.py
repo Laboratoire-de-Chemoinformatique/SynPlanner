@@ -27,13 +27,14 @@ class Node:
 
 
 def layout(
-    root: Node, col_gap: float = 74.0, row_gap: float = 18.0
+    root: Node, col_gap: float = 74.0, row_gap: float = 18.0, *, compact: bool = False
 ) -> tuple[float, float, dict[int, float], dict[int, float]]:
     """Position every node. The target sits on the right, the leaves on the left.
 
     :param root: The target's node; its ``children`` are the precursors it came from.
     :param col_gap: Empty width between two columns; the connectors live in it.
     :param row_gap: Empty height between two stacked subtrees.
+    :param compact: Pack subtree contours, reserving space for connector lanes.
     :return: ``(width, height, x per column, width per column)``.
     """
     if not col_gap > 0.0 or not row_gap >= 0.0:
@@ -69,7 +70,7 @@ def layout(
         x += col_w[depth] + col_gap
     total_w = x - col_gap
 
-    total_h = _place(root, 0.0, row_gap)
+    total_h = _place_compact(root, row_gap) if compact else _place(root, 0.0, row_gap)
     for node in order:
         node.x = col_x[node.depth] + (col_w[node.depth] - node.w)
     return total_w, total_h, col_x, col_w
@@ -97,6 +98,48 @@ def _place(node: Node, top: float, row_gap: float) -> float:
     return max(cursor, node.y + node.h)
 
 
+def _place_compact(root: Node, row_gap: float) -> float:
+    """Pack branches by their occupied heights in each column and connector gap."""
+
+    def place(node):
+        upper, lower = {}, {}
+        for child in node.children:
+            child_upper, child_lower = place(child)
+            shift = max(
+                (
+                    lower[d] + row_gap - child_upper[d]
+                    for d in lower.keys() & child_upper.keys()
+                ),
+                default=0.0,
+            )
+            for descendant in [child, *walk(child)]:
+                descendant.y += shift
+            for depth in child_upper:
+                top, bottom = child_upper[depth] + shift, child_lower[depth] + shift
+                upper[depth] = min(upper.get(depth, top), top)
+                lower[depth] = max(lower.get(depth, bottom), bottom)
+
+        if node.children:
+            first, last = node.children[0], node.children[-1]
+            node.y = (first.y + first.h / 2 + last.y + last.h / 2) / 2 - node.h / 2
+            # Odd slots represent connector corridors between molecule columns.
+            # Their full vertical spans must stay apart too, not only the boxes.
+            centres = [node.y + node.h / 2, *(c.y + c.h / 2 for c in node.children)]
+            upper[2 * node.depth + 1] = min(centres)
+            lower[2 * node.depth + 1] = max(centres)
+        else:
+            node.y = 0.0
+        upper[2 * node.depth] = node.y
+        lower[2 * node.depth] = node.y + node.h
+        return upper, lower
+
+    upper, lower = place(root)
+    shift = -min(upper.values())
+    for node in [root, *walk(root)]:
+        node.y += shift
+    return max(lower.values()) + shift
+
+
 def walk(node: Node) -> list[Node]:
     """Every descendant of ``node``, excluding ``node`` itself."""
     out, stack = [], list(node.children)
@@ -112,6 +155,8 @@ def edges(
     col_x: dict[int, float],
     col_w: dict[int, float],
     lane_frac: float = 0.42,
+    *,
+    compact: bool = False,
 ) -> list[dict[str, Any]]:
     """One entry per parent: the lane x plus the child and parent anchor points.
 
@@ -126,10 +171,13 @@ def edges(
         if not node.children:
             continue
         right = col_x[node.depth + 1] + col_w[node.depth + 1]
+        # Packed branches can occupy the unused width beside a narrow parent.
+        # Keep vertical connectors in the actual gap, outside every box column.
+        left = col_x[node.depth] if compact else node.x
         out.append(
             {
                 "node": node,
-                "lane": right + (node.x - right) * lane_frac,
+                "lane": right + (left - right) * lane_frac,
                 "parent": (node.x, node.y + node.h / 2),
                 "children": [(c.x + c.w, c.y + c.h / 2) for c in node.children],
             }

@@ -7,6 +7,8 @@ from copy import deepcopy
 
 from chython.containers import CGRContainer
 
+_ROUTE_METADATA = ("route_stereo_steps", "route_step_depths")
+
 
 class RouteCGRContainer(CGRContainer):
     """CGRContainer subclass used for composed synthetic route CGRs.
@@ -21,40 +23,55 @@ class RouteCGRContainer(CGRContainer):
     __slots__ = ()
 
     def flush_cache(self):
-        stereo = self.__dict__.get("route_stereo_steps")
+        metadata = {
+            name: self.__dict__[name]
+            for name in _ROUTE_METADATA
+            if name in self.__dict__
+        }
         super().flush_cache()
-        if stereo is not None:
-            self.route_stereo_steps = stereo
+        self.__dict__.update(metadata)
 
     def copy(self, **kwargs):
         result = super().copy(**kwargs)
-        if hasattr(self, "route_stereo_steps"):
-            result.route_stereo_steps = deepcopy(self.route_stereo_steps)
+        for name in _ROUTE_METADATA:
+            if hasattr(self, name):
+                setattr(result, name, deepcopy(getattr(self, name)))
         return result
 
     def substructure(self, atoms, **kwargs):
         result = super().substructure(atoms, **kwargs)
-        if hasattr(self, "route_stereo_steps"):
-            result.route_stereo_steps = deepcopy(self.route_stereo_steps)
+        for name in _ROUTE_METADATA:
+            if hasattr(self, name):
+                setattr(result, name, deepcopy(getattr(self, name)))
         return result
 
     def remap(self, mapping, *, copy=False):
-        snapshots = None
-        if hasattr(self, "route_stereo_steps"):
+        snapshots = {} if hasattr(self, "route_stereo_steps") else None
+        depths = deepcopy(getattr(self, "route_step_depths", None))
+        if snapshots is not None or depths is not None:
             from .deconvolution import reactions_from_route_cgr
-            from .stereo import snapshot
+            from .stereo import graph_digest, snapshot
 
-            snapshots = {}
             for step, reaction in reactions_from_route_cgr(self).items():
+                key = str(step + 1)
+                source_graph = graph_digest(reaction.compose())
                 for molecule in reaction.molecules():
                     molecule.remap(
                         {n: m for n, m in mapping.items() if molecule.has_atom(n)}
                     )
                 reaction.flush_cache()
-                snapshots[str(step + 1)] = snapshot(reaction, reaction.compose())
+                cgr = reaction.compose()
+                if snapshots is not None:
+                    snapshots[key] = snapshot(reaction, cgr)
+                if depths is not None and key in depths:
+                    if depths[key]["graph"] == source_graph:
+                        depths[key]["graph"] = graph_digest(cgr)
         result = super().remap(mapping, copy=copy)
+        target = result if copy else self
         if snapshots is not None:
-            (result if copy else self).route_stereo_steps = snapshots
+            target.route_stereo_steps = snapshots
+        if depths is not None:
+            target.route_step_depths = depths
         return result
 
     def depict(self, *args, **kwargs):

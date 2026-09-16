@@ -28,10 +28,12 @@ def overlaps(root: Node) -> list[tuple[str, str]]:
     return bad
 
 
-def edge_hits(root: Node, col_x: dict, col_w: dict) -> list[tuple[str, str]]:
+def edge_hits(
+    root: Node, col_x: dict, col_w: dict, *, compact=False
+) -> list[tuple[str, str]]:
     """Every connector segment that crosses the interior of some box."""
     placed, bad = boxes(root), []
-    for edge in edges(root, col_x, col_w):
+    for edge in edges(root, col_x, col_w, compact=compact):
         lane, (px, py) = edge["lane"], edge["parent"]
         segments = [((lane, py), (px, py))]
         for cx, cy in edge["children"]:
@@ -55,13 +57,13 @@ def finite(root: Node) -> bool:
     return all(v == v and abs(v) < 1e9 for n in [root, *walk(root)] for v in (n.x, n.y))
 
 
-def lanes_inside_gap(root: Node, col_x: dict, col_w: dict) -> bool:
+def lanes_inside_gap(root: Node, col_x: dict, col_w: dict, *, compact=False) -> bool:
     """Every lane sits strictly inside the empty gap between two columns.
 
     A degenerate picture with everything collapsed onto one point passes every
     no-overlap test vacuously; it fails this one.
     """
-    for edge in edges(root, col_x, col_w):
+    for edge in edges(root, col_x, col_w, compact=compact):
         node = edge["node"]
         right = col_x[node.depth + 1] + col_w[node.depth + 1]
         if not right < edge["lane"] < node.x:
@@ -82,10 +84,10 @@ def bbox_inside(root: Node, width: float, height: float) -> bool:
 def assert_well_formed(root: Node, **kwargs) -> None:
     width, height, col_x, col_w = layout(root, **kwargs)
     assert overlaps(root) == []
-    assert edge_hits(root, col_x, col_w) == []
+    assert edge_hits(root, col_x, col_w, compact=kwargs.get("compact", False)) == []
     assert finite(root)
     assert bbox_inside(root, width, height)
-    assert lanes_inside_gap(root, col_x, col_w)
+    assert lanes_inside_gap(root, col_x, col_w, compact=kwargs.get("compact", False))
 
 
 def leaf(key: str, w: float = 100, h: float = 60) -> Node:
@@ -133,8 +135,9 @@ WELL_FORMED = {
 
 
 @pytest.mark.parametrize("name", sorted(WELL_FORMED))
-def test_layout_is_well_formed(name):
-    assert_well_formed(WELL_FORMED[name])
+@pytest.mark.parametrize("compact", [False, True])
+def test_layout_is_well_formed(name, compact):
+    assert_well_formed(WELL_FORMED[name], compact=compact)
 
 
 def _cycle() -> Node:
@@ -213,7 +216,8 @@ def test_deep_chain_does_not_blow_the_stack():
         sys.setrecursionlimit(limit)
 
 
-def test_random_trees_are_well_formed():
+@pytest.mark.parametrize("compact", [False, True])
+def test_random_trees_are_well_formed(compact):
     rng = random.Random(7)
     for _ in range(200):
         nodes = [Node("r", rng.uniform(5, 600), rng.uniform(5, 400))]
@@ -222,4 +226,25 @@ def test_random_trees_are_well_formed():
             child = Node(f"n{i}", rng.uniform(5, 600), rng.uniform(5, 400))
             parent.children.append(child)
             nodes.append(child)
-        assert_well_formed(nodes[0])
+        assert_well_formed(nodes[0], compact=compact)
+
+
+def test_compact_layout_reclaims_empty_branch_space():
+    from copy import deepcopy
+
+    root = Node(
+        "target",
+        100,
+        100,
+        [
+            leaf("short branch", 100, 40),
+            Node("long branch", 100, 100, [leaf("a", 100, 100), leaf("b", 100, 100)]),
+        ],
+    )
+    compact_root = deepcopy(root)
+    _, height, _, _ = layout(root, row_gap=20)
+    _, compact_height, _, _ = layout(compact_root, row_gap=20, compact=True)
+    if compact_height >= height:
+        pytest.fail("Branch packing did not reclaim empty vertical space")
+    if overlaps(compact_root):
+        pytest.fail("Packed branches overlap")

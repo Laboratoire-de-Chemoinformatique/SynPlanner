@@ -179,7 +179,11 @@ def _drawable_copies(steps: Any, layouts: Layouts) -> dict[int, MoleculeContaine
 
 
 def _route_tree(
-    steps: Any, unresolved: Any, align: bool, layouts: Layouts = None
+    steps: Any,
+    unresolved: Any,
+    align: bool,
+    layouts: Layouts = None,
+    box_pad: float = BOX_PAD,
 ) -> tuple[Node, dict]:
     copies = _drawable_copies(steps, layouts)
     # Align drawing copies, leaving the shared base geometry untouched.
@@ -202,8 +206,8 @@ def _route_tree(
         depicts[id(mol)] = (svg, box)
         node = Node(
             key=str(mol),
-            w=box[2] * PX_PER_UNIT + 2 * BOX_PAD,
-            h=box[3] * PX_PER_UNIT + 2 * BOX_PAD,
+            w=box[2] * PX_PER_UNIT + 2 * box_pad,
+            h=box[3] * PX_PER_UNIT + 2 * box_pad,
         )
         node.mol = mol
         made = by_product.get(id(mol))
@@ -227,6 +231,7 @@ def _to_svg(
     w: float,
     h: float,
     prices: Prices = None,
+    box_pad: float = BOX_PAD,
 ) -> str:
     top = 16.0  # room for the role caption drawn above a box
     bottom = PRICE_BAND if prices else 0.0  # the last row's pill hangs below h
@@ -268,9 +273,9 @@ def _to_svg(
         svg, box = depicts[id(node.mol)]
         inner = svg[svg.index(">", svg.index("<svg")) + 1 : svg.rindex("</svg>")]
         parts.append(
-            f'<svg x="{node.x + BOX_PAD:.1f}" y="{node.y + BOX_PAD:.1f}" '
-            f'width="{max(1.0, node.w - 2 * BOX_PAD):.1f}" '
-            f'height="{max(1.0, node.h - 2 * BOX_PAD):.1f}" '
+            f'<svg x="{node.x + box_pad:.1f}" y="{node.y + box_pad:.1f}" '
+            f'width="{max(1.0, node.w - 2 * box_pad):.1f}" '
+            f'height="{max(1.0, node.h - 2 * box_pad):.1f}" '
             f'viewBox="{box[0]} {box[1]} {box[2]} {box[3]}">{inner}</svg>'
         )
         if node.role in ROLE_CAPTION:
@@ -311,6 +316,11 @@ def draw_route(
     align: bool = True,
     layouts: Layouts = None,
     prices: Prices = None,
+    *,
+    compact: bool = False,
+    box_pad: float | None = None,
+    row_gap: float | None = None,
+    col_gap: float | None = None,
 ) -> str:
     """Draw one route.
 
@@ -331,13 +341,25 @@ def draw_route(
         listed molecule gets a small pill under its box, carrying the payload
         verbatim for a page that wants to open something on a click. What a price
         is and where it came from is the caller's business, never this module's.
+    :param compact: Use 5 px box padding, 20 px row gaps and 50 px column gaps.
+        Pack branches more tightly without changing molecule scale.
+    :param box_pad: Padding inside each molecule box in pixels; overrides the preset.
+    :param row_gap: Vertical gap between subtrees in pixels; overrides the preset.
+        Price captions reserve their additional band independently.
+    :param col_gap: Horizontal connector gap in pixels; overrides the preset.
     :return: The SVG, without ``ROUTE_CSS`` or ``ARROW_DEFS``.
     """
-    root, depicts = _route_tree(steps, unresolved, align, layouts)
+    box_pad = (5.0 if compact else BOX_PAD) if box_pad is None else box_pad
+    row_gap = (20.0 if compact else ROW_GAP) if row_gap is None else row_gap
+    col_gap = (50.0 if compact else 74.0) if col_gap is None else col_gap
+    root, depicts = _route_tree(steps, unresolved, align, layouts, box_pad)
     width, height, col_x, col_w = layout(
-        root, row_gap=ROW_GAP + (PRICE_BAND if prices else 0.0)
+        root,
+        col_gap=col_gap,
+        row_gap=row_gap + (PRICE_BAND if prices else 0.0),
+        compact=compact,
     )
-    links = edges(root, col_x, col_w)
+    links = edges(root, col_x, col_w, compact=compact)
     for edge in links:
         edge["number"] = edge["node"].number
-    return _to_svg(root, depicts, links, width, height, prices)
+    return _to_svg(root, depicts, links, width, height, prices, box_pad)

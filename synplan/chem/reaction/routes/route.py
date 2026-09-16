@@ -538,6 +538,11 @@ class Route:
         standalone: bool = True,
         layouts: Layouts = None,
         prices: Prices = None,
+        *,
+        compact: bool = False,
+        box_pad: float | None = None,
+        row_gap: float | None = None,
+        col_gap: float | None = None,
     ) -> str:
         """Draw the route as an SVG.
 
@@ -550,6 +555,10 @@ class Route:
             cards. Precursor copies align to their own product when ``align=True``.
         :param prices: Pill label and click payload per leaf id, drawn under the
             leaf's box. See :func:`~synplan.utils.routedraw.draw_route`.
+        :param compact: Reduce padding/gaps and pack branches without shrinking molecules.
+        :param box_pad: Optional pixel padding inside boxes, overriding the preset.
+        :param row_gap: Optional pixel gap between subtrees, overriding the preset.
+        :param col_gap: Optional pixel gap between columns, overriding the preset.
         """
 
         unresolved: tuple[MoleculeContainer, ...] = ()
@@ -558,7 +567,15 @@ class Route:
                 leaf for leaf in self.leaves() if molecule_key(leaf) in self.unresolved
             )
         svg = draw_route(
-            self.steps, unresolved, align=align, layouts=layouts, prices=prices
+            self.steps,
+            unresolved,
+            align=align,
+            layouts=layouts,
+            prices=prices,
+            compact=compact,
+            box_pad=box_pad,
+            row_gap=row_gap,
+            col_gap=col_gap,
         )
         if not standalone:
             return svg
@@ -589,64 +606,24 @@ class Route:
             a RouteCGR, or the per-step-local numbering fuses distinct atoms.
         """
 
+        if reconcile_atom_mapping:
+            result = build_route_cgr(self, include_reactions=True)
+            if not result.ok:
+                raise _composition_error(result)
+            if result.mapped_route is None:
+                raise ValueError("Route composition returned no mapped route")
+            return result.mapped_route.to_json()
+
         stock = frozenset(molecule_key(leaf) for leaf in self.leaves())
         stock -= self.unresolved
         target = self.target
+        reactions = self.reactions_dict
+        made = steps_by_product(self.steps)
 
-        if reconcile_atom_mapping:
-            result = build_route_cgr(
-                {0: self.reactions_dict}, 0, include_reactions=True
-            )
-            if not result.ok:
-                raise _composition_error(result)
-            reactions = dict(result.reactions_dict)
-            # Composition rewrites every step: it renumbers them onto one atom
-            # numbering and hands back the by-products the search's steps left
-            # out. Neither the objects nor the numbering survive, so the link
-            # falls back to spelling, the way a route read out of a file is
-            # linked -- an earlier step that makes what this one consumes.
-            products = {}
-            for index, step in enumerate(self.steps):
-                composed = next(
-                    (p for p in reactions[index].products if p == step.product), None
-                )
-                if composed is None:
-                    raise ValueError(
-                        f"step {index} no longer makes {step.product} after composition"
-                    )
-                products[index] = composed
-            target = products[root_step(self.steps)]
-
-            def source_of(mol: MoleculeContainer, consumer: int | None):
-                """Which earlier step makes ``mol`` -- by the atoms they share.
-
-                Composition numbers every step onto one graph, so the step whose
-                product is built from these atoms is the one that made it. Two
-                steps making the same molecule are still two steps, and spelling
-                could not tell them apart.
-                """
-                atoms = frozenset(mol)
-                shared, index = max(
-                    (
-                        (len(atoms & frozenset(product)), earlier)
-                        for earlier, product in products.items()
-                        if consumer is None or earlier < consumer
-                    ),
-                    default=(0, None),
-                )
-                if not shared:
-                    return None
-                return index, reactions[index], products[index]
-        else:
-            reactions = self.reactions_dict
-            made = steps_by_product(self.steps)
-
-            def source_of(mol: MoleculeContainer, consumer: int | None):
-                """Which step makes ``mol`` -- read off identity, never re-derived."""
-                index = made.get(id(mol))
-                return (
-                    None if index is None else (index, self.steps[index].reaction, mol)
-                )
+        def source_of(mol: MoleculeContainer, consumer: int | None):
+            """Read dependencies from identity, including after reconciliation."""
+            index = made.get(id(mol))
+            return None if index is None else (index, self.steps[index].reaction, mol)
 
         def step_fields(index: int) -> tuple[str, dict[str, Any]]:
             step = self.steps[index]
@@ -694,7 +671,9 @@ class Route:
             ``build_route_cgr`` themselves.
         """
 
-        result = build_route_cgr({0: self.reactions_dict}, 0, preserve_transient_bonds)
+        result = build_route_cgr(
+            self, preserve_transient_bonds=preserve_transient_bonds
+        )
         if not result.ok:
             raise _composition_error(result)
         return result.cgr
