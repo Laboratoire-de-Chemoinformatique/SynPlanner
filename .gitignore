@@ -177,3 +177,6 @@ synplan_data/benchmarks/
 
 # Full Boceprevir tutorial runs; the compact replay fixture lives in tests/data/.
 /tutorial_results/route_pg_support/
+
+# Local reviewer instructions and reports
+/agents/
