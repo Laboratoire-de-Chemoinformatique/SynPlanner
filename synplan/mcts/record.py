@@ -223,7 +223,9 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             "search record"
         )
 
-    molecules = [read_smiles(smiles) for smiles in raw["molecules"]]
+    # Match the writer's atom insertion order. Symmetric mapped fragments can
+    # otherwise choose a different spelling and invalidate unchanged stereo context.
+    molecules = [in_atom_order(read_smiles(smiles)) for smiles in raw["molecules"]]
     nodes: dict[int, Node] = {}
     parents: dict[int, int] = {}
     children: dict[int, set[int]] = {}
