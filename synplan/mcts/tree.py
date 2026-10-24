@@ -153,6 +153,7 @@ class Tree:
         expansion_function: Policy,
         evaluation_function: EvaluationStrategy = None,
         priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
+        forward_assessor=None,
     ):
         """Initializes a tree object with optional parameters for tree search for target
         molecule.
@@ -162,6 +163,8 @@ class Tree:
         :param reaction_rules: A loaded reaction rules.
         :param building_blocks: A loaded building blocks.
         :param expansion_function: A loaded policy function.
+        :param forward_assessor: Optional shared reaction assessor for a hard
+            Top-K filter before child insertion. Rollout simulations are unchanged.
         :param evaluation_function: An evaluation strategy. If None, a random
             evaluation strategy is used as default.
         :param priority_rules: Optional **mapping** of curated rule sets,
@@ -187,6 +190,14 @@ class Tree:
 
         # tree config parameters
         self.config = config
+        if forward_assessor is not None and config.direction != "retro":
+            raise ValueError(
+                "Forward validation currently supports retrosynthetic search only"
+            )
+        self.forward_assessor = forward_assessor
+        self.forward_metadata = {}
+        self.forward_stats = {}
+        self._forward_inputs = set()
         self.stop_reason = None
         self._stereo_assessments = {}
         for record in config.stereo_assessments:
@@ -425,6 +436,14 @@ class Tree:
             and time() - self.start_time >= self.config.max_time
         )
 
+    def finalize_forward(self, assessor, mode, *, silent=True, combine_search=False):
+        """Explicit post-search assessment; route reads alone never run inference."""
+        from .forward import finalize_forward_routes
+
+        return finalize_forward_routes(
+            self, assessor, mode, silent=silent, combine_search=combine_search
+        )
+
     def run(self) -> "Tree":
         """Run the search to completion and return the tree.
 
@@ -505,6 +524,8 @@ class Tree:
         )
         expanded = False
         for candidate in self._iter_rules(curr_node):
+            if self.forward_assessor is not None and self.time_limit_reached():
+                break
             self._increment_rule_stats(candidate.rule_source, tried=1)
             rule_produced = False
             # Multi-application fires for any priority source (every source
@@ -711,6 +732,44 @@ class Tree:
         if not set(prev_precursor).isdisjoint(new_precursor):
             return False
 
+        forward_prediction = None
+        if self.forward_assessor is not None:
+            if self.time_limit_reached():
+                return False
+            from .forward import ForwardValidationError
+
+            try:
+                forward_prediction = self.forward_assessor.assess_reactions(
+                    [products], [curr_node.curr_precursor.molecule]
+                )[0]
+            except Exception as error:
+                raise ForwardValidationError(
+                    f"Forward validation failed: {error}"
+                ) from error
+            stats = self.forward_assessor.last_stats
+            for key in (
+                "cache_hits",
+                "cache_misses",
+                "model_predictions",
+                "inference_seconds",
+            ):
+                self.forward_stats[key] = self.forward_stats.get(key, 0) + stats[key]
+            self._forward_inputs.update(self.forward_assessor.last_inputs)
+            self.forward_stats["unique_inputs"] = len(self._forward_inputs)
+            self.forward_stats["candidate_checks"] = (
+                self.forward_stats.get("candidate_checks", 0) + 1
+            )
+            outcome = (
+                "assumed_passes"
+                if len(products) == 1
+                else "rejections"
+                if forward_prediction["alert"]
+                else "model_passes"
+            )
+            self.forward_stats[outcome] = self.forward_stats.get(outcome, 0) + 1
+            if forward_prediction["alert"]:
+                return False
+
         precursors_to_expand = (
             *curr_node.next_precursor,
             *(
@@ -775,6 +834,7 @@ class Tree:
             stereo_events=tuple(assessment["events"]),
             stereo_evidence=tuple(evidence),
             stereo_history=history,
+            forward_prediction=forward_prediction,
         )
 
         for np in new_precursor:
@@ -1327,6 +1387,17 @@ class Tree:
                 "rule_id": step.get("rule_id"),
                 "rule_source": step.get("rule_source"),
                 "rule_key": step.get("rule_key"),
+                **(
+                    {
+                        "meta": {
+                            "forward_prediction": self.nodes[
+                                step["node_id"]
+                            ].forward_prediction
+                        }
+                    }
+                    if self.nodes[step["node_id"]].forward_prediction is not None
+                    else {}
+                ),
             }
             for index, step in enumerate(steps)
         }
@@ -1431,6 +1502,7 @@ class Tree:
             ),
             "search_time": round(self.curr_time, 1),
             "stop_reason": self.stop_reason,
+            "forward_statistics": dict(self.forward_stats),
             "solved": len(self.winning_nodes) > 0,
             "stereo_proposals": len(self.proposal_nodes),
             "stereo_incompatible_outcomes": self.stats.stereo_incompatible_outcomes,

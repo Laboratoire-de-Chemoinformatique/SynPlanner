@@ -430,12 +430,27 @@ def _make_json_v1(
             if metadata:
                 extra["meta"] = metadata
             if _meta and step_id in _meta:
-                extra.update(_meta[step_id])
+                fields = dict(_meta[step_id])
+                metadata.update(fields.pop("meta", {}))
+                extra.update(fields)
+                if metadata:
+                    extra["meta"] = metadata
             return mapped_smiles(reaction), extra
 
         # Build route tree and store
         tree_node = route_tree(target, source_of, purchasable, step_fields)
         if tree_node is not None and tree is not None:
+            node = getattr(tree, "nodes", {}).get(route_id)
+            if getattr(node, "route_assessment", None) is not None:
+                from copy import deepcopy
+                from dataclasses import asdict
+
+                from synplan.chem.reaction.routes.route import Route
+
+                tree_node["assessment"] = deepcopy(node.route_assessment)
+                tree_node["provenance"] = asdict(
+                    Route.from_tree(tree, route_id).provenance
+                )
             summary = getattr(
                 getattr(tree, "nodes", {}).get(route_id), "stereo_summary", None
             )

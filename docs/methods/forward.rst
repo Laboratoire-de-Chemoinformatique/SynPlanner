@@ -3,7 +3,11 @@
 Forward reaction assessment
 ===========================
 
-Forward prediction estimates candidate products from reactant SMILES.
+Forward assessment measures whether a model recovers the designated product of
+each reaction in a completed route. It annotates copies of ``Route`` objects in
+their original order. A separate ``ForwardRouteScorer`` aggregates these step
+annotations without inference. Neither assessment changes the original search
+score, policy likelihood, protection/competing-sites scores, or route order.
 
 Models and shared prediction policy
 -----------------------------------
@@ -126,22 +130,6 @@ Stereo-free grouping is tested independently because it intentionally differs.
 The width-one upstream comparison uses three identical inputs to avoid its
 single-active-item squeeze failure; standalone singleton decoding is tested
 separately. Width-ten/twenty comparisons use different inputs.
-
-
-Annotation persistence
-----------------------
-
-``Step.forward_prediction`` optionally stores ``product_inchikey``, ``rank``,
-``score`` and ``alert`` under reaction-node ``meta.forward_prediction``.
-Annotations belong to steps and do not modify shared reaction containers.
-``Route.assessment`` is an optional root-level dictionary. Route JSON also
-round-trips ``provenance``, including search score and policy log likelihood.
-Legacy documents without these optional fields remain readable.
-
-``Route.from_json(..., on_step=callback)`` calls
-``callback(reaction, source_node)`` for each restored step, allowing collection
-tools to preserve metadata on the original JSON nodes.
-
 
 Matching and step scores
 -----------------------
@@ -268,7 +256,6 @@ correspondence without guessing reaction identity or overwriting metadata.
 The output is written atomically to a separate file; input, output and cache
 paths must differ.
 
-
 Route assessment
 ----------------
 
@@ -349,12 +336,92 @@ Assumed scores are blue, model matches green, and zero scores red. The combined
 column appears only when a combined score is present. Zoom and SVG/PNG export
 remain available; no network resources are required.
 
+Optional validation during planning
+-----------------------------------
+
+The final top-level entry of ``configs/planning_standard.yaml`` is optional:
+
+.. code-block:: yaml
+
+   # After tree, node_expansion, and other planning sections.
+   forward_val_config: null
+
+Omitting it or leaving it null runs ordinary planning, without loading a forward
+model or opening a prediction cache. To enable it, set
+``forward_val_config: forward_predictor.yaml``. This reference is relative to the
+planning YAML, not the shell's working directory. The separate file contains:
+
+.. code-block:: yaml
+
+   forward_val_type: on-the-fly  # null, on-the-fly, post-processing
+   forward_val_path: ../synplan_data/forward/synfwd-1/v1/
+   top_k: 10
+   device: cpu
+   threads: 4
+   batch_size: 16
+   cache_path: null
+
+``forward_val_type: null`` also disables assessment. An enabled configuration
+requires a Chemformer ONNX bundle directory. Model and explicit cache paths are
+relative to this forward YAML; a null cache path uses ``forward_cache.json`` in
+the planning results directory. CUDA is explicit and never falls back silently.
+An explicitly supplied unreadable or invalid configuration raises an error.
+
+``top_k`` is an acceptance cutoff from 1 to 10. Prediction generation still uses
+up to ten augmentations, twenty beams per augmentation, and up to ten distinct
+stereo-free product identities. The complete prediction list is cached, so
+changing Top-K does not invalidate predictions or require new inference. Missing
+candidates are never padded. A product outside the selected Top-K receives the
+same zero annotation as an absent product.
+
+**On-the-fly** checks each otherwise eligible disconnection before creating its
+child or registering a reusable search state. All newly generated precursors,
+including stock molecules and small fragments, are supplied as forward reactants;
+the expanded precursor is the expected product. Unrelated pending branches are
+not part of that reaction. A missing Top-K match rejects the candidate. Passing
+candidates retain their ordinary policy probabilities and search-value updates;
+reciprocal rank is recorded separately. Single-reactant steps retain the assumed
+1.0 convention. Filtering applies to policy and priority rules and to terminal
+children. It does not validate temporary reactions inside the rollout evaluator.
+
+Checks run sequentially, reusing the adapter's augmentation batching. One model
+instance and JSON cache are shared across targets. Identical normalized reactants
+reuse predictions even when their expected products differ. Model execution and
+expected-product identification failures propagate as errors, never as chemical
+rejections. Validation currently supports retrosynthetic search only.
+
+**Post-processing** saves completed search output before assessing the completed
+routes. It keeps all routes, including failures, and preserves their order. Both
+modes calculate the existing geometric forward route score after search; combined
+scoring remains opt-in through the route-scoring interface. Annotations and scores
+survive JSON, HTML, mapped export, and search-record round trips. Search records
+contain data only: opening one or calling ``routes()`` never loads a model.
+
+The planning CLI handles loading and finalization. Low-level Python callers can
+share an assessor explicitly:
+
+.. code-block:: python
+
+   from synplan.mcts.forward import load_forward_validation
+
+   config, assessor = load_forward_validation("configs/forward_predictor.yaml", "results")
+   # Include the usual target, rules, stock, policy and evaluator arguments.
+   tree = Tree(..., forward_assessor=(
+       assessor if config and config.forward_val_type == "on-the-fly" else None
+   ))
+   tree.run()
+   routes = (tree.finalize_forward(assessor, config.forward_val_type, silent=False)
+             if config else tree.routes())
+
+The planning runner also accepts ``forward_val_config=None``, a YAML path, or a
+``ForwardValidationConfig``. A path supplied directly through this Python API is
+relative to the current working directory. The same disabled semantics apply.
 
 Iteration and time budgets
---------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ordinary default remains 600 seconds. Set ``tree.max_time: null`` to
-disable the wall-clock limit and compare searches at a fixed iteration budget:
+The ordinary default remains 600 seconds. For an iteration-controlled comparison,
+explicitly disable the wall-clock cutoff:
 
 .. code-block:: yaml
 
@@ -363,6 +430,22 @@ disable the wall-clock limit and compare searches at a fixed iteration budget:
      max_time: null
      max_depth: 6
 
-Tree-size, depth, exhaustion and stop-at-first conditions still apply. All
-search algorithms support a null limit. Search statistics include the stopping
-reason, and elapsed search time is retained when expansion exhausts the tree.
+Tree-size, depth, exhaustion and stop-at-first conditions still apply. Filtering
+changes the explored tree, so equal iteration counts do not imply equal numbers
+of generated or accepted candidates. Search wall time includes on-the-fly
+inference and cache work. Initialization and post-processing are reported
+separately. Finite deadlines are checked between candidate predictions: an active
+inference call may finish after the deadline, but no new prediction starts then.
+
+``forward_validation.json`` records resolved settings, model identity,
+initialization time, per-target search statistics, and forward statistics.
+These include checks, model passes/rejections, assumed passes, unique inputs,
+cache hits/misses, and inference time. A shared cache makes wall time dependent on
+its initial contents; comparisons should record those contents and cache usage.
+
+Routes surviving on-the-fly filtering pass this model by construction. Their pass
+rate is not independent validation or experimental accuracy. Stereo-free product
+recovery does not establish stereochemical correctness, conditions, or feasibility.
+
+Chemformer checkpoint loading and competing-sites integration remain separate
+subtasks.

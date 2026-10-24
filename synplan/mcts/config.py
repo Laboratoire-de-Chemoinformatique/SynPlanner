@@ -228,3 +228,25 @@ class CombinedPolicyConfig(BaseConfigModel):
     rule_prob_threshold: float = 0.0
     ranking_weight: float = Field(default=1.0, gt=0.0)
     temperature: float = Field(default=1.0, gt=0.0)
+
+
+class ForwardValidationConfig(BaseConfigModel):
+    """Optional planning validation; paths in YAML are relative to its directory."""
+
+    forward_val_type: Literal["on-the-fly", "post-processing"] | None = None
+    forward_val_path: Path | None = None
+    top_k: int = Field(default=10, ge=1, le=10)
+    device: Literal["cpu", "cuda"] = "cpu"
+    threads: int = Field(default=4, ge=1)
+    batch_size: int = Field(default=16, ge=1)
+    cache_path: Path | None = None
+
+    @classmethod
+    def from_yaml(cls, file_path):
+        path = Path(file_path).resolve()
+        config = super().from_yaml(str(path))
+        for name in ("forward_val_path", "cache_path"):
+            value = getattr(config, name)
+            if value is not None:
+                setattr(config, name, (path.parent / value).resolve())
+        return config
