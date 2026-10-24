@@ -1,5 +1,6 @@
 """Route aggregation, persistence, collection scoring and offline reporting."""
 
+import json
 from copy import deepcopy
 from dataclasses import replace
 from io import StringIO
@@ -12,6 +13,7 @@ from scripts import score_routes
 from synplan.chem.reaction.routes.quality import ForwardRouteScorer
 from synplan.chem.reaction.routes.route import Route, RouteProvenance, Step
 from synplan.utils.json import read_json, write_json_atomic
+from synplan.utils.visualisation import routes_report_html
 
 
 def annotated_step(product, reactants, score, *, assumed=False):
@@ -208,14 +210,18 @@ def test_collection_preserves_metadata_order_and_chemistry():
 
 
 @pytest.mark.parametrize("combine", [False, True])
-def test_script_gzip_without_loading_model(tmp_path, monkeypatch, combine):
+def test_script_gzip_and_html_without_loading_model(tmp_path, monkeypatch, combine):
     from synplan.ml.inference.chemformer import OnnxChemformer
 
     def unexpected(*args, **kwargs):
         raise AssertionError("route scoring must not initialize the model")
 
     monkeypatch.setattr(OnnxChemformer, "__init__", unexpected)
-    source, output = tmp_path / "input.json.gz", tmp_path / "out.json.gz"
+    source, output, html = (
+        tmp_path / "input.json.gz",
+        tmp_path / "out.json.gz",
+        tmp_path / "routes.html",
+    )
     collection = {
         "target": {"custom-route": linear([0.25, 1.0], assumed=(1,)).to_json()}
     }
@@ -228,6 +234,8 @@ def test_script_gzip_without_loading_model(tmp_path, monkeypatch, combine):
             str(source),
             "--output",
             str(output),
+            "--html",
+            str(html),
             "--quiet",
             *(["--combine-search"] if combine else []),
         ],
@@ -236,3 +244,28 @@ def test_script_gzip_without_loading_model(tmp_path, monkeypatch, combine):
     result = read_json(output)["target"]["custom-route"]["assessment"]
     assert ("combined_score" in result) is combine
     assert read_json(source) == collection
+    page = html.read_text()
+    assert ("<th>Combined score</th>" in page) is combine
+    assert "custom-route" in page
+    assert "Assumed · 1 reactant" in page
+
+
+def test_report_filters_step_tables_and_escaping():
+    routes = ForwardRouteScorer().assess(
+        [linear([1.0]), linear([0.0, 1.0], assumed=(1,))]
+    )
+    page = routes_report_html(
+        routes, None, route_labels=["<script>bad</script>", "route-2"]
+    )
+    assert "<script>bad</script>" not in page
+    assert "&lt;script&gt;bad&lt;/script&gt;" in page
+    assert "No zero-score steps · 1" in page
+    assert "At least one zero-score step · 1" in page
+    assert page.count('class="route card"') == 2
+    assert page.count("data-step-color=") == 3
+    assert 'data-step-color="#285d9a"' in page
+    assert 'data-step-color="#bd3f3f"' in page
+    assert "<th>Combined score</th>" not in page
+    assert "No top-10 match" in page
+    assert "Policy log likelihood" in page
+    assert "reason" not in json.dumps(routes[0].assessment)

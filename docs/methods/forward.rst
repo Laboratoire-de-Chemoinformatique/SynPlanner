@@ -327,14 +327,24 @@ readable. Re-running reaction assessment clears an earlier route assessment;
 run the route scorer again to refresh it after reaction annotations change.
 Explicitly editing route chemistry likewise requires reassessment.
 
-Score a saved collection without loading a model:
+Score a saved collection and optionally create an offline HTML report:
 
 .. code-block:: bash
 
    python scripts/score_routes.py \
        --input results/routes_forward.json.gz \
-       --output results/routes_assessed.json.gz
+       --output results/routes_assessed.json.gz \
+       --html results/routes_assessed.html
 
 Add ``--combine-search`` to include the combined score, or ``--quiet`` to hide
-the route-based tqdm bar. Input and output paths must differ. JSON output is
-written atomically; route IDs, collection order and existing metadata survive.
+the route-based tqdm bar. Input, output and HTML paths must differ. JSON output
+is written atomically; route IDs, collection order and existing metadata are
+preserved. The input must already contain forward annotations.
+
+The existing route renderer displays assessment tables automatically when routes
+carry these annotations. The report shows forward/search scores, policy log
+likelihoods, reaction scores and molecule drawings. Filters select all routes,
+routes without zero-score steps, or routes containing at least one zero.
+Assumed scores are blue, model matches green, and zero scores red. The combined
+column appears only when a combined score is present. Zoom and SVG/PNG export
+remain available; no network resources are required.

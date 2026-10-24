@@ -38,15 +38,28 @@ def main():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--html", type=Path, help="Optional self-contained HTML report")
     parser.add_argument("--combine-search", action="store_true")
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
-    paths = [args.input, args.output]
+    paths = [args.input, args.output] + ([args.html] if args.html else [])
     if len({path.resolve() for path in paths}) != len(paths):
-        parser.error("Input and output must be separate files")
+        parser.error("Input, output and HTML must be separate files")
     scorer = ForwardRouteScorer(combine_search=args.combine_search)
     result = score_collection(read_json(args.input), scorer, silent=args.quiet)
     write_json_atomic(args.output, result)
+    if args.html:
+        from synplan.utils.visualisation import routes_report_html
+
+        records = list(collection_routes(result))
+        args.html.parent.mkdir(parents=True, exist_ok=True)
+        routes_report_html(
+            [Route.from_json(tree) for _, tree in records],
+            str(args.html),
+            prices=False,
+            route_labels=[label for label, _ in records],
+        )
+
 
 if __name__ == "__main__":
     main()
