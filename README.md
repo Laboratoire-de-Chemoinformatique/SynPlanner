@@ -134,7 +134,10 @@ Neither score is an experimental success probability. Chimera also supports an
 explicit `backend="ckpt"` with optional PyTorch, without RetroChimera or Lightning.
 CPU is the default;
 `device="cuda"` requires an available ONNX Runtime CUDA provider.
-See [forward prediction](docs/methods/forward.rst) for preprocessing and ranking.
+For per-reaction product-recovery scores and a reusable JSON cache, use
+`ForwardReactionAssessor` from `synplan.chem.reaction.routes.quality`.
+See [forward assessment](docs/methods/forward.rst) for stereo-free matching,
+progress reporting, and the standalone collection script.
 
 ## Using SynPlanner with an AI agent
 

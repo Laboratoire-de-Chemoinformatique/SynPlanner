@@ -141,3 +141,129 @@ Legacy documents without these optional fields remain readable.
 ``Route.from_json(..., on_step=callback)`` calls
 ``callback(reaction, source_node)`` for each restored step, allowing collection
 tools to preserve metadata on the original JSON nodes.
+
+
+Matching and step scores
+-----------------------
+
+``ForwardReactionAssessor`` visits ``route.steps``, taking reactants from
+``step.reaction.reactants`` and the expected product from ``step.product``.
+The latter matters when a reaction has multiple products.
+
+**One-reactant exception.** Reactions containing exactly one entry in
+``step.reaction.reactants`` receive ``score=1.0``, ``rank=null`` and
+``alert=false`` without preprocessing, cache lookup or model inference.
+One-reactant reactions were intentionally excluded from SynFwd-1 training,
+with the assumption that suitable conditions could yield the product.
+The same selected convention applies to Chimera; it does not imply Chimera was
+trained with the same exclusion. This score records that assumption; it is not a model top-one match or proof
+of experimental feasibility. Reagents are not counted as reactants. Two
+reactant entries still require inference even when they are identical.
+The designated product must still have a valid stereo-free InChIKey.
+
+For other reactions, up to ten final distinct products are generated. Each parseable candidate is
+canonicalized with chython using ``fix_tautomers=False``, then identified with
+``inchi_key(molecule, ignore_stereo=True)``. The expected product is identified
+with the same stereo-free InChIKey operation. Full returned keys are compared;
+they are not truncated to the connectivity block. Isotope differences remain
+distinguishable. Standard InChI normalization can identify some tautomeric forms
+as equivalent, but this is not a general tautomer enumeration procedure.
+
+Stereochemistry is ignored for prediction deduplication and matching: neither route chemistry nor model
+inputs lose their stereo labels. An opposite or unspecified stereoisomer can
+therefore match. This measures **stereo-free product recovery**, not
+stereochemical correctness or experimental feasibility.
+
+The matching distinct product at position ``k`` receives ``rank=k``, ``score=1/k``,
+and ``alert=false``. Positions start at one. If no top-ten candidate matches,
+``rank=null``, ``score=0.0`` and ``alert=true``. Invalid candidates have been removed and duplicates collapsed before ranking. An alert means only that the expected product was not recovered in
+the first ten positions. It does not identify why the model missed it.
+
+Model execution errors and failures to identify the expected product propagate
+to the caller. They are not converted into zero scores.
+
+.. code-block:: python
+
+   from synplan.chem.reaction.routes.quality import ForwardReactionAssessor
+
+   assessor = ForwardReactionAssessor(
+       model, cache_path="results/forward_cache.json", batch_size=16
+   )
+   assessed_routes = assessor.assess(routes, silent=False)
+   print(assessed_routes[0].steps[0].forward_prediction)
+   print(assessor.last_stats)
+
+``Step.forward_prediction`` is optional. Each annotated step contains only
+``product_inchikey``, ``rank``, ``score`` and ``alert``; there is no ``reason``
+field. ``Route.to_json()`` and ``Route.from_json()`` round-trip this dictionary
+under reaction-node ``meta.forward_prediction``. Annotation never writes into
+shared reaction containers. Existing Python route provenance remains attached
+to the returned copies.
+
+Cache and progress
+------------------
+
+The cache is an in-memory dictionary backed by a named JSON file retained after
+the run. The script defaults to ``forward_cache.json`` beside its output;
+``--cache`` selects an explicit reusable path across collections. The Python
+API defaults to that filename in the current directory.
+
+Entries are grouped by a SHA-256 fingerprint of model/backend, runtime asset
+hashes, augmentation count and seed, beam width, requested result count, decoder
+chunk size, sequence limits, pipeline/matching versions, identity/ranking rules,
+runtime package versions and execution providers. Within that group, normalized
+reactants identify an entry. Expected products are excluded: identical
+reactants, even with different expected products, need one model prediction.
+Each entry stores final canonical predictions, stereo-free InChIKeys,
+representative sequence log likelihoods, aggregate ranking scores and actual
+augmentation count. Pipeline version 2 cannot reuse historical single-input
+beam-10 entries. Old fingerprint groups remain intact in the cache. Final step scores are not cached:
+the one-reactant exception leaves existing multi-reactant predictions reusable.
+Previously cached one-reactant entries are retained but ignored.
+
+The JSON file loads once. The assessor collects unique inputs across all routes,
+then predicts only cache misses. After each completed batch it writes the updated
+dictionary to a temporary sibling, closes that file, and atomically replaces the
+named cache. A restart reuses committed batches; an interrupted batch may be
+recomputed. An orphan temporary file is ignored. A malformed named cache raises
+an error rather than silently losing saved results.
+
+This sequential workflow needs neither a database nor worker locks. JSON keeps
+the cache inspectable and portable with the results. It rewrites the whole file
+per batch and retains its contents in memory, so it is intended for collections
+that fit in memory. There is no concurrent-writer support: use separate cache
+paths for simultaneous processes.
+
+The first tqdm bar counts routes while collecting reactions. The second counts
+uncached model inputs and advances after each completed batch. The summary and
+``last_stats`` report route count, reaction occurrences, unique inputs, cache
+hits/misses, model predictions, predictions saved, matched/unmatched occurrences,
+one-reactant steps, total non-zero scores and elapsed assessment time.
+Matched/unmatched counts describe only model-assessed occurrences; assumed
+one-reactant scores are reported separately. Hits/misses count unique model
+inputs; cache savings compare actual inference inputs with model-assessed
+occurrences, excluding the one-reactant bypass. Python calls are
+silent by default; scripts show progress unless ``--quiet`` is passed.
+
+Assess an exported collection
+----------------------------
+
+From the repository root in ``synplan_env``:
+
+.. code-block:: bash
+
+   python scripts/assess_routes.py \
+       --model synplan_data/forward/forwardchimera-denovo/v1 \
+       --model-type chimera --backend onnx \
+       --input results/routes.json.gz \
+       --output results/routes_forward.json.gz \
+       --cache results/forward_cache.json
+
+The input is the existing target-keyed mapping whose values are route-ID
+mappings or route lists. JSON and JSON.GZ are supported. The script restores
+``Route`` objects and overlays annotations onto a copy of the original JSON,
+preserving target/route/child order and arbitrary existing metadata. The JSON
+reader's optional ``on_step(reaction, source_node)`` callback supplies the
+correspondence without guessing reaction identity or overwriting metadata.
+The output is written atomically to a separate file; input, output and cache
+paths must differ.
