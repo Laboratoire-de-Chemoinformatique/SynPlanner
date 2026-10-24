@@ -21,6 +21,7 @@ from synplan.chem.reaction.routes.quality.protection.scanner import (
 )
 from synplan.chem.reaction.routes.quality.protection.scorer import CompetingSitesScore
 from synplan.chem.reaction.routes.quality.scorer import (
+    ForwardRouteScorer,
     PolicyLikelihoodScorer,
     ProtectionRouteScorer,
     RouteScorer,
@@ -30,6 +31,7 @@ __all__ = [
     "CompetingInteraction",
     "CompetingSitesScore",
     "ForwardReactionAssessor",
+    "ForwardRouteScorer",
     "FunctionalGroupDetector",
     "FunctionalGroupMatch",
     "HalogenDetector",

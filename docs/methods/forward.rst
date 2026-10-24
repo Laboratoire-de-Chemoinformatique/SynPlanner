@@ -267,3 +267,74 @@ reader's optional ``on_step(reaction, source_node)`` callback supplies the
 correspondence without guessing reaction identity or overwriting metadata.
 The output is written atomically to a separate file; input, output and cache
 paths must differ.
+
+
+Route assessment
+----------------
+
+``ForwardRouteScorer`` computes the geometric mean over **all** reaction steps:
+
+.. math::
+
+   F = \left(\prod_{i=1}^{N} s_i\right)^{1/N}
+
+Each entry in ``route.steps`` contributes once, including all branches of a
+convergent route. Shared downstream steps are not counted repeatedly along
+different leaf-to-target paths. Any zero-score step gives ``F=0.0``. For positive
+scores, the implementation uses ``exp(fsum(log(s_i)) / N)`` to avoid underflow.
+
+Assumed one-reactant scores of 1.0 are included in the denominator. Consequently
+``[0.25, 1.0]`` scores 0.5, and a route consisting entirely of assumed steps scores
+1.0. Such steps can increase the mean; the assessment reports their count
+separately. These values are ranking heuristics, not calibrated probabilities
+of experimental success or measures of stereochemical correctness.
+
+.. code-block:: python
+
+   from synplan.chem.reaction.routes.quality import ForwardRouteScorer
+
+   scorer = ForwardRouteScorer()
+   assessed_routes = scorer.assess(annotated_routes, silent=False)
+   forward_score = scorer.score(annotated_routes[0])
+   ranked_routes = scorer.rank(assessed_routes)  # explicit, stable descending sort
+
+   combined = ForwardRouteScorer(combine_search=True)
+   combined_score = combined.score(annotated_routes[0])
+
+``assess()`` preserves input order and returns route copies with an optional
+``Route.assessment`` dictionary. It records ``aggregation="geometric_mean_all_steps"``,
+``forward_score``, ``search_score``, ``total_steps``, ``zero_score_steps`` and
+``assumed_one_reactant_steps``. It does not mutate steps or shared chemistry.
+Missing step annotations raise an error, even when another step already scores
+zero. Run reaction assessment first; route scoring never initializes a model.
+
+Combining is **disabled by default**. When enabled, ``combined_score`` is added:
+
+.. math::
+
+   C = S_{\mathrm{search}} \times F
+
+The original search scale is retained without collection normalization.
+Combination requires a finite, nonnegative recorded search score. Forward-only
+assessment works without search provenance and records ``search_score=null``.
+``score()`` and inherited ``rank()`` use the forward score by default, or the
+combined score when explicitly enabled. Policy log likelihood remains a separate,
+unchanged provenance value and is never used in this combination.
+
+``Route.to_json()`` and ``Route.from_json()`` round-trip optional root-level
+``assessment`` and ``provenance``. Legacy files without these fields remain
+readable. Re-running reaction assessment clears an earlier route assessment;
+run the route scorer again to refresh it after reaction annotations change.
+Explicitly editing route chemistry likewise requires reassessment.
+
+Score a saved collection without loading a model:
+
+.. code-block:: bash
+
+   python scripts/score_routes.py \
+       --input results/routes_forward.json.gz \
+       --output results/routes_assessed.json.gz
+
+Add ``--combine-search`` to include the combined score, or ``--quiet`` to hide
+the route-based tqdm bar. Input and output paths must differ. JSON output is
+written atomically; route IDs, collection order and existing metadata survive.
