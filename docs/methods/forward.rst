@@ -148,6 +148,10 @@ trained with the same exclusion. This score records that assumption; it is not a
 of experimental feasibility. Reagents are not counted as reactants. Two
 reactant entries still require inference even when they are identical.
 The designated product must still have a valid stereo-free InChIKey.
+Reports display these steps as ordinary positive scores of 1.0, using the same
+styling as model-assessed positive steps. Their Top-k rank is shown as a dash
+because no model prediction was run. There is no separate ``Assumed`` label,
+legend or column in either the overview or per-route tables.
 
 For other reactions, up to ten final distinct products are generated. Each parseable candidate is
 canonicalized with chython using ``fix_tautomers=False``, then identified with
@@ -223,15 +227,15 @@ that fit in memory. There is no concurrent-writer support: use separate cache
 paths for simultaneous processes.
 
 The first tqdm bar counts routes while collecting reactions. The second counts
-uncached model inputs and advances after each completed batch. The summary and
-``last_stats`` report route count, reaction occurrences, unique inputs, cache
-hits/misses, model predictions, predictions saved, matched/unmatched occurrences,
-one-reactant steps, total non-zero scores and elapsed assessment time.
-Matched/unmatched counts describe only model-assessed occurrences; assumed
-one-reactant scores are reported separately. Hits/misses count unique model
-inputs; cache savings compare actual inference inputs with model-assessed
-occurrences, excluding the one-reactant bypass. Python calls are
-silent by default; scripts show progress unless ``--quiet`` is passed.
+uncached model inputs and advances after each completed batch. The console summary
+reports routes, reaction occurrences, unique inputs, cache hits/misses, positive
+and zero scores, and elapsed assessment time. Positive counts include one-reactant
+scores. ``last_stats`` additionally retains model predictions, predictions saved,
+matched/unmatched model-assessed occurrences and one-reactant counts for auditing.
+Hits/misses count unique model inputs; cache savings compare actual inference
+inputs with model-assessed occurrences, excluding the one-reactant bypass.
+Python calls are silent by default; scripts show progress unless ``--quiet``
+is passed.
 
 Assess an exported collection
 ----------------------------
@@ -332,9 +336,9 @@ The existing route renderer displays assessment tables automatically when routes
 carry these annotations. The report shows forward/search scores, policy log
 likelihoods, reaction scores and molecule drawings. Filters select all routes,
 routes without zero-score steps, or routes containing at least one zero.
-Assumed scores are blue, model matches green, and zero scores red. The combined
-column appears only when a combined score is present. Zoom and SVG/PNG export
-remain available; no network resources are required.
+Positive scores are green, including one-reactant steps, and zero scores red.
+The combined column appears only when a combined score is present. Zoom and
+SVG/PNG export remain available; no network resources are required.
 
 Optional validation during planning
 -----------------------------------

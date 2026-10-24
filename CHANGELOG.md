@@ -260,8 +260,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   assumed steps. Search scores and policy likelihoods remain separate; multiplying
   the forward score by the search score is an explicit option.
 - Forward annotations, route assessments, and provenance round-trip through route
-  JSON. HTML reports display reaction and route scores, distinguish assumed
-  steps, and filter routes by zero-score reactions.
+  JSON. HTML reports display reaction and route scores and filter routes by
+  zero-score reactions.
 - Optional planning validation through the top-level `forward_val_config`
   reference. Null settings preserve ordinary planning. On-the-fly validation
   rejects candidates outside Top-K before child creation; post-processing saves

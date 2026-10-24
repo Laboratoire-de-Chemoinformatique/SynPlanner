@@ -236,7 +236,6 @@ def test_errors_propagate_instead_of_rejecting(model, tmp_path):
     assert tree.forward_stats.get("rejections", 0) == 0
 
 
-
 def test_finite_limit_starts_no_second_prediction(model, tmp_path, monkeypatch):
     import synplan.mcts.tree as module
 

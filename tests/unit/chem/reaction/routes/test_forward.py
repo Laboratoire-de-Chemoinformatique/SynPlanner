@@ -287,7 +287,11 @@ def test_progress_totals_batches_and_order(
     assert [bar.options["disable"] for bar in bars] == [silent, silent]
     assert bars[0].updates == [1] * 5 and bars[1].updates == [2, 1]
     assert [call[0] for call in model.calls] == [["CC.N", "CCC.N"], ["CO.N"]]
-    assert bool(capsys.readouterr().out) is not silent
+    summary = capsys.readouterr().out
+    assert bool(summary) is not silent
+    assert "assumed" not in summary
+    if not silent:
+        assert "5 positive, 0 zero" in summary
 
 
 def test_annotation_round_trip_does_not_touch_reaction_metadata(model, tmp_path):

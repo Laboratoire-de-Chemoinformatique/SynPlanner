@@ -15,11 +15,10 @@ border-bottom:1px solid #e6e8eb;white-space:nowrap}
 .assessment-table a{color:#194c7e}
 .assessment-step-table{margin:16px 18px}
 .assessment-step-table caption{text-align:left;padding:0 0 10px;font-weight:600}
-.forward-match,.forward-zero,.forward-assumed{display:inline-block;border-radius:4px;
+.forward-match,.forward-zero{display:inline-block;border-radius:4px;
 padding:3px 8px;font-size:12px;font-weight:600}
 .forward-match{background:#eaf5ef;color:#216145}
 .forward-zero{background:#fceeed;color:#a62f36}
-.forward-assumed{background:#eaf1fc;color:#285d9a}
 .assessment-filters{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
 .assessment-filters button{padding:8px 12px;border:1px solid #cdd6df;
 border-radius:4px;background:white;cursor:pointer}
@@ -68,9 +67,9 @@ def _number(value):
 def _step_display(annotation):
     if annotation["score"] == 0:
         return "zero", "No top-10 match", "#bd3f3f"
-    if annotation["rank"] is None:
-        return "assumed", "Assumed · 1 reactant", "#285d9a"
-    return "match", str(annotation["rank"]), "#267154"
+    # One-reactant steps share the positive-score style without inventing a model rank.
+    rank = "—" if annotation["rank"] is None else str(annotation["rank"])
+    return "match", rank, "#267154"
 
 
 def _badge(annotation):
@@ -104,7 +103,7 @@ def assessment_steps(route, index):
         '<table class="assessment-table">'
         f"<caption>Forward route score: {_number(score['forward_score'])}{combined}"
         " · step numbers match the drawing</caption>"
-        "<thead><tr><th>Step</th><th>Top-k rank / assumption</th><th>Step score</th>"
+        "<thead><tr><th>Step</th><th>Top-k rank</th><th>Step score</th>"
         "<th>Alert</th><th>Product InChIKey · stereo-free</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table>"
         '<a href="#assessment-overview">Back to score overview ↑</a></div>'
@@ -135,7 +134,6 @@ def assessment_overview(routes, labels):
             f"<td>{_number(score.get('search_score'))}</td><td>{_number(likelihood)}</td>"
             + (f"<td>{_number(score.get('combined_score'))}</td>" if combined else "")
             + f"<td>{score.get('zero_score_steps', '—')} / {len(route)}</td>"
-            + f"<td>{score.get('assumed_one_reactant_steps', '—')}</td>"
             + f"<td>{vector}</td></tr>"
         )
     buttons = "".join(
@@ -152,8 +150,7 @@ def assessment_overview(routes, labels):
         "<h2>Forward route assessment</h2>"
         '<p class="assessment-note">The route score is the geometric mean of all step '
         "scores, counting each step once across every branch. A zero step makes the "
-        "route score zero. Assumed one-reactant scores of 1.0 are included: "
-        "[0.25, 1.0] gives 0.5. These are ranking heuristics, not probabilities of "
+        "route score zero. These are ranking heuristics, not probabilities of "
         "experimental success or measures of stereochemical correctness. "
         "Search scores and policy log likelihoods retain their original scale.</p>"
         + (
@@ -162,15 +159,14 @@ def assessment_overview(routes, labels):
             if combined
             else ""
         )
-        + '<p><span class="forward-match">Model match</span> '
-        '<span class="forward-zero">No top-10 match</span> '
-        '<span class="forward-assumed">Assumed · 1 reactant</span></p>'
+        + '<p><span class="forward-match">Positive score</span> '
+        '<span class="forward-zero">No top-10 match</span></p>'
         f'<div class="assessment-filters">{buttons}</div>'
         '<div class="assessment-scroll"><table class="assessment-table">'
         "<thead><tr><th>Route ID</th><th>Forward score</th><th>Search score</th>"
         "<th>Policy log likelihood</th>"
         + ("<th>Combined score</th>" if combined else "")
-        + "<th>Zero / total steps</th><th>Assumed steps</th>"
+        + "<th>Zero / total steps</th>"
         "<th>Step scores · 1 → n</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table></div></section>"
     )

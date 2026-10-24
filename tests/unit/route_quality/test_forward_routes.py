@@ -244,10 +244,12 @@ def test_script_gzip_and_html_without_loading_model(tmp_path, monkeypatch, combi
     result = read_json(output)["target"]["custom-route"]["assessment"]
     assert ("combined_score" in result) is combine
     assert read_json(source) == collection
-    page = html.read_text()
+    page = html.read_text(encoding="utf-8")
     assert ("<th>Combined score</th>" in page) is combine
     assert "custom-route" in page
-    assert "Assumed · 1 reactant" in page
+    assert "Step scores · 1 → n" in page
+    assert "Assumed" not in page
+    assert '<span class="forward-match" title="—">1.000</span>' in page
 
 
 def test_report_filters_step_tables_and_escaping():
@@ -263,8 +265,10 @@ def test_report_filters_step_tables_and_escaping():
     assert "At least one zero-score step · 1" in page
     assert page.count('class="route card"') == 2
     assert page.count("data-step-color=") == 3
-    assert 'data-step-color="#285d9a"' in page
+    assert page.count('data-step-color="#267154"') == 2
     assert 'data-step-color="#bd3f3f"' in page
+    assert "forward-assumed" not in page
+    assert "Assumed" not in page
     assert "<th>Combined score</th>" not in page
     assert "No top-10 match" in page
     assert "Policy log likelihood" in page

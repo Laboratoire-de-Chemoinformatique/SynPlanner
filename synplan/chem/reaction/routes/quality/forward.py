@@ -132,10 +132,9 @@ class ForwardReactionAssessor:
             stats = self.last_stats
             tqdm.write(
                 f"{len(routes)} routes; {stats['reaction_occurrences']} reactions; "
-                f"{stats['single_reactant_steps']} assumed; "
                 f"{stats['unique_inputs']} unique inputs; "
                 f"{stats['cache_hits']} cache hits, {stats['cache_misses']} misses; "
-                f"{stats['matched']} matched, {stats['unmatched']} unmatched; "
+                f"{stats['nonzero_scored']} positive, {stats['unmatched']} zero; "
                 f"{stats['elapsed_seconds']:.2f}s"
             )
         return assessed
@@ -150,6 +149,7 @@ class ForwardReactionAssessor:
         inputs, expected, unique = [], [], {}
         single_reactant_steps = 0
         for molecules, product in zip(reactants, products, strict=True):
+            # The one-reactant scoring convention is documented in methods/forward.rst.
             if len(molecules) == 1:
                 value = None
                 single_reactant_steps += 1
