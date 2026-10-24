@@ -109,6 +109,31 @@ The full CLI includes commands for every pipeline step: `reaction_mapping`, `rea
 
 The [tutorials](https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner/tree/main/tutorials) cover every step from data curation to protection scoring, route clustering and library design; the [documentation](https://synplanner.readthedocs.io/) explains the methods behind them.
 
+## Forward reaction prediction
+
+The base installation can run a local SynFwd-1 Chemformer ONNX bundle:
+
+```python
+from synplan.ml.inference.chemformer import OnnxChemformer
+
+model = OnnxChemformer("synplan_data/forward/synfwd-1/v1")
+results = model.predict(["CC(=O)Cl.N"], beam_width=20, num_results=10, batch_size=16)
+print(results[0]["predictions"])
+```
+
+The directory must contain `encoder.onnx`, `decoder.onnx`, `vocabulary.json`,
+and `model.json`; no Chemformer checkout or PyTorch is needed. Inputs are
+reactants-only SMILES. Chython formatting removes atom maps, followed by the
+RDKit canonical isomeric SMILES used in training, without tautomer standardization.
+Chemformer uses up to ten rooted input augmentations and twenty beams per
+augmentation. Invalid products are removed; full stereo-free InChIKeys collapse
+duplicates, then best rank and reciprocal-rank support select up to ten products.
+Results preserve input order and expose representative `log_likelihoods`
+separately from `ranking_scores`. Neither is an experimental success probability.
+CPU is the default;
+`device="cuda"` requires an available ONNX Runtime CUDA provider.
+See [forward prediction](docs/methods/forward.rst) for preprocessing and ranking.
+
 ## Using SynPlanner with an AI agent
 
 If you use Claude Code, Codex, Cursor, Copilot, or another agent that supports the [Agent Skills](https://agentskills.io) format, this repository ships a skill that teaches the agent how to use SynPlanner correctly — which API to reach for, how chython differs from RDKit, and what to do by default.
