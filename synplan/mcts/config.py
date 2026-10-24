@@ -26,8 +26,7 @@ class TreeConfig(BaseConfigModel):
     :param max_iterations: The number of iterations to run the algorithm
         for.
     :param max_tree_size: The maximum number of nodes in the tree.
-    :param max_time: The time limit (in seconds) for the algorithm to
-        run.
+    :param max_time: The wall-clock limit in seconds; None disables this limit.
     :param max_depth: The maximum depth of the tree.
     :param max_reaction_outcomes: Maximum mappings examined per rule application.
         Defaults to 5; larger values can retain alternate reaction sites.
@@ -87,7 +86,7 @@ class TreeConfig(BaseConfigModel):
     direction: Literal["retro", "forward"] = "retro"
     max_iterations: int = Field(default=100, gt=0)
     max_tree_size: int = Field(default=1000000, gt=0)
-    max_time: float = Field(default=600, gt=0)
+    max_time: float | None = Field(default=600, gt=0)
     max_depth: int = Field(default=6, gt=0)
     max_reaction_outcomes: int = Field(default=5, gt=0)
     exclude_small: bool = True
@@ -229,3 +228,25 @@ class CombinedPolicyConfig(BaseConfigModel):
     rule_prob_threshold: float = 0.0
     ranking_weight: float = Field(default=1.0, gt=0.0)
     temperature: float = Field(default=1.0, gt=0.0)
+
+
+class ForwardValidationConfig(BaseConfigModel):
+    """Optional planning validation; paths in YAML are relative to its directory."""
+
+    forward_val_type: Literal["on-the-fly", "post-processing"] | None = None
+    forward_val_path: Path | None = None
+    top_k: int = Field(default=10, ge=1, le=10)
+    device: Literal["cpu", "cuda"] = "cpu"
+    threads: int = Field(default=4, ge=1)
+    batch_size: int = Field(default=16, ge=1)
+    cache_path: Path | None = None
+
+    @classmethod
+    def from_yaml(cls, file_path):
+        path = Path(file_path).resolve()
+        config = super().from_yaml(str(path))
+        for name in ("forward_val_path", "cache_path"):
+            value = getattr(config, name)
+            if value is not None:
+                setattr(config, name, (path.parent / value).resolve())
+        return config

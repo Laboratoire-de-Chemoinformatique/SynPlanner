@@ -37,6 +37,8 @@ dependencies = [
 
 # Optional workflows; the base installation runs ONNX policies on CPU.
 [project.optional-dependencies]
+forward-checkpoint = ["torch>=2.5"]
+forward-export = ["torch>=2.5", "onnx>=1.17"]
 curation = [
   "torch>=2.0",
   "chytorch-synplan>=1.70",

@@ -847,6 +847,9 @@ def planning_cli(
     # node_evaluation keys are read separately below; merging them here would
     # reach TreeConfig (extra="forbid") and reject every config that has them.
     search_config = dict(config["tree"])
+    forward_val_config = config.get("forward_val_config")
+    if forward_val_config is not None:
+        forward_val_config = Path(config_path).resolve().parent / forward_val_config
     if "combined_policy" in config:
         # both heads come from the config; --policy_network has nothing to point at
         policy_config = CombinedPolicyConfig.from_dict(config["combined_policy"])
@@ -902,6 +905,7 @@ def planning_cli(
     run_search(
         targets_path=targets,
         search_config=search_config,
+        forward_val_config=forward_val_config,
         policy_config=policy_config,
         evaluation_config=evaluation_config,
         reaction_rules_path=reaction_rules,

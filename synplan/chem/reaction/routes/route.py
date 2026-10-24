@@ -8,7 +8,7 @@ from SMILES.
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from enum import Enum
 from math import fsum
 from typing import TYPE_CHECKING, Any, Literal
@@ -115,12 +115,15 @@ class Step:
     :param product: The molecule this step disconnects. One of
         ``reaction.products``, by identity -- never a copy, never a guess at
         which product the route cares about.
+    :param forward_prediction: Optional stereo-free product-recovery annotation;
+        kept on the step rather than in a potentially shared reaction container.
     """
 
     reaction: ReactionContainer
     product: MoleculeContainer
     origin: StepOrigin | None = None
     conditions: Conditions | None = None
+    forward_prediction: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not any(self.product is mol for mol in self.reaction.products):
@@ -177,12 +180,14 @@ class Route:
         purchasable -- the whole stored verdict. Empty on a solved route.
     :param provenance: Where the route came from -- the search run behind it, or
         what reading it out of a file turned up.
+    :param assessment: Optional post-search route scores, separate from provenance.
     """
 
     steps: tuple[Step, ...]
     unresolved: frozenset[str] = frozenset()
     provenance: RouteProvenance | None = None
     stereo: dict[str, Any] | None = None
+    assessment: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not self.steps:
@@ -215,7 +220,14 @@ class Route:
             likelihood = None
         steps = tuple(
             # one product per step by construction: the precursor being expanded
-            Step(reaction, reaction.products[0], _origin(metadata.get(index, {})))
+            Step(
+                reaction,
+                reaction.products[0],
+                _origin(metadata.get(index, {})),
+                forward_prediction=deepcopy(
+                    metadata.get(index, {}).get("meta", {}).get("forward_prediction")
+                ),
+            )
             for index, reaction in enumerate(tree.synthesis_route(node_id))
         )
         route = cls(
@@ -230,6 +242,7 @@ class Route:
                 policy_log_likelihood=likelihood,
             ),
             stereo=deepcopy(getattr(tree.nodes[node_id], "stereo_summary", None)),
+            assessment=deepcopy(getattr(tree.nodes[node_id], "route_assessment", None)),
         )
         if route.stereo is None:
             from synplan.chem.stereo_evidence import route_stereo_summary
@@ -259,26 +272,43 @@ class Route:
         return route
 
     @classmethod
-    def from_json(cls, route_json: RouteNode) -> Route:
+    def from_json(cls, route_json: RouteNode, *, on_step=None) -> Route:
         """Rebuild a route from one v1 JSON route tree.
 
         Each leaf carries the verdict of the molecule node it was read from, so
         the exported verdict is reproduced rather than re-decided against a stock
-        the file does not carry. v1 JSON has no envelope, so the route comes back
-        with no search behind it: its :attr:`provenance` holds only what the read
-        itself found out.
+        the file does not carry. Optional root-level provenance and assessment
+        survive round trips. Legacy files without provenance retain only what
+        the read itself found out.
+
+        ``on_step(reaction, source_node)`` optionally records the correspondence
+        with the input JSON, for metadata-preserving collection updates.
         """
 
-        parsed = read_route_tree(route_json)
+        parsed = read_route_tree(route_json, on_step=on_step)
+        provenance = route_json.get("provenance", {})
         steps = tuple(
-            Step(reaction, product, _origin(metadata))
+            Step(
+                reaction,
+                product,
+                _origin(metadata),
+                forward_prediction=deepcopy(
+                    reaction.meta.pop("forward_prediction", None)
+                ),
+            )
             for reaction, product, metadata in parsed.steps
         )
         return cls(
             steps=steps,
             unresolved=frozenset(molecule_key(mol) for mol in parsed.unresolved),
-            provenance=RouteProvenance(uncanonical=parsed.uncanonical),
+            provenance=RouteProvenance(
+                search_score=provenance.get("search_score"),
+                tree_node_id=provenance.get("tree_node_id"),
+                policy_log_likelihood=provenance.get("policy_log_likelihood"),
+                uncanonical=max(parsed.uncanonical, provenance.get("uncanonical", 0)),
+            ),
             stereo=deepcopy(route_json.get("stereo")),
+            assessment=deepcopy(route_json.get("assessment")),
         )
 
     # ------------------------------------------------------------------
@@ -580,8 +610,8 @@ class Route:
         The file's nesting is the route's own structure, so a multi-product step
         writes the product the route actually disconnects. Round trip keeps the
         steps, the per-step :class:`StepOrigin` and the leaf ``in_stock`` flags, and
-        therefore :attr:`solved`. It drops :attr:`provenance` (v1 JSON has no
-        envelope) and 2D coordinates. Nothing in the route is modified.
+        therefore :attr:`solved`. Optional provenance and assessment are written
+        on the root node; 2D coordinates are omitted. Nothing is modified.
 
         :param reconcile_atom_mapping: Renumber atoms consistently across steps
             before writing. Off by default because it costs a full RouteCGR
@@ -652,6 +682,8 @@ class Route:
             step = self.steps[index]
             extra: dict[str, Any] = {}
             metadata = dict(step.reaction.meta)
+            if step.forward_prediction is not None:
+                metadata["forward_prediction"] = deepcopy(step.forward_prediction)
             if metadata:
                 extra["meta"] = metadata
             if step.origin is not None:
@@ -665,6 +697,11 @@ class Route:
         result = route_tree(
             target, source_of, lambda mol, key, leaf: key in stock, step_fields
         )
+        if result is not None:
+            if self.provenance is not None:
+                result["provenance"] = asdict(self.provenance)
+            if self.assessment is not None:
+                result["assessment"] = deepcopy(self.assessment)
         if result is not None and self.stereo is not None:
             stereo_status = self.stereo_status
             result["stereo"] = {

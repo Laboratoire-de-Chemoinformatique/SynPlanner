@@ -15,6 +15,7 @@ from synplan.chem.reaction.rules.config import RuleExtractionConfig
 from synplan.chem.synthon.config import SynthonConfig
 from synplan.mcts.config import (
     CombinedPolicyConfig,
+    ForwardValidationConfig,
     TreeConfig,
 )
 from synplan.ml.config import (
@@ -27,6 +28,7 @@ CONFIGS = Path(__file__).resolve().parents[3] / "configs"
 
 # config file -> flat config class (whole file validates as one model)
 FLAT = {
+    "forward_predictor.yaml": ForwardValidationConfig,
     "reactions_standardization.yaml": ReactionStandardizationConfig,
     "reactions_filtration.yaml": ReactionFilterConfig,
     "rules_extraction.yaml": RuleExtractionConfig,

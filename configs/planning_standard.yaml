@@ -17,3 +17,6 @@ node_expansion:
   top_rules: 50
   rule_prob_threshold: 0.0
   priority_rules_fraction: 0.5
+
+# Optional forward validation settings (relative to this file).
+forward_val_config: null

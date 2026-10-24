@@ -33,7 +33,7 @@ __all__ = [
 ]
 
 #: Versioned identifier for the search-record file. Bump when the shape changes.
-SEARCH_RECORD_SCHEMA = "synplan-tree/3"
+SEARCH_RECORD_SCHEMA = "synplan-tree/4"
 
 
 @dataclass
@@ -59,6 +59,7 @@ class SearchRecord:
     stats: dict
     config: TreeConfig = field(default_factory=TreeConfig)
     original_target: MoleculeContainer | None = None
+    forward_metadata: dict = field(default_factory=dict)
 
     # The Tree readouts that touch nodes and parents only, bound from the real
     # class: a record has to answer them exactly as the search did.
@@ -163,6 +164,8 @@ def write_search_record(
             "stereo_evidence": list(node.stereo_evidence),
             "stereo_history": node.stereo_history,
             "stereo_summary": getattr(node, "stereo_summary", None),
+            "forward_prediction": node.forward_prediction,
+            "route_assessment": node.route_assessment,
             "selected_stock": [
                 p.molecule.meta.get("selected_stock") for p in node.new_precursors
             ],
@@ -182,6 +185,11 @@ def write_search_record(
         "nodes": nodes,
         "winning": list(tree.winning_nodes),
         "stats": _counters(tree),
+        **(
+            {"forward_validation": tree.forward_metadata}
+            if tree.forward_metadata
+            else {}
+        ),
     }
     if tree.config.stereo_mode == "off":
         record.update(stereo_mode="off", original_target=str(tree.original_target))
@@ -216,6 +224,7 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
     if raw.get("schema") not in {
         "synplan-tree/1",
         "synplan-tree/2",
+        "synplan-tree/3",
         SEARCH_RECORD_SCHEMA,
     }:
         raise ValueError(
@@ -223,7 +232,9 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             "search record"
         )
 
-    molecules = [read_smiles(smiles) for smiles in raw["molecules"]]
+    # Match the writer's atom insertion order. Symmetric mapped fragments can
+    # otherwise choose a different spelling and invalidate unchanged stereo context.
+    molecules = [in_atom_order(read_smiles(smiles)) for smiles in raw["molecules"]]
     nodes: dict[int, Node] = {}
     parents: dict[int, int] = {}
     children: dict[int, set[int]] = {}
@@ -283,6 +294,8 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             stereo_events=entry.get("stereo_events", ()),
             stereo_evidence=entry.get("stereo_evidence", ()),
             stereo_history=entry.get("stereo_history", ""),
+            forward_prediction=entry.get("forward_prediction"),
+            route_assessment=entry.get("route_assessment"),
         )
         if entry.get("stereo_summary"):
             nodes[node_id].stereo_summary = entry["stereo_summary"]
@@ -309,6 +322,7 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
         children=children,
         winning_nodes=list(raw["winning"]),
         stats=stats,
+        forward_metadata=raw.get("forward_validation", {}),
         config=TreeConfig(stereo_mode=raw.get("stereo_mode", "proposal")),
         original_target=read_smiles(raw.get("original_target", raw["target"])),
     )

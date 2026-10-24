@@ -10,8 +10,8 @@ from typing import Any, TypedDict
 class RouteNode(TypedDict, total=False):
     """Version-1 JSON-compatible route node.
 
-    The existing route JSON format deliberately has no top-level envelope.  This
-    type documents that stable shape without changing serialized files.
+    The route JSON format has no separate envelope. Optional provenance and
+    assessment dictionaries annotate the root of the same molecule/reaction tree.
     """
 
     type: str
@@ -19,6 +19,8 @@ class RouteNode(TypedDict, total=False):
     children: list[RouteNode]
     in_stock: bool
     meta: dict[str, Any]
+    provenance: dict[str, Any]
+    assessment: dict[str, Any]
     step_id: int
     tree_node_id: int | None
     rule_id: int | None

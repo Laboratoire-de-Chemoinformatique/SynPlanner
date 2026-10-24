@@ -1,0 +1,7 @@
+forward_val_type: on-the-fly  # null, on-the-fly, post-processing
+forward_val_path: ../synplan_data/forward/synfwd-1/v1/
+top_k: 10
+device: cpu
+threads: 4
+batch_size: 16
+cache_path: null

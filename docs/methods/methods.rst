@@ -24,3 +24,4 @@ Practical usage is covered in :doc:`/configuration/configuration` and :doc:`/use
     planning
     priority_rules
     routes
+    forward

@@ -25,9 +25,11 @@ from synplan.chem.reaction.routes.quality.scorer import RouteScorer
 from synplan.chem.reaction.routes.representation import extract_reactions
 from synplan.chem.utils import mol_from_smiles
 from synplan.mcts.config import CombinedPolicyConfig
+from synplan.mcts.forward import ForwardValidationError, load_forward_validation
 from synplan.mcts.tree import Tree, TreeConfig
 from synplan.ml.config import PolicyNetworkConfig
 from synplan.utils.files import iter_csv_smiles, iter_smiles_records
+from synplan.utils.json import write_json_atomic
 from synplan.utils.loading import (
     load_building_blocks,
     load_combined_policy_function,
@@ -112,6 +114,7 @@ def build_target_routes(tree, reactions: dict | None = None) -> list[dict]:
     return list(
         make_json(
             reactions,
+            tree=tree if tree.forward_metadata else None,
             keep_ids=True,
             building_blocks=tree.building_blocks,
         ).values()
@@ -175,6 +178,7 @@ def run_search(
     reconcile_atom_mapping: bool = False,
     export_routes: bool = False,
     routes_filename: str = "results.json.gz",
+    forward_val_config=None,
 ) -> None:
     """Performs a tree search on a set of target molecules using specified configuration
     and reaction rules, logging the results and statistics.
@@ -209,6 +213,8 @@ def run_search(
         False, leaving the existing outputs byte-identical.
     :param routes_filename: Filename (under ``results_root``) for the gzipped
         target-keyed routes artifact. Only used when ``export_routes`` is True.
+    :param forward_val_config: Optional forward YAML path or ForwardValidationConfig.
+        None disables assessment. Relative paths supplied here use the working directory.
     :return: None.
     """
 
@@ -231,6 +237,8 @@ def run_search(
         "num_iter",
         "tree_depth",
         "search_time",
+        "stop_reason",
+        "forward_statistics",
         "solved",
         # Policy performance
         "expansion_calls",
@@ -296,6 +304,23 @@ def run_search(
 
     tree_config = TreeConfig.from_dict(search_config)
     tree_config.silent = True
+    forward_config, forward_assessor = load_forward_validation(
+        forward_val_config, results_root
+    )
+    if forward_config is not None and tree_config.direction != "retro":
+        raise ValueError(
+            "Forward validation currently supports retrosynthetic search only"
+        )
+    forward_manifest = None
+    if forward_config is not None:
+        forward_manifest = {
+            "configuration": forward_config.to_dict(),
+            "model_identity": forward_assessor.identity,
+            "model_fingerprint": forward_assessor.fingerprint,
+            "initialization_seconds": forward_assessor.initialization_seconds,
+            "targets": {},
+        }
+        write_json_atomic(results_root / "forward_validation.json", forward_manifest)
     if tree_config.stereo_mode == "off" and not is_json_catalogue:
         building_blocks = frozenset(
             str(smiles(s, ignore_stereo=True)) for s in building_blocks
@@ -353,10 +378,22 @@ def run_search(
                     expansion_function=policy_function,
                     evaluation_function=evaluation_function,
                     priority_rules=priority_rules,
+                    forward_assessor=(
+                        forward_assessor
+                        if forward_config is not None
+                        and forward_config.forward_val_type == "on-the-fly"
+                        else None
+                    ),
                 )
 
+                if forward_config is not None:
+                    tree.forward_metadata = {
+                        k: v for k, v in forward_manifest.items() if k != "targets"
+                    }
                 tree.run()
 
+            except ForwardValidationError:
+                raise
             except Exception as e:
                 extracted_routes.append(
                     [
@@ -373,6 +410,34 @@ def run_search(
                 )
 
                 continue
+
+            if forward_config is not None:
+                from synplan.mcts.record import write_search_record
+
+                # Save completed planning before post-processing can fail.
+                write_search_record(
+                    tree, routes_folder / f"search_{ti}_unassessed.json.gz"
+                )
+                write_json_atomic(
+                    routes_folder / f"routes_{ti}_unassessed.json.gz",
+                    {
+                        target_smi: {
+                            str(r.provenance.tree_node_id): r.to_json()
+                            for r in tree.routes()
+                        }
+                    },
+                )
+                tree.finalize_forward(
+                    forward_assessor, forward_config.forward_val_type, silent=False
+                )
+                write_search_record(tree, routes_folder / f"search_{ti}.json.gz")
+                forward_manifest["targets"][str(ti)] = {
+                    "target": target_smi,
+                    **tree.to_stats_dict(),
+                }
+                write_json_atomic(
+                    results_root / "forward_validation.json", forward_manifest
+                )
 
             # is solved
             n_solved += bool(tree.winning_nodes)

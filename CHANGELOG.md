@@ -240,6 +240,51 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the ranking from position 35 down. Whether it changed a score at all depends on
   the tree.
 
+## [1.8.0]
+
+### Added
+
+- Local Chemformer and ForwardChimera ONNX adapters using the existing base
+  dependencies. Chimera also supports explicit checkpoint inference and ONNX
+  export through optional PyTorch extras, without RetroChimera or Lightning.
+- Shared forward prediction with up to ten deterministic rooted reactant SMILES,
+  twenty beams per augmentation, stereo-free full-InChIKey deduplication, and
+  reranking to at most ten distinct products. Inputs retain stereochemistry and
+  isotopes; representative sequence likelihoods remain separate from rank scores.
+- `ForwardReactionAssessor` for stereo-free product recovery, reciprocal-rank
+  scores, and unmatched-product alerts. One-reactant steps receive an explicit
+  assumed score of 1.0 without inference. Reusable JSON caches use model/pipeline
+  fingerprints, atomic writes, and tqdm progress; collection scripts preserve
+  route IDs, order, and existing metadata.
+- `ForwardRouteScorer` aggregates all reaction scores geometrically, including
+  assumed steps. Search scores and policy likelihoods remain separate; multiplying
+  the forward score by the search score is an explicit option.
+- Forward annotations, route assessments, and provenance round-trip through route
+  JSON. HTML reports display reaction and route scores and filter routes by
+  zero-score reactions.
+- Optional planning validation through the top-level `forward_val_config`
+  reference. Null settings preserve ordinary planning. On-the-fly validation
+  rejects candidates outside Top-K before child creation; post-processing saves
+  completed planning output before assessment and retains failed routes.
+- Shared model sessions and prediction caches across planning targets, explicit
+  low-level finalization, and timing/cache/filter statistics. Search records use
+  schema 4 for annotations and model identity while accepting schemas 1 through 3.
+- `max_time: null` supports iteration-controlled runs across search algorithms,
+  with stopping reasons recorded. The ordinary time limit remains 600 seconds.
+
+### Changed
+
+- Forward prediction ranks distinct product identities after augmentation rather
+  than raw single-input beams. Versioned cache fingerprints prevent historical
+  beam-10 predictions from satisfying the new generation policy. Forward scores
+  describe product recovery and are ranking heuristics, not experimental success
+  probabilities.
+
+### Fixed
+
+- Search-record loading preserves atom insertion order for symmetric mapped
+  fragments, preventing unchanged reactions from invalidating stereo evidence.
+
 ## [1.7.0] - 2026-08-25
 
 ### Added

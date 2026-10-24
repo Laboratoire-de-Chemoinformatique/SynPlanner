@@ -23,6 +23,13 @@ from synplan.utils.routedraw import (
     molecule_svg,
 )
 from synplan.utils.svgslim import Doc, hidden_defs
+from synplan.utils.visualisation.assessment import (
+    ASSESSMENT_CSS,
+    ASSESSMENT_JS,
+    assessment_group,
+    assessment_overview,
+    assessment_steps,
+)
 from synplan.utils.visualisation.assets import (
     REPORT_CSS,
     REPORT_JS,
@@ -199,7 +206,7 @@ def _report_header(
         ("Routes", len(routes), ""),
         ("Search time", _seconds(search_time), " s" if search_time is not None else ""),
         ("Shortest route", min((len(route) for route in routes), default=0), " steps"),
-        ("Best score", round(max(scores), 3) if scores else "—", ""),
+        ("Best search score", round(max(scores), 3) if scores else "—", ""),
     )
     target = (
         ""
@@ -335,6 +342,7 @@ def routes_report_html(
     stats: dict | None = None,
     prices: bool = True,
     building_blocks: Any = None,
+    route_labels: Sequence[str] | None = None,
 ) -> str | None:
     """Write an HTML page with the given routes drawn.
 
@@ -367,11 +375,26 @@ def routes_report_html(
     :param building_blocks: The catalogue the search ran against, read only for the
         vendor names its release metadata carries. Without it a pill names its
         vendors by the short codes the records hold.
+    :param route_labels: Optional display IDs in route order, for exported collections.
+        Routes carrying assessment annotations also get score tables and filters.
     :return: The page when ``html_path`` is None, otherwise None.
     """
     vendors = vendor_names(building_blocks) if building_blocks is not None else {}
     with _temporary_render_config(mapping=bool(aam)):
         routes = list(routes)
+        if route_labels is None:
+            route_labels = [
+                str(
+                    route.provenance.tree_node_id
+                    if route.provenance is not None
+                    and route.provenance.tree_node_id is not None
+                    else index
+                )
+                for index, route in enumerate(routes, 1)
+            ]
+        elif len(route_labels) != len(routes):
+            raise ValueError("Route labels must match the number of routes")
+        assessed = any(route.assessment is not None for route in routes)
         # A legacy SMILES stock carries no vendors at all, so a page drawn against
         # one would wear a Price per gram column that can never hold anything.
         prices = prices and any(
@@ -430,12 +453,22 @@ def routes_report_html(
                 if prices
                 else ""
             )
-            node_id = None if provenance is None else provenance.tree_node_id
             score = None if provenance is None else provenance.search_score
+            attributes = (
+                f' id="assessment-route-{index}" '
+                f'data-assessment-group="{assessment_group(route)}"'
+                if assessed
+                else ""
+            )
+            if route.assessment is not None:
+                rows = (
+                    '<details class="assessment-strings"><summary>Reaction SMILES'
+                    f"</summary>{rows}</details>"
+                )
             body.append(
-                '<section class="route card"><div class="rhead">'
+                f'<section class="route card"{attributes}><div class="rhead">'
                 f'<div class="kv"><div class="eyebrow">Route ID</div>'
-                f'<div class="v id">{index if node_id is None else node_id}</div></div>'
+                f'<div class="v id">{escape(str(route_labels[index - 1]))}</div></div>'
                 f'<div class="kv"><div class="eyebrow">Steps</div>'
                 f'<div class="v">{len(route)}</div></div>'
                 f'<div class="kv"><div class="eyebrow">Search score</div>'
@@ -444,7 +477,8 @@ def routes_report_html(
                 + '<div class="acts"><button class="act" data-act="zoom">Zoom</button>'
                 '<button class="act" data-act="svg">SVG</button>'
                 '<button class="act" data-act="png">PNG</button></div></div>'
-                f'<div class="draw">'
+                + assessment_steps(route, index)
+                + '<div class="draw">'
                 f"{doc.route(route.svg(standalone=False, layouts=layouts, prices=pills))}"
                 f"</div>{rows}</section>"
             )
@@ -453,7 +487,8 @@ def routes_report_html(
             '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
             '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
             "<title>Retrosynthetic Routes Report</title>\n"
-            f"<style>{ROUTE_CSS}{REPORT_CSS}</style>\n</head>\n<body>\n"
+            f"<style>{ROUTE_CSS}{REPORT_CSS}{ASSESSMENT_CSS if assessed else ''}</style>\n"
+            "</head>\n<body>\n"
             + hidden_defs(ARROW_DEFS, doc.defs())
             + '<div class="wrap">'
             + _report_header(
@@ -461,9 +496,11 @@ def routes_report_html(
                 drawable_copy(routes[0].target, layouts) if routes else None,
                 stats,
             )
+            + (assessment_overview(routes, route_labels) if assessed else "")
             + "".join(body)
             + "</div>\n<script>"
             + REPORT_JS
+            + (ASSESSMENT_JS if assessed else "")
             + "</script>\n</body>\n</html>\n"
         )
 
