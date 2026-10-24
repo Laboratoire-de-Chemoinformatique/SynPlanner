@@ -26,8 +26,7 @@ class TreeConfig(BaseConfigModel):
     :param max_iterations: The number of iterations to run the algorithm
         for.
     :param max_tree_size: The maximum number of nodes in the tree.
-    :param max_time: The time limit (in seconds) for the algorithm to
-        run.
+    :param max_time: The wall-clock limit in seconds; None disables this limit.
     :param max_depth: The maximum depth of the tree.
     :param max_reaction_outcomes: Maximum mappings examined per rule application.
         Defaults to 5; larger values can retain alternate reaction sites.
@@ -87,7 +86,7 @@ class TreeConfig(BaseConfigModel):
     direction: Literal["retro", "forward"] = "retro"
     max_iterations: int = Field(default=100, gt=0)
     max_tree_size: int = Field(default=1000000, gt=0)
-    max_time: float = Field(default=600, gt=0)
+    max_time: float | None = Field(default=600, gt=0)
     max_depth: int = Field(default=6, gt=0)
     max_reaction_outcomes: int = Field(default=5, gt=0)
     exclude_small: bool = True

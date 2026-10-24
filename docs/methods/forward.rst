@@ -348,3 +348,21 @@ routes without zero-score steps, or routes containing at least one zero.
 Assumed scores are blue, model matches green, and zero scores red. The combined
 column appears only when a combined score is present. Zoom and SVG/PNG export
 remain available; no network resources are required.
+
+
+Iteration and time budgets
+--------------------------
+
+The ordinary default remains 600 seconds. Set ``tree.max_time: null`` to
+disable the wall-clock limit and compare searches at a fixed iteration budget:
+
+.. code-block:: yaml
+
+   tree:
+     max_iterations: 100
+     max_time: null
+     max_depth: 6
+
+Tree-size, depth, exhaustion and stop-at-first conditions still apply. All
+search algorithms support a null limit. Search statistics include the stopping
+reason, and elapsed search time is retained when expansion exhausts the tree.

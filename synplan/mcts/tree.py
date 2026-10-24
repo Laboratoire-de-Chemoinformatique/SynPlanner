@@ -187,6 +187,7 @@ class Tree:
 
         # tree config parameters
         self.config = config
+        self.stop_reason = None
         self._stereo_assessments = {}
         for record in config.stereo_assessments:
             self._stereo_assessments.setdefault(record.get("context"), []).append(
@@ -373,12 +374,16 @@ class Tree:
         """
 
         if self.curr_iteration >= self.config.max_iterations:
+            self.stop_reason = "max_iterations"
             raise StopIteration("Iterations limit exceeded.")
         if self.curr_tree_size >= self.config.max_tree_size:
+            self.stop_reason = "max_tree_size"
             raise StopIteration("Max tree size exceeded or all possible routes found.")
-        if time() - self.start_time >= self.config.max_time:
+        if self.time_limit_reached():
+            self.stop_reason = "max_time"
             raise StopIteration("Time limit exceeded.")
         if self.stop_at_first and self.found_a_route:
+            self.stop_reason = "stop_at_first"
             raise StopIteration("Already found a route.")
 
         # start new iteration
@@ -390,8 +395,13 @@ class Tree:
 
         previous_routes = len(self.winning_nodes)
         previous_expansions = self.stats.expansion_calls
-        is_solved, last_node_id = self.algorithm.step()
-        self.curr_time = time() - self.start_time
+        try:
+            is_solved, last_node_id = self.algorithm.step()
+        except StopIteration:
+            self.stop_reason = self.stop_reason or "exhausted"
+            raise
+        finally:
+            self.curr_time = time() - self.start_time
         self.stats.iterations_without_expansion += (
             self.stats.expansion_calls == previous_expansions
         )
@@ -406,6 +416,14 @@ class Tree:
                 self.stats.first_solution_time = round(self.curr_time, 4)
 
         return is_solved, last_node_id
+
+    def time_limit_reached(self):
+        """A null time limit disables only the wall-clock stopping condition."""
+        return (
+            self.config.max_time is not None
+            and bool(self.start_time)
+            and time() - self.start_time >= self.config.max_time
+        )
 
     def run(self) -> "Tree":
         """Run the search to completion and return the tree.
@@ -535,7 +553,10 @@ class Tree:
         elif node_id != 1:
             self.stats.dead_end_nodes += 1
 
+        if self.time_limit_reached():
+            self.stop_reason = "max_time"
         if not expanded and node_id == 1:
+            self.stop_reason = self.stop_reason or "exhausted"
             raise StopIteration("\nThe target molecule was not expanded.")
 
     def _iter_rules(self, curr_node: Node):
@@ -1409,6 +1430,7 @@ class Tree:
                 max(n.depth for n in self.nodes.values()) if self.nodes else 0
             ),
             "search_time": round(self.curr_time, 1),
+            "stop_reason": self.stop_reason,
             "solved": len(self.winning_nodes) > 0,
             "stereo_proposals": len(self.proposal_nodes),
             "stereo_incompatible_outcomes": self.stats.stereo_incompatible_outcomes,

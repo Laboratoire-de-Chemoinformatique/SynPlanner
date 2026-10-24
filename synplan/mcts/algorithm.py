@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from bisect import bisect_right
 from math import sqrt
 from random import choice, uniform
-from time import time
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
@@ -82,7 +81,7 @@ class NMCSPlayoutMixin:
         depth = node_depth
         sequence: list[int] = []
 
-        if time() - self.tree.start_time > self.tree.config.max_time:
+        if self.tree.time_limit_reached():
             return node_id, sequence
 
         if node_id not in self.tree.expanded_nodes:
@@ -573,7 +572,7 @@ class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
             self.tree.redundant_children[node_id]
         )
         while all_children:
-            if time() - self.tree.start_time > self.tree.config.max_time:
+            if self.tree.time_limit_reached():
                 return best_node_id, chosen_path + best_path
             if self.tree.nodes[node_id].is_solved():
                 self._mark_solved(node_id)
@@ -624,7 +623,7 @@ class NestedMonteCarlo(NMCSPlayoutMixin, BaseSearchStrategy):
                     best_path = path
                     best_score = score
                     best_node_id = candidate_id
-                if time() - self.tree.start_time > self.tree.config.max_time:
+                if self.tree.time_limit_reached():
                     return best_node_id, chosen_path + best_path
             if len(best_path) == 0:
                 return node_id, chosen_path
@@ -747,7 +746,7 @@ class LazyNestedMonteCarlo(
             self.tree.expanded_nodes.add(node_id)
         best_score = -float("inf")
         while self.tree.children[node_id]:
-            if time() - self.tree.start_time > self.tree.config.max_time:
+            if self.tree.time_limit_reached():
                 return best_node_id, chosen_path + best_path
             if self.tree.nodes[node_id].is_solved():
                 self._mark_solved(node_id)
@@ -829,7 +828,7 @@ class LazyNestedMonteCarlo(
                     best_path = path
                     best_score = score
                     best_node_id = candidate_id
-                if time() - self.tree.start_time > self.tree.config.max_time:
+                if self.tree.time_limit_reached():
                     return best_node_id, chosen_path + best_path
             if len(best_path) == 0:
                 return node_id, chosen_path
