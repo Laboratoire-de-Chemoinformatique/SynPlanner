@@ -132,7 +132,7 @@ class RouteRead(NamedTuple):
     uncanonical: int
 
 
-def read_route_tree(route_json) -> RouteRead:
+def read_route_tree(route_json, *, on_step=None) -> RouteRead:
     """Read one v1 route tree into molecules, steps and stock verdicts.
 
     A step's product is the very object the consuming reaction holds as a
@@ -144,6 +144,9 @@ def read_route_tree(route_json) -> RouteRead:
     older SynPlanner or another tool, and one spelling per molecule is what makes
     the rest of this -- and of :class:`~synplan.chem.reaction.routes.route.Route`
     -- a lookup rather than a guess. Canonicalisation keeps atom mapping.
+
+    ``on_step(reaction, source_node)`` observes each restored reaction and its
+    original JSON node, allowing callers to preserve arbitrary file metadata.
     """
     steps = []
     unresolved = []
@@ -213,6 +216,8 @@ def read_route_tree(route_json) -> RouteRead:
         steps.append(
             (reaction, product, {k: source[k] for k in _STEP_META_KEYS if k in source})
         )
+        if on_step is not None:
+            on_step(reaction, source)
         return product
 
     molecule(route_json)

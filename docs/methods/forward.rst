@@ -126,3 +126,18 @@ Stereo-free grouping is tested independently because it intentionally differs.
 The width-one upstream comparison uses three identical inputs to avoid its
 single-active-item squeeze failure; standalone singleton decoding is tested
 separately. Width-ten/twenty comparisons use different inputs.
+
+
+Annotation persistence
+----------------------
+
+``Step.forward_prediction`` optionally stores ``product_inchikey``, ``rank``,
+``score`` and ``alert`` under reaction-node ``meta.forward_prediction``.
+Annotations belong to steps and do not modify shared reaction containers.
+``Route.assessment`` is an optional root-level dictionary. Route JSON also
+round-trips ``provenance``, including search score and policy log likelihood.
+Legacy documents without these optional fields remain readable.
+
+``Route.from_json(..., on_step=callback)`` calls
+``callback(reaction, source_node)`` for each restored step, allowing collection
+tools to preserve metadata on the original JSON nodes.
