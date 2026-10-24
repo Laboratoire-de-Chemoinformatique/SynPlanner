@@ -125,11 +125,13 @@ The directory must contain `encoder.onnx`, `decoder.onnx`, `vocabulary.json`,
 and `model.json`; no Chemformer checkout or PyTorch is needed. Inputs are
 reactants-only SMILES. Chython formatting removes atom maps, followed by the
 RDKit canonical isomeric SMILES used in training, without tautomer standardization.
-Chemformer uses up to ten rooted input augmentations and twenty beams per
-augmentation. Invalid products are removed; full stereo-free InChIKeys collapse
-duplicates, then best rank and reciprocal-rank support select up to ten products.
-Results preserve input order and expose representative `log_likelihoods`
-separately from `ranking_scores`. Neither is an experimental success probability.
+Both Chemformer and `synplan.ml.inference.chimera.ForwardChimera` use up to ten
+rooted input augmentations and twenty beams per augmentation. Invalid products
+are removed; full stereo-free InChIKeys collapse duplicates, then best rank and
+reciprocal-rank support select up to ten products. Results preserve input order
+and expose representative `log_likelihoods` separately from `ranking_scores`.
+Neither score is an experimental success probability. Chimera also supports an
+explicit `backend="ckpt"` with optional PyTorch, without RetroChimera or Lightning.
 CPU is the default;
 `device="cuda"` requires an available ONNX Runtime CUDA provider.
 See [forward prediction](docs/methods/forward.rst) for preprocessing and ranking.
