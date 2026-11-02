@@ -177,3 +177,28 @@ def test_cuda_initialization_fallback_is_rejected(model, monkeypatch):
     )
     with pytest.raises(RuntimeError, match="provider failed to initialize"):
         OnnxChemformer(model.directory, device="cuda")
+
+
+@pytest.mark.parametrize("finish,empty", [(True, False), (True, True), (False, False)])
+def test_cached_sampler_preserves_parent_history_and_end_scoring(
+    model, monkeypatch, finish, empty
+):
+    model.decoder.finish = finish
+    model.decoder.empty_candidates = empty
+    expected = model._predict_batch(["C", "NO"], beam_width=2)
+    calls = []
+
+    def cached(prefix, memory, mask, past, parents):
+        reconstructed = (
+            prefix[:, -1:]
+            if past is None
+            else np.concatenate((past[parents], prefix[:, -1:]), axis=1)
+        )
+        np.testing.assert_array_equal(reconstructed, prefix)
+        calls.append(reconstructed.shape[1])
+        return model._decode(reconstructed, memory, mask), reconstructed
+
+    monkeypatch.setattr(model, "_decode_cached", cached)
+    model.kv_cache = True
+    assert model._predict_batch(["C", "NO"], beam_width=2) == expected
+    assert calls == list(range(1, max(calls) + 1))

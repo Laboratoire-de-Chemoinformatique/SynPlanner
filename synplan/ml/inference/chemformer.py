@@ -4,8 +4,8 @@ synplan/ml/inference/chemformer.py adapts the portable ONNX inference wrapper fr
 chemformer-workflows (Apache License, Version 2.0).
 Original source: chemformer_workflows/integrations/onnx_inference.py, distributed
 with the SynFwd-1 model as predict.py.
-Changes: chython-based mapping removal, a batched Python API, and removal of the
-standalone command-line interface.
+Changes: chython-based mapping removal, a batched Python API, optional cached
+ONNX decoding, and removal of the standalone command-line interface.
 
 Chemformer architecture and vocabulary: MolecularAI/Chemformer, Apache-2.0.
 V2 implementation: MolecularAI/aizynthmodels, Apache-2.0.
@@ -291,7 +291,8 @@ class OnnxChemformer:
     """Forward prediction using the portable Chemformer encoder/decoder format.
 
     ``model_dir`` contains encoder.onnx, decoder.onnx, vocabulary.json and
-    model.json. Sessions are loaded once; no Python code from the bundle is run.
+    model.json. Bundles declaring ``kv_cache`` also contain decoder_with_past.onnx.
+    Sessions are loaded once; no Python code from the bundle is run.
     CPU needs only SynPlanner's base dependencies. CUDA requires a separately
     installed ONNX Runtime CUDA provider and fails if it cannot initialize.
 
@@ -332,6 +333,10 @@ class OnnxChemformer:
         )
         self.directory = Path(model_dir)
         self.metadata = json.loads((self.directory / "model.json").read_text())
+        self.kv_cache = self.metadata.get("kv_cache", False)
+        self.device = device
+        if self.kv_cache:
+            self.runtime_files += ("decoder_with_past.onnx",)
         self.max_length = self.metadata["architecture"]["max_seq_len"]
         self.tokenizer = _Tokenizer(self.directory / "vocabulary.json", self.max_length)
         options = ort.SessionOptions()
@@ -353,9 +358,21 @@ class OnnxChemformer:
             sess_options=options,
             providers=providers,
         )
+        sessions = {"encoder": self.encoder, "decoder": self.decoder}
+        if self.kv_cache:
+            self.decoder_with_past = ort.InferenceSession(
+                str(self.directory / "decoder_with_past.onnx"),
+                sess_options=options,
+                providers=providers,
+            )
+            sessions["decoder_with_past"] = self.decoder_with_past
+            self.cache_names = [
+                f"past_{i}_{kind}"
+                for i in range(self.metadata["architecture"]["num_layers"])
+                for kind in ("key", "value", "cross_key", "cross_value")
+            ]
         if any(
-            provider not in session.get_providers()
-            for session in (self.encoder, self.decoder)
+            provider not in session.get_providers() for session in sessions.values()
         ):
             raise RuntimeError(
                 f"Requested provider failed to initialize: {provider}; "
@@ -363,7 +380,7 @@ class OnnxChemformer:
             )
         self.decoder_batch_size = decoder_batch_size
         self.providers = {
-            name: getattr(self, name).get_providers() for name in ("encoder", "decoder")
+            name: session.get_providers() for name, session in sessions.items()
         }
 
     def prediction_identity(self, *, beam_width=20, num_results=10):
@@ -419,12 +436,17 @@ class OnnxChemformer:
         prefix = np.full((batch, 1), start, dtype=np.int64)
         scores = None
         done = np.zeros(batch, dtype=bool)
+        past, parents = None, None
         for position in range(self.max_length - 2):
             if done.all():
                 break
-            actions = self._decode(prefix, memory, mask)
+            if self.kv_cache:
+                actions, past = self._decode_cached(prefix, memory, mask, past, parents)
+            else:
+                actions = self._decode(prefix, memory, mask)
             if position == 0:
                 scores, tokens = _topk(actions, beam_width)
+                parents = np.repeat(np.arange(batch, dtype=np.int64), beam_width)
                 memory = np.repeat(memory, beam_width, axis=0)
                 mask = np.repeat(mask, beam_width, axis=0)
                 prefix = np.repeat(prefix, beam_width, axis=0)
@@ -439,12 +461,16 @@ class OnnxChemformer:
                 prefix = prefix.reshape(batch, beam_width, -1)[
                     np.arange(batch)[:, None], parents
                 ].reshape(batch * beam_width, -1)
+                parents = (parents + np.arange(batch)[:, None] * beam_width).reshape(-1)
                 prefix = np.concatenate((prefix, tokens.reshape(-1, 1)), axis=1)
                 scores = scores.reshape(-1, 1)
             done = np.any(prefix == end, axis=1)
         tail = np.where(done, pad, end).astype(np.int64)
         if not done.all():
-            actions = self._decode(prefix, memory, mask)
+            if self.kv_cache:
+                actions, past = self._decode_cached(prefix, memory, mask, past, parents)
+            else:
+                actions = self._decode(prefix, memory, mask)
             scores += (actions[np.arange(len(prefix)), tail] * (~done)).reshape(-1, 1)
         prefix = np.concatenate((prefix, tail[:, None]), axis=1)
         predictions = (
@@ -457,3 +483,40 @@ class OnnxChemformer:
             {"reactants": s, "predictions": p, "log_likelihoods": ll}
             for s, p, ll in zip(reactants, predictions, scores)
         ]
+
+    def _decode_cached(self, prefix, memory, mask, past, parents):
+        """Single-token decoding; each chunk gathers its parents inside ONNX."""
+        session = self.decoder if past is None else self.decoder_with_past
+        chunks = []
+        for start in range(0, len(prefix), self.decoder_batch_size):
+            rows = slice(start, start + self.decoder_batch_size)
+            inputs = {
+                "input_ids": np.ascontiguousarray(prefix[rows, -1:]),
+                "padding_mask": mask[rows],
+            }
+            if past is None:
+                inputs["memory"] = memory[rows]
+            else:
+                inputs.update(zip(self.cache_names, past, strict=True))
+                inputs["beam_indices"] = parents[rows]
+                inputs["position"] = np.asarray(prefix.shape[1] - 1, dtype=np.int64)
+            binding = session.io_binding()
+            for name, value in inputs.items():
+                if isinstance(value, np.ndarray):
+                    binding.bind_cpu_input(name, value)
+                else:
+                    binding.bind_ortvalue_input(name, value)
+            for output in session.get_outputs():
+                binding.bind_output(output.name, self.device)
+            session.run_with_iobinding(binding)
+            chunks.append(binding.get_outputs())
+        scores = np.concatenate([chunk[0].numpy() for chunk in chunks])
+        if len(chunks) == 1:
+            return scores, chunks[0][1:]
+        # CPU OrtValue.numpy() exposes the same memory. Only joining chunk outputs
+        # allocates a new array; parent gathering remains inside the cached graph.
+        state = [
+            np.concatenate([chunk[i].numpy() for chunk in chunks])
+            for i in range(1, len(chunks[0]))
+        ]
+        return scores, state
