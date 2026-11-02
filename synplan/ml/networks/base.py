@@ -58,7 +58,8 @@ class GraphMCTSNetwork(Module):
         self.lr = learning_rate
 
     @abstractmethod
-    def forward(self, batch: Batch) -> Tensor:
+    # nn.Module types forward as a mutable callable; overriding it is its API.
+    def forward(self, batch: Batch) -> Tensor:  # ty: ignore[invalid-mutable-override]
         """Run forward propagation on a batch of molecular graphs.
 
         :param batch: The batch of molecular graphs processed together in a single

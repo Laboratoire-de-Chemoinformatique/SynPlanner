@@ -33,7 +33,8 @@ class RMSNorm(nn.Module):
         super().__init__()
         self.weight = nn.Parameter(torch.ones(width))
 
-    def forward(self, value):
+    # nn.Module types forward as a mutable callable; overriding it is its API.
+    def forward(self, value):  # ty: ignore[invalid-mutable-override]
         value = value.float()
         return (
             value
@@ -61,7 +62,8 @@ class Attention(nn.Module):
             self.linear_values(value)
         )
 
-    def forward(self, query, keys, values, mask=None):
+    # nn.Module types forward as a mutable callable; overriding it is its API.
+    def forward(self, query, keys, values, mask=None):  # ty: ignore[invalid-mutable-override]
         queries = self.split(self.linear_query(query)) / math.sqrt(self.depth)
         scores = queries @ keys.transpose(-1, -2)
         if mask is not None:
@@ -80,7 +82,8 @@ class FeedForward(nn.Module):
             nn.Linear(width, hidden),
         )
 
-    def forward(self, value):
+    # nn.Module types forward as a mutable callable; overriding it is its API.
+    def forward(self, value):  # ty: ignore[invalid-mutable-override]
         norm = self.layer_norm(value)
         return value + self.w_2(F.silu(self.w_1(norm)) * self.w_3(norm))
 
@@ -92,7 +95,8 @@ class EncoderLayer(nn.Module):
         self.self_attn = Attention(width, heads)
         self.feed_forward = FeedForward(width, hidden)
 
-    def forward(self, value, mask):
+    # nn.Module types forward as a mutable callable; overriding it is its API.
+    def forward(self, value, mask):  # ty: ignore[invalid-mutable-override]
         norm = self.layer_norm(value)
         keys, values = self.self_attn.keys_values(norm)
         return self.feed_forward(value + self.self_attn(norm, keys, values, mask))
@@ -108,7 +112,8 @@ class DecoderLayer(nn.Module):
         )
         self.feed_forward = FeedForward(width, hidden)
 
-    def forward(self, value, memory, mask, past=None):
+    # nn.Module types forward as a mutable callable; overriding it is its API.
+    def forward(self, value, memory, mask, past=None):  # ty: ignore[invalid-mutable-override]
         norm = self.layer_norm_1(value)
         keys, values = self.self_attn.keys_values(norm)
         if past is None:
@@ -207,7 +212,8 @@ class EncoderGraph(nn.Module):
         super().__init__()
         self.model = model
 
-    def forward(self, input_ids, padding_mask):
+    # nn.Module types forward as a mutable callable; overriding it is its API.
+    def forward(self, input_ids, padding_mask):  # ty: ignore[invalid-mutable-override]
         return self.model.encode(input_ids, padding_mask)
 
 
@@ -216,7 +222,8 @@ class InitialDecoderGraph(nn.Module):
         super().__init__()
         self.model = model
 
-    def forward(self, input_ids, memory, padding_mask):
+    # nn.Module types forward as a mutable callable; overriding it is its API.
+    def forward(self, input_ids, memory, padding_mask):  # ty: ignore[invalid-mutable-override]
         return self.model.decode(input_ids, padding_mask, 0, memory=memory)
 
 
@@ -225,7 +232,8 @@ class CachedDecoderGraph(nn.Module):
         super().__init__()
         self.model = model
 
-    def forward(self, input_ids, padding_mask, position, beam_indices, *past):
+    # nn.Module types forward as a mutable callable; overriding it is its API.
+    def forward(self, input_ids, padding_mask, position, beam_indices, *past):  # ty: ignore[invalid-mutable-override]
         return self.model.decode(
             input_ids, padding_mask, position, past=past, beam_indices=beam_indices
         )
