@@ -244,6 +244,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Chemformer ONNX decoding with self- and cross-attention KV caches through
+  encoder, initial-decoder, and cached-decoder graphs. The adapter selects cached
+  decoding from bundle metadata, preserves the existing prediction policy, and
+  continues to support original two-graph bundles without new runtime dependencies.
+  Includes checkpoint-verified export, manifests, and numerical, beam-search,
+  batching, and dependency-isolation tests.
+- `ReactionT5v2-forward-USPTO_MIT` forward prediction with ONNX by default,
+  optional Transformers checkpoint inference, blank reagents, and the shared
+  augmented stereo-free ranking policy. Includes pinned checkpoint download,
+  cached-decoder ONNX export, manifests, and collection-script selection. The
+  `reactiont5` tokenizer extra supports ONNX inference; separate optional extras
+  provide checkpoint inference and export.
 - Local Chemformer and ForwardChimera ONNX adapters using the existing base
   dependencies. Chimera also supports explicit checkpoint inference and ONNX
   export through optional PyTorch extras, without RetroChimera or Lightning.
@@ -274,6 +286,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The forward-planning example selects the cached SynFwd-1 v2 bundle. Ordinary
+  planning still defaults to no forward assessment. Cached bundles receive
+  separate asset-based prediction-cache identities; historical entries remain
+  intact and are not reused automatically for the new graphs.
 - Forward prediction ranks distinct product identities after augmentation rather
   than raw single-input beams. Versioned cache fingerprints prevent historical
   beam-10 predictions from satisfying the new generation policy. Forward scores
@@ -282,6 +298,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Forward assessment respects package layering: chemistry helpers live in the
+  chemistry package and injected models provide their cache identity. Cache
+  identities for existing Chemformer and Chimera bundles remain compatible.
+- Discard invalid-valence generated candidates when chython cannot normalize
+  them; unexpected normalization and inference errors remain visible.
+- Resolve type-checker errors for framework overrides and shutdown context-manager
+  annotations, and update route-report test fixtures to supply node metadata.
+  Package-layer checks retain their existing prohibitions.
 - Search-record loading preserves atom insertion order for symmetric mapped
   fragments, preventing unchanged reactions from invalidating stereo evidence.
 
