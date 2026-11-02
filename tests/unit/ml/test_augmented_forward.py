@@ -2,6 +2,7 @@
 
 from types import SimpleNamespace
 
+import pytest
 from chython import inchi_key, smiles
 from rdkit import Chem
 
@@ -103,3 +104,26 @@ def test_chiral_root_in_later_component_keeps_stereo_and_isotope():
         assert Chem.MolToInchiKey(Chem.MolFromSmiles(normalized)) == expected
         assert Chem.MolToInchiKey(Chem.MolFromSmiles(product)) == expected
         assert key == candidate(normalized)[1]
+
+
+def test_invalid_valence_candidate_is_discarded():
+    from synplan.chem.utils import forward_candidate
+
+    # A real ReactionT5 beam triggers TypeError in chython 1.108's normalizer.
+    assert forward_candidate("N#CC1(c2ccc(NC(=O)c3cccn=C3NCc3ccncc3)cc2)CCCC1") == (
+        None,
+        None,
+    )
+
+
+def test_unexpected_canonicalization_error_propagates(monkeypatch):
+    from chython.containers import MoleculeContainer
+
+    from synplan.chem.utils import forward_candidate
+
+    def fail(*args, **kwargs):
+        raise TypeError("unexpected failure")
+
+    monkeypatch.setattr(MoleculeContainer, "canonicalize", fail)
+    with pytest.raises(TypeError, match="unexpected failure"):
+        forward_candidate("CCO")

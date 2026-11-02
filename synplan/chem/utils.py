@@ -561,7 +561,14 @@ def forward_candidate(value):
         molecule = _molecule(value)
         if not isinstance(molecule, MoleculeContainer) or not molecule:
             return None, None
-        molecule.canonicalize(fix_tautomers=False)
+        try:
+            molecule.canonicalize(fix_tautomers=False)
+        except TypeError:
+            # chython 1.108 can fail on an unknown implicit hydrogen count in an
+            # invalid-valence candidate. Unexpected normalization bugs propagate.
+            if not molecule.check_valence():
+                raise
+            return None, None
         return str(molecule), inchi_key(molecule, ignore_stereo=True)
     except (ValueError, ValenceError):
         return None, None
