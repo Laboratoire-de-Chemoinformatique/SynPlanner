@@ -141,6 +141,11 @@ class ForwardChimera:
             for kind in ("key", "value", "cross_key", "cross_value")
         ]
 
+    def prediction_identity(self, *, beam_width=20, num_results=10):
+        from .forward import prediction_identity
+
+        return prediction_identity(self, beam_width=beam_width, num_results=num_results)
+
     def predict(self, reactants, beam_width=20, batch_size=16, *, num_results=10):
         if not 1 <= beam_width <= len(self.tokenizer.tokens):
             raise ValueError("Beam width must be between 1 and vocabulary size")

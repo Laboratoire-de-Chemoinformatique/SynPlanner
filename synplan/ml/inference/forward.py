@@ -23,47 +23,16 @@ representative selection, and batching independent of neural architecture.
 
 import hashlib
 import math
+import platform
 import random
-from functools import reduce
-from operator import or_
+from importlib.metadata import version
 
-from chython import inchi_key, smiles
-from chython.containers import MoleculeContainer
-from chython.exceptions import ValenceError
 from rdkit import Chem
 
+from synplan.chem.utils import canonical_reactants as canonical_reactants
+from synplan.chem.utils import forward_candidate as candidate
+
 PIPELINE_VERSION = 2
-
-
-def _molecule(value):
-    # chython 1.108 can invert stereo at a later component's root. Parsing
-    # components separately and using its union preserves their local ordering.
-    if "@" in value and "." in value:
-        return reduce(or_, (smiles(part) for part in value.split(".")))
-    return smiles(value)
-
-
-def canonical_reactants(value):
-    """Unmap using chython; preserve stereo, isotopes and tautomer form."""
-    if not value.strip() or ">" in value:
-        raise ValueError("Supply nonempty reactants-only SMILES separated by dots")
-    molecule = Chem.MolFromSmiles(format(_molecule(value), ""))
-    if molecule is None or not molecule.GetNumAtoms():
-        raise ValueError(f"Invalid reactant SMILES: {value}")
-    return Chem.MolToSmiles(molecule, canonical=True, isomericSmiles=True)
-
-
-def candidate(value):
-    if ">" in value:
-        return None, None
-    try:
-        molecule = _molecule(value)
-        if not isinstance(molecule, MoleculeContainer) or not molecule:
-            return None, None
-        molecule.canonicalize(fix_tautomers=False)
-        return str(molecule), inchi_key(molecule, ignore_stereo=True)
-    except (ValueError, ValenceError):
-        return None, None
 
 
 def augment(reactants, count=10, seed=0):
@@ -183,3 +152,46 @@ def predict_augmented(
             )
             offset += len(variants)
     return results
+
+
+def _sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def prediction_identity(model, *, beam_width=20, num_results=10):
+    """Backend-owned cache identity; chemistry consumes this through the model."""
+    backend = model.backend
+    return {
+        "model": type(model).__name__,
+        "backend": backend,
+        "files": {
+            name: _sha256(model.directory / name) for name in model.runtime_files
+        },
+        "beam_width": beam_width,
+        "num_results": num_results,
+        "augmentation_size": model.augmentation_size,
+        "seed": model.seed,
+        "decoder_batch_size": getattr(model, "decoder_batch_size", None),
+        "max_length": model.max_length,
+        "max_generated_length": getattr(
+            model, "max_generated_length", model.max_length
+        ),
+        "pipeline_version": PIPELINE_VERSION,
+        "identity": "full-standard-inchikey-ignore-stereo",
+        "ranking": "clean-best-rank-then-reciprocal-support-stable-first",
+        "runtime": {
+            "python": platform.python_version(),
+            **{
+                name: version(name)
+                for name in ("synplanner", "numpy", "rdkit", "chython-synplan")
+            },
+            backend: __import__(
+                "onnxruntime" if backend == "onnx" else "torch"
+            ).__version__,
+        },
+        "providers": model.providers,
+    }

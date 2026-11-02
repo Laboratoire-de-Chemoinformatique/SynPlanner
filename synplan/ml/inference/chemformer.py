@@ -366,6 +366,11 @@ class OnnxChemformer:
             name: getattr(self, name).get_providers() for name in ("encoder", "decoder")
         }
 
+    def prediction_identity(self, *, beam_width=20, num_results=10):
+        from .forward import prediction_identity
+
+        return prediction_identity(self, beam_width=beam_width, num_results=num_results)
+
     def predict(
         self,
         reactants: Sequence[str],

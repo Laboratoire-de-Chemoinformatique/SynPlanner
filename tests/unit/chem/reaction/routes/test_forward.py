@@ -12,6 +12,7 @@ from scripts import assess_routes
 from synplan.chem.reaction.routes.quality import forward
 from synplan.chem.reaction.routes.quality.forward import ForwardReactionAssessor
 from synplan.chem.reaction.routes.route import Route, Step
+from synplan.ml.inference import forward as pipeline
 from synplan.ml.inference.forward import aggregate, candidate, canonical_reactants
 from synplan.utils import json as json_io
 
@@ -48,6 +49,8 @@ def model(tmp_path):
             }
             self.calls = []
             self.predictions = ["CCO"] + ["N"] * 9
+
+        prediction_identity = pipeline.prediction_identity
 
         def predict(self, reactants, **kwargs):
             self.calls.append((list(reactants), kwargs))
@@ -178,7 +181,7 @@ def test_cache_fingerprint_invalidation(model, tmp_path, monkeypatch, change):
     if change == "file":
         (model.directory / "encoder.onnx").write_text("new graph")
     elif change == "runtime":
-        monkeypatch.setattr(forward, "version", lambda name: "new version")
+        monkeypatch.setattr(pipeline, "version", lambda name: "new version")
     elif change == "provider":
         model.providers = {"encoder": ["CUDAExecutionProvider"]}
     elif change == "matching":
@@ -190,7 +193,7 @@ def test_cache_fingerprint_invalidation(model, tmp_path, monkeypatch, change):
     elif change == "results":
         monkeypatch.setattr(forward, "NUM_RESULTS", 5)
     elif change == "pipeline":
-        monkeypatch.setattr(forward, "PIPELINE_VERSION", 3)
+        monkeypatch.setattr(pipeline, "PIPELINE_VERSION", 3)
     else:
         model.decoder_batch_size = 32
     new = assessor(model, tmp_path)

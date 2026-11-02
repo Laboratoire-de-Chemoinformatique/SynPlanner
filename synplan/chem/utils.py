@@ -5,16 +5,20 @@ import logging
 import re
 import warnings
 from collections.abc import Iterable
+from functools import reduce
 from io import StringIO
+from operator import or_
 from typing import Literal
 
+from chython import inchi_key, smiles
 from chython.containers import (
     MoleculeContainer,
     ReactionContainer,
 )
-from chython.exceptions import InvalidAromaticRing, MappingError
+from chython.exceptions import InvalidAromaticRing, MappingError, ValenceError
 from chython.files.daylight.tokenize import smarts_tokenize
 from chython.files.SDFrw import SDFRead
+from rdkit import Chem
 
 from synplan.chem.stereo import parse_smiles_preserving_stereo
 
@@ -529,3 +533,35 @@ def __getattr__(name: str):
 
         return getattr(query_cgr, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def _molecule(value):
+    # chython 1.108 can invert stereo at a later component's root. Parsing
+    # components separately and using its union preserves their local ordering.
+    if "@" in value and "." in value:
+        return reduce(or_, (smiles(part) for part in value.split(".")))
+    return smiles(value)
+
+
+def canonical_reactants(value):
+    """Unmap using chython; preserve stereo, isotopes and tautomer form."""
+    if not value.strip() or ">" in value:
+        raise ValueError("Supply nonempty reactants-only SMILES separated by dots")
+    molecule = Chem.MolFromSmiles(format(_molecule(value), ""))
+    if molecule is None or not molecule.GetNumAtoms():
+        raise ValueError(f"Invalid reactant SMILES: {value}")
+    return Chem.MolToSmiles(molecule, canonical=True, isomericSmiles=True)
+
+
+def forward_candidate(value):
+    """Canonical product and stereo-free identity, without fixing tautomers."""
+    if ">" in value:
+        return None, None
+    try:
+        molecule = _molecule(value)
+        if not isinstance(molecule, MoleculeContainer) or not molecule:
+            return None, None
+        molecule.canonicalize(fix_tautomers=False)
+        return str(molecule), inchi_key(molecule, ignore_stereo=True)
+    except (ValueError, ValenceError):
+        return None, None

@@ -4,16 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-import platform
 from dataclasses import replace
-from importlib.metadata import version
 from pathlib import Path
 from time import perf_counter
 
 from chython import inchi_key
 from tqdm.auto import tqdm
 
-from synplan.ml.inference.forward import PIPELINE_VERSION, canonical_reactants
+from synplan.chem.utils import canonical_reactants
 from synplan.utils.json import read_json, write_json_atomic
 
 # Bump whenever preprocessing, beam search, or matching semantics change.
@@ -33,37 +31,9 @@ def _sha256(path):
 
 
 def _model_identity(model):
-    backend = model.backend
     return {
-        "model": type(model).__name__,
-        "backend": backend,
-        "files": {
-            name: _sha256(model.directory / name) for name in model.runtime_files
-        },
-        "beam_width": BEAM_WIDTH,
-        "num_results": NUM_RESULTS,
-        "augmentation_size": model.augmentation_size,
-        "seed": model.seed,
-        "decoder_batch_size": getattr(model, "decoder_batch_size", None),
-        "max_length": model.max_length,
-        "max_generated_length": getattr(
-            model, "max_generated_length", model.max_length
-        ),
+        **model.prediction_identity(beam_width=BEAM_WIDTH, num_results=NUM_RESULTS),
         "assessment_version": ASSESSMENT_VERSION,
-        "pipeline_version": PIPELINE_VERSION,
-        "identity": "full-standard-inchikey-ignore-stereo",
-        "ranking": "clean-best-rank-then-reciprocal-support-stable-first",
-        "runtime": {
-            "python": platform.python_version(),
-            **{
-                name: version(name)
-                for name in ("synplanner", "numpy", "rdkit", "chython-synplan")
-            },
-            backend: __import__(
-                "onnxruntime" if backend == "onnx" else "torch"
-            ).__version__,
-        },
-        "providers": model.providers,
     }
 
 

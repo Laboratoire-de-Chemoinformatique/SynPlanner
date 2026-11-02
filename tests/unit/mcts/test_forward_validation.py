@@ -12,7 +12,7 @@ from synplan.mcts.config import ForwardValidationConfig
 from synplan.mcts.forward import ForwardValidationError, load_forward_validation
 from synplan.mcts.record import read_search_record, write_search_record
 from synplan.mcts.search import build_target_routes
-from synplan.ml.inference.forward import aggregate
+from synplan.ml.inference.forward import aggregate, prediction_identity
 from synplan.utils.visualisation import extract_routes
 
 
@@ -52,6 +52,7 @@ def model(tmp_path):
             for value in values
         ]
 
+    model.prediction_identity = lambda **kwargs: prediction_identity(model, **kwargs)
     model.predict = predict
     return model
 
