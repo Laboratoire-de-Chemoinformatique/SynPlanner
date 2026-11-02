@@ -14,7 +14,9 @@ Models and shared prediction policy
 
 ``OnnxChemformer`` lives in ``synplan.ml.inference.chemformer``. Its directory
 contains ``encoder.onnx``, ``decoder.onnx``, ``vocabulary.json`` and ``model.json``.
-The compact SynFwd-1 bundle is at ``synplan_data/forward/synfwd-1/v1/``.
+The original SynFwd-1 bundle is at ``synplan_data/forward/synfwd-1/v1/``.
+The cached ``v2/`` export additionally contains ``decoder_with_past.onnx``;
+``kv_cache: true`` in its metadata selects incremental decoding automatically.
 ``ForwardChimera`` lives in ``synplan.ml.inference.chimera``. Its directory is
 ``synplan_data/forward/forwardchimera-denovo/v1/`` and contains ``encoder.onnx``,
 ``decoder.onnx``, ``decoder_with_past.onnx``, ``model.json`` and
@@ -81,7 +83,7 @@ preserve input order. Other fields are ``predictions``, ``canonical_products``,
    from synplan.ml.inference.chemformer import OnnxChemformer
    from synplan.ml.inference.chimera import ForwardChimera
 
-   chemformer = OnnxChemformer("synplan_data/forward/synfwd-1/v1", threads=4)
+   chemformer = OnnxChemformer("synplan_data/forward/synfwd-1/v2", threads=4)
    chimera = ForwardChimera("synplan_data/forward/forwardchimera-denovo/v1")
    predictions = chimera.predict(["CC(=O)Cl.N"], num_results=10,
                                  beam_width=20, batch_size=1)
@@ -91,6 +93,52 @@ preserve input order. Other fields are ``predictions``, ``canonical_products``,
 ``beam_width`` controls decoding per augmentation, independently of the final
 result count. The internal ``_predict_batch`` decoders remain available for raw
 parity tests; they receive already prepared spellings and retain raw beams.
+
+Chemformer KV caching on CPU
+---------------------------
+
+The original decoder recalculates the complete generated prefix at every token.
+The cached export processes only the latest token, retaining each decoder
+layer's self-attention keys/values and the static cross-attention projections of
+the reactants. The encoder is unchanged. Initial decoding creates the cache;
+``decoder_with_past.onnx`` gathers the selected beam parents and appends the
+new token's state. Positional offsets, beam selection, finished-beam handling,
+and final end-token scoring follow the original Chemformer sampler.
+
+This changes execution, not the prediction policy: the model weights, up to ten
+augmentations, twenty beams, maximum sequence length, stereo-free identity rules,
+and final product ranking are unchanged. Floating-point kernel differences can
+affect near-tied beams, so cached exports require numerical and ranked-prediction
+parity checks. Existing two-graph bundles remain supported.
+
+Create a separate bundle using the optional ``SynPlanner[forward-export]`` tools:
+
+.. code-block:: console
+
+   python -m scripts.export_chemformer \
+       --source synplan_data/forward/synfwd-1/v1 \
+       --checkpoint /path/to/best.ckpt \
+       --output synplan_data/forward/synfwd-1/v2
+
+The exporter verifies the checkpoint SHA-256 against the original metadata,
+copies the encoder and attribution, and regenerates the manifest. The output
+directory must be new. Production inference imports neither PyTorch nor the
+Chemformer training checkout and requires no additional dependencies. Point the
+existing assessment script's ``--model`` or planning ``forward_val_path`` at the
+new directory to use it.
+
+KV states live only for the current prediction. The retained JSON reaction cache
+still avoids repeated predictions across routes. New graph hashes automatically
+create a separate cache identity, preserving historical predictions. Keep the
+original bundle and caches for reproducible comparisons.
+
+``threads=4`` and ``decoder_batch_size=64`` retain their existing defaults. Cached
+decoding respects the beam-row chunk limit; chunk outputs are joined between
+steps. Single-chunk states remain ONNX Runtime values. CPU chunk joins allocate
+arrays, so benchmark peak memory as well as latency: state size grows with beam
+count and generated length. CPU benchmarks should use the same inputs, thread
+count and prediction settings, exclude loading, disable the reaction-result
+cache, and measure both implementations sequentially.
 
 Chimera architecture and assets
 ------------------------------
@@ -359,7 +407,7 @@ planning YAML, not the shell's working directory. The separate file contains:
 .. code-block:: yaml
 
    forward_val_type: on-the-fly  # null, on-the-fly, post-processing
-   forward_val_path: ../synplan_data/forward/synfwd-1/v1/
+   forward_val_path: ../synplan_data/forward/synfwd-1/v2/
    top_k: 10
    device: cpu
    threads: 4
