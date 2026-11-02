@@ -143,9 +143,10 @@ The latter matters when a reaction has multiple products.
 ``alert=false`` without preprocessing, cache lookup or model inference.
 One-reactant reactions were intentionally excluded from SynFwd-1 training,
 with the assumption that suitable conditions could yield the product.
-The same selected convention applies to Chimera; it does not imply Chimera was
-trained with the same exclusion. This score records that assumption; it is not a model top-one match or proof
-of experimental feasibility. Reagents are not counted as reactants. Two
+The same selected convention applies to Chimera and ReactionT5; it does not
+imply either was trained with the same exclusion. This score records that
+assumption; it is not a model top-one match or proof of experimental feasibility.
+Reagents are not counted as reactants. Two
 reactant entries still require inference even when they are identical.
 The designated product must still have a valid stereo-free InChIKey.
 Reports display these steps as ordinary positive scores of 1.0, using the same
@@ -453,3 +454,105 @@ recovery does not establish stereochemical correctness, conditions, or feasibili
 
 Chemformer checkpoint loading and competing-sites integration remain separate
 subtasks.
+
+ReactionT5v2 USPTO-MIT
+---------------------
+
+``ReactionT5`` adds the ``sagawa/ReactionT5v2-forward-USPTO_MIT`` checkpoint as a
+post-processing alternative. It uses the standard Hugging Face T5 architecture:
+12 encoder and 12 decoder layers, width 768, 12 attention heads, gated GELU
+feed-forward layers, and a 268-token vocabulary. It has **198,640,896 learned
+parameters**, compared with **44,676,619** for the supplied Chemformer SynFwd-1
+checkpoint and **76,169,047** for ForwardChimeraDeNovo. These counts exclude the
+fixed sinusoidal position buffers in Chemformer and Chimera.
+
+The release is pinned to ``260cf4aa7e6f55b1a9db1e328f48701cd3fd7cfc``. Its
+provenance is T5 v1.1 base, CompoundT5 pretraining, ORD forward training, then
+USPTO-MIT fine-tuning. The upstream model card's introduction says
+``USPOT_50k``, whereas its fine-tuning section and repository name specify
+USPTO-MIT; the bundle retains the original card and records this discrepancy.
+The generic ``ReactionT5v2-forward`` checkpoint is not used.
+
+Install the small tokenizer dependency for ONNX inference:
+
+.. code-block:: bash
+
+   uv pip install -e '.[reactiont5]'
+
+Checkpoint inference additionally needs ``SynPlanner[reactiont5-checkpoint]``;
+export needs ``SynPlanner[reactiont5-export]``. Transformers 4.40.2 is pinned to
+match the upstream checkpoint and generation reference. ONNX inference imports
+neither PyTorch nor Transformers. The other forward adapters do not require
+these extras. The adapter does not depend on the ReactionT5 checkout, Lightning,
+Syntheseus or RetroChimera.
+
+Prepare the portable directory once (optional export dependencies required):
+
+.. code-block:: bash
+
+   python -m scripts.export_reactiont5 --download \
+     --model synplan_data/forward/reactiont5v2-uspto-mit/v1
+
+The bundle retains the original safetensors checkpoint, configuration, tokenizer,
+release metadata and MIT attribution, alongside ``encoder.onnx``,
+``decoder.onnx`` and ``decoder_with_past.onnx``. ``model.json`` lists the required
+runtime graph files, including any external tensor data. ``manifest.json`` records
+SHA-256 hashes; the download also verifies the released weight checksum. No
+executable code is loaded from this directory. Large assets remain outside Git.
+
+.. code-block:: python
+
+   from synplan.ml.inference.reactiont5 import ReactionT5
+
+   model = ReactionT5("synplan_data/forward/reactiont5v2-uspto-mit/v1")
+   predictions = model.predict(["CC(=O)Cl.Nc1ccccc1"], num_results=10)
+   # Explicit optional checkpoint inference:
+   checkpoint = ReactionT5("synplan_data/forward/reactiont5v2-uspto-mit/v1",
+                           backend="ckpt")
+
+Both backends default to CPU with four threads. CUDA must be requested explicitly
+and must initialize successfully. The ONNX decoder retains K/V states on the
+execution device, reordering them within its graph when beams change parents.
+
+Every augmented spelling is formatted exactly as
+``REACTANT:<reactant SMILES>REAGENT: `` with a trailing space and **blank
+reagents**. Route reagent metadata is not supplied. Atom mapping is removed
+through chython formatting; stereochemistry and isotopes are preserved in the
+input. The released Unigram tokenizer is used directly, without recanonicalizing
+augmented spellings. Decoded outputs follow the reference convention of removing
+spaces and a trailing dot before shared chemical processing.
+
+Generation uses the reference prediction script's explicit limits: 400 input
+tokens, and 300 output tokens including the decoder start token. The latter
+explicitly overrides the 150-token default in the released generation config.
+Overlong inputs raise an error instead of being truncated. Beam hypotheses use
+length penalty 1.0 and the reference's default heuristic stopping; raw generation
+is verified against Transformers. Representative ``log_likelihoods`` are sums of
+token log probabilities, distinct from length-normalized raw beam scores and
+shared augmentation ``ranking_scores``.
+
+The shared ten-augmentation, twenty-beam, ten-distinct-product pipeline and
+stereo-free full-InChIKey matching apply unchanged. Invalid candidate structures
+are discarded, including a chython 1.108 normalization error for invalid valence;
+unexpected errors and failures to identify the expected product still propagate.
+Single-reactant steps retain the documented 1.0 convention. Route aggregation and
+optional search-score combination are unchanged. Tokenizer version, blank-reagent
+format, generation settings, backend and asset hashes enter the cache identity.
+Chemistry lives in ``synplan.chem``; each injected model supplies its inference
+identity, so the assessor does not import the ML package.
+
+.. code-block:: bash
+
+   python -m scripts.assess_routes --model-type reactiont5 --backend onnx \
+     --model synplan_data/forward/reactiont5v2-uspto-mit/v1 \
+     --input results/routes.json.gz --output results/reactiont5_forward.json.gz \
+     --cache results/reactiont5_cache.json
+   python -m scripts.score_routes --input results/reactiont5_forward.json.gz \
+     --output results/reactiont5_scored.json.gz --html results/reactiont5.html
+
+ReactionT5 selection is currently available through this post-processing script
+and the Python adapter. Planning YAML continues to use Chemformer. Comparison
+reports should distinguish this shared augmented policy from historical raw
+Chemformer beam-10 results, and report loading, cold inference, and warm-cache
+time separately. All scores describe model product recovery, not experimental
+accuracy or probabilities of synthetic success.

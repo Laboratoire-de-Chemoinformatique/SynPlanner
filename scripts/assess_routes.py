@@ -41,7 +41,9 @@ def main():
         "--model", type=Path, required=True, help="Portable model bundle directory"
     )
     parser.add_argument(
-        "--model-type", choices=("chemformer", "chimera"), default="chemformer"
+        "--model-type",
+        choices=("chemformer", "chimera", "reactiont5"),
+        default="chemformer",
     )
     parser.add_argument("--backend", choices=("onnx", "ckpt"), default="onnx")
     parser.add_argument("--input", type=Path, required=True)
@@ -61,6 +63,12 @@ def main():
         from synplan.ml.inference.chimera import ForwardChimera
 
         model = ForwardChimera(
+            args.model, device=args.device, threads=args.threads, backend=args.backend
+        )
+    elif args.model_type == "reactiont5":
+        from synplan.ml.inference.reactiont5 import ReactionT5
+
+        model = ReactionT5(
             args.model, device=args.device, threads=args.threads, backend=args.backend
         )
     else:
