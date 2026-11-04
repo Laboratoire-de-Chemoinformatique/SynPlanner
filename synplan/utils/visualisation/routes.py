@@ -23,14 +23,9 @@ from synplan.utils.routedraw import (
     molecule_svg,
 )
 from synplan.utils.svgslim import Doc, hidden_defs
-from synplan.utils.visualisation.assessment import (
+from synplan.utils.visualisation.assets import (
     ASSESSMENT_CSS,
     ASSESSMENT_JS,
-    assessment_group,
-    assessment_overview,
-    assessment_steps,
-)
-from synplan.utils.visualisation.assets import (
     REPORT_CSS,
     REPORT_JS,
     ROLE_LEGEND,
@@ -334,6 +329,124 @@ def _route_prices(
     return pills, f"{per_mol / weight:g}"
 
 
+def _assessment_group(route):
+    if route.assessment is None:
+        return "unassessed"
+    return "failed" if route.assessment["zero_score_steps"] else "positive"
+
+
+def _number(value):
+    return "—" if value is None else f"{value:.6g}"
+
+
+def _step_display(annotation):
+    if annotation["score"] == 0:
+        return "zero", "No top-10 match", "#bd3f3f"
+    # One-reactant steps share the positive-score style without inventing a model rank.
+    rank = "—" if annotation["rank"] is None else str(annotation["rank"])
+    return "match", rank, "#267154"
+
+
+def _badge(annotation):
+    style, rank, _ = _step_display(annotation)
+    return (
+        f'<span class="forward-{style}" title="{rank}">{annotation["score"]:.3f}</span>'
+    )
+
+
+def _assessment_steps(route, index):
+    if route.assessment is None:
+        return ""
+    rows = []
+    for number, step in enumerate(route, 1):
+        annotation = step.forward_prediction
+        _, rank, colour = _step_display(annotation)
+        rows.append(
+            f'<tr id="assessment-route-{index}-step-{number}" data-step-color="{colour}">'
+            f"<td>{number}</td><td>{rank}</td><td>{_badge(annotation)}</td>"
+            f"<td>{'Yes' if annotation['alert'] else 'No'}</td>"
+            f'<td class="mono">{escape(annotation["product_inchikey"])}</td></tr>'
+        )
+    score = route.assessment
+    combined = (
+        f" · Combined: {_number(score['combined_score'])}"
+        if "combined_score" in score
+        else ""
+    )
+    return (
+        '<div class="assessment-step-table assessment-scroll">'
+        '<table class="assessment-table">'
+        f"<caption>Forward route score: {_number(score['forward_score'])}{combined}"
+        " · step numbers match the drawing</caption>"
+        "<thead><tr><th>Step</th><th>Top-k rank</th><th>Step score</th>"
+        "<th>Alert</th><th>Product InChIKey · stereo-free</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table>"
+        '<a href="#assessment-overview">Back to score overview ↑</a></div>'
+    )
+
+
+def _assessment_overview(routes, labels):
+    combined = any(
+        r.assessment is not None and "combined_score" in r.assessment for r in routes
+    )
+    groups = [_assessment_group(route) for route in routes]
+    rows = []
+    for index, (route, label, group) in enumerate(zip(routes, labels, groups), 1):
+        score = route.assessment or {}
+        likelihood = (
+            None if route.provenance is None else route.provenance.policy_log_likelihood
+        )
+        vector = " ".join(
+            f'<a href="#assessment-route-{index}-step-{number}">'
+            f"{_badge(step.forward_prediction)}</a>"
+            for number, step in enumerate(route, 1)
+            if route.assessment is not None
+        )
+        rows.append(
+            f'<tr data-assessment-group="{group}">'
+            f'<td><a href="#assessment-route-{index}">{escape(str(label))}</a></td>'
+            f"<td>{_number(score.get('forward_score'))}</td>"
+            f"<td>{_number(score.get('search_score'))}</td><td>{_number(likelihood)}</td>"
+            + (f"<td>{_number(score.get('combined_score'))}</td>" if combined else "")
+            + f"<td>{score.get('zero_score_steps', '—')} / {len(route)}</td>"
+            + f"<td>{vector}</td></tr>"
+        )
+    buttons = "".join(
+        f'<button data-assessment-filter="{group}" '
+        f'aria-pressed="{str(group == "all").lower()}">{label} · {count}</button>'
+        for group, label, count in (
+            ("all", "All routes", len(routes)),
+            ("positive", "No zero-score steps", groups.count("positive")),
+            ("failed", "At least one zero-score step", groups.count("failed")),
+        )
+    )
+    return (
+        '<section id="assessment-overview" class="assessment-overview card">'
+        "<h2>Forward route assessment</h2>"
+        '<p class="assessment-note">The route score is the geometric mean of all step '
+        "scores, counting each step once across every branch. A zero step makes the "
+        "route score zero. These are ranking heuristics, not probabilities of "
+        "experimental success or measures of stereochemical correctness. "
+        "Search scores and policy log likelihoods retain their original scale.</p>"
+        + (
+            '<p class="assessment-note">Combined score = search score &times; forward route '
+            "score; explicitly enabled for this report.</p>"
+            if combined
+            else ""
+        )
+        + '<p><span class="forward-match">Positive score</span> '
+        '<span class="forward-zero">No top-10 match</span></p>'
+        f'<div class="assessment-filters">{buttons}</div>'
+        '<div class="assessment-scroll"><table class="assessment-table">'
+        "<thead><tr><th>Route ID</th><th>Forward score</th><th>Search score</th>"
+        "<th>Policy log likelihood</th>"
+        + ("<th>Combined score</th>" if combined else "")
+        + "<th>Zero / total steps</th>"
+        "<th>Step scores · 1 → n</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table></div></section>"
+    )
+
+
 def routes_report_html(
     routes: Iterable[Route],
     html_path: str | None,
@@ -456,7 +569,7 @@ def routes_report_html(
             score = None if provenance is None else provenance.search_score
             attributes = (
                 f' id="assessment-route-{index}" '
-                f'data-assessment-group="{assessment_group(route)}"'
+                f'data-assessment-group="{_assessment_group(route)}"'
                 if assessed
                 else ""
             )
@@ -477,7 +590,7 @@ def routes_report_html(
                 + '<div class="acts"><button class="act" data-act="zoom">Zoom</button>'
                 '<button class="act" data-act="svg">SVG</button>'
                 '<button class="act" data-act="png">PNG</button></div></div>'
-                + assessment_steps(route, index)
+                + _assessment_steps(route, index)
                 + '<div class="draw">'
                 f"{doc.route(route.svg(standalone=False, layouts=layouts, prices=pills))}"
                 f"</div>{rows}</section>"
@@ -496,7 +609,7 @@ def routes_report_html(
                 drawable_copy(routes[0].target, layouts) if routes else None,
                 stats,
             )
-            + (assessment_overview(routes, route_labels) if assessed else "")
+            + (_assessment_overview(routes, route_labels) if assessed else "")
             + "".join(body)
             + "</div>\n<script>"
             + REPORT_JS
