@@ -3,29 +3,29 @@ revision = 3
 requires-python = ">=3.10, <3.15"
 resolution-markers = [
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version < '3.11' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version < '3.11' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version < '3.11' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version < '3.11' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version < '3.11' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version < '3.11' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version < '3.11' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
 ]
 conflicts = [[
@@ -266,15 +266,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3a/1e/365a9144db3254f86f1b974660b9ede1e9a38c9dc0730e4a9b1192eec5d6/altair-6.1.0.tar.gz", hash = "sha256:dda699216cf85b040d968ae5a569ad45957616811e38760a85e5118269daca67", size = 765519, upload-time = "2026-04-21T13:08:46.44Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ce/63/5dacc8d8306c715088b897a479e551bc0779fd2f0f26c97fec5e36542b4e/altair-6.1.0-py3-none-any.whl", hash = "sha256:fdf5fd939512e5b2fc4441c82dfd2635e706defbd037db0ac429ef5ddce66c3b", size = 796996, upload-time = "2026-04-21T13:08:48.549Z" },
-]
-
-[[package]]
-name = "annotated-doc"
-version = "0.0.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/57/ba/046ceea27344560984e26a590f90bc7f4a75b06701f653222458922b558c/annotated_doc-0.0.4.tar.gz", hash = "sha256:fbcda96e87e9c92ad167c2e53839e57503ecfda18804ea28102353485033faa4", size = 7288, upload-time = "2025-11-10T22:07:42.062Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1e/d3/26bf1008eb3d2daa8ef4cacc7f3bfdc11818d111f7e2d0201bc6e3b49d45/annotated_doc-0.0.4-py3-none-any.whl", hash = "sha256:571ac1dc6991c450b25a9c2d84a3705e2ae7a53467b5d111c24fa8baabbed320", size = 5303, upload-time = "2025-11-10T22:07:40.673Z" },
 ]
 
 [[package]]
@@ -884,24 +875,24 @@ version = "1.3.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
 ]
 dependencies = [
@@ -1469,24 +1460,24 @@ version = "0.22.4"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ae/b6/03bb70946330e88ffec97aefd3ea75ba575cb2e762061e0e62a213befee8/docutils-0.22.4.tar.gz", hash = "sha256:4db53b1fde9abecbb74d91230d32ab626d94f6badfc575d6db9194a49df29968", size = 2291750, upload-time = "2025-12-18T19:00:26.443Z" }
@@ -2042,22 +2033,21 @@ wheels = [
 
 [[package]]
 name = "huggingface-hub"
-version = "1.14.0"
+version = "0.36.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
     { name = "fsspec" },
-    { name = "hf-xet", marker = "platform_machine == 'AMD64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
-    { name = "httpx" },
+    { name = "hf-xet", marker = "platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
     { name = "packaging" },
     { name = "pyyaml" },
+    { name = "requests" },
     { name = "tqdm" },
-    { name = "typer" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/39/40/43109e943fd718b0ccd0cd61eb4f1c347df22bf81f5874c6f22adf44bcff/huggingface_hub-1.14.0.tar.gz", hash = "sha256:d6d2c9cd6be1d02ae9ec6672d5587d10a427f377db688e82528f426a041622c2", size = 782365, upload-time = "2026-05-06T14:14:34.278Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7c/b7/8cb61d2eece5fb05a83271da168186721c450eb74e3c31f7ef3169fa475b/huggingface_hub-0.36.2.tar.gz", hash = "sha256:1934304d2fb224f8afa3b87007d58501acfda9215b334eed53072dd5e815ff7a", size = 649782, upload-time = "2026-02-06T09:24:13.098Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/89/a5/33b49ba7bea7c41bb37f74ec0f8beea0831e052330196633fe2c77516ea6/huggingface_hub-1.14.0-py3-none-any.whl", hash = "sha256:efe075535c62e130b30e836b138e13785f6f043d1f0539e0a39aa411a99e90b8", size = 661479, upload-time = "2026-05-06T14:14:32.029Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/af/48ac8483240de756d2438c380746e7130d1c6f75802ef22f3c6d49982787/huggingface_hub-0.36.2-py3-none-any.whl", hash = "sha256:48f0c8eac16145dfce371e9d2d7772854a4f591bcb56c9cf548accf531d54270", size = 566395, upload-time = "2026-02-06T09:24:11.133Z" },
 ]
 
 [[package]]
@@ -2832,24 +2822,24 @@ version = "4.2.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
 ]
 dependencies = [
@@ -3322,24 +3312,24 @@ version = "5.0.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
 ]
 dependencies = [
@@ -3471,24 +3461,24 @@ version = "3.6.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6a/51/63fe664f3908c97be9d2e4f1158eb633317598cfa6e1fc14af5383f17512/networkx-3.6.1.tar.gz", hash = "sha256:26b7c357accc0c8cde558ad486283728b65b6a95d85ee1cd66bafab4c8168509", size = 2517025, upload-time = "2025-12-08T17:02:39.908Z" }
@@ -3617,24 +3607,24 @@ version = "2.4.4"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d7/9f/b8cef5bffa569759033adda9481211426f12f53299629b410340795c2514/numpy-2.4.4.tar.gz", hash = "sha256:2d390634c5182175533585cc89f3608a4682ccb173cc9bb940b2881c8d6f8fa0", size = 20731587, upload-time = "2026-03-29T13:22:01.298Z" }
@@ -4454,24 +4444,24 @@ version = "1.29.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
 ]
 dependencies = [
@@ -5586,6 +5576,111 @@ wheels = [
 ]
 
 [[package]]
+name = "regex"
+version = "2026.9.29"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/fc/f2/af1da9d3ceed77bfcdce40427d49ba0be94e4fe84245e3bfef68c10e75b6/regex-2026.9.29.tar.gz", hash = "sha256:8b5fcc4771732191b2b7d1dd68d8f0353f47f8d90b6150f6dce58bf1112442cb", size = 419199, upload-time = "2026-09-29T00:49:58.298Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f6/37/404442e7296554792e2de4c0c8f8b95ee491a3c227d6ff90d4cebf2dbde3/regex-2026.9.29-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:9916fda742cd4eede63b286f58c06718324265d727ce0856eb1aac86d0d150d6", size = 495402, upload-time = "2026-09-29T00:45:50.322Z" },
+    { url = "https://files.pythonhosted.org/packages/72/6d/116db2946888bd60db8e2033739471be6d80aa47c833afd952c9ed40654c/regex-2026.9.29-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:8873c4a11c50b9989168881aeb3f08859f469d809941866aa1feefd8be5431f6", size = 295139, upload-time = "2026-09-29T00:45:51.826Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/1d/aefd12fb5cd62b748aa6ed28725b375c71102853fcbf15fb6481f806a2ba/regex-2026.9.29-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:1d9fe8091b2e89d470df68a9331111ed008ae8aae6bf1e8e1fba4086a495c84e", size = 292130, upload-time = "2026-09-29T00:45:53.017Z" },
+    { url = "https://files.pythonhosted.org/packages/7c/98/41fe60ae6ccf3e166fe7bc73495aa15e9a1a7fe3a1f9f0f95a3d64a2df0f/regex-2026.9.29-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:fb00027a09a8f9f08028b40dce4c933cf73e4833240ed356583fdc9cfa721566", size = 793080, upload-time = "2026-09-29T00:45:54.331Z" },
+    { url = "https://files.pythonhosted.org/packages/45/0d/944b13e8286ecba61a3baeca28b375550821a279800bdb18fac41ade6637/regex-2026.9.29-cp310-cp310-manylinux2014_ppc64le.manylinux_2_17_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:14e953ff3607c92d7675bf79c4d4509ef6782aa8c08509f179f9b3d6d0679e86", size = 865241, upload-time = "2026-09-29T00:45:56.065Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/b4/e1c32fdee0462f1373c52a73325cafbde653fac0b0cc1e9badac74154f4a/regex-2026.9.29-cp310-cp310-manylinux2014_s390x.manylinux_2_17_s390x.manylinux_2_28_s390x.whl", hash = "sha256:0476e5bcbe6e1ba3d1c4cc7bbb1c3ba78e3b979b5c8a88d0a6a8cdd4992b8c84", size = 905496, upload-time = "2026-09-29T00:45:57.491Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/99/eae371ca63f7ea1f1eac025021527adb57ce3a4b67ff608b896fd31ea447/regex-2026.9.29-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:4fb41211d2333eb930a51e0546a65999761cf1f572a4da56ef9b8a62966c06f2", size = 797643, upload-time = "2026-09-29T00:45:58.746Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/26/9e4f158459e37e41633c96f49766a465f801c5daba9507260609ed76d783/regex-2026.9.29-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:edf06545875f3efa31560d94121e95c7fd70d98b1dfedc0157097d79b13b52ea", size = 797591, upload-time = "2026-09-29T00:46:00.2Z" },
+    { url = "https://files.pythonhosted.org/packages/86/60/5e1c5c6e85132e757ae77bd7693f1809046edb2c8853658c9200f4c8593c/regex-2026.9.29-cp310-cp310-manylinux_2_31_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:6398d5145689503412cc1748895242598d8846b8967b851133b20dc2ed1e21e8", size = 774874, upload-time = "2026-09-29T00:46:01.491Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/13/301b394f32a8db86ae3280533c9186229595fed766376f18e87959f92f96/regex-2026.9.29-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:45010bcfe66df41522d56c9b6114e87ecc597a08970ff6a2ced24415c141ae5f", size = 780168, upload-time = "2026-09-29T00:46:02.817Z" },
+    { url = "https://files.pythonhosted.org/packages/f6/27/0c647127db32760b2dfc4c38da9ca509a3c4a8d3d93a586121a10fef2701/regex-2026.9.29-cp310-cp310-musllinux_1_2_ppc64le.whl", hash = "sha256:a5758353650079898dc1b2b0e95aa51fa23a30d020e06f62c430dd08ee56cdd8", size = 856604, upload-time = "2026-09-29T00:46:04.152Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/18/cac15fb2829c33218ececf76333b66869a96e4f973480ec32494921750f0/regex-2026.9.29-cp310-cp310-musllinux_1_2_riscv64.whl", hash = "sha256:6f7121a8914ed13fcfe2099f895341bfb789f004d4c5a0bdece8fa667da10849", size = 760602, upload-time = "2026-09-29T00:46:05.794Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/55/967676e4089a25d5f54b9d62522f9fe09b87677d1db58f207888d4ccfbe3/regex-2026.9.29-cp310-cp310-musllinux_1_2_s390x.whl", hash = "sha256:b9d74e4eee9ddb64c2e92d5d61472c59c21684c059eb7b68767be9628e977859", size = 846830, upload-time = "2026-09-29T00:46:07.258Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/8d/bb4165d61860ed443da5fb0fafe629c1ee9202526394eead7925bdee2be4/regex-2026.9.29-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:143533cc4b6fbc5b95aca0a5b8d541088d374831593def000ec89322c220221d", size = 785445, upload-time = "2026-09-29T00:46:08.89Z" },
+    { url = "https://files.pythonhosted.org/packages/86/a6/a5cfc2560e063f8e6871373d3b719f573d7e7fcaa09db43e7c8aaeb51bd5/regex-2026.9.29-cp310-cp310-win32.whl", hash = "sha256:b84f186a7f0536fe4ff9a9fa12d06d007b9b71d4b5352ddcc41f59ad6522a312", size = 268950, upload-time = "2026-09-29T00:46:10.331Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/f6/b127312ebc8092357f435c9e4594fd8cf50abb85f8b4b16ab8d262abab2a/regex-2026.9.29-cp310-cp310-win_amd64.whl", hash = "sha256:23ae6fdad9e63e54038f5ef78aba2933faca61e24d432786589e737bc5522ebb", size = 280629, upload-time = "2026-09-29T00:46:11.638Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/e4/ab36f3c26f2374d16d525dd5a7fb4997f3c6e6bb7c6722821b84f9ea35b1/regex-2026.9.29-cp310-cp310-win_arm64.whl", hash = "sha256:c0094897d7d01f184b2d7fe8c56c66d64efe01b31f4b7d34205b391387df1111", size = 279407, upload-time = "2026-09-29T00:46:13.248Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/6b/6dea87689c3a06a6e79d254bf824e6f3e3d724b5ba027c6112559aa6cd2c/regex-2026.9.29-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:6abb75ab16bc3281714a5b99548a2225db70dba1f995f6d7f7419b76eb5a8fbe", size = 495413, upload-time = "2026-09-29T00:46:14.51Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/a5/0c791a0e83ad1013d262c13247c4c77e0f4a8d05bdc167df96aba6681c0d/regex-2026.9.29-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:b7b893976e7fe42053da64f2aa27239c24252fd2ec6df471e1be197c0addc3b1", size = 295145, upload-time = "2026-09-29T00:46:16.292Z" },
+    { url = "https://files.pythonhosted.org/packages/b1/07/9bf3607d8d13a12e436ab9d63f9791e10706827d535695b23964ad79fd79/regex-2026.9.29-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:066d0e3dbfdd739bce2bf8c2a41dd16f73e3d8adc2eb06dd803a36a307f56075", size = 292123, upload-time = "2026-09-29T00:46:17.646Z" },
+    { url = "https://files.pythonhosted.org/packages/64/6b/32c2e6fc617e1d3f247e250fea31a9a35b1265bd32f585968aa13b9999b9/regex-2026.9.29-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7020ed44df30b3aa492c00ee3b52d0548c1f30c2c6c5bb13ae897680900d3413", size = 799537, upload-time = "2026-09-29T00:46:18.976Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/72/f041177f3c7a4606f7c81a95fe7eea03e2a0c4e8bff9e439a01432cbc9f2/regex-2026.9.29-cp311-cp311-manylinux2014_ppc64le.manylinux_2_17_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:ae4613d7d9dda60fcba95f846cc6f808017f1843f392cf9daad14a6534493d71", size = 873255, upload-time = "2026-09-29T00:46:20.684Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/4e/a78948e11dd715e0e46716c2e0f3404b3fe6a44e2a2e9abdc7d965cab2b3/regex-2026.9.29-cp311-cp311-manylinux2014_s390x.manylinux_2_17_s390x.manylinux_2_28_s390x.whl", hash = "sha256:bec37990e3d6121f29ecfb594bd8f1bf009e9f7926daba2e50e3b27d3892a783", size = 914570, upload-time = "2026-09-29T00:46:22.599Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/70/aa08d1d2b294894b365e5f8ba5380fe3f8546acdb81f10639dfd74209c37/regex-2026.9.29-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:612b709381c0355b70d89cdb51b7f670591ed5cbbc0e3b5337488019dc667b65", size = 804978, upload-time = "2026-09-29T00:46:23.981Z" },
+    { url = "https://files.pythonhosted.org/packages/21/32/1b03534c4715aca3b564416d28d518083ed4dab3bc913267600d2256140d/regex-2026.9.29-cp311-cp311-manylinux_2_31_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:a760da040b47767b4b873adfb7c3b691e9ba2fc60f113f9d0b88f1a62f323e85", size = 779297, upload-time = "2026-09-29T00:46:25.318Z" },
+    { url = "https://files.pythonhosted.org/packages/76/a7/378f6f558d9e4444af315a307c5953565a511d1e3666f1bb7bdc82012b6b/regex-2026.9.29-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:49ee178ca31c94621294bf9b8b676a92a2e6bba8af0529591753719e57edb621", size = 786961, upload-time = "2026-09-29T00:46:26.963Z" },
+    { url = "https://files.pythonhosted.org/packages/59/13/79f0b1846f5f342f92ddbd4b27b18bcb86da96d902c1a0be26520bde98d7/regex-2026.9.29-cp311-cp311-musllinux_1_2_ppc64le.whl", hash = "sha256:5eeb8edc6110d9194a4d0d54610f64c37a31c605b5dbb7e407fc6ec7fa34a4a1", size = 863234, upload-time = "2026-09-29T00:46:28.58Z" },
+    { url = "https://files.pythonhosted.org/packages/97/19/05af70dec9f2eed6ba34e08d2dcc6a48e7ae5e307659d5fe4201a5d7bbee/regex-2026.9.29-cp311-cp311-musllinux_1_2_riscv64.whl", hash = "sha256:ccb64d887a9db1cd76dbc0f92051a1a478a2a67e7f56c62d915cb881d7734704", size = 766487, upload-time = "2026-09-29T00:46:29.941Z" },
+    { url = "https://files.pythonhosted.org/packages/01/e1/9c7486d4afe8fdd1fe0ad60139f8aa91427381f409af6a29b609d8fdcb3a/regex-2026.9.29-cp311-cp311-musllinux_1_2_s390x.whl", hash = "sha256:9e4482589065c8ecd761cff522dcd85f2d39e62f551e37e025d1c7d54772def3", size = 854792, upload-time = "2026-09-29T00:46:31.358Z" },
+    { url = "https://files.pythonhosted.org/packages/26/c7/49d008ff5f741d9a9799d7315556f3a12b983ff0fcd2cdfb62904bedafbf/regex-2026.9.29-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:d60030baaa7bfbb02d650c126cdcddcb6e33dbff14d819434c8fa2fdcaeeeba5", size = 793050, upload-time = "2026-09-29T00:46:32.775Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/a1/46ba549e65562ca04608b24179b8a7bb6f146ae0e7c6d7f5e70f3339c8ba/regex-2026.9.29-cp311-cp311-win32.whl", hash = "sha256:18ae8eed4526e35bdb754d61562b90bf5c00a67fdcf3cc1380dd59597486631b", size = 268940, upload-time = "2026-09-29T00:46:34.179Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/4a/aab232183c70fdcf77bcf0c51819da02ec522e393e6a0bf00bcf2142e21f/regex-2026.9.29-cp311-cp311-win_amd64.whl", hash = "sha256:1043aedf5917caa861bcb25a9c11460049656bdf0017a90a309fa8f255467725", size = 280641, upload-time = "2026-09-29T00:46:35.484Z" },
+    { url = "https://files.pythonhosted.org/packages/33/b1/7c05954af0f51de376df2ba97f7f78a8b79334c7e5b3d2d9f2aead1f4d3d/regex-2026.9.29-cp311-cp311-win_arm64.whl", hash = "sha256:352cf115a810b357caa35193ab656ecf5ef41056855e82f292c99e8514f8d954", size = 279411, upload-time = "2026-09-29T00:46:37.193Z" },
+    { url = "https://files.pythonhosted.org/packages/84/48/3fdcde9a0baa84d7d25571223265d6e434e114763b438601d54a8028bf3e/regex-2026.9.29-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:dc79d36d0618752265f0d575915bdc5c5130ecb9c9f6b3bcefeae32e4bdfafcf", size = 497903, upload-time = "2026-09-29T00:46:38.938Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/1c/4ee3e97c76f53940488dfe7a7e18705e78daac8cd7fb161d246b9e328449/regex-2026.9.29-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:3a21a9509d0ee88e7a70e1ad228cd2f0e0fd1e187458db132e8a8d18c97daf9d", size = 296416, upload-time = "2026-09-29T00:46:40.406Z" },
+    { url = "https://files.pythonhosted.org/packages/37/14/f3f0ba083d2094392d5eabf56db5ea6ba469fd6e927afd187042054ea68a/regex-2026.9.29-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:f57dc6b8fef170f105d2cf5cdce254f47b137d7755086cf7050f47e16582abba", size = 293633, upload-time = "2026-09-29T00:46:41.959Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/72/67e7a8ce17f1aea49df215564048efb49cc8c2b31a0e0fc30f36838f8516/regex-2026.9.29-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:f93bc1c3486ef3747e07c9d7c1d0a147b8fbaab975f80e348aed6f71309dfaca", size = 805885, upload-time = "2026-09-29T00:46:43.373Z" },
+    { url = "https://files.pythonhosted.org/packages/f6/78/25436bcfd4d2260b4b4090094d55d7ab53ec8a1ab4865a0b8bcb33c7d5c0/regex-2026.9.29-cp312-cp312-manylinux2014_ppc64le.manylinux_2_17_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:9e1d3a4cb7993b708f0ada8d0c84590efd853f169e7147d2202c9da503180242", size = 878344, upload-time = "2026-09-29T00:46:45.328Z" },
+    { url = "https://files.pythonhosted.org/packages/97/e6/a09ec3a23ae41d6179880e67f0aace9284b2d95f2d7b326eff203f8eec5e/regex-2026.9.29-cp312-cp312-manylinux2014_s390x.manylinux_2_17_s390x.manylinux_2_28_s390x.whl", hash = "sha256:dabee8f4935e731fb46b2a3091bdda0d3d94b3bbfb907d2b4f12eefce4009619", size = 919181, upload-time = "2026-09-29T00:46:47.041Z" },
+    { url = "https://files.pythonhosted.org/packages/26/83/d2fbd2e4e3afb1167daa825187d196f313cbaa1a4768f311fb041bb0e3d2/regex-2026.9.29-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:39ab5894d971f9ac68baa6eca5c50387db579cfcacf36ae8df3feceb1815e6d0", size = 807783, upload-time = "2026-09-29T00:46:48.894Z" },
+    { url = "https://files.pythonhosted.org/packages/46/0b/eb429a7016610d44fc89a597163f8c9127505f0d7dc724dc9effbb6a3ac0/regex-2026.9.29-cp312-cp312-manylinux_2_31_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:c1a9a6651197fbed6f0212591418b9def774fc3f8324f78d1bf0e6a63e5f8aa1", size = 783465, upload-time = "2026-09-29T00:46:50.64Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/07/58a3c0153c7476898430f6a7cf3d9062a1d17fbea4f43399ecaf411c7b4c/regex-2026.9.29-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:87fb80cbe3557e27e7b28b995c2b2eedf689b8886f941ab93e0e288f0976518a", size = 793519, upload-time = "2026-09-29T00:46:52.396Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/e8/161b94d39164520e21a7befe0245569bf7fda4c7cf1fc4e2df2b5def49da/regex-2026.9.29-cp312-cp312-musllinux_1_2_ppc64le.whl", hash = "sha256:3c5c2ef13797466aa64170cbb66ad98a32351dd4127694cea7199f80f213750d", size = 869293, upload-time = "2026-09-29T00:46:54.128Z" },
+    { url = "https://files.pythonhosted.org/packages/8f/07/3b02ed829aa2decdc1955d222bd1e2f99d1c8bb4873bbb9a66b2f0a36bff/regex-2026.9.29-cp312-cp312-musllinux_1_2_riscv64.whl", hash = "sha256:59b49507f47479e299a9e1bc41b5cb83a7afda0540625f1dbae886615978acbf", size = 770239, upload-time = "2026-09-29T00:46:56.106Z" },
+    { url = "https://files.pythonhosted.org/packages/42/5b/ba61f6fe062eb8562e742367d177bb75370434138ef6c9d2a27114f8d613/regex-2026.9.29-cp312-cp312-musllinux_1_2_s390x.whl", hash = "sha256:0dd8af32e9f7b56b7f95cc1fd79b23054c3bdc172392ae560acc24d57b7ffe71", size = 861973, upload-time = "2026-09-29T00:46:57.665Z" },
+    { url = "https://files.pythonhosted.org/packages/cc/27/767259b20e8a842948990f5e99138d6c077248fd42f8b5468b1d9ca4b814/regex-2026.9.29-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:db5e82ba15c142425b8406690032df89e39cca4a2e8afbbb9a3d84edc2373ac3", size = 796470, upload-time = "2026-09-29T00:46:59.236Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/05/2566c4ba849b68a8ab81a6bf428fa79d20aae7ddee83979103c0381df254/regex-2026.9.29-cp312-cp312-win32.whl", hash = "sha256:d0c3082bf79bcd6a614d55916590ad4b8f93200e10b97f463ea5d9d07c9b5f23", size = 269327, upload-time = "2026-09-29T00:47:01.135Z" },
+    { url = "https://files.pythonhosted.org/packages/93/19/489bc8db91196381c935752df01ba3f607140daece33b78d88573f028e64/regex-2026.9.29-cp312-cp312-win_amd64.whl", hash = "sha256:fdd88ed5e20b1bcdd234421e454962c971aa44b653bdb7f1ea9ef683e90fb649", size = 280334, upload-time = "2026-09-29T00:47:04.436Z" },
+    { url = "https://files.pythonhosted.org/packages/0b/47/fb88ba779d0e5e7d4b0ec1aceeb13845948a2cb876bd572a2d1dfdba090b/regex-2026.9.29-cp312-cp312-win_arm64.whl", hash = "sha256:4fe97894d1b306c919b4e50def1e6f6c522f4d03a7283811f4d108f1ce5d3ac2", size = 279614, upload-time = "2026-09-29T00:47:06.541Z" },
+    { url = "https://files.pythonhosted.org/packages/79/d5/6080f7d1a6e7e36aa720f806ac93c035ba39c209ae6cc510e8ef4c0279c6/regex-2026.9.29-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:f1a0d5117230dd46b399a30a38afa44f79c99f3168988fdc4f425c3f928b39df", size = 497622, upload-time = "2026-09-29T00:47:08.251Z" },
+    { url = "https://files.pythonhosted.org/packages/00/71/c87fc7a2e21a42f9d57489db32951c37eef56d153840459a80d464f0321d/regex-2026.9.29-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:f0fe9834e5aeccaf19a0d8feb296d66a24be1a7c9922002f842a682cd5abb787", size = 296281, upload-time = "2026-09-29T00:47:09.764Z" },
+    { url = "https://files.pythonhosted.org/packages/11/9e/aa0f4cde3bc4688c1d58b0cd8415edd708339bc0bc401a195b0b1e8c8f0c/regex-2026.9.29-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:c90fcf7804ea0a54b896ce0f2b9565350220b8d4890fd0db461a476a4c687963", size = 293472, upload-time = "2026-09-29T00:47:11.723Z" },
+    { url = "https://files.pythonhosted.org/packages/90/d4/e835c487850ed922a8d6074f953b888c8ea99775c76b9ed5f8a4d72eab92/regex-2026.9.29-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:e11edba5bc344a32b029a7af9d4b3173982dd79eeafa0b9dbd787364414b0509", size = 805966, upload-time = "2026-09-29T00:47:13.235Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/57/ba8809847fbae8d2cbc71367c6ded510a7ec88bf52493c65efc1acf4effb/regex-2026.9.29-cp313-cp313-manylinux2014_ppc64le.manylinux_2_17_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:bb90e7177944b6684738c1fc36aabd2dd00d1de3be7dbe09f91e196f1bc0dc81", size = 878346, upload-time = "2026-09-29T00:47:14.877Z" },
+    { url = "https://files.pythonhosted.org/packages/1a/52/e3da19fc3cc15ef67ab67e121e87887c3bccfdb683a7a9ec557c460ca5b7/regex-2026.9.29-cp313-cp313-manylinux2014_s390x.manylinux_2_17_s390x.manylinux_2_28_s390x.whl", hash = "sha256:d06fcdecc10fc7954d7c8f27a03c96055fe525274dc84a7b0dbdc3d6b9e03dab", size = 919250, upload-time = "2026-09-29T00:47:16.622Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/8e/c1ed81f55f992f6aa0b699a592a50c1ce9e6d44ff1aee2c14c0537dcef9c/regex-2026.9.29-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:d49c18f1ea294cf4adde2e5ac256e98c82ea9d708462ce4bf799dffa7cfe8a2c", size = 807902, upload-time = "2026-09-29T00:47:18.268Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/bc/5a6886eb470e41040e21e05b75024a18b6ebfe7ea400b72094a60f949101/regex-2026.9.29-cp313-cp313-manylinux_2_31_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:3e778bfccd63075167709136afbc251c1f683758d5bf49c803c60ac3f894ce6b", size = 783514, upload-time = "2026-09-29T00:47:19.921Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/52/6d951d453b023c6edb880f1ba474291b53b8ce1cc438b96a9db6d791d991/regex-2026.9.29-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:686ac5350fceae63830bb98805fcb8039325bf4c06d9f6f048ff65229d5bffa5", size = 793466, upload-time = "2026-09-29T00:47:21.552Z" },
+    { url = "https://files.pythonhosted.org/packages/99/b9/d5a41adc08360f5eee0dc4846c578f002366947211fc8af5a69a64ee7b9f/regex-2026.9.29-cp313-cp313-musllinux_1_2_ppc64le.whl", hash = "sha256:26ec4ccce55aa533fbd603d08911b01101a8fcfec987845ac3ae2c7087b2bde3", size = 869464, upload-time = "2026-09-29T00:47:23.276Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/32/d76c9d91f5d798e2e9e67f6f85ec4ae35445ac425f7454797311cecb80ca/regex-2026.9.29-cp313-cp313-musllinux_1_2_riscv64.whl", hash = "sha256:a655d34b2a6943af32401f3d94f72e9d731f6ad16285815550bf2b4ee69d420a", size = 770278, upload-time = "2026-09-29T00:47:25.193Z" },
+    { url = "https://files.pythonhosted.org/packages/24/00/aeebdb540c620a0f7317f6d6fad80a47729ecf0599a24b5c34ec155351f5/regex-2026.9.29-cp313-cp313-musllinux_1_2_s390x.whl", hash = "sha256:0c992c19cd45058a4b92f68f139c93db168b48fb1f322c9a7cd620806afb6b51", size = 861949, upload-time = "2026-09-29T00:47:27.005Z" },
+    { url = "https://files.pythonhosted.org/packages/12/62/d0314bcedfd3586197e4596931fa220260eb2385bf53184e5b9ae67db24b/regex-2026.9.29-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:ebb8912f565b8cdbbf27debfe00df04202c20e2f651b9e32767930c5eace3621", size = 796602, upload-time = "2026-09-29T00:47:29.233Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/c7/d5a8c13a613facb03e0fb55c1ebaaf7bb35d8e2c1abe8bef8dca809fc1d9/regex-2026.9.29-cp313-cp313-win32.whl", hash = "sha256:4d7d93613b01b0199961330e49cfc52d479b3d5776c56c691db31130c0a07d91", size = 269306, upload-time = "2026-09-29T00:47:31.14Z" },
+    { url = "https://files.pythonhosted.org/packages/80/a7/bf93a3a6afa5f7bc16b7afb94ae581b01cae620b8ad56bd8f9572a985959/regex-2026.9.29-cp313-cp313-win_amd64.whl", hash = "sha256:61956f074ecd123f55adca68ee3eab46e6a07ad3f8e64e6db95dfacb444f55c4", size = 280307, upload-time = "2026-09-29T00:47:32.709Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/7d/388274e53605a86297f433a08102a7bbdcf9379d47683d307ccaefd88e2c/regex-2026.9.29-cp313-cp313-win_arm64.whl", hash = "sha256:bfc71e6d970419c1309b3640305298643e2a734cad3f7cfb6d2ddee4175ab53d", size = 279599, upload-time = "2026-09-29T00:47:34.674Z" },
+    { url = "https://files.pythonhosted.org/packages/93/1f/d9dc6f02f569625faf67a4daec926cd5023472dcd69bb44286dccd5a5ab3/regex-2026.9.29-cp314-cp314-macosx_10_15_universal2.whl", hash = "sha256:957bb708e8057ab1649ba566456429d691ec9b90d1c9ad1af1ba7ffbbeaf05f2", size = 497598, upload-time = "2026-09-29T00:47:36.541Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/83/9b693a3fd1451381e812031a8961ec5b3b8f0c8cc6871f14c5223642804d/regex-2026.9.29-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:c9b602fae1e00b7c035d661ce85575365719192a7b46784bd71cf64c68053aa0", size = 296250, upload-time = "2026-09-29T00:47:38.233Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/5f/52bc2abc3fef040cd9de76ab29c918d6a717a454ae2b9dd7938b0c95656d/regex-2026.9.29-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:0166844493626c5015c6088ee15c9ca2fd060ca15b7641d1657da6a58432ae33", size = 293518, upload-time = "2026-09-29T00:47:39.957Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/fc/cf50671215ee0057046980b4571ef8646a005819bb67f0957e779ed107a5/regex-2026.9.29-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b97a38fb4c732b6832db6bf108963adbcd82ef1268ba2025dce390f45af75efa", size = 806037, upload-time = "2026-09-29T00:47:41.676Z" },
+    { url = "https://files.pythonhosted.org/packages/14/4b/dddef8fc15c63e4347cc9efb138d0cd306f30e6c98acbcc81a8f780083b9/regex-2026.9.29-cp314-cp314-manylinux2014_ppc64le.manylinux_2_17_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:a540abfab208e1b7ef2df231c40ef3b6cbb30a0aad6204e9b6a81c10a6794628", size = 878881, upload-time = "2026-09-29T00:47:43.755Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/cb/38daabed32d28f7e58a06e9344ce00dc67952e9996bc578ed6a29fe1240e/regex-2026.9.29-cp314-cp314-manylinux2014_s390x.manylinux_2_17_s390x.manylinux_2_28_s390x.whl", hash = "sha256:ddfa987262763c3c22a8367d2a49c244b018a74c3a8e3ab1a864119ad45c5633", size = 918684, upload-time = "2026-09-29T00:47:45.594Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/4d/041d9458a645fee4fce4d642a89d27271a3cfcd91095104f6dde44da70bf/regex-2026.9.29-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:2f7f7aa47b229f2b39a2ae2596d2ad5625d77b5eb9856fac2dab3eb506cdd0a0", size = 807176, upload-time = "2026-09-29T00:47:47.372Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/c4/4383eed7aa5aef67616cb1b3f3ad06b7c624c4e6cced48630cd5ce133d85/regex-2026.9.29-cp314-cp314-manylinux_2_31_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:d9b77b25b4f395f92de6099ab08e8ae2bc7e51dfe157f22900902243a5cc90c7", size = 784315, upload-time = "2026-09-29T00:47:49.518Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/a6/0086ad31cebb183c637d3198547075aa493afde308e1ff61fccccb29ba6e/regex-2026.9.29-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:34b6925af9853bf461950e6508910f179fd6e9b1a7ec8548e069606b7e51a26b", size = 793748, upload-time = "2026-09-29T00:47:51.279Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/a0/f9005cba3f629a859573fc5d1224ea4e1f97919ec8581d018e03a351a604/regex-2026.9.29-cp314-cp314-musllinux_1_2_ppc64le.whl", hash = "sha256:addd736a0547d553283adaf4e05d7104e7f2c7b0b092e9b4d28756825f14531f", size = 870302, upload-time = "2026-09-29T00:47:53.368Z" },
+    { url = "https://files.pythonhosted.org/packages/01/4f/e1a3e46bb5315a4e18b01a990e7a28e2a16595609d50c442baf2815a3c65/regex-2026.9.29-cp314-cp314-musllinux_1_2_riscv64.whl", hash = "sha256:fe3fa1dd453ed5c7f5ea23a26218329790ed7197a99b90e94330e313959a7f52", size = 770299, upload-time = "2026-09-29T00:47:55.606Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/fe/f303b4acfda44e1ff1379368748c1ef2dad04a6a8e9c0ecbc970b19d97ca/regex-2026.9.29-cp314-cp314-musllinux_1_2_s390x.whl", hash = "sha256:0cc63b5e47c12a48d90c7e9d7de6a035dd14f62868aaedbb4e0ff8ba2b8bfe7b", size = 861570, upload-time = "2026-09-29T00:47:57.617Z" },
+    { url = "https://files.pythonhosted.org/packages/60/b6/b4f7e99249f596017c60ccad5faf9310fc8e3e59bb2244940a90a1b0bdff/regex-2026.9.29-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:724184b4aafed865e4f13ca313fdcb43024300c028ec67319cfa16847d84685e", size = 795967, upload-time = "2026-09-29T00:47:59.922Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/d3/fc865a4638d9f6762192b6bab5b7aa1f33a90e9e99578c2e111e2a63c8c3/regex-2026.9.29-cp314-cp314-win32.whl", hash = "sha256:c6c8fabf1dafc1f1ddcbb67896d3f93efb092e8c4b6322d7389b944e76a484e5", size = 274758, upload-time = "2026-09-29T00:48:01.8Z" },
+    { url = "https://files.pythonhosted.org/packages/31/e2/c2b466924ccbeb874862968ca638051b15a8fd29d994a0e99004a5cbf78e/regex-2026.9.29-cp314-cp314-win_amd64.whl", hash = "sha256:1c2a0026062abcc321a53db4a185ceba0b59a66b5d37b0808917a88b55a5257f", size = 283817, upload-time = "2026-09-29T00:48:03.614Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/42/ea0f8dbaa924fa75c6338935eaee2f44dab369b27f02db1e03d74344b049/regex-2026.9.29-cp314-cp314-win_arm64.whl", hash = "sha256:121a76a0985db80ceae9e171c337f8c927868e37d01b54e3ce87bc87f9c6a208", size = 283663, upload-time = "2026-09-29T00:48:05.624Z" },
+    { url = "https://files.pythonhosted.org/packages/44/48/d58e5081119f5c223bbb37d2340acde3d069e1df8e8cd166c37502eee4da/regex-2026.9.29-cp314-cp314t-macosx_10_15_universal2.whl", hash = "sha256:e31f72490b7c12f7790e1e25c3afffd20503ee1bfb43461d7838b871ff244b19", size = 501393, upload-time = "2026-09-29T00:48:07.833Z" },
+    { url = "https://files.pythonhosted.org/packages/72/3c/c49945287d4f9efee7d41f98072f8ad880efb8f430595a612fbdea996a4e/regex-2026.9.29-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:80ea96f5c1a30bf09007d48466521d9c294bebe197c708c3359096e3e3691632", size = 298237, upload-time = "2026-09-29T00:48:09.684Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/1f/688cb61c3d4cf7bcc1ed444b5cc49399eba3e51c469ae285cf87fea3022e/regex-2026.9.29-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:554bffadcbcb6d5f4e5fb10a61cc52084b9a63d1dab5f10bcd2c4343972e8e2c", size = 295936, upload-time = "2026-09-29T00:48:11.454Z" },
+    { url = "https://files.pythonhosted.org/packages/26/a3/de43ac6b877b7d09c19a3a426b1bd5acdd209eaaf68f406466f80439ccf6/regex-2026.9.29-cp314-cp314t-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:864e9b87ac33c3fb9fb4ad48166d4fdb579c351d5c77deb0d34bccb36a775cd9", size = 816905, upload-time = "2026-09-29T00:48:13.321Z" },
+    { url = "https://files.pythonhosted.org/packages/62/14/9940763201c51d537786304984c67d0fc3d2ed18837ffb6f09a869f6b6c9/regex-2026.9.29-cp314-cp314t-manylinux2014_ppc64le.manylinux_2_17_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:044265d77d94f5e3cb2fd72c76723807c429cb8c533e9d4672d0334a6f14f588", size = 881527, upload-time = "2026-09-29T00:48:15.313Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/e1/c842d8df0b23245ebf202f8ab9c39fd48e2db39959454ec39a41c8c72082/regex-2026.9.29-cp314-cp314t-manylinux2014_s390x.manylinux_2_17_s390x.manylinux_2_28_s390x.whl", hash = "sha256:2089fe39c406784d90101c726755ffa1497bb74638fd434300d2b88006186de8", size = 923115, upload-time = "2026-09-29T00:48:17.328Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/c1/98622479e3c354a446a75232e522d747d2b3df23092dcd8a5309380a2020/regex-2026.9.29-cp314-cp314t-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0def9fb6abac55492d6d51cddb7225d07d6f279e774e0adc08569a54a5fc8d46", size = 820674, upload-time = "2026-09-29T00:48:19.32Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/d0/5808c95f9c79ed27b5eedaafc3df6239ec56a49f2e23ea8f831b18427c82/regex-2026.9.29-cp314-cp314t-manylinux_2_31_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:888d60953908dcf761aa320c3e390ab8556efbdb551ace63921de90f6ae0848d", size = 793306, upload-time = "2026-09-29T00:48:21.615Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/d3/021ca2638671ad20603bcd9b4d5bfa35d2610cd216a043ea7f0b44ea39f6/regex-2026.9.29-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:ed511a0708e2297e1d6431e7fb217e3402791e491e02da800658ace4973df1bb", size = 803103, upload-time = "2026-09-29T00:48:23.871Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/2d/755c6d13ef9c657378013676c391c7a402166b3f419a464a3e058dcbe533/regex-2026.9.29-cp314-cp314t-musllinux_1_2_ppc64le.whl", hash = "sha256:e1172147d28d8fbcf8cb8d26c41506169f5ad8fe9ec969cb116835a19d4d8eca", size = 872175, upload-time = "2026-09-29T00:48:26.255Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/fc/e1cab183b9dafe8597f58c1c766da9bf96204d3b2f232bcf3eeb75ff7b6c/regex-2026.9.29-cp314-cp314t-musllinux_1_2_riscv64.whl", hash = "sha256:92f05c9c42bde5785dc48770bc2194d9f7442544156f951e19cd31b096cec562", size = 777362, upload-time = "2026-09-29T00:48:28.389Z" },
+    { url = "https://files.pythonhosted.org/packages/06/7c/e10ea17fba31fb4a1f9d13ed53a2d2a9066a2aea58d7557e263f6d99e7b0/regex-2026.9.29-cp314-cp314t-musllinux_1_2_s390x.whl", hash = "sha256:f37964e4a5e993d2fd45147741e9dff7f34a2d8c00ab94c4ea0514a4677f959e", size = 865606, upload-time = "2026-09-29T00:48:30.4Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/6e/69824d9aee1fd41c54ea7264654a47c8d9d84d8a228e11c2bcf4c201ed81/regex-2026.9.29-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:951733b1bbdb71e377cec567b409f1a7881b47cfcad84121aa74cb575fa425ea", size = 807945, upload-time = "2026-09-29T00:48:32.375Z" },
+    { url = "https://files.pythonhosted.org/packages/89/22/857050a86e21ce60193e02a8ef662521f2e263a645c8b1b905fc136b61a7/regex-2026.9.29-cp314-cp314t-win32.whl", hash = "sha256:65b408d8fcb273e3499e7ef2ce796810da1becd208c7fb4373692a242d79d461", size = 276758, upload-time = "2026-09-29T00:48:34.72Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/96/56808fe029553d7d4c703414f2a527faad2ea2bfa9ca094a2e7f8762b530/regex-2026.9.29-cp314-cp314t-win_amd64.whl", hash = "sha256:bf48516e35cf848390ea68850aba53e7c333720d2945b4d2c25b69fc5171723f", size = 286527, upload-time = "2026-09-29T00:48:36.864Z" },
+    { url = "https://files.pythonhosted.org/packages/01/aa/074e2cfb3d8101a6a764aba5f7c5d1e21de087483e35bdc0c4ce2eb60364/regex-2026.9.29-cp314-cp314t-win_arm64.whl", hash = "sha256:9173db3be74a35cb6731701094b98120f7ee4876a287882a59cdea1fa7da342f", size = 285954, upload-time = "2026-09-29T00:48:38.901Z" },
+]
+
+[[package]]
 name = "requests"
 version = "2.33.1"
 source = { registry = "https://pypi.org/simple" }
@@ -5920,24 +6015,24 @@ version = "1.17.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.11.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
 ]
 dependencies = [
@@ -6036,15 +6131,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/0d/1c/73e719955c59b8e424d015ab450f51c0af856ae46ea2da83eba51cc88de1/setuptools-81.0.0.tar.gz", hash = "sha256:487b53915f52501f0a79ccfd0c02c165ffe06631443a886740b91af4b7a5845a", size = 1198299, upload-time = "2026-02-06T21:10:39.601Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/e3/c164c88b2e5ce7b24d667b9bd83589cf4f3520d97cad01534cd3c4f55fdb/setuptools-81.0.0-py3-none-any.whl", hash = "sha256:fdd925d5c5d9f62e4b74b30d6dd7828ce236fd6ed998a08d81de62ce5a6310d6", size = 1062021, upload-time = "2026-02-06T21:10:37.175Z" },
-]
-
-[[package]]
-name = "shellingham"
-version = "1.5.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/58/15/8b3609fd3830ef7b27b655beb4b4e9c62313a4e8da8c676e142cc210d58e/shellingham-1.5.4.tar.gz", hash = "sha256:8dbca0739d487e5bd35ab3ca4b36e11c4078f3a234bfce294b0a0291363404de", size = 10310, upload-time = "2023-10-24T04:13:40.426Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl", hash = "sha256:7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686", size = 9755, upload-time = "2023-10-24T04:13:38.866Z" },
 ]
 
 [[package]]
@@ -6159,19 +6245,19 @@ version = "9.1.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
-    "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version >= '3.14' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.13.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
+    "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
     "python_full_version == '3.12.*' and extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128'",
 ]
 dependencies = [
@@ -6410,9 +6496,48 @@ curation = [
     { name = "torch", version = "2.11.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "extra == 'extra-10-synplanner-cu126' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
     { name = "torch", version = "2.11.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
 ]
+forward-checkpoint = [
+    { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "extra == 'extra-10-synplanner-cu126' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+]
+forward-export = [
+    { name = "onnx" },
+    { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "extra == 'extra-10-synplanner-cu126' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+]
 gui = [
     { name = "streamlit" },
     { name = "streamlit-ketcher" },
+]
+reactiont5 = [
+    { name = "tokenizers" },
+]
+reactiont5-checkpoint = [
+    { name = "safetensors" },
+    { name = "tokenizers" },
+    { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "extra == 'extra-10-synplanner-cu126' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "transformers" },
+]
+reactiont5-export = [
+    { name = "onnx" },
+    { name = "safetensors" },
+    { name = "tokenizers" },
+    { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra == 'extra-10-synplanner-cpu') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra != 'extra-10-synplanner-cu126' and extra != 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'extra-10-synplanner-cpu') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "extra == 'extra-10-synplanner-cu126' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "torch", version = "2.11.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra != 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128') or (extra != 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "transformers" },
 ]
 training = [
     { name = "adabelief-pytorch" },
@@ -6468,6 +6593,8 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'training'", specifier = ">=3.7" },
     { name = "matplotlib-venn", marker = "extra == 'training'", specifier = ">=1.1" },
     { name = "numpy", specifier = ">=2" },
+    { name = "onnx", marker = "extra == 'forward-export'", specifier = ">=1.17" },
+    { name = "onnx", marker = "extra == 'reactiont5-export'", specifier = ">=1.17" },
     { name = "onnx", marker = "extra == 'training'", specifier = ">=1.17" },
     { name = "onnxruntime", marker = "python_full_version < '3.11'", specifier = ">=1.23,<1.24" },
     { name = "onnxruntime", marker = "python_full_version >= '3.11'", specifier = ">=1.23" },
@@ -6478,15 +6605,22 @@ requires-dist = [
     { name = "pytorch-lightning", marker = "extra == 'training'", specifier = ">=2.3.3,!=2.6.2,!=2.6.3" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rdkit", specifier = ">=2023.9.1" },
+    { name = "safetensors", marker = "extra == 'reactiont5-checkpoint'", specifier = ">=0.4" },
     { name = "safetensors", marker = "extra == 'training'", specifier = ">=0.4" },
     { name = "scipy", marker = "extra == 'curation'", specifier = ">=1.10" },
     { name = "streamlit", marker = "extra == 'gui'", specifier = ">1.35.1" },
     { name = "streamlit-ketcher", marker = "extra == 'gui'", specifier = ">=0.0.1" },
     { name = "synplanner", extras = ["curation", "training", "gui"], marker = "extra == 'all'" },
+    { name = "synplanner", extras = ["reactiont5"], marker = "extra == 'reactiont5-checkpoint'" },
+    { name = "synplanner", extras = ["reactiont5-checkpoint"], marker = "extra == 'reactiont5-export'" },
+    { name = "tokenizers", marker = "extra == 'reactiont5'", specifier = ">=0.19,<0.20" },
     { name = "torch", marker = "extra == 'cpu'", specifier = ">=2.0", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "synplanner", extra = "cpu" } },
     { name = "torch", marker = "extra == 'cu126'", specifier = ">=2.0", index = "https://download.pytorch.org/whl/cu126", conflict = { package = "synplanner", extra = "cu126" } },
     { name = "torch", marker = "extra == 'cu128'", specifier = ">=2.0", index = "https://download.pytorch.org/whl/cu128", conflict = { package = "synplanner", extra = "cu128" } },
     { name = "torch", marker = "extra == 'curation'", specifier = ">=2.0" },
+    { name = "torch", marker = "extra == 'forward-checkpoint'", specifier = ">=2.5" },
+    { name = "torch", marker = "extra == 'forward-export'", specifier = ">=2.5" },
+    { name = "torch", marker = "extra == 'reactiont5-checkpoint'", specifier = ">=2.5" },
     { name = "torch", marker = "extra == 'training'", specifier = ">=2.6" },
     { name = "torch-geometric", marker = "extra == 'cpu'", specifier = ">=2.4.0" },
     { name = "torch-geometric", marker = "extra == 'cu126'", specifier = ">=2.4.0" },
@@ -6494,8 +6628,9 @@ requires-dist = [
     { name = "torch-geometric", marker = "extra == 'training'", specifier = ">=2.4.0" },
     { name = "torchmetrics", marker = "extra == 'training'", specifier = ">=1.0" },
     { name = "tqdm", specifier = ">=4.66" },
+    { name = "transformers", marker = "extra == 'reactiont5-checkpoint'", specifier = "==4.40.2" },
 ]
-provides-extras = ["curation", "training", "gui", "all", "cpu", "cu126", "cu128"]
+provides-extras = ["forward-checkpoint", "forward-export", "reactiont5", "reactiont5-checkpoint", "reactiont5-export", "curation", "training", "gui", "all", "cpu", "cu126", "cu128"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -6558,6 +6693,60 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7a/fd/7a5ee21fd08ff70d3d33a5781c255cbe779659bd03278feb98b19ee550f4/tinycss2-1.4.0.tar.gz", hash = "sha256:10c0972f6fc0fbee87c3edb76549357415e94548c1ae10ebccdea16fb404a9b7", size = 87085, upload-time = "2024-10-24T14:58:29.895Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e6/34/ebdc18bae6aa14fbee1a08b63c015c72b64868ff7dae68808ab500c492e2/tinycss2-1.4.0-py3-none-any.whl", hash = "sha256:3a49cf47b7675da0b15d0c6e1df8df4ebd96e9394bb905a5775adb0d884c5289", size = 26610, upload-time = "2024-10-24T14:58:28.029Z" },
+]
+
+[[package]]
+name = "tokenizers"
+version = "0.19.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huggingface-hub" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/48/04/2071c150f374aab6d5e92aaec38d0f3c368d227dd9e0469a1f0966ac68d1/tokenizers-0.19.1.tar.gz", hash = "sha256:ee59e6680ed0fdbe6b724cf38bd70400a0c1dd623b07ac729087270caeac88e3", size = 321039, upload-time = "2024-04-17T21:40:41.849Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c1/60/91cac8d496b304ec5a22f07606893cad35ea8e1a8406dc8909e365f97a80/tokenizers-0.19.1-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:952078130b3d101e05ecfc7fc3640282d74ed26bcf691400f872563fca15ac97", size = 2533301, upload-time = "2024-04-17T21:36:02.256Z" },
+    { url = "https://files.pythonhosted.org/packages/4c/12/9cb68762ff5fee1efd51aefe2f62cb225f26f060a68a3779e1060bbc7a59/tokenizers-0.19.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:82c8b8063de6c0468f08e82c4e198763e7b97aabfe573fd4cf7b33930ca4df77", size = 2440223, upload-time = "2024-04-17T21:36:06.941Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/03/b2020e6a78fb994cff1ec962adc157c23109172a46b4fe451d6d0dd33fdb/tokenizers-0.19.1-cp310-cp310-manylinux_2_12_i686.manylinux2010_i686.whl", hash = "sha256:f03727225feaf340ceeb7e00604825addef622d551cbd46b7b775ac834c1e1c4", size = 3683779, upload-time = "2024-04-17T21:36:09.626Z" },
+    { url = "https://files.pythonhosted.org/packages/50/4e/2e5549a26dc6f9e434f83bebf16c2d7dc9dc3477cc0ec8b23ede4d465b90/tokenizers-0.19.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:453e4422efdfc9c6b6bf2eae00d5e323f263fff62b29a8c9cd526c5003f3f642", size = 3569431, upload-time = "2024-04-17T21:36:12.283Z" },
+    { url = "https://files.pythonhosted.org/packages/75/79/158626bd794e75551e0c6bb93f1cd3c9ba08ba14b181b98f09e95994f609/tokenizers-0.19.1-cp310-cp310-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:02e81bf089ebf0e7f4df34fa0207519f07e66d8491d963618252f2e0729e0b46", size = 3424739, upload-time = "2024-04-17T21:36:14.787Z" },
+    { url = "https://files.pythonhosted.org/packages/65/8e/5f4316976c26009f1ae0b6543f3d97af29afa5ba5dc145251e6a07314618/tokenizers-0.19.1-cp310-cp310-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:b07c538ba956843833fee1190cf769c60dc62e1cf934ed50d77d5502194d63b1", size = 3965791, upload-time = "2024-04-17T21:36:18.528Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/e1/5dbac9618709972434eea072670cd69fba1aa988e6200f16057722b4bf96/tokenizers-0.19.1-cp310-cp310-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:e28cab1582e0eec38b1f38c1c1fb2e56bce5dc180acb1724574fc5f47da2a4fe", size = 4049879, upload-time = "2024-04-17T21:36:21.251Z" },
+    { url = "https://files.pythonhosted.org/packages/40/4f/eb78de4af3b17b589f43a369cbf0c3a7173f25c3d2cd93068852c07689aa/tokenizers-0.19.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8b01afb7193d47439f091cd8f070a1ced347ad0f9144952a30a41836902fe09e", size = 3607049, upload-time = "2024-04-17T21:36:23.803Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/f8/141dcb0f88e9452af8d20d14dd53aab5937222a2bb4f2c04bfed6829263c/tokenizers-0.19.1-cp310-cp310-musllinux_1_1_aarch64.whl", hash = "sha256:7fb297edec6c6841ab2e4e8f357209519188e4a59b557ea4fafcf4691d1b4c98", size = 9634084, upload-time = "2024-04-17T21:36:26.75Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/be/debb7caa3f88ed54015170db16e07aa3a5fea2d3983d0dde92f98d888dc8/tokenizers-0.19.1-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:2e8a3dd055e515df7054378dc9d6fa8c8c34e1f32777fb9a01fea81496b3f9d3", size = 9949480, upload-time = "2024-04-17T21:36:29.592Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/e7/26bedf5d270d293d572a90bd66b0b030012aedb95d8ee87e8bcd446b76fb/tokenizers-0.19.1-cp310-none-win32.whl", hash = "sha256:7ff898780a155ea053f5d934925f3902be2ed1f4d916461e1a93019cc7250837", size = 2041462, upload-time = "2024-04-17T21:36:33.369Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/85/d999b9a05fd101d48f1a365d68be0b109277bb25c89fb37a389d669f9185/tokenizers-0.19.1-cp310-none-win_amd64.whl", hash = "sha256:bea6f9947e9419c2fda21ae6c32871e3d398cba549b93f4a65a2d369662d9403", size = 2220036, upload-time = "2024-04-17T21:36:35.903Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/d6/6e1d728d765eb4102767f071bf7f6439ab10d7f4a975c9217db65715207a/tokenizers-0.19.1-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:5c88d1481f1882c2e53e6bb06491e474e420d9ac7bdff172610c4f9ad3898059", size = 2533448, upload-time = "2024-04-17T21:36:38.61Z" },
+    { url = "https://files.pythonhosted.org/packages/90/79/d17a0f491d10817cd30f1121a07aa09c8e97a81114b116e473baf1577f09/tokenizers-0.19.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:ddf672ed719b4ed82b51499100f5417d7d9f6fb05a65e232249268f35de5ed14", size = 2440254, upload-time = "2024-04-17T21:36:40.398Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/28/2d11c3ff94f9d42eceb2ea549a06e3f166fe391c5a025e5d96fac898a3ac/tokenizers-0.19.1-cp311-cp311-manylinux_2_12_i686.manylinux2010_i686.whl", hash = "sha256:dadc509cc8a9fe460bd274c0e16ac4184d0958117cf026e0ea8b32b438171594", size = 3684971, upload-time = "2024-04-17T21:36:43.115Z" },
+    { url = "https://files.pythonhosted.org/packages/36/c6/537f22b57e6003904d35d07962dbde2f2e9bdd791d0241da976a4c7f8194/tokenizers-0.19.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:dfedf31824ca4915b511b03441784ff640378191918264268e6923da48104acc", size = 3568894, upload-time = "2024-04-17T21:36:45.011Z" },
+    { url = "https://files.pythonhosted.org/packages/af/ef/3c1deed14ec59b2c8e7e2fa27b2a53f7d101181277a43b89ab17d891ef2e/tokenizers-0.19.1-cp311-cp311-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:ac11016d0a04aa6487b1513a3a36e7bee7eec0e5d30057c9c0408067345c48d2", size = 3426873, upload-time = "2024-04-17T21:36:47.001Z" },
+    { url = "https://files.pythonhosted.org/packages/06/db/c0320c4798ac6bd12d2ef895bec9d10d216a3b4d6fff10e9d68883ea7edc/tokenizers-0.19.1-cp311-cp311-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:76951121890fea8330d3a0df9a954b3f2a37e3ec20e5b0530e9a0044ca2e11fe", size = 3965050, upload-time = "2024-04-17T21:36:49.202Z" },
+    { url = "https://files.pythonhosted.org/packages/4c/8a/a166888d6cb14db55f5eb7ce0b1d4777d145aa27cbf4f945712cf6c29935/tokenizers-0.19.1-cp311-cp311-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:b342d2ce8fc8d00f376af068e3274e2e8649562e3bc6ae4a67784ded6b99428d", size = 4047855, upload-time = "2024-04-17T21:36:52.864Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/03/fb50fc03f86016b227a967c8d474f90230c885c0d18f78acdfda7a96ce56/tokenizers-0.19.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d16ff18907f4909dca9b076b9c2d899114dd6abceeb074eca0c93e2353f943aa", size = 3608228, upload-time = "2024-04-17T21:36:55.7Z" },
+    { url = "https://files.pythonhosted.org/packages/5b/cd/0385e1026e1e03732fd398e964792a3a8433918b166748c82507e014d748/tokenizers-0.19.1-cp311-cp311-musllinux_1_1_aarch64.whl", hash = "sha256:706a37cc5332f85f26efbe2bdc9ef8a9b372b77e4645331a405073e4b3a8c1c6", size = 9633115, upload-time = "2024-04-17T21:36:58.299Z" },
+    { url = "https://files.pythonhosted.org/packages/25/50/8f8ad0bbdaf09d04b15e6502d1fa1c653754ed7e016e4ae009726aa1a4e4/tokenizers-0.19.1-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:16baac68651701364b0289979ecec728546133e8e8fe38f66fe48ad07996b88b", size = 9949062, upload-time = "2024-04-17T21:37:01.947Z" },
+    { url = "https://files.pythonhosted.org/packages/db/11/31be66710f1d14526f3588a441efadeb184e1e68458067007b20ead03c59/tokenizers-0.19.1-cp311-none-win32.whl", hash = "sha256:9ed240c56b4403e22b9584ee37d87b8bfa14865134e3e1c3fb4b2c42fafd3256", size = 2041039, upload-time = "2024-04-17T21:37:05.607Z" },
+    { url = "https://files.pythonhosted.org/packages/65/8e/6d7d72b28f22c422cff8beae10ac3c2e4376b9be721ef8167b7eecd1da62/tokenizers-0.19.1-cp311-none-win_amd64.whl", hash = "sha256:ad57d59341710b94a7d9dbea13f5c1e7d76fd8d9bcd944a7a6ab0b0da6e0cc66", size = 2220386, upload-time = "2024-04-17T21:37:08.295Z" },
+    { url = "https://files.pythonhosted.org/packages/63/90/2890cd096898dcdb596ee172cde40c0f54a9cf43b0736aa260a5501252af/tokenizers-0.19.1-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:621d670e1b1c281a1c9698ed89451395d318802ff88d1fc1accff0867a06f153", size = 2530580, upload-time = "2024-04-17T21:37:10.688Z" },
+    { url = "https://files.pythonhosted.org/packages/74/d1/f4e1e950adb36675dfd8f9d0f4be644f3f3aaf22a5677a4f5c81282b662e/tokenizers-0.19.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:d924204a3dbe50b75630bd16f821ebda6a5f729928df30f582fb5aade90c818a", size = 2436682, upload-time = "2024-04-17T21:37:12.966Z" },
+    { url = "https://files.pythonhosted.org/packages/ed/30/89b321a16c58d233e301ec15072c0d3ed5014825e72da98604cd3ab2fba1/tokenizers-0.19.1-cp312-cp312-manylinux_2_12_i686.manylinux2010_i686.whl", hash = "sha256:4f3fefdc0446b1a1e6d81cd4c07088ac015665d2e812f6dbba4a06267d1a2c95", size = 3693494, upload-time = "2024-04-17T21:37:14.755Z" },
+    { url = "https://files.pythonhosted.org/packages/05/40/fa899f32de483500fbc78befd378fd7afba4270f17db707d1a78c0a4ddc3/tokenizers-0.19.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:9620b78e0b2d52ef07b0d428323fb34e8ea1219c5eac98c2596311f20f1f9266", size = 3566541, upload-time = "2024-04-17T21:37:17.067Z" },
+    { url = "https://files.pythonhosted.org/packages/67/14/e7da32ae5fb4971830f1ef335932fae3fa57e76b537e852f146c850aefdf/tokenizers-0.19.1-cp312-cp312-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:04ce49e82d100594715ac1b2ce87d1a36e61891a91de774755f743babcd0dd52", size = 3430792, upload-time = "2024-04-17T21:37:19.055Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/4b/aae61bdb6ab584d2612170801703982ee0e35f8b6adacbeefe5a3b277621/tokenizers-0.19.1-cp312-cp312-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:c5c2ff13d157afe413bf7e25789879dd463e5a4abfb529a2d8f8473d8042e28f", size = 3962812, upload-time = "2024-04-17T21:37:21.008Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/b6/f7b7ef89c4da7b20256e6eab23d3835f05d1ca8f451d31c16cbfe3cd9eb6/tokenizers-0.19.1-cp312-cp312-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:3174c76efd9d08f836bfccaca7cfec3f4d1c0a4cf3acbc7236ad577cc423c840", size = 4024688, upload-time = "2024-04-17T21:37:23.659Z" },
+    { url = "https://files.pythonhosted.org/packages/80/54/12047a69f5b382d7ee72044dc89151a2dd0d13b2c9bdcc22654883704d31/tokenizers-0.19.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7c9d5b6c0e7a1e979bec10ff960fae925e947aab95619a6fdb4c1d8ff3708ce3", size = 3610961, upload-time = "2024-04-17T21:37:26.234Z" },
+    { url = "https://files.pythonhosted.org/packages/52/b7/1e8a913d18ac28feeda42d4d2d51781874398fb59cd1c1e2653a4b5742ed/tokenizers-0.19.1-cp312-cp312-musllinux_1_1_aarch64.whl", hash = "sha256:a179856d1caee06577220ebcfa332af046d576fb73454b8f4d4b0ba8324423ea", size = 9631367, upload-time = "2024-04-17T21:37:28.752Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/3d/2284f6d99f8f21d09352b88b8cfefa24ab88468d962aeb0aa15c20d76b32/tokenizers-0.19.1-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:952b80dac1a6492170f8c2429bd11fcaa14377e097d12a1dbe0ef2fb2241e16c", size = 9950121, upload-time = "2024-04-17T21:37:31.741Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/94/ec3369dbc9b7200c14c8c7a1a04c78b7a7398d0c001e1b7d1ffe30eb93a0/tokenizers-0.19.1-cp312-none-win32.whl", hash = "sha256:01d62812454c188306755c94755465505836fd616f75067abcae529c35edeb57", size = 2044069, upload-time = "2024-04-17T21:37:35.672Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/97/80bff6937e0c67d30c0facacd4f0bcf4254e581aa4995c73cef8c8640e56/tokenizers-0.19.1-cp312-none-win_amd64.whl", hash = "sha256:b70bfbe3a82d3e3fb2a5e9b22a39f8d1740c96c68b6ace0086b39074f08ab89a", size = 2214527, upload-time = "2024-04-17T21:37:39.19Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/7b/38fb7207cde3d1dc5272411cd18178e6437cdc1ef08cac5d0e8cfd57f38c/tokenizers-0.19.1-pp310-pypy310_pp73-macosx_10_12_x86_64.whl", hash = "sha256:3b11853f17b54c2fe47742c56d8a33bf49ce31caf531e87ac0d7d13d327c9334", size = 2532668, upload-time = "2024-04-17T21:39:15.866Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/0d/2c452fe17fc17f0cdb713acb811eebb1f714b8c21d497c4672af4f491229/tokenizers-0.19.1-pp310-pypy310_pp73-macosx_11_0_arm64.whl", hash = "sha256:d26194ef6c13302f446d39972aaa36a1dda6450bc8949f5eb4c27f51191375bd", size = 2438321, upload-time = "2024-04-17T21:39:17.887Z" },
+    { url = "https://files.pythonhosted.org/packages/19/e0/f9e915d028b45798723eab59c253da28040aa66b9f31dcb7cfc3be88fa37/tokenizers-0.19.1-pp310-pypy310_pp73-manylinux_2_12_i686.manylinux2010_i686.whl", hash = "sha256:e8d1ed93beda54bbd6131a2cb363a576eac746d5c26ba5b7556bc6f964425594", size = 3682304, upload-time = "2024-04-17T21:39:20.388Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/2b/db8a94608c392752681c2ca312487b7cd5bcc4f77e24a90daa4916138271/tokenizers-0.19.1-pp310-pypy310_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ca407133536f19bdec44b3da117ef0d12e43f6d4b56ac4c765f37eca501c7bda", size = 3566208, upload-time = "2024-04-17T21:39:23.122Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/58/2e998462677c4c0eb5123ce386bcb488a155664d273d0283122866515f09/tokenizers-0.19.1-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ce05fde79d2bc2e46ac08aacbc142bead21614d937aac950be88dc79f9db9022", size = 3605791, upload-time = "2024-04-17T21:39:26.195Z" },
+    { url = "https://files.pythonhosted.org/packages/83/ac/26bc2e2bb2a054dc2e51699628936f5474e093b68da6ccdde04b2fc39ab8/tokenizers-0.19.1-pp310-pypy310_pp73-musllinux_1_1_aarch64.whl", hash = "sha256:35583cd46d16f07c054efd18b5d46af4a2f070a2dd0a47914e66f3ff5efb2b1e", size = 9632867, upload-time = "2024-04-17T21:39:28.637Z" },
+    { url = "https://files.pythonhosted.org/packages/45/b6/36c1bb106bbe96012c9367df89ed01599cada036c0b96d38fbbdbeb75c9f/tokenizers-0.19.1-pp310-pypy310_pp73-musllinux_1_1_x86_64.whl", hash = "sha256:43350270bfc16b06ad3f6f07eab21f089adb835544417afda0f83256a8bf8b75", size = 9945103, upload-time = "2024-04-17T21:39:32.522Z" },
 ]
 
 [[package]]
@@ -6949,6 +7138,28 @@ wheels = [
 ]
 
 [[package]]
+name = "transformers"
+version = "4.40.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "filelock" },
+    { name = "huggingface-hub" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu126') or (extra == 'extra-10-synplanner-cpu' and extra == 'extra-10-synplanner-cu128') or (extra == 'extra-10-synplanner-cu126' and extra == 'extra-10-synplanner-cu128')" },
+    { name = "packaging" },
+    { name = "pyyaml" },
+    { name = "regex" },
+    { name = "requests" },
+    { name = "safetensors" },
+    { name = "tokenizers" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/73/ef/d877998c9ab04ecb8eeda495e1c64f2f6bb6724b0634f7d0d6aca2cdc6af/transformers-4.40.2.tar.gz", hash = "sha256:657b6054a2097671398d976ad46e60836e7e15f9ea9551631a96e33cb9240649", size = 7797669, upload-time = "2024-05-06T16:08:02.166Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/05/23/ba02efa28518557e0cfe0ce5c1170000dd7501ed02ac865fc90cbe3daa93/transformers-4.40.2-py3-none-any.whl", hash = "sha256:71cb94301ec211a2e1d4b8c8d18dcfaa902dfa00a089dceca167a8aa265d6f2d", size = 8999918, upload-time = "2024-05-06T16:07:56.121Z" },
+]
+
+[[package]]
 name = "triton"
 version = "3.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -6987,21 +7198,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e0/a8/949edebe3a82774c1ec34f637f5dd82d1cf22c25e963b7d63771083bbee5/twine-6.2.0.tar.gz", hash = "sha256:e5ed0d2fd70c9959770dce51c8f39c8945c574e18173a7b81802dab51b4b75cf", size = 172262, upload-time = "2025-09-04T15:43:17.255Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3a/7a/882d99539b19b1490cac5d77c67338d126e4122c8276bf640e411650c830/twine-6.2.0-py3-none-any.whl", hash = "sha256:418ebf08ccda9a8caaebe414433b0ba5e25eb5e4a927667122fbe8f829f985d8", size = 42727, upload-time = "2025-09-04T15:43:15.994Z" },
-]
-
-[[package]]
-name = "typer"
-version = "0.25.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "annotated-doc" },
-    { name = "click" },
-    { name = "rich" },
-    { name = "shellingham" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e4/51/9aed62104cea109b820bbd6c14245af756112017d309da813ef107d42e7e/typer-0.25.1.tar.gz", hash = "sha256:9616eb8853a09ffeabab1698952f33c6f29ffdbceb4eaeecf571880e8d7664cc", size = 122276, upload-time = "2026-04-30T19:32:16.964Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/f9/2b3ff4e56e5fa7debfaf9eb135d0da96f3e9a1d5b27222223c7296336e5f/typer-0.25.1-py3-none-any.whl", hash = "sha256:75caa44ed46a03fb2dab8808753ffacdbfea88495e74c85a28c5eefcf5f39c89", size = 58409, upload-time = "2026-04-30T19:32:18.271Z" },
 ]
 
 [[package]]

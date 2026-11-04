@@ -19,6 +19,8 @@ class RouteNode(TypedDict, total=False):
     children: list[RouteNode]
     in_stock: bool
     meta: dict[str, Any]
+    provenance: dict[str, Any]
+    assessment: dict[str, Any]
     step_id: int
     tree_node_id: int | None
     rule_id: int | None

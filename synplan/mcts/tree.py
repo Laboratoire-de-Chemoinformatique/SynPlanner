@@ -153,6 +153,7 @@ class Tree:
         expansion_function: Policy,
         evaluation_function: EvaluationStrategy = None,
         priority_rules: dict[str, list[CanonicalRetroReactor]] | None = None,
+        forward_assessor=None,
     ):
         """Initializes a tree object with optional parameters for tree search for target
         molecule.
@@ -162,6 +163,8 @@ class Tree:
         :param reaction_rules: A loaded reaction rules.
         :param building_blocks: A loaded building blocks.
         :param expansion_function: A loaded policy function.
+        :param forward_assessor: Optional shared reaction assessor for a hard
+            Top-K filter before child insertion. Rollout simulations are unchanged.
         :param evaluation_function: An evaluation strategy. If None, a random
             evaluation strategy is used as default.
         :param priority_rules: Optional **mapping** of curated rule sets,
@@ -323,6 +326,19 @@ class Tree:
             )
         self.algorithm = ALGORITHMS[algo_key](self)
 
+        # forward validation
+        if forward_assessor is not None and config.direction != "retro":
+            raise ValueError(
+                "Forward validation currently supports retrosynthetic search only"
+            )
+        self.forward_assessor = forward_assessor
+        self.forward_metadata = {}
+        self.forward_stats = {}
+        self._forward_inputs = set()
+        # Retain assessed Routes by terminal node id; aggregates stay on each Route.
+        self.assessed_routes = {}
+        self.stop_reason = None
+
         priority_rules_total = sum(len(rules) for rules in self.priority_rules.values())
         logger.debug(
             f"Tree init: target={str(target)[:50]}, "
@@ -373,12 +389,16 @@ class Tree:
         """
 
         if self.curr_iteration >= self.config.max_iterations:
+            self.stop_reason = "max_iterations"
             raise StopIteration("Iterations limit exceeded.")
         if self.curr_tree_size >= self.config.max_tree_size:
+            self.stop_reason = "max_tree_size"
             raise StopIteration("Max tree size exceeded or all possible routes found.")
-        if time() - self.start_time >= self.config.max_time:
+        if self.time_limit_reached():
+            self.stop_reason = "max_time"
             raise StopIteration("Time limit exceeded.")
         if self.stop_at_first and self.found_a_route:
+            self.stop_reason = "stop_at_first"
             raise StopIteration("Already found a route.")
 
         # start new iteration
@@ -390,8 +410,13 @@ class Tree:
 
         previous_routes = len(self.winning_nodes)
         previous_expansions = self.stats.expansion_calls
-        is_solved, last_node_id = self.algorithm.step()
-        self.curr_time = time() - self.start_time
+        try:
+            is_solved, last_node_id = self.algorithm.step()
+        except StopIteration:
+            self.stop_reason = self.stop_reason or "exhausted"
+            raise
+        finally:
+            self.curr_time = time() - self.start_time
         self.stats.iterations_without_expansion += (
             self.stats.expansion_calls == previous_expansions
         )
@@ -406,6 +431,22 @@ class Tree:
                 self.stats.first_solution_time = round(self.curr_time, 4)
 
         return is_solved, last_node_id
+
+    def time_limit_reached(self):
+        """A null time limit disables only the wall-clock stopping condition."""
+        return (
+            self.config.max_time is not None
+            and bool(self.start_time)
+            and time() - self.start_time >= self.config.max_time
+        )
+
+    def finalize_forward(self, assessor, mode, *, silent=True, combine_search=False):
+        """Explicit post-search assessment; route reads alone never run inference."""
+        from .forward import finalize_forward_routes
+
+        return finalize_forward_routes(
+            self, assessor, mode, silent=silent, combine_search=combine_search
+        )
 
     def run(self) -> "Tree":
         """Run the search to completion and return the tree.
@@ -487,6 +528,8 @@ class Tree:
         )
         expanded = False
         for candidate in self._iter_rules(curr_node):
+            if self.forward_assessor is not None and self.time_limit_reached():
+                break
             self._increment_rule_stats(candidate.rule_source, tried=1)
             rule_produced = False
             # Multi-application fires for any priority source (every source
@@ -535,7 +578,10 @@ class Tree:
         elif node_id != 1:
             self.stats.dead_end_nodes += 1
 
+        if self.time_limit_reached():
+            self.stop_reason = "max_time"
         if not expanded and node_id == 1:
+            self.stop_reason = self.stop_reason or "exhausted"
             raise StopIteration("\nThe target molecule was not expanded.")
 
     def _iter_rules(self, curr_node: Node):
@@ -690,6 +736,44 @@ class Tree:
         if not set(prev_precursor).isdisjoint(new_precursor):
             return False
 
+        forward_prediction = None
+        if self.forward_assessor is not None:
+            if self.time_limit_reached():
+                return False
+            from .forward import ForwardValidationError
+
+            try:
+                forward_prediction = self.forward_assessor.assess_reactions(
+                    [products], [curr_node.curr_precursor.molecule]
+                )[0]
+            except Exception as error:
+                raise ForwardValidationError(
+                    f"Forward validation failed: {error}"
+                ) from error
+            stats = self.forward_assessor.last_stats
+            for key in (
+                "cache_hits",
+                "cache_misses",
+                "model_predictions",
+                "inference_seconds",
+            ):
+                self.forward_stats[key] = self.forward_stats.get(key, 0) + stats[key]
+            self._forward_inputs.update(self.forward_assessor.last_inputs)
+            self.forward_stats["unique_inputs"] = len(self._forward_inputs)
+            self.forward_stats["candidate_checks"] = (
+                self.forward_stats.get("candidate_checks", 0) + 1
+            )
+            outcome = (
+                "assumed_passes"
+                if len(products) == 1
+                else "rejections"
+                if forward_prediction["alert"]
+                else "model_passes"
+            )
+            self.forward_stats[outcome] = self.forward_stats.get(outcome, 0) + 1
+            if forward_prediction["alert"]:
+                return False
+
         precursors_to_expand = (
             *curr_node.next_precursor,
             *(
@@ -754,6 +838,7 @@ class Tree:
             stereo_events=tuple(assessment["events"]),
             stereo_evidence=tuple(evidence),
             stereo_history=history,
+            forward_prediction=forward_prediction,
         )
 
         for np in new_precursor:
@@ -1293,12 +1378,20 @@ class Tree:
 
         :meth:`route_details` numbers steps from the target down; a route numbers
         them from the deepest step up, so the two run opposite ways and this is
-        where they are reconciled.
+        where they are reconciled. Reconstructed routes use their saved origins
+        to keep metadata aligned with :meth:`synthesis_route` after branch ordering.
 
         :raises ValueError: if ``node_id`` is not a node of this tree.
         """
 
         steps = self.route_details(node_id).get("steps", [])
+        reconstructed = getattr(self.nodes[node_id], "reconstructed_route", None)
+        if reconstructed is not None:
+            by_node = {step["node_id"]: step for step in steps}
+            steps = [
+                by_node[step.origin.tree_node_id]
+                for step in reversed(reconstructed.steps)
+            ]
         return {
             len(steps) - 1 - index: {
                 "step_id": len(steps) - 1 - index,
@@ -1306,6 +1399,17 @@ class Tree:
                 "rule_id": step.get("rule_id"),
                 "rule_source": step.get("rule_source"),
                 "rule_key": step.get("rule_key"),
+                **(
+                    {
+                        "meta": {
+                            "forward_prediction": self.nodes[
+                                step["node_id"]
+                            ].forward_prediction
+                        }
+                    }
+                    if self.nodes[step["node_id"]].forward_prediction is not None
+                    else {}
+                ),
             }
             for index, step in enumerate(steps)
         }
@@ -1409,6 +1513,8 @@ class Tree:
                 max(n.depth for n in self.nodes.values()) if self.nodes else 0
             ),
             "search_time": round(self.curr_time, 1),
+            "stop_reason": self.stop_reason,
+            "forward_statistics": dict(self.forward_stats),
             "solved": len(self.winning_nodes) > 0,
             "stereo_proposals": len(self.proposal_nodes),
             "stereo_incompatible_outcomes": self.stats.stereo_incompatible_outcomes,

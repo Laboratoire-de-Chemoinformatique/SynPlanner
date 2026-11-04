@@ -240,6 +240,87 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the ranking from position 35 down. Whether it changed a score at all depends on
   the tree.
 
+## [1.8.0]
+
+### Added
+
+- Chemformer ONNX decoding with self- and cross-attention KV caches through
+  encoder, initial-decoder, and cached-decoder graphs. The adapter selects cached
+  decoding from bundle metadata, preserves the existing prediction policy, and
+  continues to support original two-graph bundles without new runtime dependencies.
+  Includes checkpoint-verified export, manifests, and numerical, beam-search,
+  batching, and dependency-isolation tests.
+- `ReactionT5v2-forward-USPTO_MIT` forward prediction with ONNX by default,
+  optional Transformers checkpoint inference, blank reagents, and the shared
+  augmented stereo-free ranking policy. Includes pinned checkpoint download,
+  cached-decoder ONNX export, manifests, and collection-script selection. The
+  `reactiont5` tokenizer extra supports ONNX inference; separate optional extras
+  provide checkpoint inference and export.
+- Local Chemformer and ForwardChimera ONNX inference using the existing base
+  dependencies. Chimera also supports explicit checkpoint inference and ONNX
+  export through optional PyTorch extras, without RetroChimera or Lightning.
+- Shared forward prediction with up to ten deterministic rooted reactant SMILES,
+  twenty beams per augmentation, stereo-free full-InChIKey deduplication, and
+  reranking to at most ten distinct products. Inputs retain stereochemistry and
+  isotopes; representative sequence likelihoods remain separate from rank scores.
+- `ForwardReactionAssessor` for stereo-free product recovery, reciprocal-rank
+  scores, and unmatched-product alerts. One-reactant steps receive an explicit
+  assumed score of 1.0 without inference. Reusable JSON caches use model/pipeline
+  fingerprints, atomic writes, and tqdm progress; collection scripts preserve
+  route IDs, order, and existing metadata.
+- `ForwardRouteScorer` aggregates all reaction scores geometrically, including
+  assumed steps. Search scores and policy likelihoods remain separate; multiplying
+  the forward score by the search score is an explicit option.
+- Forward annotations, route assessments, and provenance round-trip through route
+  JSON. HTML reports display reaction and route scores and filter routes by
+  zero-score reactions.
+- Optional planning validation through the top-level `forward_val_config`
+  reference. Null settings preserve ordinary planning. On-the-fly validation
+  rejects candidates outside Top-K before child creation; post-processing saves
+  completed planning output before assessment and retains failed routes.
+- Shared model sessions and prediction caches across planning targets, explicit
+  low-level finalization, and timing/cache/filter statistics. Search records use
+  schema 5 for annotations, model identity, and route-owned aggregate scores while
+  accepting schemas 1 through 4.
+- `max_time: null` supports iteration-controlled runs across search algorithms,
+  with stopping reasons recorded. The ordinary time limit remains 600 seconds.
+
+### Changed
+
+- One `ForwardPredictor` reader and `Tokenizer` class in `synplan.ml.inference`
+  replace the model-specific `OnnxChemformer`, `ForwardChimera`, and `ReactionT5`
+  classes and import paths. Select the model with `model_type`; ONNX remains the
+  default. Native tokenization, beam search, KV caching, prediction settings, and
+  compatible cache identities are preserved without new dependencies.
+- Full third-party license terms and attribution are consolidated in the
+  distributed `LICENSE`; adapted inference sources retain short attribution and
+  modification notices.
+- The forward-planning example selects the cached SynFwd-1 v2 bundle. Ordinary
+  planning still defaults to no forward assessment. Cached bundles receive
+  separate asset-based prediction-cache identities; historical entries remain
+  intact and are not reused automatically for the new graphs.
+- Forward prediction ranks distinct product identities after augmentation rather
+  than raw single-input beams. Versioned cache fingerprints prevent historical
+  beam-10 predictions from satisfying the new generation policy. Forward scores
+  describe product recovery and are ranking heuristics, not experimental success
+  probabilities.
+
+### Fixed
+
+- Aggregate forward scores belong only to `Route.assessment`, not shared search
+  nodes. Reconstruction and exports preserve each route's scores, and search
+  record loading restores legacy node-level aggregates onto Route objects.
+- Forward assessment respects package layering: chemistry helpers live in the
+  chemistry package and injected models provide their cache identity. Cache
+  identities for existing Chemformer and Chimera bundles remain compatible.
+- Discard invalid-valence generated candidates when chython cannot normalize
+  them; unexpected normalization and inference errors remain visible.
+- Resolve type-checker errors for framework overrides and shutdown context-manager
+  annotations, and update route-report test fixtures to supply node metadata.
+  Package-layer checks retain their existing prohibitions.
+- Search-record loading preserves atom insertion order for symmetric mapped
+  fragments, preventing unchanged reactions from invalidating stereo evidence.
+
 ## [1.7.0] - 2026-08-25
 
 ### Added

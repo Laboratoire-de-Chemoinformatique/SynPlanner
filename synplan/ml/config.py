@@ -143,7 +143,8 @@ class LinearPolicyNetworkConfig(PolicyNetworkConfig):
     :class:`MHNRankingPolicyNetworkConfig`.
     """
 
-    architecture: Literal["linear"] = "linear"
+    # Pydantic discriminator: the subclass deliberately narrows the validated field.
+    architecture: Literal["linear"] = "linear"  # ty: ignore[invalid-mutable-override]
 
 
 class MHNRankingPolicyNetworkConfig(PolicyNetworkConfig):
@@ -156,7 +157,8 @@ class MHNRankingPolicyNetworkConfig(PolicyNetworkConfig):
     side). These fields live ONLY here, never on the base or linear config.
     """
 
-    architecture: Literal["mhn_ranking"] = "mhn_ranking"
+    # Pydantic discriminator: the subclass deliberately narrows the validated field.
+    architecture: Literal["mhn_ranking"] = "mhn_ranking"  # ty: ignore[invalid-mutable-override]
 
     # MHN association mechanism
     association_dim: int = Field(default=512, gt=0)

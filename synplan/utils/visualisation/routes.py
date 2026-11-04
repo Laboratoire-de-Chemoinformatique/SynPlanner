@@ -24,6 +24,8 @@ from synplan.utils.routedraw import (
 )
 from synplan.utils.svgslim import Doc, hidden_defs
 from synplan.utils.visualisation.assets import (
+    ASSESSMENT_CSS,
+    ASSESSMENT_JS,
     REPORT_CSS,
     REPORT_JS,
     ROLE_LEGEND,
@@ -199,7 +201,7 @@ def _report_header(
         ("Routes", len(routes), ""),
         ("Search time", _seconds(search_time), " s" if search_time is not None else ""),
         ("Shortest route", min((len(route) for route in routes), default=0), " steps"),
-        ("Best score", round(max(scores), 3) if scores else "—", ""),
+        ("Best search score", round(max(scores), 3) if scores else "—", ""),
     )
     target = (
         ""
@@ -327,6 +329,124 @@ def _route_prices(
     return pills, f"{per_mol / weight:g}"
 
 
+def _assessment_group(route):
+    if route.assessment is None:
+        return "unassessed"
+    return "failed" if route.assessment["zero_score_steps"] else "positive"
+
+
+def _number(value):
+    return "—" if value is None else f"{value:.6g}"
+
+
+def _step_display(annotation):
+    if annotation["score"] == 0:
+        return "zero", "No top-10 match"
+    # One-reactant steps share the positive-score style without inventing a model rank.
+    rank = "—" if annotation["rank"] is None else escape(str(annotation["rank"]))
+    return "match", rank
+
+
+def _badge(annotation):
+    style, rank = _step_display(annotation)
+    return (
+        f'<span class="forward-{style}" title="{rank}">{annotation["score"]:.3f}</span>'
+    )
+
+
+def _assessment_steps(route, index):
+    if route.assessment is None:
+        return ""
+    rows = []
+    for number, step in enumerate(route, 1):
+        annotation = step.forward_prediction
+        _, rank = _step_display(annotation)
+        rows.append(
+            f'<tr id="assessment-route-{index}-step-{number}">'
+            f"<td>{number}</td><td>{rank}</td><td>{_badge(annotation)}</td>"
+            f"<td>{'Yes' if annotation['alert'] else 'No'}</td>"
+            f'<td class="mono">{escape(annotation["product_inchikey"])}</td></tr>'
+        )
+    score = route.assessment
+    combined = (
+        f" · Combined: {_number(score['combined_score'])}"
+        if "combined_score" in score
+        else ""
+    )
+    return (
+        '<div class="assessment-step-table assessment-scroll">'
+        '<table class="assessment-table">'
+        f"<caption>Forward route score: {_number(score['forward_score'])}{combined}"
+        " · step numbers match the drawing</caption>"
+        "<thead><tr><th>Step</th><th>Top-k rank</th><th>Step score</th>"
+        "<th>Alert</th><th>Product InChIKey · stereo-free</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table>"
+        '<a href="#assessment-overview">Back to score overview ↑</a></div>'
+    )
+
+
+def _assessment_overview(routes, labels):
+    combined = any(
+        r.assessment is not None and "combined_score" in r.assessment for r in routes
+    )
+    groups = [_assessment_group(route) for route in routes]
+    rows = []
+    for index, (route, label, group) in enumerate(zip(routes, labels, groups), 1):
+        score = route.assessment or {}
+        likelihood = (
+            None if route.provenance is None else route.provenance.policy_log_likelihood
+        )
+        vector = " ".join(
+            f'<a href="#assessment-route-{index}-step-{number}">'
+            f"{_badge(step.forward_prediction)}</a>"
+            for number, step in enumerate(route, 1)
+            if route.assessment is not None
+        )
+        rows.append(
+            f'<tr data-assessment-group="{group}">'
+            f'<td><a href="#assessment-route-{index}">{escape(str(label))}</a></td>'
+            f"<td>{_number(score.get('forward_score'))}</td>"
+            f"<td>{_number(score.get('search_score'))}</td><td>{_number(likelihood)}</td>"
+            + (f"<td>{_number(score.get('combined_score'))}</td>" if combined else "")
+            + f"<td>{escape(str(score.get('zero_score_steps', '—')))} / {len(route)}</td>"
+            + f"<td>{vector}</td></tr>"
+        )
+    buttons = "".join(
+        f'<button data-assessment-filter="{group}" '
+        f'aria-pressed="{str(group == "all").lower()}">{label} · {count}</button>'
+        for group, label, count in (
+            ("all", "All routes", len(routes)),
+            ("positive", "No zero-score steps", groups.count("positive")),
+            ("failed", "At least one zero-score step", groups.count("failed")),
+        )
+    )
+    return (
+        '<section id="assessment-overview" class="assessment-overview card">'
+        "<h2>Forward route assessment</h2>"
+        '<p class="assessment-note">The route score is the geometric mean of all step '
+        "scores, counting each step once across every branch. A zero step makes the "
+        "route score zero. These are ranking heuristics, not probabilities of "
+        "experimental success or measures of stereochemical correctness. "
+        "Search scores and policy log likelihoods retain their original scale.</p>"
+        + (
+            '<p class="assessment-note">Combined score = search score &times; forward route '
+            "score; explicitly enabled for this report.</p>"
+            if combined
+            else ""
+        )
+        + '<p><span class="forward-match">Positive score</span> '
+        '<span class="forward-zero">No top-10 match</span></p>'
+        f'<div class="assessment-filters">{buttons}</div>'
+        '<div class="assessment-scroll"><table class="assessment-table">'
+        "<thead><tr><th>Route ID</th><th>Forward score</th><th>Search score</th>"
+        "<th>Policy log likelihood</th>"
+        + ("<th>Combined score</th>" if combined else "")
+        + "<th>Zero / total steps</th>"
+        "<th>Step scores · 1 → n</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table></div></section>"
+    )
+
+
 def routes_report_html(
     routes: Iterable[Route],
     html_path: str | None,
@@ -335,6 +455,7 @@ def routes_report_html(
     stats: dict | None = None,
     prices: bool = True,
     building_blocks: Any = None,
+    route_labels: Sequence[str] | None = None,
 ) -> str | None:
     """Write an HTML page with the given routes drawn.
 
@@ -367,11 +488,26 @@ def routes_report_html(
     :param building_blocks: The catalogue the search ran against, read only for the
         vendor names its release metadata carries. Without it a pill names its
         vendors by the short codes the records hold.
+    :param route_labels: Optional display IDs in route order, for exported collections.
+        Routes carrying assessment annotations also get score tables and filters.
     :return: The page when ``html_path`` is None, otherwise None.
     """
     vendors = vendor_names(building_blocks) if building_blocks is not None else {}
     with _temporary_render_config(mapping=bool(aam)):
         routes = list(routes)
+        if route_labels is None:
+            route_labels = [
+                str(
+                    route.provenance.tree_node_id
+                    if route.provenance is not None
+                    and route.provenance.tree_node_id is not None
+                    else index
+                )
+                for index, route in enumerate(routes, 1)
+            ]
+        elif len(route_labels) != len(routes):
+            raise ValueError("Route labels must match the number of routes")
+        assessed = any(route.assessment is not None for route in routes)
         # A legacy SMILES stock carries no vendors at all, so a page drawn against
         # one would wear a Price per gram column that can never hold anything.
         prices = prices and any(
@@ -430,12 +566,17 @@ def routes_report_html(
                 if prices
                 else ""
             )
-            node_id = None if provenance is None else provenance.tree_node_id
             score = None if provenance is None else provenance.search_score
+            attributes = (
+                f' id="assessment-route-{index}" '
+                f'data-assessment-group="{_assessment_group(route)}"'
+                if assessed
+                else ""
+            )
             body.append(
-                '<section class="route card"><div class="rhead">'
+                f'<section class="route card"{attributes}><div class="rhead">'
                 f'<div class="kv"><div class="eyebrow">Route ID</div>'
-                f'<div class="v id">{index if node_id is None else node_id}</div></div>'
+                f'<div class="v id">{escape(str(route_labels[index - 1]))}</div></div>'
                 f'<div class="kv"><div class="eyebrow">Steps</div>'
                 f'<div class="v">{len(route)}</div></div>'
                 f'<div class="kv"><div class="eyebrow">Search score</div>'
@@ -444,7 +585,8 @@ def routes_report_html(
                 + '<div class="acts"><button class="act" data-act="zoom">Zoom</button>'
                 '<button class="act" data-act="svg">SVG</button>'
                 '<button class="act" data-act="png">PNG</button></div></div>'
-                f'<div class="draw">'
+                + _assessment_steps(route, index)
+                + '<div class="draw">'
                 f"{doc.route(route.svg(standalone=False, layouts=layouts, prices=pills))}"
                 f"</div>{rows}</section>"
             )
@@ -453,7 +595,8 @@ def routes_report_html(
             '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
             '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
             "<title>Retrosynthetic Routes Report</title>\n"
-            f"<style>{ROUTE_CSS}{REPORT_CSS}</style>\n</head>\n<body>\n"
+            f"<style>{ROUTE_CSS}{REPORT_CSS}{ASSESSMENT_CSS if assessed else ''}</style>\n"
+            "</head>\n<body>\n"
             + hidden_defs(ARROW_DEFS, doc.defs())
             + '<div class="wrap">'
             + _report_header(
@@ -461,9 +604,11 @@ def routes_report_html(
                 drawable_copy(routes[0].target, layouts) if routes else None,
                 stats,
             )
+            + (_assessment_overview(routes, route_labels) if assessed else "")
             + "".join(body)
             + "</div>\n<script>"
             + REPORT_JS
+            + (ASSESSMENT_JS if assessed else "")
             + "</script>\n</body>\n</html>\n"
         )
 
