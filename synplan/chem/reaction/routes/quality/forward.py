@@ -11,7 +11,7 @@ from time import perf_counter
 from chython import inchi_key
 from tqdm.auto import tqdm
 
-from synplan.chem.utils import canonical_reactants
+from synplan.chem.rdkit_compat import canonical_reactants
 from synplan.utils.json import read_json, write_json_atomic
 
 # Bump whenever preprocessing, beam search, or matching semantics change.
@@ -20,21 +20,6 @@ ASSESSMENT_VERSION = 2
 SCORING_VERSION = 2
 BEAM_WIDTH = 20
 NUM_RESULTS = 10
-
-
-def _sha256(path):
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _model_identity(model):
-    return {
-        **model.prediction_identity(beam_width=BEAM_WIDTH, num_results=NUM_RESULTS),
-        "assessment_version": ASSESSMENT_VERSION,
-    }
 
 
 class ForwardReactionAssessor:
@@ -57,7 +42,10 @@ class ForwardReactionAssessor:
         self.model = model
         self.batch_size = batch_size
         self.cache_path = Path(cache_path)
-        self.identity = _model_identity(model)
+        self.identity = {
+            **model.prediction_identity(beam_width=BEAM_WIDTH, num_results=NUM_RESULTS),
+            "assessment_version": ASSESSMENT_VERSION,
+        }
         self.fingerprint = hashlib.sha256(
             json.dumps(self.identity, sort_keys=True).encode()
         ).hexdigest()

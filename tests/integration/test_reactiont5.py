@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from synplan.chem.utils import canonical_reactants
+from synplan.chem.rdkit_compat import canonical_reactants
 from synplan.ml.inference.forward import augment
 from synplan.ml.inference.reactiont5 import INPUT_TEMPLATE, ReactionT5
 

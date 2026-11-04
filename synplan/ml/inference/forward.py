@@ -29,7 +29,7 @@ from importlib.metadata import version
 
 from rdkit import Chem
 
-from synplan.chem.utils import canonical_reactants as canonical_reactants
+from synplan.chem.rdkit_compat import canonical_reactants as canonical_reactants
 from synplan.chem.utils import forward_candidate as candidate
 
 PIPELINE_VERSION = 2
