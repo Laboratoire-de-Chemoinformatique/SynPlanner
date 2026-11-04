@@ -78,7 +78,7 @@ def finalize_forward_routes(tree, assessor, mode, *, silent=True, combine_search
             tree.nodes[step.origin.tree_node_id].forward_prediction = deepcopy(
                 step.forward_prediction
             )
-    tree._finalized_routes = {
+    tree.assessed_routes = {
         route.provenance.tree_node_id: replace(
             route, assessment=deepcopy(route.assessment)
         )

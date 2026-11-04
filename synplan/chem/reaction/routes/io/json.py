@@ -435,14 +435,14 @@ def _make_json_v1(
         # Build route tree and store
         tree_node = route_tree(target, source_of, purchasable, step_fields)
         if tree_node is not None and tree is not None:
-            finalized = getattr(tree, "_finalized_routes", {}).get(route_id)
-            if finalized is not None and finalized.assessment is not None:
+            assessed_route = getattr(tree, "assessed_routes", {}).get(route_id)
+            if assessed_route is not None and assessed_route.assessment is not None:
                 from copy import deepcopy
                 from dataclasses import asdict
 
                 from synplan.chem.reaction.routes.route import Route
 
-                tree_node["assessment"] = deepcopy(finalized.assessment)
+                tree_node["assessment"] = deepcopy(assessed_route.assessment)
                 tree_node["provenance"] = asdict(
                     Route.from_tree(tree, route_id).provenance
                 )

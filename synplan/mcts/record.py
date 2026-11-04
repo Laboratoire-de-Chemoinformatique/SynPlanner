@@ -50,6 +50,8 @@ class SearchRecord:
     :param stats: ``to_stats_dict()`` plus ``branching_profile`` and
         ``routes_found_at`` -- the counters the node graph cannot recompute.
         :meth:`winning_rule_ranks` is recomputed, not stored.
+    :param assessed_routes: Assessed Routes keyed by terminal node id; aggregate
+        scores remain on each Route.
     """
 
     target: MoleculeContainer
@@ -61,7 +63,7 @@ class SearchRecord:
     config: TreeConfig = field(default_factory=TreeConfig)
     original_target: MoleculeContainer | None = None
     forward_metadata: dict = field(default_factory=dict)
-    _finalized_routes: dict[int, Route] = field(default_factory=dict, repr=False)
+    assessed_routes: dict[int, Route] = field(default_factory=dict, repr=False)
 
     # The Tree readouts that touch nodes and parents only, bound from the real
     # class: a record has to answer them exactly as the search did.
@@ -195,10 +197,10 @@ def write_search_record(
     }
     if tree.config.stereo_mode == "off":
         record.update(stereo_mode="off", original_target=str(tree.original_target))
-    if tree._finalized_routes:
+    if tree.assessed_routes:
         record["route_assessments"] = {
             str(route_id): route.assessment
-            for route_id, route in tree._finalized_routes.items()
+            for route_id, route in tree.assessed_routes.items()
         }
     with _open(file_path, "wt") as file:
         json.dump(record, file)
@@ -343,7 +345,7 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             for route_id, value in raw.get("route_assessments", {}).items()
         }
     )
-    record._finalized_routes = {
+    record.assessed_routes = {
         route_id: replace(Route.from_tree(record, route_id), assessment=assessment)
         for route_id, assessment in assessments.items()
     }

@@ -535,20 +535,29 @@ def __getattr__(name: str):
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-def _molecule(value):
+def parse_forward_smiles(smiles_text: str) -> MoleculeContainer:
+    """Parse reactant or predicted-product SMILES, preserving component stereo."""
     # chython 1.108 can invert stereo at a later component's root. Parsing
     # components separately and using its union preserves their local ordering.
-    if "@" in value and "." in value:
-        return unite_molecules((smiles(part) for part in value.split(".")), remap=True)
-    return smiles(value)
+    if "@" in smiles_text and "." in smiles_text:
+        return unite_molecules(
+            (smiles(part) for part in smiles_text.split(".")), remap=True
+        )
+    return smiles(smiles_text)
 
 
-def forward_candidate(value):
-    """Canonical product and stereo-free identity, without fixing tautomers."""
-    if ">" in value:
+def forward_candidate(product_smiles: str) -> tuple[str | None, str | None]:
+    """Canonical product and stereo-free identity, without fixing tautomers.
+
+    :param product_smiles: One model-predicted product SMILES, possibly containing
+        dot-separated components.
+    :return: Canonical SMILES retaining stereo and its stereo-free InChIKey,
+        or ``(None, None)`` for an invalid candidate.
+    """
+    if ">" in product_smiles:
         return None, None
     try:
-        molecule = _molecule(value)
+        molecule = parse_forward_smiles(product_smiles)
         if not isinstance(molecule, MoleculeContainer) or not molecule:
             return None, None
         try:

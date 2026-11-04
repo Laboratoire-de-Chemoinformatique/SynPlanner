@@ -335,7 +335,8 @@ class Tree:
         self.forward_metadata = {}
         self.forward_stats = {}
         self._forward_inputs = set()
-        self._finalized_routes = {}
+        # Retain assessed Routes by terminal node id; aggregates stay on each Route.
+        self.assessed_routes = {}
         self.stop_reason = None
 
         priority_rules_total = sum(len(rules) for rules in self.priority_rules.values())
