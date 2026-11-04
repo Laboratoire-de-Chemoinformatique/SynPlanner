@@ -341,14 +341,14 @@ def _number(value):
 
 def _step_display(annotation):
     if annotation["score"] == 0:
-        return "zero", "No top-10 match", "#bd3f3f"
+        return "zero", "No top-10 match"
     # One-reactant steps share the positive-score style without inventing a model rank.
     rank = "—" if annotation["rank"] is None else str(annotation["rank"])
-    return "match", rank, "#267154"
+    return "match", rank
 
 
 def _badge(annotation):
-    style, rank, _ = _step_display(annotation)
+    style, rank = _step_display(annotation)
     return (
         f'<span class="forward-{style}" title="{rank}">{annotation["score"]:.3f}</span>'
     )
@@ -360,9 +360,9 @@ def _assessment_steps(route, index):
     rows = []
     for number, step in enumerate(route, 1):
         annotation = step.forward_prediction
-        _, rank, colour = _step_display(annotation)
+        _, rank = _step_display(annotation)
         rows.append(
-            f'<tr id="assessment-route-{index}-step-{number}" data-step-color="{colour}">'
+            f'<tr id="assessment-route-{index}-step-{number}">'
             f"<td>{number}</td><td>{rank}</td><td>{_badge(annotation)}</td>"
             f"<td>{'Yes' if annotation['alert'] else 'No'}</td>"
             f'<td class="mono">{escape(annotation["product_inchikey"])}</td></tr>'
@@ -573,11 +573,6 @@ def routes_report_html(
                 if assessed
                 else ""
             )
-            if route.assessment is not None:
-                rows = (
-                    '<details class="assessment-strings"><summary>Reaction SMILES'
-                    f"</summary>{rows}</details>"
-                )
             body.append(
                 f'<section class="route card"{attributes}><div class="rhead">'
                 f'<div class="kv"><div class="eyebrow">Route ID</div>'

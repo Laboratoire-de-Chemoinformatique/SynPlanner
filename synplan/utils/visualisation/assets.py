@@ -114,7 +114,6 @@ padding:3px 8px;font-size:12px;font-weight:600}
 .assessment-filters button{padding:8px 12px;border:1px solid #cdd6df;
 border-radius:4px;background:white;cursor:pointer}
 .assessment-filters button[aria-pressed=true]{background:#163e5b;color:white}
-.assessment-strings summary{padding:12px 18px;cursor:pointer}
 """
 
 #: Export and zoom for :func:`routes_report_html`. The page pools every molecule in
@@ -353,13 +352,6 @@ document.querySelectorAll('a[href^="#assessment-route-"]').forEach(link => {
   link.addEventListener('click', () => {
     const card = document.getElementById(link.hash.slice(1)).closest('.route');
     if (card.hidden) filterAssessment('all');
-  });
-});
-document.querySelectorAll('.route[data-assessment-group]').forEach(card => {
-  const rows = card.querySelectorAll('[data-step-color]');
-  card.querySelectorAll('.draw .sp-num').forEach(label => {
-    const row = rows[Number(label.textContent) - 1];
-    if (row) label.previousElementSibling.setAttribute('fill', row.dataset.stepColor);
   });
 });
 """

@@ -264,9 +264,12 @@ def test_report_filters_step_tables_and_escaping():
     assert "No zero-score steps · 1" in page
     assert "At least one zero-score step · 1" in page
     assert page.count('class="route card"') == 2
-    assert page.count("data-step-color=") == 3
-    assert page.count('data-step-color="#267154"') == 2
-    assert 'data-step-color="#bd3f3f"' in page
+    assert page.count('<tr id="assessment-route-') == 3
+    assert '<span class="forward-match" title="1">1.000</span>' in page
+    assert '<span class="forward-zero" title="No top-10 match">0.000</span>' in page
+    assert "data-step-color" not in page
+    assert "previousElementSibling" not in page
+    assert "<details" not in page
     assert "forward-assumed" not in page
     assert "Assumed" not in page
     assert "<th>Combined score</th>" not in page
