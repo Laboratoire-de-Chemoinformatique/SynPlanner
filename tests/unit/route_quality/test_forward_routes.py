@@ -12,7 +12,7 @@ from tqdm import tqdm
 from scripts import score_routes
 from synplan.chem.reaction.routes.quality import ForwardRouteScorer
 from synplan.chem.reaction.routes.route import Route, RouteProvenance, Step
-from synplan.utils.json import read_json, write_json_atomic
+from synplan.utils.files import read_json, write_json_atomic
 from synplan.utils.visualisation import routes_report_html
 
 

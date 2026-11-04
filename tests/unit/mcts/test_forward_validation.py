@@ -20,7 +20,7 @@ from synplan.mcts.forward import ForwardValidationError, load_forward_validation
 from synplan.mcts.record import read_search_record, write_search_record
 from synplan.mcts.search import build_target_routes
 from synplan.ml.inference.forward import aggregate, prediction_identity
-from synplan.utils.json import read_json, write_json_atomic
+from synplan.utils.files import read_json, write_json_atomic
 from synplan.utils.visualisation import extract_routes, routes_report_html
 
 
@@ -362,7 +362,7 @@ def test_finite_limit_starts_no_second_prediction(model, tmp_path, monkeypatch):
 def test_planning_runner_modes_and_shared_sessions(model, tmp_path, monkeypatch, mode):
     import synplan.mcts.search as search
     import synplan.ml.inference as chemformer
-    from synplan.utils.json import read_json
+    from synplan.utils.files import read_json
 
     template = two_reactant_tree()
     monkeypatch.setattr(

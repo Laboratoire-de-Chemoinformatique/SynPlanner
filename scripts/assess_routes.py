@@ -8,7 +8,7 @@ from pathlib import Path
 from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.routes.quality import ForwardReactionAssessor
 from synplan.ml.inference import ForwardPredictor
-from synplan.utils.json import read_json, write_json_atomic
+from synplan.utils.files import read_json, write_json_atomic
 
 
 def assess_collection(collection, assessor, *, silent=True):

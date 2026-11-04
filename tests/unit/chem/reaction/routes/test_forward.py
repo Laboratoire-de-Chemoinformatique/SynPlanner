@@ -14,7 +14,7 @@ from synplan.chem.reaction.routes.quality.forward import ForwardReactionAssessor
 from synplan.chem.reaction.routes.route import Route, Step
 from synplan.ml.inference import forward as pipeline
 from synplan.ml.inference.forward import aggregate, candidate, canonical_reactants
-from synplan.utils import json as json_io
+from synplan.utils import files as json_io
 
 RUNTIME_FILES = ("encoder.onnx", "decoder.onnx", "vocabulary.json", "model.json")
 

@@ -12,7 +12,7 @@ from chython import inchi_key
 from tqdm.auto import tqdm
 
 from synplan.chem.rdkit_compat import canonical_reactants
-from synplan.utils.json import read_json, write_json_atomic
+from synplan.utils.files import read_json, write_json_atomic
 
 # Bump whenever preprocessing, beam search, or matching semantics change.
 ASSESSMENT_VERSION = 2
