@@ -905,7 +905,6 @@ def planning_cli(
     run_search(
         targets_path=targets,
         search_config=search_config,
-        forward_val_config=forward_val_config,
         policy_config=policy_config,
         evaluation_config=evaluation_config,
         reaction_rules_path=reaction_rules,
@@ -913,6 +912,7 @@ def planning_cli(
         results_root=results_dir,
         reconcile_atom_mapping=reconcile_mapping,
         export_routes=export_routes,
+        forward_val_config=forward_val_config,
     )
 
 

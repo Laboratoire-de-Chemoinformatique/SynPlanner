@@ -190,15 +190,6 @@ class Tree:
 
         # tree config parameters
         self.config = config
-        if forward_assessor is not None and config.direction != "retro":
-            raise ValueError(
-                "Forward validation currently supports retrosynthetic search only"
-            )
-        self.forward_assessor = forward_assessor
-        self.forward_metadata = {}
-        self.forward_stats = {}
-        self._forward_inputs = set()
-        self.stop_reason = None
         self._stereo_assessments = {}
         for record in config.stereo_assessments:
             self._stereo_assessments.setdefault(record.get("context"), []).append(
@@ -334,6 +325,17 @@ class Tree:
                 f"Unknown algorithm '{config.algorithm}'. Allowed: {list(ALGORITHMS.keys())}"
             )
         self.algorithm = ALGORITHMS[algo_key](self)
+
+        # forward validation
+        if forward_assessor is not None and config.direction != "retro":
+            raise ValueError(
+                "Forward validation currently supports retrosynthetic search only"
+            )
+        self.forward_assessor = forward_assessor
+        self.forward_metadata = {}
+        self.forward_stats = {}
+        self._forward_inputs = set()
+        self.stop_reason = None
 
         priority_rules_total = sum(len(rules) for rules in self.priority_rules.values())
         logger.debug(

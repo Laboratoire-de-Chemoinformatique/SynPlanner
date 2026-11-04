@@ -26,7 +26,8 @@ class TreeConfig(BaseConfigModel):
     :param max_iterations: The number of iterations to run the algorithm
         for.
     :param max_tree_size: The maximum number of nodes in the tree.
-    :param max_time: The wall-clock limit in seconds; None disables this limit.
+    :param max_time: The time limit (in seconds) for the algorithm to
+        run.
     :param max_depth: The maximum depth of the tree.
     :param max_reaction_outcomes: Maximum mappings examined per rule application.
         Defaults to 5; larger values can retain alternate reaction sites.
