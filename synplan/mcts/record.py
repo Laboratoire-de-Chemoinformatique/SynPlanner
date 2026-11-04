@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import gzip
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from synplan.chem.precursor import Precursor
+from synplan.chem.reaction.routes.route import Route
 from synplan.chem.stereo import parse_smiles_preserving_stereo as read_smiles
 from synplan.chem.utils import in_atom_order, molecule_key
 from synplan.mcts.config import TreeConfig
@@ -33,7 +34,7 @@ __all__ = [
 ]
 
 #: Versioned identifier for the search-record file. Bump when the shape changes.
-SEARCH_RECORD_SCHEMA = "synplan-tree/4"
+SEARCH_RECORD_SCHEMA = "synplan-tree/5"
 
 
 @dataclass
@@ -60,6 +61,7 @@ class SearchRecord:
     config: TreeConfig = field(default_factory=TreeConfig)
     original_target: MoleculeContainer | None = None
     forward_metadata: dict = field(default_factory=dict)
+    _finalized_routes: dict[int, Route] = field(default_factory=dict, repr=False)
 
     # The Tree readouts that touch nodes and parents only, bound from the real
     # class: a record has to answer them exactly as the search did.
@@ -121,7 +123,8 @@ def write_search_record(
     The routes are not written: a route is a path through the node graph, so
     :meth:`SearchRecord.routes` rebuilds them from the nodes rather than the
     file carrying a second copy of them. Node values are written unrounded, so
-    the record scores a route with the number the search scored it with.
+    the record scores a route with the number the search scored it with. Finalized
+    route assessments are stored separately, keyed by the route's terminal id.
 
     Molecules are written mapped. Atom numbers are what say which reactant atom
     became which product atom, and a route that lost them would write reactions
@@ -165,7 +168,6 @@ def write_search_record(
             "stereo_history": node.stereo_history,
             "stereo_summary": getattr(node, "stereo_summary", None),
             "forward_prediction": node.forward_prediction,
-            "route_assessment": node.route_assessment,
             "selected_stock": [
                 p.molecule.meta.get("selected_stock") for p in node.new_precursors
             ],
@@ -193,6 +195,11 @@ def write_search_record(
     }
     if tree.config.stereo_mode == "off":
         record.update(stereo_mode="off", original_target=str(tree.original_target))
+    if tree._finalized_routes:
+        record["route_assessments"] = {
+            str(route_id): route.assessment
+            for route_id, route in tree._finalized_routes.items()
+        }
     with _open(file_path, "wt") as file:
         json.dump(record, file)
     return Path(file_path)
@@ -225,6 +232,7 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
         "synplan-tree/1",
         "synplan-tree/2",
         "synplan-tree/3",
+        "synplan-tree/4",
         SEARCH_RECORD_SCHEMA,
     }:
         raise ValueError(
@@ -295,13 +303,10 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             stereo_evidence=entry.get("stereo_evidence", ()),
             stereo_history=entry.get("stereo_history", ""),
             forward_prediction=entry.get("forward_prediction"),
-            route_assessment=entry.get("route_assessment"),
         )
         if entry.get("stereo_summary"):
             nodes[node_id].stereo_summary = entry["stereo_summary"]
         if entry.get("reconstructed"):
-            from synplan.chem.reaction.routes.route import Route
-
             nodes[node_id].reconstructed_route = Route.from_json(entry["reconstructed"])
         parents[node_id] = parent_id
         unexpanded[node_id] = tuple(entry["expand"])
@@ -315,7 +320,7 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
         int(depth): profile for depth, profile in stats["branching_profile"].items()
     }
     stats["routes_found_at"] = [tuple(found) for found in stats["routes_found_at"]]
-    return SearchRecord(
+    record = SearchRecord(
         target=nodes[1].curr_precursor.molecule,
         nodes=nodes,
         parents=parents,
@@ -326,3 +331,20 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
         config=TreeConfig(stereo_mode=raw.get("stereo_mode", "proposal")),
         original_target=read_smiles(raw.get("original_target", raw["target"])),
     )
+    # Older records stored aggregates on terminal nodes; migrate them to Routes.
+    assessments = {
+        entry["id"]: entry["route_assessment"]
+        for entry in raw["nodes"]
+        if entry.get("route_assessment") is not None
+    }
+    assessments.update(
+        {
+            int(route_id): value
+            for route_id, value in raw.get("route_assessments", {}).items()
+        }
+    )
+    record._finalized_routes = {
+        route_id: replace(Route.from_tree(record, route_id), assessment=assessment)
+        for route_id, assessment in assessments.items()
+    }
+    return record

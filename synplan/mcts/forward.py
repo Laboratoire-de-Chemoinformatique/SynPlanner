@@ -1,6 +1,7 @@
 """Assembly of optional forward validation for planning and explicit finalization."""
 
 from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 from time import perf_counter
 
@@ -45,7 +46,7 @@ def load_forward_validation(config=None, results_root="."):
 
 
 def finalize_forward_routes(tree, assessor, mode, *, silent=True, combine_search=False):
-    """Explicitly assess completed routes and persist data on their tree nodes.
+    """Retain finalized Routes and incoming-reaction annotations on search nodes.
 
     Search itself and read-only route reconstruction never call this function.
     Terminal stereo proposals are annotated too, without changing their status.
@@ -77,9 +78,12 @@ def finalize_forward_routes(tree, assessor, mode, *, silent=True, combine_search
             tree.nodes[step.origin.tree_node_id].forward_prediction = deepcopy(
                 step.forward_prediction
             )
-        tree.nodes[route.provenance.tree_node_id].route_assessment = deepcopy(
-            route.assessment
+    tree._finalized_routes = {
+        route.provenance.tree_node_id: replace(
+            route, assessment=deepcopy(route.assessment)
         )
+        for route in routes
+    }
     tree.forward_metadata.update(
         {
             "mode": mode,

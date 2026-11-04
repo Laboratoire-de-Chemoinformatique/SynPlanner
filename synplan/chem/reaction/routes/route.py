@@ -212,6 +212,7 @@ class Route:
 
         if node_id not in tree.nodes:
             raise KeyError(node_id)
+        finalized = getattr(tree, "_finalized_routes", {}).get(node_id)
         metadata = tree.step_metadata(node_id)
         try:
             likelihood = tree.route_log_likelihood(node_id)
@@ -242,7 +243,9 @@ class Route:
                 policy_log_likelihood=likelihood,
             ),
             stereo=deepcopy(getattr(tree.nodes[node_id], "stereo_summary", None)),
-            assessment=deepcopy(getattr(tree.nodes[node_id], "route_assessment", None)),
+            assessment=deepcopy(finalized.assessment)
+            if finalized is not None
+            else None,
         )
         if route.stereo is None:
             from synplan.chem.stereo_evidence import route_stereo_summary

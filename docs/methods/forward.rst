@@ -450,6 +450,12 @@ scoring remains opt-in through the route-scoring interface. Annotations and scor
 survive JSON, HTML, mapped export, and search-record round trips. Search records
 contain data only: opening one or calling ``routes()`` never loads a model.
 
+Reaction annotations belong to incoming search edges; aggregate scores belong
+only to ``Route.assessment``. Finalization retains assessed Route objects for
+later exports. Search records store their aggregates in a separate
+``route_assessments`` section, without duplicating route chemistry. Older
+node-level aggregates are restored onto Route objects when reading legacy records.
+
 The planning CLI handles loading and finalization. Low-level Python callers can
 share an assessor explicitly:
 

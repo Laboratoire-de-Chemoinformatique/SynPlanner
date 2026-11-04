@@ -30,7 +30,6 @@ class Node:
         stereo_evidence: tuple = (),
         stereo_history: str = "",
         forward_prediction: dict | None = None,
-        route_assessment: dict | None = None,
     ) -> None:
         """Initialize the Node object.
 
@@ -84,7 +83,6 @@ class Node:
         self.stereo_evidence = tuple(stereo_evidence)
         self.stereo_history = stereo_history
         self.forward_prediction = forward_prediction
-        self.route_assessment = route_assessment
 
         if len(self.precursors_to_expand) == 0:
             self.curr_precursor = tuple()

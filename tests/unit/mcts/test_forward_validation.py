@@ -4,16 +4,24 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
-from chython import smiles
-from test_tree_stats import FakePriorityReactor, FakeReactor, build_tree, make_mol
+from chython import inchi_key, smiles
+from test_tree_stats import (
+    FakePolicy,
+    FakePriorityReactor,
+    FakeReactor,
+    build_tree,
+    make_mol,
+)
 
 from synplan.chem.reaction.routes.quality.forward import ForwardReactionAssessor
+from synplan.chem.reaction.routes.route import Route
 from synplan.mcts.config import ForwardValidationConfig
 from synplan.mcts.forward import ForwardValidationError, load_forward_validation
 from synplan.mcts.record import read_search_record, write_search_record
 from synplan.mcts.search import build_target_routes
 from synplan.ml.inference.forward import aggregate, prediction_identity
-from synplan.utils.visualisation import extract_routes
+from synplan.utils.json import read_json, write_json_atomic
+from synplan.utils.visualisation import extract_routes, routes_report_html
 
 
 @pytest.fixture
@@ -208,6 +216,94 @@ def test_post_processing_retains_failures_and_order(model, tmp_path):
     assert result[0].provenance.search_score == source[0]["provenance"]["search_score"]
     assert not tree.forward_assessor
     assert [r.to_json() for r in tree.routes()] == [r.to_json() for r in result]
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_record_stores_aggregates_on_routes_only(model, tmp_path, legacy):
+    tree = two_reactant_tree().run()
+    assessed = tree.finalize_forward(
+        service(model, tmp_path), "post-processing", combine_search=True
+    )
+    expected = [route.to_json() for route in assessed]
+    path = write_search_record(tree, tmp_path / "record.json")
+    raw = read_json(path)
+    assert raw["schema"] == "synplan-tree/5"
+    assert all("route_assessment" not in entry for entry in raw["nodes"])
+    assert raw["route_assessments"] == {
+        str(route.provenance.tree_node_id): route.assessment for route in assessed
+    }
+    if legacy:
+        raw["schema"] = "synplan-tree/4"
+        assessments = raw.pop("route_assessments")
+        for entry in raw["nodes"]:
+            entry["route_assessment"] = assessments.get(str(entry["id"]))
+        write_json_atomic(path, raw)
+
+    model.predict = lambda *a, **k: pytest.fail("Reading scores invoked inference")
+    record = read_search_record(path)
+    assert [route.to_json() for route in record.routes()] == expected
+    html = routes_report_html(record.routes(), None)
+    assert "Forward route score: 0.5" in html
+    assert "<th>Combined score</th>" in html
+    assert all(not hasattr(node, "route_assessment") for node in tree.nodes.values())
+    assert all(not hasattr(node, "route_assessment") for node in record.nodes.values())
+    rewritten = write_search_record(record, tmp_path / "rewritten.json.gz")
+    assert read_json(rewritten)["schema"] == "synplan-tree/5"
+    assert [r.to_json() for r in read_search_record(rewritten).routes()] == expected
+    # Returned objects must not mutate the retained route assessment.
+    assessed[0].assessment["forward_score"] = 99
+    record.routes()[0].assessment["forward_score"] = 99
+    assert [r.to_json() for r in tree.routes()] == expected
+    assert [r.to_json() for r in record.routes()] == expected
+
+
+def test_shared_prefix_keeps_route_aggregates_independent(model, tmp_path):
+    class BranchingPolicy(FakePolicy):
+        def predict_reaction_rules(self, precursor, reaction_rules):
+            yield from (
+                self.rules[:1] if len(precursor.molecule) == 7 else self.rules[1:]
+            )
+
+    tree = build_tree(
+        rules=[
+            (0.8, FakeReactor(lambda: [make_mol(8)]), 0),
+            (0.6, FakeReactor(lambda: [make_mol(3), make_mol(5)]), 1),
+            (0.4, FakeReactor(lambda: [make_mol(2), make_mol(6)]), 2),
+        ],
+        policy_cls=BranchingPolicy,
+        expand_deeper=True,
+    ).run()
+    # Include both terminal siblings in the exported collection.
+    tree.winning_nodes = [i for i, node in tree.nodes.items() if node.is_solved()]
+    left, right = tree.winning_nodes
+    shared = tree.parents[left]
+    assert shared == tree.parents[right] and shared != 1
+    for node_id, rank, score in (
+        (shared, None, 1.0),
+        (left, 4, 0.25),
+        (right, None, 0.0),
+    ):
+        product = tree.nodes[tree.parents[node_id]].curr_precursor.molecule
+        tree.nodes[node_id].forward_prediction = {
+            "product_inchikey": inchi_key(product, ignore_stereo=True),
+            "rank": rank,
+            "score": score,
+            "alert": score == 0,
+        }
+    model.predict = lambda *a, **k: pytest.fail("Aggregation invoked inference")
+    finalized = tree.finalize_forward(service(model, tmp_path), "on-the-fly")
+    expected = {left: 0.5, right: 0.0}
+    assert {
+        r.provenance.tree_node_id: r.assessment["forward_score"] for r in finalized
+    } == expected
+    record = read_search_record(write_search_record(tree, tmp_path / "branches.json"))
+    for source in (tree, record):
+        assert Route.from_tree(source, shared).assessment is None
+        for node_id, score in expected.items():
+            assert Route.from_tree(source, node_id).assessment["forward_score"] == score
+        assert all(
+            not hasattr(node, "route_assessment") for node in source.nodes.values()
+        )
 
 
 def test_priority_outcomes_are_filtered(model, tmp_path):

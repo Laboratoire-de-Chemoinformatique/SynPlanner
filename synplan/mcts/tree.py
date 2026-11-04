@@ -335,6 +335,7 @@ class Tree:
         self.forward_metadata = {}
         self.forward_stats = {}
         self._forward_inputs = set()
+        self._finalized_routes = {}
         self.stop_reason = None
 
         priority_rules_total = sum(len(rules) for rules in self.priority_rules.values())
