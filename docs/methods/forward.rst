@@ -9,6 +9,10 @@ their original order. A separate ``ForwardRouteScorer`` aggregates these step
 annotations without inference. Neither assessment changes the original search
 score, policy likelihood, protection/competing-sites scores, or route order.
 
+For a worked Chemformer example, see
+:doc:`../user_guide/20_Forward_Prediction`: plan Lenvatinib routes, assess the saved
+collection, aggregate scores, export JSON and HTML, and reopen the prediction cache.
+
 Models and shared prediction policy
 -----------------------------------
 

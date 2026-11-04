@@ -286,7 +286,7 @@ with a `.json` output. The TSV needs one `SMILES` column and one or more `*_ppg`
 vendor-price columns. Bad rows go to `<output>.errors.tsv`; valid rows still
 publish atomically. Load the result with `load_building_block_catalogue`
 (`synplan.chem.building_blocks`).
-Tutorial: `20_InChIKey_Building_Block_Catalogue`
+Tutorial: `19_InChIKey_Building_Block_Catalogue`
 Docs: `methods/building_blocks`, `user_guide/cli_interface`
 
 **Plan and price routes with a vendor catalogue**
@@ -297,7 +297,7 @@ to `RolloutEvaluationConfig` and `Tree` → `tree.run()` →
 and uses the first 14 Chython InChIKey characters; JSON catalogues are
 retrosynthesis-only. Costs choose the cheapest positive offer in the complete
 prefix bucket and assume one equivalent per leaf and 100% yield.
-Tutorial: `20_InChIKey_Building_Block_Catalogue`
+Tutorial: `19_InChIKey_Building_Block_Catalogue`
 Docs: `methods/building_blocks`
 
 **Show rules, synthons or any chython objects as a table**

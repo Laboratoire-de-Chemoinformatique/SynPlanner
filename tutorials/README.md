@@ -1,9 +1,10 @@
 # SynPlanner tutorials
 
 Every tutorial here runs in Google Colab — click a badge and it installs
-SynPlanner and downloads the public data it needs. Tutorial 20 additionally
+SynPlanner and downloads the public data it needs. Tutorial 19 additionally
 requires the prepared vendor-aware InChIKey JSON catalogue to be uploaded or
-mounted.
+mounted. Tutorial 20 requires a prepared Chemformer ONNX bundle to be uploaded
+or mounted; its GPS planning resources are downloaded automatically.
 
 Locally they run the same way once SynPlanner is installed; the setup cell at the
 top of each notebook does nothing outside Colab.
@@ -41,13 +42,15 @@ top of each notebook does nothing outside Colab.
 | [Building block search](16_Building_block_search.ipynb) | which catalogue molecules a route set actually reaches for | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/16_Building_block_search.ipynb) |
 | [Synthon-based library design](17_Synthon_Based_Design.ipynb) | fragment molecules into synthons, enumerate libraries and analogues | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/17_Synthon_Based_Design.ipynb) |
 | [Retrosynthesis with synthon priority rules](18_Retrosynthesis_With_Synthon_Priority_Rules.ipynb) | the shipped synthon disconnections as a curated rule set | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/18_Retrosynthesis_With_Synthon_Priority_Rules.ipynb) |
-| [InChIKey building-block catalogue](20_InChIKey_Building_Block_Catalogue.ipynb) | run connectivity-only MCTS for Boceprevir and calculate vendor costs from a prepared JSON catalogue | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/20_InChIKey_Building_Block_Catalogue.ipynb) |
+| [InChIKey building-block catalogue](19_InChIKey_Building_Block_Catalogue.ipynb) | run connectivity-only MCTS for Boceprevir and calculate vendor costs from a prepared JSON catalogue | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/19_InChIKey_Building_Block_Catalogue.ipynb) |
+| [Forward prediction](20_Forward_Prediction.ipynb) | assess saved Lenvatinib routes with Chemformer, aggregate scores, reuse predictions, and export JSON and HTML | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/20_Forward_Prediction.ipynb) |
 
 ## Data used by the tutorials
 
 Most tutorials call `download_preset("synplanner-gps")`, which fetches models,
 rules and a building-block catalogue from HuggingFace into `synplan_data/`. Files
 that are small enough to keep in the repository live in `data/`, and a notebook
-downloads them when it is running somewhere the repository is not. Tutorial 20
+downloads them when it is running somewhere the repository is not. Tutorial 19
 uses the preset models and rules but requires a separately prepared InChIKey JSON
-catalogue.
+catalogue. Tutorial 20 downloads the GPS ONNX ranking policy, reaction rules,
+and Mcule/MolPort stock, and uses a separately supplied SynFwd-1 Chemformer bundle.
