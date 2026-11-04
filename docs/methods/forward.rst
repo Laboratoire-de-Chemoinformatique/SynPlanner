@@ -333,9 +333,9 @@ From the repository root in ``synplan_env``:
 The input is the existing target-keyed mapping whose values are route-ID
 mappings or route lists. JSON and JSON.GZ are supported. The script restores
 ``Route`` objects and overlays annotations onto a copy of the original JSON,
-preserving target/route/child order and arbitrary existing metadata. The JSON
-reader's optional ``on_step(reaction, source_node)`` callback supplies the
-correspondence without guessing reaction identity or overwriting metadata.
+preserving target/route/child order and arbitrary existing metadata. The script
+tracks source nodes through temporary metadata in a parsing copy and removes
+that bookkeeping before assessment; the route and JSON reader APIs need no hooks.
 The output is written atomically to a separate file; input, output and cache
 paths must differ.
 

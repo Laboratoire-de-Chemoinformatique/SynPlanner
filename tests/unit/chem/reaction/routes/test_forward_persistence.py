@@ -49,12 +49,7 @@ def test_annotations_provenance_and_legacy_json():
 def test_annotation_is_separate_from_chemistry_and_source_metadata():
     source = annotated_route()
     tree = source.to_json()
-    observed = []
-    restored = Route.from_json(
-        tree, on_step=lambda reaction, node: observed.append((reaction, node))
-    )
-    assert observed == [(restored.steps[0].reaction, tree["children"][0])]
-    assert observed[0][1] is tree["children"][0]
+    restored = Route.from_json(tree)
     assert (
         restored.steps[0].reaction.meta["existing"]
         == source.steps[0].reaction.meta["existing"]

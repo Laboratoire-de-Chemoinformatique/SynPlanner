@@ -275,7 +275,7 @@ class Route:
         return route
 
     @classmethod
-    def from_json(cls, route_json: RouteNode, *, on_step=None) -> Route:
+    def from_json(cls, route_json: RouteNode) -> Route:
         """Rebuild a route from one v1 JSON route tree.
 
         Each leaf carries the verdict of the molecule node it was read from, so
@@ -283,12 +283,9 @@ class Route:
         the file does not carry. Optional root-level provenance and assessment
         survive round trips. Legacy files without provenance retain only what
         the read itself found out.
-
-        ``on_step(reaction, source_node)`` optionally records the correspondence
-        with the input JSON, for metadata-preserving collection updates.
         """
 
-        parsed = read_route_tree(route_json, on_step=on_step)
+        parsed = read_route_tree(route_json)
         provenance = route_json.get("provenance", {})
         steps = tuple(
             Step(

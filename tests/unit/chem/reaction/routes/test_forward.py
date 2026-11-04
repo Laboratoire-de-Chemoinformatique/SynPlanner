@@ -348,6 +348,52 @@ def test_collection_preserves_all_metadata_and_branch_order(model, tmp_path):
     assert output == original
 
 
+def test_collection_maps_identical_reactions_to_their_designated_products(
+    model, tmp_path
+):
+    reactions = [smiles("CC.N>>CCO.CN") for _ in range(2)]
+    branches = [
+        Step(reaction, reaction.products[i]) for i, reaction in enumerate(reactions)
+    ]
+    root = route("CCOCN", "CCO.CN")
+    root.steps[0].reaction._reactants = tuple(step.product for step in branches)
+    tree = Route((*branches, *root.steps)).to_json()
+    root_node = tree["children"][0]
+    for label, node in zip(("left", "right"), root_node["children"], strict=True):
+        node["children"][0]["meta"] = {"source_key": label, "notes": {"keep": [label]}}
+    root_node["meta"] = {"source_key": "root"}
+    root_node["children"].reverse()
+    reaction_nodes = [node["children"][0] for node in root_node["children"]]
+    assert reaction_nodes[0]["smiles"] == reaction_nodes[1]["smiles"]
+    collection = {"target": {"route-id": tree}}
+    original = deepcopy(collection)
+    service = assessor(model, tmp_path)
+
+    class CheckMetadata:
+        def assess(self, routes, **kwargs):
+            for restored in routes:
+                for step in restored.steps:
+                    assert all(isinstance(key, str) for key in step.reaction.meta)
+                    assert step.reaction.meta["source_key"] in {"left", "right", "root"}
+            return service.assess(routes, **kwargs)
+
+    output = assess_routes.assess_collection(collection, CheckMetadata())
+    assert collection == original
+    json.dumps(output)  # No temporary object keys or source references escape.
+    root_node = output["target"]["route-id"]["children"][0]
+    scored_nodes = [node["children"][0] for node in root_node["children"]]
+    assert [node["meta"]["source_key"] for node in scored_nodes] == ["right", "left"]
+    expected = {"left": (1, 1.0), "right": (None, 0.0), "root": (None, 0.0)}
+    for node in [root_node, *scored_nodes]:
+        prediction = node["meta"].pop("forward_prediction")
+        assert (prediction["rank"], prediction["score"]) == expected[
+            node["meta"]["source_key"]
+        ]
+    assert output == original
+    assert service.last_stats["reaction_occurrences"] == 3
+    assert service.last_stats["unique_inputs"] == 2
+
+
 def test_script_gzip_input_output_and_default_cache(model, tmp_path, monkeypatch):
     source, output = tmp_path / "input.json.gz", tmp_path / "results/output.json.gz"
     collection = {"target": [route().to_json()]}

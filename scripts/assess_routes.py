@@ -15,9 +15,18 @@ def assess_collection(collection, assessor, *, silent=True):
     """Overlay annotations on a copy, preserving every existing JSON field."""
     collection = deepcopy(collection)
     routes, nodes = [], {}
+    source_key = object()
 
-    def remember(reaction, node):
-        nodes[id(reaction)] = node
+    def with_source(node):
+        """Tag only the parsing copy; JSON order need not match reactant order."""
+        if not isinstance(node, dict):
+            return node
+        tagged = dict(node)
+        if node.get("type") == "reaction":
+            tagged["meta"] = {**node.get("meta", {}), source_key: node}
+        if node.get("children"):
+            tagged["children"] = [with_source(child) for child in node["children"]]
+        return tagged
 
     for target_routes in collection.values():
         trees = (
@@ -26,7 +35,10 @@ def assess_collection(collection, assessor, *, silent=True):
         for tree in trees:
             # Reaction reassessment invalidates any aggregate from an earlier run.
             tree.pop("assessment", None)
-            routes.append(Route.from_json(tree, on_step=remember))
+            route = Route.from_json(with_source(tree))
+            for step in route.steps:
+                nodes[id(step.reaction)] = step.reaction.meta.pop(source_key)
+            routes.append(route)
     for route in assessor.assess(routes, silent=silent):
         for step in route.steps:
             nodes[id(step.reaction)].setdefault("meta", {})["forward_prediction"] = (
