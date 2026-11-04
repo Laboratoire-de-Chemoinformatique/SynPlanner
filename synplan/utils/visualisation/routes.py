@@ -343,7 +343,7 @@ def _step_display(annotation):
     if annotation["score"] == 0:
         return "zero", "No top-10 match"
     # One-reactant steps share the positive-score style without inventing a model rank.
-    rank = "—" if annotation["rank"] is None else str(annotation["rank"])
+    rank = "—" if annotation["rank"] is None else escape(str(annotation["rank"]))
     return "match", rank
 
 
@@ -408,7 +408,7 @@ def _assessment_overview(routes, labels):
             f"<td>{_number(score.get('forward_score'))}</td>"
             f"<td>{_number(score.get('search_score'))}</td><td>{_number(likelihood)}</td>"
             + (f"<td>{_number(score.get('combined_score'))}</td>" if combined else "")
-            + f"<td>{score.get('zero_score_steps', '—')} / {len(route)}</td>"
+            + f"<td>{escape(str(score.get('zero_score_steps', '—')))} / {len(route)}</td>"
             + f"<td>{vector}</td></tr>"
         )
     buttons = "".join(

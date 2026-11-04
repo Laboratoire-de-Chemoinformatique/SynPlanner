@@ -3,6 +3,7 @@
 import json
 from copy import deepcopy
 from dataclasses import replace
+from html import escape
 from io import StringIO
 
 import pytest
@@ -276,3 +277,27 @@ def test_report_filters_step_tables_and_escaping():
     assert "No top-10 match" in page
     assert "Policy log likelihood" in page
     assert "reason" not in json.dumps(routes[0].assessment)
+
+
+@pytest.mark.parametrize("field", ["rank", "zero_score_steps"])
+def test_report_escapes_saved_assessment_fields(field):
+    route = ForwardRouteScorer().assess([linear([1.0])])[0]
+    raw = route.to_json()
+    marker = '"><em id="injected">saved & untrusted</em>'
+    if field == "rank":
+        raw["children"][0]["meta"]["forward_prediction"][field] = marker
+    else:
+        raw["assessment"][field] = marker
+    restored = Route.from_json(json.loads(json.dumps(raw)))
+    if field == "rank":
+        restored = ForwardRouteScorer().assess([restored])[0]
+    before = restored.to_json()
+    page = routes_report_html([restored], None)
+    assert '<em id="injected">' not in page
+    assert escape(marker) in page
+    if field == "rank":
+        assert f'title="{escape(marker)}"' in page
+        assert f"<td>{escape(marker)}</td>" in page
+    else:
+        assert f"<td>{escape(marker)} / 1</td>" in page
+    assert restored.to_json() == before
