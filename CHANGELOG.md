@@ -256,7 +256,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   cached-decoder ONNX export, manifests, and collection-script selection. The
   `reactiont5` tokenizer extra supports ONNX inference; separate optional extras
   provide checkpoint inference and export.
-- Local Chemformer and ForwardChimera ONNX adapters using the existing base
+- Local Chemformer and ForwardChimera ONNX inference using the existing base
   dependencies. Chimera also supports explicit checkpoint inference and ONNX
   export through optional PyTorch extras, without RetroChimera or Lightning.
 - Shared forward prediction with up to ten deterministic rooted reactant SMILES,
@@ -280,12 +280,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   completed planning output before assessment and retains failed routes.
 - Shared model sessions and prediction caches across planning targets, explicit
   low-level finalization, and timing/cache/filter statistics. Search records use
-  schema 4 for annotations and model identity while accepting schemas 1 through 3.
+  schema 5 for annotations, model identity, and route-owned aggregate scores while
+  accepting schemas 1 through 4.
 - `max_time: null` supports iteration-controlled runs across search algorithms,
   with stopping reasons recorded. The ordinary time limit remains 600 seconds.
 
 ### Changed
 
+- One `ForwardPredictor` reader and `Tokenizer` class in `synplan.ml.inference`
+  replace the model-specific `OnnxChemformer`, `ForwardChimera`, and `ReactionT5`
+  classes and import paths. Select the model with `model_type`; ONNX remains the
+  default. Native tokenization, beam search, KV caching, prediction settings, and
+  compatible cache identities are preserved without new dependencies.
+- Full third-party license terms and attribution are consolidated in the
+  distributed `LICENSE`; adapted inference sources retain short attribution and
+  modification notices.
 - The forward-planning example selects the cached SynFwd-1 v2 bundle. Ordinary
   planning still defaults to no forward assessment. Cached bundles receive
   separate asset-based prediction-cache identities; historical entries remain
@@ -298,6 +307,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Aggregate forward scores belong only to `Route.assessment`, not shared search
+  nodes. Reconstruction and exports preserve each route's scores, and search
+  record loading restores legacy node-level aggregates onto Route objects.
 - Forward assessment respects package layering: chemistry helpers live in the
   chemistry package and injected models provide their cache identity. Cache
   identities for existing Chemformer and Chimera bundles remain compatible.
