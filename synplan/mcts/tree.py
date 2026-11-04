@@ -1377,12 +1377,20 @@ class Tree:
 
         :meth:`route_details` numbers steps from the target down; a route numbers
         them from the deepest step up, so the two run opposite ways and this is
-        where they are reconciled.
+        where they are reconciled. Reconstructed routes use their saved origins
+        to keep metadata aligned with :meth:`synthesis_route` after branch ordering.
 
         :raises ValueError: if ``node_id`` is not a node of this tree.
         """
 
         steps = self.route_details(node_id).get("steps", [])
+        reconstructed = getattr(self.nodes[node_id], "reconstructed_route", None)
+        if reconstructed is not None:
+            by_node = {step["node_id"]: step for step in steps}
+            steps = [
+                by_node[step.origin.tree_node_id]
+                for step in reversed(reconstructed.steps)
+            ]
         return {
             len(steps) - 1 - index: {
                 "step_id": len(steps) - 1 - index,

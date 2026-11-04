@@ -13,10 +13,12 @@ from test_tree_stats import (
     make_mol,
 )
 
+from synplan.chem.precursor import Precursor
 from synplan.chem.reaction.routes.quality.forward import ForwardReactionAssessor
 from synplan.chem.reaction.routes.route import Route
 from synplan.mcts.config import ForwardValidationConfig
 from synplan.mcts.forward import ForwardValidationError, load_forward_validation
+from synplan.mcts.node import Node
 from synplan.mcts.record import read_search_record, write_search_record
 from synplan.mcts.search import build_target_routes
 from synplan.ml.inference.forward import aggregate, prediction_identity
@@ -304,6 +306,75 @@ def test_shared_prefix_keeps_route_aggregates_independent(model, tmp_path):
         assert all(
             not hasattr(node, "route_assessment") for node in source.nodes.values()
         )
+
+
+@pytest.mark.parametrize("mode", ["on-the-fly", "post-processing"])
+def test_reconstructed_branches_keep_scores_and_origins(model, tmp_path, mode):
+    target, left, right, carbon_left, oxygen, carbon_right, nitrogen = (
+        Precursor(smiles(value), canonicalize=False)
+        for value in (
+            "[CH3:1][CH2:2][O:3][CH2:4][NH2:5]",
+            "[CH3:1][CH2:2][OH:3]",
+            "[CH3:4][NH2:5]",
+            "[CH3:1][CH3:2]",
+            "[OH2:3]",
+            "[CH4:4]",
+            "[NH3:5]",
+        )
+    )
+    tree = build_tree(rules=[])
+    tree.original_target = target.molecule
+    tree.nodes = {
+        1: Node((target,), (target,)),
+        2: Node((left, right), (left, right)),
+        3: Node((right,), (carbon_left, oxygen)),
+        4: Node((), (carbon_right, nitrogen)),
+    }
+    tree.parents = {1: 0, 2: 1, 3: 2, 4: 3}
+    tree.children = {1: {2}, 2: {3}, 3: {4}, 4: set()}
+    tree.winning_nodes = [4]
+    tree.curr_tree_size = 5
+    expected = {}
+    for node_id, precursor, rank in ((2, target, 1), (3, left, 2), (4, right, 4)):
+        node = tree.nodes[node_id]
+        node.rule_id, node.rule_source, node.rule_key = (
+            node_id,
+            "policy",
+            f"policy:{node_id}",
+        )
+        expected[node_id] = {
+            "product_inchikey": inchi_key(precursor.molecule, ignore_stereo=True),
+            "rank": rank,
+            "score": 1 / rank,
+            "alert": False,
+        }
+    original = Route.from_tree(tree, 4)
+    assert [step.origin.tree_node_id for step in original] == [3, 4, 2]
+    # Stereo reconstruction retains origins in branch order; node annotations
+    # may arrive later and must not be read from this saved copy.
+    tree.nodes[4].reconstructed_route = deepcopy(original)
+    if mode == "on-the-fly":
+        for node_id, annotation in expected.items():
+            tree.nodes[node_id].forward_prediction = deepcopy(annotation)
+    model.predictions = ["CCOCN", "CCO", "O", "CN"]
+    assessed = tree.finalize_forward(service(model, tmp_path), mode)[0]
+    assert bool(model.calls) is (mode == "post-processing")
+    record = read_search_record(write_search_record(tree, tmp_path / "record.json.gz"))
+    restored = Route.from_json(assessed.to_json())
+    for route in (assessed, tree.routes()[0], record.routes()[0], restored):
+        assert route.assessment["forward_score"] == pytest.approx(0.5)
+        assert [step.origin for step in route] == [step.origin for step in original]
+        assert [str(step.reaction) for step in route] == [
+            str(step.reaction) for step in original
+        ]
+        for step in route:
+            assert step.forward_prediction == expected[step.origin.tree_node_id]
+            assert step.forward_prediction["product_inchikey"] == inchi_key(
+                step.product, ignore_stereo=True
+            )
+    for source in (tree, record):
+        for node_id, annotation in expected.items():
+            assert source.nodes[node_id].forward_prediction == annotation
 
 
 def test_priority_outcomes_are_filtered(model, tmp_path):
