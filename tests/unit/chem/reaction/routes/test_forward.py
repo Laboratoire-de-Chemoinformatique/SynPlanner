@@ -352,7 +352,7 @@ def test_script_gzip_input_output_and_default_cache(model, tmp_path, monkeypatch
     source, output = tmp_path / "input.json.gz", tmp_path / "results/output.json.gz"
     collection = {"target": [route().to_json()]}
     json_io.write_json_atomic(source, collection)
-    monkeypatch.setattr(assess_routes, "OnnxChemformer", lambda *a, **k: model)
+    monkeypatch.setattr(assess_routes, "ForwardPredictor", lambda *a, **k: model)
     monkeypatch.setattr(
         "sys.argv",
         [

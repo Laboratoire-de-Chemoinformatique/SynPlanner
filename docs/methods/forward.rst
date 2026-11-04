@@ -12,19 +12,25 @@ score, policy likelihood, protection/competing-sites scores, or route order.
 Models and shared prediction policy
 -----------------------------------
 
-``OnnxChemformer`` lives in ``synplan.ml.inference.chemformer``. Its directory
-contains ``encoder.onnx``, ``decoder.onnx``, ``vocabulary.json`` and ``model.json``.
+All three models use ``ForwardPredictor`` from ``synplan.ml.inference``, with
+explicit ``model_type="chemformer"``, ``"chimera"`` or ``"reactiont5"`` selection.
+The default is Chemformer with the ONNX backend. Existing bundle formats and
+cache identities are unchanged by this unified interface.
+
+For Chemformer, the directory contains ``encoder.onnx``, ``decoder.onnx``,
+``vocabulary.json`` and ``model.json``.
 The original SynFwd-1 bundle is at ``synplan_data/forward/synfwd-1/v1/``.
 The cached ``v2/`` export additionally contains ``decoder_with_past.onnx``;
 ``kv_cache: true`` in its metadata selects incremental decoding automatically.
-``ForwardChimera`` lives in ``synplan.ml.inference.chimera``. Its directory is
+For Chimera, the directory is
 ``synplan_data/forward/forwardchimera-denovo/v1/`` and contains ``encoder.onnx``,
 ``decoder.onnx``, ``decoder_with_past.onnx``, ``model.json`` and
 ``source/vocab.txt``. Both directories are ignored by Git. A single graph is
 insufficient. Original exports, ZIP, checkpoint and attribution are retained.
 
-Both ONNX adapters use the existing base dependencies, without importing
-PyTorch, RetroChimera, Lightning, Syntheseus or code from the asset directory.
+Chemformer and Chimera ONNX inference use the existing base dependencies,
+without importing PyTorch, RetroChimera, Lightning, Syntheseus or code from the
+asset directory.
 Sessions load once. CPU defaults to four threads. ``device="cuda"`` requires an
 independently installed ONNX Runtime CUDA provider and its CUDA/cuDNN libraries;
 provider initialization failures raise instead of silently falling back.
@@ -33,7 +39,7 @@ Chimera additionally accepts explicit ``backend="ckpt"``. This needs optional
 PyTorch (``SynPlanner[forward-checkpoint]``), but neither RetroChimera nor
 Lightning. Export uses the same compact architecture with optional PyTorch and
 ONNX tooling (``SynPlanner[forward-export]``). The default remains ONNX.
-Chemformer's existing adapter supports ONNX only.
+Chemformer supports ONNX only.
 
 Each input is reactants-only SMILES, with dot-separated components, not a
 ``reactants>>product`` string. There is no separate reagent channel. Chython
@@ -80,19 +86,43 @@ preserve input order. Other fields are ``predictions``, ``canonical_products``,
 
 .. code-block:: python
 
-   from synplan.ml.inference.chemformer import OnnxChemformer
-   from synplan.ml.inference.chimera import ForwardChimera
+   from synplan.ml.inference import ForwardPredictor
 
-   chemformer = OnnxChemformer("synplan_data/forward/synfwd-1/v2", threads=4)
-   chimera = ForwardChimera("synplan_data/forward/forwardchimera-denovo/v1")
+   chemformer = ForwardPredictor("synplan_data/forward/synfwd-1/v2", threads=4)
+   chimera = ForwardPredictor("synplan_data/forward/forwardchimera-denovo/v1",
+                              model_type="chimera")
    predictions = chimera.predict(["CC(=O)Cl.N"], num_results=10,
                                  beam_width=20, batch_size=1)
-   checkpoint = ForwardChimera("synplan_data/forward/forwardchimera-denovo/v1",
-                              backend="ckpt")
+   checkpoint = ForwardPredictor("synplan_data/forward/forwardchimera-denovo/v1",
+                                 model_type="chimera", backend="ckpt")
 
 ``beam_width`` controls decoding per augmentation, independently of the final
 result count. The internal ``_predict_batch`` decoders remain available for raw
 parity tests; they receive already prepared spellings and retain raw beams.
+
+Implementation and attribution
+------------------------------
+
+One ``Tokenizer(model_dir, model_type, max_length)`` class supplies batch
+``encode()`` and ``decode()`` methods. Encoding returns integer token IDs and a
+boolean mask where ``True`` means padding. The runtime converts this mask to
+ReactionT5's integer attention mask. Chemformer adds encoder start/end tokens;
+Chimera does not; ReactionT5 uses its exported tokenizer and blank-reagent
+input template. Tokenization never canonicalizes or truncates augmented inputs.
+
+Loading and ONNX execution are shared. Beam search retains the three models'
+EOS, length normalization and termination rules. Changing those rules would
+change predictions. The ``_..._torch.py`` modules are internal architecture/export
+implementations; their leading underscore is a naming convention, not access
+control. Conditional imports keep PyTorch and Transformers optional.
+
+The Chemformer-derived code adapts MolecularAI/Chemformer,
+MolecularAI/aizynthmodels and chemformer-workflows under Apache-2.0. Chimera
+inference and augmentation adapt Microsoft RetroChimera v1.3.0 and OpenNMT-py
+3.5.1 under MIT. ReactionT5v2 is by Tatsuya Sagawa et al. under MIT; its beam
+semantics follow Transformers 4.40.2. The distributed ``LICENSE`` contains the
+full third-party terms and attribution, separately scoped from SynPlanner's
+MIT terms. Adapted source files retain short attribution and modification notices.
 
 Chemformer KV caching on CPU
 ---------------------------
@@ -512,7 +542,7 @@ subtasks.
 ReactionT5v2 USPTO-MIT
 ---------------------
 
-``ReactionT5`` adds the ``sagawa/ReactionT5v2-forward-USPTO_MIT`` checkpoint as a
+``ForwardPredictor(..., model_type="reactiont5")`` loads the ``sagawa/ReactionT5v2-forward-USPTO_MIT`` checkpoint as a
 post-processing alternative. It uses the standard Hugging Face T5 architecture:
 12 encoder and 12 decoder layers, width 768, 12 attention heads, gated GELU
 feed-forward layers, and a 268-token vocabulary. It has **198,640,896 learned
@@ -556,13 +586,14 @@ executable code is loaded from this directory. Large assets remain outside Git.
 
 .. code-block:: python
 
-   from synplan.ml.inference.reactiont5 import ReactionT5
+   from synplan.ml.inference import ForwardPredictor
 
-   model = ReactionT5("synplan_data/forward/reactiont5v2-uspto-mit/v1")
+   model = ForwardPredictor("synplan_data/forward/reactiont5v2-uspto-mit/v1",
+                            model_type="reactiont5")
    predictions = model.predict(["CC(=O)Cl.Nc1ccccc1"], num_results=10)
    # Explicit optional checkpoint inference:
-   checkpoint = ReactionT5("synplan_data/forward/reactiont5v2-uspto-mit/v1",
-                           backend="ckpt")
+   checkpoint = ForwardPredictor("synplan_data/forward/reactiont5v2-uspto-mit/v1",
+                                 model_type="reactiont5", backend="ckpt")
 
 Both backends default to CPU with four threads. CUDA must be requested explicitly
 and must initialize successfully. The ONNX decoder retains K/V states on the

@@ -3,13 +3,14 @@
 import numpy as np
 import pytest
 
-from synplan.ml.inference.chimera import ForwardChimera, _Tokenizer
+from synplan.ml.inference import ForwardPredictor, Tokenizer
 
 
 def tokenizer(tmp_path, max_length=12):
-    path = tmp_path / "vocab.txt"
+    (tmp_path / "source").mkdir()
+    path = tmp_path / "source/vocab.txt"
     path.write_text("<BOS>\n<EOS>\n<PAD>\n<UNK>\nC\nN\nO\n")
-    return _Tokenizer(path, max_length)
+    return Tokenizer(tmp_path, "chimera", max_length)
 
 
 def test_tokenizer_and_length(tmp_path):
@@ -17,9 +18,9 @@ def test_tokenizer_and_length(tmp_path):
     ids, mask = model.encode(["CN", "O"])
     np.testing.assert_array_equal(ids, [[4, 5], [6, 2]])
     np.testing.assert_array_equal(mask, [[False, False], [False, True]])
-    assert model.decode([4, 1, 5]) == "C"
-    assert model.decode([0, 4, 1, 5]) == "C"
-    assert model.decode([4, 0, 1]) == "C<BOS>"
+    assert model.decode([[4, 1, 5]])[0] == "C"
+    assert model.decode([[0, 4, 1, 5]])[0] == "C"
+    assert model.decode([[4, 0, 1]])[0] == "C<BOS>"
     with pytest.raises(ValueError, match="maximum is 2"):
         model.encode(["CCC"])
     with pytest.raises(ValueError, match="tokenized completely"):
@@ -27,13 +28,14 @@ def test_tokenizer_and_length(tmp_path):
 
 
 def test_finished_hypotheses_survive_pruning_and_kv_parents(tmp_path):
-    model = object.__new__(ForwardChimera)
+    model = object.__new__(ForwardPredictor)
+    model.model_type = "chimera"
     model.tokenizer = tokenizer(tmp_path)
     model.max_generated_length = 10
     model._encode = lambda ids, mask: None
     parents_seen = []
 
-    def decode(ids, mask, position, memory=None, past=None, parents=None):
+    def decode(ids, mask, memory=None, past=None, parents=None, *, position=None):
         parents_seen.append(None if parents is None else parents.tolist())
         result = np.full((len(ids), 7), -100.0, dtype=np.float32)
         if position == 0:

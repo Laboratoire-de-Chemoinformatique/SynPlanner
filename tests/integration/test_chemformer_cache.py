@@ -13,7 +13,7 @@ import sys
 import numpy as np
 import pytest
 
-from synplan.ml.inference.chemformer import OnnxChemformer
+from synplan.ml.inference import ForwardPredictor
 
 INPUTS = ["CC(=O)Cl.N", "CCO.CC(=O)O", "C[C@H](N)C(=O)O.CC(=O)Cl"]
 
@@ -27,7 +27,7 @@ def models():
     if not all(paths):
         pytest.skip("Set both original and cached Chemformer bundle directories")
     # Deliberately split beam siblings across decoder chunks.
-    return tuple(OnnxChemformer(path, decoder_batch_size=7) for path in paths)
+    return tuple(ForwardPredictor(path, decoder_batch_size=7) for path in paths)
 
 
 def compare(left, right):
@@ -70,7 +70,7 @@ def test_cached_logits_parent_reordering_padding_and_position_limit(models):
     for position in range(cached.max_length - 1):
         actual, past = cached._decode_cached(prefix, memory, mask, past, parents)
         if position in (0, 1, 7, 31, 126, cached.max_length - 2):
-            expected = original._decode(prefix, memory, mask)
+            expected = original._decode_full_prefix(prefix, memory, mask)
             np.testing.assert_allclose(actual, expected, rtol=2e-4, atol=2e-4)
         parents = (
             np.array([1, 0, 1], dtype=np.int64)
@@ -119,8 +119,8 @@ class Block(importlib.abc.MetaPathFinder):
         if fullname.split('.')[0] in {'torch', 'transformers', 'pytorch_lightning', 'aizynthmodels', 'chemformer_workflows', 'retrochimera'}:
             raise ImportError('Unexpected dependency: ' + fullname)
 sys.meta_path.insert(0, Block())
-from synplan.ml.inference.chemformer import OnnxChemformer
-model = OnnxChemformer(sys.argv[1])
+from synplan.ml.inference import ForwardPredictor
+model = ForwardPredictor(sys.argv[1])
 assert model.kv_cache
 assert model.predict(['CC(=O)Cl.N'])[0]['product_inchikeys']
 """

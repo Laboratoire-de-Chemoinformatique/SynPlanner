@@ -9,8 +9,9 @@ import numpy as np
 import pytest
 
 from synplan.chem.rdkit_compat import canonical_reactants
+from synplan.ml.inference import ForwardPredictor
 from synplan.ml.inference.forward import augment
-from synplan.ml.inference.reactiont5 import INPUT_TEMPLATE, ReactionT5
+from synplan.ml.inference.tokenizer import INPUT_TEMPLATE
 
 
 @pytest.fixture(scope="module")
@@ -23,7 +24,7 @@ def directory():
 
 @pytest.fixture(scope="module")
 def model(directory):
-    return ReactionT5(directory)
+    return ForwardPredictor(directory, model_type="reactiont5")
 
 
 def test_tokenizer_and_limits(directory, model):
@@ -32,7 +33,8 @@ def test_tokenizer_and_limits(directory, model):
         directory / "source", local_files_only=True
     )
     values = ["C[C@H](O)F.[13CH4]", "CCO.CC(=O)O"]
-    ids, mask = model.tokenizer.encode(values)
+    ids, padding = model.tokenizer.encode(values)
+    mask = (~padding).astype(np.int64)
     expected = tokenizer(
         [INPUT_TEMPLATE.format(s) for s in values], padding=True, return_tensors="np"
     )
@@ -71,8 +73,8 @@ class Block(importlib.abc.MetaPathFinder):
         if fullname.split('.')[0] in blocked:
             raise AssertionError('Forbidden backend import: ' + fullname)
 sys.meta_path.insert(0, Block())
-from synplan.ml.inference.reactiont5 import ReactionT5
-m = ReactionT5(sys.argv[1], backend=sys.argv[2], augmentation_size=1)
+from synplan.ml.inference import ForwardPredictor
+m = ForwardPredictor(sys.argv[1], model_type="reactiont5", backend=sys.argv[2], augmentation_size=1)
 r = m.predict(['CCO.CC(=O)O'], beam_width=1)
 assert r[0]['predictions']
 """
@@ -84,9 +86,10 @@ assert r[0]['predictions']
 def test_checkpoint_logits_beams_and_cached_reordering(directory, model):
     torch = pytest.importorskip("torch")
     transformers = pytest.importorskip("transformers")
-    checkpoint = ReactionT5(directory, backend="ckpt")
+    checkpoint = ForwardPredictor(directory, model_type="reactiont5", backend="ckpt")
     inputs = ["CC(=O)Cl.Nc1ccccc1", "CCO.CC(=O)O"]
-    ids, mask = model.tokenizer.encode(inputs)
+    ids, padding = model.tokenizer.encode(inputs)
+    mask = (~padding).astype(np.int64)
     memory, reference = model._encode(ids, mask), checkpoint._encode(ids, mask)
     np.testing.assert_allclose(memory.numpy(), reference.numpy(), atol=2e-5, rtol=1e-4)
     tokens = np.zeros((2, 1), dtype=np.int64)
@@ -129,7 +132,7 @@ def test_checkpoint_logits_beams_and_cached_reordering(directory, model):
                 return_dict_in_generate=True,
                 output_scores=True,
             )
-        assert [checkpoint.tokenizer.decode(row) for row in generated.sequences] == [
+        assert checkpoint.tokenizer.decode(generated.sequences) == [
             value for row in actual for value in row["predictions"]
         ]
         for a, b in zip(actual, expected, strict=True):

@@ -9,12 +9,12 @@ import pytest
 torch = pytest.importorskip("torch")
 pytest.importorskip("onnx")
 
+from synplan.ml.inference import ForwardPredictor  # noqa: E402
 from synplan.ml.inference._chemformer_torch import (  # noqa: E402
     CachedDecoderGraph,
     ChemformerDecoder,
     InitialDecoderGraph,
 )
-from synplan.ml.inference.chemformer import OnnxChemformer  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -169,8 +169,8 @@ def bundles(tmp_path_factory):
 @pytest.mark.parametrize("chunk", [1, 3, 64])
 def test_exported_cached_sampler_matches_full_prefix(bundles, chunk, monkeypatch):
     path, reference = bundles
-    old = OnnxChemformer(path, threads=1, decoder_batch_size=chunk)
-    new = OnnxChemformer(path, threads=1, decoder_batch_size=chunk)
+    old = ForwardPredictor(path, threads=1, decoder_batch_size=chunk)
+    new = ForwardPredictor(path, threads=1, decoder_batch_size=chunk)
     old.kv_cache = False
 
     def full_prefix(prefix, memory, mask):
@@ -181,7 +181,7 @@ def test_exported_cached_sampler_matches_full_prefix(bundles, chunk, monkeypatch
                 torch.from_numpy(mask),
             ).numpy()
 
-    monkeypatch.setattr(old, "_decode", full_prefix)
+    monkeypatch.setattr(old, "_decode_full_prefix", full_prefix)
     for width in (1, 5):
         expected = old._predict_batch(["CO", "N", "CCC"], width)
         actual = new._predict_batch(["CO", "N", "CCC"], width)

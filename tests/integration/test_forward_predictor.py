@@ -16,7 +16,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from synplan.ml.inference.chemformer import OnnxChemformer, canonical_reactants
+from synplan.chem.rdkit_compat import canonical_reactants
+from synplan.ml.inference import ForwardPredictor
 
 INPUTS = ["CC(=O)Cl.N", "CCO.CC(=O)O", "CC(=O)Cl.CN"]
 RUNTIME_FILES = ("encoder.onnx", "decoder.onnx", "vocabulary.json", "model.json")
@@ -32,7 +33,7 @@ def model_dir():
 
 @pytest.fixture(scope="module")
 def model(model_dir):
-    return OnnxChemformer(model_dir, decoder_batch_size=7)
+    return ForwardPredictor(model_dir, decoder_batch_size=7)
 
 
 @pytest.fixture(scope="module")
@@ -101,8 +102,8 @@ class BlockTrainingDependencies(importlib.abc.MetaPathFinder):
             raise ImportError('Unexpected dependency: ' + fullname)
 
 sys.meta_path.insert(0, BlockTrainingDependencies())
-from synplan.ml.inference.chemformer import OnnxChemformer
-rows = OnnxChemformer(sys.argv[1]).predict(['CC(=O)Cl.N'])
+from synplan.ml.inference import ForwardPredictor
+rows = ForwardPredictor(sys.argv[1]).predict(['CC(=O)Cl.N'])
 assert 1 <= len(rows[0]['predictions']) <= 10
 assert rows[0]['product_inchikeys']
 """

@@ -78,12 +78,12 @@ def two_reactant_tree(**kwargs):
 
 
 def test_disabled_configs_load_nothing(tmp_path, monkeypatch):
-    import synplan.ml.inference.chemformer as module
+    import synplan.ml.inference as module
 
     def fail(*args, **kwargs):
         pytest.fail("Disabled validation loaded a model")
 
-    monkeypatch.setattr(module, "OnnxChemformer", fail)
+    monkeypatch.setattr(module, "ForwardPredictor", fail)
     path = tmp_path / "forward.yaml"
     path.write_text("forward_val_type: null\nforward_val_path: missing\n")
     for config in (None, path, ForwardValidationConfig()):
@@ -361,7 +361,7 @@ def test_finite_limit_starts_no_second_prediction(model, tmp_path, monkeypatch):
 @pytest.mark.parametrize("mode", [None, "post-processing", "on-the-fly"])
 def test_planning_runner_modes_and_shared_sessions(model, tmp_path, monkeypatch, mode):
     import synplan.mcts.search as search
-    import synplan.ml.inference.chemformer as chemformer
+    import synplan.ml.inference as chemformer
     from synplan.utils.json import read_json
 
     template = two_reactant_tree()
@@ -383,7 +383,7 @@ def test_planning_runner_modes_and_shared_sessions(model, tmp_path, monkeypatch,
         loaded.append(args)
         return model
 
-    monkeypatch.setattr(chemformer, "OnnxChemformer", load)
+    monkeypatch.setattr(chemformer, "ForwardPredictor", load)
     targets = tmp_path / "targets.smi"
     targets.write_text("CCCCCCC\nCCCCCCC\n")
     output = tmp_path / "results"
@@ -430,7 +430,7 @@ def test_planning_runner_modes_and_shared_sessions(model, tmp_path, monkeypatch,
 
 def test_post_failure_keeps_completed_search(model, tmp_path, monkeypatch):
     import synplan.mcts.search as search
-    import synplan.ml.inference.chemformer as chemformer
+    import synplan.ml.inference as chemformer
 
     template = two_reactant_tree()
     for name, value in [
@@ -440,7 +440,7 @@ def test_post_failure_keeps_completed_search(model, tmp_path, monkeypatch):
         ("load_evaluation_function", template.evaluator),
     ]:
         monkeypatch.setattr(search, name, lambda *a, _value=value, **k: _value)
-    monkeypatch.setattr(chemformer, "OnnxChemformer", lambda *a, **k: model)
+    monkeypatch.setattr(chemformer, "ForwardPredictor", lambda *a, **k: model)
 
     def fail(*args, **kwargs):
         raise RuntimeError("inference unavailable")

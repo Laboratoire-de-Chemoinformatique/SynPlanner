@@ -5,7 +5,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from synplan.ml.inference.reactiont5 import INPUT_TEMPLATE, _beam_search
+from synplan.ml.inference.beam_search import reactiont5 as _beam_search
+from synplan.ml.inference.tokenizer import INPUT_TEMPLATE
 
 
 def test_blank_reagents_template():
@@ -117,9 +118,10 @@ def test_tiny_t5_matches_transformers_generate(beam):
 
 @pytest.mark.parametrize("width", [0, 268])
 def test_invalid_beam_width(width):
-    from synplan.ml.inference.reactiont5 import ReactionT5
+    from synplan.ml.inference import ForwardPredictor
 
-    model = ReactionT5.__new__(ReactionT5)
+    model = ForwardPredictor.__new__(ForwardPredictor)
+    model.model_type = "reactiont5"
     model.metadata = {"architecture": {"vocab_size": 268}}
     with pytest.raises(ValueError, match="Beam width"):
         model.predict(["CC.O"], beam_width=width)

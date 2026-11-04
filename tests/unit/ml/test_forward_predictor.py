@@ -7,11 +7,8 @@ import numpy as np
 import onnxruntime as ort
 import pytest
 
-from synplan.ml.inference.chemformer import (
-    OnnxChemformer,
-    _Tokenizer,
-    canonical_reactants,
-)
+from synplan.chem.rdkit_compat import canonical_reactants
+from synplan.ml.inference import ForwardPredictor, Tokenizer
 
 
 @pytest.fixture
@@ -73,7 +70,7 @@ def model(vocabulary, monkeypatch):
     monkeypatch.setattr(
         ort, "get_available_providers", lambda: ["CPUExecutionProvider"]
     )
-    return OnnxChemformer(vocabulary.parent, decoder_batch_size=3)
+    return ForwardPredictor(vocabulary.parent, decoder_batch_size=3)
 
 
 @pytest.mark.parametrize(
@@ -97,7 +94,7 @@ def test_preprocessing_requires_reactants_only(value):
 
 
 def test_tokenizer_padding_and_length_limit(vocabulary):
-    tokenizer = _Tokenizer(vocabulary, max_length=5)
+    tokenizer = Tokenizer(vocabulary.parent, "chemformer", max_length=5)
     ids, mask = tokenizer.encode(["C", "CON"])
     np.testing.assert_array_equal(ids, [[1, 4, 2, 0, 0], [1, 4, 6, 5, 2]])
     np.testing.assert_array_equal(
@@ -166,7 +163,7 @@ def test_invalid_generation_settings(model, options, message):
 
 def test_cuda_unavailable_is_not_silently_replaced_by_cpu(model):
     with pytest.raises(RuntimeError, match="provider is unavailable"):
-        OnnxChemformer(model.directory, device="cuda")
+        ForwardPredictor(model.directory, device="cuda")
 
 
 def test_cuda_initialization_fallback_is_rejected(model, monkeypatch):
@@ -176,7 +173,7 @@ def test_cuda_initialization_fallback_is_rejected(model, monkeypatch):
         lambda: ["CPUExecutionProvider", "CUDAExecutionProvider"],
     )
     with pytest.raises(RuntimeError, match="provider failed to initialize"):
-        OnnxChemformer(model.directory, device="cuda")
+        ForwardPredictor(model.directory, device="cuda")
 
 
 @pytest.mark.parametrize("finish,empty", [(True, False), (True, True), (False, False)])
@@ -196,7 +193,7 @@ def test_cached_sampler_preserves_parent_history_and_end_scoring(
         )
         np.testing.assert_array_equal(reconstructed, prefix)
         calls.append(reconstructed.shape[1])
-        return model._decode(reconstructed, memory, mask), reconstructed
+        return model._decode_full_prefix(reconstructed, memory, mask), reconstructed
 
     monkeypatch.setattr(model, "_decode_cached", cached)
     model.kv_cache = True

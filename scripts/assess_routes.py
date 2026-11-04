@@ -7,7 +7,7 @@ from pathlib import Path
 
 from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.routes.quality import ForwardReactionAssessor
-from synplan.ml.inference.chemformer import OnnxChemformer
+from synplan.ml.inference import ForwardPredictor
 from synplan.utils.json import read_json, write_json_atomic
 
 
@@ -59,22 +59,15 @@ def main():
     cache = args.cache or args.output.parent / "forward_cache.json"
     if len({p.resolve() for p in (args.input, args.output, cache)}) != 3:
         parser.error("Input, output and cache must be separate files")
-    if args.model_type == "chimera":
-        from synplan.ml.inference.chimera import ForwardChimera
-
-        model = ForwardChimera(
-            args.model, device=args.device, threads=args.threads, backend=args.backend
-        )
-    elif args.model_type == "reactiont5":
-        from synplan.ml.inference.reactiont5 import ReactionT5
-
-        model = ReactionT5(
-            args.model, device=args.device, threads=args.threads, backend=args.backend
-        )
-    else:
-        if args.backend != "onnx":
-            parser.error("Chemformer currently supports only the ONNX backend")
-        model = OnnxChemformer(args.model, device=args.device, threads=args.threads)
+    if args.model_type == "chemformer" and args.backend != "onnx":
+        parser.error("Chemformer currently supports only the ONNX backend")
+    model = ForwardPredictor(
+        args.model,
+        model_type=args.model_type,
+        backend=args.backend,
+        device=args.device,
+        threads=args.threads,
+    )
     assessor = ForwardReactionAssessor(
         model, cache_path=cache, batch_size=args.batch_size
     )

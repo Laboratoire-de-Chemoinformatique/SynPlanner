@@ -2,7 +2,7 @@
 
 Adapted from MolecularAI/aizynthmodels Chemformer v2 (revision
 f9262c2c44720a194ae67a37c35b411b20aec2c8) and chemformer-workflows' portable
-attention. Apache-2.0; the full license and attribution are in chemformer.py.
+attention. Apache-2.0; the full license and attribution are in the repository LICENSE.
 Modifications: inference-only decoder, direct state-dictionary loading, cached
 self/cross attention and beam-parent gathering. No training package is imported.
 """

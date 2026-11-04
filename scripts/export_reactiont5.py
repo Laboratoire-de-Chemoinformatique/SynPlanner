@@ -204,7 +204,7 @@ def export(directory):
         f"Checkpoint: https://huggingface.co/{REPOSITORY}/tree/{REVISION}\n\n"
         "ONNX: encoder.onnx, decoder.onnx, decoder_with_past.onnx, model.json, source/tokenizer.json, plus any external data listed in model.json. "
         "Checkpoint inference additionally uses source/config.json and source/model.safetensors.\n\n"
-        "Use `ReactionT5(directory)` from `synplan.ml.inference.reactiont5`; specify backend='ckpt' explicitly for Transformers. "
+        "Use `ForwardPredictor(directory, model_type='reactiont5')` from `synplan.ml.inference`; specify backend='ckpt' explicitly for Transformers. "
         "Install SynPlanner[reactiont5] for ONNX or [reactiont5-checkpoint] for checkpoint inference.\n\n"
         "Input is unmapped, stereochemistry-preserving reactant SMILES, formatted as `REACTANT:<SMILES>REAGENT: ` with blank reagents. "
         "Up to ten deterministic rooted inputs, twenty beams each, stereo-free full-InChIKey grouping and best-rank/support reranking to ten distinct products. "

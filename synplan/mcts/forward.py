@@ -32,10 +32,10 @@ def load_forward_validation(config=None, results_root="."):
             update={"cache_path": Path(results_root).resolve() / "forward_cache.json"}
         )
     from synplan.chem.reaction.routes.quality.forward import ForwardReactionAssessor
-    from synplan.ml.inference.chemformer import OnnxChemformer
+    from synplan.ml.inference import ForwardPredictor
 
     started = perf_counter()
-    model = OnnxChemformer(
+    model = ForwardPredictor(
         config.forward_val_path, device=config.device, threads=config.threads
     )
     assessor = ForwardReactionAssessor(

@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from synplan.ml.inference.chimera import ForwardChimera
+from synplan.ml.inference import ForwardPredictor
 
 
 @pytest.fixture(scope="module")
@@ -23,7 +23,7 @@ def directory():
 
 @pytest.fixture(scope="module")
 def model(directory):
-    return ForwardChimera(directory)
+    return ForwardPredictor(directory, model_type="chimera")
 
 
 def test_bundle_manifest(directory):
@@ -56,8 +56,8 @@ class Block(importlib.abc.MetaPathFinder):
         if sys.argv[2] == 'onnx': blocked.add('torch')
         if fullname.split('.')[0] in blocked: raise ImportError('Unexpected dependency: ' + fullname)
 sys.meta_path.insert(0, Block())
-from synplan.ml.inference.chimera import ForwardChimera
-result = ForwardChimera(sys.argv[1], backend=sys.argv[2]).predict(['CC(=O)Cl.N'])[0]
+from synplan.ml.inference import ForwardPredictor
+result = ForwardPredictor(sys.argv[1], model_type="chimera", backend=sys.argv[2]).predict(['CC(=O)Cl.N'])[0]
 assert 1 <= len(result['predictions']) <= 10
 assert len(set(result['product_inchikeys'])) == len(result['predictions'])
 """
@@ -87,7 +87,7 @@ def test_batching_and_order(model):
 
 def test_checkpoint_graphs_and_reordered_kv(model, directory):
     pytest.importorskip("torch")
-    native = ForwardChimera(directory, backend="ckpt")
+    native = ForwardPredictor(directory, model_type="chimera", backend="ckpt")
     ids, mask = model.tokenizer.encode(["CC(=O)Cl.N", "CCO.CC(=O)O"])
     memory, reference = model._encode(ids, mask), native._encode(ids, mask)
     np.testing.assert_allclose(
@@ -97,10 +97,10 @@ def test_checkpoint_graphs_and_reordered_kv(model, directory):
     previous_a = previous_b = parents = None
     for position in range(4):
         actual, previous_a = model._decode(
-            ids, mask, position, memory, previous_a, parents
+            ids, mask, memory, previous_a, parents, position=position
         )
         expected, previous_b = native._decode(
-            ids, mask, position, reference, previous_b, parents
+            ids, mask, reference, previous_b, parents, position=position
         )
         np.testing.assert_allclose(actual, expected, atol=1e-4, rtol=3e-5)
         parents = (

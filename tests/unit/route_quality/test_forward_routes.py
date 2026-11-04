@@ -211,12 +211,12 @@ def test_collection_preserves_metadata_order_and_chemistry():
 
 @pytest.mark.parametrize("combine", [False, True])
 def test_script_gzip_and_html_without_loading_model(tmp_path, monkeypatch, combine):
-    from synplan.ml.inference.chemformer import OnnxChemformer
+    from synplan.ml.inference import ForwardPredictor
 
     def unexpected(*args, **kwargs):
         raise AssertionError("route scoring must not initialize the model")
 
-    monkeypatch.setattr(OnnxChemformer, "__init__", unexpected)
+    monkeypatch.setattr(ForwardPredictor, "__init__", unexpected)
     source, output, html = (
         tmp_path / "input.json.gz",
         tmp_path / "out.json.gz",
