@@ -17,6 +17,7 @@ from synplan.chem.building_blocks import (
 )
 from synplan.chem.building_blocks.stereo import compatible_records, selected_record
 from synplan.chem.stereo import has_stereo_groups
+from synplan.chem.target_bonds import TargetAtomProvenance
 from synplan.chem.utils import safe_canonicalization
 
 logger = logging.getLogger(__name__)
@@ -26,12 +27,18 @@ class Precursor:
     """Precursor class is used to extend the molecule behavior needed for interaction with
     a tree in MCTS."""
 
-    def __init__(self, molecule: MoleculeContainer, canonicalize: bool = True):
+    def __init__(
+        self,
+        molecule: MoleculeContainer,
+        canonicalize: bool = True,
+        target_atom_provenance: TargetAtomProvenance | None = None,
+    ):
         """It initializes a Precursor object with a molecule container as a parameter.
 
         :param molecule: A molecule.
         """
         self.molecule = safe_canonicalization(molecule) if canonicalize else molecule
+        self.target_atom_provenance = target_atom_provenance or TargetAtomProvenance()
         self.prev_precursors = []
         self._inchi_key: str | None = None
         self._inchi_key_error: tuple[type[Exception], str] | None = None
