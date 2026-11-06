@@ -59,6 +59,7 @@ some advanced explanations and configurations, that can be used for both demonst
 - `Retrosynthesis with Synthon Priority Rules`_ - demonstrates how the shipped synthon disconnections steer an MCTS search as a curated priority-rule set.
 - `InChIKey Building-Block Catalogue`_ - uses a prepared vendor-aware JSON catalogue for connectivity-only Boceprevir MCTS and detached route costing.
 - `Forward Prediction`_ - assesses saved Lenvatinib routes with Chemformer, aggregates reaction scores, reuses cached predictions, and exports JSON and HTML.
+- `Target Bond Constraints`_ - requires selected disconnections and freezes protected target bonds.
 
 .. _Welcome to Chython: 00_Welcome_to_Chython.ipynb
 .. _Coming from RDKit: 01_Coming_from_RDKit.ipynb
@@ -82,6 +83,7 @@ some advanced explanations and configurations, that can be used for both demonst
 .. _Retrosynthesis with Synthon Priority Rules: 18_Retrosynthesis_With_Synthon_Priority_Rules.ipynb
 .. _InChIKey Building-Block Catalogue: 19_InChIKey_Building_Block_Catalogue.ipynb
 .. _Forward Prediction: 20_Forward_Prediction.ipynb
+.. _Target Bond Constraints: 21_Bond_freeze_break.ipynb
 
 .. toctree::
    :hidden:
@@ -113,5 +115,6 @@ some advanced explanations and configurations, that can be used for both demonst
    18_Retrosynthesis_With_Synthon_Priority_Rules
    19_InChIKey_Building_Block_Catalogue
    20_Forward_Prediction
+   21_Bond_freeze_break
    ../configuration/configuration
    ../methods/methods
