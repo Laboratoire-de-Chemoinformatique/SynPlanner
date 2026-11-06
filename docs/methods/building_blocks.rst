@@ -222,28 +222,3 @@ Synthonizer adapter
 existing component-aware ``synthonise_smiles(block.smiles)`` path. Vendor and
 identity metadata remain on the ``BuildingBlock``. MCTS does not invoke the
 Synthonizer, and this catalogue adds no protection or stereo provenance.
-
-Measured identity cost
-======================
-
-``scripts/benchmark_building_block_identity.py`` is a reproducible,
-Chython-only benchmark. On 1,000 valid rows sampled from the combined
-``all-bb-2026-06`` TSV, three repeats measured these means on the development
-machine:
-
-.. list-table::
-   :header-rows: 1
-
-   * - Operation
-     - Mean per query
-   * - Canonical SMILES set lookup on an already-finalized molecule
-     - 0.254 microseconds
-   * - Chython InChIKey generation plus lookup
-     - 521.267 microseconds
-   * - Cached ``Precursor`` InChIKey lookup
-     - 0.103 microseconds
-
-InChI generation is therefore the material cost and must happen once per
-finalized precursor. The immutable dictionary lookup after caching is not the
-bottleneck. Re-run the benchmark on deployment hardware rather than treating
-these wall-clock values as universal.

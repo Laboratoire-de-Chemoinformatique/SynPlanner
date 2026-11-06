@@ -58,9 +58,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   processes a `BuildingBlock` through its stored SMILES without coupling the
   Synthonizer to MCTS.
 
-- Added an InChIKey catalogue tutorial and a Chython-only identity benchmark
-  demonstrating catalogue loading, connectivity-prefix matching, MCTS use,
-  and post-search route costing.
+- Added an InChIKey catalogue tutorial demonstrating catalogue loading,
+  connectivity-prefix matching, MCTS use, and post-search route costing.
 
 - `write_search_record(tree, path)` / `read_search_record(path)` write a finished
   search to one file and read it back: the molecules interned into one list, the node
