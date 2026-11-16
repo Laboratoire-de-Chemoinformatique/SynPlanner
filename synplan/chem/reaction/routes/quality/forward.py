@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 from time import perf_counter
@@ -20,6 +21,33 @@ ASSESSMENT_VERSION = 2
 SCORING_VERSION = 2
 BEAM_WIDTH = 20
 NUM_RESULTS = 10
+
+
+FORWARD_ASSESSMENT_FIELDS = frozenset(
+    {
+        "aggregation",
+        "forward_score",
+        "search_score",
+        "total_steps",
+        "zero_score_steps",
+        "assumed_one_reactant_steps",
+        "combined_score",
+    }
+)
+
+
+def without_forward_assessment(assessment):
+    """Invalidate forward aggregates while preserving unrelated assessments."""
+    if assessment is None:
+        return None
+    if "forward_score" not in assessment and "combined_score" not in assessment:
+        return deepcopy(assessment) or None
+    retained = {
+        k: deepcopy(v)
+        for k, v in assessment.items()
+        if k not in FORWARD_ASSESSMENT_FIELDS
+    }
+    return retained or None
 
 
 class ForwardReactionAssessor:
@@ -81,7 +109,7 @@ class ForwardReactionAssessor:
                     replace(step, forward_prediction=next(annotations))
                     for step in route.steps
                 ),
-                assessment=None,
+                assessment=without_forward_assessment(route.assessment),
             )
             for route in routes
         ]

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.routes.quality import ForwardReactionAssessor
+from synplan.chem.reaction.routes.quality.forward import without_forward_assessment
 from synplan.ml.inference import ForwardPredictor
 from synplan.utils.files import read_json, write_json_atomic
 
@@ -33,8 +34,12 @@ def assess_collection(collection, assessor, *, silent=True):
             target_routes.values() if isinstance(target_routes, dict) else target_routes
         )
         for tree in trees:
-            # Reaction reassessment invalidates any aggregate from an earlier run.
-            tree.pop("assessment", None)
+            # Reaction reassessment invalidates only earlier forward aggregates.
+            retained = without_forward_assessment(tree.get("assessment"))
+            if retained is None:
+                tree.pop("assessment", None)
+            else:
+                tree["assessment"] = retained
             route = Route.from_json(with_source(tree))
             for step in route.steps:
                 nodes[id(step.reaction)] = step.reaction.meta.pop(source_key)

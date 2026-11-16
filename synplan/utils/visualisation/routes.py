@@ -329,8 +329,12 @@ def _route_prices(
     return pills, f"{per_mol / weight:g}"
 
 
+def _has_forward_assessment(route):
+    return route.assessment is not None and "forward_score" in route.assessment
+
+
 def _assessment_group(route):
-    if route.assessment is None:
+    if not _has_forward_assessment(route):
         return "unassessed"
     return "failed" if route.assessment["zero_score_steps"] else "positive"
 
@@ -355,7 +359,7 @@ def _badge(annotation):
 
 
 def _assessment_steps(route, index):
-    if route.assessment is None:
+    if not _has_forward_assessment(route):
         return ""
     rows = []
     for number, step in enumerate(route, 1):
@@ -400,7 +404,7 @@ def _assessment_overview(routes, labels):
             f'<a href="#assessment-route-{index}-step-{number}">'
             f"{_badge(step.forward_prediction)}</a>"
             for number, step in enumerate(route, 1)
-            if route.assessment is not None
+            if _has_forward_assessment(route) and step.forward_prediction is not None
         )
         rows.append(
             f'<tr data-assessment-group="{group}">'
@@ -507,7 +511,7 @@ def routes_report_html(
             ]
         elif len(route_labels) != len(routes):
             raise ValueError("Route labels must match the number of routes")
-        assessed = any(route.assessment is not None for route in routes)
+        assessed = any(_has_forward_assessment(route) for route in routes)
         # A legacy SMILES stock carries no vendors at all, so a page drawn against
         # one would wear a Price per gram column that can never hold anything.
         prices = prices and any(
