@@ -275,7 +275,10 @@ def test_report_filters_step_tables_and_escaping():
     assert "Assumed" not in page
     assert "<th>Combined score</th>" not in page
     assert "No top-10 match" in page
-    assert "Policy log likelihood" in page
+    assert "Policy log likelihood" not in page
+    assert "Policy log likelihood" in routes_report_html(
+        routes, None, show_policy_log_likelihood=True
+    )
     assert "reason" not in json.dumps(routes[0].assessment)
 
 
