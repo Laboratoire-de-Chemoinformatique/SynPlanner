@@ -154,6 +154,32 @@ judges on S(T) alone. Go lower level only to tune it — `ProtectionConfig`,
 `FunctionalGroupDetector`, `get_reaction_center_atoms`, `classify_reaction_type`.
 Tutorial: `08_Protection_Scoring`
 
+**Forward-assess an existing route collection**
+From the repository root in the SynPlanner environment, use an existing
+Chemformer ONNX bundle directory and a target-keyed route JSON/JSON.GZ collection
+(not a search record). Replace the example paths below; write to separate outputs.
+
+```bash
+python -m scripts.assess_routes \
+  --model /path/to/chemformer-bundle \
+  --input results/routes.json.gz \
+  --output results/routes_forward.json.gz \
+  --cache results/forward_cache.json
+
+python -m scripts.score_routes \
+  --input results/routes_forward.json.gz \
+  --output results/routes_scored.json.gz \
+  --html results/routes_forward.html
+```
+
+Assessment defaults to Chemformer ONNX on CPU with four threads. Reuse the JSON
+cache across runs to avoid repeating compatible predictions. The second command
+aggregates saved reaction scores and optionally renders HTML, without inference.
+Both preserve route order; combined search/forward scoring requires explicitly
+adding `--combine-search` to the second command. Add `--quiet` to hide progress.
+For matching rules, the one-reactant convention, and other model options, see
+[forward assessment](../../../docs/methods/forward.rst).
+
 **Save a finished search and read it back**
 `write_search_record(tree, path)` / `read_search_record(path)`
 (`synplan.mcts.record`). One file: interned molecules, the node graph, the winning
@@ -260,7 +286,7 @@ with a `.json` output. The TSV needs one `SMILES` column and one or more `*_ppg`
 vendor-price columns. Bad rows go to `<output>.errors.tsv`; valid rows still
 publish atomically. Load the result with `load_building_block_catalogue`
 (`synplan.chem.building_blocks`).
-Tutorial: `20_InChIKey_Building_Block_Catalogue`
+Tutorial: `19_InChIKey_Building_Block_Catalogue`
 Docs: `methods/building_blocks`, `user_guide/cli_interface`
 
 **Plan and price routes with a vendor catalogue**
@@ -271,7 +297,7 @@ to `RolloutEvaluationConfig` and `Tree` → `tree.run()` →
 and uses the first 14 Chython InChIKey characters; JSON catalogues are
 retrosynthesis-only. Costs choose the cheapest positive offer in the complete
 prefix bucket and assume one equivalent per leaf and 100% yield.
-Tutorial: `20_InChIKey_Building_Block_Catalogue`
+Tutorial: `19_InChIKey_Building_Block_Catalogue`
 Docs: `methods/building_blocks`
 
 **Show rules, synthons or any chython objects as a table**

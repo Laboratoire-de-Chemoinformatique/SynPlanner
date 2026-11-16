@@ -4,6 +4,9 @@ reading/writing."""
 import contextlib
 import csv
 import gzip
+import json
+import os
+import tempfile
 from collections.abc import Iterable, Iterator
 from io import StringIO
 from os.path import splitext
@@ -459,6 +462,30 @@ def open_text(path: str | Path) -> TextIO:
     if p.suffix.lower() == ".gz":
         return gzip.open(p, "rt", encoding="utf-8", newline="")
     return open(p, encoding="utf-8", newline="")
+
+
+def read_json(path):
+    """Read JSON from a plain or gzip-compressed UTF-8 file."""
+    with open_text(path) as stream:
+        return json.load(stream)
+
+
+def write_json_atomic(path, data):
+    """Close a temporary sibling before replacing the destination."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        dir=path.parent, prefix=f".{path.name}.", delete=False
+    ) as stream:
+        temporary = Path(stream.name)
+    try:
+        opener = gzip.open if path.suffix.lower() == ".gz" else open
+        with opener(temporary, "wt", encoding="utf-8") as stream:
+            json.dump(data, stream, indent=2, allow_nan=False)
+            stream.write("\n")
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _resolve_csv_column(fieldnames: list[str] | None, column: str) -> str:

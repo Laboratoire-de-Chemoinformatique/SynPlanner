@@ -157,7 +157,7 @@ def test_page_summarises_the_routes_it_was_handed(page, routes):
     for label, value in (
         ("Routes", len(routes)),
         ("Shortest route", min(len(route) for route in routes)),
-        ("Best score", 0.5),
+        ("Best search score", 0.5),
     ):
         assert label in page
         assert f">{value}<" in page

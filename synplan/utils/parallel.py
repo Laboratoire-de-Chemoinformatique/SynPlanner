@@ -20,7 +20,7 @@ import signal
 import sys
 import threading
 from collections import deque
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Generator, Iterable, Iterator
 from concurrent.futures import (
     Future,
     ProcessPoolExecutor,
@@ -389,7 +389,7 @@ def _unordered_stream(
 
 
 @contextmanager
-def graceful_shutdown() -> Iterator[threading.Event]:
+def graceful_shutdown() -> Generator[threading.Event, None, None]:
     """Context manager that catches SIGTERM/SIGINT and sets a stop event.
 
     Restores the original signal handlers on exit. If called from a non-main

@@ -27,6 +27,9 @@ class _MockConfig:
 class _MockRouteMetadataTree:
     step_metadata = Tree.step_metadata
 
+    def __init__(self):
+        self.nodes = {node_id: Node((), ()) for node_id in (2, 7)}
+
     def route_details(self, node_id: int) -> dict:
         assert node_id == 7
         return {

@@ -47,6 +47,7 @@ class GraphEmbedding(Module):
             ]
         )
 
+    # nn.Module types forward as a mutable callable; overriding it is its API.
     def forward(self, graph: Batch) -> Tensor:
         """Takes a graph as input and performs graph convolution on it.
 
@@ -166,6 +167,7 @@ class GraphEmbeddingGPS(Module):
             )
             self.convs.append(layer)
 
+    # nn.Module types forward as a mutable callable; overriding it is its API.
     def forward(self, graph: Batch) -> Tensor:
         atoms = graph.x.float()
         atoms = torch.log(atoms + 1)

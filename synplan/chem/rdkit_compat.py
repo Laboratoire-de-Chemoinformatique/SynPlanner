@@ -12,7 +12,11 @@ from collections.abc import Iterable
 from chython.containers import MoleculeContainer
 
 from synplan.chem.precursor import is_purchasable
-from synplan.chem.utils import clean_molecule, safe_canonicalization
+from synplan.chem.utils import (
+    clean_molecule,
+    parse_forward_smiles,
+    safe_canonicalization,
+)
 
 
 def target_from_rdkit(
@@ -201,3 +205,19 @@ def extract_routes_rdkit(tree, keep_mapping: bool = True) -> list[dict]:
         routes_block.append(_build_node(target_mol))
 
     return routes_block
+
+
+def canonical_reactants(reactants_smiles: str) -> str:
+    """Remove atom maps and return RDKit canonical isomeric reactant SMILES.
+
+    :param reactants_smiles: Reactants-only SMILES with dot-separated components.
+        Stereochemistry and isotopes are preserved without fixing tautomers.
+    """
+    from rdkit import Chem
+
+    if not reactants_smiles.strip() or ">" in reactants_smiles:
+        raise ValueError("Supply nonempty reactants-only SMILES separated by dots")
+    molecule = Chem.MolFromSmiles(format(parse_forward_smiles(reactants_smiles), ""))
+    if molecule is None or not molecule.GetNumAtoms():
+        raise ValueError(f"Invalid reactant SMILES: {reactants_smiles}")
+    return Chem.MolToSmiles(molecule, canonical=True, isomericSmiles=True)

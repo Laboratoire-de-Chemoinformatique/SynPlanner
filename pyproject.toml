@@ -37,6 +37,11 @@ dependencies = [
 
 # Optional workflows; the base installation runs ONNX policies on CPU.
 [project.optional-dependencies]
+forward-checkpoint = ["torch>=2.5"]
+forward-export = ["torch>=2.5", "onnx>=1.17"]
+reactiont5 = ["tokenizers>=0.19,<0.20"]
+reactiont5-checkpoint = ["SynPlanner[reactiont5]", "torch>=2.5", "transformers==4.40.2", "safetensors>=0.4"]
+reactiont5-export = ["SynPlanner[reactiont5-checkpoint]", "onnx>=1.17"]
 curation = [
   "torch>=2.0",
   "chytorch-synplan>=1.70",
@@ -196,18 +201,21 @@ ignore = [
 [tool.ty.rules]
 # False positives from chython/rdkit/torch/numpy dynamic types
 invalid-argument-type = "ignore"
-unresolved-attribute = "ignore"
+missing-attribute = "ignore"
+missing-union-attribute = "ignore"
 unsupported-operator = "ignore"
 not-subscriptable = "ignore"
-invalid-method-override = "ignore"
+incompatible-method-override = "ignore"
 not-iterable = "ignore"
-call-non-callable = "ignore"
+not-callable = "ignore"
 no-matching-overload = "ignore"
 index-out-of-bounds = "ignore"
 missing-argument = "ignore"      # chython Reactor has multiple constructors
 invalid-type-form = "ignore"     # chython stubs use `any` instead of `Any`
-unresolved-import = "ignore"     # rdkit uses dynamic imports (SA_Score, Descriptors)
-invalid-return-type = "ignore"   # chython union narrowing false positives
+import-not-found = "ignore"      # rdkit uses dynamic imports (SA_Score, Descriptors)
+invalid-explicit-return = "ignore" # chython union narrowing false positives
+invalid-implicit-return = "ignore" # chython union narrowing false positives
+abstract-class-instantiation = "ignore" # torch-geometric's generated methods
 invalid-assignment = "ignore"    # chython union narrowing false positives
 invalid-parameter-default = "ignore" # chython defaults
 # Keep enabled (catches real bugs like undefined names)

@@ -93,6 +93,29 @@ header.page{padding:20px 16px 18px}
 }
 """
 
+ASSESSMENT_CSS = """
+[hidden]{display:none!important}
+.assessment-overview{padding:20px;margin:20px 0}
+.assessment-overview h2{margin:0 0 12px;font-size:20px}
+.assessment-note{color:#526171;line-height:1.6}
+.assessment-scroll{overflow-x:auto}
+.assessment-table{border-collapse:collapse;width:100%;font-size:13px}
+.assessment-table th,.assessment-table td{padding:10px;text-align:left;
+border-bottom:1px solid #e6e8eb;white-space:nowrap}
+.assessment-table th{background:#f4f7fa}
+.assessment-table a{color:#194c7e}
+.assessment-step-table{margin:16px 18px}
+.assessment-step-table caption{text-align:left;padding:0 0 10px;font-weight:600}
+.forward-match,.forward-zero{display:inline-block;border-radius:4px;
+padding:3px 8px;font-size:12px;font-weight:600}
+.forward-match{background:#eaf5ef;color:#216145}
+.forward-zero{background:#fceeed;color:#a62f36}
+.assessment-filters{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.assessment-filters button{padding:8px 12px;border:1px solid #cdd6df;
+border-radius:4px;background:white;cursor:pointer}
+.assessment-filters button[aria-pressed=true]{background:#163e5b;color:white}
+"""
+
 #: Export and zoom for :func:`routes_report_html`. The page pools every molecule in
 #: one hidden ``<defs>``, so an exported drawing has to carry back the definitions
 #: its own references reach for, and :data:`ROUTE_CSS` with them.
@@ -312,6 +335,26 @@ document.addEventListener("click", (e) => {
 });
 """
 )
+
+ASSESSMENT_JS = """
+function filterAssessment(group) {
+  document.querySelectorAll('[data-assessment-group]').forEach(node => {
+    node.hidden = group !== 'all' && node.dataset.assessmentGroup !== group;
+  });
+  document.querySelectorAll('[data-assessment-filter]').forEach(button => {
+    button.setAttribute('aria-pressed', String(button.dataset.assessmentFilter === group));
+  });
+}
+document.querySelectorAll('[data-assessment-filter]').forEach(button => {
+  button.addEventListener('click', () => filterAssessment(button.dataset.assessmentFilter));
+});
+document.querySelectorAll('a[href^="#assessment-route-"]').forEach(link => {
+  link.addEventListener('click', () => {
+    const card = document.getElementById(link.hash.slice(1)).closest('.route');
+    if (card.hidden) filterAssessment('all');
+  });
+});
+"""
 
 #: Every role the drawing tints, in reading order.
 ROLE_LEGEND = (

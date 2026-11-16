@@ -8,11 +8,12 @@ from collections.abc import Iterable
 from io import StringIO
 from typing import Literal
 
+from chython import inchi_key, smiles
 from chython.containers import (
     MoleculeContainer,
     ReactionContainer,
 )
-from chython.exceptions import InvalidAromaticRing, MappingError
+from chython.exceptions import InvalidAromaticRing, MappingError, ValenceError
 from chython.files.daylight.tokenize import smarts_tokenize
 from chython.files.SDFrw import SDFRead
 
@@ -246,19 +247,22 @@ def mol_from_smiles(
     return cleaned
 
 
-def unite_molecules(molecules: Iterable[MoleculeContainer]) -> MoleculeContainer:
+def unite_molecules(
+    molecules: Iterable[MoleculeContainer], *, remap: bool = False
+) -> MoleculeContainer:
     """Unites a list of MoleculeContainer objects into a single MoleculeContainer. This
     function takes multiple molecules and combines them into one larger molecule. The
     first molecule in the list is taken as the base, and subsequent molecules are united
     with it sequentially.
 
     :param molecules: A list of MoleculeContainer objects to be united.
+    :param remap: Let chython resolve overlapping atom numbers between components.
     :return: A single MoleculeContainer object representing the union of all input
         molecules.
     """
     new_mol = MoleculeContainer()
     for mol in molecules:
-        new_mol = new_mol.union(mol)
+        new_mol = new_mol.union(mol, remap=remap)
     return new_mol
 
 
@@ -529,3 +533,41 @@ def __getattr__(name: str):
 
         return getattr(query_cgr, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def parse_forward_smiles(smiles_text: str) -> MoleculeContainer:
+    """Parse reactant or predicted-product SMILES, preserving component stereo."""
+    # chython 1.108 can invert stereo at a later component's root. Parsing
+    # components separately and using its union preserves their local ordering.
+    if "@" in smiles_text and "." in smiles_text:
+        return unite_molecules(
+            (smiles(part) for part in smiles_text.split(".")), remap=True
+        )
+    return smiles(smiles_text)
+
+
+def forward_candidate(product_smiles: str) -> tuple[str | None, str | None]:
+    """Canonical product and stereo-free identity, without fixing tautomers.
+
+    :param product_smiles: One model-predicted product SMILES, possibly containing
+        dot-separated components.
+    :return: Canonical SMILES retaining stereo and its stereo-free InChIKey,
+        or ``(None, None)`` for an invalid candidate.
+    """
+    if ">" in product_smiles:
+        return None, None
+    try:
+        molecule = parse_forward_smiles(product_smiles)
+        if not isinstance(molecule, MoleculeContainer) or not molecule:
+            return None, None
+        try:
+            molecule.canonicalize(fix_tautomers=False)
+        except TypeError:
+            # chython 1.108 can fail on an unknown implicit hydrogen count in an
+            # invalid-valence candidate. Unexpected normalization bugs propagate.
+            if not molecule.check_valence():
+                raise
+            return None, None
+        return str(molecule), inchi_key(molecule, ignore_stereo=True)
+    except (ValueError, ValenceError):
+        return None, None

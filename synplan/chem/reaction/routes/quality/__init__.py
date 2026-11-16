@@ -1,5 +1,6 @@
 """Route quality assessment and re-ranking."""
 
+from synplan.chem.reaction.routes.quality.forward import ForwardReactionAssessor
 from synplan.chem.reaction.routes.quality.protection.config import ProtectionConfig
 from synplan.chem.reaction.routes.quality.protection.functional_groups import (
     FunctionalGroupDetector,
@@ -20,6 +21,7 @@ from synplan.chem.reaction.routes.quality.protection.scanner import (
 )
 from synplan.chem.reaction.routes.quality.protection.scorer import CompetingSitesScore
 from synplan.chem.reaction.routes.quality.scorer import (
+    ForwardRouteScorer,
     PolicyLikelihoodScorer,
     ProtectionRouteScorer,
     RouteScorer,
@@ -28,6 +30,8 @@ from synplan.chem.reaction.routes.quality.scorer import (
 __all__ = [
     "CompetingInteraction",
     "CompetingSitesScore",
+    "ForwardReactionAssessor",
+    "ForwardRouteScorer",
     "FunctionalGroupDetector",
     "FunctionalGroupMatch",
     "HalogenDetector",

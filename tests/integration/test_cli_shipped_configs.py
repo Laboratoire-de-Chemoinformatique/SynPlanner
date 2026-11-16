@@ -12,9 +12,11 @@ CLI wiring plus config parsing, not the pipeline behind it.
 from pathlib import Path
 
 import pytest
+import yaml
 from click.testing import CliRunner
 
 import synplan.interfaces.cli as cli
+from synplan.mcts.config import ForwardValidationConfig
 
 CONFIGS = Path(__file__).resolve().parents[2] / "configs"
 
@@ -169,14 +171,57 @@ CASES = [
     ),
 ]
 
-# Configs consumed by the Python API only, never passed to a subcommand.
-PYTHON_API_ONLY = {"combined_ranking_filtering_policy.yaml"}
+# Configs consumed through the Python API or another config, not directly as --config.
+REFERENCED_CONFIGS = {
+    "combined_ranking_filtering_policy.yaml",
+    "forward_predictor.yaml",
+}
 
 
 def test_every_shipped_config_has_a_cli_case():
     # getattr unwraps pytest.param; a plain tuple indexes directly
     covered = {getattr(case, "values", case)[1] for case in CASES}
-    assert {p.name for p in CONFIGS.glob("*.yaml")} == covered | PYTHON_API_ONLY
+    assert {p.name for p in CONFIGS.glob("*.yaml")} == covered | REFERENCED_CONFIGS
+
+
+def test_shipped_forward_config_reaches_planning(
+    tmp_path, monkeypatch, stubbed_workers
+):
+    planning = yaml.safe_load(
+        (CONFIGS / "planning_standard.yaml").read_text(encoding="utf-8")
+    )
+    planning["forward_val_config"] = "forward_predictor.yaml"
+    planning_path = tmp_path / "planning.yaml"
+    planning_path.write_text(yaml.safe_dump(planning), encoding="utf-8")
+    forward_path = tmp_path / "forward_predictor.yaml"
+    forward_path.write_bytes((CONFIGS / forward_path.name).read_bytes())
+    calls = []
+    monkeypatch.setattr(cli, "run_search", lambda **kwargs: calls.append(kwargs))
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        for name in INPUTS:
+            Path(name).touch()
+        result = runner.invoke(
+            cli.synplan,
+            [
+                "planning",
+                "--config",
+                str(planning_path),
+                "--targets",
+                "in.smi",
+                "--reaction_rules",
+                "rules.tsv",
+                "--building_blocks",
+                "bb.smi",
+                "--policy_network",
+                "net.ckpt",
+            ],
+        )
+    assert result.exit_code == 0, result.output
+    assert calls[0]["forward_val_config"] == forward_path
+    config = ForwardValidationConfig.from_yaml(calls[0]["forward_val_config"])
+    assert config.forward_val_type == "on-the-fly"
+    assert config.top_k == 10
 
 
 @pytest.fixture

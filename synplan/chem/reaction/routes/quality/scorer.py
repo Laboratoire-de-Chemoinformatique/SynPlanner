@@ -6,6 +6,8 @@ implementations for different scoring strategies.
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
+from dataclasses import replace
+from math import exp, fsum, isfinite, log
 
 from tqdm.auto import tqdm
 
@@ -75,6 +77,65 @@ class PolicyLikelihoodScorer(RouteScorer):
         if route.provenance is None or route.provenance.policy_log_likelihood is None:
             raise ValueError("Route likelihood requires recorded policy probabilities.")
         return route.provenance.policy_log_likelihood
+
+
+class ForwardRouteScorer(RouteScorer):
+    """Geometric mean of all annotated steps, optionally multiplied by search.
+
+    Every step contributes once, including assumed one-reactant scores of 1.0.
+    No inference is performed. ``rank`` is explicit; ``assess`` preserves order.
+    These scores are ranking heuristics, not experimental success probabilities.
+    """
+
+    def __init__(self, *, combine_search: bool = False):
+        self.combine_search = combine_search
+
+    def _assessment(self, route: Route) -> dict:
+        scores = []
+        for index, step in enumerate(route, 1):
+            if step.forward_prediction is None:
+                raise ValueError(f"Step {index} has no forward prediction annotation")
+            scores.append(step.forward_prediction["score"])
+        zeros = scores.count(0.0)
+        forward = 0.0 if zeros else exp(fsum(map(log, scores)) / len(scores))
+        search = None if route.provenance is None else route.provenance.search_score
+        assessment = {
+            "aggregation": "geometric_mean_all_steps",
+            "forward_score": forward,
+            "search_score": search,
+            "total_steps": len(scores),
+            "zero_score_steps": zeros,
+            "assumed_one_reactant_steps": sum(
+                len(step.reaction.reactants) == 1
+                and step.forward_prediction["rank"] is None
+                and step.forward_prediction["score"] == 1.0
+                for step in route
+            ),
+        }
+        if self.combine_search:
+            if search is None or not isfinite(search) or search < 0:
+                raise ValueError(
+                    "Combined scoring requires a finite, nonnegative search score"
+                )
+            assessment["combined_score"] = search * forward
+        return assessment
+
+    def score(self, route: Route) -> float:
+        """Return forward score, or search × forward when explicitly enabled."""
+        key = "combined_score" if self.combine_search else "forward_score"
+        return self._assessment(route)[key]
+
+    def assess(self, routes: Iterable[Route], *, silent: bool = True) -> list[Route]:
+        """Annotate copies without changing steps, chemistry, or collection order."""
+        routes = list(routes)
+        with tqdm(
+            total=len(routes), desc="Assessing routes", unit="route", disable=silent
+        ) as bar:
+            assessed = []
+            for route in routes:
+                assessed.append(replace(route, assessment=self._assessment(route)))
+                bar.update()
+        return assessed
 
 
 def _competing_sites(config: ProtectionConfig | None) -> CompetingSitesScore:
