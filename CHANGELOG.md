@@ -7,6 +7,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Optional AIMNet2 gas-phase thermochemistry on copied completed routes, with
+  conservative balancing, exhaustive missing-stereo enumeration, LoQI conformer
+  generation, minimum validation, and persistent molecular caches. JSON and HTML
+  preserve variant results; an independent thermochemistry HTML report keeps
+  forward validation separate. CPU/all extras include
+  AIMNet2/ASE on Python 3.11+; LoQI is installed separately at a pinned revision.
+  Tutorial 21 assesses all 435 saved apatinib routes (1,192 steps), with resumable
+  checkpoints, compact error logs, a Manifest dialog, and cache verification.
+  Policy log likelihood is opt-in in both report APIs. Proton balancing preserves
+  the 0.8 confidence threshold and uses the exact E(H+) = 0 eV convention.
+
 - Optional progress bars for route ranking and clustering through `silent=False`.
 - Chython stereo constraints for carbon tetrahedra, E/Z and allene axes across
   preparation, extraction, stock selection, search and route reconstruction.

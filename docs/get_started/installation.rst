@@ -122,11 +122,5 @@ AIMNet2 thermochemistry
 
 Python 3.11+ installations of ``SynPlanner[cpu]`` and ``SynPlanner[all]`` include
 AIMNet2/ASE; ``SynPlanner[aimnet]`` selects just that optional stack. LoQI requires
-a separate pinned GitHub installation until its PyPI release. Pip extras do not
-select a package index; install CPU PyTorch separately:
-
-.. code-block:: bash
-
-   python -m pip install 'torch>=2.10' --index-url https://download.pytorch.org/whl/cpu
-   python -m pip install 'SynPlanner[cpu]'
-   python -m pip install 'loqi @ git+https://github.com/isayevlab/LoQI@04f3caef4521b3fbcb236f8b01f4bc80c83cb918'
+a separate pinned GitHub installation until its PyPI release. See
+:doc:`../methods/aimnet` for installation commands and CPU PyTorch wheel selection.
