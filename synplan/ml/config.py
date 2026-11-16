@@ -144,7 +144,7 @@ class LinearPolicyNetworkConfig(PolicyNetworkConfig):
     """
 
     # Pydantic discriminator: the subclass deliberately narrows the validated field.
-    architecture: Literal["linear"] = "linear"  # ty: ignore[invalid-mutable-override]
+    architecture: Literal["linear"] = "linear"  # ty: ignore[incompatible-mutable-override]
 
 
 class MHNRankingPolicyNetworkConfig(PolicyNetworkConfig):
@@ -158,7 +158,7 @@ class MHNRankingPolicyNetworkConfig(PolicyNetworkConfig):
     """
 
     # Pydantic discriminator: the subclass deliberately narrows the validated field.
-    architecture: Literal["mhn_ranking"] = "mhn_ranking"  # ty: ignore[invalid-mutable-override]
+    architecture: Literal["mhn_ranking"] = "mhn_ranking"  # ty: ignore[incompatible-mutable-override]
 
     # MHN association mechanism
     association_dim: int = Field(default=512, gt=0)

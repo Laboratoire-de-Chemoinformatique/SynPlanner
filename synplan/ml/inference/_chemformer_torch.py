@@ -117,7 +117,7 @@ class InitialDecoderGraph(nn.Module):
         self.model = model
 
     # nn.Module types forward as a mutable callable; overriding it is its API.
-    def forward(self, input_ids, memory, padding_mask):  # ty: ignore[invalid-mutable-override]
+    def forward(self, input_ids, memory, padding_mask):
         return self.model.decode(input_ids, padding_mask, 0, memory=memory)
 
 
@@ -127,7 +127,7 @@ class CachedDecoderGraph(nn.Module):
         self.model = model
 
     # nn.Module types forward as a mutable callable; overriding it is its API.
-    def forward(self, input_ids, padding_mask, position, beam_indices, *past):  # ty: ignore[invalid-mutable-override]
+    def forward(self, input_ids, padding_mask, position, beam_indices, *past):
         return self.model.decode(
             input_ids, padding_mask, position, past=past, parents=beam_indices
         )

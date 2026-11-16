@@ -25,7 +25,7 @@ class EncoderGraph(nn.Module):
         self.encoder = model.encoder
 
     # nn.Module types forward as a mutable callable; overriding it is its API.
-    def forward(self, input_ids, attention_mask):  # ty: ignore[invalid-mutable-override]
+    def forward(self, input_ids, attention_mask):
         return self.encoder(
             input_ids=input_ids, attention_mask=attention_mask, return_dict=False
         )[0]
@@ -41,7 +41,7 @@ class DecoderGraph(nn.Module):
         self.scale = self.width**-0.5 if model.config.tie_word_embeddings else 1.0
 
     # nn.Module types forward as a mutable callable; overriding it is its API.
-    def forward(self, input_ids, attention_mask, memory_or_parents, *past):  # ty: ignore[invalid-mutable-override]
+    def forward(self, input_ids, attention_mask, memory_or_parents, *past):
         if self.cached:
             past = tuple(value.index_select(0, memory_or_parents) for value in past)
             state = tuple(tuple(past[i : i + 4]) for i in range(0, len(past), 4))

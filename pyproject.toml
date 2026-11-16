@@ -201,18 +201,21 @@ ignore = [
 [tool.ty.rules]
 # False positives from chython/rdkit/torch/numpy dynamic types
 invalid-argument-type = "ignore"
-unresolved-attribute = "ignore"
+missing-attribute = "ignore"
+missing-union-attribute = "ignore"
 unsupported-operator = "ignore"
 not-subscriptable = "ignore"
-invalid-method-override = "ignore"
+incompatible-method-override = "ignore"
 not-iterable = "ignore"
-call-non-callable = "ignore"
+not-callable = "ignore"
 no-matching-overload = "ignore"
 index-out-of-bounds = "ignore"
 missing-argument = "ignore"      # chython Reactor has multiple constructors
 invalid-type-form = "ignore"     # chython stubs use `any` instead of `Any`
-unresolved-import = "ignore"     # rdkit uses dynamic imports (SA_Score, Descriptors)
-invalid-return-type = "ignore"   # chython union narrowing false positives
+import-not-found = "ignore"      # rdkit uses dynamic imports (SA_Score, Descriptors)
+invalid-explicit-return = "ignore" # chython union narrowing false positives
+invalid-implicit-return = "ignore" # chython union narrowing false positives
+abstract-class-instantiation = "ignore" # torch-geometric's generated methods
 invalid-assignment = "ignore"    # chython union narrowing false positives
 invalid-parameter-default = "ignore" # chython defaults
 # Keep enabled (catches real bugs like undefined names)
