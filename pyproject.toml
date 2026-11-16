@@ -37,6 +37,7 @@ dependencies = [
 
 # Optional workflows; the base installation runs ONNX policies on CPU.
 [project.optional-dependencies]
+aimnet = ["aimnet[ase]==0.2.6; python_version >= '3.11'"]
 forward-checkpoint = ["torch>=2.5"]
 forward-export = ["torch>=2.5", "onnx>=1.17"]
 reactiont5 = ["tokenizers>=0.19,<0.20"]
@@ -63,8 +64,8 @@ training = [
   "onnxscript>=0.5",
 ]
 gui = ["streamlit>1.35.1", "streamlit-ketcher>=0.0.1"]
-all = ["SynPlanner[curation,training,gui]"]
-cpu = ["torch>=2.0", "torch-geometric>=2.4.0"]
+all = ["SynPlanner[curation,training,gui,aimnet]"]
+cpu = ["torch>=2.0", "torch-geometric>=2.4.0", "SynPlanner[aimnet]"]
 cu126 = ["torch>=2.0", "torch-geometric>=2.4.0"]
 cu128 = ["torch>=2.0", "torch-geometric>=2.4.0"]
 
@@ -100,6 +101,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+# Local historical experiment archives are audit inputs, not release artifacts.
+[tool.hatch.build.targets.sdist]
+exclude = ["/aimnet"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["synplan", "scripts"]
