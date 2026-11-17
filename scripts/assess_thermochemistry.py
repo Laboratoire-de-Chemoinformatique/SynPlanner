@@ -11,11 +11,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 import traceback
 from argparse import ArgumentParser
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
+from uuid import uuid4
 
 from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.score import AIMNetConfig, AIMNetReactionAssessor
@@ -28,6 +30,14 @@ REACTION_CHECKPOINT_VERSION = 2
 
 class IncompatibleCheckpointError(ValueError):
     """An existing run belongs to different inputs or calculation settings."""
+
+
+def _add_note(error, message):
+    # Keep the original exception even on base SynPlanner's Python 3.10.
+    if hasattr(error, "add_note"):
+        error.add_note(message)
+    else:
+        error.__notes__ = [*getattr(error, "__notes__", []), message]
 
 
 def load_routes(path):
@@ -90,6 +100,17 @@ def run_assessment(
     service = AIMNetReactionAssessor(config, cache_path=cache_path)
     config = service.config
     completed = []
+    accepted = False
+    previous_artifacts = any(
+        (output / name).exists()
+        for name in (
+            "checkpoint.json",
+            "routes_aimnet.json",
+            "routes_aimnet.html",
+            "run_summary.json",
+            "reactions",
+        )
+    )
     started = perf_counter()
     manifest = {
         "source": {
@@ -158,7 +179,6 @@ def run_assessment(
             raise IncompatibleCheckpointError(
                 "Checkpoint input, settings, models, or calculation code changed; use a new output directory."
             )
-        write_json_atomic(job_path, {"fingerprint": fingerprint, **fingerprint_data})
         carry = {}
         for index, reaction in enumerate(reactions):
             path = checkpoint / f"{index:05}.json"
@@ -171,6 +191,8 @@ def run_assessment(
                 )
             completed.append(record["annotation"])
             carry = record["stats"]
+        write_json_atomic(job_path, {"fingerprint": fingerprint, **fingerprint_data})
+        accepted = True
         offset = len(completed)
         previous_summary = output / "run_summary.json"
         if previous_summary.exists():
@@ -308,8 +330,23 @@ def run_assessment(
         # Refusing a different job must not overwrite its completed report.
         raise
     except BaseException as exc:
-        # Preserve the original exception and its full traceback in the job log.
-        (output / "error.log").write_text(traceback.format_exc())
+        # A failed attempt must not replace a previously accepted publication.
+        diagnostic = output / "attempts" / uuid4().hex
+        try:
+            diagnostic.mkdir(parents=True)
+            (diagnostic / "error.log").write_text(traceback.format_exc())
+            write_json_atomic(
+                diagnostic / "failure.json",
+                {
+                    "stage": "execution" if accepted else "startup",
+                    "started_utc": manifest["started_utc"],
+                    "error": {"type": type(exc).__name__, "detail": str(exc)},
+                },
+            )
+        except Exception as diagnostic_error:
+            _add_note(exc, f"Could not write attempt diagnostics: {diagnostic_error}")
+        if previous_artifacts and not accepted:
+            raise
         manifest.update(
             run_status="aborted",
             error={"type": type(exc).__name__, "detail": str(exc)},
@@ -322,14 +359,23 @@ def run_assessment(
             for r in reactions[len(completed) :]
         )
         try:
+            (output / "error.log").write_text(traceback.format_exc())
             export_results(routes, labels, completed, output, manifest)
-        except Exception:
-            (output / "report_error.log").write_text(traceback.format_exc())
-        write_json_atomic(output / "run_summary.json", manifest)
+            write_json_atomic(output / "run_summary.json", manifest)
+        except Exception as report_error:
+            _add_note(exc, f"Could not publish aborted report: {report_error}")
         raise
     finally:
         if workers > 1 and hasattr(service.calculator, "close"):
-            service.calculator.close()
+            original_error = sys.exc_info()[1]
+            try:
+                service.calculator.close()
+            except Exception as cleanup_error:
+                if original_error is None:
+                    raise
+                _add_note(
+                    original_error, f"Worker cleanup also failed: {cleanup_error}"
+                )
 
 
 def main():

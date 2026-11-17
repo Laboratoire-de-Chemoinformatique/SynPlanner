@@ -89,3 +89,73 @@ def test_incompatible_run_preserves_existing_reports(tmp_path, monkeypatch):
     with pytest.raises(batch.IncompatibleCheckpointError):
         batch.run_assessment(source, output, AIMNetConfig(temperature=310), cache)
     assert {name: (output / name).read_bytes() for name in saved} == saved
+
+
+@pytest.mark.parametrize("partial", [False, True])
+@pytest.mark.parametrize("error_type", [ImportError, FileNotFoundError, RuntimeError])
+def test_resume_startup_failure_preserves_publication(
+    tmp_path, monkeypatch, partial, error_type
+):
+    class Backend(Calculator):
+        broken_identity = False
+
+        def identity(self):
+            if self.broken_identity:
+                raise error_type("startup unavailable")
+            return super().identity()
+
+        def calculate(self, text):
+            if partial and text == "O":
+                raise RuntimeError("interrupted calculation")
+            return super().calculate(text)
+
+    backend = Backend()
+    inject(monkeypatch, backend)
+    source = input_file(tmp_path, ["CCO>>CCO", "O>>O"])
+    output = tmp_path / "results"
+    if partial:
+        with pytest.raises(RuntimeError):
+            batch.run_assessment(
+                source, output, AIMNetConfig(), tmp_path / "cache.json"
+            )
+    else:
+        batch.run_assessment(source, output, AIMNetConfig(), tmp_path / "cache.json")
+    saved = {
+        p.relative_to(output): p.read_bytes() for p in output.rglob("*") if p.is_file()
+    }
+    backend.broken_identity = True
+    with pytest.raises(error_type, match="startup unavailable"):
+        batch.run_assessment(source, output, AIMNetConfig(), tmp_path / "cache.json")
+    assert all((output / name).read_bytes() == data for name, data in saved.items())
+    failures = [
+        json.loads(p.read_text()) for p in output.glob("attempts/*/failure.json")
+    ]
+    assert any(r["stage"] == "startup" for r in failures)
+
+
+def test_cleanup_and_export_errors_do_not_mask_original(tmp_path, monkeypatch):
+    from scripts import aimnet_workers
+
+    class Broken(Calculator):
+        def __init__(self, *args):
+            super().__init__()
+
+        def identity(self):
+            raise ImportError("original startup error")
+
+        def close(self):
+            raise RuntimeError("cleanup error")
+
+    monkeypatch.setattr(aimnet_workers, "CPUMolecularWorkers", Broken)
+
+    def broken_export(*args):
+        raise OSError("export error")
+
+    monkeypatch.setattr(batch, "export_results", broken_export)
+    source = input_file(tmp_path, ["O>>O"])
+    with pytest.raises(ImportError, match="original startup error") as caught:
+        batch.run_assessment(
+            source, tmp_path / "new", AIMNetConfig(), tmp_path / "cache.json", workers=2
+        )
+    assert any("cleanup error" in note for note in caught.value.__notes__)
+    assert any("export error" in note for note in caught.value.__notes__)

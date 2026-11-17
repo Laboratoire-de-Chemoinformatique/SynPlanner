@@ -173,9 +173,11 @@ class CPUMolecularWorkers:
         return record["result"]
 
     def close(self):
-        self.pool.shutdown(wait=True, cancel_futures=True)
-        for name, value in self._thread_environment.items():
-            if value is None:
-                os.environ.pop(name, None)
-            else:
-                os.environ[name] = value
+        try:
+            self.pool.shutdown(wait=True, cancel_futures=True)
+        finally:
+            for name, value in self._thread_environment.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
