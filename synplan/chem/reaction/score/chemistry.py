@@ -17,7 +17,7 @@ from synplan.chem.reaction.curation.rebalancing import (
     RebalancingError,
     rebalance_reaction,
 )
-from synplan.chem.reaction.score.config import MolecularCalculationError
+from synplan.chem.reaction.score.config import AIMNetConfig, MolecularCalculationError
 from synplan.chem.utils import mapped_smiles
 
 SUPPORTED_ELEMENTS = frozenset(
@@ -38,6 +38,30 @@ def parse_species(smiles: str):
     if mol is None or not mol.GetNumAtoms():
         raise MolecularCalculationError("applicability", "invalid_structure", smiles)
     return mol
+
+
+def normalize_config(config: AIMNetConfig) -> AIMNetConfig:
+    """Resolve equivalent symmetry keys once without changing the caller's config."""
+    symmetry = {}
+    for text, number in config.symmetry_numbers.items():
+        key = canonical_species(parse_species(text))
+        if key in symmetry and symmetry[key] != number:
+            raise ValueError(f"Conflicting symmetry numbers for {key}")
+        symmetry[key] = number
+    return config.model_copy(update={"symmetry_numbers": symmetry}, deep=True)
+
+
+def symmetry_error(smiles: str, result: dict, config: AIMNetConfig) -> str | None:
+    """Legacy default results may omit metadata; overrides require proof."""
+    number = result.get("symmetry_number")
+    if number is None and smiles not in config.symmetry_numbers:
+        return None
+    expected = config.symmetry_numbers.get(smiles, 1)
+    if type(number) is not int or number != expected:
+        return (
+            f"Molecular symmetry for {smiles}: recorded {number!r}, expected {expected}"
+        )
+    return None
 
 
 def is_proton(smiles: str) -> bool:

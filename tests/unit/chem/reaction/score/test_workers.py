@@ -21,7 +21,9 @@ def test_successful_worker_result_is_reused_without_submission(tmp_path, monkeyp
     service = adapter(tmp_path)
     result = {"energy_eV": -10.0}
     monkeypatch.setattr(
-        workers, "_backend", SimpleNamespace(calculate=lambda _: result)
+        workers,
+        "_backend",
+        SimpleNamespace(calculate=lambda _: result, config=AIMNetConfig()),
     )
     workers._calculate("O", service._path("O"))
     assert service.calculate("O") == result

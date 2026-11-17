@@ -15,8 +15,10 @@ from pathlib import Path
 
 from synplan.chem.reaction.score.chemistry import (
     is_proton,
+    normalize_config,
     prepare_reaction,
     stereoisomers,
+    symmetry_error,
 )
 from synplan.chem.reaction.score.config import AIMNetConfig, MolecularCalculationError
 from synplan.chem.reaction.score.molecular import (
@@ -24,6 +26,8 @@ from synplan.chem.reaction.score.molecular import (
     AIMNetMolecularCalculator,
 )
 from synplan.utils.files import read_json, write_json_atomic
+
+WORKER_CHECKPOINT_VERSION = 2
 
 _backend = None
 
@@ -38,12 +42,17 @@ def _initialize(config, threads):
 
 
 def _identity():
+    assert _backend is not None, "Worker calculator was not initialized"
     return _backend.identity()
 
 
 def _calculate(smiles, checkpoint):
+    assert _backend is not None, "Worker calculator was not initialized"
     try:
-        record = {"result": _backend.calculate(smiles)}
+        result = _backend.calculate(smiles)
+        if problem := symmetry_error(smiles, result, _backend.config):
+            raise ValueError(problem)
+        record = {"result": result}
     except MolecularCalculationError as exc:
         record = {
             "failure": exc.to_dict(),
@@ -61,7 +70,7 @@ class CPUMolecularWorkers:
             raise ValueError("Multiple molecular workers currently support CPU only")
         if workers < 1 or threads < 1:
             raise ValueError("Worker and thread counts must be positive")
-        self.config = config
+        config = self.config = normalize_config(config)
         self._thread_environment = {
             name: os.environ.get(name)
             for name in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
@@ -86,6 +95,7 @@ class CPUMolecularWorkers:
 
     def _path(self, smiles):
         data = {
+            "version": WORKER_CHECKPOINT_VERSION,
             "config": self.config.model_dump(mode="json"),
             "calculator": self.identity(),
             "smiles": smiles,
@@ -119,9 +129,14 @@ class CPUMolecularWorkers:
                         continue
                     seen.add(smiles)
                     cached = self.cached.get(smiles)
-                    if cached is not None and (
-                        not is_proton(smiles)
-                        or cached.get("electronic_energy_reference") == PROTON_REFERENCE
+                    if (
+                        cached is not None
+                        and not symmetry_error(smiles, cached, self.config)
+                        and (
+                            not is_proton(smiles)
+                            or cached.get("electronic_energy_reference")
+                            == PROTON_REFERENCE
+                        )
                     ):
                         continue
                     self._submit(smiles)
@@ -129,6 +144,11 @@ class CPUMolecularWorkers:
 
     def _submit(self, smiles):
         path = self._path(smiles)
+        if path.exists():
+            record = read_json(path)
+            result = record.get("result")
+            if result is not None and symmetry_error(smiles, result, self.config):
+                path.unlink()
         if smiles not in self.futures and not path.exists():
             self.futures[smiles] = self.pool.submit(_calculate, smiles, path)
 
@@ -148,6 +168,8 @@ class CPUMolecularWorkers:
             )
             exc.conformer_failures = record["conformer_failures"]
             raise exc
+        if problem := symmetry_error(smiles, record["result"], self.config):
+            raise ValueError(problem)
         return record["result"]
 
     def close(self):

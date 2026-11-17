@@ -118,6 +118,9 @@ def test_cache_invalidated_by_calculation_settings(tmp_path, change):
         "fmax": {"fmax": 0.02},
     }
     calculator = Calculator(identity="weights-2" if change == "model" else "weights-1")
+    if change == "symmetry":
+        calculate = calculator.calculate
+        calculator.calculate = lambda text: {**calculate(text), "symmetry_number": 2}
     AIMNetReactionAssessor(
         AIMNetConfig(**changes.get(change, {})), cache, calculator=calculator
     ).assess([route("CCO>>CCO")])

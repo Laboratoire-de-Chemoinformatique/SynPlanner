@@ -19,11 +19,11 @@ from typing import TYPE_CHECKING, Any, Protocol
 from tqdm.auto import tqdm
 
 from synplan.chem.reaction.score.chemistry import (
-    canonical_species,
     is_proton,
-    parse_species,
+    normalize_config,
     prepare_reaction,
     reaction_variants,
+    symmetry_error,
 )
 from synplan.chem.reaction.score.config import AIMNetConfig, MolecularCalculationError
 from synplan.chem.reaction.score.molecular import (
@@ -46,7 +46,7 @@ CACHE_VERSION = 1
 
 
 class MolecularCalculator(Protocol):
-    """Injectable adapter; identity must identify model bytes and runtime versions."""
+    """Adapter identity identifies model/runtime; overrides require symmetry_number."""
 
     def identity(self) -> dict: ...
 
@@ -101,16 +101,7 @@ class AIMNetReactionAssessor:
         *,
         calculator: MolecularCalculator | None = None,
     ):
-        config = config or AIMNetConfig()
-        symmetry = {}
-        for text, number in config.symmetry_numbers.items():
-            key = canonical_species(parse_species(text))
-            if key in symmetry and symmetry[key] != number:
-                raise ValueError(f"Conflicting symmetry numbers for {key}")
-            symmetry[key] = number
-        self.config = config.model_copy(
-            update={"symmetry_numbers": symmetry}, deep=True
-        )
+        self.config = normalize_config(config or AIMNetConfig())
         self.calculator = calculator or AIMNetMolecularCalculator(self.config)
         self.cache_path = Path(cache_path) if cache_path is not None else None
         self.cache: dict[str, Any] = (
@@ -144,6 +135,11 @@ class AIMNetReactionAssessor:
             != PROTON_REFERENCE
         ):
             del self._entries[smiles]
+        if smiles in self._entries and symmetry_error(
+            smiles, self._entries[smiles], self.config
+        ):
+            del self._entries[smiles]
+            self.last_stats["cache_invalidations"] += 1
         if smiles in self._entries:
             self.last_stats["cache_hits"] += 1
             return self._entries[smiles]
@@ -153,6 +149,8 @@ class AIMNetReactionAssessor:
         started = perf_counter()
         try:
             result = self.calculator.calculate(smiles)
+            if problem := symmetry_error(smiles, result, self.config):
+                raise ValueError(problem)
             if not all(
                 isfinite(result[k]) for k in ("energy_eV", "enthalpy_eV", "gibbs_eV")
             ):
@@ -252,6 +250,7 @@ class AIMNetReactionAssessor:
         started = perf_counter()
         self.last_stats = {
             "cache_hits": 0,
+            "cache_invalidations": 0,
             "molecular_calculations": 0,
             "molecular_failures": 0,
             "calculation_seconds": 0.0,

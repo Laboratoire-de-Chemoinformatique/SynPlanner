@@ -23,6 +23,8 @@ from synplan.chem.reaction.score.molecular import file_digest
 from synplan.chem.utils import mapped_smiles
 from synplan.utils.files import read_json, write_json_atomic
 
+REACTION_CHECKPOINT_VERSION = 2
+
 
 class IncompatibleCheckpointError(ValueError):
     """An existing run belongs to different inputs or calculation settings."""
@@ -86,6 +88,7 @@ def run_assessment(
     labels, routes = load_routes(input_path)
     reactions = [step.reaction for route in routes for step in route]
     service = AIMNetReactionAssessor(config, cache_path=cache_path)
+    config = service.config
     completed = []
     started = perf_counter()
     manifest = {
@@ -107,25 +110,43 @@ def run_assessment(
     sidecar = input_path.with_suffix(".provenance.json")
     if sidecar.exists():
         manifest["source"]["collection_provenance"] = read_json(sidecar)
+    job_path = output / "checkpoint.json"
+    if (
+        job_path.exists()
+        and read_json(job_path).get("version") != REACTION_CHECKPOINT_VERSION
+    ):
+        raise IncompatibleCheckpointError(
+            "Legacy reaction checkpoints: use a new output directory; validated molecular caches may be reused."
+        )
+    if not job_path.exists() and any((output / "reactions").glob("*.json")):
+        raise IncompatibleCheckpointError(
+            "Reaction checkpoints have no job identity; use a new output directory."
+        )
+    worker_calculator = None
     try:
         # Resolve models before accepting checkpoints from an earlier process.
         if workers > 1:
             from scripts.aimnet_workers import CPUMolecularWorkers
 
-            service.calculator = CPUMolecularWorkers(
+            worker_calculator = CPUMolecularWorkers(
                 config, output / "molecular_jobs", workers, threads
             )
+            service.calculator = worker_calculator
         identity = service.calculator.identity()
-        package = Path(__file__).resolve().parents[1] / "synplan/chem/reaction"
+        repository = Path(__file__).resolve().parents[1]
+        package = repository / "synplan/chem/reaction"
         sources = [
             *sorted((package / "score").glob("*.py")),
             package / "curation/rebalancing.py",
+            Path(__file__).resolve(),
+            repository / "scripts/aimnet_workers.py",
         ]
         fingerprint_data = {
+            "version": REACTION_CHECKPOINT_VERSION,
             "source_sha256": manifest["source"]["sha256"],
             "config": config.model_dump(mode="json"),
             "calculator": identity,
-            "code": {str(p.relative_to(package)): file_digest(p) for p in sources},
+            "code": {str(p.relative_to(repository)): file_digest(p) for p in sources},
         }
         fingerprint = hashlib.sha256(
             json.dumps(fingerprint_data, sort_keys=True).encode()
@@ -180,8 +201,8 @@ def run_assessment(
             "workers": workers,
             "threads_per_worker": threads,
         }
-        if workers > 1:
-            unique, scheduled = service.calculator.prime(
+        if worker_calculator is not None:
+            unique, scheduled = worker_calculator.prime(
                 reactions[offset:], service.cache
             )
             print(
@@ -193,6 +214,7 @@ def run_assessment(
             stats = dict(service.last_stats)
             for key in (
                 "cache_hits",
+                "cache_invalidations",
                 "molecular_calculations",
                 "molecular_failures",
                 "calculation_seconds",
@@ -220,6 +242,7 @@ def run_assessment(
         stats = dict(service.last_stats)
         for key in (
             "cache_hits",
+            "cache_invalidations",
             "molecular_calculations",
             "molecular_failures",
             "calculation_seconds",

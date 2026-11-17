@@ -17,6 +17,7 @@ from rdkit.Chem import rdDetermineBonds
 from synplan.chem.reaction.score.chemistry import (
     canonical_species,
     is_proton,
+    normalize_config,
     parse_species,
 )
 from synplan.chem.reaction.score.config import AIMNetConfig, MolecularCalculationError
@@ -189,7 +190,7 @@ class AIMNetMolecularCalculator:
     """
 
     def __init__(self, config: AIMNetConfig):
-        self.config = config
+        self.config = normalize_config(config)
         self._identity = None
 
     def identity(self) -> dict:
