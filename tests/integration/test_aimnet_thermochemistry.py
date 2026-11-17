@@ -1,4 +1,4 @@
-"""Opt-in real CPU pipeline. Model downloads are never performed by tests.
+"""Opt-in real CPU/CUDA pipeline. Model downloads are never performed by tests.
 
 Set SYNPLAN_AIMNET_MODEL and SYNPLAN_LOQI_MODEL to existing released checkpoint
 files. The LoQI package must be installed separately at the documented revision.
@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from chython import smiles
+from chython.containers import ReactionContainer
 
 from synplan.chem.reaction.routes import Route, Step
 from synplan.chem.reaction.score import AIMNetConfig, AIMNetReactionAssessor
@@ -30,7 +31,9 @@ def calculation(tmp_path_factory):
     pytest.importorskip("loqi")
     pytest.importorskip("aimnet")
     config = AIMNetConfig(
-        aimnet_checkpoint=Path(paths[0]), loqi_checkpoint=Path(paths[1]), device="cpu"
+        aimnet_checkpoint=Path(paths[0]),
+        loqi_checkpoint=Path(paths[1]),
+        device=os.environ.get("SYNPLAN_AIMNET_DEVICE", "cpu"),
     )
     reactions = [
         "CC(=O)O.CCO>>CC(=O)OCC.O",  # Already balanced.
@@ -40,6 +43,7 @@ def calculation(tmp_path_factory):
     routes = []
     for text in reactions:
         reaction = smiles(text)
+        assert isinstance(reaction, ReactionContainer)
         routes.append(Route((Step(reaction, reaction.products[0]),)))
     cache = tmp_path_factory.mktemp("aimnet") / "cache.json"
     assessor = AIMNetReactionAssessor(config, cache)
@@ -47,7 +51,7 @@ def calculation(tmp_path_factory):
     return config, cache, routes, assessed, assessor
 
 
-def test_real_cpu_reactions_and_stereo(calculation):
+def test_real_reactions_and_stereo(calculation):
     _, _, _, assessed, assessor = calculation
     annotations = [route.steps[0].thermochemistry for route in assessed]
     assert [r["status"] for r in annotations] == ["ok", "ok", "ok"]
@@ -80,7 +84,7 @@ def test_selected_minimum_matches_direct_aimnet_ase(calculation):
     )
     calc = AIMNet2Calculator(
         str(config.aimnet_checkpoint),
-        device="cpu",
+        device=config.device,
         compile_model=False,
         cuda_graph=False,
     )
@@ -94,7 +98,10 @@ def test_selected_minimum_matches_direct_aimnet_ase(calculation):
         hessian=True,
     )
     energy = float(raw["energy"].item())
-    assert np.linalg.norm(raw["forces"].detach().numpy(), axis=-1).max() <= config.fmax
+    assert (
+        np.linalg.norm(raw["forces"].detach().cpu().numpy(), axis=-1).max()
+        <= config.fmax
+    )
     modes = analyze_hessian(raw["hessian"], atoms.positions, atoms.get_masses())
     assert modes.n_imaginary == 0
     direct = IdealGasThermo(
@@ -128,3 +135,39 @@ def test_reopened_cache_performs_no_calculations(calculation, monkeypatch):
     restored = reopened.assess(routes)
     assert reopened.last_stats["molecular_calculations"] == 0
     assert [r.to_json() for r in restored] == [r.to_json() for r in original]
+
+
+def test_real_serial_parallel_symmetry_override(calculation, tmp_path):
+    from scripts.aimnet_workers import CPUMolecularWorkers
+
+    config, *_ = calculation
+    if config.device != "cpu":
+        pytest.skip("The worker pool supports CPU only")
+    import torch
+
+    torch.set_num_threads(1)
+    config = config.model_copy(update={"symmetry_numbers": {"[OH2]": 2}})
+    reactions = [smiles("O.[H][H]>>O.[H][H]")]
+    serial = AIMNetReactionAssessor(config, tmp_path / "serial.json")
+    expected = serial.assess_reactions(reactions)
+    parallel = CPUMolecularWorkers(config, tmp_path / "workers", workers=2, threads=1)
+    try:
+        assessor = AIMNetReactionAssessor(
+            config, tmp_path / "parallel.json", calculator=parallel
+        )
+        assert parallel.prime(reactions, assessor.cache) == (2, 2)
+        actual = assessor.assess_reactions(reactions)
+    finally:
+        parallel.close()
+    assert actual[0]["status"] == expected[0]["status"] == "ok"
+    for row in (actual[0], expected[0]):
+        assert row["molecules"]["O"]["symmetry_number"] == 2
+        assert row["calculation"]["config"]["symmetry_numbers"] == {"O": 2}
+    for species in ("O", "[H][H]"):
+        for key in ("energy_eV", "enthalpy_eV", "gibbs_eV"):
+            assert actual[0]["molecules"][species][key] == pytest.approx(
+                expected[0]["molecules"][species][key], abs=1e-6, rel=0
+            )
+    restored = AIMNetReactionAssessor(config, tmp_path / "parallel.json")
+    restored.assess_reactions(reactions)
+    assert restored.last_stats["molecular_calculations"] == 0

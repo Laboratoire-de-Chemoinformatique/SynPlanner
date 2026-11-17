@@ -202,6 +202,65 @@ Unexpected errors propagate and retain a traceback plus a partial report whose
 unprocessed steps are explicitly Errored — run aborted. Cached verification
 covers every previously successful reaction and forbids new molecular calculations.
 
+CPU and GPU reaction benchmarks
+-------------------------------
+
+The benchmark uses six reactions from the saved apatinib collection: the final
+substitution with H+ and Cl-, an already-balanced hydration, two amidations
+with different molecular sizes, and reactions with two and four stereochemical
+variants. It does not extrapolate these measurements to the full collection.
+
+From the repository root, with local weights and a separate CUDA-enabled Python
+environment containing the same scientific package versions:
+
+.. code-block:: bash
+
+   python -m scripts.benchmark_thermochemistry \
+     --input tutorials/data/apatinib_routes.json \
+     --output tutorial_results/aimnet_benchmark \
+     --aimnet-model /path/aimnet2_wb97m_d3_0.pt \
+     --loqi-model /path/loqi_flow_v1.1.0.ckpt \
+     --gpu-python /path/cuda-environment/bin/python \
+     --cpu-cores 1 4 8 --gpu-host-cores 4 --repeats 3
+
+Each configuration uses one process pinned to distinct physical cores on one
+NUMA node. The GPU configuration uses one CUDA device and four host CPU cores.
+Configurations run sequentially; their order and reaction order rotate between
+repetitions. Ten conformers, 25 sampling steps, seed 42, and the standard
+optimization and thermochemical settings remain unchanged.
+
+Every reaction and repetition starts with an empty molecular-results cache.
+Species may be reused within that reaction, but never across benchmark trials.
+Model loading and a water warm-up are measured separately; model weights and
+operating-system file caches remain warm. CUDA is synchronized at calculation
+timing boundaries. Any failed GPU preflight aborts the benchmark before CPU calculations begin.
+The failure remains visible in the report and attempt diagnostics.
+
+The output separates molecular calculation time, molecular-cache writing time,
+and complete reaction thermo-data writing time. Both write measurements include
+JSON serialization, buffered file close and atomic replacement, without forced
+``fsync``; they are not measurements of durable disk latency. Remaining
+preparation, balancing, enumeration and aggregation time is reported separately.
+Total reaction time excludes startup, timing-record writes and report generation.
+
+``benchmark.html``, ``benchmark.json`` and ``trials.csv`` contain individual
+trials and per-reaction medians, means and ranges. Failed trials remain visible;
+speedups require all repetitions to have complete successful variant coverage.
+Raw records also retain conformer outcomes and CPU/GPU energy differences.
+Configuration, identities and startup timings appear once in the Manifest.
+These measurements reflect the machine's observed load, not exclusive access
+to its hardware.
+
+Completed trials are checkpointed. Repeating the same command resumes completed
+trials; an interrupted trial starts again with a new empty cache. Changed source,
+models, input or settings require a new output directory. Generate a partial
+report at any time without rerunning calculations:
+
+.. code-block:: bash
+
+   python -m scripts.benchmark_thermochemistry \
+     --report-only tutorial_results/aimnet_benchmark
+
 Balancing audit scope
 ---------------------
 
