@@ -1,8 +1,7 @@
 from collections.abc import Callable
 
 from rdkit import Chem, RDLogger
-from rdkit.Chem.Descriptors import ExactMolWt
-from rdkit.Chem.rdMolDescriptors import CalcNumHeavyAtoms
+from rdkit.Chem.rdMolDescriptors import CalcExactMolWt, CalcNumHeavyAtoms
 from rdkit.Contrib.SA_Score import sascorer
 
 RDLogger.DisableLog("rdApp.*")
@@ -76,13 +75,13 @@ class RDKitScore:
             return self._clamp(1.0 - total_heavy / self._H_MAX)
 
         if self.score_function == "weight":
-            total_weight = self._safe_sum(molecules, ExactMolWt, 1000.0)
+            total_weight = self._safe_sum(molecules, CalcExactMolWt, 1000.0)
             return self._clamp(1.0 - total_weight / self._W_MAX)
 
         if self.score_function == "weightXsascore":
             total = self._safe_sum(
                 molecules,
-                lambda molecule: ExactMolWt(molecule)
+                lambda molecule: CalcExactMolWt(molecule)
                 * sascorer.calculateScore(molecule),
                 10000.0,
             )
@@ -90,7 +89,7 @@ class RDKitScore:
 
         total = self._safe_sum(
             molecules,
-            lambda molecule: ExactMolWt(molecule) ** 2
+            lambda molecule: CalcExactMolWt(molecule) ** 2
             * sascorer.calculateScore(molecule),
             10000.0,
         )
