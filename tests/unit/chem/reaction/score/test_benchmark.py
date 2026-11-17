@@ -197,11 +197,13 @@ def test_export_round_trip_escaping_and_hidden_manifest(tmp_path, monkeypatch):
     original_open = Path.open
 
     def legacy_locale(self, mode="r", buffering=-1, encoding=None, **kwargs):
-        if "b" not in mode and encoding is None:
+        if "b" not in mode and encoding in (None, "locale"):
             encoding = "cp1252"
         return original_open(self, mode, buffering, encoding=encoding, **kwargs)
 
     monkeypatch.setattr(Path, "open", legacy_locale)
+    with pytest.raises(UnicodeEncodeError):
+        (tmp_path / "locale.txt").write_text("Δ")
     manifest, trials = fixture_trials()
     before = deepcopy(manifest)
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
