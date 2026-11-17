@@ -14,7 +14,7 @@ from chython.containers import ReactionContainer
 
 from synplan.chem.reaction.routes import Route, Step
 from synplan.chem.reaction.score import AIMNetConfig, AIMNetReactionAssessor
-from synplan.chem.reaction.score.molecular import AIMNetMolecularCalculator
+from synplan.chem.reaction.score.aimnet.molecular import AIMNetMolecularCalculator
 
 
 @pytest.fixture(scope="module")

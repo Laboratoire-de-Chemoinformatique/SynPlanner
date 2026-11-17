@@ -21,7 +21,7 @@ from uuid import uuid4
 
 from synplan.chem.reaction.routes import Route
 from synplan.chem.reaction.score import AIMNetConfig, AIMNetReactionAssessor
-from synplan.chem.reaction.score.molecular import file_digest
+from synplan.chem.reaction.score.aimnet.molecular import file_digest
 from synplan.chem.utils import mapped_smiles
 from synplan.utils.files import read_json, write_json_atomic
 
@@ -90,7 +90,7 @@ def export_results(routes, labels, annotations, output, manifest):
     return annotated
 
 
-def run_assessment(
+def run_thermochemistry_assessment(
     input_path, output, config, cache_path, *, verify_cache=False, workers=1, threads=4
 ):
     input_path, output = Path(input_path), Path(output)
@@ -157,7 +157,7 @@ def run_assessment(
         repository = Path(__file__).resolve().parents[1]
         package = repository / "synplan/chem/reaction"
         sources = [
-            *sorted((package / "score").glob("*.py")),
+            *sorted((package / "score").rglob("*.py")),
             package / "curation/rebalancing.py",
             Path(__file__).resolve(),
             repository / "scripts/aimnet_workers.py",
@@ -167,7 +167,9 @@ def run_assessment(
             "source_sha256": manifest["source"]["sha256"],
             "config": config.model_dump(mode="json"),
             "calculator": identity,
-            "code": {str(p.relative_to(repository)): file_digest(p) for p in sources},
+            "code": {
+                p.relative_to(repository).as_posix(): file_digest(p) for p in sources
+            },
         }
         fingerprint = hashlib.sha256(
             json.dumps(fingerprint_data, sort_keys=True).encode()
@@ -334,7 +336,9 @@ def run_assessment(
         diagnostic = output / "attempts" / uuid4().hex
         try:
             diagnostic.mkdir(parents=True)
-            (diagnostic / "error.log").write_text(traceback.format_exc())
+            (diagnostic / "error.log").write_text(
+                traceback.format_exc(), encoding="utf-8"
+            )
             write_json_atomic(
                 diagnostic / "failure.json",
                 {
@@ -359,7 +363,7 @@ def run_assessment(
             for r in reactions[len(completed) :]
         )
         try:
-            (output / "error.log").write_text(traceback.format_exc())
+            (output / "error.log").write_text(traceback.format_exc(), encoding="utf-8")
             export_results(routes, labels, completed, output, manifest)
             write_json_atomic(output / "run_summary.json", manifest)
         except Exception as report_error:
@@ -378,14 +382,37 @@ def run_assessment(
                 )
 
 
+# Compatibility for notebooks and callers written before the explicit name.
+run_assessment = run_thermochemistry_assessment
+
+
+def config_from_arguments(args) -> AIMNetConfig:
+    """Validate defaults < YAML < explicitly supplied CLI overrides."""
+    config = AIMNetConfig.from_yaml(str(args.config)) if args.config else AIMNetConfig()
+    values = config.model_dump()
+    for field, value in (
+        ("device", args.device),
+        ("aimnet_checkpoint", args.aimnet_model),
+        ("loqi_checkpoint", args.loqi_model),
+    ):
+        if value is not None:
+            values[field] = value
+    return AIMNetConfig.model_validate(values)
+
+
 def main():
     parser = ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--config",
+        type=Path,
+        help="AIMNet YAML settings; explicit model/device flags override them",
+    )
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--aimnet-model", type=Path)
     parser.add_argument("--loqi-model", type=Path)
-    parser.add_argument("--device", default="cpu")
+    parser.add_argument("--device", help="Override YAML device (default: cpu)")
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--verify-cache", action="store_true")
     parser.add_argument(
@@ -395,17 +422,14 @@ def main():
         help="Isolated CPU molecular workers; defaults to one",
     )
     args = parser.parse_args()
+    config = config_from_arguments(args)
     import torch
 
     torch.set_num_threads(args.threads)
-    result = run_assessment(
+    result = run_thermochemistry_assessment(
         args.input,
         args.output,
-        AIMNetConfig(
-            device=args.device,
-            aimnet_checkpoint=args.aimnet_model,
-            loqi_checkpoint=args.loqi_model,
-        ),
+        config,
         args.cache,
         verify_cache=args.verify_cache,
         workers=args.workers,

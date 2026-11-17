@@ -70,3 +70,16 @@ class MolecularCalculationError(Exception):
             "detail": str(self),
             "category": self.category,
         }
+
+
+def normalize_config(config: AIMNetConfig) -> AIMNetConfig:
+    """Resolve equivalent symmetry keys once without changing the caller's config."""
+    from .species import canonical_species, parse_species
+
+    symmetry = {}
+    for text, number in config.symmetry_numbers.items():
+        key = canonical_species(parse_species(text))
+        if key in symmetry and symmetry[key] != number:
+            raise ValueError(f"Conflicting symmetry numbers for {key}")
+        symmetry[key] = number
+    return config.model_copy(update={"symmetry_numbers": symmetry}, deep=True)

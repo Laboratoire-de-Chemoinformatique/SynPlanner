@@ -21,7 +21,10 @@ def inject(monkeypatch, calculator):
 def input_file(tmp_path, texts):
     path = tmp_path / "routes.json"
     path.write_text(
-        json.dumps({str(i + 10): route(text).to_json() for i, text in enumerate(texts)})
+        json.dumps(
+            {str(i + 10): route(text).to_json() for i, text in enumerate(texts)}
+        ),
+        encoding="utf-8",
     )
     return path
 
@@ -43,7 +46,9 @@ def test_resume_complete_run_and_successful_cache_verification(tmp_path, monkeyp
     )
     assert resumed["resumed_reactions"] == 2
     assert calculator.calls == ["CCO", "O"]
-    assert list(json.loads((output / "routes_aimnet.json").read_text())) == ["10", "11"]
+    assert list(
+        json.loads((output / "routes_aimnet.json").read_text(encoding="utf-8"))
+    ) == ["10", "11"]
 
 
 def test_abort_keeps_results_and_marks_unprocessed_steps(tmp_path, monkeypatch):
@@ -58,16 +63,21 @@ def test_abort_keeps_results_and_marks_unprocessed_steps(tmp_path, monkeypatch):
     output = tmp_path / "results"
     with pytest.raises(RuntimeError, match="unexpectedly"):
         batch.run_assessment(source, output, AIMNetConfig(), tmp_path / "cache.json")
-    data = json.loads((output / "routes_aimnet.json").read_text())
+    data = json.loads((output / "routes_aimnet.json").read_text(encoding="utf-8"))
     annotations = [
         row["children"][0]["meta"]["thermochemistry"] for row in data.values()
     ]
     assert annotations[0]["status"] == "ok"
     assert all(a["failure"]["reason"] == "run_aborted" for a in annotations[1:])
-    assert "Traceback" in (output / "error.log").read_text()
-    assert "Errored — run aborted" in (output / "routes_aimnet.html").read_text()
+    assert "Traceback" in (output / "error.log").read_text(encoding="utf-8")
+    assert "Errored — run aborted" in (output / "routes_aimnet.html").read_text(
+        encoding="utf-8"
+    )
     assert (
-        json.loads((output / "run_summary.json").read_text())["run_status"] == "aborted"
+        json.loads((output / "run_summary.json").read_text(encoding="utf-8"))[
+            "run_status"
+        ]
+        == "aborted"
     )
 
 
@@ -128,7 +138,8 @@ def test_resume_startup_failure_preserves_publication(
         batch.run_assessment(source, output, AIMNetConfig(), tmp_path / "cache.json")
     assert all((output / name).read_bytes() == data for name, data in saved.items())
     failures = [
-        json.loads(p.read_text()) for p in output.glob("attempts/*/failure.json")
+        json.loads(p.read_text(encoding="utf-8"))
+        for p in output.glob("attempts/*/failure.json")
     ]
     assert any(r["stage"] == "startup" for r in failures)
 

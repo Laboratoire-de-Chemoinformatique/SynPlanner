@@ -192,7 +192,7 @@ def export_benchmark(output, *, publish=True):
     from synplan.utils.files import write_json_atomic
 
     output = Path(output)
-    manifest = json.loads((output / "manifest.json").read_text())
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
     trials, startups, identities = [], [], {}
     strict = manifest.get("format_version") == FORMAT_VERSION
     for profile in manifest["profiles"]:
@@ -207,7 +207,7 @@ def export_benchmark(output, *, publish=True):
             for startup_path in startup_paths:
                 if not startup_path.exists():
                     continue
-                record = json.loads(startup_path.read_text())
+                record = json.loads(startup_path.read_text(encoding="utf-8"))
                 if strict and record["status"] == "ready":
                     expected = manifest["execution_identities"][profile["id"]]
                     key = fingerprint(expected)
@@ -237,7 +237,7 @@ def export_benchmark(output, *, publish=True):
                     if not failed:
                         continue
                     path = failed[-1]
-                record = json.loads(path.read_text())
+                record = json.loads(path.read_text(encoding="utf-8"))
                 if strict:
                     key = executions.get(record.get("execution_id"))
                     if key is None or key != record.get("execution_fingerprint"):
@@ -251,7 +251,9 @@ def export_benchmark(output, *, publish=True):
                         / "thermochemistry.json"
                     )
                     if annotation_path.is_file():
-                        annotation = json.loads(annotation_path.read_text())
+                        annotation = json.loads(
+                            annotation_path.read_text(encoding="utf-8")
+                        )
                         provenance = annotation.get("calculation", {})
                         manifest["thermochemistry"] = {
                             "method": provenance.get("method"),
@@ -270,7 +272,7 @@ def export_benchmark(output, *, publish=True):
     if not publish:
         return result
     write_json_atomic(output / "benchmark.json", result)
-    with (output / "trials.csv").open("w", newline="") as stream:
+    with (output / "trials.csv").open("w", newline="", encoding="utf-8") as stream:
         fields = [
             "execution_id",
             "execution_fingerprint",
@@ -290,5 +292,7 @@ def export_benchmark(output, *, publish=True):
         writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(trials)
-    (output / "benchmark.html").write_text(report_html(manifest, summary, trials))
+    (output / "benchmark.html").write_text(
+        report_html(manifest, summary, trials), encoding="utf-8"
+    )
     return result

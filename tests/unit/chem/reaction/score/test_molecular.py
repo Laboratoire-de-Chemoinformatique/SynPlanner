@@ -5,8 +5,11 @@ import pytest
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-from synplan.chem.reaction.score.config import AIMNetConfig, MolecularCalculationError
-from synplan.chem.reaction.score.molecular import (
+from synplan.chem.reaction.score.aimnet.config import (
+    AIMNetConfig,
+    MolecularCalculationError,
+)
+from synplan.chem.reaction.score.aimnet.molecular import (
     AIMNetMolecularCalculator,
     species_seed,
     thermochemistry,
@@ -168,7 +171,7 @@ def test_proton_uses_exact_electronic_reference_and_monatomic_thermo(
     from ase.thermochemistry import IdealGasThermo
     from ase.units import kB
 
-    from synplan.chem.reaction.score.molecular import PROTON_REFERENCE
+    from synplan.chem.reaction.score.aimnet.molecular import PROTON_REFERENCE
 
     backend = AIMNetMolecularCalculator(AIMNetConfig())
     monkeypatch.setattr(backend, "identity", lambda: {})

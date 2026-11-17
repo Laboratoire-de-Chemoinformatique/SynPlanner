@@ -5,7 +5,10 @@ from types import SimpleNamespace
 import pytest
 
 from scripts import aimnet_workers as workers
-from synplan.chem.reaction.score.config import AIMNetConfig, MolecularCalculationError
+from synplan.chem.reaction.score.aimnet.config import (
+    AIMNetConfig,
+    MolecularCalculationError,
+)
 
 
 def adapter(tmp_path):

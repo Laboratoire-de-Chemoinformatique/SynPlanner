@@ -35,7 +35,7 @@ def execution_identity(profile, runtime):
     """Exclude changing load, clocks and free memory from compatibility checks."""
     import torch
 
-    cpuinfo = Path("/proc/cpuinfo").read_text().split("\n\n")[0]
+    cpuinfo = Path("/proc/cpuinfo").read_text(encoding="utf-8").split("\n\n")[0]
     stable_fields = {
         "vendor_id",
         "cpu family",
@@ -56,8 +56,10 @@ def execution_identity(profile, runtime):
         topology.append(
             {
                 "cpu": int(directory.name[3:]),
-                "core": (folder / "core_id").read_text().strip(),
-                "socket": (folder / "physical_package_id").read_text().strip(),
+                "core": (folder / "core_id").read_text(encoding="utf-8").strip(),
+                "socket": (folder / "physical_package_id")
+                .read_text(encoding="utf-8")
+                .strip(),
                 "nodes": sorted(p.name for p in directory.glob("node[0-9]*")),
             }
         )
@@ -111,7 +113,9 @@ def execution_identity(profile, runtime):
             "memory_bytes": device.total_memory,
             "compute_capability": [device.major, device.minor],
             # Works without NVML, including hosts with mismatched NVML libraries.
-            "driver": Path("/proc/driver/nvidia/version").read_text().splitlines()[0],
+            "driver": Path("/proc/driver/nvidia/version")
+            .read_text(encoding="utf-8")
+            .splitlines()[0],
         }
     return identity
 
@@ -142,7 +146,7 @@ def probe_runtime(profile, repo, destination):
         raise RuntimeError(
             f"Runtime preflight failed for {profile['id']}: {result.stderr[-4000:]}"
         )
-    return json.loads(destination.read_text())
+    return json.loads(destination.read_text(encoding="utf-8"))
 
 
 def main():
@@ -152,7 +156,7 @@ def main():
     synchronize, runtime = configure_runtime(profile)
     synchronize()
     Path(sys.argv[2]).write_text(
-        json.dumps(execution_identity(profile, runtime), indent=2)
+        json.dumps(execution_identity(profile, runtime), indent=2), encoding="utf-8"
     )
 
 

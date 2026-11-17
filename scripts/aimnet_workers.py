@@ -13,18 +13,21 @@ import os
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-from synplan.chem.reaction.score.chemistry import (
-    is_proton,
+from synplan.chem.reaction.score.aimnet.cache import symmetry_error
+from synplan.chem.reaction.score.aimnet.config import (
+    AIMNetConfig,
+    MolecularCalculationError,
     normalize_config,
-    prepare_reaction,
-    stereoisomers,
-    symmetry_error,
 )
-from synplan.chem.reaction.score.config import AIMNetConfig, MolecularCalculationError
-from synplan.chem.reaction.score.molecular import (
+from synplan.chem.reaction.score.aimnet.molecular import (
     PROTON_REFERENCE,
     AIMNetMolecularCalculator,
 )
+from synplan.chem.reaction.score.aimnet.preparation import (
+    prepare_reaction,
+    stereoisomers,
+)
+from synplan.chem.reaction.score.aimnet.species import is_proton
 from synplan.utils.files import read_json, write_json_atomic
 
 WORKER_CHECKPOINT_VERSION = 2

@@ -6,14 +6,15 @@ import pytest
 from chython import smiles
 from rdkit import Chem
 
-from synplan.chem.reaction.score import AIMNetConfig, chemistry
-from synplan.chem.reaction.score.chemistry import (
+from synplan.chem.reaction.score import AIMNetConfig
+from synplan.chem.reaction.score.aimnet import preparation as chemistry
+from synplan.chem.reaction.score.aimnet.config import MolecularCalculationError
+from synplan.chem.reaction.score.aimnet.preparation import (
     conserved,
     prepare_reaction,
     reaction_variants,
     stereoisomers,
 )
-from synplan.chem.reaction.score.config import MolecularCalculationError
 
 
 def test_balancer_adds_water_and_preserves_original():
@@ -119,7 +120,7 @@ def test_invalid_config(settings):
 def test_loqi_charge_vocabulary_and_atomic_bypass(charge):
     from rdkit import Chem
 
-    from synplan.chem.reaction.score.chemistry import validate_loqi_charges
+    from synplan.chem.reaction.score.aimnet.species import validate_loqi_charges
 
     molecule = Chem.MolFromSmiles("C[Si-3]")
     molecule.GetAtomWithIdx(1).SetFormalCharge(charge)
@@ -151,7 +152,7 @@ def test_unsupported_charge_does_not_abort_collection():
 
 def test_direct_backend_rejects_charge_before_loading_models(monkeypatch):
     from synplan.chem.reaction.score import AIMNetConfig
-    from synplan.chem.reaction.score.molecular import AIMNetMolecularCalculator
+    from synplan.chem.reaction.score.aimnet.molecular import AIMNetMolecularCalculator
 
     backend = AIMNetMolecularCalculator(AIMNetConfig())
     monkeypatch.setattr(

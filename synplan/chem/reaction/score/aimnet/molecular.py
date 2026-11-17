@@ -14,14 +14,13 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import rdDetermineBonds
 
-from synplan.chem.reaction.score.chemistry import (
+from .config import AIMNetConfig, MolecularCalculationError, normalize_config
+from .species import (
     canonical_species,
     is_proton,
-    normalize_config,
     parse_species,
     validate_loqi_charges,
 )
-from synplan.chem.reaction.score.config import AIMNetConfig, MolecularCalculationError
 
 LOQI_MODEL = "loqi_flow_v1.1.0"
 LOQI_COMMIT = "04f3caef4521b3fbcb236f8b01f4bc80c83cb918"

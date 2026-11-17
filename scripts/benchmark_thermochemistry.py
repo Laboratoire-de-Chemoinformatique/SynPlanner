@@ -60,7 +60,7 @@ def interpreter_path(path):
 
 
 def read_json(path):
-    return json.loads(Path(path).read_text())
+    return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
 def physical_cpus(count, allowed=None, topology_root=Path("/sys/devices/system/cpu")):
@@ -70,8 +70,8 @@ def physical_cpus(count, allowed=None, topology_root=Path("/sys/devices/system/c
     for cpu in allowed:
         folder = topology_root / f"cpu{cpu}"
         topology = folder / "topology"
-        socket = int((topology / "physical_package_id").read_text())
-        core = int((topology / "core_id").read_text())
+        socket = int((topology / "physical_package_id").read_text(encoding="utf-8"))
+        core = int((topology / "core_id").read_text(encoding="utf-8"))
         nodes = sorted(folder.glob("node[0-9]*"))
         node = nodes[0].name if nodes else str(socket)
         groups.setdefault((socket, node), {}).setdefault(core, cpu)
@@ -211,7 +211,7 @@ def run_trial(
     started = perf_counter_ns()
     try:
         with patch(
-            "synplan.chem.reaction.score.aimnet.write_json_atomic", cache_writer
+            "synplan.chem.reaction.score.aimnet.cache.write_json_atomic", cache_writer
         ):
             assessor = AIMNetReactionAssessor(config, cache, calculator=calculator)
             assert not assessor.cache["calculations"]
@@ -227,7 +227,9 @@ def run_trial(
     except BaseException as exc:
         finished = perf_counter_ns()
         record["error"] = {"type": type(exc).__name__, "detail": str(exc)}
-        (attempt_path / "error.log").write_text(traceback.format_exc())
+        (attempt_path / "error.log").write_text(
+            traceback.format_exc(), encoding="utf-8"
+        )
         raise
     else:
         finished = perf_counter_ns()
@@ -291,7 +293,7 @@ def run_trial(
 
 def load_cases(input_path):
     from scripts.assess_thermochemistry import load_routes
-    from synplan.chem.reaction.score.chemistry import (
+    from synplan.chem.reaction.score.aimnet.preparation import (
         prepare_reaction,
         reaction_variants,
     )
@@ -342,7 +344,9 @@ def worker(job_path):
         }
         startup.update(execution, execution_identity=actual_execution, runtime=runtime)
         from synplan.chem.reaction.score import AIMNetConfig
-        from synplan.chem.reaction.score.molecular import AIMNetMolecularCalculator
+        from synplan.chem.reaction.score.aimnet.molecular import (
+            AIMNetMolecularCalculator,
+        )
         from synplan.utils.files import write_json_atomic
 
         config = AIMNetConfig(**{**job["config"], "device": profile["device"]})
@@ -407,7 +411,9 @@ def worker(job_path):
         from synplan.utils.files import write_json_atomic
 
         try:
-            (output / f"error-{execution_id}.log").write_text(traceback.format_exc())
+            (output / f"error-{execution_id}.log").write_text(
+                traceback.format_exc(), encoding="utf-8"
+            )
             if not startup_path.exists():
                 startup["error"] = {"type": type(exc).__name__, "detail": str(exc)}
                 write_json_atomic(startup_path, startup)
@@ -426,7 +432,7 @@ def launch(job, python, repo):
     environment = {**os.environ, "PYTHONPATH": str(repo), "PYTHONUNBUFFERED": "1"}
     for name in THREAD_VARIABLES:
         environment[name] = str(job["profile"]["threads"])
-    with (output / "process.log").open("a") as log:
+    with (output / "process.log").open("a", encoding="utf-8") as log:
         process = subprocess.Popen(
             [
                 str(python),
@@ -483,7 +489,7 @@ def run_benchmark(args):
         Path(__file__),
         repo / "scripts/benchmark_runtime.py",
         repo / "scripts/benchmark_thermochemistry_report.py",
-        *sorted((repo / "synplan/chem/reaction/score").glob("*.py")),
+        *sorted((repo / "synplan/chem/reaction/score").rglob("*.py")),
         repo / "synplan/chem/reaction/curation/rebalancing.py",
     ]
     definition = {
@@ -498,7 +504,7 @@ def run_benchmark(args):
             "aimnet": digest(args.aimnet_model),
             "loqi": digest(args.loqi_model),
         },
-        "source_hashes": {str(p.relative_to(repo)): digest(p) for p in sources},
+        "source_hashes": {p.relative_to(repo).as_posix(): digest(p) for p in sources},
     }
     definition["expected_versions"] = {name: version(name) for name in PACKAGES}
     key = fingerprint(definition)
@@ -609,7 +615,7 @@ def run_benchmark(args):
         manifest["status"] = "complete"
     except BaseException as exc:
         try:
-            (attempt / "error.log").write_text(traceback.format_exc())
+            (attempt / "error.log").write_text(traceback.format_exc(), encoding="utf-8")
             write_json_atomic(
                 attempt / "failure.json",
                 {

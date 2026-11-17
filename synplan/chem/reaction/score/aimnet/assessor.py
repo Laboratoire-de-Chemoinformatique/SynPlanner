@@ -1,87 +1,27 @@
-"""Post-planning AIMNet2 gas-phase thermochemistry of balanced reaction variants.
-
-The public assessor follows ForwardReactionAssessor's copy-and-annotate API.
-Neither planning, route order, nor the original reaction containers are changed.
-"""
+"""Post-planning orchestration of balanced reaction and copied route assessments."""
 
 from __future__ import annotations
 
-import hashlib
-import json
 from collections.abc import Callable, Iterable
 from copy import deepcopy
-from dataclasses import replace
-from math import fsum, isfinite
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING
 
 from tqdm.auto import tqdm
 
-from synplan.chem.reaction.score.chemistry import (
-    is_proton,
-    normalize_config,
-    prepare_reaction,
-    reaction_variants,
-    symmetry_error,
-)
-from synplan.chem.reaction.score.config import AIMNetConfig, MolecularCalculationError
-from synplan.chem.reaction.score.molecular import (
-    EV_TO_KCAL_MOL,
-    PROTON_REFERENCE,
-    AIMNetMolecularCalculator,
-)
 from synplan.chem.utils import mapped_smiles
-from synplan.utils.files import read_json, write_json_atomic
+
+from .cache import MolecularCache, MolecularCalculator
+from .config import AIMNetConfig, MolecularCalculationError, normalize_config
+from .molecular import PROTON_REFERENCE, AIMNetMolecularCalculator
+from .preparation import prepare_reaction, reaction_variants
+from .results import ASSESSMENT_VERSION, annotate_routes, reaction_thermochemistry
 
 if TYPE_CHECKING:
     from chython.containers import ReactionContainer
 
     from synplan.chem.reaction.routes import Route
-
-__all__ = ["AIMNetConfig", "AIMNetReactionAssessor"]
-
-ASSESSMENT_VERSION = 1
-CACHE_VERSION = 1
-
-
-class MolecularCalculator(Protocol):
-    """Adapter identity identifies model/runtime; overrides require symmetry_number."""
-
-    def identity(self) -> dict: ...
-
-    def calculate(self, smiles: str) -> dict: ...
-
-
-def _fingerprint(value) -> str:
-    return hashlib.sha256(
-        json.dumps(value, sort_keys=True, allow_nan=False).encode()
-    ).hexdigest()
-
-
-def reaction_thermochemistry(
-    reactants: list[str], products: list[str], molecules: dict
-) -> dict:
-    """Stoichiometric products minus reactants; duplicate species count repeatedly."""
-    result = {"units": "kcal/mol"}
-    for name, field in (
-        ("delta_e", "energy_eV"),
-        ("delta_h", "enthalpy_eV"),
-        ("delta_g", "gibbs_eV"),
-    ):
-        value = (
-            fsum(
-                [
-                    *(molecules[s][field] for s in products),
-                    *(-molecules[s][field] for s in reactants),
-                ]
-            )
-            * EV_TO_KCAL_MOL
-        )
-        if not isfinite(value):
-            raise ValueError("Molecular calculator returned nonfinite thermochemistry")
-        result[name] = value
-    return result
 
 
 class AIMNetReactionAssessor:
@@ -104,67 +44,21 @@ class AIMNetReactionAssessor:
         self.config = normalize_config(config or AIMNetConfig())
         self.calculator = calculator or AIMNetMolecularCalculator(self.config)
         self.cache_path = Path(cache_path) if cache_path is not None else None
-        self.cache: dict[str, Any] = (
-            read_json(self.cache_path)
-            if self.cache_path is not None and self.cache_path.exists()
-            else {"version": CACHE_VERSION, "calculations": {}}
-        )
-        if self.cache.get("version") != CACHE_VERSION:
-            raise ValueError("Unsupported AIMNet cache version")
-        self.identity = None
-        self._entries = None
+        self._cache = MolecularCache(self.config, self.cache_path)
         self.last_stats = {}
         self.completed_reactions: list[dict] = []
 
+    @property
+    def cache(self) -> dict:
+        """Molecular cache data, also used to prime isolated workers."""
+        return self._cache.data
+
+    @property
+    def identity(self) -> dict | None:
+        return self._cache.identity
+
     def _molecule(self, smiles: str) -> dict:
-        if self._entries is None:
-            self.identity = {
-                "assessment_version": ASSESSMENT_VERSION,
-                "config": self.config.model_dump(mode="json"),
-                "calculator": self.calculator.identity(),
-            }
-            key = _fingerprint(self.identity)
-            self._entries = self.cache["calculations"].setdefault(
-                key, {"identity": self.identity, "molecules": {}}
-            )["molecules"]
-        self._seen_species.add(smiles)
-        if (
-            smiles in self._entries
-            and is_proton(smiles)
-            and self._entries[smiles].get("electronic_energy_reference")
-            != PROTON_REFERENCE
-        ):
-            del self._entries[smiles]
-        if smiles in self._entries and symmetry_error(
-            smiles, self._entries[smiles], self.config
-        ):
-            del self._entries[smiles]
-            self.last_stats["cache_invalidations"] += 1
-        if smiles in self._entries:
-            self.last_stats["cache_hits"] += 1
-            return self._entries[smiles]
-        if smiles in self._failures:
-            raise self._failures[smiles]
-        self.last_stats["molecular_calculations"] += 1
-        started = perf_counter()
-        try:
-            result = self.calculator.calculate(smiles)
-            if problem := symmetry_error(smiles, result, self.config):
-                raise ValueError(problem)
-            if not all(
-                isfinite(result[k]) for k in ("energy_eV", "enthalpy_eV", "gibbs_eV")
-            ):
-                raise ValueError("Molecular calculator returned nonfinite E/H/G")
-        except MolecularCalculationError as exc:
-            self._failures[smiles] = exc
-            self.last_stats["molecular_failures"] += 1
-            raise
-        finally:
-            self.last_stats["calculation_seconds"] += perf_counter() - started
-        self._entries[smiles] = deepcopy(result)
-        if self.cache_path is not None:
-            write_json_atomic(self.cache_path, self.cache)
-        return self._entries[smiles]
+        return self._cache.get(smiles, self.calculator, self.last_stats)
 
     def _reaction(self, reaction: ReactionContainer) -> dict:
         result = {
@@ -255,8 +149,7 @@ class AIMNetReactionAssessor:
             "molecular_failures": 0,
             "calculation_seconds": 0.0,
         }
-        self._seen_species: set[str] = set()
-        self._failures: dict[str, MolecularCalculationError] = {}
+        self._cache.begin_assessment()
         self.completed_reactions = []
         results = self.completed_reactions
         for index, reaction in enumerate(
@@ -274,7 +167,7 @@ class AIMNetReactionAssessor:
                 on_reaction(index, result)
         self.last_stats.update(
             reaction_occurrences=len(results),
-            unique_species=len(self._seen_species),
+            unique_species=len(self._cache.seen_species),
             successful_reactions=sum(r["status"] == "ok" for r in results),
             skipped_reactions=sum(r["status"] == "skipped" for r in results),
             total_variants=sum(len(r["variants"]) for r in results),
@@ -325,31 +218,4 @@ class AIMNetReactionAssessor:
         routes: Iterable[Route], annotations: Iterable[dict]
     ) -> list[Route]:
         """Attach aligned results to route copies, also usable for checkpoints."""
-        annotations = iter(annotations)
-        assessed = []
-        for route in routes:
-            steps = tuple(
-                replace(step, thermochemistry=next(annotations)) for step in route.steps
-            )
-            rows = [step.thermochemistry for step in steps]
-            summary = {
-                "version": ASSESSMENT_VERSION,
-                "total_steps": len(steps),
-                "successful_steps": sum(r["status"] == "ok" for r in rows),
-                "skipped_steps": sum(r["status"] == "skipped" for r in rows),
-                "failed_steps": sum(r["status"] == "failed" for r in rows),
-                "partial_steps": sum(r["status"] == "partial" for r in rows),
-                "total_variants": sum(len(r["variants"]) for r in rows),
-                "successful_variants": sum(
-                    r.get("successful_variants", 0) for r in rows
-                ),
-                "calculation": deepcopy(rows[0]["calculation"]),
-            }
-            assessed.append(
-                replace(
-                    route,
-                    steps=steps,
-                    assessment={**deepcopy(route.assessment or {}), "aimnet": summary},
-                )
-            )
-        return assessed
+        return annotate_routes(routes, annotations)

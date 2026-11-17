@@ -7,8 +7,9 @@ import pytest
 
 from scripts import aimnet_workers as workers
 from scripts import assess_thermochemistry as batch
-from synplan.chem.reaction.score import AIMNetConfig, AIMNetReactionAssessor, aimnet
-from synplan.chem.reaction.score.chemistry import normalize_config
+from synplan.chem.reaction.score import AIMNetConfig, AIMNetReactionAssessor
+from synplan.chem.reaction.score.aimnet import assessor as aimnet
+from synplan.chem.reaction.score.aimnet.config import normalize_config
 
 from .test_aimnet import Calculator, route
 from .test_batch import input_file
@@ -59,7 +60,9 @@ def setup_backends(monkeypatch):
 
 
 def annotation(output):
-    return json.loads((output / "reactions/00000.json").read_text())["annotation"]
+    return json.loads((output / "reactions/00000.json").read_text(encoding="utf-8"))[
+        "annotation"
+    ]
 
 
 def test_serial_parallel_override_equivalence_and_reuse(tmp_path, monkeypatch):
@@ -92,13 +95,13 @@ def test_invalid_symmetry_cache_recalculates_only_affected_species(tmp_path, rec
     AIMNetReactionAssessor(config, cache, calculator=SymmetryCalculator(config)).assess(
         rows
     )
-    saved = json.loads(cache.read_text())
+    saved = json.loads(cache.read_text(encoding="utf-8"))
     water = next(iter(saved["calculations"].values()))["molecules"]["O"]
     water.pop("symmetry_number")
     if recorded is not None:
         water["symmetry_number"] = recorded
     water["gibbs_eV"] = -999
-    cache.write_text(json.dumps(saved))
+    cache.write_text(json.dumps(saved), encoding="utf-8")
     calculator = SymmetryCalculator(config)
     service = AIMNetReactionAssessor(config, cache, calculator=calculator)
     service.assess(rows)
@@ -124,14 +127,19 @@ def test_worker_rejects_inconsistent_job_results(tmp_path, monkeypatch):
     )
     try:
         path = service._path("O")
-        path.write_text(json.dumps({"result": {"symmetry_number": 1}}))
+        path.write_text(
+            json.dumps({"result": {"symmetry_number": 1}}), encoding="utf-8"
+        )
         assert service.calculate("O")["symmetry_number"] == 2
     finally:
         service.close()
 
 
+@pytest.mark.parametrize(
+    "changed_source", ["aimnet_workers.py", "aimnet/preparation.py", "aimnet/cache.py"]
+)
 def test_legacy_and_changed_orchestration_checkpoints_are_refused(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, changed_source
 ):
     setup_backends(monkeypatch)
     config = AIMNetConfig(symmetry_numbers={"O": 2})
@@ -139,21 +147,23 @@ def test_legacy_and_changed_orchestration_checkpoints_are_refused(
     output = tmp_path / "results"
     batch.run_assessment(source, output, config, tmp_path / "cache.json")
     job = output / "checkpoint.json"
-    checkpoint = json.loads(job.read_text())
+    checkpoint = json.loads(job.read_text(encoding="utf-8"))
     assert "scripts/aimnet_workers.py" in checkpoint["code"]
     assert "scripts/assess_thermochemistry.py" in checkpoint["code"]
+    assert "synplan/chem/reaction/score/aimnet/preparation.py" in checkpoint["code"]
+    assert all("\\" not in name for name in checkpoint["code"])
     before = (output / "routes_aimnet.json").read_bytes()
     digest = batch.file_digest
     monkeypatch.setattr(
         batch,
         "file_digest",
-        lambda p: "changed" if str(p).endswith("aimnet_workers.py") else digest(p),
+        lambda p: "changed" if p.as_posix().endswith(changed_source) else digest(p),
     )
     with pytest.raises(batch.IncompatibleCheckpointError):
         batch.run_assessment(source, output, config, tmp_path / "fresh.json")
     assert (output / "routes_aimnet.json").read_bytes() == before
     checkpoint.pop("version")
-    job.write_text(json.dumps(checkpoint))
+    job.write_text(json.dumps(checkpoint), encoding="utf-8")
     with pytest.raises(batch.IncompatibleCheckpointError, match="Legacy"):
         batch.run_assessment(source, output, config, tmp_path / "fresh.json")
     assert (output / "routes_aimnet.json").read_bytes() == before

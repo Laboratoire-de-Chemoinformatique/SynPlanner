@@ -9,9 +9,9 @@ from chython import smiles
 
 from synplan.chem.reaction.routes import Route, Step
 from synplan.chem.reaction.score import AIMNetConfig, AIMNetReactionAssessor
-from synplan.chem.reaction.score.aimnet import reaction_thermochemistry
-from synplan.chem.reaction.score.config import MolecularCalculationError
-from synplan.chem.reaction.score.molecular import EV_TO_KCAL_MOL
+from synplan.chem.reaction.score.aimnet.config import MolecularCalculationError
+from synplan.chem.reaction.score.aimnet.molecular import EV_TO_KCAL_MOL
+from synplan.chem.reaction.score.aimnet.results import reaction_thermochemistry
 
 
 class Calculator:
@@ -168,7 +168,7 @@ def test_unexpected_error_propagates_and_checkpoints_survive(tmp_path):
     cache = tmp_path / "cache.json"
     with pytest.raises(RuntimeError, match="model bug"):
         AIMNetReactionAssessor(cache_path=cache, calculator=Broken()).assess([route()])
-    assert json.loads(cache.read_text())["calculations"]
+    assert json.loads(cache.read_text(encoding="utf-8"))["calculations"]
 
 
 def test_partial_stereo_coverage_is_explicit():
@@ -198,7 +198,14 @@ class Block(importlib.abc.MetaPathFinder):
 sys.meta_path.insert(0, Block())
 from chython import smiles
 from synplan.chem.reaction.score.aimnet import AIMNetConfig, AIMNetReactionAssessor
-service = AIMNetReactionAssessor(cache_path=None)
+import tempfile
+from pathlib import Path
+with tempfile.TemporaryDirectory() as directory:
+    path = Path(directory) / 'config.yaml'
+    path.write_text('device: cpu\\ntemperature: 310\\n', encoding='utf-8')
+    config = AIMNetConfig.from_yaml(str(path))
+service = AIMNetReactionAssessor(config, cache_path=None)
+assert service.config.temperature == 310
 assert service.assess_reactions([smiles('[Na+]>>[Na+]')])[0]['status'] == 'skipped'
 try:
     service.assess_reactions([smiles('CCO>>CCO')])
@@ -213,7 +220,7 @@ else:
 
 
 def test_old_proton_cache_invalidated_without_discarding_other_species(tmp_path):
-    from synplan.chem.reaction.score.molecular import PROTON_REFERENCE
+    from synplan.chem.reaction.score.aimnet.molecular import PROTON_REFERENCE
 
     class Exact(Calculator):
         def calculate(self, text):

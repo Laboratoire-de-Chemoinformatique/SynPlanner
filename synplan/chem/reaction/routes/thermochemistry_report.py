@@ -17,7 +17,7 @@ from typing import Any
 from synplan.chem.reaction.routes.representation.depiction import (
     _temporary_render_config,
 )
-from synplan.chem.reaction.score.config import FILTER_REASONS
+from synplan.chem.reaction.score.aimnet.config import FILTER_REASONS
 from synplan.utils.routedraw import ARROW_DEFS, ROUTE_CSS, drawable_copy, molecule_svg
 from synplan.utils.svgslim import Doc, hidden_defs
 

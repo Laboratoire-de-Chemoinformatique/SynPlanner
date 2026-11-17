@@ -11,8 +11,8 @@ import pytest
 from scripts import benchmark_thermochemistry as bench
 from scripts.benchmark_thermochemistry_report import aggregate, export_benchmark
 from synplan.chem.reaction.score import AIMNetConfig
-from synplan.chem.reaction.score import aimnet as assessor_module
-from synplan.chem.reaction.score.config import MolecularCalculationError
+from synplan.chem.reaction.score.aimnet import cache as cache_module
+from synplan.chem.reaction.score.aimnet.config import MolecularCalculationError
 
 from .test_aimnet import Calculator
 
@@ -90,7 +90,7 @@ def test_each_trial_recalculates_and_writes_cache_and_annotation(tmp_path):
 
 
 def test_abort_restores_writer_and_retry_does_not_reuse_partial_cache(tmp_path):
-    original = assessor_module.write_json_atomic
+    original = cache_module.write_json_atomic
 
     class Broken(Calculator):
         broken = True
@@ -104,10 +104,12 @@ def test_abort_restores_writer_and_retry_does_not_reuse_partial_cache(tmp_path):
     source = case("CCO.O>>CCO.O", ("CCO", "O"))
     with pytest.raises(RuntimeError, match="model bug"):
         bench.run_trial(source, AIMNetConfig(), calculator, tmp_path)
-    assert assessor_module.write_json_atomic is original
+    assert cache_module.write_json_atomic is original
     assert not (tmp_path / "trial.json").exists()
     assert (
-        json.loads((tmp_path / "attempt-001/timings.json").read_text())["status"]
+        json.loads((tmp_path / "attempt-001/timings.json").read_text(encoding="utf-8"))[
+            "status"
+        ]
         == "errored"
     )
     assert (tmp_path / "attempt-001/cache.json").exists()
@@ -125,7 +127,10 @@ def test_expected_molecular_failure_is_retained(tmp_path):
     assert result["status"] == "failed"
     assert result["successful_variants"] == 0 and result["total_variants"] == 1
     assert result["thermo_writes"] == 1
-    assert json.loads((tmp_path / "trial.json").read_text())["status"] == "failed"
+    assert (
+        json.loads((tmp_path / "trial.json").read_text(encoding="utf-8"))["status"]
+        == "failed"
+    )
 
 
 def test_core_selection_excludes_smt_and_cross_numa(tmp_path):
@@ -133,8 +138,8 @@ def test_core_selection_excludes_smt_and_cross_numa(tmp_path):
         folder = tmp_path / f"cpu{cpu}"
         (folder / "topology").mkdir(parents=True)
         (folder / "node0").mkdir()
-        (folder / "topology/physical_package_id").write_text("0")
-        (folder / "topology/core_id").write_text(str(core))
+        (folder / "topology/physical_package_id").write_text("0", encoding="utf-8")
+        (folder / "topology/core_id").write_text(str(core), encoding="utf-8")
     assert bench.physical_cpus(2, [0, 1, 2, 3], tmp_path) == [0, 1]
     with pytest.raises(ValueError, match="physical cores"):
         bench.physical_cpus(3, [0, 1, 2, 3], tmp_path)
@@ -187,16 +192,25 @@ def test_summaries_include_failures_and_speedups_require_all_repeats():
     assert aggregate(manifest, trials[:-1])[1]["speedup_vs_cpu1"] is None
 
 
-def test_export_round_trip_escaping_and_hidden_manifest(tmp_path):
+def test_export_round_trip_escaping_and_hidden_manifest(tmp_path, monkeypatch):
+    # Emulate a Windows legacy locale: report/CSV I/O must choose UTF-8 itself.
+    original_open = Path.open
+
+    def legacy_locale(self, mode="r", buffering=-1, encoding=None, **kwargs):
+        if "b" not in mode and encoding is None:
+            encoding = "cp1252"
+        return original_open(self, mode, buffering, encoding=encoding, **kwargs)
+
+    monkeypatch.setattr(Path, "open", legacy_locale)
     manifest, trials = fixture_trials()
     before = deepcopy(manifest)
-    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     for trial in trials:
         directory = (
             tmp_path / trial["profile"] / f"repeat-{trial['repeat']}" / trial["case_id"]
         )
         directory.mkdir(parents=True)
-        (directory / "trial.json").write_text(json.dumps(trial))
+        (directory / "trial.json").write_text(json.dumps(trial), encoding="utf-8")
     annotation = tmp_path / "cpu-1/repeat-1/test/attempt-001/thermochemistry.json"
     annotation.parent.mkdir()
     annotation.write_text(
@@ -208,7 +222,8 @@ def test_export_round_trip_escaping_and_hidden_manifest(tmp_path):
                 },
                 "molecules": {"coordinates_angstrom": [[12345, 23456, 34567]]},
             }
-        )
+        ),
+        encoding="utf-8",
     )
     result = export_benchmark(tmp_path)
     assert result["manifest"]["thermochemistry"]["reference_conventions"] == {
@@ -216,8 +231,8 @@ def test_export_round_trip_escaping_and_hidden_manifest(tmp_path):
     }
     assert len(result["trials"]) == 6
     assert manifest == before
-    assert len((tmp_path / "trials.csv").read_text().splitlines()) == 7
-    page = (tmp_path / "benchmark.html").read_text()
+    assert len((tmp_path / "trials.csv").read_text(encoding="utf-8").splitlines()) == 7
+    page = (tmp_path / "benchmark.html").read_text(encoding="utf-8")
     assert (
         "<script>bad</script>" not in page
         and "&lt;script&gt;bad&lt;/script&gt;" in page
@@ -270,7 +285,9 @@ def test_gpu_interpreter_keeps_virtual_environment_packages(tmp_path):
     if not python.is_symlink():
         pytest.skip("This host cannot create a symlinked Python environment")
     site_packages = next((environment / "lib").glob("python*/site-packages"))
-    (site_packages / "benchmark_env_marker.py").write_text('value = "selected-venv"\n')
+    (site_packages / "benchmark_env_marker.py").write_text(
+        'value = "selected-venv"\n', encoding="utf-8"
+    )
     result = subprocess.check_output(
         [
             bench.interpreter_path(python),
@@ -286,7 +303,7 @@ def test_gpu_interpreter_keeps_virtual_environment_packages(tmp_path):
 def benchmark_run(tmp_path, monkeypatch):
     monkeypatch.setattr(bench.sys, "platform", "linux")
     source = tmp_path / "routes.json"
-    source.write_text("{}")
+    source.write_text("{}", encoding="utf-8")
     aimnet, loqi = tmp_path / "aimnet.pt", tmp_path / "loqi.ckpt"
     aimnet.write_bytes(b"fake aimnet")
     loqi.write_bytes(b"fake loqi")
@@ -340,7 +357,8 @@ def benchmark_run(tmp_path, monkeypatch):
                     "calculator": {},
                     "profile": job["profile"],
                 }
-            )
+            ),
+            encoding="utf-8",
         )
         for selected in job["cases"]:
             directory = block / selected["id"]
@@ -353,7 +371,7 @@ def benchmark_run(tmp_path, monkeypatch):
                 selected, AIMNetConfig(), Calculator(), directory, execution=execution
             )
         (block / "complete.json").write_text(
-            json.dumps({**execution, "complete": True})
+            json.dumps({**execution, "complete": True}), encoding="utf-8"
         )
         return 0
 
@@ -405,7 +423,7 @@ def test_gpu_probe_failure_aborts_before_cpu_work(benchmark_run, monkeypatch, fa
     assert not state.calls
     assert bench.read_json(args.output / "manifest.json")["status"] == "aborted"
     assert bench.read_json(args.output / "benchmark.json")["trials"] == []
-    assert "aborted" in (args.output / "benchmark.html").read_text()
+    assert "aborted" in (args.output / "benchmark.html").read_text(encoding="utf-8")
     assert next((args.output / "attempts").glob("*/failure.json"))
 
 
@@ -452,7 +470,7 @@ def test_legacy_resume_refused_but_report_reading_supported(benchmark_run):
     args, state = benchmark_run
     args.output.mkdir()
     manifest, _ = fixture_trials()
-    (args.output / "manifest.json").write_text(json.dumps(manifest))
+    (args.output / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     export_benchmark(args.output)
     before = (args.output / "benchmark.html").read_bytes()
     with pytest.raises(ValueError, match="Legacy benchmark"):
@@ -467,7 +485,7 @@ def test_tampered_trial_identity_is_not_aggregated(benchmark_run):
     path = args.output / "cpu-1/repeat-1/test/trial.json"
     record = bench.read_json(path)
     record["execution_id"] = "missing-startup"
-    path.write_text(json.dumps(record))
+    path.write_text(json.dumps(record), encoding="utf-8")
     page = (args.output / "benchmark.html").read_bytes()
     with pytest.raises(ValueError, match="matching execution provenance"):
         export_benchmark(args.output)

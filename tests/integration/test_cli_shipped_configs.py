@@ -9,6 +9,7 @@ The heavy worker each subcommand calls is stubbed out; what is under test is
 CLI wiring plus config parsing, not the pipeline behind it.
 """
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -178,10 +179,16 @@ REFERENCED_CONFIGS = {
 }
 
 
+# Standalone assessment commands are tested separately from Click subcommands.
+SCRIPT_CONFIGS = {"aimnet_thermo.yaml"}
+
+
 def test_every_shipped_config_has_a_cli_case():
     # getattr unwraps pytest.param; a plain tuple indexes directly
     covered = {getattr(case, "values", case)[1] for case in CASES}
-    assert {p.name for p in CONFIGS.glob("*.yaml")} == covered | REFERENCED_CONFIGS
+    assert {
+        p.name for p in CONFIGS.glob("*.yaml")
+    } == covered | REFERENCED_CONFIGS | SCRIPT_CONFIGS
 
 
 def test_shipped_forward_config_reaches_planning(
@@ -246,3 +253,41 @@ def test_shipped_config_reaches_its_command(command, config, args, stubbed_worke
 
     assert result.exit_code == 0, f"{command} {config}: {result.exception!r}"
     assert stubbed_workers, f"{command} {config} exited without doing any work"
+
+
+@pytest.mark.parametrize("config_name", sorted(SCRIPT_CONFIGS))
+def test_shipped_aimnet_config_reaches_thermochemistry_runner(
+    config_name, tmp_path, monkeypatch
+):
+    import torch
+
+    from scripts import assess_thermochemistry as batch
+    from synplan.chem.reaction.score import AIMNetConfig
+
+    calls = []
+
+    def record(input_path, output, config, cache_path, **kwargs):
+        calls.append((input_path, output, config, cache_path, kwargs))
+        return {}
+
+    monkeypatch.setattr(batch, "run_thermochemistry_assessment", record)
+    monkeypatch.setattr(torch, "set_num_threads", lambda value: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "assess_thermochemistry",
+            "--config",
+            str(CONFIGS / config_name),
+            "--input",
+            str(tmp_path / "routes.json"),
+            "--output",
+            str(tmp_path / "results"),
+            "--cache",
+            str(tmp_path / "cache.json"),
+        ],
+    )
+    batch.main()
+    assert len(calls) == 1
+    assert calls[0][2] == AIMNetConfig()
+    assert calls[0][4] == {"verify_cache": False, "workers": 1, "threads": 4}
