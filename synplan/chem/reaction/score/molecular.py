@@ -19,6 +19,7 @@ from synplan.chem.reaction.score.chemistry import (
     is_proton,
     normalize_config,
     parse_species,
+    validate_loqi_charges,
 )
 from synplan.chem.reaction.score.config import AIMNetConfig, MolecularCalculationError
 
@@ -304,12 +305,13 @@ class AIMNetMolecularCalculator:
             np.random.set_state(np_state)
 
     def calculate(self, smiles: str) -> dict:
+        expected = Chem.AddHs(parse_species(smiles))
+        validate_loqi_charges(expected)
         self.identity()
         from aimnet.calculators import AIMNet2ASE
         from ase import Atoms
         from ase.optimize import BFGS
 
-        expected = Chem.AddHs(parse_species(smiles))
         if is_proton(smiles):
             # A nucleus with no electrons has exactly zero electronic energy.
             # Model inference on H+ introduces a spurious learned offset.

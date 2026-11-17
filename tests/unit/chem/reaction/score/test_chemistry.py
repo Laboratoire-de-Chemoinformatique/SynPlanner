@@ -113,3 +113,59 @@ def test_symmetric_species_permutations_and_stoichiometry():
 def test_invalid_config(settings):
     with pytest.raises(ValueError):
         AIMNetConfig(**settings)
+
+
+@pytest.mark.parametrize("charge", [-3, -2, 3, 4])
+def test_loqi_charge_vocabulary_and_atomic_bypass(charge):
+    from rdkit import Chem
+
+    from synplan.chem.reaction.score.chemistry import validate_loqi_charges
+
+    molecule = Chem.MolFromSmiles("C[Si-3]")
+    molecule.GetAtomWithIdx(1).SetFormalCharge(charge)
+    molecule.UpdatePropertyCache(strict=False)
+    if -2 <= charge <= 3:
+        validate_loqi_charges(molecule)
+    else:
+        with pytest.raises(MolecularCalculationError) as caught:
+            validate_loqi_charges(molecule)
+        assert caught.value.reason == "unsupported_charge"
+        assert caught.value.category == "filtered_out"
+    validate_loqi_charges(Chem.MolFromSmiles("[N-3]"))
+
+
+def test_unsupported_charge_does_not_abort_collection():
+    from synplan.chem.reaction.score import AIMNetReactionAssessor
+
+    from .test_aimnet import Calculator
+
+    calculator = Calculator()
+    results = AIMNetReactionAssessor(
+        cache_path=None, calculator=calculator
+    ).assess_reactions([smiles("C[Si-3]>>C[Si-3]"), smiles("CCO>>CCO")])
+    assert results[0]["failure"]["reason"] == "unsupported_charge"
+    assert results[0]["status"] == "skipped"
+    assert results[1]["status"] == "ok"
+    assert calculator.calls == ["CCO"]
+
+
+def test_direct_backend_rejects_charge_before_loading_models(monkeypatch):
+    from synplan.chem.reaction.score import AIMNetConfig
+    from synplan.chem.reaction.score.molecular import AIMNetMolecularCalculator
+
+    backend = AIMNetMolecularCalculator(AIMNetConfig())
+    monkeypatch.setattr(
+        backend, "identity", lambda: pytest.fail("models must not load")
+    )
+    with pytest.raises(MolecularCalculationError, match="LoQI supports"):
+        backend.calculate("C[Si-3]")
+
+
+def test_balanced_completion_rechecks_loqi_charges(monkeypatch):
+    monkeypatch.setattr(
+        chemistry, "rebalance_reaction", lambda *a, **kw: smiles("C[Si-3]>>C[Si-3]")
+    )
+    with pytest.raises(MolecularCalculationError) as caught:
+        prepare_reaction(smiles("CC(=O)O.CCO>>CC(=O)OCC"), 0.8)
+    assert caught.value.reason == "unsupported_charge"
+    assert caught.value.reaction_context["balanced_reaction"]

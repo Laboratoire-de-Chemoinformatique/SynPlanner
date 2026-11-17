@@ -39,6 +39,7 @@ class AIMNetConfig(BaseConfigModel):
 FILTER_REASONS = frozenset(
     {
         "unsupported_element",
+        "unsupported_charge",
         "radical",
         "unsupported_stereo",
         "unsupported_redox",

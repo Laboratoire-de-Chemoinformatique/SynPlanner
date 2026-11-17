@@ -132,6 +132,21 @@ def _check_stereo(mol) -> None:
             )
 
 
+def validate_loqi_charges(mol) -> None:
+    """LoQI Flow v1.1.0 encodes six atom-charge classes with offset two."""
+    if Chem.AddHs(mol).GetNumAtoms() == 1:
+        return  # Atomic species never enter the conformer generator.
+    for atom in mol.GetAtoms():
+        charge = atom.GetFormalCharge()
+        if not -2 <= charge <= 3:
+            raise MolecularCalculationError(
+                "applicability",
+                "unsupported_charge",
+                f"LoQI supports atom charges -2 through +3; atom {atom.GetIdx()} "
+                f"({atom.GetSymbol()}) has charge {charge}.",
+            )
+
+
 def validate_species(mol) -> None:
     if not mol.GetNumAtoms():
         raise MolecularCalculationError(
@@ -146,6 +161,7 @@ def validate_species(mol) -> None:
             raise MolecularCalculationError(
                 "applicability", "radical", "Only closed-shell species are supported."
             )
+    validate_loqi_charges(mol)
     _check_stereo(mol)
 
 
