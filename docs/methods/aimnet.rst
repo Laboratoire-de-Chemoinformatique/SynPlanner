@@ -31,7 +31,7 @@ revision:
 
 For a source checkout, replace ``SynPlanner[cpu]`` with ``-e '.[cpu]'``.
 The repository's ``uv sync --extra cpu`` also selects CPU PyTorch. Install LoQI
-after syncing, or use ``uv sync --inexact`` to retain the separate installation.
+after syncing, or use ``uv sync --extra cpu --inexact`` to retain the separate installation.
 A future LoQI PyPI release can be added to the extras without changing the API.
 
 Model weights resolve through upstream checksum-verified registries on first
@@ -88,6 +88,9 @@ Chemistry and numerical contracts
   a skip; metal-containing species are not silently removed from an equation.
 * Supported elements are H, B, C, N, O, F, Si, P, S, Cl, As, Se, Br, and I.
   Charges are passed explicitly; isotope labels and masses are preserved.
+  Polyatomic species must use LoQI atom charges from -2 through +3; other
+  charges are filtered with reason ``unsupported_charge`` before model loading.
+  The check counts explicit hydrogens; monatomic species bypass LoQI.
 * Already-balanced equations need no inference. Otherwise balancing requires
   confidence at least 0.8, refuses unsupported redox completion, and neither
   invents redox agents nor drops competing products. Element/isotope counts,
@@ -139,6 +142,10 @@ Cache identity includes stereochemistry, isotope/charge identity, model byte
 hashes, software versions, sampling/optimization settings, and thermochemical
 assumptions. Failures are reused only within the current assessment and retried
 on the next call. Interrupted runs retain completed molecular calculations.
+Symmetry overrides are canonicalized identically for serial and parallel runs.
+Cached symmetry metadata must match the requested value; incompatible entries
+are recalculated selectively. Legacy entries without symmetry metadata remain
+usable only for the default symmetry assumption.
 Use one writer per cache file; concurrent writers are not supported.
 
 ``cache_path=None`` uses an in-memory cache. ``last_stats`` records reaction and
@@ -198,6 +205,11 @@ and each completed reaction is checkpointed atomically. Identical runs resume
 completed reactions, including recorded failures; use a new output directory to
 retry failed reactions while retaining the molecular cache. Changed input,
 calculation code, models or settings require a new reaction-checkpoint directory.
+Reaction and worker checkpoint format 2 also fingerprints the orchestration
+code. Older reaction checkpoints must be kept in their original directory;
+start a new directory with a copy of the compatible molecular cache. Older
+Route JSON remains readable. A failed resume startup preserves the existing
+JSON/HTML reports and writes diagnostics under ``attempts/<id>/``.
 Unexpected errors propagate and retain a traceback plus a partial report whose
 unprocessed steps are explicitly Errored — run aborted. Cached verification
 covers every previously successful reaction and forbids new molecular calculations.
@@ -210,8 +222,9 @@ substitution with H+ and Cl-, an already-balanced hydration, two amidations
 with different molecular sizes, and reactions with two and four stereochemical
 variants. It does not extrapolate these measurements to the full collection.
 
-From the repository root, with local weights and a separate CUDA-enabled Python
-environment containing the same scientific package versions:
+Benchmarks require Linux CPU affinity, sysfs topology, and NVIDIA driver
+interfaces. From the repository root, use local weights and a separate
+CUDA-enabled Python environment containing the same scientific package versions:
 
 .. code-block:: bash
 
@@ -252,8 +265,19 @@ These measurements reflect the machine's observed load, not exclusive access
 to its hardware.
 
 Completed trials are checkpointed. Repeating the same command resumes completed
-trials; an interrupted trial starts again with a new empty cache. Changed source,
-models, input or settings require a new output directory. Generate a partial
+trials; an interrupted trial starts again with a new empty cache. Each trial
+links to its immutable ``startups/<execution-id>.json`` record. Resume checks
+the exact runtime for each profile: Python, package builds (including the Torch
+CPU/CUDA suffix), CPU topology and affinity, GPU UUID and driver, CUDA/cuDNN,
+and precision settings. Live load and free memory are recorded but do not
+determine compatibility. A completed resume performs lightweight runtime probes
+without loading models or calculating molecules.
+
+Changed execution identity, source, models, input or settings require a new
+output directory. Format 1 benchmarks remain readable with ``--report-only``
+but cannot be resumed for calculation; leave their results intact and start
+a new directory. Failed resume preflight writes separate attempt diagnostics
+without replacing existing trials or reports. Generate a partial
 report at any time without rerunning calculations:
 
 .. code-block:: bash
@@ -289,8 +313,10 @@ To run the real-model CPU checks against local checkpoints:
    OMP_NUM_THREADS=4 pytest tests/integration/test_aimnet_thermochemistry.py
 
 The checks cover already-balanced and completed equations, two product
-stereoisomers, direct AIMNet2/ASE parity, and reopening the cache with no new
-molecular calculations.
+stereoisomers, direct AIMNet2/ASE parity, serial/parallel symmetry overrides,
+and reopening the cache with no new molecular calculations. Set
+``SYNPLAN_AIMNET_DEVICE=cuda:0`` in the CUDA environment to run the same
+reaction and parity checks on GPU; the CPU-only worker check is skipped.
 
 * `AIMNet2 model and applicability <https://github.com/isayevlab/aimnetcentral/blob/v0.2.6/docs/models/aimnet2.md>`_
 * `AIMNet2 optimization and thermochemistry <https://github.com/isayevlab/aimnetcentral/blob/v0.2.6/docs/tutorials/geometry_optimization.md>`_
