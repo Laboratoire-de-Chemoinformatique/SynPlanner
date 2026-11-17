@@ -160,7 +160,7 @@ Chemformer ONNX bundle directory and a target-keyed route JSON/JSON.GZ collectio
 (not a search record). Replace the example paths below; write to separate outputs.
 
 ```bash
-python -m scripts.assess_routes \
+python -m scripts.assess_forward_routes \
   --model /path/to/chemformer-bundle \
   --input results/routes.json.gz \
   --output results/routes_forward.json.gz \

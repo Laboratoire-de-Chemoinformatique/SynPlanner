@@ -327,7 +327,7 @@ From the repository root in ``synplan_env``:
 
 .. code-block:: bash
 
-   python scripts/assess_routes.py \
+   python scripts/assess_forward_routes.py \
        --model synplan_data/forward/forwardchimera-denovo/v1 \
        --model-type chimera --backend onnx \
        --input results/routes.json.gz \
@@ -632,7 +632,7 @@ identity, so the assessor does not import the ML package.
 
 .. code-block:: bash
 
-   python -m scripts.assess_routes --model-type reactiont5 --backend onnx \
+   python -m scripts.assess_forward_routes --model-type reactiont5 --backend onnx \
      --model synplan_data/forward/reactiont5v2-uspto-mit/v1 \
      --input results/routes.json.gz --output results/reactiont5_forward.json.gz \
      --cache results/reactiont5_cache.json

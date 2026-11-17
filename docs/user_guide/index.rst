@@ -83,7 +83,7 @@ some advanced explanations and configurations, that can be used for both demonst
 .. _Retrosynthesis with Synthon Priority Rules: 18_Retrosynthesis_With_Synthon_Priority_Rules.ipynb
 .. _InChIKey Building-Block Catalogue: 19_InChIKey_Building_Block_Catalogue.ipynb
 .. _Forward Prediction: 20_Forward_Prediction.ipynb
-.. _AIMNet Thermochemistry: 21_AIMNet_Thermochemistry.ipynb
+.. _AIMNet Thermochemistry: 22_AIMNet_Thermochemistry.ipynb
 
 .. toctree::
    :hidden:
@@ -115,6 +115,6 @@ some advanced explanations and configurations, that can be used for both demonst
    18_Retrosynthesis_With_Synthon_Priority_Rules
    19_InChIKey_Building_Block_Catalogue
    20_Forward_Prediction
-   21_AIMNet_Thermochemistry
+   22_AIMNet_Thermochemistry
    ../configuration/configuration
    ../methods/methods

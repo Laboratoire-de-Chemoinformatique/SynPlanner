@@ -7,7 +7,7 @@ SynRBL strategy, enumerates missing stereochemistry, generates LoQI conformers,
 and calculates gas-phase reaction energies, enthalpies, and Gibbs energies.
 It returns route copies in input order; it does not rank routes or change search.
 
-See :doc:`../user_guide/21_AIMNet_Thermochemistry` for an executable example
+See :doc:`../user_guide/22_AIMNet_Thermochemistry` for an executable example
 using all 435 pre-generated apatinib routes (1,192 steps) in saved order,
 independent JSON/HTML exports, and persistent cache reuse. The bundled snapshot preserves
 planning scores and Chemformer annotations; its adjacent provenance file records
@@ -51,17 +51,35 @@ Python interface
    from synplan.utils.visualisation import thermochemistry_report_html
 
    routes = read_routes_json("routes.json", as_routes=True)
-   config = AIMNetConfig(
-       device="cpu", temperature=298.15, pressure=101325.0,
-       n_conformers=10, seed=42,
-       symmetry_numbers={"O": 2, "[H][H]": 2},  # Optional per-species overrides.
-   )
+   config = AIMNetConfig.from_yaml("configs/aimnet_thermo.yaml")
    assessor = AIMNetReactionAssessor(config, cache_path="aimnet_cache.json")
    assessed = assessor.assess(routes, silent=False)
    write_routes_json(assessed, "routes_aimnet.json")
    thermochemistry_report_html(assessed, "routes_aimnet.html",
                               manifest={"statistics": assessor.last_stats})
    print(assessor.last_stats)
+
+The shipped ``configs/aimnet_thermo.yaml`` is a flat mapping of all
+``AIMNetConfig`` settings. Omitted fields use class defaults; unknown fields and
+invalid values are rejected. Edit temperature, pressure, symmetry overrides,
+sampling, optimization, or checkpoint paths there, or construct ``AIMNetConfig``
+directly in Python. ``to_yaml(path)`` saves a configuration using the same format.
+Relative checkpoint paths resolve from the working directory; use absolute paths
+for offline jobs launched from different directories.
+
+The batch CLI accepts ``--config PATH``. Explicit ``--device``, ``--aimnet-model``
+and ``--loqi-model`` arguments override YAML values; otherwise YAML values take
+precedence over class defaults. Without ``--config`` the existing CPU defaults
+apply. Input, output, cache, worker and thread settings are separate execution
+arguments. The notebook loads the shipped YAML and retains its explicit
+local-checkpoint environment overrides.
+
+The ``score.aimnet`` package separates orchestration (``assessor``), preparation
+and species checks (``preparation`` and ``species``), molecular calculation
+(``molecular``), persistence (``cache``), result assembly (``results``), and
+configuration (``config``). Both public imports from ``score`` and
+``score.aimnet`` remain supported; internal modules are not compatibility APIs.
+Model dependencies and weights are loaded only when calculation needs them.
 
 ``assess_reactions(reactions, silent=True)`` accepts an iterable of Chython
 ``ReactionContainer`` objects and returns aligned JSON-compatible dictionaries.
@@ -187,11 +205,23 @@ results are excluded. Both thermochemistry and forward HTML APIs default to
 ``show_policy_log_likelihood=False``. The forward scorer CLI offers
 ``--show-policy-log-likelihood`` as an explicit opt-in.
 
+Forward validation uses ``scripts.assess_forward_routes`` and
+``assess_forward_collection(...)``. Thermochemistry uses
+``scripts.assess_thermochemistry`` and ``run_thermochemistry_assessment(...)``.
+The old ``scripts.assess_routes`` / ``assess_collection`` and thermochemistry
+``run_assessment`` names remain compatibility aliases; neither command dispatches
+to the other workflow.
+
+Source fingerprints include every nested AIMNet module. After upgrading the
+implementation, use a new output directory for reaction/benchmark checkpoints
+and retain a compatible molecular cache.
+
 From the repository root, the complete apatinib run can be reproduced with:
 
 .. code-block:: bash
 
    python -m scripts.assess_thermochemistry \
+     --config configs/aimnet_thermo.yaml \
      --input tutorials/data/apatinib_routes.json \
      --output tutorial_results/aimnet_apatinib \
      --cache tutorial_results/aimnet_cache.json \
