@@ -47,9 +47,10 @@ def test_cluster_routes_empty():
     assert cluster_routes({}, use_strat=False) == {}
 
 
-def test_cluster_routes_valid(sb_cgrs_dict):
+@pytest.mark.parametrize("use_strat", [False, True])
+def test_cluster_routes_valid(sb_cgrs_dict, use_strat):
     """cluster_routes groups all routes and includes every entry."""
-    clusters = cluster_routes(sb_cgrs_dict, use_strat=False)
+    clusters = cluster_routes(sb_cgrs_dict, use_strat=use_strat)
 
     assert isinstance(clusters, dict)
     # Every original route ID must appear in exactly one cluster

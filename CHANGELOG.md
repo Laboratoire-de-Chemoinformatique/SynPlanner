@@ -58,9 +58,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   processes a `BuildingBlock` through its stored SMILES without coupling the
   Synthonizer to MCTS.
 
-- Added an InChIKey catalogue tutorial and a Chython-only identity benchmark
-  demonstrating catalogue loading, connectivity-prefix matching, MCTS use,
-  and post-search route costing.
+- Added an InChIKey catalogue tutorial demonstrating catalogue loading,
+  connectivity-prefix matching, MCTS use, and post-search route costing.
 
 - `write_search_record(tree, path)` / `read_search_record(path)` write a finished
   search to one file and read it back: the molecules interned into one list, the node
@@ -239,6 +238,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   hid real penalties, reporting S(T) 1.00 for routes that score 0.875, which moved
   the ranking from position 35 down. Whether it changed a score at all depends on
   the tree.
+
+## [1.8.1]
+
+### Added
+
+- Python `Tree(..., bonds_state=...)` can require selected target bonds to break
+  (state `1`) or forbid their cleavage (state `2`); state `0` is unconstrained.
+  Multiple required bonds must all be broken before a route is accepted, while
+  unrelated preliminary disconnections remain allowed. Bond keys are validated,
+  unordered Chython atom-number pairs; `tree.bonds_state` returns a defensive copy.
+- Immutable target-atom provenance follows precursor fragmentation and multirule
+  applications, preventing newly introduced atoms from acquiring constraints when
+  Chython reuses an atom number from another fragment.
+- `apply_reaction_rule()` accepts optional keyword-only `constraints` and
+  `provenance` inputs while preserving existing arguments and native
+  `MoleculeContainer` product lists. Constrained applications carry immutable
+  atom identities in molecule metadata between steps; Tree stores them on
+  precursors.
+- `selected_bonds_svg()` in `synplan.chem.target_bonds` depicts required bonds in
+  red and frozen bonds in blue using the same validation as `Tree`.
+- Tutorial 21 compares baseline and bond-constrained searches using the existing
+  RouteCGR/SB-CGR clustering APIs and independently checks each winning route's
+  disconnections.
+- Search-record schema 6 preserves bond constraints, unresolved required bonds,
+  and precursor target identities alongside stereo state and forward assessments.
+  Schemas 1–5 remain readable; records without bond fields default to empty
+  constraints. Records cannot resume searches.
+
+### Fixed
+
+- Frozen-bond filtering compares target-derived endpoint adjacency directly.
+  Bond-order changes and mapped endpoint-element substitutions neither satisfy a
+  required break nor violate a frozen bond. Forbidden candidates do not consume
+  the per-rule outcome limit, so later valid alternatives remain available;
+  zero outcomes yields none, and negative limits raise `ValueError`.
+- Candidate deduplication, cycle detection, and pruning include target ancestry
+  and unresolved required bonds when constraints are active, while retaining
+  current stereo obligations and complete precursor multiplicities. Constraints
+  are Python-only; rollout evaluation remains advisory.
 
 ## [1.8.0]
 

@@ -9,18 +9,21 @@ from test_tree_stats import (
     FakePolicy,
     FakePriorityReactor,
     FakeReactor,
+    FixedEvaluationStrategy,
     build_tree,
     make_mol,
 )
 
 from synplan.chem.precursor import Precursor
+from synplan.chem.reaction import CanonicalRetroReactor
 from synplan.chem.reaction.routes.quality.forward import ForwardReactionAssessor
 from synplan.chem.reaction.routes.route import Route
-from synplan.mcts.config import ForwardValidationConfig
+from synplan.mcts.config import ForwardValidationConfig, TreeConfig
 from synplan.mcts.forward import ForwardValidationError, load_forward_validation
 from synplan.mcts.node import Node
 from synplan.mcts.record import read_search_record, write_search_record
 from synplan.mcts.search import build_target_routes
+from synplan.mcts.tree import Tree
 from synplan.ml.inference.forward import aggregate, prediction_identity
 from synplan.utils.files import read_json, write_json_atomic
 from synplan.utils.visualisation import extract_routes, routes_report_html
@@ -220,7 +223,7 @@ def test_post_processing_retains_failures_and_order(model, tmp_path):
     assert [r.to_json() for r in tree.routes()] == [r.to_json() for r in result]
 
 
-@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize("legacy", [None, 4, 5])
 def test_record_stores_aggregates_on_routes_only(model, tmp_path, legacy):
     tree = two_reactant_tree().run()
     assessed = tree.finalize_forward(
@@ -229,16 +232,25 @@ def test_record_stores_aggregates_on_routes_only(model, tmp_path, legacy):
     expected = [route.to_json() for route in assessed]
     path = write_search_record(tree, tmp_path / "record.json")
     raw = read_json(path)
-    assert raw["schema"] == "synplan-tree/5"
+    assert raw["schema"] == "synplan-tree/6"
     assert all("route_assessment" not in entry for entry in raw["nodes"])
     assert raw["route_assessments"] == {
         str(route.provenance.tree_node_id): route.assessment for route in assessed
     }
     if legacy:
-        raw["schema"] = "synplan-tree/4"
-        assessments = raw.pop("route_assessments")
+        raw["schema"] = f"synplan-tree/{legacy}"
+        raw.pop("bonds_state")
         for entry in raw["nodes"]:
-            entry["route_assessment"] = assessments.get(str(entry["id"]))
+            for field in (
+                "new_provenance",
+                "expand_provenance",
+                "remaining_required_bonds",
+            ):
+                entry.pop(field)
+        if legacy == 4:
+            assessments = raw.pop("route_assessments")
+            for entry in raw["nodes"]:
+                entry["route_assessment"] = assessments.get(str(entry["id"]))
         write_json_atomic(path, raw)
 
     model.predict = lambda *a, **k: pytest.fail("Reading scores invoked inference")
@@ -250,7 +262,7 @@ def test_record_stores_aggregates_on_routes_only(model, tmp_path, legacy):
     assert all(not hasattr(node, "route_assessment") for node in tree.nodes.values())
     assert all(not hasattr(node, "route_assessment") for node in record.nodes.values())
     rewritten = write_search_record(record, tmp_path / "rewritten.json.gz")
-    assert read_json(rewritten)["schema"] == "synplan-tree/5"
+    assert read_json(rewritten)["schema"] == "synplan-tree/6"
     assert [r.to_json() for r in read_search_record(rewritten).routes()] == expected
     # Returned objects must not mutate the retained route assessment.
     assessed[0].assessment["forward_score"] = 99
@@ -576,3 +588,67 @@ def test_cli_resolves_top_level_reference(tmp_path, monkeypatch, reference):
     assert len(calls) == 1
     assert "forward_val_config" not in calls[0]["search_config"]
     assert calls[0]["forward_val_config"] == (folder / reference if reference else None)
+
+
+@pytest.mark.parametrize("stereo_mode", ["proposal", "off"])
+@pytest.mark.parametrize(
+    "bonds_state,top_k,solved,checks",
+    [
+        ({(3, 4): 1, (1, 2): 2}, 2, True, 1),
+        ({(3, 4): 1, (1, 2): 2}, 1, False, 1),
+        ({(3, 4): 2}, 2, False, 0),
+        ({(1, 2): 1}, 2, False, 1),
+    ],
+)
+def test_bond_constraints_with_forward_filter_and_record(
+    model, tmp_path, stereo_mode, bonds_state, top_k, solved, checks
+):
+    """Real cleavage must pass both gates, with both kinds of state surviving export."""
+    target = smiles("[CH3:1][CH2:2][CH2:3][OH:4]")
+    rule = CanonicalRetroReactor.from_smarts("[C;D2:1]-[O;D1:2]>>[C;D1:1].[O;D0:2]")
+    model.predictions = ["N", str(target)]
+    assessor = service(model, tmp_path, top_k=top_k)
+    tree = Tree(
+        target=target,
+        config=TreeConfig(
+            algorithm="breadth_first",
+            max_iterations=1,
+            max_time=None,
+            min_mol_size=0,
+            silent=True,
+            stereo_mode=stereo_mode,
+        ),
+        reaction_rules=[rule],
+        building_blocks={"CCC", "O"},
+        expansion_function=FakePolicy([(0.7, rule, 0)]),
+        evaluation_function=FixedEvaluationStrategy(),
+        forward_assessor=assessor,
+        bonds_state=bonds_state,
+    ).run()
+    assert bool(tree.winning_nodes) is solved
+    assert tree.forward_stats.get("candidate_checks", 0) == checks
+    assert len(model.calls) == checks
+    if solved:
+        node = tree.nodes[tree.winning_nodes[0]]
+        assert not node.remaining_required_bonds
+        assert node.forward_prediction["rank"] == 2
+        assert node.policy_probability == 0.7
+        routes = tree.finalize_forward(assessor, "on-the-fly")
+        assert routes[0].assessment["forward_score"] == 0.5
+        assert len(model.calls) == 1
+    else:
+        assert len(tree.nodes) == 1
+
+    restored = read_search_record(write_search_record(tree, tmp_path / "bonds.json.gz"))
+    assert restored.bonds_state == bonds_state
+    assert restored.config.stereo_mode == stereo_mode
+    assert [r.to_json() for r in restored.routes()] == [
+        r.to_json() for r in tree.routes()
+    ]
+    for node_id, node in tree.nodes.items():
+        saved = restored.nodes[node_id]
+        assert saved.remaining_required_bonds == node.remaining_required_bonds
+        assert saved.forward_prediction == node.forward_prediction
+        assert [p.target_atom_provenance for p in saved.new_precursors] == [
+            p.target_atom_provenance for p in node.new_precursors
+        ]
