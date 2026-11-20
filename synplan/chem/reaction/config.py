@@ -18,6 +18,8 @@ class ReactorConfig(BaseConfigModel):
         disabled for every rule.
     :param delete_atoms: If True, atoms in reactants but not in products are removed.
     :param one_shot: If True, do only single reaction center per application.
+    :param reconcile_mapping: Opt in to route-lineage atom-map allocation and
+        atom-origin provenance. False preserves baseline reactor behaviour.
 
     .. note::
         ``fix_aromatic_rings`` and ``fix_tautomers`` are intentionally not
@@ -34,6 +36,7 @@ class ReactorConfig(BaseConfigModel):
     automorphism_filter: bool = True
     delete_atoms: bool = False
     one_shot: bool = True
+    reconcile_mapping: bool = False
 
     def to_reactor_kwargs(self) -> dict:
         """Convert to kwargs dict for Reactor constructor."""

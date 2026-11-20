@@ -270,6 +270,11 @@ def load_reaction_rules(
             decollapse_symmetric_matches=decollapse_symmetric_matches,
         )
 
+    if reactor_config and reactor_config.reconcile_mapping:
+        raise ValueError(
+            "reconcile_mapping=True requires TSV rules; legacy pickles contain "
+            "already-constructed baseline reactors"
+        )
     # Legacy pickle path — cannot string-check pre-compiled Reactors.
     return _load_rules_pickle(file)
 
