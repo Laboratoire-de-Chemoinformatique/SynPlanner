@@ -15,6 +15,11 @@ from synplan.chem.utils import mapped_smiles
 from .cache import MolecularCache, MolecularCalculator
 from .config import AIMNetConfig, MolecularCalculationError, normalize_config
 from .molecular import PROTON_REFERENCE, AIMNetMolecularCalculator
+from .phase import (
+    apply_phase_conventions,
+    net_coefficients,
+    separates_ions,
+)
 from .preparation import prepare_reaction, reaction_variants
 from .results import ASSESSMENT_VERSION, annotate_routes, reaction_thermochemistry
 
@@ -40,11 +45,35 @@ class AIMNetReactionAssessor:
         cache_path: str | Path | None = "aimnet_cache.json",
         *,
         calculator: MolecularCalculator | None = None,
+        gas_calculator: MolecularCalculator | None = None,
     ):
         self.config = normalize_config(config or AIMNetConfig())
         self.calculator = calculator or AIMNetMolecularCalculator(self.config)
         self.cache_path = Path(cache_path) if cache_path is not None else None
         self._cache = MolecularCache(self.config, self.cache_path)
+        self.gas = None
+        if self.config.phase == "cpcm_water" and self.config.also_calculate_gas:
+            gas_config = self.config.model_copy(
+                update={
+                    "phase": "gas",
+                    "also_calculate_gas": False,
+                    "cpcm_checkpoint": None,
+                    "cpcm_sha256": None,
+                    "solvent_concentration_mol_l": None,
+                }
+            )
+            gas_path = self.cache_path
+            if gas_path is not None and not self._cache.disk_backed:
+                gas_path = gas_path.with_name(gas_path.stem + ".gas" + gas_path.suffix)
+            if gas_calculator is None and isinstance(
+                self.calculator, AIMNetMolecularCalculator
+            ):
+                gas_calculator = AIMNetMolecularCalculator(
+                    gas_config, generator=self.calculator.generator
+                )
+            self.gas = AIMNetReactionAssessor(
+                gas_config, gas_path, calculator=gas_calculator
+            )
         self.last_stats = {}
         self.completed_reactions: list[dict] = []
 
@@ -60,6 +89,15 @@ class AIMNetReactionAssessor:
     def _molecule(self, smiles: str) -> dict:
         return self._cache.get(smiles, self.calculator, self.last_stats)
 
+    def run_identity(self):
+        identity = self.calculator.identity()
+        if self.gas:
+            return {
+                "primary": identity,
+                "gas": self.gas.calculator.identity(),
+            }
+        return identity
+
     def _reaction(self, reaction: ReactionContainer) -> dict:
         result = {
             "version": ASSESSMENT_VERSION,
@@ -71,7 +109,9 @@ class AIMNetReactionAssessor:
         }
         try:
             prepared, reactants, products = prepare_reaction(
-                reaction, self.config.min_confidence
+                reaction,
+                self.config.min_confidence,
+                infer_balance=self.config.balance_policy == "infer",
             )
         except MolecularCalculationError as exc:
             result.update(exc.reaction_context)
@@ -79,7 +119,24 @@ class AIMNetReactionAssessor:
             result["status"] = "skipped" if exc.category == "filtered_out" else "failed"
             return result
         result.update(prepared)
-        for left, right in reaction_variants(reactants, products):
+        if (
+            self.config.phase == "gas"
+            and self.config.withhold_gas_ion_separation
+            and separates_ions(net_coefficients(reactants, products))
+        ):
+            result["failure"] = {
+                "category": "filtered_out",
+                "stage": "publication",
+                "reason": "gas_charge_separation",
+                "detail": "The equation changes the charge-squared sum of separated ions.",
+            }
+            return result
+        assignments = (
+            reaction_variants(reactants, products)
+            if self.config.stereo_policy == "enumerate"
+            else [(reactants, products)]
+        )
+        for left, right in assignments:
             variant = {
                 "id": len(result["variants"]) + 1,
                 "reaction": ".".join(left) + ">>" + ".".join(right),
@@ -113,6 +170,7 @@ class AIMNetReactionAssessor:
                 variant.update(
                     reaction_thermochemistry(left, right, result["molecules"])
                 )
+                apply_phase_conventions(variant, self.config)
             result["variants"].append(variant)
         if not result["variants"]:
             result["status"] = "failed"
@@ -150,6 +208,9 @@ class AIMNetReactionAssessor:
             "calculation_seconds": 0.0,
         }
         self._cache.begin_assessment()
+        if self.gas:
+            self.gas._cache.begin_assessment()
+            self.gas.last_stats = self.last_stats
         self.completed_reactions = []
         results = self.completed_reactions
         for index, reaction in enumerate(
@@ -161,13 +222,35 @@ class AIMNetReactionAssessor:
             )
         ):
             result = self._reaction(reaction)
+            if self.config.also_calculate_gas:
+                assert self.gas is not None
+                alternate = self.gas._reaction(reaction)
+                gas_variants = {
+                    v["reaction"]: v
+                    for v in alternate["variants"]
+                    if v["status"] == "ok"
+                }
+                for variant in result["variants"]:
+                    gas = gas_variants.get(variant["reaction"])
+                    if gas is not None and variant["status"] == "ok":
+                        variant["delta_delta_g_solv_kcal_mol"] = (
+                            variant["delta_g"] - gas["delta_g"]
+                        )
+                alternate["calculation"] = self.gas._calculation_provenance()
+                result.update(
+                    version=2, phase="cpcm_water", additional_phases={"gas": alternate}
+                )
             result["calculation"] = self._calculation_provenance()
             results.append(result)
             if on_reaction is not None:
                 on_reaction(index, result)
         self.last_stats.update(
             reaction_occurrences=len(results),
-            unique_species=len(self._cache.seen_species),
+            unique_species=len(
+                self._cache.seen_species.union(
+                    self.gas._cache.seen_species if self.gas else ()
+                )
+            ),
             successful_reactions=sum(r["status"] == "ok" for r in results),
             skipped_reactions=sum(r["status"] == "skipped" for r in results),
             total_variants=sum(len(r["variants"]) for r in results),
@@ -185,8 +268,17 @@ class AIMNetReactionAssessor:
     def _calculation_provenance(self) -> dict:
         return {
             "identity": deepcopy(self.identity),
+            **(
+                {"gas_reference_calculator": deepcopy(self.gas.identity)}
+                if self.gas
+                else {}
+            ),
             "config": self.config.model_dump(mode="json"),
-            "method": "gas_phase_single_conformer_RRHO",
+            "method": (
+                "gas_phase_single_conformer_RRHO"
+                if self.config.phase == "gas"
+                else "cpcm_water_single_conformer_RRHO"
+            ),
             "reference_conventions": {
                 "proton_electronic_energy": "0 eV",
                 "proton_reference_version": PROTON_REFERENCE,

@@ -153,7 +153,7 @@ def run_thermochemistry_assessment(
                 config, output / "molecular_jobs", workers, threads
             )
             service.calculator = worker_calculator
-        identity = service.calculator.identity()
+        identity = service.run_identity()
         repository = Path(__file__).resolve().parents[1]
         package = repository / "synplan/chem/reaction"
         sources = [
@@ -301,6 +301,10 @@ def run_thermochemistry_assessment(
                 (rxn, row)
                 for rxn, row in zip(reactions, completed, strict=True)
                 if row["status"] == "ok"
+                and all(
+                    p["status"] in {"ok", "skipped"}
+                    for p in row.get("additional_phases", {}).values()
+                )
             ]
             warm = AIMNetReactionAssessor(
                 config, cache_path, calculator=service.calculator
@@ -321,6 +325,12 @@ def run_thermochemistry_assessment(
             assert [r["variants"] for r in repeated] == [
                 r["variants"] for _, r in eligible
             ]
+            for current, (_, previous) in zip(repeated, eligible, strict=True):
+                for phase, entry in previous.get("additional_phases", {}).items():
+                    assert (
+                        current["additional_phases"][phase]["variants"]
+                        == entry["variants"]
+                    )
             manifest["cached_rerun"] = {
                 **warm.last_stats,
                 "scope": "all previously successful reactions",

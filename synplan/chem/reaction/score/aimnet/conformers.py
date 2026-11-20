@@ -1,14 +1,18 @@
-"""Load LoQI and generate reproducible conformer seeds."""
+"""Load LoQI once and reuse phase-independent seeds during dual-phase assessment."""
 
 import random
+from functools import lru_cache
 
 import numpy as np
 
 
 class LoQIGenerator:
-    def __init__(self, config):
+    def __init__(self, config, *, reuse_seeds=False):
         self.config = config
         self.model = None
+        self.generate = (
+            lru_cache(maxsize=16)(self._sample) if reuse_seeds else self._sample
+        )
 
     def load(self, checkpoint):
         import loqi
@@ -22,7 +26,7 @@ class LoQIGenerator:
             )
         return self.model
 
-    def generate(self, smiles, seed):
+    def _sample(self, smiles, seed):
         import loqi
         import torch
 

@@ -56,9 +56,12 @@ class AIMNetMolecularCalculator:
     incompatible checkpoints, device failures and unexpected model errors propagate.
     """
 
-    def __init__(self, config: AIMNetConfig):
+    def __init__(self, config: AIMNetConfig, *, generator=None):
         self.config = normalize_config(config)
-        self.generator = LoQIGenerator(self.config)
+        self.generator = generator or LoQIGenerator(
+            self.config,
+            reuse_seeds=config.also_calculate_gas,
+        )
         self._identity = None
         self._water = None
 

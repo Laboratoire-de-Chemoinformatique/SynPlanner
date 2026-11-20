@@ -5,10 +5,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 from copy import deepcopy
 from dataclasses import replace
-from math import fsum, isfinite
+from math import isfinite
 from typing import TYPE_CHECKING
 
 from .molecular import EV_TO_KCAL_MOL
+from .phase import net_coefficients, stoichiometric_sum
 
 if TYPE_CHECKING:
     from synplan.chem.reaction.routes import Route
@@ -20,21 +21,18 @@ def reaction_thermochemistry(
     reactants: list[str], products: list[str], molecules: dict
 ) -> dict:
     """Stoichiometric products minus reactants; duplicate species count repeatedly."""
+    net = net_coefficients(reactants, products)
     result = {"units": "kcal/mol"}
     for name, field in (
         ("delta_e", "energy_eV"),
         ("delta_h", "enthalpy_eV"),
         ("delta_g", "gibbs_eV"),
     ):
-        value = (
-            fsum(
-                [
-                    *(molecules[s][field] for s in products),
-                    *(-molecules[s][field] for s in reactants),
-                ]
-            )
-            * EV_TO_KCAL_MOL
-        )
+        values = {s: molecules[s][field] for s in net}
+        if name == "delta_e" and None in values.values():
+            result[name] = None
+            continue
+        value = stoichiometric_sum(net, values) * EV_TO_KCAL_MOL
         if not isfinite(value):
             raise ValueError("Molecular calculator returned nonfinite thermochemistry")
         result[name] = value

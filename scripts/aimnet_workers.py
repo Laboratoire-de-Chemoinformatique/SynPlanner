@@ -122,12 +122,18 @@ class CPUMolecularWorkers:
         for reaction in reactions:
             try:
                 _, reactants, products = prepare_reaction(
-                    reaction, self.config.min_confidence
+                    reaction,
+                    self.config.min_confidence,
+                    infer_balance=self.config.balance_policy == "infer",
                 )
             except MolecularCalculationError:
                 continue  # The assessor records the exact reaction failure.
             for species in dict.fromkeys([*reactants, *products]):
-                for smiles in stereoisomers(species):
+                for smiles in (
+                    stereoisomers(species)
+                    if self.config.stereo_policy == "enumerate"
+                    else (species,)
+                ):
                     if smiles in seen:
                         continue
                     seen.add(smiles)

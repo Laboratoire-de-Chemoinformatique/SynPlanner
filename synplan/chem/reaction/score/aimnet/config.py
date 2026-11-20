@@ -34,6 +34,7 @@ class AIMNetConfig(BaseConfigModel):
     fmax: PositiveFloat = 0.01
     max_steps: PositiveInt = 200
     min_confidence: float = Field(default=0.8, ge=0, le=1, allow_inf_nan=False)
+    also_calculate_gas: bool = False
     phase: Literal["gas", "cpcm_water"] = "gas"
     cpcm_checkpoint: Path | None = None
     cpcm_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -42,15 +43,20 @@ class AIMNetConfig(BaseConfigModel):
     etkdg_fallback: bool = False
     etkdg_max_heavy_atoms: int = Field(default=0, ge=0, strict=True)
     conformer_selection: Literal["optimize_all", "lowest_seed_energy"] = "optimize_all"
+    withhold_gas_ion_separation: bool = False
+    solvent_concentration_mol_l: PositiveFloat | None = None
     optimizer: Literal["BFGS", "LBFGS"] = "BFGS"
     concentration_mol_l: PositiveFloat | None = None
     imaginary_cutoff_cm1: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    balance_policy: Literal["infer", "validate"] = "infer"
     symmetry_numbers: dict[str, PositiveInt] = Field(default_factory=dict)
     aimnet_checkpoint: Path | None = None
     loqi_checkpoint: Path | None = None
 
     @model_validator(mode="after")
     def validate_phase(self):
+        if self.also_calculate_gas and self.phase != "cpcm_water":
+            raise ValueError("also_calculate_gas requires a water calculation")
         if self.phase == "cpcm_water" and not (
             self.cpcm_sha256
             and (self.cpcm_checkpoint or self.cpcm_sha256 == LOQI_CPCM_SHA256)
@@ -58,12 +64,24 @@ class AIMNetConfig(BaseConfigModel):
             raise ValueError(
                 "CPCM water requires a local checkpoint and its full SHA-256"
             )
+        if self.solvent_concentration_mol_l is not None and (
+            self.phase != "cpcm_water" or self.concentration_mol_l is None
+        ):
+            raise ValueError(
+                "Solvent concentration requires CPCM water and a solute concentration standard state"
+            )
         return self
 
     def molecular_settings(self):
         """Keep compatible gas cache keys, excluding reaction-level policies."""
         settings = self.model_dump(
             mode="json",
+            exclude={
+                "balance_policy",
+                "also_calculate_gas",
+                "withhold_gas_ion_separation",
+                "solvent_concentration_mol_l",
+            },
         )
         for key in (
             "phase",

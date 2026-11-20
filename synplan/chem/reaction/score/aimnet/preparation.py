@@ -63,13 +63,19 @@ def conserved(reactants: list[str], products: list[str]) -> bool:
 
 
 def prepare_reaction(
-    reaction, min_confidence: float
+    reaction, min_confidence: float, *, infer_balance: bool = True
 ) -> tuple[dict, list[str], list[str]]:
     """Balance a copy, recording every inferred species and the original equation."""
     original_r, original_p = reaction_species(reaction)
     original = mapped_smiles(reaction)
     if conserved(original_r, original_p):
         balanced, confidence = reaction, 1.0
+    elif not infer_balance:
+        raise MolecularCalculationError(
+            "balancing",
+            "not_conserved",
+            "Supplied equation does not conserve atoms, isotopes, or charge.",
+        )
     else:
         try:
             balanced = rebalance_reaction(
