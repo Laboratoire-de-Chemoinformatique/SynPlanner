@@ -4,6 +4,10 @@ from typing import TYPE_CHECKING
 from chython.containers import CGRContainer, MoleculeContainer, ReactionContainer
 
 from synplan.chem.precursor import is_purchasable
+from synplan.chem.reaction.reactor import (
+    ATOM_ORIGINS_META,
+    ROUTE_ATOM_MAPPING_CONTRACT,
+)
 from synplan.chem.reaction.routes.contracts import (
     RouteCGRBuildResult,
     RouteDiagnostic,
@@ -588,6 +592,87 @@ class _Fold:
         return result
 
 
+def _route_reactions(tree_or_routes, route_id):
+    """Return a route's reactions in chronological synthetic order."""
+
+    if isinstance(tree_or_routes, dict):
+        if route_id not in tree_or_routes:
+            raise KeyError(f"Route {route_id} not in provided dict.")
+        step_map = tree_or_routes[route_id]
+        return [step_map[step] for step in sorted(step_map)]
+    return tree_or_routes.synthesis_route(route_id)
+
+
+def _validate_atom_origins(reactions, *, allow_missing: bool = False) -> bool:
+    """Validate native provenance once, optionally recognizing legacy routes."""
+
+    if not reactions:
+        if allow_missing:
+            return False
+        raise ValueError("cannot compose an empty route")
+
+    origin_pairs = []
+    for step, reaction in enumerate(reactions, 1):
+        for side_name, molecules in (
+            ("reactant", reaction.reactants),
+            ("product", reaction.products),
+        ):
+            for molecule_index, molecule in enumerate(molecules):
+                origins = molecule.meta.get(ATOM_ORIGINS_META)
+                if origins is None:
+                    if allow_missing:
+                        return False
+                    raise ValueError(
+                        "native RouteCGR requires atom-origin metadata on every "
+                        f"molecule; missing at step {step} {side_name} "
+                        f"{molecule_index}"
+                    )
+                missing = set(molecule) - set(origins)
+                extra = set(origins) - set(molecule)
+                if missing or extra:
+                    if allow_missing:
+                        return False
+                    raise ValueError(
+                        "incomplete atom-origin metadata at step "
+                        f"{step} {side_name} {molecule_index}: "
+                        f"missing={sorted(missing)[:10]}, extra={sorted(extra)[:10]}"
+                    )
+                origin_pairs.extend(
+                    (atom_map, origins[atom_map]) for atom_map in molecule
+                )
+
+    map_to_origin = {}
+    origin_to_map = {}
+    for atom_map, origin in origin_pairs:
+        previous_origin = map_to_origin.setdefault(atom_map, origin)
+        if previous_origin != origin:
+            raise ValueError(
+                f"atom map {atom_map} refers to origins {previous_origin} and {origin}"
+            )
+        previous_map = origin_to_map.setdefault(origin, atom_map)
+        if previous_map != atom_map:
+            raise ValueError(
+                f"atom origin {origin} appears under maps {previous_map} and {atom_map}"
+            )
+    return True
+
+
+def _compose_route_cgr_direct(
+    reactions,
+    preserve_transient_bonds=True,
+    return_reactions_dict=False,
+):
+    """Fold an origin-verified route without structural matching or remapping."""
+
+    fold = _Fold(reactions, return_reactions_dict)
+    for step in range(len(reactions) - 2, -1, -1):
+        curr_cgr = fold.cgrs[step]
+        fold.label(step, curr_cgr)
+        fold.keep(step, curr_cgr)
+        fold.accum = _compose_cgrs(curr_cgr, fold.accum, preserve_transient_bonds)
+    return fold.finish(preserve_transient_bonds)
+
+
 def _compose_route_cgr_legacy(
     tree_or_routes,
     route_id,
@@ -769,15 +854,90 @@ def build_route_cgr(
     preserve_transient_bonds: bool = True,
     *,
     include_reactions: bool = False,
+    reconcile_atom_mapping: bool | None = None,
 ) -> RouteCGRBuildResult:
     """Build a RouteCGR and report recoverable composition failures explicitly."""
 
-    result = _compose_route_cgr_legacy(
-        tree_or_routes,
-        route_id,
-        preserve_transient_bonds=preserve_transient_bonds,
-        return_reactions_dict=include_reactions,
-    )
+    if isinstance(tree_or_routes, dict) and route_id not in tree_or_routes:
+        raise KeyError(f"Route {route_id} not in provided dict.")
+    try:
+        reactions = None
+        origins_validated = False
+        direct_error = None
+        marked_native = (
+            getattr(tree_or_routes, "atom_mapping_contract", None)
+            == ROUTE_ATOM_MAPPING_CONTRACT
+        )
+        # Unmarked live Trees are legacy inputs.  Besides keeping the public
+        # compatibility contract, this avoids evaluating synthesis_route()
+        # outside the legacy adapter, where its recoverable diagnostics are
+        # deliberately normalized.  Provenance-only auto-detection is useful
+        # for explicit route dictionaries, whose public format has no contract
+        # marker of its own.
+        if (
+            reconcile_atom_mapping is None
+            and not marked_native
+            and isinstance(tree_or_routes, dict)
+        ):
+            reactions = _route_reactions(tree_or_routes, route_id)
+            try:
+                marked_native = _validate_atom_origins(reactions, allow_missing=True)
+                origins_validated = marked_native
+            except (ValueError, KeyError, IndexError) as error:
+                # Complete provenance was present, but it was inconsistent.
+                # Treat this as an automatic direct-composition failure so the
+                # compatibility fallback runs exactly once.
+                marked_native = True
+                direct_error = error
+
+        use_direct = reconcile_atom_mapping is False or (
+            reconcile_atom_mapping is None and marked_native
+        )
+        if use_direct:
+            try:
+                if direct_error is not None:
+                    raise direct_error
+                if reactions is None:
+                    reactions = _route_reactions(tree_or_routes, route_id)
+                if not origins_validated:
+                    _validate_atom_origins(reactions)
+                result = _compose_route_cgr_direct(
+                    reactions,
+                    preserve_transient_bonds=preserve_transient_bonds,
+                    return_reactions_dict=include_reactions,
+                )
+            except (ValueError, KeyError, IndexError) as error:
+                if reconcile_atom_mapping is False:
+                    raise
+                logger.warning(
+                    "Route %s native atom mapping failed validation/composition; "
+                    "falling back to legacy reconciliation once: %s",
+                    route_id,
+                    error,
+                )
+                result = _compose_route_cgr_legacy(
+                    tree_or_routes,
+                    route_id,
+                    preserve_transient_bonds=preserve_transient_bonds,
+                    return_reactions_dict=include_reactions,
+                )
+        else:
+            result = _compose_route_cgr_legacy(
+                tree_or_routes,
+                route_id,
+                preserve_transient_bonds=preserve_transient_bonds,
+                return_reactions_dict=include_reactions,
+            )
+    except (ValueError, KeyError, IndexError) as error:
+        return RouteCGRBuildResult(
+            route_id=route_id,
+            diagnostic=RouteDiagnostic(
+                route_id=route_id,
+                stage="route_cgr_native_composition",
+                message=str(error),
+                exception_type=type(error).__name__,
+            ),
+        )
     if result is None:
         return RouteCGRBuildResult(
             route_id=route_id,
@@ -799,6 +959,8 @@ def compose_route_cgr(
     route_id,
     preserve_transient_bonds: bool = True,
     return_reactions_dict: bool = False,
+    *,
+    reconcile_atom_mapping: bool | None = None,
 ):
     """Compatibility adapter returning the historical RouteCGR result mapping."""
 
@@ -807,6 +969,7 @@ def compose_route_cgr(
         route_id,
         preserve_transient_bonds,
         include_reactions=return_reactions_dict,
+        reconcile_atom_mapping=reconcile_atom_mapping,
     ).as_legacy_dict(include_reactions=return_reactions_dict)
 
 
@@ -814,6 +977,8 @@ def compose_all_route_cgrs(
     tree_or_routes,
     route_id=None,
     preserve_transient_bonds=True,
+    *,
+    reconcile_atom_mapping: bool | None = None,
 ):
     """
     Process routes (reassign atom mappings) to compose RouteCGR.
@@ -844,6 +1009,7 @@ def compose_all_route_cgrs(
                 routes_dict,
                 route_id,
                 preserve_transient_bonds=preserve_transient_bonds,
+                reconcile_atom_mapping=reconcile_atom_mapping,
             )
             return result.cgr if result.ok else None
 
@@ -865,6 +1031,7 @@ def compose_all_route_cgrs(
             tree,
             route_id,
             preserve_transient_bonds=preserve_transient_bonds,
+            reconcile_atom_mapping=reconcile_atom_mapping,
         )
         if result.ok:
             route_cgrs[route_id] = result.cgr
@@ -877,6 +1044,7 @@ def compose_all_route_cgrs(
             tree,
             route_id,
             preserve_transient_bonds=preserve_transient_bonds,
+            reconcile_atom_mapping=reconcile_atom_mapping,
         )
         if result.ok:
             route_cgrs[route_id] = result.cgr

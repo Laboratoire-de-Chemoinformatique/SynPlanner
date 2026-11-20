@@ -1,5 +1,6 @@
 """Module containing a class Node in the tree search."""
 
+from synplan.chem.reaction import AtomMappingState
 from synplan.chem.stereo import StereoObligations
 
 
@@ -30,6 +31,7 @@ class Node:
         stereo_evidence: tuple = (),
         stereo_history: str = "",
         forward_prediction: dict | None = None,
+        atom_mapping_state: AtomMappingState | None = None,
     ) -> None:
         """Initialize the Node object.
 
@@ -83,6 +85,7 @@ class Node:
         self.stereo_evidence = tuple(stereo_evidence)
         self.stereo_history = stereo_history
         self.forward_prediction = forward_prediction
+        self.atom_mapping_state = atom_mapping_state
 
         if len(self.precursors_to_expand) == 0:
             self.curr_precursor = tuple()

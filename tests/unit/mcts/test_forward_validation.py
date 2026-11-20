@@ -229,7 +229,7 @@ def test_record_stores_aggregates_on_routes_only(model, tmp_path, legacy):
     expected = [route.to_json() for route in assessed]
     path = write_search_record(tree, tmp_path / "record.json")
     raw = read_json(path)
-    assert raw["schema"] == "synplan-tree/5"
+    assert raw["schema"] == "synplan-tree/6"
     assert all("route_assessment" not in entry for entry in raw["nodes"])
     assert raw["route_assessments"] == {
         str(route.provenance.tree_node_id): route.assessment for route in assessed
@@ -250,7 +250,7 @@ def test_record_stores_aggregates_on_routes_only(model, tmp_path, legacy):
     assert all(not hasattr(node, "route_assessment") for node in tree.nodes.values())
     assert all(not hasattr(node, "route_assessment") for node in record.nodes.values())
     rewritten = write_search_record(record, tmp_path / "rewritten.json.gz")
-    assert read_json(rewritten)["schema"] == "synplan-tree/5"
+    assert read_json(rewritten)["schema"] == "synplan-tree/6"
     assert [r.to_json() for r in read_search_record(rewritten).routes()] == expected
     # Returned objects must not mutate the retained route assessment.
     assessed[0].assessment["forward_score"] = 99

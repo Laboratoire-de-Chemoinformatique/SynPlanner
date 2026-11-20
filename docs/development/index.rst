@@ -12,6 +12,7 @@ requests, and cutting a release.
    pr_review
    release
    chemist_review
+   reactor_mapping
 
 - :doc:`setup` — uv environment, running tests, building Docker images.
 - :doc:`package_layout` — which package a new module belongs in, and how it

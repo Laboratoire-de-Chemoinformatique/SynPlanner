@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from synplan.chem.precursor import Precursor
+from synplan.chem.reaction import AtomMappingState
+from synplan.chem.reaction.reactor import ATOM_ORIGINS_META, copy_atom_mapping_metadata
 from synplan.chem.reaction.routes.route import Route
 from synplan.chem.stereo import parse_smiles_preserving_stereo as read_smiles
 from synplan.chem.utils import in_atom_order, molecule_key
@@ -34,7 +36,7 @@ __all__ = [
 ]
 
 #: Versioned identifier for the search-record file. Bump when the shape changes.
-SEARCH_RECORD_SCHEMA = "synplan-tree/5"
+SEARCH_RECORD_SCHEMA = "synplan-tree/6"
 
 
 @dataclass
@@ -64,6 +66,7 @@ class SearchRecord:
     original_target: MoleculeContainer | None = None
     forward_metadata: dict = field(default_factory=dict)
     assessed_routes: dict[int, Route] = field(default_factory=dict, repr=False)
+    atom_mapping_contract: str | None = None
 
     # The Tree readouts that touch nodes and parents only, bound from the real
     # class: a record has to answer them exactly as the search did.
@@ -137,11 +140,14 @@ def write_search_record(
     :return: The path written.
     """
 
-    molecules: dict[str, int] = {}
+    molecule_indices: dict[tuple[str, tuple[tuple[int, int], ...]], int] = {}
 
     def index(precursor: Precursor) -> int:
-        key = format(in_atom_order(precursor.molecule), "m")
-        return molecules.setdefault(key, len(molecules))
+        molecule = precursor.molecule
+        smiles = format(in_atom_order(molecule), "m")
+        origins = tuple(sorted(molecule.meta.get(ATOM_ORIGINS_META, {}).items()))
+        key = (smiles, origins)
+        return molecule_indices.setdefault(key, len(molecule_indices))
 
     nodes = [
         {
@@ -170,6 +176,15 @@ def write_search_record(
             "stereo_history": node.stereo_history,
             "stereo_summary": getattr(node, "stereo_summary", None),
             "forward_prediction": node.forward_prediction,
+            "atom_mapping_state": (
+                [
+                    node_mapping_state.map_ceiling,
+                    node_mapping_state.origin_ceiling,
+                ]
+                if (node_mapping_state := getattr(node, "atom_mapping_state", None))
+                is not None
+                else None
+            ),
             "selected_stock": [
                 p.molecule.meta.get("selected_stock") for p in node.new_precursors
             ],
@@ -185,7 +200,10 @@ def write_search_record(
     record = {
         "schema": SEARCH_RECORD_SCHEMA,
         "target": molecule_key(tree.nodes[1].curr_precursor.molecule),
-        "molecules": list(molecules),
+        "molecules": [
+            {"smiles": smiles, "origins": origins} if origins else smiles
+            for smiles, origins in molecule_indices
+        ],
         "nodes": nodes,
         "winning": list(tree.winning_nodes),
         "stats": _counters(tree),
@@ -202,6 +220,9 @@ def write_search_record(
             str(route_id): route.assessment
             for route_id, route in tree.assessed_routes.items()
         }
+    atom_mapping_contract = getattr(tree, "atom_mapping_contract", None)
+    if atom_mapping_contract is not None:
+        record["atom_mapping_contract"] = atom_mapping_contract
     with _open(file_path, "wt") as file:
         json.dump(record, file)
     return Path(file_path)
@@ -235,6 +256,7 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
         "synplan-tree/2",
         "synplan-tree/3",
         "synplan-tree/4",
+        "synplan-tree/5",
         SEARCH_RECORD_SCHEMA,
     }:
         raise ValueError(
@@ -242,9 +264,22 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             "search record"
         )
 
-    # Match the writer's atom insertion order. Symmetric mapped fragments can
-    # otherwise choose a different spelling and invalidate unchanged stereo context.
-    molecules = [in_atom_order(read_smiles(smiles)) for smiles in raw["molecules"]]
+    molecules = []
+    for stored in raw["molecules"]:
+        if isinstance(stored, str):
+            smiles = stored
+            origins = ()
+        else:
+            smiles = stored["smiles"]
+            origins = stored.get("origins", ())
+        # Match the writer's atom insertion order. Symmetric mapped fragments can
+        # otherwise choose a different spelling and invalidate stereo context.
+        molecule = in_atom_order(read_smiles(smiles))
+        if origins:
+            molecule.meta[ATOM_ORIGINS_META] = {
+                int(atom_map): int(origin) for atom_map, origin in origins
+            }
+        molecules.append(molecule)
     nodes: dict[int, Node] = {}
     parents: dict[int, int] = {}
     children: dict[int, set[int]] = {}
@@ -252,9 +287,12 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
 
     for entry in raw["nodes"]:  # a node is always written after its parent
         node_id, parent_id = entry["id"], entry["parent"]
-        new = tuple(
-            Precursor(molecules[i].copy(), canonicalize=False) for i in entry["new"]
-        )
+        new_list = []
+        for i in entry["new"]:
+            copied = molecules[i].copy()
+            copy_atom_mapping_metadata(molecules[i], copied)
+            new_list.append(Precursor(copied, canonicalize=False))
+        new = tuple(new_list)
         for precursor, selected in zip(new, entry.get("selected_stock", ())):
             if selected:
                 precursor.molecule.meta["selected_stock"] = selected
@@ -275,8 +313,10 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             # swaps interchangeable subtrees
             slot = next((s for s, (i, _) in enumerate(pool) if i == wanted), None)
             if slot is None:
+                stored = raw["molecules"][wanted]
+                label = stored if isinstance(stored, str) else stored["smiles"]
                 raise ValueError(
-                    f"node {node_id} has {raw['molecules'][wanted]} to expand, but "
+                    f"node {node_id} has {label} to expand, but "
                     "no ancestor of it produced that molecule"
                 )
             expand.append(pool.pop(slot)[1])
@@ -305,6 +345,11 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             stereo_evidence=entry.get("stereo_evidence", ()),
             stereo_history=entry.get("stereo_history", ""),
             forward_prediction=entry.get("forward_prediction"),
+            atom_mapping_state=(
+                AtomMappingState(*entry["atom_mapping_state"])
+                if entry.get("atom_mapping_state") is not None
+                else None
+            ),
         )
         if entry.get("stereo_summary"):
             nodes[node_id].stereo_summary = entry["stereo_summary"]
@@ -332,6 +377,7 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
         forward_metadata=raw.get("forward_validation", {}),
         config=TreeConfig(stereo_mode=raw.get("stereo_mode", "proposal")),
         original_target=read_smiles(raw.get("original_target", raw["target"])),
+        atom_mapping_contract=raw.get("atom_mapping_contract"),
     )
     # Older records stored aggregates on terminal nodes; migrate them to Routes.
     assessments = {

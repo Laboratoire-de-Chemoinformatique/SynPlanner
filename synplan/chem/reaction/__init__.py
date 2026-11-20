@@ -5,7 +5,9 @@ historical dotted path ``synplan.chem.reaction`` keeps exposing the same
 names after the module was promoted to a package.
 """
 
+from synplan.chem.reaction.config import ReactorConfig
 from synplan.chem.reaction.reactor import (
+    AtomMappingState,
     CanonicalRetroReactor,
     Reaction,
     add_small_mols,
@@ -13,8 +15,10 @@ from synplan.chem.reaction.reactor import (
 )
 
 __all__ = [
+    "AtomMappingState",
     "CanonicalRetroReactor",
     "Reaction",
+    "ReactorConfig",
     "add_small_mols",
     "apply_reaction_rule",
 ]

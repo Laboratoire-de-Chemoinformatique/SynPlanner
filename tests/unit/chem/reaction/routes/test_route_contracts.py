@@ -7,6 +7,7 @@ import warnings
 import pytest
 from chython import smiles
 
+from synplan.chem.reaction.reactor import ROUTE_ATOM_MAPPING_CONTRACT
 from synplan.chem.reaction.routes.clustering.subclustering import (
     post_process_subcluster,
 )
@@ -125,10 +126,13 @@ def test_post_process_subcluster_does_not_mutate_completed_mapping():
     assert result is not subgroup
 
 
-def test_route_composition_does_not_hide_coding_errors():
+@pytest.mark.parametrize("mapping_contract", [None, ROUTE_ATOM_MAPPING_CONTRACT])
+def test_route_composition_does_not_hide_coding_errors(mapping_contract):
     class BrokenTree:
         def synthesis_route(self, route_id):
             raise AttributeError("broken implementation")
 
+    tree = BrokenTree()
+    tree.atom_mapping_contract = mapping_contract
     with pytest.raises(AttributeError, match="broken implementation"):
-        build_route_cgr(BrokenTree(), 3)
+        build_route_cgr(tree, 3)
