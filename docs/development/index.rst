@@ -23,5 +23,3 @@ requests, and cutting a release.
   images to GHCR.
 - :doc:`chemist_review` — the open chemistry questions on the ``llm``-provenance
   disconnection rules, and the rules held out of ``rules.json`` until they are answered.
-- :doc:`reactor_mapping` — native route-lineage atom mapping, direct RouteCGR
-  composition modes, and the URSA A/B benchmark.
