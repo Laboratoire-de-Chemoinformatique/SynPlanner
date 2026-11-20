@@ -459,11 +459,35 @@ class CanonicalRetroReactor(Reactor):
             patch_token = _ACTIVE_NATIVE_PATCH.set(None)
             try:
                 reaction = next(reactions)
+                split_patch = _ACTIVE_NATIVE_PATCH.get()
             except StopIteration:
                 return
             finally:
                 _ACTIVE_NATIVE_PATCH.reset(patch_token)
                 _ACTIVE_NATIVE_MAPPING.reset(call_token)
+            if split_patch is not None:
+                # Chython can contract split ions after _single_stage yields.
+                # A salt inherits the first ion's metadata but contains both graphs.
+                for product in reaction.products:
+                    if len(product) == len(product.meta.get(ATOM_ORIGINS_META, ())):
+                        continue
+                    try:
+                        self._attach_preserved_provenance(
+                            product,
+                            split_patch.state,
+                            split_patch.origins,
+                            split_patch.legacy_maps,
+                        )
+                    except KeyError as error:
+                        raise RuntimeError(
+                            f"missing origin for contracted product atom {error.args[0]}"
+                        ) from error
+                    if len(set(product.meta[ATOM_ORIGINS_META].values())) != len(
+                        product
+                    ):
+                        raise RuntimeError(
+                            "conflicting atom origins in contracted product"
+                        )
             if include_reactant_provenance:
                 for reactant in reaction.reactants:
                     reactant.meta[ATOM_ORIGINS_META] = {
@@ -545,6 +569,7 @@ class CanonicalRetroReactor(Reactor):
                         virtual_components[component_index]
                     )
                 products = [products[index] for index in component_order]
+                _ACTIVE_NATIVE_PATCH.set(patch)
             yield products
 
     def _patcher(

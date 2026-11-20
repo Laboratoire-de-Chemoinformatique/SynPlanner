@@ -66,6 +66,47 @@ def test_element_substitution_gets_a_new_identity_but_ring_atoms_do_not():
     )
 
 
+@pytest.mark.parametrize("raised_floor", [False, True])
+def test_bay_6096_salt_retains_both_ions_through_next_expansion(raised_floor):
+    target_text = (
+        "[cH:5]1[cH:4][c:3]([cH:29][cH:28][n+:6]1[CH2:7][CH2:8]"
+        "[NH:9][C:10](=[O:11])[c:12]2[cH:27][c:26]3[n:15]([cH:14][cH:13]2)"
+        "[c:16]([cH:24][n:25]3)-[c:17]4[c:18]([n:20][o:21][c:22]4[CH3:23])"
+        "[CH3:19])[NH:2][CH3:1]"
+    )
+    if raised_floor:
+        target_text = target_text.replace("[CH3:19]", "[13CH3:19]")
+    target = smiles(target_text)
+    root_state = initialize_atom_origins(target)
+    state = AtomMappingState(40, 50) if raised_floor else root_state
+    cleavage = _reactor(
+        "[C:1]-[N:2]-[C:4](-[c:3])=[O:5]>>[C:1]-[N:2].[c:3]-[C:4](=[O:5])-[O-:6]",
+        native=True,
+    )
+    (salt,) = next(apply_reaction_rule(target, cleavage, atom_mapping_state=state))
+    oxygen = state.map_ceiling + 1
+    child = AtomMappingState(oxygen, state.origin_ceiling + 1)
+    expected = {**target.meta[ATOM_ORIGINS_META], oxygen: child.origin_ceiling}
+    assert len(salt) == len(expected) == len(set(expected.values())) == 30
+    assert set(salt) == set(expected)
+    assert salt.meta[ATOM_ORIGINS_META] == expected
+    assert salt.meta[ATOM_MAPPING_STATE_META] == (
+        child.map_ceiling,
+        child.origin_ceiling,
+    )
+    assert salt.meta.get(LEGACY_ATOM_MAPS_META, {}) == (
+        {oxygen: 30} if raised_floor else {}
+    )
+    assert salt.meta["_synplan_has_isotopes"] is raised_floor
+    nitrile = _reactor("[C:1](-[C:2])-[N:3]>>[C:1](-[C:2])#[N:3]", native=True)
+    product = next(
+        p
+        for (p,) in apply_reaction_rule(salt, nitrile, atom_mapping_state=child)
+        if int(p.bond(8, 9)) == 3
+    )
+    assert product.meta[ATOM_ORIGINS_META] == expected
+
+
 def test_split_products_receive_independent_complete_origin_dicts():
     molecule = smiles("CC(=O)N(C)C")
     state = initialize_atom_origins(molecule)
