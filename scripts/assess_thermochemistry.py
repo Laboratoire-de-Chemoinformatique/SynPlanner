@@ -225,7 +225,7 @@ def run_thermochemistry_assessment(
             "workers": workers,
             "threads_per_worker": threads,
         }
-        if worker_calculator is not None:
+        if worker_calculator is not None and not service._cache.disk_backed:
             unique, scheduled = worker_calculator.prime(
                 reactions[offset:], service.cache
             )

@@ -77,11 +77,12 @@ def test_reaction_sign_units_duplicates_and_all_products():
     assert reverse["delta_g"] == -actual["delta_g"]
 
 
-def test_persistent_cache_and_no_input_mutation(tmp_path):
+@pytest.mark.parametrize("filename", ["cache.json", "cache.sqlite"])
+def test_persistent_cache_and_no_input_mutation(tmp_path, filename):
     source = route()
     before = source.to_json()
     calculator = Calculator()
-    cache = tmp_path / "nested" / "cache.json"
+    cache = tmp_path / "nested" / filename
     service = AIMNetReactionAssessor(cache_path=cache, calculator=calculator)
     result = service.assess([source, source])
     assert len(calculator.calls) == 4
@@ -104,8 +105,9 @@ def test_persistent_cache_and_no_input_mutation(tmp_path):
     "change",
     ["model", "temperature", "pressure", "seed", "symmetry", "conformers", "fmax"],
 )
-def test_cache_invalidated_by_calculation_settings(tmp_path, change):
-    cache = tmp_path / "cache.json"
+@pytest.mark.parametrize("filename", ["cache.json", "cache.sqlite"])
+def test_cache_invalidated_by_calculation_settings(tmp_path, change, filename):
+    cache = tmp_path / filename
     AIMNetReactionAssessor(cache_path=cache, calculator=Calculator()).assess(
         [route("CCO>>CCO")]
     )

@@ -14,6 +14,7 @@ from synplan.utils.files import read_json, write_json_atomic
 
 from .config import AIMNetConfig, MolecularCalculationError
 from .molecular import PROTON_REFERENCE
+from .registry import MolecularRegistry
 from .results import ASSESSMENT_VERSION
 from .species import is_proton
 
@@ -53,9 +54,14 @@ class MolecularCache:
     def __init__(self, config: AIMNetConfig, path: Path | None):
         self.config = config
         self.cache_path = path
+        self.disk_backed = path is not None and path.suffix in {
+            ".sqlite",
+            ".sqlite3",
+            ".db",
+        }
         self.data: dict[str, Any] = (
             read_json(path)
-            if path is not None and path.exists()
+            if not self.disk_backed and path is not None and path.exists()
             else {"version": CACHE_VERSION, "calculations": {}}
         )
         if self.data.get("version") != CACHE_VERSION:
@@ -77,25 +83,25 @@ class MolecularCache:
                 "calculator": calculator.identity(),
             }
             key = _fingerprint(self.identity)
-            self._entries = self.data["calculations"].setdefault(
-                key, {"identity": self.identity, "molecules": {}}
-            )["molecules"]
+            if self.disk_backed:
+                self._entries = MolecularRegistry(self.cache_path, key, self.identity)
+            else:
+                self._entries = self.data["calculations"].setdefault(
+                    key, {"identity": self.identity, "molecules": {}}
+                )["molecules"]
         self.seen_species.add(smiles)
-        if (
-            smiles in self._entries
-            and is_proton(smiles)
-            and self._entries[smiles].get("electronic_energy_reference")
-            != PROTON_REFERENCE
-        ):
-            del self._entries[smiles]
-        if smiles in self._entries and symmetry_error(
-            smiles, self._entries[smiles], self.config
-        ):
-            del self._entries[smiles]
-            stats["cache_invalidations"] += 1
-        if smiles in self._entries:
-            stats["cache_hits"] += 1
-            return self._entries[smiles]
+        cached = self._entries.get(smiles)
+        if cached is not None:
+            stale_proton = (
+                is_proton(smiles)
+                and cached.get("electronic_energy_reference") != PROTON_REFERENCE
+            )
+            if stale_proton or symmetry_error(smiles, cached, self.config):
+                del self._entries[smiles]
+                stats["cache_invalidations"] += 1
+            else:
+                stats["cache_hits"] += 1
+                return cached
         if smiles in self.failures:
             raise self.failures[smiles]
         stats["molecular_calculations"] += 1
@@ -114,7 +120,11 @@ class MolecularCache:
             raise
         finally:
             stats["calculation_seconds"] += perf_counter() - started
+        write_started = perf_counter()
         self._entries[smiles] = deepcopy(result)
-        if self.cache_path is not None:
+        if self.cache_path is not None and not self.disk_backed:
             write_json_atomic(self.cache_path, self.data)
-        return self._entries[smiles]
+        stats["molecular_write_seconds"] = (
+            stats.get("molecular_write_seconds", 0.0) + perf_counter() - write_started
+        )
+        return result
