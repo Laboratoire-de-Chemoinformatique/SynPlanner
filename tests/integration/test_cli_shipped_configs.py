@@ -180,7 +180,7 @@ REFERENCED_CONFIGS = {
 
 
 # Standalone assessment commands are tested separately from Click subcommands.
-SCRIPT_CONFIGS = {"aimnet_thermo.yaml"}
+SCRIPT_CONFIGS = {"aimnet_thermo.yaml", "aimnet_aqueous.yaml"}
 
 
 def test_every_shipped_config_has_a_cli_case():
@@ -289,5 +289,5 @@ def test_shipped_aimnet_config_reaches_thermochemistry_runner(
     )
     batch.main()
     assert len(calls) == 1
-    assert calls[0][2] == AIMNetConfig()
+    assert calls[0][2] == AIMNetConfig.from_yaml(str(CONFIGS / config_name))
     assert calls[0][4] == {"verify_cache": False, "workers": 1, "threads": 4}

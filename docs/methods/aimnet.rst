@@ -38,8 +38,8 @@ Model weights resolve through upstream checksum-verified registries on first
 use. Set ``AIMNET_CACHE_DIR`` and ``LOQI_CACHE_DIR`` to control download locations.
 For offline use, provide ``aimnet_checkpoint`` and ``loqi_checkpoint`` paths to
 local copies of the released gas-phase AIMNet2 wB97M-D3 and LoQI Flow v1.1.0
-checkpoints. LoQI's bundled solvent-trained optimizer is not used: all optimization
-and thermochemistry use the gas-phase AIMNet2 calculator.
+checkpoints. The default route workflow uses the gas-phase calculator for
+optimization and thermochemistry. The aqueous preset below selects a water potential.
 
 Python interface
 ----------------
@@ -243,6 +243,78 @@ JSON/HTML reports and writes diagnostics under ``attempts/<id>/``.
 Unexpected errors propagate and retain a traceback plus a partial report whose
 unprocessed steps are explicitly Errored — run aborted. Cached verification
 covers every previously successful reaction and forbids new molecular calculations.
+
+Gas and implicit-water calculations
+-----------------------------------
+
+The installed wheel includes both presets under
+``importlib.resources.files("synplan").joinpath("configs")``.
+Use ``configs/aimnet_aqueous.yaml`` from a checkout to calculate both phases for a supplied
+balanced equation. The preset ranks 50 seeds by electronic energy in each
+phase, optimizes the lowest valid seed with LBFGS and uses a projected
+analytical Hessian. It uses ETKDGv3 for molecules with up to four heavy atoms
+and as a fallback after unsuccessful LoQI conformers. The selected 3D
+stereoisomer is recorded with the molecular result. This mode permits a
+whole-molecule mirror and does not enumerate unassigned stereocenters.
+
+The supplied CPCM-water potential is the checksum-verified TorchScript model
+distributed with LoQI. Both phases use ASE harmonic thermochemistry at
+298.15 K with a 1 mol/L reference. The aqueous reaction includes a correction
+of RT ln(55.5084) per net water molecule. The preset inverts sub-100 cm⁻¹
+imaginary modes and records their signed frequencies. That operation does
+not implement quasi-RRHO low-frequency entropy or enthalpy corrections.
+Both phases retain the default rotational symmetry number of one unless a
+species-specific override is supplied.
+
+Set ``reference_table: bundled`` to apply experimental references. The
+bundled JSON lists canonical species, source and reference conditions.
+Energy shifts use kcal/mol and equilibrium entries use dimensionless pKa values. It covers selected ions, acids and bases.
+A path to another table with the same schema can be supplied. Gas acidities
+use separate enthalpy and Gibbs values. Carbonate uses the measured aqueous
+bicarbonate dissociation enthalpy and pKa. Where only a Gibbs reference is
+available, the correction retains the indicated reference species' entropy.
+Derived quantities, raw values and the table hash are recorded separately.
+An aqueous reference alone supplies no electronic energy. A phase whose
+molecular calculation fails retains its own failure reason. The solvent
+effect is reported as aqueous minus gas ΔG when both variants succeed. Each
+aqueous variant records its signed exposure to the single-ion proton
+convention and identifies net ions without experimental anchors.
+
+.. code-block:: python
+
+   config = AIMNetConfig.from_yaml("configs/aimnet_aqueous.yaml")
+   assessor = AIMNetReactionAssessor(config, cache_path="molecules.sqlite")
+   assessed = assessor.assess(routes)
+   thermochemistry_report_html(assessed, "water.html", phase="cpcm_water")
+   thermochemistry_report_html(assessed, "gas.html", phase="gas")
+
+For a CSV or gzipped CSV, give the equation column and optionally a curated
+equation column. The latter is checked for conservation as supplied. Each
+input row is preserved, including duplicate identifiers and failed reactions.
+
+.. code-block:: bash
+
+   python -m scripts.assess_reaction_csv reactions.csv results.sqlite \
+       --equation-column reaction_smiles --curated-column balanced_smiles \
+       --config configs/aimnet_aqueous.yaml
+
+Repeat the same command to resume. The SQLite database stores input records
+and annotations in ``occurrences``, ordered by ``ordinal`` within each
+``campaign``. Its ``campaigns`` table stores the input checksum and calculation
+manifest. Raw molecular results are shared by method and species in
+``molecules``. The command reports calculation, molecular-write and
+reaction-write times separately. Source data, overrides and model weights can
+be kept outside the checkout.
+
+To compare a published scalar column from the input with the stored calculation,
+specify its phase and quantity. The comparison reports missing values on each
+side, mean signed error, mean absolute error, and the input ordinal with the
+largest discrepancy. Multiple stereochemical variants are counted as ambiguous.
+
+.. code-block:: bash
+
+   python -m scripts.compare_thermochemistry results.sqlite \
+       --phase cpcm_water --quantity delta_g --reference-column measured_delta_g
 
 CPU and GPU reaction benchmarks
 -------------------------------

@@ -203,3 +203,30 @@ def test_cpcm_hessian_matches_finite_difference_forces():
         assert hessian[:, index] == pytest.approx(
             ((low - high) / 0.004).ravel(), abs=0.08, rel=0.01
         )
+
+
+def test_real_dual_phase_reuses_molecular_registry(calculation, tmp_path):
+    checkpoints, _, _, _, _ = calculation
+    config = AIMNetConfig.from_yaml(
+        str(Path(__file__).resolve().parents[2] / "configs/aimnet_aqueous.yaml")
+    ).model_copy(
+        update={
+            "loqi_checkpoint": checkpoints.loqi_checkpoint,
+            "aimnet_checkpoint": checkpoints.aimnet_checkpoint,
+        }
+    )
+    db = tmp_path / "methods.sqlite"
+    reaction = smiles("C.C>>CC.[H][H]")
+    assessor = AIMNetReactionAssessor(config, db)
+    row = assessor.assess_reactions([reaction])[0]
+    assert row["status"] == "ok" and row["additional_phases"]["gas"]["status"] == "ok"
+    assert assessor.last_stats["molecular_calculations"] == 6
+    assert all(m["requested_conformers"] == 50 for m in row["molecules"].values())
+    warm = AIMNetReactionAssessor(config, db)
+    repeated = warm.assess_reactions([reaction])[0]
+    assert repeated["variants"] == row["variants"]
+    assert (
+        repeated["additional_phases"]["gas"]["variants"]
+        == row["additional_phases"]["gas"]["variants"]
+    )
+    assert warm.last_stats["molecular_calculations"] == 0

@@ -111,6 +111,10 @@ exclude = ["/aimnet"]
 packages = ["synplan", "scripts"]
 artifacts = ["*.tsv", "*.csv", "*.yaml", "*.json"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"configs/aimnet_thermo.yaml" = "synplan/configs/aimnet_thermo.yaml"
+"configs/aimnet_aqueous.yaml" = "synplan/configs/aimnet_aqueous.yaml"
+
 [tool.uv]
 # Floors on transitive dependencies that ship CVE fixes.
 constraint-dependencies = [

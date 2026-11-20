@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from copy import deepcopy
+from dataclasses import replace
 from html import escape
 from math import isfinite
 from pathlib import Path
@@ -38,8 +39,16 @@ def _finite(value):
 
 
 def _valid_variant(variant):
-    return variant.get("status") == "ok" and all(
-        _finite(variant.get(k)) for k in ENERGIES
+    return (
+        variant.get("status") == "ok"
+        and all(_finite(variant.get(k)) for k in ("delta_h", "delta_g"))
+        and (
+            _finite(variant.get("delta_e"))
+            or (
+                variant.get("delta_e") is None
+                and bool(variant.get("species_corrections"))
+            )
+        )
     )
 
 
@@ -68,7 +77,7 @@ def _number(value):
 
 
 def _energy_range(variants, key):
-    values = [v[key] for v in variants if _valid_variant(v)]
+    values = [v[key] for v in variants if _valid_variant(v) and _finite(v.get(key))]
     if not values:
         return "—"
     if len(variants) == 1:
@@ -260,9 +269,15 @@ def _conditions(recipes):
         return "Multiple calculation settings are present; see the Manifest for each set of conditions."
     config = next(iter(configs.values()))
     overrides = config.get("symmetry_numbers", {})
+    concentration = config.get("concentration_mol_l")
+    standard_state = (
+        f"concentration: {escape(str(concentration))} mol/L"
+        if concentration is not None
+        else f"pressure: {escape(str(config.get('pressure', '—')))} Pa"
+    )
     return (
         f"Temperature: {escape(str(config.get('temperature', '—')))} K; "
-        f"pressure: {escape(str(config.get('pressure', '—')))} Pa. "
+        f"{standard_state}. "
         "Rotational symmetry number defaults to 1 unless overridden per species."
         + (
             f" {len(overrides)} per-species overrides are recorded in the Manifest."
@@ -330,6 +345,7 @@ def thermochemistry_report_html(
     manifest=None,
     route_labels=None,
     show_policy_log_likelihood=False,
+    phase=None,
 ):
     """Render all routes in input order, with compact tables below each drawing.
 
@@ -340,6 +356,27 @@ def thermochemistry_report_html(
     from synplan.utils.visualisation.assets import REPORT_CSS, REPORT_JS
 
     routes = list(routes)
+    if phase is not None:
+        if phase not in {"gas", "cpcm_water"}:
+            raise ValueError("Unknown thermochemistry phase")
+
+        def selected(step):
+            record = step.thermochemistry or {}
+            primary = (
+                record.get("calculation", {}).get("config", {}).get("phase", "gas")
+            )
+            return (
+                step
+                if primary == phase
+                else replace(
+                    step, thermochemistry=record.get("additional_phases", {}).get(phase)
+                )
+            )
+
+        routes = [
+            replace(route, steps=tuple(selected(step) for step in route.steps))
+            for route in routes
+        ]
     labels = (
         list(route_labels)
         if route_labels is not None
@@ -355,6 +392,16 @@ def thermochemistry_report_html(
     if len(labels) != len(routes):
         raise ValueError("Route labels must match the number of routes")
     provenance = _manifest(routes, manifest)
+    phases = {
+        r.get("config", {}).get("phase", "gas") for r in provenance["calculations"]
+    }
+    phase_label = (
+        "Gas-phase"
+        if phases == {"gas"}
+        else "CPCM-water"
+        if phases == {"cpcm_water"}
+        else "Phase-specific"
+    )
     counts = Counter(display_status(s.thermochemistry) for r in routes for s in r)
     with _temporary_render_config(mapping=False):
         doc, layouts = Doc(), {}
@@ -401,7 +448,7 @@ def thermochemistry_report_html(
             f'<p class="thermo-overview">{len(routes)} routes · {sum(counts.values())} steps · '
             f"{counts['processed']} processed · {counts['filtered_out']} filtered out · {counts['errored']} errored</p>"
             f'<p class="thermo-conditions">{_conditions(provenance["calculations"])}</p>'
-            "<p>Gas-phase, single-conformer RRHO values for each balanced equation. "
+            f"<p>{phase_label}, single-conformer RRHO values for each balanced equation. "
             "Min-max ranges cover calculated stereochemical variants; expand Variants for individual results. "
             "These values do not establish selectivity or reaction barriers.</p>"
             + banner

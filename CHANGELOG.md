@@ -258,6 +258,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - YAML-driven AIMNet configuration in `configs/aimnet_thermo.yaml`, separate
   forward and thermochemistry assessment entry points, and a focused AIMNet
   subpackage that preserves the public assessment API and molecular caches.
+- Optional gas and CPCM-water RRHO calculations with phase-specific reports,
+  experimental reference corrections and a resumable CSV-to-SQLite runner.
 - Reproducible Apatinib CPU/GPU benchmarks separating molecular calculation,
   molecular-cache writing, and reaction thermo-data writing time.
 

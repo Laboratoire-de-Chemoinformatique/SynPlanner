@@ -11,6 +11,9 @@ from chython import smiles
 
 from scripts.assess_reaction_csv import assess_csv
 from scripts.compare_thermochemistry import compare
+from synplan.chem.reaction.routes.thermochemistry_report import (
+    thermochemistry_report_html,
+)
 from synplan.chem.reaction.score import AIMNetConfig, AIMNetReactionAssessor
 from synplan.chem.reaction.score.aimnet.config import MolecularCalculationError
 from synplan.chem.reaction.score.aimnet.molecular import EV_TO_KCAL_MOL
@@ -69,6 +72,8 @@ def test_derived_carbonate_enters_only_the_aqueous_phase():
     assert result["delta_g"] == pytest.approx(-R_KCAL * 298.15 * log(10) * 10.33)
     assert result["delta_h"] == pytest.approx(-14.85 / 4.184)
     assert result["species_corrections"]
+    assert "1 processed" in thermochemistry_report_html([r], phase="cpcm_water")
+    assert "1 filtered out" in thermochemistry_report_html([r], phase="gas")
 
 
 def test_independent_phase_failures():
