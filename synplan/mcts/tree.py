@@ -19,7 +19,17 @@ from synplan.chem.building_blocks import (
     SQLiteBuildingBlockCatalogue,
 )
 from synplan.chem.precursor import Precursor
-from synplan.chem.reaction import CanonicalRetroReactor, Reaction, apply_reaction_rule
+from synplan.chem.reaction import (
+    CanonicalRetroReactor,
+    Reaction,
+    apply_reaction_rule,
+)
+from synplan.chem.reaction.reactor import (
+    ROUTE_ATOM_MAPPING_CONTRACT,
+    atom_mapping_state_from_molecules,
+    copy_atom_mapping_metadata,
+    initialize_atom_origins,
+)
 from synplan.chem.reaction.routes.route import Route
 from synplan.chem.reaction.rules import POLICY_SOURCE_NAME
 from synplan.chem.stereo import (
@@ -231,6 +241,22 @@ class Tree:
         self.priority_rules: dict[str, tuple[CanonicalRetroReactor, ...]] = {
             name: tuple(rules) for name, rules in (priority_rules or {}).items()
         }
+        all_reactors = [
+            *self.reaction_rules,
+            *(rule for rules in self.priority_rules.values() for rule in rules),
+        ]
+        mapping_modes = {
+            bool(getattr(rule, "reconcile_mapping", False)) for rule in all_reactors
+        }
+        if len(mapping_modes) > 1:
+            raise ValueError(
+                "a Tree cannot mix baseline and native-mapping reaction rules, "
+                "including priority rules"
+            )
+        self.reconcile_mapping = mapping_modes.pop() if mapping_modes else False
+        self.atom_mapping_contract = (
+            ROUTE_ATOM_MAPPING_CONTRACT if self.reconcile_mapping else None
+        )
         if self.config.use_priority and not self.priority_rules:
             raise ValueError(
                 "config.use_priority=True but no priority_rules were supplied. "
@@ -481,6 +507,9 @@ class Tree:
             target = target.copy()
             target.clean_stereo()
         target_molecule = Precursor(target)
+        atom_mapping_state = None
+        if self.reconcile_mapping:
+            atom_mapping_state = initialize_atom_origins(target_molecule.molecule)
         obligations = []
         try:
             stereo_requirements(target_molecule.molecule)
@@ -493,11 +522,17 @@ class Tree:
                 )
         except UnresolvedStereo as error:
             obligations.append({"reason": error.reason, "detail": str(error)})
-        target_molecule.prev_precursors.append(Precursor(target))
+        target_history = Precursor(target_molecule.molecule.copy(), canonicalize=False)
+        if self.reconcile_mapping:
+            copy_atom_mapping_metadata(
+                target_molecule.molecule, target_history.molecule
+            )
+        target_molecule.prev_precursors.append(target_history)
         target_node = Node(
             precursors_to_expand=(target_molecule,),
             new_precursors=(target_molecule,),
             stereo_obligations=tuple(obligations),
+            atom_mapping_state=atom_mapping_state,
         )
 
         return target_node
@@ -547,6 +582,7 @@ class Tree:
                 rm_dup=enable_multirule,
                 max_mapping_work=self.config.max_mapping_work,
                 diagnostics=diagnostics,
+                atom_mapping_state=curr_node.atom_mapping_state,
             ):
                 if self._add_child_if_new(context, products, candidate):
                     rule_produced = True
@@ -649,7 +685,13 @@ class Tree:
         policy_rank = candidate.policy_rank
         rule_source = candidate.rule_source
 
-        products = [m.copy() for m in products]
+        if self.reconcile_mapping:
+            # Native reactor products are newly owned values and already carry
+            # fresh metadata dictionaries. Avoid duplicating the full graph
+            # and provenance once more on the hot expansion path.
+            products = list(products)
+        else:
+            products = [molecule.copy() for molecule in products]
         if self.config.stereo_mode == "off":
             for molecule in products:
                 molecule.clean_stereo()
@@ -839,6 +881,13 @@ class Tree:
             stereo_evidence=tuple(evidence),
             stereo_history=history,
             forward_prediction=forward_prediction,
+            atom_mapping_state=(
+                atom_mapping_state_from_molecules(
+                    products, curr_node.atom_mapping_state
+                )
+                if self.reconcile_mapping
+                else None
+            ),
         )
 
         for np in new_precursor:
