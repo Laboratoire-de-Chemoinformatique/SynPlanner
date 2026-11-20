@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import random
 import sys
 from importlib import import_module
 from importlib.metadata import distribution, version
@@ -12,15 +11,17 @@ from pathlib import Path
 
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import rdDetermineBonds
 
 from .config import AIMNetConfig, MolecularCalculationError, normalize_config
+from .conformers import LoQIGenerator
+from .geometry import _with_coordinates, validate_geometry
 from .species import (
     canonical_species,
     is_proton,
     parse_species,
     validate_loqi_charges,
 )
+from .vibrations import thermochemistry
 
 LOQI_MODEL = "loqi_flow_v1.1.0"
 LOQI_COMMIT = "04f3caef4521b3fbcb236f8b01f4bc80c83cb918"
@@ -44,144 +45,6 @@ def species_seed(smiles: str, seed: int) -> int:
     )
 
 
-def _with_coordinates(mol, positions):
-    result = Chem.Mol(mol)
-    result.RemoveAllConformers()
-    conformer = Chem.Conformer(result.GetNumAtoms())
-    conformer.Set3D(True)
-    for index, xyz in enumerate(positions):
-        conformer.SetAtomPosition(index, tuple(map(float, xyz)))
-    result.AddConformer(conformer, assignId=True)
-    return result
-
-
-def validate_geometry(mol, positions, *, optimized: bool) -> None:
-    """Check coordinates independently of the labels carried by the input graph."""
-    positions = np.asarray(positions, dtype=float)
-    stage = "optimization" if optimized else "generation"
-    if positions.shape != (mol.GetNumAtoms(), 3) or not np.isfinite(positions).all():
-        raise MolecularCalculationError(
-            stage, "nonfinite_geometry", "Coordinates must be finite with shape (N, 3)."
-        )
-    distances = np.linalg.norm(positions[:, None] - positions[None, :], axis=-1)
-    np.fill_diagonal(distances, np.inf)
-    if np.any(distances < 0.4):
-        raise MolecularCalculationError(
-            stage, "collapsed_geometry", "An interatomic distance is below 0.4 Å."
-        )
-    # The AIMNet2 compressed-H defect concerns geminal H atoms. A real H-H
-    # bond in H2 (~0.74 Å) must pass the pre-optimization 0.8 Å check.
-    for atom in mol.GetAtoms():
-        hydrogens = [n.GetIdx() for n in atom.GetNeighbors() if n.GetAtomicNum() == 1]
-        for i, left in enumerate(hydrogens):
-            for right in hydrogens[i + 1 :]:
-                if distances[left, right] < (0.6 if optimized else 0.8):
-                    raise MolecularCalculationError(
-                        stage,
-                        "collapsed_hydrogens",
-                        "Geminal hydrogens are too close for AIMNet2.",
-                    )
-    geometry = _with_coordinates(mol, positions)
-    inferred = Chem.Mol(geometry)
-    rdDetermineBonds.DetermineConnectivity(inferred, useVdw=True, covFactor=1.3)
-
-    def edges(m):
-        return {
-            tuple(sorted((b.GetBeginAtomIdx(), b.GetEndAtomIdx())))
-            for b in m.GetBonds()
-        }
-
-    if edges(inferred) != edges(mol):
-        raise MolecularCalculationError(
-            stage,
-            "connectivity_changed",
-            "Coordinates do not match the requested molecular connectivity.",
-        )
-    Chem.RemoveStereochemistry(geometry)
-    Chem.AssignStereochemistryFrom3D(geometry, confId=0, replaceExistingTags=True)
-    Chem.AssignStereochemistry(geometry, cleanIt=True, force=True)
-    if canonical_species(geometry) != canonical_species(mol):
-        raise MolecularCalculationError(
-            stage,
-            "stereo_mismatch",
-            "3D stereochemistry does not match the requested stereoisomer.",
-        )
-
-
-def thermochemistry(
-    atoms, energy: float, hessian, config: AIMNetConfig, symmetry: int
-) -> dict:
-    """Projected harmonic modes and one-conformer ideal-gas E/H/G, in eV."""
-    from aimnet.calculators.vibrations import analyze_hessian
-    from ase.thermochemistry import IdealGasThermo
-
-    hessian = np.asarray(hessian, dtype=float)
-    if not np.isfinite(hessian).all() or not np.isfinite(energy):
-        raise MolecularCalculationError(
-            "frequencies", "nonfinite_hessian", "Energy and Hessian must be finite."
-        )
-    try:
-        vibrations = analyze_hessian(
-            hessian, atoms.get_positions(), atoms.get_masses(), project_tr=True
-        )
-    except np.linalg.LinAlgError as exc:
-        raise MolecularCalculationError(
-            "frequencies", "diagonalization_failed", str(exc)
-        ) from exc
-    frequencies = np.asarray(vibrations.frequencies_cm1)
-    expected = (
-        0 if len(atoms) == 1 else 3 * len(atoms) - (5 if vibrations.is_linear else 6)
-    )
-    if len(frequencies) != expected:
-        raise MolecularCalculationError(
-            "frequencies",
-            "mode_count",
-            "Projected vibrational mode count is inconsistent with molecular geometry.",
-        )
-    if not np.isfinite(frequencies).all() or np.any(frequencies <= 0):
-        raise MolecularCalculationError(
-            "frequencies",
-            "not_a_minimum",
-            "Imaginary/nonpositive vibrational modes; no modes were discarded or made positive.",
-        )
-    geometry = (
-        "monatomic"
-        if len(atoms) == 1
-        else ("linear" if vibrations.is_linear else "nonlinear")
-    )
-    thermo = IdealGasThermo(
-        vib_energies=vibrations.energies_ev,
-        potentialenergy=energy,
-        atoms=atoms,
-        geometry=geometry,
-        symmetrynumber=symmetry,
-        spin=0,
-        ignore_imag_modes=False,
-    )
-    enthalpy = float(thermo.get_enthalpy(config.temperature, verbose=False))
-    gibbs = float(
-        thermo.get_gibbs_energy(config.temperature, config.pressure, verbose=False)
-    )
-    if not np.isfinite([energy, enthalpy, gibbs]).all():
-        raise MolecularCalculationError(
-            "thermochemistry", "nonfinite_thermochemistry", "Nonfinite E/H/G."
-        )
-    return {
-        "energy_eV": float(energy),
-        "enthalpy_eV": enthalpy,
-        "gibbs_eV": gibbs,
-        "frequencies_cm1": frequencies.tolist(),
-        "geometry": geometry,
-        "symmetry_number": symmetry,
-        "spin": 0,
-        "temperature_K": config.temperature,
-        "pressure_Pa": config.pressure,
-        "atomic_numbers": atoms.numbers.tolist(),
-        "masses_amu": atoms.get_masses().tolist(),
-        "coordinates_angstrom": atoms.get_positions().tolist(),
-    }
-
-
 class AIMNetMolecularCalculator:
     """Reuse loaded models, optimizing LoQI conformers with the gas-phase model.
 
@@ -191,6 +54,7 @@ class AIMNetMolecularCalculator:
 
     def __init__(self, config: AIMNetConfig):
         self.config = normalize_config(config)
+        self.generator = LoQIGenerator(self.config)
         self._identity = None
 
     def identity(self) -> dict:
@@ -201,7 +65,7 @@ class AIMNetMolecularCalculator:
                 "AIMNet thermochemistry requires Python 3.11+; base SynPlanner remains usable on Python 3.10."
             )
         try:
-            import loqi
+            import_module("loqi")
 
             import_module("ase")
             from aimnet.calculators import AIMNet2Calculator
@@ -247,12 +111,7 @@ class AIMNetMolecularCalculator:
             compile_model=False,
             cuda_graph=False,
         )
-        self._loqi = loqi.load_model(
-            loqi_path,
-            config="loqi_flow.yaml",
-            device=self.config.device,
-            progress=False,
-        )
+        loqi_model = self.generator.load(loqi_path)
         source = distribution("loqi").read_text("direct_url.json")
         self._identity = {
             "aimnet_model": released[aimnet_digest],
@@ -260,7 +119,7 @@ class AIMNetMolecularCalculator:
             "loqi_model": LOQI_MODEL,
             "loqi_sha256": loqi_digest,
             "loqi_source": json.loads(source) if source else None,
-            "loqi_config": OmegaConf.to_container(self._loqi.config, resolve=True),
+            "loqi_config": OmegaConf.to_container(loqi_model.config, resolve=True),
             "versions": {
                 name: version(name)
                 for name in (
@@ -281,27 +140,7 @@ class AIMNetMolecularCalculator:
         return self._identity
 
     def _generate(self, smiles: str):
-        import loqi
-        import torch
-
-        # LoQI seeds Python, NumPy, and Torch internally. Restore caller RNGs.
-        py_state, np_state = random.getstate(), np.random.get_state()
-        try:
-            with torch.random.fork_rng(
-                devices=[] if self.config.device == "cpu" else None
-            ):
-                return loqi.generate_conformers(
-                    smiles,
-                    self.config.n_conformers,
-                    model=self._loqi,
-                    seed=species_seed(smiles, self.config.seed),
-                    steps=self.config.loqi_steps,
-                    batch_atoms=self.config.batch_atoms,
-                    add_hs=True,
-                )[0]
-        finally:
-            random.setstate(py_state)
-            np.random.set_state(np_state)
+        return self.generator.generate(smiles, species_seed(smiles, self.config.seed))
 
     def calculate(self, smiles: str) -> dict:
         expected = Chem.AddHs(parse_species(smiles))
