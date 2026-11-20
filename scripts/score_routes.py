@@ -41,6 +41,7 @@ def main():
     parser.add_argument("--html", type=Path, help="Optional self-contained HTML report")
     parser.add_argument("--combine-search", action="store_true")
     parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--show-policy-log-likelihood", action="store_true")
     args = parser.parse_args()
     paths = [args.input, args.output] + ([args.html] if args.html else [])
     if len({path.resolve() for path in paths}) != len(paths):
@@ -58,6 +59,7 @@ def main():
             str(args.html),
             prices=False,
             route_labels=[label for label, _ in records],
+            show_policy_log_likelihood=args.show_policy_log_likelihood,
         )
 
 

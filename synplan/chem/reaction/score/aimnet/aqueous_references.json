@@ -1,0 +1,171 @@
+{
+  "version": "1",
+  "solvent": "water",
+  "temperature_K": 298.15,
+  "concentration_mol_l": 1,
+  "ion_solvation": {
+    "[H+]": {
+      "value": -265.9,
+      "source": "10.1021/jp063552y Table 8"
+    },
+    "[F-]": {
+      "value": -104.4,
+      "source": "10.1021/jp063552y Table 8"
+    },
+    "[Cl-]": {
+      "value": -74.5,
+      "source": "10.1021/jp063552y Table 8"
+    },
+    "[Br-]": {
+      "value": -68.3,
+      "source": "10.1021/jp063552y Table 8"
+    },
+    "[I-]": {
+      "value": -59.9,
+      "source": "10.1021/jp063552y Table 8"
+    },
+    "[OH-]": {
+      "value": -104.7,
+      "source": "10.1021/jp063552y Table 8"
+    },
+    "[NH4+]": {
+      "value": -85.2,
+      "source": "10.1021/jp063552y Table 8"
+    },
+    "C[O-]": {
+      "value": -95,
+      "source": "10.1021/jp063552y Table 8"
+    },
+    "CC[S-]": {
+      "value": -71.8,
+      "source": "10.1021/jp063552y Table 8"
+    },
+    "[C-]#N": {
+      "value": -70.2,
+      "source": "10.1021/jp063552y Table 8"
+    }
+  },
+  "protonated_bases": {
+    "[NH4+]": {
+      "parent": "N",
+      "value": 9.3,
+      "source": "10.1021/jp063552y Table 2"
+    },
+    "CC[NH+](CC)CC": {
+      "parent": "CCN(CC)CC",
+      "value": 10.8,
+      "source": "10.1021/jp063552y Table 2"
+    },
+    "c1cc[nH+]cc1": {
+      "parent": "c1ccncc1",
+      "value": 5.2,
+      "source": "10.1021/jp063552y Table 2"
+    },
+    "C[NH+]1CCOCC1": {
+      "parent": "CN1CCOCC1",
+      "value": 7.38,
+      "source": "IUPAC Dissociation Constants v2.4, Perrin perrin1459, H4, C=0.01 M at 25 C"
+    },
+    "Cc1cccc(C)[nH+]1": {
+      "parent": "Cc1cccc(C)n1",
+      "value": 6.72,
+      "source": "IUPAC Dissociation Constants v2.4, Perrin perrin1113, A63, C<0.001 M and I<0.015 M at 25 C"
+    },
+    "CC[NH+](C(C)C)C(C)C": {
+      "parent": "CCN(C(C)C)C(C)C",
+      "value": 11.44,
+      "source": "Fujii et al. (1995), doi:10.1248/cpb.43.1872. Aqueous pKa as tabulated in Table 1 of https://pmc.ncbi.nlm.nih.gov/articles/PMC2664611/"
+    }
+  },
+  "deprotonated_acids": {
+    "O=C([O-])[O-]": {
+      "parent": "O=C([O-])O",
+      "value": 10.33,
+      "source": "USGS Data Series 1038, carbonate speciation at 25 C; NBS Tables with Erratum, NIST mds2-2124, aqueous standard formation enthalpies at 298.15 K: carbonate -677.14 and bicarbonate -691.99 kJ/mol, H+(aq) conventional zero.",
+      "enthalpy_kcal_mol": 3.549235181644359
+    }
+  },
+  "gas_acidities": {
+    "[Cl-]": {
+      "parent": "Cl",
+      "value": 328.1,
+      "enthalpy_kcal_mol": 333.4,
+      "gas_reference_pressure_Pa": 101325,
+      "source": "NIST Chemistry WebBook SRD 69, https://webbook.nist.gov/cgi/cbook.cgi?ID=C7647010&Mask=20&Units=CAL"
+    },
+    "[Br-]": {
+      "parent": "Br",
+      "value": 318.3,
+      "enthalpy_kcal_mol": 323.54,
+      "gas_reference_pressure_Pa": 101325,
+      "source": "NIST Chemistry WebBook SRD 69, https://webbook.nist.gov/cgi/cbook.cgi?ID=C10035106&Mask=20&Units=CAL"
+    },
+    "[I-]": {
+      "parent": "I",
+      "value": 309.28,
+      "enthalpy_kcal_mol": 314.35,
+      "gas_reference_pressure_Pa": 101325,
+      "source": "NIST Chemistry WebBook SRD 69, https://webbook.nist.gov/cgi/cbook.cgi?ID=C10034852&Mask=20&Units=CAL"
+    },
+    "[OH-]": {
+      "parent": "O",
+      "value": 383.74,
+      "enthalpy_kcal_mol": 390.33,
+      "gas_reference_pressure_Pa": 101325,
+      "source": "NIST Chemistry WebBook SRD 69, Smith, Kim et al. (1997), https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185&Mask=20&Units=CAL"
+    },
+    "C[O-]": {
+      "parent": "CO",
+      "value": 376.02,
+      "enthalpy_kcal_mol": 382.0,
+      "gas_reference_pressure_Pa": 101325,
+      "source": "NIST Chemistry WebBook SRD 69, Nee, Osterwalder et al. (2006), NIST average enthalpy, https://webbook.nist.gov/cgi/cbook.cgi?ID=C67561&Mask=20&Units=CAL"
+    },
+    "CC[S-]": {
+      "parent": "CCS",
+      "value": 348.9,
+      "enthalpy_kcal_mol": 355.2,
+      "gas_reference_pressure_Pa": 101325,
+      "source": "NIST Chemistry WebBook SRD 69, Bartmess, Scott et al. (1979), https://webbook.nist.gov/cgi/cbook.cgi?ID=C75081&Mask=20&Units=CAL"
+    },
+    "[C-]#N": {
+      "parent": "C#N",
+      "value": 343.17,
+      "enthalpy_kcal_mol": 350.5,
+      "gas_reference_pressure_Pa": 101325,
+      "source": "NIST Chemistry WebBook SRD 69, Bradforth, Kim et al. (1993), https://webbook.nist.gov/cgi/cbook.cgi?ID=C74908&Mask=20&Units=CAL"
+    },
+    "[F-]": {
+      "parent": "F",
+      "value": 365.67,
+      "enthalpy_kcal_mol": 372.0,
+      "gas_reference_pressure_Pa": 101325,
+      "source": "NIST Chemistry WebBook SRD 69, Blondel, Delsart et al. (2001), NIST average enthalpy, https://webbook.nist.gov/cgi/cbook.cgi?ID=C7664393&Mask=20&Units=CAL"
+    }
+  },
+  "strong_acids": {
+    "Cl": {
+      "source": "NBS Tables with Erratum, NIST mds2-2124, HCl ai minus g. Gas reference converted from 1 bar to 1 M. Dilute aqueous molality approximated by molarity.",
+      "value": -10.4893644105945,
+      "enthalpy_kcal_mol": -17.89005736137667
+    },
+    "I": {
+      "source": "NBS Tables with Erratum, NIST mds2-2124, HI ai minus g. Gas reference converted from 1 bar to 1 M. Dilute aqueous molality approximated by molarity.",
+      "value": -14.63396288095779,
+      "enthalpy_kcal_mol": -19.519598470363288
+    },
+    "Br": {
+      "source": "NBS Tables with Erratum, NIST mds2-2124, HBr ai minus g. Gas reference converted from 1 bar to 1 M. Dilute aqueous molality approximated by molarity.",
+      "value": -13.974307049217826,
+      "enthalpy_kcal_mol": -20.351338432122372
+    },
+    "O=[N+]([O-])O": {
+      "source": "NBS Tables with Erratum, NIST mds2-2124, HNO3 ai minus g. Gas reference converted from 1 bar to 1 M. Dilute aqueous molality approximated by molarity.",
+      "value": -10.633006858013239,
+      "enthalpy_kcal_mol": -17.28011472275335
+    }
+  },
+  "gas_unbound": [
+    "O=C([O-])[O-]"
+  ]
+}

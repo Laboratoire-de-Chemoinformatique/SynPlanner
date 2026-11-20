@@ -1,0 +1,24 @@
+# Flat AIMNetConfig settings: AIMNetConfig.from_yaml("configs/aimnet_thermo.yaml").
+# CPU is the default; CUDA requires a compatible separately installed runtime.
+device: cpu
+
+temperature: 298.15       # K
+pressure: 101325.0        # Pa
+# Isomeric SMILES -> rotational symmetry number; absent species default to 1.
+# Example: {"O": 2, "[H][H]": 2}
+symmetry_numbers: {}
+
+n_conformers: 10
+loqi_steps: 25
+batch_atoms: 2000
+seed: 42
+
+fmax: 0.01               # eV/angstrom
+max_steps: 200
+min_confidence: 0.8
+
+# null resolves the released models through checksum-verified upstream registries.
+# For offline execution, supply existing local AIMNet2 wB97M-D3 and LoQI Flow
+# v1.1.0 checkpoints. Relative paths are relative to the working directory.
+aimnet_checkpoint: null
+loqi_checkpoint: null

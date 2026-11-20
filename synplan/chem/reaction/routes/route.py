@@ -115,6 +115,7 @@ class Step:
     :param product: The molecule this step disconnects. One of
         ``reaction.products``, by identity -- never a copy, never a guess at
         which product the route cares about.
+    :param thermochemistry: Optional balanced-reaction AIMNet thermochemistry.
     :param forward_prediction: Optional stereo-free product-recovery annotation;
         kept on the step rather than in a potentially shared reaction container.
     """
@@ -124,6 +125,7 @@ class Step:
     origin: StepOrigin | None = None
     conditions: Conditions | None = None
     forward_prediction: dict[str, Any] | None = None
+    thermochemistry: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not any(self.product is mol for mol in self.reaction.products):
@@ -228,6 +230,9 @@ class Route:
                 forward_prediction=deepcopy(
                     metadata.get(index, {}).get("meta", {}).get("forward_prediction")
                 ),
+                thermochemistry=deepcopy(
+                    metadata.get(index, {}).get("meta", {}).get("thermochemistry")
+                ),
             )
             for index, reaction in enumerate(tree.synthesis_route(node_id))
         )
@@ -295,6 +300,7 @@ class Route:
                 forward_prediction=deepcopy(
                     reaction.meta.pop("forward_prediction", None)
                 ),
+                thermochemistry=deepcopy(reaction.meta.pop("thermochemistry", None)),
             )
             for reaction, product, metadata in parsed.steps
         )
@@ -684,6 +690,8 @@ class Route:
             metadata = dict(step.reaction.meta)
             if step.forward_prediction is not None:
                 metadata["forward_prediction"] = deepcopy(step.forward_prediction)
+            if step.thermochemistry is not None:
+                metadata["thermochemistry"] = deepcopy(step.thermochemistry)
             if metadata:
                 extra["meta"] = metadata
             if step.origin is not None:

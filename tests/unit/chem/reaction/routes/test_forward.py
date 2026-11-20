@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 from chython import inchi_key, smiles
 
-from scripts import assess_routes
+from scripts import assess_forward_routes as assess_routes
 from synplan.chem.reaction.routes.quality import forward
 from synplan.chem.reaction.routes.quality.forward import ForwardReactionAssessor
 from synplan.chem.reaction.routes.route import Route, Step
@@ -330,7 +330,9 @@ def test_collection_preserves_all_metadata_and_branch_order(model, tmp_path):
     tree["children"][0]["children"][0]["supplier_note"] = "keep this too"
     collection = {"target-b": {"route-9": tree}, "target-a": [route().to_json()]}
     original = deepcopy(collection)
-    output = assess_routes.assess_collection(collection, assessor(model, tmp_path))
+    output = assess_routes.assess_forward_collection(
+        collection, assessor(model, tmp_path)
+    )
     assert collection == original
     assert list(output) == list(collection)
 
@@ -377,7 +379,7 @@ def test_collection_maps_identical_reactions_to_their_designated_products(
                     assert step.reaction.meta["source_key"] in {"left", "right", "root"}
             return service.assess(routes, **kwargs)
 
-    output = assess_routes.assess_collection(collection, CheckMetadata())
+    output = assess_routes.assess_forward_collection(collection, CheckMetadata())
     assert collection == original
     json.dumps(output)  # No temporary object keys or source references escape.
     root_node = output["target"]["route-id"]["children"][0]
@@ -494,6 +496,6 @@ def test_reaction_reassessment_clears_stale_route_scores(model, tmp_path):
     assert result.assessment is None
     assert source.assessment["forward_score"] == 0.1
     collection = {"target": {"route": source.to_json()}}
-    updated = assess_routes.assess_collection(collection, service)
+    updated = assess_routes.assess_forward_collection(collection, service)
     assert "assessment" not in updated["target"]["route"]
     assert "assessment" in collection["target"]["route"]

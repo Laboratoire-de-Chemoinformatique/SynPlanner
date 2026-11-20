@@ -14,6 +14,9 @@ from synplan.chem.reaction.routes.representation.depiction import (
     _temporary_render_config,
 )
 from synplan.chem.reaction.routes.route import Route, Step
+from synplan.chem.reaction.routes.thermochemistry_report import (
+    thermochemistry_report_html as thermochemistry_report_html,
+)
 from synplan.chem.reaction.rules.priority import POLICY_SOURCE_NAME
 from synplan.utils.routedraw import (
     ARROW_DEFS,
@@ -329,8 +332,12 @@ def _route_prices(
     return pills, f"{per_mol / weight:g}"
 
 
+def _has_forward_assessment(route):
+    return route.assessment is not None and "forward_score" in route.assessment
+
+
 def _assessment_group(route):
-    if route.assessment is None:
+    if not _has_forward_assessment(route):
         return "unassessed"
     return "failed" if route.assessment["zero_score_steps"] else "positive"
 
@@ -355,7 +362,7 @@ def _badge(annotation):
 
 
 def _assessment_steps(route, index):
-    if route.assessment is None:
+    if not _has_forward_assessment(route):
         return ""
     rows = []
     for number, step in enumerate(route, 1):
@@ -385,7 +392,7 @@ def _assessment_steps(route, index):
     )
 
 
-def _assessment_overview(routes, labels):
+def _assessment_overview(routes, labels, *, show_policy_log_likelihood=False):
     combined = any(
         r.assessment is not None and "combined_score" in r.assessment for r in routes
     )
@@ -400,13 +407,14 @@ def _assessment_overview(routes, labels):
             f'<a href="#assessment-route-{index}-step-{number}">'
             f"{_badge(step.forward_prediction)}</a>"
             for number, step in enumerate(route, 1)
-            if route.assessment is not None
+            if _has_forward_assessment(route) and step.forward_prediction is not None
         )
         rows.append(
             f'<tr data-assessment-group="{group}">'
             f'<td><a href="#assessment-route-{index}">{escape(str(label))}</a></td>'
             f"<td>{_number(score.get('forward_score'))}</td>"
-            f"<td>{_number(score.get('search_score'))}</td><td>{_number(likelihood)}</td>"
+            f"<td>{_number(score.get('search_score'))}</td>"
+            + (f"<td>{_number(likelihood)}</td>" if show_policy_log_likelihood else "")
             + (f"<td>{_number(score.get('combined_score'))}</td>" if combined else "")
             + f"<td>{escape(str(score.get('zero_score_steps', '—')))} / {len(route)}</td>"
             + f"<td>{vector}</td></tr>"
@@ -427,7 +435,7 @@ def _assessment_overview(routes, labels):
         "scores, counting each step once across every branch. A zero step makes the "
         "route score zero. These are ranking heuristics, not probabilities of "
         "experimental success or measures of stereochemical correctness. "
-        "Search scores and policy log likelihoods retain their original scale.</p>"
+        "Search scores retain their original scale.</p>"
         + (
             '<p class="assessment-note">Combined score = search score &times; forward route '
             "score; explicitly enabled for this report.</p>"
@@ -439,7 +447,7 @@ def _assessment_overview(routes, labels):
         f'<div class="assessment-filters">{buttons}</div>'
         '<div class="assessment-scroll"><table class="assessment-table">'
         "<thead><tr><th>Route ID</th><th>Forward score</th><th>Search score</th>"
-        "<th>Policy log likelihood</th>"
+        + ("<th>Policy log likelihood</th>" if show_policy_log_likelihood else "")
         + ("<th>Combined score</th>" if combined else "")
         + "<th>Zero / total steps</th>"
         "<th>Step scores · 1 → n</th></tr></thead>"
@@ -456,6 +464,7 @@ def routes_report_html(
     prices: bool = True,
     building_blocks: Any = None,
     route_labels: Sequence[str] | None = None,
+    show_policy_log_likelihood: bool = False,
 ) -> str | None:
     """Write an HTML page with the given routes drawn.
 
@@ -507,7 +516,8 @@ def routes_report_html(
             ]
         elif len(route_labels) != len(routes):
             raise ValueError("Route labels must match the number of routes")
-        assessed = any(route.assessment is not None for route in routes)
+        forward_assessed = any(_has_forward_assessment(route) for route in routes)
+        assessed = forward_assessed
         # A legacy SMILES stock carries no vendors at all, so a page drawn against
         # one would wear a Price per gram column that can never hold anything.
         prices = prices and any(
@@ -604,7 +614,15 @@ def routes_report_html(
                 drawable_copy(routes[0].target, layouts) if routes else None,
                 stats,
             )
-            + (_assessment_overview(routes, route_labels) if assessed else "")
+            + (
+                _assessment_overview(
+                    routes,
+                    route_labels,
+                    show_policy_log_likelihood=show_policy_log_likelihood,
+                )
+                if forward_assessed
+                else ""
+            )
             + "".join(body)
             + "</div>\n<script>"
             + REPORT_JS

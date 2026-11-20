@@ -242,7 +242,23 @@ _HALOGENS = frozenset({"F", "Cl", "Br", "I"})
 
 
 class RebalancingError(ValueError):
-    """Raised when a reaction cannot be balanced."""
+    """A balancing failure or an explicit policy refusal, with a stable reason."""
+
+    def __init__(self, message, *, reason="balancing_unsolved", category="errored"):
+        super().__init__(message)
+        self.reason = reason
+        self.category = category
+
+
+def _is_redox_hydrogen(molecule: MoleculeContainer) -> bool:
+    """Hydrogen-only species other than a monatomic proton (including isotopes)."""
+    if set(molecule.brutto) != {"H"}:
+        return False
+    return not (
+        len(molecule) == 1
+        and sum(atom.charge for _, atom in molecule.atoms()) == 1
+        and molecule.brutto["H"] == 1
+    )
 
 
 # How often an answer proves right, by how many molecules it had to invent,
@@ -273,7 +289,7 @@ def confidence(original: ReactionContainer, balanced: ReactionContainer) -> floa
         score *= 0.5  # several whole organic species conjured at once
     if len(list(original.molecules())) > 4:
         score *= 0.5  # crowded reactions misalign, as the paper also reports
-    if any(set(molecule.brutto) == {"H"} for molecule in added):
+    if any(_is_redox_hydrogen(molecule) for molecule in added):
         score *= 0.75  # loose hydrogen stands in for chemistry left unread
     return round(score, 3)
 
@@ -1099,13 +1115,21 @@ def rebalance_reaction(
         before = Counter(str(molecule) for molecule in reaction.molecules())
         after = Counter(str(molecule) for molecule in balanced.molecules())
         if any(
-            set(smiles_chython(text).brutto) == {"H"}
+            _is_redox_hydrogen(smiles_chython(text))
             for text in (after - before).elements()
         ) and not _redox_is_recorded(reaction):
-            raise RebalancingError("free hydrogen with no redox reagent recorded")
+            raise RebalancingError(
+                "free hydrogen with no redox reagent recorded",
+                reason="unsupported_redox",
+                category="filtered_out",
+            )
     score = confidence(reaction, balanced)
     if score < min_confidence:
-        raise RebalancingError(f"confidence {score} below {min_confidence}")
+        raise RebalancingError(
+            f"confidence {score} below {min_confidence}",
+            reason="confidence_below_threshold",
+            category="filtered_out",
+        )
     balanced.meta["confidence"] = score
     return balanced
 
@@ -1186,7 +1210,7 @@ def _redox_is_recorded(reaction: ReactionContainer) -> bool:
         composition = molecule.brutto
         if _REDOX_ELEMENTS & set(composition):
             return True
-        if set(composition) <= {"H"}:  # hydrogen itself was recorded
+        if _is_redox_hydrogen(molecule):  # a proton is not a redox reagent
             return True
         if len(molecule) == 2 and set(composition) <= {"Br", "I", "Cl", "O"}:
             return True  # Br2, I2, O2 and the peroxides

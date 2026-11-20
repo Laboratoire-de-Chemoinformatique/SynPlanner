@@ -390,3 +390,32 @@ def test_rebalancing_runs_after_reagent_removal():
     assert order.index("rebalance_reaction_config") > order.index(
         "remove_reagents_config"
     )
+
+
+def test_apatinib_proton_and_chloride_are_not_redox_hydrogen():
+    text = "C1CCCC1(c2ccc(cc2)NC(=O)c3cccnc3Cl)C#N.c1cnccc1CN>>C1CCCC1(c2ccc(cc2)NC(=O)c3c(NCc4ccncc4)nccc3)C#N"
+    result = rebalance_reaction(
+        smiles(text), min_confidence=0.8, refuse_unsupported_redox=True
+    )
+    assert not reaction_imbalance(result)
+    assert {str(m) for m in result.products if len(m) == 1} == {"[H+]", "[Cl-]"}
+    assert result.meta["confidence"] == 0.88
+
+
+def test_proton_never_authorizes_unrecorded_redox():
+    for proton in ("[H+]", "[2H+]", "[3H+]"):
+        with pytest.raises(RebalancingError) as exc:
+            rebalance_reaction(
+                smiles(f"CCO>{proton}>CC=O"), refuse_unsupported_redox=True
+            )
+        assert exc.value.reason == "unsupported_redox"
+        assert exc.value.category == "filtered_out"
+
+
+def test_hydrogen_species_classification():
+    from synplan.chem.reaction.curation.rebalancing import _is_redox_hydrogen
+
+    for text in ("[H+]", "[2H+]", "[3H+]"):
+        assert not _is_redox_hydrogen(smiles(text))
+    for text in ("[H]", "[2H]", "[H][H]", "[2H][2H]", "[H-]"):
+        assert _is_redox_hydrogen(smiles(text))

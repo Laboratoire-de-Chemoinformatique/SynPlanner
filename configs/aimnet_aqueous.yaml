@@ -1,0 +1,20 @@
+# Gas and implicit-water RRHO using the CPCM model distributed with LoQI Flow.
+# To use an eager CPCM-water model, set cpcm_checkpoint and its full SHA-256.
+phase: cpcm_water
+also_calculate_gas: true
+cpcm_sha256: 32f73fcd68e76f67a6e088841304ca0adc96066cca83216dd9ed992e9e4dec87
+temperature: 298.15
+concentration_mol_l: 1.0
+solvent_concentration_mol_l: 55.5084
+optimizer: LBFGS
+n_conformers: 50
+stereo_policy: conformer
+allow_mirror_image: true
+etkdg_fallback: true
+# Prefer distance geometry for small molecules.
+etkdg_max_heavy_atoms: 4
+conformer_selection: lowest_seed_energy
+imaginary_cutoff_cm1: 100
+reference_table: bundled
+withhold_gas_ion_separation: true
+balance_policy: validate

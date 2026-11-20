@@ -47,3 +47,4 @@ objects, or compare InChI.
 - [API reference](https://synplanner.readthedocs.io/en/latest/api.html): full module documentation
 - [Docker images](https://synplanner.readthedocs.io/en/latest/get_started/docker_images.html)
 - [Release notes](https://synplanner.readthedocs.io/en/latest/release_notes.html)
+- [AIMNet2 thermochemistry](https://synplanner.readthedocs.io/en/latest/methods/aimnet.html): balance and enumerate completed route reactions, generate LoQI conformers, and compute gas-phase ΔE/ΔH/ΔG.

@@ -16,6 +16,7 @@ from synplan.utils.visualisation.routes import (
     get_child_nodes,
     route_rule_labels,
     routes_report_html,
+    thermochemistry_report_html,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "routes_report_html",
     "routes_subclustering_report",
     "supporting_table_2_html",
+    "thermochemistry_report_html",
 ]

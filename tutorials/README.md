@@ -45,6 +45,8 @@ top of each notebook does nothing outside Colab.
 | [InChIKey building-block catalogue](19_InChIKey_Building_Block_Catalogue.ipynb) | run connectivity-only MCTS for Boceprevir and calculate vendor costs from a prepared JSON catalogue | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/19_InChIKey_Building_Block_Catalogue.ipynb) |
 | [Forward prediction](20_Forward_Prediction.ipynb) | assess saved Lenvatinib routes with Chemformer, aggregate scores, reuse predictions, and export JSON and HTML | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Laboratoire-de-Chemoinformatique/SynPlanner/blob/main/tutorials/20_Forward_Prediction.ipynb) |
 
+| [AIMNet thermochemistry](22_AIMNet_Thermochemistry.ipynb) | balance saved route reactions, enumerate missing stereo, generate LoQI conformers, and compute gas-phase ΔE/ΔH/ΔG | Local CPU/GPU runtime |
+
 ## Data used by the tutorials
 
 Most tutorials call `download_preset("synplanner-gps")`, which fetches models,
@@ -54,3 +56,5 @@ downloads them when it is running somewhere the repository is not. Tutorial 19
 uses the preset models and rules but requires a separately prepared InChIKey JSON
 catalogue. Tutorial 20 downloads the GPS ONNX ranking policy, reaction rules,
 and Mcule/MolPort stock, and uses a separately supplied SynFwd-1 Chemformer bundle.
+
+Tutorial 22 reuses all 435 pre-generated apatinib routes (1,192 steps) in `data/apatinib_routes.json`, retaining source order, planning scores, and stored forward annotations. Its independent thermochemistry report shows five values per step, explicit filtered/error states, and a single Manifest. The adjacent provenance JSON records the source. CPU execution supports per-reaction checkpoints and optional isolated workers. Set `SYNPLAN_AIMNET_ROUTES` to another saved collection. Local model paths avoid first-use downloads.

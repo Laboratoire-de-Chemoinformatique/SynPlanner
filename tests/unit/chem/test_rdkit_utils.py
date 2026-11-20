@@ -37,3 +37,14 @@ def test_rdkit_score_keeps_invalid_molecule_fallback():
     score = rdkit_utils.RDKitScore("heavyAtomCount")(_node("not a molecule"))
 
     assert score == 0.0
+
+
+@pytest.mark.parametrize("text", ["CCO", "[13CH3]O", "[2H]O[2H]", "[NH4+]", "[Cl-]"])
+def test_weight_score_keeps_exact_isotope_and_charge_masses(text):
+    from rdkit.Chem import Descriptors
+
+    mol = rdkit_utils.Chem.MolFromSmiles(text)
+    expected = Descriptors.ExactMolWt(mol)
+    assert rdkit_utils.CalcExactMolWt(mol) == expected
+    score = rdkit_utils.RDKitScore("weight")(_node(text))
+    assert score == pytest.approx(max(0.0, 1.0 - expected / 1000.0))

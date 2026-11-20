@@ -240,6 +240,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the ranking from position 35 down. Whether it changed a score at all depends on
   the tree.
 
+## [1.10.0]
+
+### Added
+
+- Optional AIMNet2 gas-phase thermochemistry on copied completed routes, with
+  conservative balancing, exhaustive missing-stereo enumeration, LoQI conformer
+  generation, minimum validation, and persistent molecular caches. JSON and HTML
+  preserve variant results; an independent thermochemistry HTML report keeps
+  forward validation separate. CPU/all extras include
+  AIMNet2/ASE on Python 3.11+; LoQI is installed separately at a pinned revision.
+  Tutorial 22 assesses all 435 saved apatinib routes (1,192 steps), with resumable
+  checkpoints, compact error logs, a Manifest dialog, and cache verification.
+  Policy log likelihood is opt-in in both report APIs. Proton balancing preserves
+  the 0.8 confidence threshold and uses the exact E(H+) = 0 eV convention.
+
+- YAML-driven AIMNet configuration in `configs/aimnet_thermo.yaml`, separate
+  forward and thermochemistry assessment entry points, and a focused AIMNet
+  subpackage that preserves the public assessment API and molecular caches.
+- Optional gas and CPCM-water RRHO calculations with phase-specific reports,
+  experimental reference corrections and a resumable CSV-to-SQLite runner.
+- Reproducible Apatinib CPU/GPU benchmarks separating molecular calculation,
+  molecular-cache writing, and reaction thermo-data writing time.
+
+### Fixed
+
+- Canonical symmetry overrides and selective cache validation, explicit LoQI
+  charge filtering, and preservation of earlier reports when resume startup fails.
+- Portable UTF-8 report/log output and checkpoint source paths on Windows;
+  consistent type-checker tooling and RDKit exact-mass imports.
+
 ## [1.8.0]
 
 ### Added

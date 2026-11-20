@@ -12,6 +12,7 @@ import yaml
 from synplan.chem.reaction.curation.filtering import ReactionFilterConfig
 from synplan.chem.reaction.curation.standardizing import ReactionStandardizationConfig
 from synplan.chem.reaction.rules.config import RuleExtractionConfig
+from synplan.chem.reaction.score import AIMNetConfig
 from synplan.chem.synthon.config import SynthonConfig
 from synplan.mcts.config import (
     CombinedPolicyConfig,
@@ -28,6 +29,8 @@ CONFIGS = Path(__file__).resolve().parents[3] / "configs"
 
 # config file -> flat config class (whole file validates as one model)
 FLAT = {
+    "aimnet_thermo.yaml": AIMNetConfig,
+    "aimnet_aqueous.yaml": AIMNetConfig,
     "forward_predictor.yaml": ForwardValidationConfig,
     "reactions_standardization.yaml": ReactionStandardizationConfig,
     "reactions_filtration.yaml": ReactionFilterConfig,

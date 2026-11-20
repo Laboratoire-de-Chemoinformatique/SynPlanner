@@ -11,6 +11,7 @@ from math import exp, fsum, isfinite, log
 
 from tqdm.auto import tqdm
 
+from synplan.chem.reaction.routes.quality.forward import without_forward_assessment
 from synplan.chem.reaction.routes.quality.protection.config import ProtectionConfig
 from synplan.chem.reaction.routes.quality.protection.functional_groups import (
     FunctionalGroupDetector,
@@ -133,7 +134,15 @@ class ForwardRouteScorer(RouteScorer):
         ) as bar:
             assessed = []
             for route in routes:
-                assessed.append(replace(route, assessment=self._assessment(route)))
+                assessed.append(
+                    replace(
+                        route,
+                        assessment={
+                            **(without_forward_assessment(route.assessment) or {}),
+                            **self._assessment(route),
+                        },
+                    )
+                )
                 bar.update()
         return assessed
 

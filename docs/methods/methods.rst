@@ -25,3 +25,4 @@ Practical usage is covered in :doc:`/configuration/configuration` and :doc:`/use
     priority_rules
     routes
     forward
+    aimnet

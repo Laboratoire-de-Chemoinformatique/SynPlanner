@@ -81,8 +81,8 @@ jobs:
       - run: |
           uv sync --locked --group dev --extra cpu
       - name: ruff format
-        run: uv run --no-sync ruff format --check synplan tests
+        run: uv run --no-sync ruff format --check synplan tests scripts
       - name: ruff
-        run: uv run --no-sync ruff check synplan tests
+        run: uv run --no-sync ruff check synplan tests scripts
       - name: ty
-        run: uvx ty check synplan/
+        run: uv run --no-sync ty check synplan/ scripts/assess_forward_routes.py scripts/assess_routes.py scripts/assess_thermochemistry.py scripts/assess_reaction_csv.py scripts/compare_thermochemistry.py scripts/aimnet_workers.py scripts/benchmark_thermochemistry.py scripts/benchmark_runtime.py scripts/benchmark_thermochemistry_report.py

@@ -116,3 +116,11 @@ Limitations and notes
 - To run the full planning quickstart in 10 minutes, continue to :doc:`/user_guide/ten_minutes`.
 
 
+
+AIMNet2 thermochemistry
+-----------------------
+
+Python 3.11+ installations of ``SynPlanner[cpu]`` and ``SynPlanner[all]`` include
+AIMNet2/ASE; ``SynPlanner[aimnet]`` selects just that optional stack. LoQI requires
+a separate pinned GitHub installation until its PyPI release. See
+:doc:`../methods/aimnet` for installation commands and CPU PyTorch wheel selection.
