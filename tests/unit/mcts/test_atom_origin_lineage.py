@@ -9,6 +9,7 @@ from synplan.chem.reaction.reactor import (
     ATOM_ORIGINS_META,
     ROUTE_ATOM_MAPPING_CONTRACT,
 )
+from synplan.chem.reaction.routes.representation.route_cgr import build_route_cgr
 from synplan.mcts.config import TreeConfig
 from synplan.mcts.evaluation import EvaluationStrategy
 from synplan.mcts.record import read_search_record, write_search_record
@@ -128,7 +129,7 @@ def test_tree_rejects_mixed_baseline_and_native_rules():
         raise AssertionError("mixed mapping modes were accepted")
 
 
-def test_native_search_record_round_trip_retains_atom_origins(tmp_path):
+def test_native_search_record_round_trip_retains_direct_composition(tmp_path):
     reactor = _reactor("[c:1]-[Cl:2]>>[c:1]-[O:2]")
     phenol = str(smiles("c1ccccc1O"))
     tree = _tree([reactor], target="c1ccccc1Cl", building_blocks={phenol})
@@ -138,6 +139,8 @@ def test_native_search_record_round_trip_retains_atom_origins(tmp_path):
     record_path = write_search_record(tree, tmp_path / "native-search.json")
     raw = json.loads(record_path.read_text())
     record = read_search_record(record_path)
+    route_id = record.winning_nodes[0]
+    result = build_route_cgr(record, route_id, reconcile_atom_mapping=False)
 
     assert record.atom_mapping_contract == ROUTE_ATOM_MAPPING_CONTRACT
     assert all(
@@ -145,6 +148,7 @@ def test_native_search_record_round_trip_retains_atom_origins(tmp_path):
         for stored in raw["molecules"]
     )
     assert all("atom_mapping_state" in node for node in raw["nodes"])
+    assert result.ok, result.diagnostic
     assert all(
         set(precursor.molecule.meta[ATOM_ORIGINS_META]) == set(precursor.molecule)
         for node in record.nodes.values()
