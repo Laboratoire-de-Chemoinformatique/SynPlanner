@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 from synplan.chem.precursor import Precursor
 from synplan.chem.reaction import AtomMappingState
-from synplan.chem.reaction.reactor import ATOM_ORIGINS_META
+from synplan.chem.reaction.reactor import ATOM_ORIGINS_META, copy_atom_mapping_metadata
 from synplan.chem.reaction.routes.route import Route
 from synplan.chem.stereo import parse_smiles_preserving_stereo as read_smiles
 from synplan.chem.utils import in_atom_order, molecule_key
@@ -140,29 +140,14 @@ def write_search_record(
     :return: The path written.
     """
 
-    molecule_indices: dict[tuple, int] = {}
-    molecules: list[str | dict] = []
+    molecule_indices: dict[tuple[str, tuple[tuple[int, int], ...]], int] = {}
 
     def index(precursor: Precursor) -> int:
         molecule = precursor.molecule
         smiles = format(in_atom_order(molecule), "m")
         origins = tuple(sorted(molecule.meta.get(ATOM_ORIGINS_META, {}).items()))
         key = (smiles, origins)
-        existing = molecule_indices.get(key)
-        if existing is not None:
-            return existing
-        molecule_index = len(molecules)
-        molecule_indices[key] = molecule_index
-        if origins:
-            molecules.append(
-                {
-                    "smiles": smiles,
-                    "origins": [list(item) for item in origins],
-                }
-            )
-        else:
-            molecules.append(smiles)
-        return molecule_index
+        return molecule_indices.setdefault(key, len(molecule_indices))
 
     nodes = [
         {
@@ -215,7 +200,10 @@ def write_search_record(
     record = {
         "schema": SEARCH_RECORD_SCHEMA,
         "target": molecule_key(tree.nodes[1].curr_precursor.molecule),
-        "molecules": molecules,
+        "molecules": [
+            {"smiles": smiles, "origins": origins} if origins else smiles
+            for smiles, origins in molecule_indices
+        ],
         "nodes": nodes,
         "winning": list(tree.winning_nodes),
         "stats": _counters(tree),
@@ -277,7 +265,6 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
         )
 
     molecules = []
-    molecule_labels = []
     for stored in raw["molecules"]:
         if isinstance(stored, str):
             smiles = stored
@@ -293,7 +280,6 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
                 int(atom_map): int(origin) for atom_map, origin in origins
             }
         molecules.append(molecule)
-        molecule_labels.append(smiles)
     nodes: dict[int, Node] = {}
     parents: dict[int, int] = {}
     children: dict[int, set[int]] = {}
@@ -304,8 +290,7 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
         new_list = []
         for i in entry["new"]:
             copied = molecules[i].copy()
-            if origins := molecules[i].meta.get(ATOM_ORIGINS_META):
-                copied.meta[ATOM_ORIGINS_META] = dict(origins)
+            copy_atom_mapping_metadata(molecules[i], copied)
             new_list.append(Precursor(copied, canonicalize=False))
         new = tuple(new_list)
         for precursor, selected in zip(new, entry.get("selected_stock", ())):
@@ -328,8 +313,10 @@ def read_search_record(file_path: str | PathLike[str]) -> SearchRecord:
             # swaps interchangeable subtrees
             slot = next((s for s, (i, _) in enumerate(pool) if i == wanted), None)
             if slot is None:
+                stored = raw["molecules"][wanted]
+                label = stored if isinstance(stored, str) else stored["smiles"]
                 raise ValueError(
-                    f"node {node_id} has {molecule_labels[wanted]} to expand, but "
+                    f"node {node_id} has {label} to expand, but "
                     "no ancestor of it produced that molecule"
                 )
             expand.append(pool.pop(slot)[1])
