@@ -19,7 +19,39 @@ def _with_coordinates(mol, positions):
     return result
 
 
-def validate_geometry(mol, positions, *, optimized: bool) -> None:
+def matches_stereo(observed, requested, allow_unassigned, allow_mirror):
+    """Compare complete molecular graphs, optionally accepting unspecified centers or a whole mirror."""
+    if (
+        observed.GetNumAtoms() != requested.GetNumAtoms()
+        or observed.GetNumBonds() != requested.GetNumBonds()
+    ):
+        return False
+
+    if allow_unassigned:
+        graphs = [Chem.Mol(m) for m in (observed, requested)]
+        for graph in graphs:
+            Chem.RemoveStereochemistry(graph)
+        if canonical_species(graphs[0]) != canonical_species(graphs[1]):
+            return False
+
+    def matches(query):
+        if allow_unassigned:
+            return observed.HasSubstructMatch(query, useChirality=True)
+        return canonical_species(observed) == canonical_species(query)
+
+    if matches(requested):
+        return True
+    if allow_mirror:
+        mirror = Chem.Mol(requested)
+        for atom in mirror.GetAtoms():
+            atom.InvertChirality()
+        return matches(mirror)
+    return False
+
+
+def validate_geometry(
+    mol, positions, *, optimized: bool, conformer_stereo=False, allow_mirror=False
+) -> str:
     """Check coordinates independently of the labels carried by the input graph."""
     positions = np.asarray(positions, dtype=float)
     stage = "optimization" if optimized else "generation"
@@ -64,9 +96,10 @@ def validate_geometry(mol, positions, *, optimized: bool) -> None:
     Chem.RemoveStereochemistry(geometry)
     Chem.AssignStereochemistryFrom3D(geometry, confId=0, replaceExistingTags=True)
     Chem.AssignStereochemistry(geometry, cleanIt=True, force=True)
-    if canonical_species(geometry) != canonical_species(mol):
+    if not matches_stereo(geometry, mol, conformer_stereo, allow_mirror):
         raise MolecularCalculationError(
             stage,
             "stereo_mismatch",
             "3D stereochemistry does not match the requested stereoisomer.",
         )
+    return canonical_species(geometry)

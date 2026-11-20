@@ -171,3 +171,35 @@ def test_real_serial_parallel_symmetry_override(calculation, tmp_path):
     restored = AIMNetReactionAssessor(config, tmp_path / "parallel.json")
     restored.assess_reactions(reactions)
     assert restored.last_stats["molecular_calculations"] == 0
+
+
+def test_cpcm_hessian_matches_finite_difference_forces():
+    """Check the TorchScript-to-ASE derivative sign, units and atom/axis order."""
+    if not os.environ.get("SYNPLAN_LOQI_MODEL"):
+        pytest.skip("Set SYNPLAN_LOQI_MODEL for the opt-in CPCM check")
+    from importlib.resources import files
+
+    pytest.importorskip("loqi")
+    from synplan.chem.reaction.score.aimnet.config import LOQI_CPCM_SHA256
+    from synplan.chem.reaction.score.aimnet.cpcm import WaterPotential
+    from synplan.chem.reaction.score.aimnet.molecular import file_digest
+
+    path = Path(
+        str(
+            files("megalodon").joinpath(
+                "metrics/aimnet2/cpcm_model/wb97m_cpcms_v2_0.jpt"
+            )
+        )
+    )
+    assert file_digest(path) == LOQI_CPCM_SHA256
+    potential = WaterPotential(path, "cpu")
+    numbers = [8, 1, 1]
+    coordinates = np.array([[0.0, 0.0, 0.0], [0.96, 0.0, 0.0], [-0.24, 0.93, 0.0]])
+    hessian = potential.evaluate(coordinates, numbers, 0, hessian=True)
+    displacements = np.eye(9).reshape(9, 3, 3) * 0.002
+    for index, delta in enumerate(displacements):
+        _, high = potential.evaluate(coordinates + delta, numbers, 0)
+        _, low = potential.evaluate(coordinates - delta, numbers, 0)
+        assert hessian[:, index] == pytest.approx(
+            ((low - high) / 0.004).ravel(), abs=0.08, rel=0.01
+        )

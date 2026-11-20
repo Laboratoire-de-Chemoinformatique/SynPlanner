@@ -113,7 +113,7 @@ class CPUMolecularWorkers:
         for block in cache.get("calculations", {}).values():
             identity = block.get("identity", {})
             if (
-                identity.get("config") == self.config.model_dump(mode="json")
+                identity.get("config") == self.config.molecular_settings()
                 and identity.get("calculator") == self.identity()
                 and identity.get("assessment_version") == 1
             ):

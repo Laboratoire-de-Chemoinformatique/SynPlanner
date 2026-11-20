@@ -1,14 +1,17 @@
-"""Settings for gas-phase AIMNet2 reaction thermochemistry."""
+"""Phase, molecular calculation and reference settings for AIMNet2 thermochemistry."""
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
 from synplan.utils.config import BaseConfigModel
 
 PositiveFloat = Annotated[float, Field(gt=0, allow_inf_nan=False)]
 PositiveInt = Annotated[int, Field(gt=0, strict=True)]
+
+
+LOQI_CPCM_SHA256 = "32f73fcd68e76f67a6e088841304ca0adc96066cca83216dd9ed992e9e4dec87"
 
 
 class AIMNetConfig(BaseConfigModel):
@@ -31,9 +34,53 @@ class AIMNetConfig(BaseConfigModel):
     fmax: PositiveFloat = 0.01
     max_steps: PositiveInt = 200
     min_confidence: float = Field(default=0.8, ge=0, le=1, allow_inf_nan=False)
+    phase: Literal["gas", "cpcm_water"] = "gas"
+    cpcm_checkpoint: Path | None = None
+    cpcm_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    stereo_policy: Literal["enumerate", "conformer"] = "enumerate"
+    allow_mirror_image: bool = False
+    etkdg_fallback: bool = False
+    etkdg_max_heavy_atoms: int = Field(default=0, ge=0, strict=True)
+    conformer_selection: Literal["optimize_all", "lowest_seed_energy"] = "optimize_all"
+    optimizer: Literal["BFGS", "LBFGS"] = "BFGS"
+    concentration_mol_l: PositiveFloat | None = None
+    imaginary_cutoff_cm1: float = Field(default=0.0, ge=0, allow_inf_nan=False)
     symmetry_numbers: dict[str, PositiveInt] = Field(default_factory=dict)
     aimnet_checkpoint: Path | None = None
     loqi_checkpoint: Path | None = None
+
+    @model_validator(mode="after")
+    def validate_phase(self):
+        if self.phase == "cpcm_water" and not (
+            self.cpcm_sha256
+            and (self.cpcm_checkpoint or self.cpcm_sha256 == LOQI_CPCM_SHA256)
+        ):
+            raise ValueError(
+                "CPCM water requires a local checkpoint and its full SHA-256"
+            )
+        return self
+
+    def molecular_settings(self):
+        """Keep compatible gas cache keys, excluding reaction-level policies."""
+        settings = self.model_dump(
+            mode="json",
+        )
+        for key in (
+            "phase",
+            "cpcm_checkpoint",
+            "cpcm_sha256",
+            "optimizer",
+            "concentration_mol_l",
+            "imaginary_cutoff_cm1",
+            "stereo_policy",
+            "allow_mirror_image",
+            "etkdg_fallback",
+            "etkdg_max_heavy_atoms",
+            "conformer_selection",
+        ):
+            if getattr(self, key) == type(self).model_fields[key].default:
+                del settings[key]
+        return settings
 
 
 FILTER_REASONS = frozenset(

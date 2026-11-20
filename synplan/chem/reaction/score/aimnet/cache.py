@@ -73,7 +73,7 @@ class MolecularCache:
         if self._entries is None:
             self.identity = {
                 "assessment_version": ASSESSMENT_VERSION,
-                "config": self.config.model_dump(mode="json"),
+                "config": self.config.molecular_settings(),
                 "calculator": calculator.identity(),
             }
             key = _fingerprint(self.identity)
