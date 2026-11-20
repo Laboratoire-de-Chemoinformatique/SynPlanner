@@ -1,11 +1,16 @@
 """Independent standard states, reference cycles, phase availability and CSV resumes."""
 
+import json
+import sqlite3
+from contextlib import closing
 from math import log
 from pathlib import Path
 
 import pytest
 from chython import smiles
 
+from scripts.assess_reaction_csv import assess_csv
+from scripts.compare_thermochemistry import compare
 from synplan.chem.reaction.score import AIMNetConfig, AIMNetReactionAssessor
 from synplan.chem.reaction.score.aimnet.config import MolecularCalculationError
 from synplan.chem.reaction.score.aimnet.molecular import EV_TO_KCAL_MOL
@@ -80,6 +85,60 @@ def test_independent_phase_failures():
     assert not separates_ions({"[Cl-]": 1, "[Br-]": -1})
 
 
+def test_corpus_preserves_rows_and_resumes(tmp_path):
+    path = tmp_path / "input.csv"
+    path.write_text("id,raw,curated\n3,O>>O,O>>O\n3,O>>O,O>>O\n7,CC>>C,CC>>C\n9,,\n")
+    db = tmp_path / "run.sqlite"
+    model = Calculator()
+    kwargs = dict(equation_column="raw", curated_column="curated", calculator=model)
+    first = assess_csv(path, db, AIMNetConfig(), **kwargs)
+    assert first["molecular_calculations"] == 1 and first["processed"] == 4
+    second = assess_csv(path, db, AIMNetConfig(), **kwargs)
+    assert second["resumed"] == 4 and second["molecular_calculations"] == 0
+    with closing(sqlite3.connect(db)) as conn:
+        rows = [
+            json.loads(r[0])
+            for r in conn.execute("select annotation from occurrences order by ordinal")
+        ]
+        assert conn.execute("select count(*) from molecules").fetchone() == (1,)
+    assert rows[2]["failure"]["reason"] == "not_conserved"
+    assert rows[3]["failure"]["stage"] == "input"
+    assert rows[0]["species"] == ["O"] and "molecules" not in rows[0]
+
+
+def test_corpus_recovers_after_unexpected_failure(tmp_path):
+    class InterruptOnce(Calculator):
+        def calculate(self, species):
+            if species == "CC":
+                raise RuntimeError("interrupted calculation")
+            return super().calculate(species)
+
+    path = tmp_path / "reactions.csv"
+    path.write_text("equation\nO>>O\nCC>>CC\n")
+    db = tmp_path / "results.db"
+    with pytest.raises(RuntimeError, match="interrupted"):
+        assess_csv(
+            path,
+            db,
+            AIMNetConfig(),
+            equation_column="equation",
+            calculator=InterruptOnce(),
+        )
+    with closing(sqlite3.connect(db)) as conn:
+        assert conn.execute("SELECT complete FROM campaigns").fetchone() == (0,)
+        assert conn.execute("SELECT COUNT(*) FROM occurrences").fetchone() == (1,)
+    stats = assess_csv(
+        path, db, AIMNetConfig(), equation_column="equation", calculator=Calculator()
+    )
+    assert (stats["resumed"], stats["processed"], stats["molecular_calculations"]) == (
+        1,
+        1,
+        1,
+    )
+    with closing(sqlite3.connect(db)) as conn:
+        assert conn.execute("SELECT complete FROM campaigns").fetchone() == (1,)
+
+
 def test_phase_difference_and_reversible_standard_state():
     a = AIMNetReactionAssessor(
         water_config(also_calculate_gas=True, solvent_concentration_mol_l=55.5084),
@@ -150,6 +209,32 @@ def test_derived_base_fallback_retains_failure_and_neutral_entropy():
     assert row["reference_base_species"] == "N"
     assert row["entropy_eV_per_K"] == pytest.approx(0.1 / 298.15)
     assert row["corrections"][0]["raw_species_failure"]["reason"] == "no_valid_minimum"
+
+
+def test_reference_comparison_accounts_for_missing_and_ambiguous_results(tmp_path):
+    source, db = tmp_path / "source.csv", tmp_path / "thermo.sqlite"
+    source.write_text(
+        "equation,published\nO>>O,2\nCC>>CC,\nCC>>C,-2\nCC>>C,\nCC(Cl)F>>CC(Cl)F,1\n"
+    )
+    assess_csv(
+        source,
+        db,
+        AIMNetConfig(),
+        equation_column="equation",
+        curated_column="equation",
+        calculator=Calculator(),
+    )
+    report = compare(db, reference_column="published", phase="gas")
+    assert report["counts"] == dict(
+        rows=5,
+        compared=1,
+        missing_reference=1,
+        missing_calculation=1,
+        both_missing=1,
+        ambiguous_multiple_variants=1,
+    )
+    assert report["mean_signed_error"] == -2 and report["maximum_absolute_error"] == 2
+    assert report["worst_input_ordinal"] == 0 and report["complete"]
 
 
 def test_whole_mirror_for_azide_and_unresolved_alkene():

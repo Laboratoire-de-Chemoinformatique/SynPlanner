@@ -85,4 +85,4 @@ jobs:
       - name: ruff
         run: uv run --no-sync ruff check synplan tests scripts
       - name: ty
-        run: uv run --no-sync ty check synplan/ scripts/assess_forward_routes.py scripts/assess_routes.py scripts/assess_thermochemistry.py scripts/aimnet_workers.py scripts/benchmark_thermochemistry.py scripts/benchmark_runtime.py scripts/benchmark_thermochemistry_report.py
+        run: uv run --no-sync ty check synplan/ scripts/assess_forward_routes.py scripts/assess_routes.py scripts/assess_thermochemistry.py scripts/assess_reaction_csv.py scripts/compare_thermochemistry.py scripts/aimnet_workers.py scripts/benchmark_thermochemistry.py scripts/benchmark_runtime.py scripts/benchmark_thermochemistry_report.py
