@@ -35,6 +35,7 @@ class AIMNetConfig(BaseConfigModel):
     max_steps: PositiveInt = 200
     min_confidence: float = Field(default=0.8, ge=0, le=1, allow_inf_nan=False)
     also_calculate_gas: bool = False
+    reference_table: str | None = None
     phase: Literal["gas", "cpcm_water"] = "gas"
     cpcm_checkpoint: Path | None = None
     cpcm_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -79,6 +80,7 @@ class AIMNetConfig(BaseConfigModel):
             exclude={
                 "balance_policy",
                 "also_calculate_gas",
+                "reference_table",
                 "withhold_gas_ion_separation",
                 "solvent_concentration_mol_l",
             },

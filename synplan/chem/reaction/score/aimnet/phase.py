@@ -54,6 +54,37 @@ def _has_unassigned_stereo(molecule):
     return False
 
 
+def phase_quality(coefficients, molecules, phase, stereo_policy):
+    """Record species-level evidence and net single-ion convention sensitivity."""
+    warnings = {}
+    exposure = 0
+    for species, n in coefficients.items():
+        record = molecules[species]
+        molecule = parse_species(species)
+        reasons = []
+        corrections = {entry["reason"] for entry in record.get("corrections", ())}
+        if phase == "cpcm_water":
+            charge = Chem.GetFormalCharge(molecule)
+            if corrections & {"proton_solvation", "base_pka"}:
+                exposure += n
+            elif "derived_from_conjugate_acid" in corrections:
+                exposure -= n
+            elif "ion_solvation" in corrections:
+                exposure += n * charge
+            elif charge:
+                reasons.append("unanchored_ion")
+        if record.get("inverted_imaginary_modes_cm1"):
+            reasons.append("inverted_imaginary_modes")
+        if stereo_policy == "conformer" and _has_unassigned_stereo(molecule):
+            reasons.append("unassigned_stereochemistry")
+        if reasons:
+            warnings[species] = reasons
+    result = {"species_warnings": warnings}
+    if phase == "cpcm_water":
+        result["proton_convention_exposure"] = exposure
+    return result
+
+
 def enantiomer_identity(coefficients):
     if len(coefficients) != 2 or sum(coefficients.values()) != 0:
         return False

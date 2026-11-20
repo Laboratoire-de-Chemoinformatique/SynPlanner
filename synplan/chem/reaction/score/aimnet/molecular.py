@@ -60,7 +60,7 @@ class AIMNetMolecularCalculator:
         self.config = normalize_config(config)
         self.generator = generator or LoQIGenerator(
             self.config,
-            reuse_seeds=config.also_calculate_gas,
+            reuse_seeds=bool(config.also_calculate_gas or config.reference_table),
         )
         self._identity = None
         self._water = None
