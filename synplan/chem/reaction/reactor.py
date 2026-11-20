@@ -33,6 +33,7 @@ ROUTE_ATOM_MAPPING_CONTRACT = "route-origin-v1"
 ATOM_ORIGINS_META = "_synplan_atom_origins"
 LEGACY_ATOM_MAPS_META = "_synplan_legacy_atom_maps"
 ATOM_MAPPING_STATE_META = "_synplan_atom_mapping_state"
+_HAS_ISOTOPES_META = "_synplan_has_isotopes"
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +80,9 @@ def initialize_atom_origins(molecule: MoleculeContainer) -> AtomMappingState:
         state.map_ceiling,
         state.origin_ceiling,
     )
+    molecule.meta[_HAS_ISOTOPES_META] = any(
+        atom.isotope is not None for atom in molecule._atoms.values()
+    )
     return state
 
 
@@ -121,6 +125,10 @@ def copy_atom_mapping_metadata(
         )
     else:
         target.meta.pop(ATOM_MAPPING_STATE_META, None)
+    if _HAS_ISOTOPES_META in source.meta:
+        target.meta[_HAS_ISOTOPES_META] = source.meta[_HAS_ISOTOPES_META]
+    else:
+        target.meta.pop(_HAS_ISOTOPES_META, None)
 
 
 class Reaction(ReactionContainer):
@@ -153,6 +161,20 @@ class CanonicalRetroReactor(Reactor):
         super().__init__(*args, **kwargs)
         if reconcile_mapping:
             self._atom_identity_plan = self._classify_atom_identities()
+            self._preserves_atom_identities = (
+                self._atom_identity_plan is not None
+                and not any(self._atom_identity_plan)
+            )
+            self._preserves_nonisotopic_atom_identities = (
+                self._atom_identity_plan is not None
+                and not any(self._atom_identity_plan[:2])
+                and all(
+                    product._atoms[position].isotope is None
+                    for position in self._atom_identity_plan[2]
+                    for product in self._products
+                    if product.has_atom(position)
+                )
+            )
 
     @property
     def reconcile_mapping(self) -> bool:
@@ -236,6 +258,24 @@ class CanonicalRetroReactor(Reactor):
     ) -> Iterator[ReactionContainer]:
         if not structures:
             return
+        if (
+            self._can_preserve_atom_identities(structures)
+            and not include_reactant_provenance
+            and atom_mapping_state is not None
+            and len(structures) == 1
+            and ATOM_ORIGINS_META in structures[0].meta
+        ):
+            # The MCTS hot path already owns validated provenance.  Avoid the
+            # native context and allocator entirely, so non-matching Top-50
+            # rules differ from baseline only by this constant-time branch.
+            yield from self._iterate_identity_preserving(
+                structures,
+                atom_mapping_state,
+                structures[0].meta[ATOM_ORIGINS_META],
+                structures[0].meta.get(LEGACY_ATOM_MAPS_META, {}),
+                include_reactant_provenance=False,
+            )
+            return
         # ``apply_reaction_rule`` requests no reactant provenance on the MCTS
         # hot path.  Such inputs are node-owned native molecules whose complete
         # metadata and ceilings were established at root creation or by the
@@ -312,11 +352,97 @@ class CanonicalRetroReactor(Reactor):
             raise ValueError("native input maps do not have unique atom origins")
 
         context = _NativeMappingCall(state, combined_origins, combined_legacy)
-        yield from self._iterate_with_native_context(
-            structures,
-            context,
-            include_reactant_provenance=include_reactant_provenance,
+        if self._can_preserve_atom_identities(structures):
+            yield from self._iterate_identity_preserving(
+                structures,
+                context.state,
+                context.origins,
+                context.legacy_maps,
+                include_reactant_provenance=include_reactant_provenance,
+            )
+        else:
+            yield from self._iterate_with_native_context(
+                structures,
+                context,
+                include_reactant_provenance=include_reactant_provenance,
+            )
+
+    def _can_preserve_atom_identities(
+        self, structures: tuple[MoleculeContainer, ...]
+    ) -> bool:
+        if self._preserves_atom_identities:
+            return True
+        if not self._preserves_nonisotopic_atom_identities:
+            return False
+        for structure in structures:
+            has_isotopes = structure.meta.get(_HAS_ISOTOPES_META)
+            if has_isotopes is None:
+                has_isotopes = any(
+                    atom.isotope is not None for atom in structure._atoms.values()
+                )
+                structure.meta[_HAS_ISOTOPES_META] = has_isotopes
+            if has_isotopes:
+                return False
+        return True
+
+    @staticmethod
+    def _attach_preserved_provenance(
+        molecule: MoleculeContainer,
+        state: AtomMappingState,
+        origins: dict[int, int],
+        legacy_maps: dict[int, int],
+    ) -> None:
+        if molecule._atoms.keys() == origins.keys():
+            molecule_origins = origins
+        else:
+            molecule_origins = {
+                atom_number: origins[atom_number] for atom_number in molecule
+            }
+        molecule.meta[ATOM_ORIGINS_META] = molecule_origins
+        molecule.meta[ATOM_MAPPING_STATE_META] = (
+            state.map_ceiling,
+            state.origin_ceiling,
         )
+        molecule.meta[_HAS_ISOTOPES_META] = any(
+            atom.isotope is not None for atom in molecule._atoms.values()
+        )
+        if legacy_maps:
+            molecule_legacy = (
+                legacy_maps
+                if molecule._atoms.keys() == origins.keys()
+                else {
+                    atom_number: legacy_maps[atom_number]
+                    for atom_number in molecule
+                    if atom_number in legacy_maps
+                }
+            )
+            if molecule_legacy:
+                molecule.meta[LEGACY_ATOM_MAPS_META] = molecule_legacy
+            else:
+                molecule.meta.pop(LEGACY_ATOM_MAPS_META, None)
+        else:
+            molecule.meta.pop(LEGACY_ATOM_MAPS_META, None)
+
+    def _iterate_identity_preserving(
+        self,
+        structures: tuple[MoleculeContainer, ...],
+        state: AtomMappingState,
+        origins: dict[int, int],
+        legacy_maps: dict[int, int],
+        *,
+        include_reactant_provenance: bool,
+    ) -> Iterator[ReactionContainer]:
+        """Run an identity-preserving rule on Chython's baseline path."""
+
+        for reaction in super().__call__(*structures):
+            if include_reactant_provenance:
+                for reactant in reaction.reactants:
+                    self._attach_preserved_provenance(
+                        reactant, state, origins, legacy_maps
+                    )
+            for product in reaction.products:
+                self._attach_preserved_provenance(product, state, origins, legacy_maps)
+            yield reaction
 
     def _iterate_with_native_context(
         self,
@@ -355,7 +481,7 @@ class CanonicalRetroReactor(Reactor):
             yield reaction
 
     def _single_stage(self, chosen, ignored):
-        if not self.reconcile_mapping:
+        if not self.reconcile_mapping or self._can_preserve_atom_identities(chosen):
             yield from super()._single_stage(chosen, ignored)
             return
 
@@ -379,6 +505,9 @@ class CanonicalRetroReactor(Reactor):
                 product.meta[ATOM_MAPPING_STATE_META] = (
                     patch.state.map_ceiling,
                     patch.state.origin_ceiling,
+                )
+                product.meta[_HAS_ISOTOPES_META] = any(
+                    atom.isotope is not None for atom in product._atoms.values()
                 )
                 legacy = (
                     patch.legacy_maps
@@ -428,7 +557,9 @@ class CanonicalRetroReactor(Reactor):
 
     def canonical_patch(self, structure, mapping):
         new = super()._patcher(structure, mapping)
-        if self.reconcile_mapping:
+        if self.reconcile_mapping and not self._can_preserve_atom_identities(
+            (structure,)
+        ):
             self._allocate_native_mapping(structure, new, mapping)
         patched = new.copy() if has_stereo(new) else None
 
@@ -498,6 +629,18 @@ class CanonicalRetroReactor(Reactor):
                 mapping[template_position]
                 for template_position in product_only_positions
             )
+
+        if not fresh_old_maps and product._atoms.keys() == structure._atoms.keys():
+            # Bond/charge/H/stereo-only rules preserve every atom identity.  The
+            # lineage mappings are treated as immutable inside the search, so a
+            # single-product outcome can reuse them instead of allocating and
+            # populating two per-atom dictionaries for every candidate.  Split
+            # products are still given independent exact subsets in
+            # ``_single_stage`` below.
+            _ACTIVE_NATIVE_PATCH.set(
+                _NativePatch(call.state, call.origins, call.legacy_maps)
+            )
+            return
 
         if not fresh_old_maps and not call.legacy_maps:
             # The overwhelmingly common rule changes only bonds/charge/H/stereo.

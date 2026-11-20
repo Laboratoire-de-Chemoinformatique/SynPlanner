@@ -158,6 +158,34 @@ def test_isotope_loss_allocates_a_new_identity_while_charge_change_does_not():
     )
 
 
+def test_identity_preserving_rule_reuses_immutable_lineage_tables(monkeypatch):
+    molecule = smiles("CN")
+    state = initialize_atom_origins(molecule)
+    origins = molecule.meta[ATOM_ORIGINS_META]
+    legacy_maps = {next(iter(molecule)): 100}
+    molecule.meta[LEGACY_ATOM_MAPS_META] = legacy_maps
+    charge_rule = _reactor("[N:1]>>[N+:1]", native=True)
+    monkeypatch.setattr(
+        charge_rule,
+        "_allocate_native_mapping",
+        lambda *_: (_ for _ in ()).throw(
+            AssertionError("identity-preserving rule entered allocator")
+        ),
+    )
+
+    product = next(
+        apply_reaction_rule(
+            molecule,
+            charge_rule,
+            atom_mapping_state=state,
+        )
+    )[0]
+
+    assert set(product) == set(molecule)
+    assert product.meta[ATOM_ORIGINS_META] is origins
+    assert product.meta[LEGACY_ATOM_MAPS_META] is legacy_maps
+
+
 def test_multirule_carries_candidate_specific_mapping_state():
     molecule = smiles("OCCO")
     state = initialize_atom_origins(molecule)
